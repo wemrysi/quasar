@@ -667,11 +667,14 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](): Free[MapFunc[T, ?], A] =
       Free.roll(Constant[T, Free[MapFunc[T, ?], A]](EJson.fromCommon[T].apply(ejson.Null[T[EJson]]())))
 
-    def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Boolean = mf.resume.fold ({
-      case Constant(ej) => CommonEJson.prj(ej.project).fold(false) {
+    def isNull[T[_[_]]: Recursive](ej: T[EJson]): Boolean =
+      CommonEJson.prj(ej.project).fold(false) {
         case ejson.Null() => true
         case _ => false
-      }
+    }
+
+    def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Boolean = mf.resume.fold ({
+      case Constant(ej) => isNull(ej)
       case _ => false
     }, _ => false)
   }

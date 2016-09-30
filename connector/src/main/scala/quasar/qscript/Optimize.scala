@@ -273,7 +273,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[F]] => F[T[F]] =
-    (Normalizable[F].normalize(_: F[T[F]])) ⋙
+    repeatedly(Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideOneSidedJoin[F, F](rebaseT[F])) ⋙
       repeatedly(C.coalesce(idPrism)) ⋙
@@ -299,7 +299,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
+    repeatedly(Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideOneSidedJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
       repeatedly(C.coalesce[CoEnv[Hole, F, ?]](coenvPrism)) ⋙
