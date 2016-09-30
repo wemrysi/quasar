@@ -49,6 +49,8 @@ sealed trait Type extends Product with Serializable { self =>
     case x @ Coproduct(_, _) => x.flatten.reduce(Type.glb)
   }
 
+  // FIXME: Using `≟` here causes runtime errors.
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   final def ⨿ (that: Type): Type =
     if (this == that) this else Coproduct(this, that)
 
@@ -262,19 +264,23 @@ trait TypeInstances {
 object Type extends TypeInstances {
   type SemanticResult[A] = ValidationNel[SemanticError, A]
 
-  private def fail[A](expected: Type, actual: Type, message: Option[String]): SemanticResult[A] =
+  private def fail0[A](expected: Type, actual: Type, message: Option[String])
+      : SemanticResult[A] =
     Validation.failure(NonEmptyList(TypeError(expected, actual, message)))
 
-  private def fail[A](expected: Type, actual: Type): SemanticResult[A] = fail(expected, actual, None)
+  private def fail[A](expected: Type, actual: Type): SemanticResult[A] =
+    fail0(expected, actual, None)
 
-  private def fail[A](expected: Type, actual: Type, msg: String): SemanticResult[A] = fail(expected, actual, Some(msg))
+  private def failMsg[A](expected: Type, actual: Type, msg: String)
+      : SemanticResult[A] =
+    fail0(expected, actual, Some(msg))
 
   private def succeed[A](v: A): SemanticResult[A] = Validation.success(v)
 
   def simplify(tpe: Type): Type = mapUp(tpe) {
     case x @ Coproduct(_, _) => {
       val ts = x.flatten.toList.filter(_ != Bottom)
-      if (ts.contains(Top)) Top else Coproduct(ts.distinct)
+      if (ts.contains(Top)) Top else Coproduct.fromSeq(ts.distinct)
     }
     case x => x
   }
@@ -299,15 +305,15 @@ object Type extends TypeInstances {
 
       case (Top, _)    => succeed(())
       case (_, Bottom) => succeed(())
-      case (_, Top)    => fail(superType, subType, "Top is not a subtype of anything")
-      case (Bottom, _) => fail(superType, subType, "Bottom is not a supertype of anything")
+      case (_, Top)    => failMsg(superType, subType, "Top is not a subtype of anything")
+      case (Bottom, _) => failMsg(superType, subType, "Bottom is not a supertype of anything")
 
       case (superType @ Coproduct(_, _), subType @ Coproduct(_, _)) =>
         typecheckCC(superType.flatten, subType.flatten)
       case (Arr(elem1), Arr(elem2)) =>
         if (elem1.length <= elem2.length)
           Zip[List].zipWith(elem1, elem2)(typecheck).concatenate
-        else fail(superType, subType, "subtype must be at least as long")
+        else failMsg(superType, subType, "subtype must be at least as long")
       case (FlexArr(supMin, supMax, superType), Arr(elem2))
           if supMin <= elem2.length =>
         typecheck(superType, elem2.concatenate(TypeOrMonoid))
@@ -396,7 +402,7 @@ object Type extends TypeInstances {
       case x @ Coproduct(_, _) =>
         for {
           xs <- x.flatten.toList.traverse(loop)
-          v2 <- f(Coproduct(xs))
+          v2 <- f(Coproduct.fromSeq(xs))
         } yield v2
 
       case _ => f(v)
@@ -456,7 +462,7 @@ object Type extends TypeInstances {
     }
   }
   object Coproduct {
-    def apply(values: Seq[Type]): Type = {
+    def fromSeq(values: Seq[Type]): Type = {
       if (values.isEmpty) Bottom
       else values.tail.foldLeft[Type](values.head)(_ ⨿ _)
     }

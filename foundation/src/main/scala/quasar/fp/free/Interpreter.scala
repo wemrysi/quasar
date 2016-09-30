@@ -67,23 +67,35 @@ class Interpreter[F[_], M[_]: Monad](val interpretTerm: F ~> M) {
   }
 }
 
-/** Extends Interpreter to provide a version with better type inference for commonly used `MonadTrans`
-  * @param interpretTerm A natural transformation from the Algebra into the desired `Monad` from which
-  *                      many other natural transformations can be derived
-  * @tparam F The type of the `Functor` that represents the algebra to be interpreted
+/** Extends Interpreter to provide a version with better type inference for
+  * commonly used `MonadTrans`
+  * @param interpretTerm A natural transformation from the Algebra into the
+  *                      desired `Monad` from which many other natural
+  *                      transformations can be derived
+  * @tparam F The type of the `Functor` that represents the algebra to be
+  *           interpreted
   * @tparam M The `Monad` into which to translate the `Free` Algebra
   */
-class SpecializedInterpreter[F[_], M[_]: Monad](interpretTerm: F ~> M) extends Interpreter(interpretTerm) {
-  def runLog[E,A](p: Process[EitherT[Program,E,?],A])(implicit catchable: Catchable[M]): EitherT[M,E,Vector[A]] = {
-    type T[Program[_],A] = EitherT[Program,E,A]
-    runLogT[T,A](p)
+class SpecializedInterpreter[F[_], M[_]: Monad](interpretTerm: F ~> M)
+    extends Interpreter(interpretTerm) {
+  def runLogE[E, A]
+    (p: Process[EitherT[Program, E, ?], A])
+    (implicit catchable: Catchable[M])
+      : EitherT[M, E, Vector[A]] = {
+    type T[Program[_], A] = EitherT[Program, E, A]
+    runLogT[T, A](p)
   }
-  def runLog[E,L:Monoid,A](p: Process[EitherT[WriterT[Program,L,?],E,?],A])(implicit catchable: Catchable[M]): EitherT[WriterT[M,L,?],E,Vector[A]] = {
-    type T1[M[_],A] = EitherT[M,E,A]
-    type T2[M[_],A] = WriterT[M,L,A]
-    type WriterResult[A] = T2[M,A]
-    type ResultT[A] = T1[T2[M,?],A]
-    val catchableR: Catchable[ResultT] = eitherTCatchable[WriterResult,E](writerTCatchable[M,L], WriterT.writerTFunctor[M,L])
-    runLogT2[T1,T2,A](p)(Hoist[T1],Hoist[T2],catchableR)
+
+  def runLogWE[E, L: Monoid, A]
+    (p: Process[EitherT[WriterT[Program, L, ?], E, ?], A])
+    (implicit catchable: Catchable[M])
+      : EitherT[WriterT[M, L, ?], E, Vector[A]] = {
+    type T1[M[_], A] = EitherT[M, E, A]
+    type T2[M[_], A] = WriterT[M, L, A]
+    type WriterResult[A] = T2[M, A]
+    type ResultT[A] = T1[T2[M, ?], A]
+    val catchableR: Catchable[ResultT] =
+      eitherTCatchable[WriterResult, E](writerTCatchable[M, L], WriterT.writerTFunctor[M, L])
+    runLogT2[T1, T2, A](p)(Hoist[T1], Hoist[T2], catchableR)
   }
 }

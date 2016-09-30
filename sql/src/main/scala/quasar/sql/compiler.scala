@@ -326,27 +326,27 @@ trait Compiler[F[_]] {
         case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
-          for {
-            leftName <- CompilerState.freshName("left")
-            rightName <- CompilerState.freshName("right")
-            leftFree = LogicalPlan.Free(leftName)
-            rightFree = LogicalPlan.Free(rightName)
-            left0 <- compileRelation(left)
-            right0 <- compileRelation(right)
-            join <- CompilerState.contextual(
-              BindingContext(Map()),
-              tableContext(leftFree, left) ++ tableContext(rightFree, right))(
-              compile0(clause).map(c =>
-                LogicalPlan.Invoke(
-                  tpe match {
-                    case LeftJoin             => LeftOuterJoin
-                    case quasar.sql.InnerJoin => InnerJoin
-                    case RightJoin            => RightOuterJoin
-                    case FullJoin             => FullOuterJoin
-                  },
-                  Func.Input3(leftFree, rightFree, c))))
-          } yield LogicalPlan.Let(leftName, left0,
-            LogicalPlan.Let(rightName, right0, join))
+          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
+            val leftFree = LogicalPlan.Free(leftName)
+            val rightFree = LogicalPlan.Free(rightName)
+
+            (compileRelation(left) ⊛
+              compileRelation(right) ⊛
+              CompilerState.contextual(
+                BindingContext(Map()),
+                tableContext(leftFree, left) ++ tableContext(rightFree, right))(
+                compile0(clause).map(c =>
+                  LogicalPlan.Invoke(
+                    tpe match {
+                      case LeftJoin             => LeftOuterJoin
+                      case quasar.sql.InnerJoin => InnerJoin
+                      case RightJoin            => RightOuterJoin
+                      case FullJoin             => FullOuterJoin
+                    },
+                    Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
+              LogicalPlan.Let(leftName, left0,
+                LogicalPlan.Let(rightName, right0, join)))
+            }).join
       }
 
     node.tail match {
@@ -409,12 +409,12 @@ trait Compiler[F[_]] {
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
-                            for {
-                              t <- CompilerState.rootTableReq
-                              flat = names.foldMap(_.toList)
-                              keys <- CompilerState.addFields(flat)(orderBy.keys.traverse { case (_, key) => compile0(key) })
-                              orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.shows)) }
-                            } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
+                            (CompilerState.rootTableReq ⊛
+                              CompilerState.addFields(names.foldMap(_.toList))(orderBy.keys.traverse { case (_, key) => compile0(key) }))((t, keys) =>
+                              Fix(OrderBy(
+                                t,
+                                Fix(MakeArrayN(keys: _*)),
+                                Fix(MakeArrayN(orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.shows)) }: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
