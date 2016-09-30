@@ -1,0 +1,1 @@
+- fix a flaky Config test by cleaning up the generator

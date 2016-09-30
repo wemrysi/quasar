@@ -18,6 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef.Map
 import quasar.contrib.pathy.{APath, PathArbitrary}
+import quasar.scalacheck._
 
 // NB: Something in here is needed by scalacheck's Arbitrary defs
 //     for scala collections.
@@ -29,7 +30,9 @@ trait MountingsConfigArbitrary {
   import MountConfigArbitrary._, PathArbitrary._
 
   implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig] =
-    Arbitrary(arbitrary[Map[APath, MountConfig]] map (MountingsConfig(_)))
+    // NB: this is a map, and MountConfig contains a map, so if the size isn't
+    // reined in we get gigantic configs.
+    Arbitrary(scaleSize(arbitrary[Map[APath, MountConfig]], scaleLinear(5)) map (MountingsConfig(_)))
 }
 
 object MountingsConfigArbitrary extends MountingsConfigArbitrary
