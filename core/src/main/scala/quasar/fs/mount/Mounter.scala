@@ -74,36 +74,34 @@ object Mounter {
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
       }
 
-    new (Mounting ~> FreeS) {
-      def apply[A](ma: Mounting[A]) = ma match {
-        case HavingPrefix(dir) =>
-          mountConfigs.keys flatMap { paths =>
-            paths.foldLeftM(Map[APath, MountType]())((m, p) =>
-              if (((dir: APath) =/= p) && p.relativeTo(dir).isDefined)
-                lookupType(p).map(m.updated(p, _)).getOrElse(m)
-              else
-                m.point[FreeS])
-          }
+    λ[Mounting ~> FreeS] {
+      case HavingPrefix(dir) =>
+        mountConfigs.keys flatMap { paths =>
+          paths.foldLeftM(Map[APath, MountType]())((m, p) =>
+            if (((dir: APath) =/= p) && p.relativeTo(dir).isDefined)
+              lookupType(p).map(m.updated(p, _)).getOrElse(m)
+            else
+              m.point[FreeS])
+        }
 
-        case LookupType(path) =>
-          lookupType(path).run
+      case LookupType(path) =>
+        lookupType(path).run
 
-        case LookupConfig(path) =>
-          mountConfigs.get(path).run
+      case LookupConfig(path) =>
+        mountConfigs.get(path).run
 
-        case MountView(loc, query, vars) =>
-          handleRequest(MountRequest.mountView(loc, query, vars)).run
+      case MountView(loc, query, vars) =>
+        handleRequest(MountRequest.mountView(loc, query, vars)).run
 
-        case MountFileSystem(loc, typ, uri) =>
-          handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
+      case MountFileSystem(loc, typ, uri) =>
+        handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
 
-        case Unmount(path) =>
-          mountConfigs.get(path)
-            .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
-            .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
-            .toRight(pathNotFound(path))
-            .run
-      }
+      case Unmount(path) =>
+        mountConfigs.get(path)
+          .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
+          .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
+          .toRight(pathNotFound(path))
+          .run
     }
   }
 
@@ -111,19 +109,15 @@ object Mounter {
     *
     * Useful in scenarios where only the bookkeeping of mounts is needed.
     */
-  def trivial[S[_]](implicit S: MountConfigs :<: S): Mounting ~> Free[S, ?] =
-    new (Mounting ~> Free[S, ?]) {
-      type F[A] = Coproduct[Id, S, A]
-      type M[A] = Free[S, A]
-      val mnt = Mounter[Id, F](κ(().right), κ(()))
-      def apply[A](m: Mounting[A]) =
-        mnt(m).foldMap[M](pointNT[M] :+: liftFT[S])
-    }
+  def trivial[S[_]](implicit S: MountConfigs :<: S) = {
+    type F[A] = Coproduct[Id, S, A]
+    val mnt   = Mounter[Id, F](κ(().right), κ(()))
 
-  ////
+    λ[Mounting ~> Free[S, ?]](m => mnt(m) foldMap (pointNT[Free[S, ?]] :+: liftFT[S]))
+  }
 
   private val pathNotFound = MountingError.pathError composePrism PathError.pathNotFound
-  private val pathExists = MountingError.pathError composePrism PathError.pathExists
+  private val pathExists   = MountingError.pathError composePrism PathError.pathExists
 
   private def mkMountRequest(path: APath, cfg: MountConfig): Option[MountRequest] =
     refineType(path).fold(

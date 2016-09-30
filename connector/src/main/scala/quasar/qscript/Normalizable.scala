@@ -35,7 +35,5 @@ trait NormalizableInstances {
 }
 
 object Normalizable extends NormalizableInstances {
-  /** It would be nice to be able to write a method like this, but it crashes scalac.
-  def make[F[X]](nt: EndoK[F]): Normalizable[F] = new Normalizable[F] { def normalize = nt }
-   */
+  def make[F[_]](f: EndoK[F]): Normalizable[F] = new Normalizable[F] { val normalize = f }
 }

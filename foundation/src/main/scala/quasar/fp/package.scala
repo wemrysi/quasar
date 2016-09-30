@@ -365,27 +365,12 @@ package object fp
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
 
-  sealed trait Polymorphic[F[_], TC[_]] {
-    def apply[A: TC]: TC[F[A]]
-  }
-
-  @typeclass trait ShowF[F[_]] {
-    def show[A](fa: F[A])(implicit sa: Show[A]): Cord
-  }
-
   implicit def ShowShowF[F[_], A: Show, FF[A] <: F[A]](implicit FS: ShowF[F]):
       Show[FF[A]] =
     new Show[FF[A]] { override def show(fa: FF[A]) = FS.show(fa) }
 
   implicit def ShowFNT[F[_]](implicit SF: ShowF[F]) =
     λ[Show ~> λ[α => Show[F[α]]]](st => ShowShowF(st, SF))
-
-  @typeclass trait EqualF[F[_]] {
-    @op("≟", true) def equal[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]):
-        Boolean
-    @op("≠") def notEqual[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]) =
-      !equal(fa1, fa2)
-  }
 
   implicit def EqualEqualF[F[_], A: Equal, FF[A] <: F[A]](implicit FE: EqualF[F]):
       Equal[FF[A]] =
@@ -396,10 +381,6 @@ package object fp
     new (Equal ~> λ[α => Equal[F[α]]]) {
       def apply[α](eq: Equal[α]): Equal[F[α]] = EqualEqualF(eq, EF)
     }
-
-  @typeclass trait SemigroupF[F[_]] {
-    @op("⊹", true) def append[A: Semigroup](fa1: F[A], fa2: F[A]): F[A]
-  }
 
   def unzipDisj[A, B](ds: List[A \/ B]): (List[A], List[B]) = {
     val (as, bs) = ds.foldLeft((List[A](), List[B]())) {
@@ -428,26 +409,6 @@ package object fp
   def pointNT[F[_]: Applicative] = λ[Id ~> F](Applicative[F] point _)
 
   def evalNT[F[_]: Monad, S](initial: S) = λ[StateT[F, S, ?] ~> F](_ eval initial)
-
-  /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
-    *
-    * NB: Uses partial application of `F[_]` for better type inference, usage:
-    *
-    *   `zoomNT[F](lens)`
-    */
-  object zoomNT {
-    def apply[F[_]]: Aux[F] =
-      new Aux[F]
-
-    final class Aux[F[_]] {
-      type ST[S, A] = StateT[F, S, A]
-      def apply[A, B](lens: Lens[A, B])(implicit M: Monad[F]): ST[B, ?] ~> ST[A, ?] =
-        new (ST[B, ?] ~> ST[A, ?]) {
-          def apply[C](s: ST[B, C]) =
-            StateT((a: A) => s.run(lens.get(a)).map(_.leftMap(lens.set(_)(a))))
-        }
-    }
-  }
 
   def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
       G[A] => G[A] =
@@ -533,17 +494,6 @@ package object fp
   def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
     interpret(ι, φ)
 
-  object Inj {
-    def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
-      F.prj(g)
-  }
-
-  @typeclass trait EqualT[T[_[_]]] {
-    def equal[F[_]](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F]): Boolean
-    def equalT[F[_]](delay: Delay[Equal, F]): Equal[T[F]] =
-      Equal.equal[T[F]](equal[F](_, _)(delay))
-  }
-
   implicit val equalTFix: EqualT[Fix] = new EqualT[Fix] {
     def equal[F[_]](tf1: Fix[F], tf2: Fix[F])(implicit del: Delay[Equal, F]): Boolean =
       del(equalT[F](del)).equal(tf1.unFix, tf2.unFix)
@@ -552,15 +502,6 @@ package object fp
   implicit def equalTEqual[T[_[_]], F[_]](implicit T: EqualT[T], F: Delay[Equal, F]):
       Equal[T[F]] =
     T.equalT[F](F)
-
-  @typeclass trait ShowT[T[_[_]]] {
-    def show[F[_]](tf: T[F])(implicit del: Delay[Show, F]): Cord =
-      Cord(shows(tf))
-    def shows[F[_]](tf: T[F])(implicit del: Delay[Show, F]): String =
-      show(tf).toString
-    def showT[F[_]](delay: Delay[Show, F]): Show[T[F]] =
-      Show.show[T[F]](show[F](_)(delay))
-  }
 
   implicit val showTFix: ShowT[Fix] = new ShowT[Fix] {
     override def show[F[_]](tf: Fix[F])(implicit del: Delay[Show, F]): Cord =
@@ -665,4 +606,55 @@ package object fp
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
     λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
   )
+}
+
+package fp {
+  @typeclass
+  trait ShowF[F[_]] {
+    def show[A](fa: F[A])(implicit sa: Show[A]): Cord
+  }
+  @typeclass
+  trait EqualF[F[_]] {
+    @op("≟", true) def equal[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]): Boolean
+    @op("≠") def notEqual[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]): Boolean = !equal(fa1, fa2)
+  }
+  @typeclass
+  trait SemigroupF[F[_]] {
+    @op("⊹", true) def append[A: Semigroup](fa1: F[A], fa2: F[A]): F[A]
+  }
+  @typeclass
+  trait EqualT[T[_[_]]] {
+    def equal[F[_]](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F]): Boolean
+    def equalT[F[_]](delay: Delay[Equal, F]): Equal[T[F]] = Equal.equal[T[F]](equal[F](_, _)(delay))
+  }
+  @typeclass
+  trait ShowT[T[_[_]]] {
+    def show[F[_]](tf: T[F])(implicit del: Delay[Show, F]): Cord    = Cord(shows(tf))
+    def shows[F[_]](tf: T[F])(implicit del: Delay[Show, F]): String = show(tf).toString
+    def showT[F[_]](delay: Delay[Show, F]): Show[T[F]]              = Show.show[T[F]](show[F](_)(delay))
+  }
+
+  /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
+    *
+    * NB: Uses partial application of `F[_]` for better type inference, usage:
+    *
+    *   `zoomNT[F](lens)`
+    */
+  object zoomNT {
+    def apply[F[_]]: Aux[F] =
+      new Aux[F]
+
+    final class Aux[F[_]] {
+      type ST[S, A] = StateT[F, S, A]
+      def apply[A, B](lens: Lens[A, B])(implicit M: Monad[F]): ST[B, ?] ~> ST[A, ?] =
+        new (ST[B, ?] ~> ST[A, ?]) {
+          def apply[C](s: ST[B, C]) =
+            StateT((a: A) => s.run(lens.get(a)).map(_.leftMap(lens.set(_)(a))))
+        }
+    }
+  }
+  object Inj {
+    def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
+      F.prj(g)
+  }
 }
