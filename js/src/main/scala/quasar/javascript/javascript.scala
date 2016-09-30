@@ -44,7 +44,7 @@ import scalaz._, Scalaz._
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-sealed trait Js {
+sealed trait Js extends Product with Serializable {
   def pprint(indent: Int): String = JavascriptPrinter.print(this, indent)
 }
 

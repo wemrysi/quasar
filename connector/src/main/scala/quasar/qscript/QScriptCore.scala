@@ -25,7 +25,7 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed abstract class QScriptCore[T[_[_]], A]
+sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 
 /** A data-level transformation.
   */
@@ -270,10 +270,9 @@ object QScriptCore {
                 EnvT((Ann(_,  _), LeftShift(_, struct2, repair2)))) =>
             val (repair, repL, repR) = concat(repair1, repair2)
 
-            val lFunc: FreeMap[IT] =
-              normalizable[IT].normalizeMapFunc(struct1 >> left)
-            val rFunc: FreeMap[IT] =
-              normalizable[IT].normalizeMapFunc(struct2 >> right)
+            val norm = TTypes.normalizable[T]
+            val lFunc: FreeMap[IT] = norm.freeMF(struct1 >> left)
+            val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
             val proj0: FreeMap[IT] =
               Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](0)))
@@ -316,48 +315,6 @@ object QScriptCore {
         }
     }
 
-  // show is needed for debugging
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
-      Normalizable[QScriptCore[T, ?]] =
-    new Normalizable[QScriptCore[T, ?]] {
-      val opt = new Optimize[T]
-
-      def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
-        def apply[A](qc: QScriptCore[T, A]) = qc match {
-          case Map(src, f) => Map(src, normalizeMapFunc(f))
-          case LeftShift(src, s, r) =>
-            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
-          case Reduce(src, bucket, reducers, repair) =>
-            val normBuck = normalizeMapFunc(bucket)
-            Reduce(
-              src,
-              // NB: all single-bucket reductions should reduce on `null`
-              normBuck.resume.fold({
-                case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
-                case _                    => normBuck
-              }, κ(normBuck)),
-              reducers.map(_.map(normalizeMapFunc(_))),
-              normalizeMapFunc(repair))
-          case Sort(src, bucket, order) =>
-            Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
-          case Union(src, l, r) =>
-            Union(
-              src,
-              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Filter(src, f) => Filter(src, normalizeMapFunc(f))
-          case Take(src, from, count) =>
-            Take(
-              src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Drop(src, from, count) =>
-            Drop(
-              src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Unreferenced() => Unreferenced()
-        }
-      }
-    }
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[QScriptCore[T, ?]] =
+    TTypes.normalizable[T].QScriptCore
 }

@@ -228,7 +228,7 @@ object Repl {
   def mountType[S[_]](path: APath)(implicit
     M: Mounting.Ops[S]
   ): Free[S, Option[String]] =
-    M.lookupType(path).map(_.fold(_.shows, "view")).run
+    M.lookupType(path).map(_.fold(_.value, "view")).run
 
   def printLog[S[_]](debugLevel: DebugLevel, log: Vector[PhaseResult])(implicit
     P: ConsoleIO.Ops[S]

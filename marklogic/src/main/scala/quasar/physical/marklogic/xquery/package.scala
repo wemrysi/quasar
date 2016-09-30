@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xquery.xml._
+import quasar.physical.marklogic.xml._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
@@ -28,6 +28,7 @@ import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 package object xquery {
@@ -60,7 +61,7 @@ package object xquery {
       Order.orderBy(_.value)
 
     implicit val show: Show[ParamName] =
-      Show.shows(_.xqy.toString)
+      Show.shows(_.xqy.shows)
   }
 
   final case class SequenceType(override val toString: String) extends scala.AnyVal
@@ -88,7 +89,7 @@ package object xquery {
   }
 
   def asArg(opt: Option[XQuery]): String =
-    opt.map(", " + _.toString).orZero
+    opt.map(", " + _.shows).orZero
 
   def declare(fname: QName): FunctionDecl.FunctionDeclDsl =
     FunctionDecl.FunctionDeclDsl(fname)
@@ -100,7 +101,7 @@ package object xquery {
     NameGenerator[F].prefixedName("$v")
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    XQuery(s"(${fa.toList.map(_.toString).intercalate(", ")})")
+    XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
@@ -109,7 +110,7 @@ package object xquery {
     ModuleImport(Some(NSPrefix(NCName(prefix))), NSUri(uri), locs.map(NSUri(_)).toIList)
 
   def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =
-    NamespaceDecl(NSPrefix(NCName(prefix)), NSUri(uri))
+    NamespaceDecl(Namespace(NSPrefix(NCName(prefix)), NSUri(uri)))
 
   def xmlElement(name: String, content: String): String =
     s"<$name>$content</$name>"

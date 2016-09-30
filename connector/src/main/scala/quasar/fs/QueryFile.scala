@@ -37,11 +37,9 @@ object QueryFile {
   final case class ResultHandle(run: Long) extends scala.AnyVal
 
   object ResultHandle {
-    implicit val resultHandleShow: Show[ResultHandle] =
-      Show.showFromToString
+    implicit val show: Show[ResultHandle] = Show.showFromToString
 
-    implicit val resultHandleOrder: Order[ResultHandle] =
-      Order.orderBy(_.run)
+    implicit val order: Order[ResultHandle] = Order.orderBy(_.run)
   }
 
   def convertAndNormalize
@@ -95,6 +93,13 @@ object QueryFile {
   private type QScriptInternal[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
+  implicit def qScriptInternalToQscriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptInternal[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
+        Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]])))
+
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
@@ -145,6 +150,13 @@ object QueryFile {
     type InterimQS[A] =
       (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
 
+    implicit val interimQsToQscriptTotal
+        : Injectable.Aux[InterimQS, QScriptTotal[T, ?]] =
+      Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+        Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
+          Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+            Injectable.inject[Const[Read[APath], ?], QScriptTotal[T, ?]])))
+
     val qs =
       merr.map(
         merr.bind(
@@ -161,19 +173,19 @@ object QueryFile {
   }
 
   /** The result of the query is stored in an output file
-    * instead of being returned to the user immidiately.
+    * instead of being returned to the user immediately.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
     extends QueryFile[(PhaseResults, FileSystemError \/ AFile)]
 
-  /** The result of the query is immidiately
+  /** The result of the query is immediately
     * streamed back to the client. This operation begins the streaming, in order
     * to continue the streaming, the client must make use of the `More` operation and
     * finally the `Close` operation in order to halt the streaming.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class EvaluatePlan(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultHandle)]
@@ -407,8 +419,8 @@ object QueryFile {
       def render(qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) => NonTerminal(List("ExecutePlan"), None, List(lp.render, out.render))
         case EvaluatePlan(lp)     => NonTerminal(List("EvaluatePlan"), None, List(lp.render))
-        case More(handle)         => Terminal(List("More"), handle.toString.some)
-        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+        case More(handle)         => Terminal(List("More"), handle.shows.some)
+        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
         case Explain(lp)          => NonTerminal(List("Explain"), None, List(lp.render))
         case ListContents(dir)    => NonTerminal(List("ListContents"), None, List(dir.render))
         case FileExists(file)     => NonTerminal(List("FileExists"), None, List(file.render))

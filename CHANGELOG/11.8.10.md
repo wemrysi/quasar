@@ -1,0 +1,1 @@
+- [#1450] fix handling of paths involving `+`

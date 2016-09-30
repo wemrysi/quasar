@@ -413,7 +413,7 @@ trait Compiler[F[_]] {
                               t <- CompilerState.rootTableReq
                               flat = names.foldMap(_.toList)
                               keys <- CompilerState.addFields(flat)(orderBy.keys.traverse { case (_, key) => compile0(key) })
-                              orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
+                              orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.shows)) }
                             } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
 
                           stepBuilder(sort) {

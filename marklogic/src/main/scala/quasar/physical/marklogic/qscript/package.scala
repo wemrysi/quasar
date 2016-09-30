@@ -27,9 +27,14 @@ import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
-  type MonadPlanErr[F[_]]            = MonadError_[F, MarkLogicPlannerError]
   type MarkLogicPlanErrT[F[_], A]    = EitherT[F, MarkLogicPlannerError, A]
   type MarkLogicPlanner[F[_], QS[_]] = Planner[F, QS, XQuery]
+
+  type MonadPlanErr[F[_]]            = MonadError_[F, MarkLogicPlannerError]
+
+  object MonadPlanErr {
+    def apply[F[_]](implicit F: MonadPlanErr[F]): MonadPlanErr[F] = F
+  }
 
   object MarkLogicPlanner {
     def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP

@@ -17,21 +17,38 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.ejson.EJson
+import quasar.fp.coproductShow
+import quasar.physical.marklogic.ErrorMessages
+
+import matryoshka.Fix
 import monocle.Prism
 import scalaz._
+import scalaz.std.string._
+import scalaz.syntax.foldable._
+import scalaz.syntax.show._
 
 sealed abstract class MarkLogicPlannerError
 
 object MarkLogicPlannerError {
   final case class InvalidQName(strLit: String) extends MarkLogicPlannerError
+  final case class UnrepresentableEJson(ejson: Fix[EJson], msgs: ErrorMessages) extends MarkLogicPlannerError
 
   val invalidQName = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidQName(s) => s
   } (InvalidQName)
 
+  val unrepresentableEJson = Prism.partial[MarkLogicPlannerError, (Fix[EJson], ErrorMessages)] {
+    case UnrepresentableEJson(ejs, msgs) => (ejs, msgs)
+  } (UnrepresentableEJson.tupled)
+
   implicit val show: Show[MarkLogicPlannerError] =
     Show.shows {
-      case InvalidQName(s) => s"'$s' is not a valid XML QName."
+      case InvalidQName(s) =>
+        s"'$s' is not a valid XML QName."
+
+      case UnrepresentableEJson(ejs, msgs) =>
+        s"'${ejs.shows}' does not have an XQuery representation: ${msgs.intercalate(", ")}"
     }
 }
 

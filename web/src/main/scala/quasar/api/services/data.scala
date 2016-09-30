@@ -94,7 +94,9 @@ object data {
     refineType(path).fold(
       dirPath => {
         val p = zippedContents[S](dirPath, format, offset, limit)
-        val headers = `Content-Type`(MediaType.`application/zip`) :: format.disposition.toList
+        val headers =
+          `Content-Type`(MediaType.`application/zip`) ::
+            (format.disposition.toList: List[Header])
         QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p))
       },
       filePath => formattedDataResponse(format, R.scan(filePath, offset, limit)))

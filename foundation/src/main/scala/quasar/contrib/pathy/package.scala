@@ -95,12 +95,14 @@ package object pathy {
     rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(
       abs => (abs relativeTo rootDir).map(p => (rootDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]),
       rel => (rel relativeTo currentDir).map(p => (currentDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]))
 
   // TODO[pathy]: Offer clean API in pathy to do this
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def refineTypeAbs[T,S](path: Path[_,T,S]): Path[Abs,T,S] \/ Path[Rel,T,S] = {
     if (path.isAbsolute) path.asInstanceOf[Path[Abs,T,S]].left
     else path.asInstanceOf[Path[Rel,T,S]].right

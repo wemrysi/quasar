@@ -124,7 +124,7 @@ abstract class ExpandDirsInstances {
           file => OutToF(wrapRead[F](file)).point[M])
     }
 
-  implicit def shiftedRead[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def shiftedReadPath[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (implicit
       SR: Const[ShiftedRead[AFile], ?] :<: F,
       QC:            QScriptCore[T, ?] :<: F,
@@ -227,11 +227,12 @@ abstract class ExpandDirsInstances {
     default
 
   implicit def shiftedReadFile[T[_[_]], F[_]]
-    (implicit R: Const[ShiftedRead[AFile], ?] :<: F)
+    (implicit SR: Const[ShiftedRead[AFile], ?] :<: F)
       : ExpandDirs.Aux[T, Const[ShiftedRead[AFile], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]](implicit PB: ProjectBucket[T, ?] :<: F)
+  implicit def projectBucket[T[_[_]], F[_]]
+    (implicit PB: ProjectBucket[T, ?] :<: F)
       : ExpandDirs.Aux[T, ProjectBucket[T, ?], F] =
     default
 }

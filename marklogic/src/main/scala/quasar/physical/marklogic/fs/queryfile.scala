@@ -17,7 +17,9 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, Planner => QPlanner}
+import quasar.{Data, LogicalPlan, Planner => QPlanner}
+import quasar.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.RenderTree.ops._
 import quasar.SKI.κ
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -55,7 +57,15 @@ object queryfile {
       f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type M[A] = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+      type MLQScript0[A]     = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
+      type MLQScript[A]      = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+      implicit val mlQScripToQScriptTotal: Injectable.Aux[MLQScript, QScriptTotal[Fix, ?]] =
+        Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
+          Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
+            Injectable.inject[Const[ShiftedRead[AFile], ?], QScriptTotal[Fix, ?]]))
+      type MLPlan[A]         = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+      type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+      type QSR[A]            = QScriptRead[Fix, A]
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
@@ -64,34 +74,41 @@ object queryfile {
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", main.render))
 
-      val listContents: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
+      val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      type MLQScript0[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
-      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
-
       def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
-        qs.cataM(MarkLogicPlanner[M, MLQScript].plan).run map {
+        qs.cataM(MarkLogicPlanner[MLPlan, MLQScript].plan).run map {
           case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
         }
 
+      val linearize: Algebra[MLQScript, List[MLQScript[ExternallyManaged]]] =
+        qsr => qsr.as[ExternallyManaged](Extern) :: Foldable[MLQScript].fold(qsr)
+
       val planning = for {
-        qs  <- convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?], QScriptRead[Fix, ?]](listContents)(lp)
-        shifted <- transFutu(qs)(ShiftRead[Fix, QScriptRead[Fix, ?], MLQScript0].shiftRead(idPrism.reverseGet)((_: QScriptRead[Fix, Fix[QScriptRead[Fix, ?]]])))
-          .transCataM(ExpandDirs[Fix, MLQScript0, MLQScript].expandDirs(idPrism.reverseGet, listContents))
-          .map(_.transCata(optimize.applyAll))
-        mod <- plan(shifted).leftMap(mlerr => mlerr match {
-          case InvalidQName(s) =>
-            FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
-              // TODO: Change to include the QScript context when supported
-              LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
-        })
-        a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
+        qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
+        shifted <- transFutu(qs)(ShiftRead[Fix, QSR, MLQScript0].shiftRead(idPrism.reverseGet)(_: QSR[Fix[QSR]]))
+                     .transCataM(ExpandDirs[Fix, MLQScript0, MLQScript].expandDirs(idPrism.reverseGet, listContents)) ∘
+                     (_.transCata(optimize.applyAll))
+        shftdRT =  shifted.cata(linearize).reverse.render
+        _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
+                     PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
+        mod     <- plan(shifted).leftMap(mlerr => mlerr match {
+                     case InvalidQName(s) =>
+                       FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
+                         // TODO: Change to include the QScript context when supported
+                         LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+
+                     case UnrepresentableEJson(ejs, _) =>
+                       FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
+                   })
+        a       <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 
       planning.run.run
     }
 
+    // FIXME: Actually write-back to MarkLogic
     def exec(lp: Fix[LogicalPlan], out: AFile) =
       plannedLP(lp)(κ(out.point[ContentSourceIO]))
 

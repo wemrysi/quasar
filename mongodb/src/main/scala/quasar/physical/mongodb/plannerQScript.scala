@@ -866,13 +866,15 @@ object MongoDbQScriptPlanner {
     freeCataM(free)(
       interpretM[StateT[OutputM, NameGen, ?], QScriptTotal[T, ?], qscript.Hole, WorkflowBuilder[WF]](κ(StateT.stateT(src)), F.plan(joinHandler, funcHandler)))
 
+  // TODO: Need `Delay[Show, WorkflowBuilder]`
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def HasLiteral[WF[_]]: WorkflowBuilder[WF] => OutputM[Bson] =
     wb => asLiteral(wb) \/> FuncApply("", "literal", wb.toString)
 
   def HasInt[WF[_]]: WorkflowBuilder[WF] => OutputM[Long] = HasLiteral(_) >>= {
     case Bson.Int32(v) => \/-(v.toLong)
     case Bson.Int64(v) => \/-(v)
-    case x => -\/(FuncApply("", "64-bit integer", x.toString))
+    case x => -\/(FuncApply("", "64-bit integer", x.shows))
   }
 
   // This is maybe worth putting in Matryoshka?
@@ -940,9 +942,20 @@ object MongoDbQScriptPlanner {
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
+    /** MonogDB’s preferred form of QScript.
+      */
     type MongoQScript[A] =
       (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
 
+    implicit val mongoQScripToQScriptTotal
+        : Injectable.Aux[MongoQScript, QScriptTotal[T, ?]] =
+      Injectable.coproduct(
+        Injectable.inject[QScriptCore[T, ?],              QScriptTotal[T, ?]],
+        Injectable.coproduct(
+          Injectable.inject[EquiJoin[T, ?],               QScriptTotal[T, ?]],
+          Injectable.inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]]))
+
+    // NB: Intermediate forms of QScript between the standard form and Mongo’s.
     type MongoQScript1[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
     type MongoQScript0[A] = (Const[Read[APath], ?] :/: MongoQScript1)#M[A]
 

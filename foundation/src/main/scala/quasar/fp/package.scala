@@ -93,13 +93,13 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
       def render(v: List[A]) = NonTerminal(List("List"), None, v.map(RA.render))
     }
 
-  implicit def ListMapRenderTree[K, V](implicit RV: RenderTree[V]):
+  implicit def ListMapRenderTree[K: Show, V](implicit RV: RenderTree[V]):
       RenderTree[ListMap[K, V]] =
     new RenderTree[ListMap[K, V]] {
       def render(v: ListMap[K, V]) =
         NonTerminal("Map" :: Nil, None,
           v.toList.map { case (k, v) =>
-            NonTerminal("Key" :: "Map" :: Nil, Some(k.toString), RV.render(v) :: Nil)
+            NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
           })
     }
 
@@ -113,13 +113,13 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
     }
 
   implicit val BooleanRenderTree: RenderTree[Boolean] =
-    RenderTree.fromToString[Boolean]("Boolean")
+    RenderTree.fromShow[Boolean]("Boolean")
   implicit val IntRenderTree: RenderTree[Int] =
-    RenderTree.fromToString[Int]("Int")
+    RenderTree.fromShow[Int]("Int")
   implicit val DoubleRenderTree: RenderTree[Double] =
-    RenderTree.fromToString[Double]("Double")
+    RenderTree.fromShow[Double]("Double")
   implicit val StringRenderTree: RenderTree[String] =
-    RenderTree.fromToString[String]("String")
+    RenderTree.fromShow[String]("String")
 
   implicit val SymbolEqual: Equal[Symbol] = Equal.equalA
 
@@ -390,11 +390,8 @@ package object fp
       Show[FF[A]] =
     new Show[FF[A]] { override def show(fa: FF[A]) = FS.show(fa) }
 
-  implicit def ShowFNT[F[_]](implicit SF: ShowF[F]):
-      Show ~> λ[α => Show[F[α]]] =
-    new (Show ~> λ[α => Show[F[α]]]) {
-      def apply[α](st: Show[α]): Show[F[α]] = ShowShowF(st, SF)
-    }
+  implicit def ShowFNT[F[_]](implicit SF: ShowF[F]) =
+    λ[Show ~> λ[α => Show[F[α]]]](st => ShowShowF(st, SF))
 
   @typeclass trait EqualF[F[_]] {
     @op("≟", true) def equal[A](fa1: F[A], fa2: F[A])(implicit eq: Equal[A]):
@@ -432,29 +429,18 @@ package object fp
     */
   def ignore[A](a: A): Unit = ()
 
-  def reflNT[F[_]]: F ~> F =
-    NaturalTransformation.refl[F]
+  def reflNT[F[_]] = λ[F ~> F](x => x)
 
   /** `liftM` as a natural transformation
     *
     * TODO: PR to scalaz
     */
-  def liftMT[F[_]: Monad, G[_[_], _]: MonadTrans]: F ~> G[F, ?] =
-    new (F ~> G[F, ?]) {
-      def apply[A](fa: F[A]) = fa.liftM[G]
-    }
+  def liftMT[F[_]: Monad, G[_[_], _]: MonadTrans] = λ[F ~> G[F, ?]](_.liftM[G])
 
   /** `point` as a natural transformation */
-  def pointNT[F[_]: Applicative]: Id ~> F =
-    new (Id ~> F) {
-      def apply[A](a: A) = Applicative[F].point(a)
-    }
+  def pointNT[F[_]: Applicative] = λ[Id ~> F](Applicative[F] point _)
 
-  def evalNT[F[_]: Monad, S](initial: S): StateT[F, S, ?] ~> F =
-    new (StateT[F, S, ?] ~> F) {
-      def apply[A](sa: StateT[F, S, A]): F[A] =
-        sa.eval(initial)
-    }
+  def evalNT[F[_]: Monad, S](initial: S) = λ[StateT[F, S, ?] ~> F](_ eval initial)
 
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
     *
@@ -689,16 +675,12 @@ package object fp
     co => co.run.fold(κ(co.point[M]), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
-    new (F ~> (Option ∘ F)#λ) {
-      def apply[A](fa: F[A]): Option[F[A]] = Some(fa)
-    },
-    NaturalTransformation.refl)
+    λ[F ~> (Option ∘ F)#λ](_.some),
+    reflNT[F]
+  )
 
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
-    new (CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]) {
-      def apply[B](coenv: CoEnv[A, F, B]): Option[F[B]] = coenv.run.toOption
-    },
-    new (F ~> CoEnv[A, F, ?]) {
-      def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
-    })
+    λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
+    λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
+  )
 }

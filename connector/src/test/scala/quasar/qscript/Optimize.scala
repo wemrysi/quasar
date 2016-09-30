@@ -43,6 +43,12 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
+  implicit def qsiToQscriptTotal[T[_[_]]]: Injectable.Aux[QSI, QScriptTotal[Fix, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
+      Injectable.coproduct(Injectable.inject[ProjectBucket[Fix, ?], QScriptTotal[Fix, ?]],
+        Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
+          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[Fix, ?]])))
+
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "optimizer" should {

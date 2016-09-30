@@ -66,9 +66,19 @@ package object qscript {
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
+  implicit def qScriptToQscriptTotal[T[_[_]]]: Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+        Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]]))
+
   /** QScript that has gone through Read conversion. */
   type QScriptRead[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
+
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+        Injectable.inject[Const[Read[APath], ?], QScriptTotal[T, ?]]))
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]

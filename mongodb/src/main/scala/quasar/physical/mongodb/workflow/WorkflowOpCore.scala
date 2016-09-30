@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 
 /** Ops that are provided by all supported MongoDB versions (since 2.6), or are
   * internal to quasar and supported everywhere. */
-sealed abstract class WorkflowOpCoreF[+A]
+sealed abstract class WorkflowOpCoreF[+A] extends Product with Serializable
 
 final case class $PureF(value: Bson) extends WorkflowOpCoreF[Nothing]
 object $pure {
@@ -919,20 +919,20 @@ object WorkflowOpCoreF {
       val wfType = "Workflow" :: Nil
 
       def render(v: WorkflowOpCoreF[Unit]) = v match {
-        case $PureF(value)       => Terminal("$PureF" :: wfType, Some(value.toString))
+        case $PureF(value)       => Terminal("$PureF" :: wfType, Some(value.shows))
         case $ReadF(coll)        => coll.render.copy(nodeType = "$ReadF" :: wfType)
         case $MatchF(_, sel)     =>
           NonTerminal("$MatchF" :: wfType, None, sel.render :: Nil)
         case $ProjectF(_, shape, xId) =>
           NonTerminal("$ProjectF" :: wfType, None,
             Reshape.renderReshape(shape) :+
-              Terminal(xId.toString :: "$ProjectF" :: wfType, None))
+              Terminal(xId.shows :: "$ProjectF" :: wfType, None))
         case $RedactF(_, value) => NonTerminal("$RedactF" :: wfType, None,
           value.render ::
             Nil)
         case $LimitF(_, count)  => Terminal("$LimitF" :: wfType, Some(count.shows))
         case $SkipF(_, count)   => Terminal("$SkipF" :: wfType, Some(count.shows))
-        case $UnwindF(_, field) => Terminal("$UnwindF" :: wfType, Some(field.toString))
+        case $UnwindF(_, field) => Terminal("$UnwindF" :: wfType, Some(field.shows))
         case $GroupF(_, grouped, -\/(by)) =>
           val nt = "$GroupF" :: wfType
           NonTerminal(nt, None,
@@ -953,13 +953,13 @@ object WorkflowOpCoreF {
           val nt = "$GeoNearF" :: wfType
           NonTerminal(nt, None,
             Terminal("Near" :: nt, Some(near.shows)) ::
-              Terminal("DistanceField" :: nt, Some(distanceField.toString)) ::
+              Terminal("DistanceField" :: nt, Some(distanceField.shows)) ::
               Terminal("Limit" :: nt, Some(limit.shows)) ::
               Terminal("MaxDistance" :: nt, Some(maxDistance.shows)) ::
-              Terminal("Query" :: nt, Some(query.toString)) ::
+              Terminal("Query" :: nt, query ∘ (_.shows)) ::
               Terminal("Spherical" :: nt, Some(spherical.shows)) ::
-              Terminal("DistanceMultiplier" :: nt, Some(distanceMultiplier.toString)) ::
-              Terminal("IncludeLocs" :: nt, Some(includeLocs.toString)) ::
+              Terminal("DistanceMultiplier" :: nt, distanceMultiplier ∘ (_.shows)) ::
+              Terminal("IncludeLocs" :: nt, includeLocs ∘ (_.shows)) ::
               Terminal("UniqueDocs" :: nt, Some(uniqueDocs.shows)) ::
               Nil)
 
