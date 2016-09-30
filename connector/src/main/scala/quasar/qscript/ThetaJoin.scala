@@ -91,20 +91,6 @@ object ThetaJoin {
         p2: EnvT[Ann[T], ThetaJoin[IT, ?], ExternallyManaged]) = None
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
-      Normalizable[ThetaJoin[T, ?]] =
-    new Normalizable[ThetaJoin[T, ?]] {
-      val opt = new Optimize[T]
-
-      def normalize = new (ThetaJoin[T, ?] ~> ThetaJoin[T, ?]) {
-        def apply[A](tj: ThetaJoin[T, A]) =
-          ThetaJoin(
-            tj.src,
-            freeTransCata(tj.lBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-            freeTransCata(tj.rBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-            normalizeMapFunc(tj.on),
-            tj.f,
-            normalizeMapFunc(tj.combine))
-      }
-    }
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[ThetaJoin[T, ?]] =
+    TTypes.normalizable[T].ThetaJoin
 }
