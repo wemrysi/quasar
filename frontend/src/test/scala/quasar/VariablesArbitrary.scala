@@ -26,7 +26,7 @@ trait VariablesArbitrary {
     Arbitrary(arb[String].map(VarName(_)))
 
   implicit val arbitraryVarValue: Arbitrary[VarValue] =
-    Arbitrary(ExprArbitrary.constExprGen.map(expr => VarValue(expr.toString)))
+    Arbitrary(ExprArbitrary.constExprGen.map(expr => VarValue(sql.pprint(expr))))
 
   implicit val arbitraryVariables: Arbitrary[Variables] =
     Arbitrary(arb[Map[VarName, VarValue]].map(Variables(_)))
