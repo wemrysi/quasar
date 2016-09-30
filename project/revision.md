@@ -1,0 +1,3 @@
+- Move class definitions out of the package object
+- utilize more polymorphic lambdas
+- adapt SimplifyProjection to reify T[_[_]] first for compilation performance
