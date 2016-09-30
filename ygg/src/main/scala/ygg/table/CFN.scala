@@ -18,7 +18,7 @@ package ygg.table
 
 import ygg._, common._, json._
 
-sealed trait CFId
+sealed trait CFId extends Product with Serializable
 final case class LeafCFId(identity: String)            extends CFId
 final case class ComposedCFId(l: CFId, r: CFId)        extends CFId
 final case class PartialLeftCFId(cv: CValue, r: CFId)  extends CFId
