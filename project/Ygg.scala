@@ -6,8 +6,11 @@ import scala.Seq
 
 object Ygg {
   def yggDropWarts = Seq(
+    Wart.Equals,
     Wart.AsInstanceOf,
+    Wart.Overloading,
     Wart.ToString,
+    Wart.NoNeedForMonad,
     Wart.Null,
     Wart.Var,
     Wart.MutableDataStructures,
