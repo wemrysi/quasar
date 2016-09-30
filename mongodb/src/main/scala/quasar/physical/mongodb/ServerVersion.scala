@@ -22,7 +22,7 @@ import scalaz._, Scalaz._
 
 final case class ServerVersion(major: Int, minor: Int, revision: Option[Int], extra: String)
 object ServerVersion {
-  private val Pattern = """(?s)(\d+)\.(\d+)(?:\.(\d+))?(.*)""".r
+  private val Pattern = """(?s)(\d+)\.(\d+)(?:\.(\d+))?[-. _]?(.*)""".r
 
   def fromString(str: String): String \/ ServerVersion = str match {
     case Pattern(major, minor, revision, extra) =>
@@ -34,7 +34,7 @@ object ServerVersion {
   implicit val show: Show[ServerVersion] = Show.show { v =>
     v.major.toString + "." + v.minor.toString +
       v.revision.foldMap("." + _) +
-      v.extra
+      (if (v.extra.isEmpty) "" else "-" + v.extra)
   }
 
   implicit val order: Order[ServerVersion] =
