@@ -203,6 +203,8 @@ object MessageFormat {
     }
   }
 
+  // FIXME: I don’t know why this is triggering here.
+  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
     val disposition = mediaType.extensions.get("disposition").flatMap { str =>
       HttpHeaderParser.CONTENT_DISPOSITION(str).toOption
@@ -221,7 +223,7 @@ object MessageFormat {
     else {
       val format =
         if (mediaType satisfies JsonFormat.SingleArray.mediaType)
-          if (mediaType.extensions.get("boundary") != Some("NL")) Some(JsonFormat.SingleArray)
+          if (mediaType.extensions.get("boundary") =/= Some("NL")) Some(JsonFormat.SingleArray)
           else Some(JsonFormat.LineDelimited)
         else if ((mediaType satisfies JsonFormat.LineDelimited.mediaType) ||
                  (mediaType satisfies new MediaType("application", "x-ldjson"))) Some(JsonFormat.LineDelimited)

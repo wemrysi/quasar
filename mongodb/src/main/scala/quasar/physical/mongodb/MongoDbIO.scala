@@ -72,6 +72,8 @@ object MongoDbIO {
   /** Returns the stream of results of aggregating documents according to the
     * given aggregation pipeline.
     */
+  // FIXME: I don’t know why this triggers here.
+  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def aggregated(
     src: Collection,
     pipeline: List[Bson.Doc],
@@ -326,23 +328,24 @@ object MongoDbIO {
     }
 
     def decodeIndex(doc: Document): Option[Index] =
-      (for {
-        name <- Option(doc.get("name")).flatMap {
-                  case s: String => s.some
-                  case _ => None
-                }
-        keys <- Option(doc.get("key")).flatMap {
-                  case kd: Document =>
-                    kd.asScala.toList.toNel.flatMap(_.traverse {
-                      case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
-                    })
-                  case _ => None
-                }
-        unique = Option(doc.get("unique")).map {
-          case java.lang.Boolean.TRUE => true
-          case _                      => false
-        }.getOrElse(false)
-      } yield Index(name, keys, unique))
+      (Option(doc.get("name")).flatMap {
+        case s: String => s.some
+        case _ => None
+      } ⊛
+        Option(doc.get("key")).flatMap {
+          case kd: Document =>
+            kd.asScala.toList.toNel.flatMap(_.traverse {
+              case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
+            })
+          case _ => None
+        })(Index(
+          _,
+          _,
+          Option(doc.get("unique")).fold(
+            false) {
+            case java.lang.Boolean.TRUE => true
+            case _                      => false
+          }))
 
     collection(coll)
       .flatMap(c => collect[Document](c.listIndexes))
