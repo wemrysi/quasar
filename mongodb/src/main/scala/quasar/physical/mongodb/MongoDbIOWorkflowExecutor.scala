@@ -115,7 +115,7 @@ private[mongodb] object MongoDbIOWorkflowExecutor {
   import EnvironmentError._
 
   /** The minimum MongoDbIO version required to be able to execute `Workflow`s. */
-  val MinMongoDbVersion = List(2, 6, 0)
+  val MinMongoDbVersion = ServerVersion(2, 6, None, "")
 
   /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =

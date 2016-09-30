@@ -361,7 +361,7 @@ object WorkflowExecutor {
       if (v >= MinMongoDbVersion)
         (new MongoDbIOWorkflowExecutor: WFExec).point[M]
       else
-        unsupportedVersion("MongoDB", v).raiseError[M, WFExec]
+        unsupportedVersion("MongoDB", v.shows).raiseError[M, WFExec]
     }
   }
 
