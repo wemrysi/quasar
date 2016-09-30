@@ -21,7 +21,7 @@ import quasar.{RenderTree, Terminal}
 import quasar.fp._
 import quasar.physical.mongodb.expression.ExprOpOps
 
-import matryoshka.Fix
+import matryoshka._
 import scalaz._, Scalaz._
 
 sealed trait AccumOp[A]
@@ -35,7 +35,7 @@ object AccumOp {
   final case class $avg[A](value: A)      extends AccumOp[A]
   final case class $sum[A](value: A)      extends AccumOp[A]
 
-  implicit val AccumOpInstance: Traverse1[AccumOp] with Comonad[AccumOp]  =
+  implicit val instance: Traverse1[AccumOp] with Comonad[AccumOp]  =
     new Traverse1[AccumOp] with Comonad[AccumOp] {
       def cobind[A, B](fa: AccumOp[A])(f: (AccumOp[A]) ⇒ B) = map(fa)(κ(f(fa)))
 
@@ -67,10 +67,24 @@ object AccumOp {
         }
     }
 
-  implicit def AccumOpRenderTree[EX[_]: Functor](implicit exprOps: ExprOpOps.Uni[EX])
+  implicit val show: Delay[Show, AccumOp] = new Delay[Show, AccumOp] {
+    def apply[A](s: Show[A]) = Show.show {
+      case $addToSet(v) => Cord("$addToSet(") ++ s.show(v) ++ Cord(")")
+      case $avg(v) => Cord("$avg(") ++ s.show(v) ++ Cord(")")
+      case $first(v) => Cord("$first(") ++ s.show(v) ++ Cord(")")
+      case $last(v) => Cord("$last(") ++ s.show(v) ++ Cord(")")
+      case $max(v) => Cord("$max(") ++ s.show(v) ++ Cord(")")
+      case $min(v) => Cord("$min(") ++ s.show(v) ++ Cord(")")
+      case $push(v) => Cord("$push(") ++ s.show(v) ++ Cord(")")
+      case $sum(v) => Cord("$sum(") ++ s.show(v) ++ Cord(")")
+    }
+  }
+
+  implicit def renderTree[EX[_]: Functor](implicit exprOps: ExprOpOps.Uni[EX])
       : RenderTree[AccumOp[Fix[EX]]] =
     new RenderTree[AccumOp[Fix[EX]]] {
-      def render(v: AccumOp[Fix[EX]]) = Terminal(List("AccumOp"), groupBson(v).toJs.pprint(0).some)
+      def render(v: AccumOp[Fix[EX]]) =
+        Terminal(List("AccumOp"), groupBson(v).toJs.pprint(0).some)
     }
 }
 

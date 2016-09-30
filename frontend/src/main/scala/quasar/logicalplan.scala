@@ -103,7 +103,7 @@ object LogicalPlan {
               }
 
             case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
-            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.toString))
+            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.name), args.unsized.map(ra.render))
             case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case LetF(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
@@ -118,13 +118,13 @@ object LogicalPlan {
       def equal[A: Equal](v1: LogicalPlan[A], v2: LogicalPlan[A]): Boolean =
         (v1, v2) match {
           case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
-          case (ConstantF(d1), ConstantF(d2)) => d1 == d2
+          case (ConstantF(d1), ConstantF(d2)) => d1 ≟ d2
           case (InvokeFUnapply(f1, v1), InvokeFUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
           case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
           case (LetF(ident1, form1, in1), LetF(ident2, form2, in2)) =>
             ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
           case (TypecheckF(expr1, typ1, cont1, fb1), TypecheckF(expr2, typ2, cont2, fb2)) =>
-            expr1 ≟ expr2 && typ1 == typ2 && cont1 ≟ cont2 && fb1 ≟ fb2
+            expr1 ≟ expr2 && typ1 ≟ typ2 && cont1 ≟ cont2 && fb1 ≟ fb2
           case _ => false
         }
     }

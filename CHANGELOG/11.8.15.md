@@ -1,0 +1,1 @@
+- [#1431] capture connection errors and include the full details in the error response (including "wrapped" exceptions)

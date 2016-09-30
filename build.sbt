@@ -69,17 +69,15 @@ lazy val buildSettings = Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
   scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
+  // NB: Some warts are disabled in specific projects. Here’s why:
+  //   • AsInstanceOf   – puffnfresh/wartremover#266
+  //   • NoNeedForMonad – puffnfresh/wartremover#268
+  //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-    Wart.Any,
-    Wart.AsInstanceOf,
-    Wart.Equals,
+    Wart.Any,                   // - see puffnfresh/wartremover#263
     Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
-    Wart.ImplicitConversion,    // - see puffnfresh/wartremover#242
-    Wart.IsInstanceOf,
-    Wart.NoNeedForMonad,        // - see puffnfresh/wartremover#159
-    Wart.Nothing,
-    Wart.Overloading,
-    Wart.ToString),
+    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
+    Wart.Nothing),              // - see puffnfresh/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -197,13 +195,13 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-   ejson, effect, js, // NB: need to get dependencies to look like:
-//          |
-         frontend,    //   frontend, connector,
-//          |               /    \  /     \
-           sql,       //  sql,  core,    marklogic, mongodb, ...
-//          |                \    |     /
-        connector,    //      interface,
+        ejson, js,  // NB: need to get dependencies to look like:
+//         \  /
+          frontend, //   frontend, connector,
+//           |            /    \  /     \
+    effect, sql,    //  sql,  core,    marklogic, mongodb, ...
+//     \     |             \    |     /
+        connector,  //      interface,
 //      / / | \ \
   core, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
@@ -220,12 +218,14 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(libraryDependencies ++= Dependencies.foundation,
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoPackage := "quasar.build",
+    exclusiveTestTag := "exclusive",
     isCIBuild := isTravis,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    exclusiveTestTag := "exclusive",
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
-    buildInfoPackage := "quasar.build")
+    libraryDependencies ++= Dependencies.foundation,
+    wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val ejson = project
@@ -238,6 +238,9 @@ lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
+  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
+    Wart.AsInstanceOf,
+    Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
@@ -256,7 +259,8 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
@@ -272,14 +276,21 @@ lazy val frontend = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -297,7 +308,10 @@ lazy val connector = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 
@@ -306,7 +320,12 @@ lazy val marklogic = project
   .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(libraryDependencies ++= Dependencies.marklogic)
+  .settings(
+    libraryDependencies ++= Dependencies.marklogic,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))
@@ -319,16 +338,24 @@ lazy val marklogicValidation = project.in(file("marklogic-validation"))
 
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(connector % BothScopes, js % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.mongodb)
+  .settings(
+    libraryDependencies ++= Dependencies.mongodb,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.Equals,
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.postgresql)
+  .settings(
+    libraryDependencies ++= Dependencies.postgresql,
+    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val skeleton = project
@@ -341,7 +368,9 @@ lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.sparkcore)
+  .settings(
+    libraryDependencies ++= Dependencies.sparkcore,
+    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -368,7 +397,8 @@ lazy val repl = project
   .settings(
     fork in run := true,
     connectInput in run := true,
-    outputStrategy := Some(StdoutOutput))
+    outputStrategy := Some(StdoutOutput),
+    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val web = project
@@ -379,7 +409,10 @@ lazy val web = project
   .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web)
+    libraryDependencies ++= Dependencies.web,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests

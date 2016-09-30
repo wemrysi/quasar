@@ -86,14 +86,14 @@ object BsonCodec {
     }, _.right)) ∘ (m => Bson.Doc(ListMap(m: _*)))
     // FIXME: cheating, but it’s what we’re already doing in the SQL parser
     case ejson.Char(value)      => Bson.Text(value.toString).right
-    case ejson.Byte(value)      => Bson.Binary(Array[Byte](value)).right
+    case ejson.Byte(value)      => Bson.Binary.fromArray(Array[Byte](value)).right
     case ejson.Int(value)       =>
       if (value.isValidInt) Bson.Int32(value.toInt).right
       else if (value.isValidLong) Bson.Int64(value.toLong).right
       else NonRepresentableEJson(value.toString + " is too large").left
     case ejson.Meta(value, meta) => (meta, value) match {
       case (EJsonType("_bson.oid"), Bson.Text(oid)) =>
-        Bson.ObjectId(oid) \/> ObjectIdFormatError(oid)
+        Bson.ObjectId.fromString(oid) \/> ObjectIdFormatError(oid)
       case (EJsonTypeSize("_ejson.binary", size), Bson.Text(data)) =>
         if (size.isValidInt)
           ejson.z85.decode(data).fold[PlannerError \/ Bson](
@@ -109,7 +109,7 @@ object BsonCodec {
             extract(map.get("day_of_month"), Bson._int32))((y, m, d) =>
             LocalDate.of(y, m, d)))
           .map(date => Bson.Date(date.atStartOfDay.toInstant(ZoneOffset.UTC))) \/>
-          NonRepresentableEJson(value.toString + " is not a valid date")
+          NonRepresentableEJson(value.shows + " is not a valid date")
       case (EJsonType("_ejson.time"), Bson.Doc(map)) =>
         (extract(map.get("hour"), Bson._int32) ⊛
           extract(map.get("minute"), Bson._int32) ⊛
@@ -120,10 +120,10 @@ object BsonCodec {
               pad2(m) + ":" +
               pad2(s) + "." +
               pad3(n))) \/>
-        NonRepresentableEJson(value.toString + " is not a valid time")
+        NonRepresentableEJson(value.shows + " is not a valid time")
       case (EJsonType("_ejson.interval"), Bson.Doc(map)) =>
         extract(map.get("seconds"), Bson._dec).map(s => Bson.Dec(s * millisPerSec)) \/>
-          NonRepresentableEJson(value.toString + " is not a valid interval")
+          NonRepresentableEJson(value.shows + " is not a valid interval")
       case (EJsonType("_ejson.timestamp"), Bson.Doc(map)) =>
         (extract(map.get("year"), Bson._int32) ⊛
           extract(map.get("month"), Bson._int32) ⊛
@@ -133,7 +133,7 @@ object BsonCodec {
           extract(map.get("second"), Bson._int32) ⊛
           extract(map.get("nanosecond"), Bson._int32))((y, mo, d, h, mi, s, n) =>
           Bson.Date(LocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))) \/>
-          NonRepresentableEJson(value.toString + " is not a valid timestamp")
+          NonRepresentableEJson(value.shows + " is not a valid timestamp")
       case (_, _) => value.right
     }
   }

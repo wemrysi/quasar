@@ -653,7 +653,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           |├─ ExprBuilder
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $ReadF(db; zips)
-          |│  │  ╰─ Schema(None)
+          |│  │  ╰─ Schema
           |│  ╰─ ExprOp("$pop")
           |├─ By
           |│  ╰─ ValueBuilder(Int32(1))

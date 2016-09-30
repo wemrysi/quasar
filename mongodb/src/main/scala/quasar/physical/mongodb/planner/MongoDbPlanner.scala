@@ -102,7 +102,7 @@ object MongoDbPlanner {
       val HasStr: Output => OutputM[String] = _.flatMap {
         _._1(Nil)(ident("_")) match {
           case Literal(Js.Str(str)) => str.right
-          case x => FuncApply(func.name, "JS string", x.toString).left
+          case x => FuncApply(func.name, "JS string", x.shows).left
         }
       }
 
@@ -416,7 +416,7 @@ object MongoDbPlanner {
           case ConstantF(b) => BsonCodec.fromData(b).toOption
           case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
           case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
+          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
           case _ => None
         }
     }
@@ -683,19 +683,19 @@ object MongoDbPlanner {
       val HasLiteral: Ann => OutputM[Bson] = ann => HasWorkflow(ann).flatMap { p =>
         asLiteral(p) match {
           case Some(value) => \/-(value)
-          case _           => -\/(FuncApply(func.name, "literal", p.toString))
+          case _           => -\/(FuncApply(func.name, "literal", p.shows))
         }
       }
 
       val HasInt: Ann => OutputM[Long] = HasLiteral(_).flatMap {
         case Bson.Int32(v) => \/-(v.toLong)
         case Bson.Int64(v) => \/-(v)
-        case x => -\/(FuncApply(func.name, "64-bit integer", x.toString))
+        case x => -\/(FuncApply(func.name, "64-bit integer", x.shows))
       }
 
       val HasText: Ann => OutputM[String] = HasLiteral(_).flatMap {
         case Bson.Text(v) => \/-(v)
-        case x => -\/(FuncApply(func.name, "text", x.toString))
+        case x => -\/(FuncApply(func.name, "text", x.shows))
       }
 
       def Arity1[A](f: Ann => OutputM[A]): OutputM[A] = args match {

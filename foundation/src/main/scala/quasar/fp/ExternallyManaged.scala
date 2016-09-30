@@ -37,5 +37,5 @@ object ExternallyManaged {
   implicit val equal: Equal[ExternallyManaged] = Equal.equalRef
   implicit val show: Show[ExternallyManaged] = Show.showFromToString
   implicit val renderTree: RenderTree[ExternallyManaged] =
-    RenderTree.fromToString("ExternallyManaged")
+    RenderTree.fromShow("ExternallyManaged")
 }

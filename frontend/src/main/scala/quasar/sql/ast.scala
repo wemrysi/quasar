@@ -124,7 +124,7 @@ sealed abstract class BinaryOperator(val sql: String) extends Product with Seria
   val name = "(" + sql + ")"
 
   override def equals(that: Any) = that match {
-    case x: BinaryOperator => sql == x.sql
+    case x: BinaryOperator => sql ≟ x.sql
     case _                 => false
   }
 
@@ -169,7 +169,7 @@ sealed abstract class UnaryOperator(val sql: String)
   val name = sql
 
   override def equals(that: Any) = that match {
-    case x: UnaryOperator => sql == x.sql
+    case x: UnaryOperator => sql ≟ x.sql
     case _                => false
   }
 
@@ -263,9 +263,17 @@ final case object RightJoin extends JoinType("right join")
 final case object InnerJoin extends JoinType("inner join")
 final case object FullJoin extends JoinType("full join")
 
+object JoinType {
+  implicit val show: Show[JoinType] = Show.showFromToString
+}
+
 sealed trait OrderType extends Product with Serializable
 final case object ASC extends OrderType
 final case object DESC extends OrderType
+
+object OrderType {
+  implicit val show: Show[OrderType] = Show.showFromToString
+}
 
 @Lenses final case class GroupBy[A](keys: List[A], having: Option[A])
 

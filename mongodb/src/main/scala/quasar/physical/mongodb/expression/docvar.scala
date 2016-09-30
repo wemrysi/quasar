@@ -31,6 +31,9 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
     (this.deref |@| that.deref)(_ startsWith (_)) getOrElse (that.deref.isEmpty)
   }
 
+  // FIXME: This overloading is terrible, but would break many things to change,
+  //        and we need to think about what is the right set of operators.
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def \ (that: DocVar): Option[DocVar] = (this, that) match {
     case (DocVar(n1, f1), DocVar(n2, f2)) if (n1 == n2) =>
       val f3 = (f1 |@| f2)(_ \ _) orElse (f1) orElse (f2)
@@ -54,12 +57,6 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
     case DocVar(_, Some(deref)) => deref.toJs(jscore.Ident(JsFn.defaultName))
   })
 
-  override def toString = this match {
-    case DocVar(DocVar.ROOT, None) => "DocVar.ROOT()"
-    case DocVar(DocVar.ROOT, Some(deref)) => s"DocField($deref)"
-    case _ => s"DocVar($name, $deref)"
-  }
-
   def bson: Bson = this match {
     case DocVar(DocVar.ROOT, Some(deref)) => Bson.Text(deref.asField)
     case DocVar(name,        deref) =>
@@ -67,6 +64,7 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
         Bson.Text(deref.map(root \ _).getOrElse(root).asVar)
   }
 }
+
 object DocVar {
   final case class Name(name: String) {
     def apply() = DocVar(this, None)
@@ -78,11 +76,21 @@ object DocVar {
     def apply(deref: Option[BsonField]) = DocVar(this, deref)
     def unapply(v: DocVar): Some[Option[BsonField]] = Some(v.deref)
   }
+
   object Name {
     implicit val equal: Equal[Name] = Equal.equalA
+
+    implicit val show: Show[Name] = Show.showFromToString
   }
+
   val ROOT    = Name("ROOT")
   val CURRENT = Name("CURRENT")
 
   implicit val equal: Equal[DocVar] = Equal.equalA
+
+  implicit val show: Show[DocVar] = Show.shows {
+    case DocVar(DocVar.ROOT, None) => "DocVar.ROOT()"
+    case DocVar(DocVar.ROOT, Some(deref)) => s"DocField(${deref.shows})"
+    case dv => s"DocVar(${dv.name.shows}, ${dv.deref.shows})"
+  }
 }

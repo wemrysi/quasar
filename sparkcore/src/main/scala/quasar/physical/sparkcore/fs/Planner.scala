@@ -252,26 +252,19 @@ object Planner {
           }
 
           StateT((sc: SparkContext) =>
-            EitherT((for {
-              df <- structFunc
-              rf <- repairFunc
-              ls = (input: Data) => df(input) match {
+            EitherT((structFunc ⊛ repairFunc)((df, rf) =>
+              src.flatMap((input: Data) => df(input) match {
                 case Data.Arr(list) => list.map(rf(input, _))
                 case Data.Obj(m) => m.values.map(rf(input, _))
                 case _ => List.empty[Data]
-              }
-            } yield {
-              src.flatMap(ls)
-            }).map((sc, _)).point[Task]))
+              })).map((sc, _)).point[Task]))
 
         case Union(src, lBranch, rBranch) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
 
-          for {
-            left <- freeCataM(lBranch)(interpretM(κ(srcState), algebraM))
-            right <- freeCataM(rBranch)(interpretM(κ(srcState), algebraM))
-          } yield left ++ right
+          (freeCataM(lBranch)(interpretM(κ(srcState), algebraM)) ⊛
+            freeCataM(rBranch)(interpretM(κ(srcState), algebraM)))(_ ++ _)
         case Unreferenced() =>
           StateT((sc: SparkContext) => {
             EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Task])

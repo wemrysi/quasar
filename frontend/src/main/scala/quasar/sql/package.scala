@@ -105,6 +105,7 @@ package object sql {
       case sel @ Select(_, _, _, _, _, _) => {
         // perform all the appropriate recursions
         // TODO remove asInstanceOf by providing a `SelectF` at compile time
+        @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
         val sel2 = Functor[Sql].map(sel)(_.makeTables(bindings)).asInstanceOf[Select[T[Sql]]]
 
         def mkRel[A](rel: SqlRelation[A]): SqlRelation[A] = rel match {
@@ -190,7 +191,7 @@ package object sql {
             ("group by" ::
               g.keys.map(_._2).mkString(", ") ::
               g.having.map("having " + _._2).toList).mkString(" ")),
-          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.toString) mkString(", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
+          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) mkString(", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
       case Vari(symbol) => ":" + symbol
       case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
@@ -294,7 +295,7 @@ package object sql {
             val aliasString = alias.cata(" as " + _, "")
             Terminal("TableRelation" :: astType, Some(prettyPrint(name) + aliasString))
           case JoinRelation(left, right, jt, clause) =>
-            NonTerminal("JoinRelation" :: astType, Some(jt.toString),
+            NonTerminal("JoinRelation" :: astType, Some(jt.shows),
               List(render(left), render(right), ra.render(clause)))
         }
       }
@@ -324,7 +325,7 @@ package object sql {
                     case OrderBy(keys) =>
                       val nt = "OrderBy" :: astType
                       NonTerminal(nt, None,
-                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.toString), ra.render(x) :: Nil)})
+                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil)})
                   } ::
                   Nil).foldMap(_.toList))
 

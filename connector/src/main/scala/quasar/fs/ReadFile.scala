@@ -30,6 +30,7 @@ import scalaz._
 import scalaz.std.anyVal._
 import scalaz.std.tuple._
 import scalaz.syntax.monad._
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.stream._
 
@@ -42,12 +43,10 @@ object ReadFile {
     val tupleIso: Iso[ReadHandle, (AFile, Long)] =
       Iso((h: ReadHandle) => (h.file, h.id))((ReadHandle(_, _)).tupled)
 
-    implicit val readHandleShow: Show[ReadHandle] =
-      Show.showFromToString
+    implicit val show: Show[ReadHandle] = Show.showFromToString
 
     // TODO: Switch to order once Order[Path[B,T,S]] exists
-    implicit val readHandleEqual: Equal[ReadHandle] =
-      Equal.equalBy(tupleIso.get)
+    implicit val equal: Equal[ReadHandle] = Equal.equalBy(tupleIso.get)
   }
 
   final case class Open(file: AFile, offset: Natural, limit: Option[Positive])
@@ -149,8 +148,8 @@ object ReadFile {
         case Open(file, off, lim) => NonTerminal(List("Open"), None,
           file.render :: Terminal(List("Offset"), Some(off.toString)) ::
             lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
-        case Read(handle)         => Terminal(List("Read"), handle.toString.some)
-        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+        case Read(handle)         => Terminal(List("Read"), handle.shows.some)
+        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
       }
     }
 }

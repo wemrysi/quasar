@@ -60,8 +60,8 @@ object Data {
 
   sealed trait Number extends Data {
     override def equals(other: Any) = (this, other) match {
-      case (Int(v1), Number(v2)) => BigDecimal(v1) == v2
-      case (Dec(v1), Number(v2)) => v1 == v2
+      case (Int(v1), Number(v2)) => BigDecimal(v1) ≟ v2
+      case (Dec(v1), Number(v2)) => v1 ≟ v2
       case _                     => false
     }
   }
@@ -167,7 +167,7 @@ object Data {
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
   object Binary {
-    def apply(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
+    def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
 
   val _binary =
@@ -330,7 +330,7 @@ object Data {
       }).fold[Data](NA)(pairs => Obj(ListMap(pairs: _*)))
     case ejson.Int(value)       => Int(value)
     // FIXME: cheating, but it’s what we’re already doing in the SQL parser
-    case ejson.Byte(value)      => Binary(Array[Byte](value))
+    case ejson.Byte(value)      => Binary.fromArray(Array[Byte](value))
     case ejson.Char(value)      => Str(value.toString)
   }
 

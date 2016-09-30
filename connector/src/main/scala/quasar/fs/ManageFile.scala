@@ -67,6 +67,8 @@ object ManageFile {
     val failIfMissing = Prism.partial[MoveSemantics, Unit] {
       case FailIfMissing => ()
     } (κ(FailIfMissing))
+
+    implicit val show: Show[MoveSemantics] = Show.showFromToString
   }
 
   sealed trait MoveScenario {
@@ -93,10 +95,10 @@ object ManageFile {
         extends MoveScenario
 
     val dirToDir: Prism[MoveScenario, (ADir, ADir)] =
-      Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ(none)))(DirToDir.tupled)
+      Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ2(none)))(DirToDir.tupled)
 
     val fileToFile: Prism[MoveScenario, (AFile, AFile)] =
-      Prism((_: MoveScenario).fold(κ(none), (s, d) => (s, d).some))(FileToFile.tupled)
+      Prism((_: MoveScenario).fold(κ2(none), (s, d) => (s, d).some))(FileToFile.tupled)
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
@@ -152,7 +154,7 @@ object ManageFile {
   implicit def renderTree[A]: RenderTree[ManageFile[A]] =
     new RenderTree[ManageFile[A]] {
       def render(mf: ManageFile[A]) = mf match {
-        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.toString.some,
+        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.shows.some,
           scenario.fold(
             (from, to) => List(from.render, to.render),
             (from, to) => List(from.render, to.render)))
