@@ -57,15 +57,25 @@ package object qscript {
   type QScriptTotal[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
       ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
-      Const[ShiftedRead, ?] :\: Const [Read, ?] :/: Const[DeadEnd, ?])#M[A]
+      Const[ShiftedRead, ?] :\: Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
 
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
+  implicit def qScriptToQscriptTotal[T[_[_]]]: Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+        Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]]))
+
   /** QScript that has gone through Read conversion. */
   type QScriptRead[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+        Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]]))
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]

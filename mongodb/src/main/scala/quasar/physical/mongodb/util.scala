@@ -141,7 +141,7 @@ object util {
                     case Some(_) => Task.delay(client.close())
                     case None    => Task.now(())
                   }
-      } yield client)(t => envErr.fail(connectionFailed(t.getMessage)))
+      } yield client)(t => envErr.fail(connectionFailed(t)))
     }
 
     disableLogging *> connString >>= createClient
