@@ -152,12 +152,6 @@ package object qscript {
         }
     }
 
-  def envtHmap[F[_], G[_], E, A](f: F ~> G): EnvT[E, F, ?] ~> EnvT[E, G, ?] =
-    new (EnvT[E, F, ?] ~> EnvT[E, G, ?]) {
-      def apply[A](env: EnvT[E, F, A]) = EnvT((env.ask, f(env.lower)))
-    }
-
-  def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
-    def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
-  }
+  def envtHmap[F[_], G[_], E, A](f: F ~> G) = λ[EnvT[E, F, ?] ~> EnvT[E, G, ?]](env => EnvT(env.ask -> f(env.lower)))
+  def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 }

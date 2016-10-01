@@ -30,20 +30,20 @@ trait MathLib extends Library {
 
   // TODO[monocle]: Unit unapply needs to do Boolean instead of Option[Unit]
   // val Zero = Prism.partial[Data, Unit] {
-  //   case Data.Number(v) if v == 0 => ()
+  //   case Data.Number(v) if v ≟ 0 => ()
   // } (κ(Data.Int(0)))
   object Zero {
     def apply() = Data.Int(0)
     def unapply(obj: Data): Boolean = obj match {
-      case Data.Number(v) if v == 0 => true
-      case _                        => false
+      case Data.Number(v) if v ≟ 0 => true
+      case _                       => false
     }
   }
   object One {
     def apply() = Data.Int(1)
     def unapply(obj: Data): Boolean = obj match {
-      case Data.Number(v) if v == 1 => true
-      case _                        => false
+      case Data.Number(v) if v ≟ 1 => true
+      case _                       => false
     }
   }
 

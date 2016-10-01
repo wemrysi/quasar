@@ -106,6 +106,9 @@ object MapFunc {
   object ConcatArraysN {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
 
+    // TODO[matryoshka]: Once we handle directly recursive types, this
+    //                   overloading can go away.
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def apply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Corecursive, A](args: List[Free[MapFunc[T2, ?], A]]):
         Free[MapFunc[T2, ?], A] =
       apply(args.map(_.toCoEnv[T])).embed.fromCoEnv
@@ -703,6 +706,9 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](str: String): Free[MapFunc[T, ?], A] =
       Free.roll(Constant[T, Free[MapFunc[T, ?], A]](EJson.fromCommon[T].apply(ejson.Str[T[EJson]](str))))
 
+    // TODO[matryoshka]: Once we handle directly recursive types, this
+    //                   overloading can go away.
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
         Option[String] =
       mf.run.fold({

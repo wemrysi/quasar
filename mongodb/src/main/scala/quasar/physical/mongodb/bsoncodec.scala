@@ -86,14 +86,14 @@ object BsonCodec {
     }, _.right)) ∘ (m => Bson.Doc(ListMap(m: _*)))
     // FIXME: cheating, but it’s what we’re already doing in the SQL parser
     case ejson.Char(value)      => Bson.Text(value.toString).right
-    case ejson.Byte(value)      => Bson.Binary(Array[Byte](value)).right
+    case ejson.Byte(value)      => Bson.Binary.fromArray(Array[Byte](value)).right
     case ejson.Int(value)       =>
       if (value.isValidInt) Bson.Int32(value.toInt).right
       else if (value.isValidLong) Bson.Int64(value.toLong).right
       else NonRepresentableEJson(value.toString + " is too large").left
     case ejson.Meta(value, meta) => (meta, value) match {
       case (EJsonType("_bson.oid"), Bson.Text(oid)) =>
-        Bson.ObjectId(oid) \/> ObjectIdFormatError(oid)
+        Bson.ObjectId.fromString(oid) \/> ObjectIdFormatError(oid)
       case (EJsonTypeSize("_ejson.binary", size), Bson.Text(data)) =>
         if (size.isValidInt)
           ejson.z85.decode(data).fold[PlannerError \/ Bson](

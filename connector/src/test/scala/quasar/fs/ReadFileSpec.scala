@@ -41,7 +41,7 @@ class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
         val n = xs.length / 2
         val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f).take(n)
 
-        MemTask.runLog(p).run.run(emptyMem)
+        MemTask.runLogE(p).run.run(emptyMem)
           .unsafePerformSync.leftMap(_.rm) must_=== ((Map.empty, \/.right(xs take n)))
       }
     }.set(maxSize = 10)

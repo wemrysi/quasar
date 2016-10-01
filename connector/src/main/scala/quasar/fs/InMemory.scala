@@ -76,8 +76,7 @@ object InMemory {
     def apply[A](rf: ReadFile[A]) = rf match {
       case ReadFile.Open(f, off, lim) =>
         (for {
-          i <- nextSeq
-          h =  ReadHandle(f, i)
+          h <- nextSeq ∘ (ReadHandle(f, _))
           _ <- readingL(h) := Reading(f, off, lim, 0).some
         } yield h.right)
 
@@ -117,8 +116,7 @@ object InMemory {
     def apply[A](wf: WriteFile[A]) = wf match {
       case WriteFile.Open(f) =>
         for {
-          i <- nextSeq
-          h =  WriteHandle(f, i)
+          h <- nextSeq ∘ (WriteHandle(f, _))
           _ <- wFileL(h) := Some(f)
           _ <- fileL(f) %= (_ orElse Some(Vector()))
         } yield h.right
@@ -163,8 +161,7 @@ object InMemory {
       case EvaluatePlan(lp) =>
         evalPlan(lp) { data =>
           for {
-            n <- nextSeq
-            h =  ResultHandle(n)
+            h <- nextSeq ∘ (ResultHandle(_))
             _ <- resultL(h) := some(data)
           } yield h
         }
@@ -218,9 +215,9 @@ object InMemory {
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
           case InvokeFUnapply(Drop, Sized((_,src), (Fix(ConstantF(Data.Int(skip))),_))) =>
-            src.flatMap(s => skip.safeToInt.map(s.drop).toRightDisjunction(unsupported(optLp)))
+            (src ⊛ skip.safeToInt.toRightDisjunction(unsupported(optLp)))(_.drop(_))
           case InvokeFUnapply(Take, Sized((_,src), (Fix(ConstantF(Data.Int(limit))),_))) =>
-            src.flatMap(s => limit.safeToInt.map(s.take).toRightDisjunction(unsupported(optLp)))
+            (src ⊛ limit.safeToInt.toRightDisjunction(unsupported(optLp)))(_.take(_))
           case InvokeFUnapply(Squash, Sized((_,src))) => src
           case ConstantF(data) => Vector(data).right
           case other =>
@@ -309,22 +306,23 @@ object InMemory {
   private def fsPathExists[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
     pathErr(pathExists(f)).left.point[InMemoryFs]
 
-  private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
+  private def moveDir(src: ADir, dst: ADir, s: MoveSemantics):
+      InMemoryFs[FileSystemError \/ Unit] =
     for {
-      m     <- contentsL.st
-      sufxs =  m.keys.toStream.map(_ relativeTo src).unite
-      files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
-      r0    <- files.traverse { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
-      r1    =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(src)))
-    } yield r1
+      files <- contentsL.st ∘
+                 (_.keys.toStream.map(_ relativeTo src).unite ∘
+                   (sufx => (src </> sufx, dst </> sufx)))
+      r     <- files.traverse { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run ∘
+                 (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(src))))
+    } yield r
 
-  private def moveFile(src: AFile, dst: AFile, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
+  private def moveFile(src: AFile, dst: AFile, s: MoveSemantics):
+      InMemoryFs[FileSystemError \/ Unit] = {
     import MoveSemantics._
 
-    val move0: InMemoryFs[FileSystemError \/ Unit] = for {
-      v <- fileL(src) <:= None
-      r <- v.cata(xs => (fileL(dst) := Some(xs)) as ().right, fsPathNotFound(src))
-    } yield r
+    val move0: InMemoryFs[FileSystemError \/ Unit] =
+      (fileL(src) <:= None) >>=
+        (_.cata(xs => (fileL(dst) := Some(xs)) as ().right, fsPathNotFound(src)))
 
     s match {
       case Overwrite =>
@@ -338,11 +336,10 @@ object InMemory {
 
   private def deleteDir(d: ADir): InMemoryFs[FileSystemError \/ Unit] =
     for {
-      m  <- contentsL.st
-      ss =  m.keys.toStream.map(_ relativeTo d).unite
-      r0 <- ss.traverse(f => EitherT(deleteFile(d </> f))).run
-      r1 =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(d)))
-    } yield r1
+      ss <- contentsL.st ∘ (_.keys.toStream.map(_ relativeTo d).unite)
+      r  <- ss.traverse(f => EitherT(deleteFile(d </> f))).run ∘
+              (_ >>= (_.nonEmpty either (()) or pathErr(pathNotFound(d))))
+    } yield r
 
   private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
     (fileL(f) <:= None) map (_.void \/> pathErr(pathNotFound(f)))

@@ -124,7 +124,7 @@ sealed abstract class BinaryOperator(val sql: String) extends Product with Seria
   val name = "(" + sql + ")"
 
   override def equals(that: Any) = that match {
-    case x: BinaryOperator => sql == x.sql
+    case x: BinaryOperator => sql ≟ x.sql
     case _                 => false
   }
 
@@ -169,7 +169,7 @@ sealed abstract class UnaryOperator(val sql: String)
   val name = sql
 
   override def equals(that: Any) = that match {
-    case x: UnaryOperator => sql == x.sql
+    case x: UnaryOperator => sql ≟ x.sql
     case _                => false
   }
 
