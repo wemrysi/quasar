@@ -299,5 +299,16 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
             Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
             Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))))))).embed)
     }
+    "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
+      val sampleFile = rootDir </> file("bar")
+
+      val originalQScript = Fix(QS.inject(QC.inj(Map(
+        Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
+        Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+
+      val expectedQScript = Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))))
+
+      originalQScript.transCata(liftFG(opt.transformIncludeToExclude[QST])) must_= expectedQScript
+    }
   }
 }

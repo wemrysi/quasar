@@ -40,14 +40,7 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript[A] =
-     (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
-
-  // This is an exact copy from marklogic's queryfile.
-  implicit val sparkQScriptToQScriptTotal
-      : Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
-    ::\::[QScriptCore[Fix, ?]](
-      ::/::[Fix, ThetaJoin[Fix, ?], Const[ShiftedRead, ?]])
+  type SparkQScript[A] = QScriptShiftRead[Fix, A]
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
@@ -80,8 +73,8 @@ object queryfile {
       val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       for {
-        qs <- (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)).map(transFutu(_)(ShiftRead[Fix, QScriptRead[Fix, ?], SparkQScript].shiftRead(idPrism.reverseGet)(_)).transCata(optimize.applyAll[SparkQScript]))
-        _ <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
+        qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp).map(shiftRead[Fix])
+        _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }
 
