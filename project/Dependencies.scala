@@ -22,7 +22,7 @@ object Dependencies {
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
-  def macros = Seq(
+  def macros1 = Seq(
     "org.spire-math" %% "jawn-parser"   % "0.9.0",
     "io.circe"       %% "circe-generic" % "0.4.1"
   )

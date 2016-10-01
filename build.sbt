@@ -203,7 +203,7 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
-  core, marklogic, mongodb, postgresql, skeleton, sparkcore, macros, ygg,
+  core, marklogic, mongodb, postgresql, skeleton, sparkcore, macros1, ygg,
 //      \ \ | / /
         interface,
 //        /  \
@@ -296,13 +296,13 @@ lazy val sql = project
 // connectors
 
 def setup(p: Project): Project = p settings commonSettings enablePlugins AutomateHeaderPlugin
-lazy val macros = project |> setup |> Ygg.macros
+lazy val macros1 = project |> setup |> Ygg.macros1
 lazy val ygg    = project |> setup |> Ygg.ygg
 
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    macros, ygg,
+    macros1, ygg,
     ejson % BothScopes,
     effect % BothScopes,
     js % BothScopes,
