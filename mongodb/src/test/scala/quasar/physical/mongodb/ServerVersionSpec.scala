@@ -71,6 +71,7 @@ class ServerVersionSpec extends Qspec with ArbitraryServerVersion {
     implicit val ord: scala.math.Ordering[ServerVersion] = Order[ServerVersion].toScalaOrdering
 
     "compare with same major/minor" >> prop { (maj: Int, min: Int, rev: Int, extra: String) =>
+      // NB: any revision number is greater than none
       ServerVersion(maj, min, Some(rev), extra) must
         beGreaterThan(ServerVersion(maj, min, None, ""))
     }
