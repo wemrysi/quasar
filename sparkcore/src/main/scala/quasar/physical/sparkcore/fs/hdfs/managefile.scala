@@ -24,16 +24,13 @@ import quasar.fs._,
   FileSystemError._,
   ManageFile._, ManageFile.MoveScenario._,
   PathError._
-// import quasar.fs.impl.ensureMoveSemantics
+import quasar.fs.impl.ensureMoveSemantics
 
-// import java.io.FileNotFoundException
 import java.lang.Exception
-// import java.nio.{file => nio}
 import scala.util.control.NonFatal
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-// import org.apache.commons.io.FileUtils
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -55,12 +52,12 @@ object managefile {
 
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
-        case Move(FileToFile(sf, df), semantics) => ???
-          // (ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
-            // moveFile(sf, df).liftM[FileSystemErrT]).run
-        case Move(DirToDir(sd, dd), semantics) => ???
-          // (ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
-            // moveDir(sd, dd).liftM[FileSystemErrT]).run
+        case Move(FileToFile(sf, df), semantics) =>
+          (ensureMoveSemantics[Free[S, ?]](sf, df, pathExists(hdfs)(_), semantics).toLeft(()) *>
+            move(sf, df, hdfs).liftM[FileSystemErrT]).run
+        case Move(DirToDir(sd, dd), semantics) =>
+          (ensureMoveSemantics[Free[S, ?]](sd, dd, pathExists(hdfs)(_), semantics).toLeft(()) *>
+            move(sd, dd, hdfs).liftM[FileSystemErrT]).run
         case Delete(path) => delete(path, hdfs)
         case TempFile(near) => tempFile(near)
       }
@@ -70,45 +67,26 @@ object managefile {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  // private def toAFile(path: nio.Path): Option[AFile] = {
-    // @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-    // val maybeUnboxed = posixCodec.parseAbsFile(path.toString)
-    // maybeUnboxed.map(sandboxAbs(_))
-  // }
-
-  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => String, fileSystem: () => FileSystem)(
+  def pathExists[S[_]](hdfs: FileSystem)(f: APath)(
     implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(Task.delay {
-      fileSystem().exists(new Path(hdfsPathStr(f)))
-    }).into[S]
+    lift(toPath(f).map(path => hdfs.exists(path))).into[S]
 
-  // private def moveFile[S[_]](src: AFile, dst: AFile)(implicit
-    // s0: Task :<: S,
-    // s1: PhysErr :<: S
-  // ): Free[S, Unit] = {
-    // val move: Task[PhysicalError \/ Unit] = Task.delay {
-      // val deleted = FileUtils.deleteQuietly(toNioPath(dst).toFile())
-      // FileUtils.moveFile(toNioPath(src).toFile(), toNioPath(dst).toFile)
-    // }.as(().right[PhysicalError]).handle {
-      // case NonFatal(ex : Exception) => UnhandledFSError(ex).left[Unit]
-    // }
-    // Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
-  // }
+  private def move[S[_]](src: APath, dst: APath, hdfs: FileSystem)(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Free[S, Unit] = {
+    val move: Task[PhysicalError \/ Unit] = (for {
+      srcPath <- toPath(src)
+      dstPath <- toPath(dst)
+    } yield {
+      val deleted = hdfs.delete(dstPath, true)
+      hdfs.rename(srcPath, dstPath)
+    }).as(().right[PhysicalError]).handle {
+      case NonFatal(ex : Exception) => UnhandledFSError(ex).left[Unit]
+    }
 
-// l  private def moveDir[S[_]](src: ADir, dst: ADir)(implicit
-    // ls0: Task :<: S,
-    // s1: PhysErr :<: S
-  // ): Free[S, Unit] = {
-
-    // val move: Task[PhysicalError \/ Unit] = Task.delay {
-      // val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
-      // FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
-    // }.as(().right[PhysicalError]).handle {
-      // case NonFatal(ex: Exception) => UnhandledFSError(ex).left[Unit]
-    // }
-
-    // Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
-  // }
+    Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
+  }
 
   private def delete[S[_]](apath: APath, hdfs: FileSystem)(implicit
     s0: Task :<: S,
