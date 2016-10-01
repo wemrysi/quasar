@@ -17,7 +17,6 @@
 package quasar
 
 import scala.Predef.implicitly
-
 import java.lang.String
 
 import matryoshka._, FunctorT.ops._
@@ -49,5 +48,23 @@ package object ejson {
     def fromExt[T[_[_]]: Corecursive]: Extension[T[EJson]] => T[EJson] =
       ExtEJson.inj(_).embed
 
+  }
+}
+
+package ejson {
+  import quasar.Predef.{ Map => scalaMap }
+  object FacadeOps {
+    implicit class SimpleFacadeOps[J](facade: jawn.SimpleFacade[J]) {
+      def xmap[K](f: J => K, g: K => J): jawn.SimpleFacade[K] = new jawn.SimpleFacade[K] {
+        def jtrue(): K                          = f(facade.jtrue())
+        def jfalse(): K                         = f(facade.jfalse())
+        def jnull(): K                          = f(facade.jnull())
+        def jint(s: String): K                  = f(facade.jint(s))
+        def jnum(s: String): K                  = f(facade.jnum(s))
+        def jstring(s: String): K               = f(facade.jstring(s))
+        def jarray(vs: scala.List[K]): K        = f(facade.jarray(vs map g))
+        def jobject(vs: scalaMap[String, K]): K = f(facade.jobject(vs mapValues g))
+      }
+    }
   }
 }

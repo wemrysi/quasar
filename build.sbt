@@ -15,8 +15,6 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
-val BothScopes = "test->test;compile->compile"
-
 def isTravis: Boolean = sys.env contains "TRAVIS"
 
 // Exclusive execution settings
@@ -192,7 +190,7 @@ lazy val root = project.in(file("."))
   .settings(noPublishSettings)
   .settings(aggregate in assembly := false)
   .aggregate(
-        foundation,
+    foundation, macros,
 //     / / | | \ \
 //
         ejson, js,  // NB: need to get dependencies to look like:
@@ -296,8 +294,10 @@ lazy val sql = project
 // connectors
 
 def setup(p: Project): Project = p settings commonSettings enablePlugins AutomateHeaderPlugin
+
+lazy val macros  = project |> setup |> Ygg.macros
 lazy val macros1 = project |> setup |> Ygg.macros1
-lazy val ygg    = project |> setup |> Ygg.ygg
+lazy val ygg     = project |> setup |> Ygg.ygg
 
 lazy val connector = project
   .settings(name := "quasar-connector-internal")

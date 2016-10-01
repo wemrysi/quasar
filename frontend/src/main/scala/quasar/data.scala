@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.ejson.{Common, EJson, Extension}
+import quasar.ejson.FacadeOps._
 import quasar.Predef._
 import quasar.fp._
 import quasar.javascript.{Js}
@@ -36,6 +37,25 @@ sealed trait Data extends Product with Serializable {
 }
 
 object Data {
+  implicit object DataFacade extends jawn.SimpleFacade[Data] {
+    def jtrue(): Data                        = True
+    def jfalse(): Data                       = False
+    def jnull(): Data                        = Null
+    def jint(s: String): Data                = Int(BigInt(s))
+    def jnum(s: String): Data                = Dec(BigDecimal(s))
+    def jstring(s: String): Data             = Str(s)
+    def jarray(vs: List[Data]): Data         = Arr(vs)
+    def jobject(vs: Map[String, Data]): Data = Obj((ListMap.newBuilder[String, Data] ++= vs).result)
+  }
+
+  implicit val EJsonDataFacade: jawn.SimpleFacade[EJson[Data]] = {
+    implicit def liftData(x: Data): EJson[Data] = toEJson[EJson].apply(x).run.fold[EJson[Data]](x => x, x => x)
+    DataFacade.xmap[EJson[Data]](
+      x => toEJson[EJson].apply(x).run.fold(x => x, x => x),
+      x => fromEJson(x)
+    )
+  }
+
   final case object Null extends Data {
     def dataType = Type.Null
     def toJs = jscore.Literal(Js.Null).some

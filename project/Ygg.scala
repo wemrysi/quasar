@@ -23,9 +23,15 @@ object Ygg {
     Wart.Option2Iterable
   )
 
+  def macros(p: Project): Project = ( p
+    .dependsOn('foundation % BothScopes, 'frontend)
+    .settings(name := "quasar-macros-internal")
+    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+  )
+
   def macros1(p: Project): Project = ( p
     .dependsOn('foundation % BothScopes)
-    .settings(name := "quasar-macros-internal")
+    .settings(name := "quasar-macros1-internal")
     .settings(libraryDependencies ++= Dependencies.macros1)
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
   )
