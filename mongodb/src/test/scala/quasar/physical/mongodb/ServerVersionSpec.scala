@@ -17,12 +17,12 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.Qspec
+import quasar.QuasarSpecification
 
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
-class ServerVersionSpec extends Qspec with ArbitraryServerVersion {
+class ServerVersionSpec extends org.specs2.scalaz.Spec with QuasarSpecification with ArbitraryServerVersion {
   "ServerVersion" should {
     "parse simple version" >> {
       ServerVersion.fromString("2.6.11") must beRightDisjunction(ServerVersion(2, 6, Some(11), ""))
@@ -90,8 +90,7 @@ class ServerVersionSpec extends Qspec with ArbitraryServerVersion {
       }
     }
   }
-}
-class ServerVersionFSpec extends org.specs2.scalaz.Spec with ArbitraryServerVersion {
+
   checkAll(order.laws[ServerVersion])
 }
 
