@@ -20,6 +20,7 @@ import quasar._
 import quasar.ejson._
 import quasar.Predef._
 import quasar.fp._
+import quasar.SKI._
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._

@@ -36,7 +36,7 @@ import quasar.Predef._
 import quasar.Variables
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
-import quasar.fp._
+import quasar.SKI._
 import quasar.fs._
 import quasar.sql.Sql
 

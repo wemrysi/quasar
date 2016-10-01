@@ -31,7 +31,7 @@ import org.threeten.bp.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
-object CoreMap {
+object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 

@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-
+import quasar.SKI._
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 

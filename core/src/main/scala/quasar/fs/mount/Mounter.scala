@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fs._
+import quasar.SKI._
 import quasar.fp._, free._
 
 import pathy.Path._

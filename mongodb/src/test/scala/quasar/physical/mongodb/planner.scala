@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
+import quasar.SKI._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._

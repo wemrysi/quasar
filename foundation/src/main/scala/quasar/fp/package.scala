@@ -312,7 +312,7 @@ trait DebugOps {
   }
 }
 
-trait SKI {
+object SKI extends Serializable {
   // NB: Unicode has double-struck and bold versions of the letters, which might
   //     be more appropriate, but the code points are larger than 2 bytes, so
   //     Scala doesn't handle them.
@@ -333,7 +333,6 @@ trait SKI {
   /** A shorter name for the identity function. */
   def ι[A]: A => A = x => x
 }
-object SKI extends SKI
 
 trait LowPriorityCoEnvImplicits {
   // TODO: move to matryoshka
@@ -360,7 +359,6 @@ package object fp
     with ProcessOps
     with QFoldableOps
     with DebugOps
-    with SKI
     with CatchableInstances {
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
@@ -531,7 +529,7 @@ package object fp
   /** A specialization of `interpret` where the leaves are of the result type.
     */
   def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
-    interpret(ι, φ)
+    interpret(SKI.ι, φ)
 
   object Inj {
     def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
@@ -586,7 +584,7 @@ package object fp
   // TODO: This should definitely be in Matryoshka.
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
       T[F] =
-    f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
+    f(t).fold(SKI.ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
   def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
@@ -654,7 +652,7 @@ package object fp
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    co => co.run.fold(κ(co), f)
+    co => co.run.fold(SKI.κ(co), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),

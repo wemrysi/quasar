@@ -18,6 +18,7 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.fp._, free._
+import quasar.SKI._
 
 import org.http4s.dsl._
 import org.http4s.headers.Host

@@ -18,6 +18,7 @@ package quasar.fp
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.SKI._
 
 import monocle.Iso
 import scalaz._

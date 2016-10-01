@@ -18,7 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.contrib.shapeless._
-import quasar.fp._
+import quasar.SKI._
 import quasar.{Func, GenericFunc, LogicalPlan, Type, SemanticError}
 
 import matryoshka._

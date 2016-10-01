@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.SKI._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 

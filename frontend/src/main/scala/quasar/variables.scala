@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp.κ
+import quasar.SKI._
 import quasar.SemanticError._
 import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST}
 

@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.SKI._
 import quasar._, Planner._
 
 import matryoshka._

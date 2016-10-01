@@ -18,6 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.SKI._
 import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
 import matryoshka._

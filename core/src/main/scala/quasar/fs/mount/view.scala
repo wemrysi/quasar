@@ -21,6 +21,7 @@ import quasar._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
+import quasar.SKI._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.sql.Sql

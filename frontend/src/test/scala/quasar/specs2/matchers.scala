@@ -18,6 +18,7 @@ package quasar.specs2
 
 import quasar.Predef._
 import quasar.RenderTree, RenderTree.ops._
+import quasar.SKI._
 import quasar.fp._
 
 import org.specs2.matcher._

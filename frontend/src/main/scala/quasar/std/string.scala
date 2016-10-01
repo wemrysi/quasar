@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 import quasar.fp._
-
+import quasar.SKI._
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failureNel}
 import shapeless.{Data => _, :: => _, _}

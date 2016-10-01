@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.Planner.NoFilesFound
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.SKI._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 

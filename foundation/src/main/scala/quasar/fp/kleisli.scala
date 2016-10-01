@@ -16,6 +16,8 @@
 
 package quasar.fp
 
+import quasar.SKI._
+
 import scalaz._
 
 trait KleisliInstances {

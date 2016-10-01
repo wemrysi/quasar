@@ -21,6 +21,7 @@ import quasar._, Planner._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.SKI._
 import quasar.fp.eitherT._
 import quasar.qscript._
 

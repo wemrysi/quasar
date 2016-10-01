@@ -18,6 +18,7 @@ package quasar
 
 import quasar.ejson.{Common, EJson, Extension}
 import quasar.Predef._
+import quasar.SKI._
 import quasar.fp._
 import quasar.javascript.{Js}
 

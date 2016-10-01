@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.SKI._
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
 import quasar.sql._

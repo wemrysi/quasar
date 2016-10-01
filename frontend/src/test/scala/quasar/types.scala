@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.SKI._
 import quasar.specs2._, QuasarMatchers._
 
 import scala.Right
