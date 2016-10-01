@@ -134,13 +134,8 @@ object MapFuncPlanner {
           }
       }
 
-    // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
-      (freshVar[F] |@| ejson.arrayEltN.qn[F]) { (i, arrElt) =>
-        let_(i -> idx) return_ {
-          arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
-        }
-      }
+      ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
     // other
     case Range(x, y)   => (x to y).point[F]

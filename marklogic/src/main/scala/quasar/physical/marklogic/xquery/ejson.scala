@@ -39,16 +39,38 @@ object ejson {
       element { ejsxs } { attribute { tpexs } { "null".xs } }
     }
 
+  // ejson:array-append($arr as element(), $item as item()*) as element()
+  def arrayAppend[F[_]: PrologW]: F[FunctionDecl2] =
+    ejs.name("array-append").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("arr")  as SequenceType("element()"),
+        $("item") as SequenceType.Top
+      ).as(SequenceType("element()")) { (arr: XQuery, item: XQuery) =>
+        mkArrayElt[F].apply(item) flatMap (mem.nodeInsertChild(arr, _))
+      }
+    }
+
   // ejson:array-concat($arr1 as element(), $arr2 as element()) as element(ejson:ejson)
-  def arrayConcat[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
+  def arrayConcat[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-concat").qn[F] |@| ejsonN.qn |@| arrayEltN.qn) { (fname, ename, aelt) =>
       declare(fname)(
-        $("arr1") as SequenceType(s"element()"),
-        $("arr2") as SequenceType(s"element()")
+        $("arr1") as SequenceType("element()"),
+        $("arr2") as SequenceType("element()")
       ).as(SequenceType(s"element($ename)")) { (arr1: XQuery, arr2: XQuery) =>
         mkArray[F] apply mkSeq_(arr1 `/` child(aelt), arr2 `/` child(aelt))
       }
     }.join
+
+  // ejson:array-element-at($arr as element(), $idx as xs:integer) as item()*
+  def arrayElementAt[F[_]: PrologW]: F[FunctionDecl2] =
+    (ejs.name("array-element-at").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
+      declare(fname)(
+        $("arr") as SequenceType("element()"),
+        $("idx") as SequenceType("xs:integer")
+      ).as(SequenceType.Top) { (arr: XQuery, idx: XQuery) =>
+        arr `/` child(aelt)(idx) `/` child.node()
+      }
+    }
 
   // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
@@ -135,6 +157,22 @@ object ejson {
         }
       }
     }.join
+
+  // ejson:object-insert($obj as element(), $key as xs:string, $value as item()*) as element()
+  //
+  // TODO: This assumes the `key` is not present in the object, for performance.
+  //       may need to switch to `objectUpdate` if we need to check that here.
+  //
+  def objectInsert[F[_]: PrologW]: F[FunctionDecl3] =
+    ejs.name("object-insert").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("obj")   as SequenceType("element()"),
+        $("key")   as SequenceType("xs:QName"),
+        $("value") as SequenceType.Top
+      ).as(SequenceType("element()")) { (obj: XQuery, key: XQuery, value: XQuery) =>
+        mkObjectEntry[F].apply(key, value) flatMap (mem.nodeInsertChild(obj, _))
+      }
+    }
 
   // ejson:seq-to-array($items as item()*) as element(ejson:ejson)
   def seqToArray[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =

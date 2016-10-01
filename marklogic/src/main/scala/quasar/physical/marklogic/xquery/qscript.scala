@@ -18,18 +18,20 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.SKI.ι
 import quasar.physical.marklogic.xml.namespaces._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
+import scalaz.IList
 import scalaz.syntax.monad._
 
 /** Functions related to qscript planning. */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object qscript {
   import syntax._, expr._, axes.{attribute, child}
-  import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl4}
+  import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl5}
 
   val qs     = NamespaceDecl(qscriptNs)
   val errorN = qs name qscriptError.local
@@ -54,26 +56,60 @@ object qscript {
       }
     }
 
-  // qscript:grouped($bucket as function(item()) as item(), $seq as item()*) as map:map
-  def grouped[F[_]: PrologW]: F[FunctionDecl2] =
-    (qs.name("grouped").qn[F] |@| asMapKey[F]) { (fname, asMKey) =>
+  // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
+  def combineN[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("combine-n").qn[F] map { fname =>
       declare(fname)(
-        $("bucket") as SequenceType("function(item()) as item()"),
-        $("seq") as SequenceType("item()*")
-      ).as(SequenceType("map:map")) { (bucket: XQuery, xs: XQuery) =>
-        val (m, x, k, o) = ("$m", "$x", "$k", "$_")
+        $("combiners") as SequenceType("(function(item()*, item()) as item()*)*")
+      ).as(SequenceType("function(item()*, item()) as item()*")) { combiners: XQuery =>
+        val (len, acc, i, x) = ("$len", "$acc", "$i", "$x")
 
-        asMKey(bucket fnapply (x.xqy)) map { theKey =>
-          let_(
-            m -> map.map(),
-            o -> for_ (x -> xs) .let_ (
-                   k -> theKey,
-                   o -> map.put(m.xqy, k.xqy, mkSeq_(map.get(m.xqy, k.xqy), x.xqy))
-                 ) .return_ (emptySeq)
-          ) .return_ (m.xqy)
+        let_ (len -> fn.count(combiners)) return_ {
+          func(acc, x) {
+            for_ (i -> (1.xqy to len.xqy)) return_ {
+              combiners(i.xqy) fnapply (acc.xqy(i.xqy), x.xqy)
+            }
+          }
         }
       }
-    }.join
+    }
+
+  // qscript:identity($x as item()*) as item()*
+  def identity[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("identity").qn[F] map { fname =>
+      declare(fname)($("x") as SequenceType.Top).as(SequenceType.Top)(ι)
+    }
+
+  // qscript:inc-avg($st as map:map, $x as item()*) as map:map
+  def incAvg[F[_]: PrologW]: F[FunctionDecl2] =
+    qs.name("inc-avg").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("st") as SequenceType("map:map"),
+        $("x")  as SequenceType.Top
+      ).as(SequenceType("map:map")) { (st: XQuery, x: XQuery) =>
+        val (c, a, y) = ("$c", "$a", "$y")
+        incAvgState[F].apply(c.xqy, y.xqy) map { nextSt =>
+          let_(
+            c -> (map.get(st, "cnt".xqy) + 1.xqy),
+            a -> map.get(st, "avg".xqy),
+            y -> (a.xqy + mkSeq_(mkSeq_(x - a.xqy) div c.xqy)))
+          .return_(nextSt)
+        }
+      }
+    }
+
+  // qscript:inc-avg-state($cntavg as map:map, $x as item()*) as map:map
+  def incAvgState[F[_]: PrologW]: F[FunctionDecl2] =
+    qs.name("inc-avg-state").qn[F] map { fname =>
+      declare(fname)(
+        $("cnt") as SequenceType("xs:integer"),
+        $("avg") as SequenceType("xs:decimal")
+      ).as(SequenceType("map:map")) { (cnt, avg) =>
+        map.new_(IList(
+          map.entry("cnt".xs, cnt),
+          map.entry("avg".xs, avg)))
+      }
+    }
 
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
@@ -91,29 +127,39 @@ object qscript {
   def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
     errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
-  // qscript:reduce(
-  //   $src as item()*,
-  //   $bucket as function(item()) as item(),
-  //   $reductions as (function(item()*) as item())*,
-  //   $repair as function(item()) as item()*
+  // qscript:reduce-with(
+  //   $initial  as function(item()*        ) as item()*,
+  //   $combine  as function(item()*, item()) as item()*,
+  //   $finalize as function(item()*        ) as item()*,
+  //   $bucket   as function(item()*        ) as item(),
+  //   $seq      as item()*
   // ) as item()*
-  def reduce[F[_]: PrologW]: F[FunctionDecl4] =
-    (qs.name("reduce").qn[F] |@| grouped[F]) { (fname, grpd) =>
+  def reduceWith[F[_]: PrologW]: F[FunctionDecl5] =
+    (qs.name("reduce-with").qn[F] |@| asMapKey[F]) { (fname, asMKey) =>
       declare(fname)(
-        $("src")        as SequenceType("item()*"),
-        $("bucket")     as SequenceType("function(item()) as item()"),
-        $("reductions") as SequenceType("(function(item()*) as item())*"),
-        $("repair")     as SequenceType("function(item()*) as item()*")
-      ).as(SequenceType("item()*")) { (src: XQuery, bucket: XQuery, reductions: XQuery, repair: XQuery) =>
-        grpd(bucket, src) map { m =>
-          val (key, bckt, reduced, res, f) = ("$key", "$bckt", "$reduced", "$res", "$f")
-          for_(
-            key -> map.keys(m))
-          .let_(
-            bckt    -> map.get(m, key.xqy),
-            reduced -> fn.map(func(f) { f.xqy fnapply (bckt.xqy) }, reductions),
-            res     -> repair.fnapply(reduced.xqy))
-          .return_(res.xqy)
+        $("initial")  as SequenceType("function(item()*) as item()*"),
+        $("combine")  as SequenceType("function(item()*, item()) as item()*"),
+        $("finalize") as SequenceType("function(item()*) as item()*"),
+        $("bucket")   as SequenceType("function(item()*) as item()"),
+        $("seq")      as SequenceType("item()*")
+      ).as(SequenceType("item()*")) { (initial: XQuery, combine: XQuery, finalize: XQuery, bucket: XQuery, xs: XQuery) =>
+        val (m, x, k, v, o) = ("$m", "$x", "$k", "$v", "$_")
+
+        asMKey(bucket fnapply (x.xqy)) map { theKey =>
+          let_(
+            m -> map.map(),
+            o -> for_ (x -> xs) .let_ (
+                   k -> theKey,
+                   v -> if_(map.contains(m.xqy, k.xqy))
+                        .then_(combine fnapply (map.get(m.xqy, k.xqy), x.xqy))
+                        .else_(initial fnapply (x.xqy)),
+                   o -> map.put(m.xqy, k.xqy, v.xqy)
+                 ) .return_ (emptySeq)
+          ) .return_ {
+            for_ (k -> map.keys(m.xqy)) .return_ {
+              finalize fnapply (map.get(m.xqy, k.xqy))
+            }
+          }
         }
       }
     }.join
@@ -143,6 +189,25 @@ object qscript {
             }
       }
     }.join
+
+  // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
+  // TODO: This and combine-n are similar, DRY them up if we go this route
+  def zipApply[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("zip-apply").qn[F] map { fname =>
+      declare(fname)(
+        $("fns") as SequenceType("(function(item()*) as item()*)*")
+      ).as(SequenceType("function(item()*) as item()*")) { fns: XQuery =>
+        val (len, i, x) = ("$len", "$i", "$x")
+
+        let_ (len -> fn.count(fns)) return_ {
+          func(x) {
+            for_ (i -> (1.xqy to len.xqy)) return_ {
+              fns(i.xqy) fnapply (x.xqy(i.xqy))
+            }
+          }
+        }
+      }
+    }
 
   // qscript:zip-map-node-keys($node as node()) as element(ejson:ejson)
   def zipMapNodeKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =

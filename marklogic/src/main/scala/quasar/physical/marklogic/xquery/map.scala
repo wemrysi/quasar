@@ -21,6 +21,9 @@ import quasar.Predef._
 import scalaz.{Foldable, IList}
 
 object map {
+  def contains(map: XQuery, key: XQuery): XQuery =
+    XQuery(s"map:contains($map, $key)")
+
   def entry(key: XQuery, value: XQuery): XQuery =
     XQuery(s"map:entry($key, $value)")
 
