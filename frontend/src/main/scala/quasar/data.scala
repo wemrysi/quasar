@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.ejson.{Common, EJson, Extension}
+import quasar.ejson.FacadeOps._
 import quasar.Predef._
 import quasar.fp._
 import quasar.javascript.{Js}
@@ -46,18 +47,13 @@ object Data {
     def jarray(vs: List[Data]): Data         = Arr(vs)
     def jobject(vs: Map[String, Data]): Data = Obj((ListMap.newBuilder[String, Data] ++= vs).result)
   }
-  implicit object EJsonDataFacade extends jawn.SimpleFacade[EJson[Data]] {
-    type J = EJson[Data]
-    private implicit def dataToEjson[A](x: Data): J = toEJson[EJson].apply(x).run.fold[J](x => x, x => x)
 
-    def jtrue(): J                     = DataFacade.jtrue()
-    def jfalse(): J                    = DataFacade.jfalse()
-    def jnull(): J                     = DataFacade.jnull()
-    def jint(s: String): J             = DataFacade.jint(s)
-    def jnum(s: String): J             = DataFacade.jnum(s)
-    def jstring(s: String): J          = DataFacade.jstring(s)
-    def jarray(vs: List[J]): J         = DataFacade.jarray(vs map fromEJson)
-    def jobject(vs: Map[String, J]): J = DataFacade.jobject(vs mapValues fromEJson)
+  implicit val EJsonDataFacade: jawn.SimpleFacade[EJson[Data]] = {
+    implicit def liftData(x: Data): EJson[Data] = toEJson[EJson].apply(x).run.fold[EJson[Data]](x => x, x => x)
+    DataFacade.xmap[EJson[Data]](
+      x => toEJson[EJson].apply(x).run.fold(x => x, x => x),
+      x => fromEJson(x)
+    )
   }
 
   final case object Null extends Data {

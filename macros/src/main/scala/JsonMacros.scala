@@ -27,12 +27,13 @@ class JsonMacroImpls(val c: Context) {
   import c.universe._
 
   type MacroFacade = Facade[Tree]
-  type JMap        = Map[String, Tree]
+  type JMap        = Map[UUID, Tree]
+
+  def maybeUuid(k: String): Option[UUID] = scala.util.Try(UUID fromString k).toOption
 
   class TreeFacade(prefix: Tree, keyMap: JMap, valueMap: JMap) extends Facade[Tree] {
-    def stringKey(s: String): Tree      = q"$s"
-    def keyOrLiteral(k: String): Tree   = keyMap.getOrElse(k, stringKey(k))
-    def valueOrLiteral(x: String): Tree = valueMap.getOrElse(x, jstring(x))
+    def keyOrLiteral(k: String): Tree   = maybeUuid(k) flatMap keyMap.get getOrElse q"$k"
+    def valueOrLiteral(x: String): Tree = maybeUuid(x) flatMap valueMap.get getOrElse jstring(x)
 
     def jtrue(): Tree                 = q"$prefix.jtrue"
     def jfalse(): Tree                = q"$prefix.jfalse"
@@ -63,10 +64,10 @@ class JsonMacroImpls(val c: Context) {
     }
     def objectContext(): FContext[Tree] = new FContext[Tree] {
       var key: String = null
-      val buf         = List.newBuilder[Tree -> Tree]
+      val buf         = List.newBuilder[(Tree, Tree)]
 
-      private def pair(l: Tree, r: Tree): Tree -> Tree = l -> r
-      private def clearKey[A](body: A): Unit   = ignore(key = null)
+      private def pair(l: Tree, r: Tree): (Tree, Tree) = l -> r
+      private def clearKey[A](body: A): Unit           = ignore(key = null)
 
       def add(arg: String): Unit = key match {
         case null => key = arg
@@ -89,9 +90,15 @@ class JsonMacroImpls(val c: Context) {
   private def fail(t: Throwable): Nothing = fail("Exception during json interpolation: " + t.getMessage)
 
   object Args {
+    def extract(parts: Seq[Tree]): Seq[String] = parts map {
+      case Literal(Constant(part: String)) => part
+      case _                               => fail("A StringContext part for the json interpolator is not a string")
+    }
+
     def unapply(t: Tree) = t match {
-      case Apply(Apply(qual, Apply(_, parts) :: Nil), implicitArg :: Nil) => Some((qual, parts, implicitArg))
-      case _                                                              => None
+      case Apply(Apply(_, Apply(_, parts) :: Nil), implicitArg :: Nil) => Some((extract(parts), implicitArg))
+      case Apply(qual, Apply(_, parts) :: Nil)                         => Some((extract(parts), q"$qual.facade"))
+      case _                                                           => None
     }
   }
 
@@ -100,34 +107,35 @@ class JsonMacroImpls(val c: Context) {
     def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): c.Expr[M[A]]
 
     def apply[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[M[A]] = c.prefix.tree match {
-      case Args(qual, parts, facade) =>
+      case Args(stringParts, facade) =>
         val A      = weakTypeOf[A]
-
-        val stringParts = parts map {
-          case Literal(Constant(part: String)) => part
-          case _                               => fail("A StringContext part for the json interpolator is not a string")
-        }
-        var uuids  = Vector[String]()
-        val keys   = scm.Map[String, Tree]()
-        val values = scm.Map[String, Tree]()
+        var uuids  = Vector[UUID]()
+        val keys   = scm.Map[UUID, Tree]()
+        val values = scm.Map[UUID, Tree]()
 
         args foreach { arg =>
           val tpe      = c.typecheck(arg.tree).tpe
-          val uuid     = UUID.randomUUID.toString
+          val uuid     = UUID.randomUUID
           uuids        = uuids :+ uuid
-          values(uuid) = if (tpe =:= A) q"$arg" else q"quasar.JLift.liftJson[$tpe, $A]($arg)"
+          values(uuid) = q"quasar.JEncoder.lift[$tpe, $A]($arg)"
 
-          if (tpe =:= typeOf[String])
+          if (tpe <:< typeOf[String])
             keys(uuid) = q"$arg"
         }
 
         if (stringParts.size != uuids.size + 1)
           fail("Invalid arguments to json interpolator")
 
-        parse(
-          ( for ((part, uuid) <- stringParts zip uuids) yield part + "\"" + uuid + "\"" ) mkString ("", "", stringParts.last),
-          new TreeFacade(q"$facade", keys.toMap, values.toMap)
-        )
+        val buf = new java.lang.StringBuilder
+        for ((part, uuid) <- stringParts zip uuids) {
+          buf append part
+          buf append '"'
+          buf append uuid.toString
+          buf append '"'
+        }
+        buf append stringParts.last
+
+        parse(buf.toString, new TreeFacade(facade, keys.toMap, values.toMap))
 
       case tree =>
         fail("Unexpected tree shape for json interpolation macro: " + tree.getClass + "\n" + showRaw(tree))
@@ -147,5 +155,14 @@ class JsonMacroImpls(val c: Context) {
     type M[X] = Vector[X]
     def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): c.Expr[M[A]] =
       c.Expr[Vector[A]](JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}"))
+  }
+
+  implicit class TryOps[A](private val x: scala.util.Try[A]) {
+    import scala.util._
+    def |(expr: => A): A = fold(_ => expr, x => x)
+    def fold[B](f: Throwable => B, g: A => B): B = x match {
+      case Success(x) => g(x)
+      case Failure(t) => f(t)
+    }
   }
 }

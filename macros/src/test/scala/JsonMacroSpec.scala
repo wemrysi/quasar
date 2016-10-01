@@ -17,22 +17,25 @@
 package quasar.macros
 
 import quasar._, Predef._
+import quasar.ejson.EJson
 import ygg.macros._
-import JsonMacros._
-import EJson._
+import JsonMacros.EJson._
 
 sealed trait FieldTree
 final case class FieldAtom() extends FieldTree
 final case class FieldSeq(xs: Vector[FieldTree]) extends FieldTree
-final case class FieldMap(xs: Vector[FieldTree -> FieldTree]) extends FieldTree
+final case class FieldMap(xs: Vector[(FieldTree, FieldTree)]) extends FieldTree
 
 class JsonMacroSpec extends quasar.Qspec {
-  val xint: Int           = 5
-  val xlong: Long         = 6L
-  val xbigint: BigInt     = BigInt(7)
-  val xdouble: Double     = 8.5d
-  val xbigdec: BigDecimal = BigDecimal("9.5")
-  val xbool: Boolean      = true
+  val xint: Int                          = 5
+  val xlong: Long                        = 6L
+  val xbigint: BigInt                    = BigInt(7)
+  val xdouble: Double                    = 8.5d
+  val xbigdec: BigDecimal                = BigDecimal("9.5")
+  val xbool: Boolean                     = true
+  val xarr: Array[Boolean]               = Array(true)
+  val xobj: Map[String, Int]             = Map("z" -> 3)
+  val xobj2: Map[String, Array[Boolean]] = Map("z" -> xarr)
 
   val jint    = json"""$xint"""
   val jlong   = json"""$xlong"""
@@ -40,7 +43,54 @@ class JsonMacroSpec extends quasar.Qspec {
   val jdouble = json"""$xdouble"""
   val jbigdec = json"""$xbigdec"""
   val jbool   = json"""$xbool"""
+  val jarr    = json"""$xarr"""
+  val jobj    = json"""$xobj"""
+  val jobj2   = json"""$xobj2"""
 
+  "json files" should {
+    "load" >> {
+      val js1 = {
+        jawn.Parser.parseFromPath[EJson[Data]]("testdata/patients-mini.json").toOption
+      }
+      val js2 = {
+        import JsonMacros.Argonaut._
+        jawn.Parser.parseFromPath[argonaut.Json]("testdata/patients-mini.json").toOption
+      }
+      val js3 = {
+        jawn.Parser.parseFromPath[Data]("testdata/patients-mini.json").toOption
+      }
+
+      js1 must beSome(beAnInstanceOf[EJson[Data]])
+      js2 must beSome(beAnInstanceOf[argonaut.Json])
+      js3 must beSome(beAnInstanceOf[Data])
+    }
+  }
+
+  "json macros" should {
+    "parse literals" >> {
+      val x = json"""{ "a" : 1, "b" : 2, "c": null }"""
+      ok
+    }
+    "interpolate" >> {
+      json"""{ "bob": $xobj, "tom": $jobj }""" must_=== json"""${ Map("bob" -> jobj, "tom" -> jobj) }"""
+    }
+    "interpolate identity" >> {
+      val x = json"[ 5 ]"
+      json"$x" must_=== json"[ 5 ]"
+    }
+    "handle sequences" >> {
+      jsonSeq"""1 2 3""" must_=== Vector(json"1", json"2", json"3")
+      jsonSeq"""
+        [ 1, 2 ]
+        [ 3, 4 ]
+      """ must_=== Vector(json"[1, 2]", json"[3, 4]")
+
+      jsonSeq"""$xbool $xarr $xobj $xobj2""" must_=== Vector(jbool, jarr, jobj, jobj2)
+    }
+  }
+
+
+/***
   type EJ = quasar.ejson.EJson[Data]
 
   def childNames(x: Data): Set[String] = x match {
@@ -79,7 +129,6 @@ class JsonMacroSpec extends quasar.Qspec {
     x.run.fold(extension, common)
   }
 
-
   "json files" should {
     "load" >> {
       val js = jawn.Parser.parseFromPath[EJ]("testdata/patients-mini.json")
@@ -89,37 +138,5 @@ class JsonMacroSpec extends quasar.Qspec {
     }
   }
 
-  "json macros" should {
-    "parse sequences" >> {
-      jsonSeq"""1 2 3""" must_=== Vector(json"1", json"2", json"3")
-    }
-    "parse literals" >> {
-      val x = json"""{ "a" : 1, "b" : 2, "c": null }"""
-      ok
-    }
-    "interpolate" >> {
-      val c = json"""[ 1, 2 ]"""
-      val x = json"""{ "a" : 1, "b" : $c }"""
-
-      x must_=== json"""{ "a" : 1, "b" : [ 1, 2 ] }"""
-    }
-    "interpolate more" >> {
-      val c1 = 55
-      val c2 = "bob"
-      val c3 = Array[Int](1, 2)
-      val c4 = Map[String, Int]("a" -> 1, "b" -> 2)
-      val x = json"""[ $c1, $c2, $c3, $c4 ]"""
-
-      x must_=== json"""[ 55, "bob", [ 1, 2 ], { "a": 1, "b": 2 } ]"""
-    }
-    "interpolate yet more" >> {
-      val c1 = Map[String, Boolean]("a" -> false, "b" -> true)
-      val c2 = json"""{ "x1": $c1, "y1": $c1 }"""
-      val c3 = json"""{ "x2": $c2, "y2": $c2 }"""
-      val c4 = json"""[ $c1, $c2, $c3 ]"""
-
-      println(c4)
-      ok
-    }
-  }
+***/
 }
