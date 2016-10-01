@@ -302,7 +302,7 @@ lazy val ygg     = project |> setup |> Ygg.ygg
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    macros1, ygg,
+    macros, macros1, ygg,
     ejson % BothScopes,
     effect % BothScopes,
     js % BothScopes,

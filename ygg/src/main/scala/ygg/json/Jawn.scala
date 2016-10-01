@@ -29,7 +29,8 @@ object AsyncParser {
 }
 
 object JParser {
-  def parseFromPath(path: String): JValue                           = macro ygg.macros.JsonMacros.parseFromPathImpl
+  def parseFromPath(path: String): JValue                           = parseFromPath(java.nio.file.Paths get path)
+  def parseFromPath(path: jPath): JValue                            = parseUnsafe(path.slurpString)
   def parseFromStream(in: InputStream): JValue                      = parseUnsafe(slurpString(in))
   def parseFromResource[A: CTag](name: String): JValue              = parseUnsafe(slurpString(jResource[A](name)))
   def parseUnsafe(str: String): JValue                              = Parser.parseUnsafe[JValue](str)

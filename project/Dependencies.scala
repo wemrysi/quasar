@@ -22,10 +22,6 @@ object Dependencies {
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
-  def macros1 = Seq(
-    "org.spire-math" %% "jawn-parser"   % "0.9.0",
-    "io.circe"       %% "circe-generic" % "0.4.1"
-  )
   def ygg = Seq(
     "org.mapdb"      %  "mapdb"             % "3.0.1",
     "com.slamdata"   %% "pathy-core"        % pathyVersion,

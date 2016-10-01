@@ -29,13 +29,6 @@ package object json {
   type JStringValue = String -> JValue
 
   type Result[A]    = Validation[Throwable, A]
-  val Json          = io.circe.Json
-  val Encoder       = io.circe.Encoder
-  val Decoder       = io.circe.Decoder
-  type Json         = io.circe.Json
-  type Encoder[A]   = io.circe.Encoder[A]
-  type Decoder[A]   = io.circe.Decoder[A]
-  type HCursor      = io.circe.HCursor
 
   val NoJPath = JPath()
   def undef: JValue = JUndefined
@@ -55,38 +48,6 @@ package object json {
       case scala.util.Left(t: ParseException) => AsyncParse(Seq(t), Nil) -> p.copy()
       case scala.util.Left(t)                 => AsyncParse(Seq(new ParseException(t.getMessage, 0, 0, 0)), Nil) -> p.copy()
     }
-  }
-
-  implicit def circeToJvalue(x: Json): JValue = x.as[JValue].toOption getOrElse JUndefined
-
-  implicit val CirceJsonEncoder: Encoder[JValue] = Encoder instance {
-    case JUndefined => Json.Null // ???
-    case JNull      => Json.Null
-    case JBool(x)   => Json fromBoolean x
-    case JNum(x)    => Json fromBigDecimal x
-    case JString(x) => Json fromString x
-    case JObject(x) => Json fromFields (x mapValues CirceJsonEncoder.apply)
-    case JArray(x)  => Json arr (x map CirceJsonEncoder.apply: _*)
-  }
-  implicit val CirceJsonDecoder: Decoder[JValue] = Decoder[Json] map (c =>
-    c.fold[JValue](
-      JNull,
-      JBool(_),
-      _.toBigDecimal.fold[JValue](JUndefined)(JNum(_)),
-      JString(_),
-      xs => JArray(xs map circeToJvalue toVector),
-      x => JObject(x.toMap mapValues circeToJvalue toMap)
-    )
-  )
-  implicit val YggFacade: SimpleFacade[JValue] = new SimpleFacade[JValue] {
-    def jnull()                          = JNull
-    def jfalse()                         = JFalse
-    def jtrue()                          = JTrue
-    def jnum(s: String)                  = JNum(s)
-    def jint(s: String)                  = JNum(s)
-    def jstring(s: String)               = JString(s)
-    def jarray(vs: List[JValue])         = JArray(vs.toVector)
-    def jobject(vs: Map[String, JValue]) = JObject(vs)
   }
 
   implicit def tryToResult[A](x: Try[A]): Result[A] = x match {

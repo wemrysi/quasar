@@ -78,6 +78,17 @@ final case class JNumBigDec(b: BigDecimal)            extends JNum
 object JValue {
   type JStringValue = String -> JValue
 
+  implicit val YggFacade: jawn.SimpleFacade[JValue] = new jawn.SimpleFacade[JValue] {
+    def jnull()                          = JNull
+    def jfalse()                         = JFalse
+    def jtrue()                          = JTrue
+    def jnum(s: String)                  = JNum(s)
+    def jint(s: String)                  = JNum(s)
+    def jstring(s: String)               = JString(s)
+    def jarray(vs: List[JValue])         = JArray(vs.toVector)
+    def jobject(vs: Map[String, JValue]) = JObject(vs)
+  }
+
   implicit object Order extends Ord[JValue] {
     def order(x: JValue, y: JValue): Ordering = (x, y) match {
       case (JObject(m1), JObject(m2))     => fieldsCompare(m1, m2)

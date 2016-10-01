@@ -32,12 +32,12 @@ object Ygg {
   def macros1(p: Project): Project = ( p
     .dependsOn('foundation % BothScopes)
     .settings(name := "quasar-macros1-internal")
-    .settings(libraryDependencies ++= Dependencies.macros1)
+    .settings(libraryDependencies ++= Seq("org.spire-math" %% "jawn-parser" % "0.9.0"))
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
   )
 
   def ygg(p: Project): Project = ( p
-    .dependsOn('foundation % BothScopes, 'macros1)
+    .dependsOn('foundation % BothScopes, 'macros1, 'ejson)
     .settings(name := "quasar-ygg-internal")
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)

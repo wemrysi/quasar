@@ -136,7 +136,7 @@ class JsonMacros(val c: Context) {
           val tpe      = c.typecheck(arg.tree).tpe
           val uuid     = UUID.randomUUID.toString
           uuids        = uuids :+ uuid
-          values(uuid) = q"io.circe.Encoder[$tpe].apply($arg)"
+          values(uuid) = q"quasar.JEncoder.lift[$tpe, ygg.json.JValue]($arg)"
 
           if (tpe =:= typeOf[String])
             keys(uuid) = q"$arg"
