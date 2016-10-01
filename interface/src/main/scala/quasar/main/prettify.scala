@@ -22,7 +22,7 @@ import quasar._
 
 import scala.Predef.{ArrowAssoc, augmentString, intWrapper}
 
-import scalaz._
+import scalaz._, Scalaz._
 
 object Prettify {
   sealed trait Segment extends Product with Serializable
@@ -41,7 +41,7 @@ object Prettify {
     def ::(prefix: Segment): Path = Path(prefix :: segs)
   }
   object Path{
-    def apply(segs: Segment*): Path = Path(segs.toList)
+    def singleton(seg: Segment): Path = Path(List(seg))
 
     def parse(str: String): String \/ Path = PathParser(str)
 
@@ -80,7 +80,7 @@ object Prettify {
     def loop(data: Data): Data \/ List[(Path, Data)] = {
       def prepend(name: Segment, data: Data): List[(Path, Data)] =
         loop(data) match {
-          case -\/ (value) => (Path(name) -> value) :: Nil
+          case -\/ (value) => (Path.singleton(name) -> value) :: Nil
           case  \/-(map)   => map.map(t => (name :: t._1) -> t._2)
         }
       data match {
@@ -91,7 +91,7 @@ object Prettify {
     }
 
     loop(data) match {
-      case -\/ (value) => ListMap(Path(FieldSeg("value")) -> value)
+      case -\/ (value) => ListMap(Path.singleton(FieldSeg("value")) -> value)
       case  \/-(map)   => map.toListMap
     }
   }
@@ -100,15 +100,22 @@ object Prettify {
     val init = Data.Obj(ListMap())
 
     def append(v: Data, p: Path, d: Data): Data = (v, p) match {
-      case (Data.Obj(values), Path(FieldSeg(s) :: Nil)) => Data.Obj(values + (s -> d))
-      case (Data.Obj(values), Path(FieldSeg(s) :: rest)) => Data.Obj(values + (s -> append(values.get(s).getOrElse(init), Path(rest), d)))
+      case (Data.Obj(values), Path(FieldSeg(s) :: Nil)) =>
+        Data.Obj(values + (s -> d))
+      case (Data.Obj(values), Path(FieldSeg(s) :: rest)) =>
+        Data.Obj(values + (s -> append(values.get(s).getOrElse(init), Path(rest), d)))
+      case (Data.Obj(values), Path(IndexSeg(_) :: _)) if values.isEmpty =>
+        append(Data.Arr(List()), p, d)
 
-      case (Data.Obj(values), Path(IndexSeg(_) :: _)) if values.isEmpty => append(Data.Arr(List()), p, d)
-
-      case (Data.Arr(values), Path(IndexSeg(x) :: _)) if values.size < x => append(Data.Arr(values :+ Data.Null), p, d)
-      case (Data.Arr(values), Path(IndexSeg(x) :: Nil)) if values.size == x => Data.Arr(values :+ d)
-      case (Data.Arr(values), Path(IndexSeg(x) :: rest)) if values.size == x => Data.Arr(values :+ append(init, Path(rest), d))
-      case (Data.Arr(values), Path(IndexSeg(x) :: rest)) if values.size == x+1 => Data.Arr(values.dropRight(1) :+ append(values.lastOption.getOrElse(init), Path(rest), d))
+      case (Data.Arr(values), Path(IndexSeg(x) :: _)) if values.size < x =>
+        append(Data.Arr(values :+ Data.Null), p, d)
+      case (Data.Arr(values), Path(IndexSeg(x) :: Nil)) if values.size ≟ x =>
+        Data.Arr(values :+ d)
+      case (Data.Arr(values), Path(IndexSeg(x) :: rest)) if values.size ≟ x =>
+        Data.Arr(values :+ append(init, Path(rest), d))
+      case (Data.Arr(values), Path(IndexSeg(x) :: rest))
+          if values.size ≟ (x + 1) =>
+        Data.Arr(values.dropRight(1) :+ append(values.lastOption.getOrElse(init), Path(rest), d))
 
       case _ => v
     }
@@ -145,14 +152,16 @@ object Prettify {
   def parse(str: String): Option[Data] = {
     import argonaut._
 
-    if (str == "") None
-    else if (str == "null") Some(Data.Null)
-    else if (str == "true") Some(Data.Bool(true))
-    else if (str == "false") Some(Data.Bool(false))
-    else
-      str.parseBigInt.toOption.map(Data.Int(_)) orElse
-        str.parseBigDecimal.toOption.map(Data.Dec(_)) orElse
+    str match {
+      case ""      => None
+      case "null"  => Data.Null.some
+      case "true"  => Data.Bool(true).some
+      case "false" => Data.Bool(false).some
+      case _       =>
+        str.parseBigInt.toOption.map(Data.Int(_)) orElse
+          str.parseBigDecimal.toOption.map(Data.Dec(_)) orElse
           DataCodec.Readable.decode(Json.jString(str)).toOption
+    }
   }
 
   /**
@@ -166,7 +175,7 @@ object Prettify {
     else {
       val flat = rows.map(flatten)
       val columnNames0 = flat.map(_.keys.toList).foldLeft[List[Path]](Nil)(mergePaths)
-      val columnNames = if (columnNames0.isEmpty) List(Path(FieldSeg("<empty>"))) else columnNames0
+      val columnNames = if (columnNames0.isEmpty) List(Path.singleton(FieldSeg("<empty>"))) else columnNames0
 
       val columns: List[(Path, List[Aligned[String]])] =
         columnNames.map(n => n -> flat.map(m => m.get(n).fold[Aligned[String]](Aligned.Left(""))(render)))
@@ -219,7 +228,7 @@ object Prettify {
       n max 1,
       { rows =>
         val cols = rows.map(flatten(_).keys.toList).foldLeft[List[Path]](Nil)(mergePaths)
-        if (cols.isEmpty) List(Path(FieldSeg("<empty>"))) else cols
+        if (cols.isEmpty) List(Path.singleton(FieldSeg("<empty>"))) else cols
       },
       _.map(_.label),
       { (row, cols) =>
