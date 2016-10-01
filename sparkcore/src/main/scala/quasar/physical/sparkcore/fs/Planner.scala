@@ -135,7 +135,7 @@ object Planner {
           case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
           case _ => Data.NA
         }
-        case Avg(_) => ???
+        case Avg(_) => ??? // TODO implement avg
         case Arbitrary(_) => (d1: Data, d2: Data) => d1
         case UnshiftArray(a) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Arr(a), Data.Arr(b)) => Data.Arr(a ++ b)
