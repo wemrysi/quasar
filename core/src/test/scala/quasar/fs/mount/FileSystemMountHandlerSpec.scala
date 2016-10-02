@@ -80,9 +80,7 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
     DefinitionResult[AbortM](abortFs, abort.fail(sig))
 
   val fsDef = FileSystemDef.fromPF {
-    case (typ, _) if typ == testType =>
-      type X[A] = DefErrT[AbortM, A]
-      fsResult("DEF").point[X]
+    case FsCfg(`testType`, _) => fsResult("DEF").point[DefErrT[AbortM, ?]]
   }
 
   val invalidPath =

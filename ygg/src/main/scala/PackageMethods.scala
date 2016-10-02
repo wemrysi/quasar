@@ -42,7 +42,6 @@ trait PackageMethods {
   def jResource(c: jClass, name: String): InputStream             = c getResourceAsStream name
   def newScratchDir(): File                                       = Files.createTempDirectory("ygg").toFile
   def systemMillis(): Long                                        = java.lang.System.currentTimeMillis()
-  def implicitly[A](implicit z: A): A                             = z
   def discard[A](value: A): Unit                                  = () // for avoiding "discarding non-Unit value" warnings
   def mutableQueue[A: Ord](xs: A*): scmPriorityQueue[A]           = scmPriorityQueue(xs: _*)
 

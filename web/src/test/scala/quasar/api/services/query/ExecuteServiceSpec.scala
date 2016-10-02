@@ -180,7 +180,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
               offset = Some(offset),
               limit = Some(Positive(limit.get.toLong).get),
               varNameAndValue = Some((varName.value, var_.toString)))),
-            state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
+            state = filesystem.state.copy(planMap = Map(limitedLp -> limitedContents)),
             status = Status.Ok,
             response = (a: String) => a must_==
               jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync
@@ -193,7 +193,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           path = filesystem.parent,
           query = Some(Query(query, offset = Some(offset), limit = Some(limit), varNameAndValue = Some((varName.value, var_.toString)))),
           destination = Some(destination),
-          state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
+          state = filesystem.state.copy(planMap = Map(lp -> filesystem.contents)),
           status = Status.Ok,
           response = json => Json.parse(json.nospaces) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
             outValue.as[String] must_== printPath(expectedDestinationPath)

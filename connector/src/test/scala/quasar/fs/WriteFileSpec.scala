@@ -58,7 +58,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
         type Result[A] = FileSystemErrT[MemStateTask,A]
 
         p.translate[Result](MemTask.interpretT).runLog.run
-          .leftMap(_.wm)
+          .leftMap(_.writeMap)
           .run(emptyMem)
           .unsafePerformSync must_=== ((Map.empty, \/.right(xs)))
       }
@@ -112,7 +112,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
           val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
 
           MemFixTask.runLogWithWrites(ws.toList, p).run
-            .leftMap(_.contents.keySet)
+            .leftMap(_.fileMap.keySet)
             .run(emptyMem)
             .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
         }
@@ -169,7 +169,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
           val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
 
           MemFixTask.runLogWithWrites(ws.toList, p).run
-            .leftMap(_.contents.keySet)
+            .leftMap(_.fileMap.keySet)
             .run(emptyMem)
             .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
         }

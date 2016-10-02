@@ -18,10 +18,10 @@ package ygg.pkg
 
 import scala.collection.{ mutable => scm, immutable => sci }
 import scalaz.Need
+import quasar.Predef._
 
 trait PackageAliases {
   // scala stdlib
-  type ->[+A, +B]                     = scala.Tuple2[A, B]
   type =?>[-A, +B]                    = scala.PartialFunction[A, B]
   type Any                            = scala.Any
   type AnyRef                         = scala.AnyRef

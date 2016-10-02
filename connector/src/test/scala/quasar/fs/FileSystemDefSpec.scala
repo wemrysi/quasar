@@ -32,7 +32,7 @@ class FileSystemDefSpec extends QuasarSpecification {
   type DefId[A] = DefErrT[Id, A]
 
   val defnResult =
-    DefinitionResult[Id](Empty.fileSystem[Id], ())
+    DefinitionResult[Id](Empty[Id].fileSystem, ())
 
   val successfulDef =
     FileSystemDef(κ(defnResult.point[DefId].some))

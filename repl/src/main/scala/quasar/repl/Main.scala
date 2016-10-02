@@ -148,7 +148,7 @@ object Main {
                       else ().point[MainTask]
 
       cfgRef       <- TaskRef(config).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty[HierarchicalFsEffM].fileSystem).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](

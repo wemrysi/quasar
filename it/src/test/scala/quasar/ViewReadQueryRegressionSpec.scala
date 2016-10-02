@@ -41,7 +41,7 @@ class ViewReadQueryRegressionSpec
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(expr, vars))) |@|
-      TaskRef(Empty.fileSystem[HierarchicalFsEffM]) |@|
+      TaskRef(Empty[HierarchicalFsEffM].fileSystem) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) { (cfgsRef, hfsRef, mntdRef) =>
       val mnt =

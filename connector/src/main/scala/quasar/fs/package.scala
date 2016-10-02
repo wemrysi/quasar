@@ -24,10 +24,12 @@ import quasar.fp.free._
 import scalaz.{Failure => _, _}
 
 package object fs extends PhysicalErrorPrisms {
-  type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
+  implicit def queryFileSystem[F[_]](x: QueryFileSystem[F]): QueryFile ~> F    = x.queryFile
+  implicit def readFileSystem[F[_]](x: ReadFileSystem[F]): ReadFile ~> F       = x.readFile
+  implicit def writeFileSystem[F[_]](x: WriteFileSystem[F]): WriteFile ~> F    = x.writeFile
+  implicit def manageFileSystem[F[_]](x: ManageFileSystem[F]): ManageFile ~> F = x.manageFile
 
-  type FileSystemFailure[A] = Failure[FileSystemError, A]
-  type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
+  type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
 
   type MonadFsErr[F[_]] = MonadError[F, FileSystemError]
 
@@ -35,7 +37,9 @@ package object fs extends PhysicalErrorPrisms {
     def apply[F[_]](implicit F: MonadFsErr[F]): MonadFsErr[F] = F
   }
 
-  type PhysErr[A] = Failure[PhysicalError, A]
+  type FileSystemFailure[A]    = Failure[FileSystemError, A]
+  type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
+  type PhysErr[A]              = Failure[PhysicalError, A]
 
   def interpretFileSystem[M[_]](
     q: QueryFile ~> M,

@@ -85,6 +85,8 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
   implicit def fileSystemErrorResponse: ToApiError[FileSystemError] = {
     import FileSystemError._
     error {
+      case Unimplemented =>
+        fromStatus(Status.BadRequest withReason "Unimplemented method")
       case ExecutionFailed(lp, reason, det, cause) =>
         fromMsg(
           InternalServerError withReason "Failed to execute SQL^2 query.",

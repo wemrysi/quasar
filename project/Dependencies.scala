@@ -38,6 +38,10 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-iteratee"           % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % "0.8.3a",
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
+    "com.github.julien-truffaut" %% "monocle-state"             % monocleVersion,
+    "com.github.julien-truffaut" %% "monocle-generic"           % monocleVersion,
+    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+    "ai.x"                       %% "lens"                      % "1.0.0",
     "io.argonaut"                %% "argonaut"                  % argonautVersion,
     "io.argonaut"                %% "argonaut-jawn"             % argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
@@ -57,7 +61,6 @@ object Dependencies {
   )
   def core = Seq(
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
-    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
     "com.slamdata"               %% "pathy-argonaut" %  pathyVersion
   )

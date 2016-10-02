@@ -47,6 +47,7 @@ object FileSystemError {
     lp: Fix[LogicalPlan],
     err: PlannerError
   ) extends FileSystemError
+
   final case class QScriptPlanningFailed private (err: PlannerError)
     extends FileSystemError
   final case class UnknownResultHandle private (h: ResultHandle)
@@ -61,6 +62,8 @@ object FileSystemError {
     extends FileSystemError
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
+
+  final case object Unimplemented extends FileSystemError
 
   val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
     case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
@@ -109,6 +112,8 @@ object FileSystemError {
 
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {
+      case Unimplemented =>
+        "Called unimplemented method"
       case ExecutionFailed(_, rsn, _, c) =>
         s"Plan execution failed: $rsn, cause=${c.map(_.cause.getMessage)}"
       case PathErr(e) =>

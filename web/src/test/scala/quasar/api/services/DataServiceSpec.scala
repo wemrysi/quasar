@@ -51,6 +51,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 import quasar.api.PathUtils._
+import FileSystemIndependentTypes._
 
 class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
@@ -458,7 +459,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
     "MOVE" >> {
       trait StateChange
       object Unchanged extends StateChange
-      case class Changed(newContents: FileMap) extends StateChange
+      case class Changed(newContents: FileMap[Chunks]) extends StateChange
 
       def testMove[A: EntityDecoder, R: AsResult](
           from: APath,
