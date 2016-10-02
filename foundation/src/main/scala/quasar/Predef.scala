@@ -30,6 +30,14 @@ class Predef extends LowPriorityImplicits {
   type ValueOf[A]                           = scala.ValueOf[A]
   def valueOf[A](implicit z: ValueOf[A]): A = z.value
 
+  type ->[+A, +B] = (A, B)
+
+  @inline final def implicitly[A](implicit value: A): A = value
+
+  implicit class QuasarPredefOps[A](private val lhs: A) {
+    def |>[B](f: A => B): B = f(lhs)
+  }
+
   /** An endomorphism is a mapping from a category to itself.
    *  It looks like scalaz already staked out "Endo" for the
    *  lower version.

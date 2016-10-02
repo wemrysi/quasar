@@ -42,8 +42,8 @@ object Mounter {
     S1: MountConfigs :<: S
   ): Mounting ~> Free[S, ?] = {
 
-    type FreeS[A]  = Free[S, A]
-    type MntE[A]   = MntErrT[FreeS, A]
+    type FreeS[A] = Free[S, A]
+    type MntE[A]  = MntErrT[FreeS, A]
 
     val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
     val merr = MonadError[MntE, MountingError]

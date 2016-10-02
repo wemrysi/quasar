@@ -21,10 +21,8 @@ import quasar.{EnvironmentError, EnvErrT, EnvErr, NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.contrib.pathy._
-import quasar.fp._
-import quasar.fp.free._
-import quasar.fs._
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}
+import quasar.fp._, free._
+import quasar.fs._, mount._
 import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
 
@@ -59,7 +57,7 @@ package object fs {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
-      runM(WorkflowExecutor.mongoDb)                 |@|
+      runM(WorkflowExecutor.mongoDb)                |@|
       queryfile.run[BsonCursor, S](client, defDb)
         .liftM[EnvErrT]                             |@|
       readfile.run[S](client).liftM[EnvErrT]        |@|
@@ -77,7 +75,7 @@ package object fs {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
-    case (MongoDBFsType, uri) =>
+    case FsCfg(MongoDBFsType, uri) =>
       type M[A] = Free[S, A]
       for {
         client <- asyncClientDef[S](uri)
@@ -101,7 +99,7 @@ package object fs {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
-      runM(WorkflowExecutor.mongoDb)                 |@|
+      runM(WorkflowExecutor.mongoDb)                |@|
       queryfile.run[BsonCursor, S](client, defDb)
         .liftM[EnvErrT]                             |@|
       readfile.run[S](client).liftM[EnvErrT]        |@|
@@ -119,7 +117,7 @@ package object fs {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
-    case (FileSystemType("mongodbq"), uri) =>
+    case FsCfg(FileSystemType("mongodbq"), uri) =>
       type M[A] = Free[S, A]
       for {
         client <- asyncClientDef[S](uri)

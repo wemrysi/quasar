@@ -41,6 +41,12 @@ package object pathy {
 
   type PathSegment = DirName \/ FileName
 
+  implicit def liftDirName(x: DirName): PathSegment = x.left
+  implicit def liftFileName(x: FileName): PathSegment = x.right
+
+  def pathName(p: APath): Option[PathSegment] =
+    refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
+
   implicit val DirNameOrder: Order[DirName] = Order.orderBy(_.value)
   implicit val FileNameOrder: Order[FileName] = Order.orderBy(_.value)
 

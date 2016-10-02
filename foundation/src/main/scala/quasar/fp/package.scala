@@ -395,7 +395,12 @@ package object fp
     * you're discarding the result, and effectively suppresses the
     * "NonUnitStatement" warning from wartremover.
     */
-  def ignore[A](a: A): Unit = ()
+  @inline final def ignore[A](a: A): Unit = ()
+
+  @inline final def doto[A, B](value: A)(f: A => B): A = {
+    ignore(f(value))
+    value
+  }
 
   def reflNT[F[_]] = λ[F ~> F](x => x)
 

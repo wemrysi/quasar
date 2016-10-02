@@ -55,7 +55,7 @@ object AlphaAndSpecialCharacters {
 }
 
 trait FileSystemFixture {
-  import FileSystemFixture._, InMemory._
+  import FileSystemFixture._, InMemory._, Impl.{ queryFile, readFile, writeFile, manageFile }
 
   val query  = QueryFile.Ops[FileSystem]
   val read   = ReadFile.Ops[FileSystem]

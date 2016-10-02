@@ -26,6 +26,5 @@ import scalaz._
 abstract class LiftedOps[G[_], S[_]](implicit S: G :<: S) {
   type F[A] = Free[S, A]
 
-  def lift[A](ga: G[A]): F[A] =
-    free.lift(ga).into[S]
+  def lift[A](ga: G[A]): F[A] = (free lift ga).into[S]
 }

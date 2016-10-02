@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar.fs._
 import quasar.fs.QueryFile.ResultHandle
-import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+import quasar.fs.mount.{ FsCfg, FileSystemDef }, FileSystemDef.DefErrT
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
 import quasar.effect._
@@ -84,10 +84,9 @@ package object local {
     writefile.chrooted[Eff](fsConf.prefix),
     managefile.chrooted[Eff](fsConf.prefix))
 
-  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
-      FileSystemDef[Free[S, ?]] =
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case (FsType, uri) =>
+      case FsCfg(FsType, uri) =>
         for {
           fsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
           res <- {
