@@ -74,15 +74,22 @@ object Mounter {
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
       }
 
+    def forPrefix(dir: ADir): FreeS[Set[APath]] =
+      mountConfigs.keys.map(_
+        .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
+        .toSet)
+
+    def handleUnmount(path: APath): OptionT[FreeS, Unit] =
+      mountConfigs.get(path)
+        .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
+        .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
+
     λ[Mounting ~> FreeS] {
       case HavingPrefix(dir) =>
-        mountConfigs.keys flatMap { paths =>
-          paths.foldLeftM(Map[APath, MountType]())((m, p) =>
-            if (((dir: APath) =/= p) && p.relativeTo(dir).isDefined)
-              lookupType(p).map(m.updated(p, _)).getOrElse(m)
-            else
-              m.point[FreeS])
-        }
+        for {
+          paths <- forPrefix(dir)
+          pairs <- paths.toList.traverse(p => lookupType(p).strengthL(p).run)
+        } yield pairs.flatMap(_.toList).toMap
 
       case LookupType(path) =>
         lookupType(path).run
@@ -97,9 +104,10 @@ object Mounter {
         handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
 
       case Unmount(path) =>
-        mountConfigs.get(path)
-          .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
-          .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
+        handleUnmount(path)
+          .flatMapF(_ =>
+            refineType(path).swap.foldMap(forPrefix)
+              .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
     }
