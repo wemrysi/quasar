@@ -133,6 +133,7 @@ object FileSystemTest {
   def externalFsUT = TestConfig.externalFileSystems {
     fsTestConfig(mongodb.fs.MongoDBFsType, mongodb.fs.mongoDbFileSystemDef) orElse
     fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)                orElse
+    fsTestConfig(jsonfile.fs.FsType, jsonfile.fs.definition)                orElse
     fsTestConfig(postgresql.fs.FsType, postgresql.fs.definition)            orElse
     fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)  orElse
     fsTestConfig(marklogic.fs.FsType, marklogic.fs.definition)
