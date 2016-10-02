@@ -190,7 +190,7 @@ lazy val root = project.in(file("."))
   .settings(noPublishSettings)
   .settings(aggregate in assembly := false)
   .aggregate(
-    foundation, macros,
+    foundation,
 //     / / | | \ \
 //
         ejson, js,  // NB: need to get dependencies to look like:
@@ -201,7 +201,7 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
-  core, marklogic, mongodb, postgresql, skeleton, sparkcore, macros1, ygg,
+  core, marklogic, mongodb, postgresql, skeleton, sparkcore, macros, macros1, ygg, jsonfile,
 //      \ \ | / /
         interface,
 //        /  \
@@ -378,6 +378,12 @@ lazy val sparkcore = project
     wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val jsonfile = project
+  .settings(name := "quasar-jsonfile-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
 // interfaces
 
 lazy val interface = project
@@ -388,6 +394,7 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
+    jsonfile,
     skeleton)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
