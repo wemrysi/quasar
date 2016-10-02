@@ -72,8 +72,8 @@ class BlockAlignSpec extends quasar.Qspec {
       "merges over three cells"            in threeCellMerge
       "empty input"                        in emptySort
       "with uniqueness for keys"           in uniqueSort
-      "arbitrary datasets"                 in checkSortDense(SortAscending)
-      "arbitrary datasets descending"      in checkSortDense(SortDescending)
+      "arbitrary datasets"                 in checkSortDense(SortAscending).flakyTest
+      "arbitrary datasets descending"      in checkSortDense(SortDescending).flakyTest
       "something something het sort"       in secondHetSortSample
     }
   }
