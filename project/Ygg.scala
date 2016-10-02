@@ -32,7 +32,6 @@ object Ygg {
   def macros1(p: Project): Project = ( p
     .dependsOn('foundation % BothScopes)
     .settings(name := "quasar-macros1-internal")
-    .settings(libraryDependencies ++= Seq("org.spire-math" %% "jawn-parser" % "0.9.0"))
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
   )
 
@@ -42,5 +41,10 @@ object Ygg {
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+  )
+
+  def jsonfile(p: Project): Project = ( p
+    .dependsOn('connector % BothScopes, 'ygg % BothScopes)
+    .settings(name := "quasar-jsonfile-internal")
   )
 }

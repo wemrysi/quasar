@@ -8,7 +8,7 @@ object Dependencies {
   private val argonautVersion   = "6.2-M3"
   private val doobieVersion     = "0.3.0"
   private val http4sVersion     = "0.14.1a"
-  private val jawnVersion       = "0.8.4"
+  private val jawnVersion       = "0.9.0"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
   private val nettyVersion      = "4.1.3.Final"
@@ -24,14 +24,13 @@ object Dependencies {
 
   def ygg = Seq(
     "org.mapdb"      %  "mapdb"             % "3.0.1",
-    "com.slamdata"   %% "pathy-core"        % pathyVersion,
     "org.spire-math" %% "spire-macros"      % "0.12.0",
-    "org.specs2"     %% "specs2-scalacheck" % specsVersion  % Test
+    "org.specs2"     %% "specs2-scalacheck" % specsVersion % Test
   )
 
   def foundation = Seq(
-    "org.spire-math"             %% "jawn-parser"               % "0.9.0",
-    "org.spire-math"             %% "jawn-ast"                  % "0.9.0",
+    "org.spire-math"             %% "jawn-parser"               % jawnVersion,
+    "org.spire-math"             %% "jawn-ast"                  % jawnVersion,
     "org.threeten"               %  "threetenbp"                % "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               % scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
@@ -94,7 +93,6 @@ object Dependencies {
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.fasterxml.uuid"         %  "java-uuid-generator" % "3.1.4",
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   def web = Seq(

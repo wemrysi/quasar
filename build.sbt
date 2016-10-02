@@ -295,9 +295,10 @@ lazy val sql = project
 
 def setup(p: Project): Project = p settings commonSettings enablePlugins AutomateHeaderPlugin
 
-lazy val macros  = project |> setup |> Ygg.macros
-lazy val macros1 = project |> setup |> Ygg.macros1
-lazy val ygg     = project |> setup |> Ygg.ygg
+lazy val macros   = project |> setup |> Ygg.macros
+lazy val macros1  = project |> setup |> Ygg.macros1
+lazy val ygg      = project |> setup |> Ygg.ygg
+lazy val jsonfile = project |> setup |> Ygg.jsonfile
 
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
@@ -376,12 +377,6 @@ lazy val sparkcore = project
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
     wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val jsonfile = project
-  .settings(name := "quasar-jsonfile-internal")
-  .dependsOn(connector % BothScopes)
-  .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
