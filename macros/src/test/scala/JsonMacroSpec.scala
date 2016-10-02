@@ -16,17 +16,25 @@
 
 package quasar.macros
 
+import scala.language.experimental.macros
+import scala.{ Any, StringContext }
+import scala.reflect.ClassTag
+import scala.Predef.implicitly
 import quasar._, Predef._
-import quasar.ejson.EJson
 import ygg.macros._
-import JsonMacros.EJson._
 
-sealed trait FieldTree
-final case class FieldAtom() extends FieldTree
-final case class FieldSeq(xs: Vector[FieldTree]) extends FieldTree
-final case class FieldMap(xs: Vector[(FieldTree, FieldTree)]) extends FieldTree
+class ArgonautJsonSpec extends AbstractJsonSpec[argonaut.Json]()(argonaut.JawnParser.facade, implicitly[ClassTag[argonaut.Json]])
+class DataJsonSpec extends AbstractJsonSpec[quasar.Data]()
+class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[quasar.Data]]()(quasar.Data.EJsonDataFacade, implicitly)
+class JawnJsonSpec extends AbstractJsonSpec[jawn.ast.JValue]()
+// class PrecogJsonSpec extends AbstractJsonSpec[ygg.json.JValue]()
 
-class JsonMacroSpec extends quasar.Qspec {
+abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassTag[A]) extends quasar.Qspec {
+  implicit class Interpolator(sc: StringContext)(implicit val facade: jawn.Facade[A]) {
+    def json(args: Any*): A            = macro JsonMacroImpls.singleImpl[A]
+    def jsonSeq(args: Any*): Vector[A] = macro JsonMacroImpls.manyImpl[A]
+  }
+
   val xint: Int                          = 5
   val xlong: Long                        = 6L
   val xbigint: BigInt                    = BigInt(7)
@@ -49,20 +57,11 @@ class JsonMacroSpec extends quasar.Qspec {
 
   "json files" should {
     "load" >> {
-      val js1 = {
-        jawn.Parser.parseFromPath[EJson[Data]]("testdata/patients-mini.json").toOption
-      }
-      val js2 = {
-        import JsonMacros.Argonaut._
-        jawn.Parser.parseFromPath[argonaut.Json]("testdata/patients-mini.json").toOption
-      }
-      val js3 = {
-        jawn.Parser.parseFromPath[Data]("testdata/patients-mini.json").toOption
-      }
+      val js = jawn.Parser.parseFromPath[A]("testdata/patients-mini.json").toOption
+      js must beSome.which(ctag.runtimeClass isAssignableFrom _.getClass)
 
-      js1 must beSome(beAnInstanceOf[EJson[Data]])
-      js2 must beSome(beAnInstanceOf[argonaut.Json])
-      js3 must beSome(beAnInstanceOf[Data])
+      // Doesn't work this way if A is abstract.
+      // js must beSome(beAnInstanceOf[A])
     }
   }
 
@@ -73,6 +72,19 @@ class JsonMacroSpec extends quasar.Qspec {
     }
     "interpolate" >> {
       json"""{ "bob": $xobj, "tom": $jobj }""" must_=== json"""${ Map("bob" -> jobj, "tom" -> jobj) }"""
+    }
+    "interpolate keys" >> {
+      val k1 = "bob"
+      val k2 = "tom"
+      val v1 = Array(false, false)
+      val v2 = Array(Array(1), Array(2))
+      val xs = json"""{ $k1: $v1, $k2: $v2 }"""
+      val xs2 = json"[ $xs, $xs ]"
+
+      val expected = json"""{ "bob": [ false, false ], "tom": [ [ 1 ], [ 2 ] ] }"""
+
+      xs must_=== expected
+      xs2 must_=== json"[ $expected, $expected ]"
     }
     "interpolate identity" >> {
       val x = json"[ 5 ]"
@@ -88,9 +100,16 @@ class JsonMacroSpec extends quasar.Qspec {
       jsonSeq"""$xbool $xarr $xobj $xobj2""" must_=== Vector(jbool, jarr, jobj, jobj2)
     }
   }
+}
 
 
 /***
+
+  sealed trait FieldTree
+  final case class FieldAtom() extends FieldTree
+  final case class FieldSeq(xs: Vector[FieldTree]) extends FieldTree
+  final case class FieldMap(xs: Vector[(FieldTree, FieldTree)]) extends FieldTree
+
   type EJ = quasar.ejson.EJson[Data]
 
   def childNames(x: Data): Set[String] = x match {
@@ -139,4 +158,3 @@ class JsonMacroSpec extends quasar.Qspec {
   }
 
 ***/
-}
