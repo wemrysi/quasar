@@ -1,0 +1,1 @@
+- [#1488] parse MongoDB server versions that include extra information after the three numbers, and if _that_ doesn't work, report the error usefully
