@@ -108,7 +108,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
       } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
 
     case Unreferenced() =>
-      expr.emptySeq.point[F]
+      "Unreferenced".xs.point[F]
   }
 
   ////
