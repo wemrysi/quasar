@@ -207,6 +207,7 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
+  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   private def freshName: MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask

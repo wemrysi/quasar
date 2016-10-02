@@ -70,7 +70,7 @@ class DataCodecSpecs extends quasar.Qspec {
       }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
       "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beLeftDisjunction }
-      "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("""{ "$binary": "TE1OTw==" }""") }
+      "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("""{ "$binary": "TE1OTw==" }""") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("""{ "$oid": "abc" }""") }
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("""{ "$na": null }""") }
     }
@@ -147,8 +147,8 @@ class DataCodecSpecs extends quasar.Qspec {
         }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
       "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beLeftDisjunction }
-      "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
-      "encode empty binary" in { DataCodec.render(Data.Binary(Array[Byte]())) must beRightDisjunction("\"\"") }
+      "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
+      "encode empty binary" in { DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beRightDisjunction("\"\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("\"abc\"") }
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("null") }
     }
@@ -194,7 +194,7 @@ class DataCodecSpecs extends quasar.Qspec {
       }
 
       "re-parse Binary as Str" in {
-        val binary = Data.Binary(Array[Byte](0, 1, 2, 3))
+        val binary = Data.Binary.fromArray(Array[Byte](0, 1, 2, 3))
         DataCodec.render(binary).flatMap(DataCodec.parse) must beRightDisjunction(Data.Str("AAECAw=="))
       }
 

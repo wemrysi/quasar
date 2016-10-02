@@ -172,6 +172,8 @@ private final class QueryFileInterpreter[C](
   private val queryR =
     MonadReader[MQ, (Option[DefaultDb], TaskRef[EvalState[C]])]
 
+  // FIXME: Not sure how to distinguish these.
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   private def MongoQuery[A](f: TaskRef[EvalState[C]] => Task[A]): MQ[A] =
     queryR.ask flatMapK { case (_, ref) => MongoDbIO.liftTask(f(ref)) }
 

@@ -28,8 +28,8 @@ final case class JsFn(param: Name, expr: JsCore) {
   def apply(x: JsCore): JsCore = expr.substitute(Ident(param), x)
 
   def >>>(that: JsFn): JsFn =
-    if (this == JsFn.identity) that
-    else if (that == JsFn.identity) this
+    if (this ≟ JsFn.identity) that
+    else if (that ≟ JsFn.identity) this
     else JsFn(this.param, Let(that.param, this.expr, that.expr).simplify)
 
   override def toString = apply(ident("_")).toJs.pprint(0)

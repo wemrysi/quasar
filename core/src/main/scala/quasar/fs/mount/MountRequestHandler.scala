@@ -108,10 +108,9 @@ final class MountRequestHandler[F[_], S[_]](
     T2: HierarchicalFsRef :<: T
   ): Free[T, Unit] =
     for {
-      mnts   <- fsm.MountedFsRef.Ops[T].get
-      evals  =  mnts.map(_.run)
-      mnted  =  hierarchical.fileSystem[F, S](evals)
-      _      <- HierarchicalFsRef.Ops[T].set(mnted)
+      mnted <- fsm.MountedFsRef.Ops[T].get ∘
+                 (mnts => hierarchical.fileSystem[F, S](mnts.map(_.run)))
+      _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }
 

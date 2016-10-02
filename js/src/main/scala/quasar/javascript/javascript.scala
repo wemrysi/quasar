@@ -113,6 +113,7 @@ object Js {
   /** Smart constructors to construct a Js.Num without worrying about numeric
     * widening or getting the `float` flag correct.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def num(value: Double) = Num(value,          true)
   def num(value: Long)   = Num(value.toDouble, false)
 }
@@ -143,7 +144,7 @@ private object JavascriptPrinter {
       case s => s"(${p(ast)})"
     }
     def seqOut(content: List[String], open: String, sep: String, close: String) = {
-      val isBlock = close == "}"
+      val isBlock = close ≟ "}"
       if (content.foldLeft(indent + open.length + close.length)(_ + _.length + sep.length + 1) < 80 && !content.exists(_.contains('\n')))
         if (isBlock) content.mkString(open + " ", sep + " ", " " + close)
         else         content.mkString(open,       sep + " ",       close)
@@ -210,7 +211,7 @@ private object JavascriptPrinter {
       case AnonObjDecl(fields)                =>
         seqOut(fields.map { case (k, v) => s""""$k": ${p3(v)}""" }, "{", ",", "}")
       case ObjDecl(name, FunDecl(_, params, stmts), fields) =>
-        val fs = for ((n, v) <- fields) yield ind(2) + s"this.$n = ${p(v)};"
+        val fs = fields ∘ { case (n, v) => ind(2) + s"this.$n = ${p(v)};" }
         val body = fs ++ stmts.map(s => ind(2) + p(s)) mkString "\n"
         s"""function $name(${params.mkString(", ")}) {\n$body\n${ind(0)}}"""
       case Return(jsExpr)                     => s"return ${p(jsExpr)}"
