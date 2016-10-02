@@ -352,6 +352,18 @@ abstract class MountingSpec[S[_]](
         r map (_ must_=== ((None, Some(viewCfgA))))
       }
 
+      "moves mount nested under src to dst" >>* {
+        val d1 = rootDir </> dir("d1")
+        val d2 = rootDir </> dir("d2")
+        val f = dir("d3") </> file("foo")
+
+        val r =
+          (mnt.mount(d1, fsCfgA) *> mnt.mount(d1 </> f, viewCfgA) *> remount(d1, d2)) *>
+          (lookupConfig(d1 </> f).run.tuple(lookupConfig(d2 </> f).run))
+
+        r map (_ must_=== ((None, Some(viewCfgA))))
+      }
+
       "succeeds when src == dst" >>* {
         val d = rootDir </> dir("srcdst")
 
