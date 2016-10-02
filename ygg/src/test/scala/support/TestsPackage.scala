@@ -33,7 +33,7 @@ trait TestsPackage extends quasar.pkg.TestsPackage {
 
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
   // (and scalacheck's BigDecimal gen will overflow at random)
-  def genBigDecimal: Gen[BigDecimal] = genBigDecimal(genExponent = genBigDecExponent)
+  override def genBigDecimal: Gen[BigDecimal] = genBigDecimal(genExponent = genBigDecExponent)
   def genBigDecExponent              = choose(-50000, 50000)
   def genBigDecimal(genExponent: Gen[Int]): Gen[BigDecimal] = (genLong, genExponent) >> { (mantissa, exponent) =>
     def adjusted = (

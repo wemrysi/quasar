@@ -19,6 +19,9 @@ package quasar.pkg
 import quasar.Predef._
 import scala.collection.mutable.Builder
 import scala.language.postfixOps
+import scala.{ Byte, Char }
+
+package object tests extends TestsPackage
 
 trait TestsPackage extends ScalacheckSupport with SpecsSupport
 
@@ -87,11 +90,14 @@ trait ScalacheckSupport {
 
   def genIndex(size: Int): Gen[Int]    = choose(0, size - 1)
   def genBool: Gen[Boolean]            = oneOf(true, false)
+  def genByte: Gen[Byte]               = choose(Byte.MinValue, Byte.MaxValue) ^^ (_.toByte)
+  def genChar: Gen[Char]               = choose(Char.MinValue, Char.MaxValue) ^^ (_.toChar)
   def genInt: Gen[Int]                 = choose(Int.MinValue, Int.MaxValue)
   def genLong: Gen[Long]               = choose(Long.MinValue, Long.MaxValue)
   def genDouble: Gen[Double]           = Arbitrary.arbDouble.arbitrary
   def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genString: Gen[String]           = Arbitrary.arbString.arbitrary
+  def genBigDecimal: Gen[BigDecimal]   = Arbitrary.arbBigDecimal.arbitrary
   def genIdentifier: Gen[String]       = identifier filter (_ != null)
   def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]              = choose(1, Int.MaxValue)
@@ -104,8 +110,13 @@ trait ScalacheckSupport {
   }
 
   implicit class ArbitraryOps[A](arb: Arbitrary[A]) {
-    def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(arb.arbitrary map f)
-    def >>[B](f: A => Gen[B]): Arbitrary[B] = Arbitrary(arb.arbitrary flatMap f)
+    def gen: Gen[A] = arb.arbitrary
+
+    def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(gen map f)
+    def >>[B](f: A => Gen[B]): Arbitrary[B] = Arbitrary(gen flatMap f)
+
+    def list: Gen[List[A]]  = gen.list
+    def opt: Gen[Option[A]] = gen.opt
   }
   implicit class ScalacheckGenOps[A](gen: Gen[A]) {
     def ^^[B](f: A => B): Gen[B]      = gen map f
@@ -115,7 +126,7 @@ trait ScalacheckSupport {
     def *(gn: Gen[Int]): Gen[Seq[A]] = gn >> (this * _)
     def *(n: Int): Gen[Seq[A]]       = vectorOfN(n, gen)
     def list: Gen[List[A]]           = listOf(gen)
-    def optional: Gen[Option[A]]     = frequency(
+    def opt: Gen[Option[A]]          = frequency(
       1  -> None,
       10 -> (gen map (x => Some(x)))
     )
