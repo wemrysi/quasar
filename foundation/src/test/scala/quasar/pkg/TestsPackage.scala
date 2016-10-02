@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package ygg.tests.pkg
+package quasar.pkg
 
-import ygg.common._
-import ygg.data._
+import quasar.Predef._
 import scala.collection.mutable.Builder
-
-// object TestSupport extends TestSupport
+import scala.language.postfixOps
 
 trait TestsPackage extends ScalacheckSupport with SpecsSupport
 
@@ -69,18 +67,7 @@ trait ScalacheckSupport {
     def builder: Builder[A, Vector[A]] = Vector.newBuilder[A]
   }
 
-  def genFile: Gen[File] = listOfN(3, identifier map (_ take 5)) map (xs => new File(xs.mkString("/", "/", ".cooked")))
-
-  def genBitSet(size: Int): Gen[BitSet] = {
-    genBool * size ^^ { bools =>
-      doto(new BitSet) { bs =>
-        bools.indices foreach { i =>
-          if (bools(i))
-            bs set i
-        }
-      }
-    }
-  }
+  def genFile: Gen[jFile] = listOfN(3, identifier map (_ take 5)) map (xs => new jFile(xs.mkString("/", "/", ".cooked")))
 
   def containerOfAtMostN[C[X] <: scTraversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
     sized(size => for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
@@ -111,44 +98,6 @@ trait ScalacheckSupport {
   def genMinus10To10: Gen[Int]         = choose(-10, 10)
   def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
   def genOffsetAndLen: Gen[Int -> Int] = (genMinus10To10, 0 upTo 20).zip
-
-  // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-  // (and scalacheck's BigDecimal gen will overflow at random)
-  def genBigDecimal: Gen[BigDecimal] = genBigDecimal(genExponent = genBigDecExponent)
-  def genBigDecExponent              = choose(-50000, 50000)
-  def genBigDecimal(genExponent: Gen[Int]): Gen[BigDecimal] = (genLong, genExponent) >> { (mantissa, exponent) =>
-    def adjusted = (
-      if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
-        exponent - mantissa.toString.length
-      else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
-        exponent + mantissa.toString.length
-      else
-        exponent
-    )
-    decimal(unscaledVal = mantissa, scale = adjusted)
-  }
-
-  def genBitSet: Gen[BitSet] = listOf(0 upTo 500) ^^ (Bits(_))
-
-  def genSparseBitSet: Gen[Codec[BitSet] -> BitSet] = {
-    (0 upTo 500) >> { size =>
-      val codec = Codec.SparseBitSetCodec(size)
-      if (size > 0)
-        listOf(0 upTo size - 1) ^^ (bits => codec -> Bits(bits))
-      else
-        const(codec -> Bits())
-    }
-  }
-  def genSparseRawBitSet: Gen[Codec[RawBitSet] -> RawBitSet] = {
-    (0 upTo 500) >> { size =>
-      val codec: Gen[Codec[RawBitSet]] = Codec.SparseRawBitSetCodec(size)
-      val bits: Gen[RawBitSet] = size match {
-        case 0 => const(RawBitSet create 0)
-        case n => listOf(0 upTo size - 1) ^^ (bits => doto(RawBitSet create size)(bs => bits foreach (bs set _)))
-      }
-      (codec, bits).zip
-    }
-  }
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)

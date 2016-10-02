@@ -18,7 +18,7 @@ package ygg.macros
 
 import quasar.Predef._
 import jawn._, AsyncParser._
-import scala.util._
+import scala.util.{ Success, Failure }
 
 object JParser {
   type ResultSeq[A] = Either[ParseException, scala.collection.Seq[A]]

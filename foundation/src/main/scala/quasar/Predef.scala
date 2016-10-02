@@ -25,7 +25,7 @@ import java.lang.String
 
 object Predef extends Predef
 
-class Predef extends LowPriorityImplicits {
+class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases {
   type AnyVal = scala.AnyVal
   type StringBuilder = java.lang.StringBuilder
 
@@ -34,8 +34,6 @@ class Predef extends LowPriorityImplicits {
    */
   type ValueOf[A]                           = scala.ValueOf[A]
   def valueOf[A](implicit z: ValueOf[A]): A = z.value
-
-  type ->[+A, +B] = (A, B)
 
   @inline final def implicitly[A](implicit value: A): A = value
 

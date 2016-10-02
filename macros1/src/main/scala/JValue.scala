@@ -17,7 +17,6 @@
 package ygg.json
 
 import quasar.Predef._
-import ygg.macros._
 import scalaz._, Scalaz._, Ordering._
 import scalaz.{ Order => Ord }
 import scala.util.Try

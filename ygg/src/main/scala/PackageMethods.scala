@@ -40,7 +40,7 @@ trait PackageMethods {
   def jclassLoader[A: CTag]: ClassLoader                          = jclass[A].getClassLoader
   def jResource[A: CTag](name: String): InputStream               = jResource(jclass[A], name)
   def jResource(c: jClass, name: String): InputStream             = c getResourceAsStream name
-  def newScratchDir(): File                                       = Files.createTempDirectory("ygg").toFile
+  def newScratchDir(): jFile                                      = Files.createTempDirectory("ygg").toFile
   def systemMillis(): Long                                        = java.lang.System.currentTimeMillis()
   def discard[A](value: A): Unit                                  = () // for avoiding "discarding non-Unit value" warnings
   def mutableQueue[A: Ord](xs: A*): scmPriorityQueue[A]           = scmPriorityQueue(xs: _*)

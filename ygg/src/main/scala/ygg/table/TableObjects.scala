@@ -191,7 +191,7 @@ object JDBM {
   }
 
   final case class SliceIndex(name: String,
-                        dbFile: File,
+                        dbFile: jFile,
                         storage: IndexStore,
                         keyRowFormat: RowFormat,
                         keyComparator: Comparator[Bytes],

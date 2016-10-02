@@ -17,12 +17,9 @@
 package ygg
 
 import quasar.Predef._
-import scala.util._
+import scala.util.{ Success, Failure }
 
 package object macros {
-  type Vec[+A] = scala.Vector[A]
-  val Vec      = scala.Vector
-
   def doTry[A](body: => A): Try[A] = Try(body)
 
   implicit class TryOps[A](private val x: Try[A]) extends AnyVal {

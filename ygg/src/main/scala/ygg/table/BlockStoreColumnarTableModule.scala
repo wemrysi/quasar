@@ -209,7 +209,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     lazy val sortMergeEngine = new MergeEngine[Bytes, SortBlockData] {}
 
-    case class JDBMState(prefix: String, fdb: Option[File -> DB], indices: IndexMap, insertCount: Long) {
+    case class JDBMState(prefix: String, fdb: Option[jFile -> DB], indices: IndexMap, insertCount: Long) {
       def commit() = fdb foreach { _._2.commit() }
 
       def closed(): JDBMState = fdb match {
@@ -219,11 +219,11 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         case None => this
       }
 
-      def opened(): (File, DB, JDBMState) = fdb match {
+      def opened(): (jFile, DB, JDBMState) = fdb match {
         case Some((f, db)) => (f, db, this)
         case None          =>
           // Open a JDBM3 DB for use in sorting under a temp directory
-          val dbFile = new File(newScratchDir(), prefix)
+          val dbFile = new jFile(newScratchDir(), prefix)
           val db     = DBMaker.fileDB(dbFile.getCanonicalPath).make()
           (dbFile, db, JDBMState(prefix, Some((dbFile, db)), indices, insertCount))
       }
