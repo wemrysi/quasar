@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -33,6 +34,8 @@ import scalaz._, Scalaz._
   */
 sealed abstract class ProjectBucket[T[_[_]], A] {
   def src: A
+  def value: FreeMap[T]
+  def name: FreeMap[T]
 }
 
 @Lenses final case class BucketField[T[_[_]], A](
@@ -45,7 +48,9 @@ sealed abstract class ProjectBucket[T[_[_]], A] {
   src: A,
   value: FreeMap[T],
   index: FreeMap[T])
-    extends ProjectBucket[T, A]
+    extends ProjectBucket[T, A] {
+  def name = index
+}
 
 object ProjectBucket {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ProjectBucket[T, ?]] =
@@ -102,7 +107,11 @@ object ProjectBucket {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) = None
+        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) = {
+        val new1 = envtHmap(λ[EndoK[ProjectBucket[IT, ?]]](pb => BucketField(pb.src, pb.value >> left, pb.name >> left)))(p1)
+        val new2 = envtHmap(λ[EndoK[ProjectBucket[IT, ?]]](pb => BucketIndex(pb.src, pb.value >> right, pb.name >> right)))(p2)
+        if (new1 ≟ new2) SrcMerge(new1, HoleF[IT], HoleF[IT]).some else None
+      }
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]: Normalizable[ProjectBucket[T, ?]] =

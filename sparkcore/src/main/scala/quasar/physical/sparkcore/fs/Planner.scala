@@ -16,22 +16,19 @@
 
 package quasar.physical.sparkcore.fs
 
-import simulacrum.typeclass
 import quasar.Predef._
-import quasar.Data
-import quasar.DataCodec
-import quasar._
-import quasar.Planner._
+import quasar._, quasar.Planner._
+import quasar.contrib.matryoshka._
+import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.qscript._
-import quasar.contrib.pathy.AFile
 
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-// 
+import simulacrum.typeclass
 
 @typeclass trait Planner[F[_]] {
   type IT[G[_]]

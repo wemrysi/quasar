@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._, Recursive.ops._
@@ -169,30 +170,6 @@ package object qscript {
       case _ => None
     }
   }
-
-  // TODO: move to matryoshka
-
-  implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
-      Delay[Equal, EnvT[E, F, ?]] =
-    new Delay[Equal, EnvT[E, F, ?]] {
-      def apply[A](eq: Equal[A]) =
-        Equal.equal {
-          case (env1, env2) =>
-            env1.ask ≟ env2.ask && F(eq).equal(env1.lower, env2.lower)
-        }
-    }
-
-  implicit def envtShow[E: Show, F[_]](implicit F: Delay[Show, F]):
-      Delay[Show, EnvT[E, F, ?]] =
-    new Delay[Show, EnvT[E, F, ?]] {
-      def apply[A](sh: Show[A]) =
-        Show.show {
-          envt => Cord("EnvT(") ++ envt.ask.show ++ Cord(", ") ++ F(sh).show(envt.lower) ++ Cord(")")
-        }
-    }
-
-  def envtHmap[F[_], G[_], E, A](f: F ~> G) = λ[EnvT[E, F, ?] ~> EnvT[E, G, ?]](env => EnvT(env.ask -> f(env.lower)))
-  def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 
   // Heplers for creating `Injectable` instances
 

@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{Data, LogicalPlan => LP}
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._

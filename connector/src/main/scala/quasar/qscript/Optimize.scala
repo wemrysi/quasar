@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
@@ -115,7 +116,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     //       target.transAnaM(_.htraverse(FI.project)) ∘ (srcCo >> _)
     freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
       target)(
-      coEnvHtraverse(_)(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))))
+      coEnvHtraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply)
       .map(targ => (targ >> srcCo.fromCoEnv).toCoEnv[T])
 
   private val UnrefedSrc =
@@ -269,8 +270,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
       liftFF(orOriginal(swapMapCount[F, CoEnv[Hole, F, ?]](coenvPrism.get))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T, T[CoEnv[Hole, F, ?]]]))) ⋙
-      (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopQC[F, CoEnv[Hole, F, ?]](coenvPrism.reverseGet)))
-
+  (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopQC[F, CoEnv[Hole, F, ?]](coenvPrism.reverseGet)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
