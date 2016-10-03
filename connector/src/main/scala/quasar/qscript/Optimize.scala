@@ -188,47 +188,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def compactQC: QScriptCore[T, ?] ~> (Option ∘ QScriptCore[T, ?])#λ =
     new (QScriptCore[T, ?] ~> (Option ∘ QScriptCore[T, ?])#λ) {
       def apply[A](fa: QScriptCore[T, A]) = fa match  {
-        case LeftShift(src, struct, repair) => {
-          def rewrite(
-            src: A,
-            repair0: JoinFunc[T],
-            elem: FreeMap[T],
-            dup: FreeMap[T] => Unary[T, FreeMap[T]]):
-              Option[QScriptCore[T, A]] = {
-            val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              repair0.toCoEnv[T]
+        case LeftShift(src, struct, repair) =>
+          rewriteShift(struct, repair) ∘
+            (LeftShift(src, _: FreeMap[T], _: JoinFunc[T])).tupled
 
-            val rightSide: JoinFunc[T] =
-              Free.point[MapFunc[T, ?], JoinSide](RightSide)
-            val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              rightSide.toCoEnv[T]
-
-            def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
-
-            val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
-            val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
-
-            val rightCount: Int = repair.para(count(rightSideCoEnv))
-
-            if (repair.para(count(zeroRef)) ≟ rightCount) { // all `RightSide` access is through `zeroRef`
-              val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-                transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
-              LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv).some
-            } else if (repair.para(count(oneRef)) ≟ rightCount) { // all `RightSide` access is through `oneRef`
-              val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-                transApoT(repair)(substitute(oneRef, rightSideCoEnv))
-              LeftShift(src, elem, replacement.fromCoEnv).some
-            } else {
-              None
-            }
-          }
-          struct.resume match {
-            case -\/(ZipArrayIndices(elem)) => rewrite(src, repair, elem, fm => DupArrayIndices(fm))
-            case -\/(ZipMapKeys(elem)) => rewrite(src, repair, elem, fm => DupMapKeys(fm))
-            case _ => None
-          }
-        }
         case Reduce(src, bucket, reducers0, repair0) => {
           // `reducers`: the reduce funcs that are used
           // `indices`: the indices into `reducers0` that are used
@@ -254,6 +217,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         case _ => None
       }
     }
+
+  // /** Chains multiple transformations together, each of which can fail to change
+  //   * anything.
+  //   */
+  // def applyTransforms
+  //   (transform: F[T[F]] => Option[F[T[F]]],
+  //     transforms: (F[T[F]] => Option[F[T[F]]])*)
+  //     : F[T[F]] => Option[F[T[F]]] =
+  //   transforms.foldLeft(
+  //     transform)(
+  //     (prev, next) => x => prev.fold(next(x))(y => next(y).orElse(y.some)))
 
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
@@ -281,17 +255,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(orOriginal(swapMapCount[F, F](idPrism.get))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T, T[F]]))) ⋙
       liftFG(elideNopQC[F, F](idPrism.reverseGet))
-
-  // /** Chains multiple transformations together, each of which can fail to change
-  //   * anything.
-  //   */
-  // def applyTransforms
-  //   (transform: F[T[F]] => Option[F[T[F]]],
-  //     transforms: (F[T[F]] => Option[F[T[F]]])*)
-  //     : F[T[F]] => Option[F[T[F]]] =
-  //   transforms.foldLeft(
-  //     transform)(
-  //     (prev, next) => x => prev.fold(next(x))(y => next(y).orElse(y.some)))
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],

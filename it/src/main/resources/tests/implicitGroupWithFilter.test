@@ -1,7 +1,11 @@
 {
   "name": "implicitly grouped, with filtering",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "pending",
+    "couchbase":  "pending"
+  },
 
   "data": "zips.data",
 
