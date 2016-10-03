@@ -996,8 +996,8 @@ object MongoDbQScriptPlanner {
           (liftFGM(assumeReadType[T, MongoQScriptInterim](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
             SimplifyJoin[T, QScriptRead[T, ?], MongoQScriptInterim].simplifyJoin(idPrism.reverseGet)
           ).apply(tf) ∘
-            Normalizable[MongoQScriptInterim].normalize).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
-            Normalizable[MongoQScript].normalize)))
+            repeatedly(Normalizable[MongoQScriptInterim].normalize(_: MongoQScriptInterim[T[MongoQScriptInterim]]))).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
+            repeatedly(Normalizable[MongoQScript].normalize(_: MongoQScript[T[MongoQScript]])))))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
