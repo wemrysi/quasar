@@ -20,7 +20,7 @@ import quasar.SKI.κ
 import quasar.NameGenerator
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
-import quasar.physical.marklogic.xquery.{PrologW, XQuery}
+import quasar.physical.marklogic.xquery._
 
 import matryoshka.Recursive
 import scalaz._, Scalaz._
