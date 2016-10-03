@@ -48,7 +48,8 @@ package object main {
     quasar.physical.mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff],
     quasar.physical.postgresql.fs.definition[PhysFsEff],
     quasar.physical.marklogic.fs.definition[PhysFsEff],
-    quasar.physical.sparkcore.fs.local.definition[PhysFsEff]
+    quasar.physical.sparkcore.fs.local.definition[PhysFsEff],
+    quasar.physical.couchbase.fs.definition[PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

@@ -3,7 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "marklogic":         "pending",
+        "couchbase":         "pending"
     },
     "data": "largeZips.data",
     "query": "select array_concat(make_array(pop), array_concat(make_array(1), make_array(2))) from largeZips",

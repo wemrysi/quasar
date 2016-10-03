@@ -1,6 +1,10 @@
 {
     "name": "match LIKE with multiple lines",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
     "data": "slamengine_commits.data",
     "query": "select count(*) from slamengine_commits where commit.message like \"Merge%\"",
     "predicate": "equalsExactly",

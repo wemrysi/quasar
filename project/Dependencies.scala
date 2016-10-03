@@ -84,6 +84,10 @@ object Dependencies {
     "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
+  val couchbase = Seq(
+    "com.couchbase.client" %  "java-client" % "2.3.2",
+    "org.http4s"           %% "http4s-core" % http4sVersion
+  )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
