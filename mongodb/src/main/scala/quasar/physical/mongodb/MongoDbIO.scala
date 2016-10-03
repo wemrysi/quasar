@@ -259,22 +259,23 @@ object MongoDbIO {
   }
 
   /** Returns the version of the MongoDB server the client is connected to. */
-  def serverVersion: MongoDbIO[List[Int]] = {
-    def lookupVersion(dbName: DatabaseName): MongoDbIO[PhysicalError \/ List[Int]] = {
+  def serverVersion: MongoDbIO[ServerVersion] = {
+    def lookupVersion(dbName: DatabaseName): MongoDbIO[String \/ ServerVersion] = {
       val cmd = Bson.Doc(ListMap("buildinfo" -> Bson.Int32(1)))
 
-      runCommand(dbName, cmd).attemptMongo.run map (_ flatMap (doc =>
-        Option(doc getString "version")
-          // FIXME: Shouldn’t be creating fresh MongoExceptions
-          .toRightDisjunction(UnhandledFSError(new MongoException("Unable to determine server version, buildInfo response is missing the 'version' field")))
-          .map(_.getValue.split('.').toList.map(_.toInt))))
+      runCommand(dbName, cmd).attemptMongo.run.map(
+        _.leftMap(_.cause.getMessage)
+          .flatMap(doc =>
+            Option(doc getString "version")
+              .toRightDisjunction("Unable to determine server version, buildInfo response is missing the 'version' field")
+              .flatMap(v => ServerVersion.fromString(v.getValue))))
     }
 
-    val finalize: ((Vector[PhysicalError], Vector[List[Int]])) => MongoDbIO[List[Int]] = {
+    val finalize: ((Vector[String], Vector[ServerVersion])) => MongoDbIO[ServerVersion] = {
       case (errs, vers) =>
         vers.headOption.map(_.point[MongoDbIO]) orElse
-        errs.headOption.map(ex => fail[List[Int]](ex.cause)) getOrElse
         // FIXME: Shouldn’t be creating fresh MongoExceptions
+        errs.headOption.map(msg => fail[ServerVersion](new MongoException(msg))) getOrElse
         fail(new MongoException("No database found."))
     }
 
