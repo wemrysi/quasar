@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs.hdfs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.DataCodec
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
@@ -25,26 +26,55 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.contrib.pathy._
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.FileSystem;
+import java.io.BufferedWriter
+import java.io.OutputStreamWriter
+import java.io.OutputStream
+
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.util.Progressable
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
-
-object queryfile {
+class queryfile(fileSystem:() => FileSystem) {
 
   private def toPath(apath: APath): Task[Path] = Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = ???
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
+    val pathStr = posixCodec.unsafePrintPath(file)
+    val hdfs = fileSystem()
+    val host = hdfs.getUri().getHost()
+    val port = hdfs.getUri().getPort()
+    val url = s"hdfs://$host:$port$pathStr"
+    hdfs.close()
+    sc.textFile(url)
+  }
 
-  def store(rdd: RDD[Data], out: AFile): Task[Unit] = ???
+  def store(rdd: RDD[Data], out: AFile): Task[Unit] = toPath(out).map { path =>
+    val hdfs = fileSystem()
+    val os: OutputStream = hdfs.create(path, new Progressable() {
+      override def progress(): Unit = {}
+    })
+    val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
 
-  def fileExists(fileSystem: () => FileSystem)(f: AFile): Task[Boolean] =
+    rdd.map(data => DataCodec.render(data)(DataCodec.Precise)).collect().foreach {
+      case \/-(v) =>
+        bw.write(v)
+        bw.newLine()
+      case -\/(der) =>
+        bw.write(s"encoding error: ${der.message}")
+        bw.newLine()
+    }
+    bw.close()
+    hdfs.close()
+  }
+
+  def fileExists(f: AFile): Task[Boolean] =
     toPath(f).map(path => {
       val hdfs = fileSystem()
       val exists = hdfs.exists(path)
@@ -52,7 +82,7 @@ object queryfile {
       exists
     })
 
-  def listContents(fileSystem:() => FileSystem)(d: ADir): EitherT[Task, FileSystemError, Set[PathSegment]] =
+  def listContents(d: ADir): EitherT[Task, FileSystemError, Set[PathSegment]] =
     EitherT(toPath(d).map(path => {
       val hdfs = fileSystem()
       val result = if(hdfs.exists(path)) {
@@ -67,6 +97,10 @@ object queryfile {
 
   def readChunkSize: Int = 5000
 
-  def input(fileSystem: () => FileSystem): Input =
-    Input(fromFile _, store _, fileExists(fileSystem) _, listContents(fileSystem) _, readChunkSize _)
+  def input: Input =
+    Input(fromFile _, store _, fileExists _, listContents _, readChunkSize _)
+}
+
+object queryfile {
+  def input(fileSystem:() => FileSystem): Input = new queryfile(fileSystem).input
 }
