@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.ejson.EJson
 import quasar.fp._
 import matryoshka._
 import scalaz._, Scalaz._
@@ -172,16 +173,13 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
           if (reducersOpt.map(_.toList).flatten.isEmpty)
             None
           else
-            (reducersOpt.zip(reducers).map {
-              case (Some(norm), _) => norm
-              case (None, red) => red
-            }).some
+            Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)).some
 
         val bucketNormOpt: Option[FreeMap[T]] = freeMFEq(bucket)
 
         val bucketNormConst: Option[FreeMap[T]] =
           bucketNormOpt.getOrElse(bucket).resume.fold({
-            case MapFuncs.Constant(ej) if MapFuncs.NullLit.isNull(ej) => None
+            case MapFuncs.Constant(ej) if EJson.isNull(ej) => None
             case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]().some
             case _ => bucketNormOpt
           }, _ => bucketNormOpt)
@@ -211,10 +209,7 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
           if (orderOpt.map(_.toList).flatten.isEmpty)
             None
           else
-            (orderOpt.zip(order).map {
-              case (Some(norm), _) => norm
-              case (None, red)     => red
-            }).some
+            Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)).some
 
         makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
       }
