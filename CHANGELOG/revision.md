@@ -1,1 +1,1 @@
-- Normalize returns Option.
+- Normalize qscript after each transformation.

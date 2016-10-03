@@ -522,6 +522,13 @@ package object fp
       Show[T[F]] =
     T.showT[F](F)
 
+  implicit def traverseEnvT[F[_]: Traverse, X]: Traverse[EnvT[X, F, ?]] = new Traverse[EnvT[X, F, ?]] {
+    def traverseImpl[G[_]: Applicative, A, B](envT: EnvT[X, F, A])(f: A => G[B]): G[EnvT[X, F, B]] =
+      envT.run match {
+        case (x, fa) => fa.traverse(f).map(fb => EnvT((x, fb)))
+      }
+  }
+
   def elgotM[M[_]: Monad, F[_]: Traverse, A, B](a: A)(φ: F[B] => M[B], ψ: A => M[B \/ F[A]]):
       M[B] = {
     def h(a: A): M[B] = ψ(a) >>= (_.traverse(_.traverse(h) >>= φ).map(_.merge))
@@ -615,6 +622,11 @@ package object fp
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
     λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
+  )
+
+  def envTPrism[T[_[_]], F[_], A](empty: A) = PrismNT[EnvT[A, F, ?], F](
+    λ[EnvT[A, F, ?] ~> λ[α => Option[F[α]]]](_.run._2.some),
+    λ[F ~> EnvT[A, F, ?]](fb => EnvT((empty, fb)))
   )
 }
 

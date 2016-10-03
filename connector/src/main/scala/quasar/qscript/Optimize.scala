@@ -118,6 +118,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       coEnvHtraverse(_)(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))))
       .map(targ => (targ >> srcCo.fromCoEnv).toCoEnv[T])
 
+  def rebaseTEnv[F[_]: Traverse](
+    target: FreeQS[T])(
+    srcEnv: T[EnvT[Ann[T], F, ?]])(
+    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+      Option[T[EnvT[Ann[T], F, ?]]] =
+   freeCataM(
+      target)(
+      interpretM[Option, QScriptTotal[T, ?], Hole, T[EnvT[Ann[T], F, ?]]](
+        κ(srcEnv.some),
+        FI.project(_) ∘ (qs => EnvT((EmptyAnn[T], qs)).embed)))
+
   private val UnrefedSrc =
     Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Unreferenced[T, FreeQS[T]]())
 
@@ -257,6 +268,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(orOriginal(swapMapCount[F, G](prism.get))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T, T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
+
+  def applyToEnvT[F[_]: Traverse: Normalizable](
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore[T, ?] :<: F,
+             TJ: ThetaJoin[T, ?] :<: F,
+             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+      F[T[EnvT[Ann[T], F, ?]]] => EnvT[Ann[T], F, T[EnvT[Ann[T], F, ?]]] =
+    applyNormalizations[F, EnvT[Ann[T], F, ?]](envTPrism(EmptyAnn[T]), rebaseTEnv)
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
