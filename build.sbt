@@ -203,6 +203,8 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
+                    marklogicValidation,
+//    /  /  |  \  \    /
   core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
