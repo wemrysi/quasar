@@ -34,6 +34,9 @@ import FileSystemError._, PathError._
 import FileSystemIndependentTypes._
 import InMemory._
 
+/**
+ * TODO: Use KeyValueStore.
+ */
 object InMemory extends StatefulFileSystem {
   val FsType     = FileSystemType("in-memory")
   val rChunkSize = 10 // Chunk size to use for [[Read]]s.

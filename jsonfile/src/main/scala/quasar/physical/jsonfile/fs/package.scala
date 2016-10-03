@@ -21,12 +21,17 @@ import quasar.fp.numeric._
 import quasar.fs._
 import FileSystemError.Unimplemented
 import quasar.contrib.pathy._
+import matryoshka.Fix
+import quasar.sql._
 import scalaz._
 
 package object fs extends UnifiedFileSystemBuilder {
-  val FsType = FileSystemType("skeleton")
+  val FsType = FileSystemType("jsonfile")
 
   def apply[F[_]: Applicative] = new Impl[F]
+
+  def fixSql(query: String): Fix[Sql]  = fixQuery(Query(query))
+  def fixQuery(query: Query): Fix[Sql] = fixParser parse query valueOr (_ => Fix(nullLiteral()))
 }
 
 package fs {

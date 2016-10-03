@@ -5,6 +5,18 @@ import wartremover._
 import scala.Seq
 
 object Ygg {
+  def imports = """
+    import quasar._, Predef._, sql._
+    import scalaz._, Scalaz._
+    import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+    import quasar.physical.jsonfile.fs._
+  """.trim
+
+  def testImports = imports + "\n" + """
+    import quasar.sql.SqlQueries._
+    import quasar.sql.fixpoint._
+  """.trim
+
   def yggDropWarts = Seq(
     Wart.Equals,
     Wart.AsInstanceOf,
@@ -46,5 +58,7 @@ object Ygg {
   def jsonfile(p: Project): Project = ( p
     .dependsOn('connector % BothScopes, 'ygg % BothScopes)
     .settings(name := "quasar-jsonfile-internal")
+    .settings(initialCommands in (Compile, console) := imports)
+    .settings(initialCommands in (Test, console) := testImports)
   )
 }
