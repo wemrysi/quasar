@@ -56,8 +56,20 @@ object ReduceFunc {
       }
     }
 
-  implicit val traverse: Traverse[ReduceFunc] = new Traverse[ReduceFunc] {
-    def traverseImpl[G[_]: Applicative, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
+  implicit val traverse1: Traverse1[ReduceFunc] = new Traverse1[ReduceFunc] {
+    def foldMapRight1[A, B](fa: ReduceFunc[A])(z: (A) ⇒ B)(f: (A, ⇒ B) ⇒ B): B =
+      fa match {
+        case Count(a)        => z(a)
+        case Sum(a)          => z(a)
+        case Min(a)          => z(a)
+        case Max(a)          => z(a)
+        case Avg(a)          => z(a)
+        case Arbitrary(a)    => z(a)
+        case UnshiftArray(a) => z(a)
+        case UnshiftMap(a1, a2) => f(a1, z(a2))
+      }
+
+    def traverse1Impl[G[_]: Apply, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
       fa match {
         case Count(a)        => f(a) ∘ (Count(_))
         case Sum(a)          => f(a) ∘ (Sum(_))
