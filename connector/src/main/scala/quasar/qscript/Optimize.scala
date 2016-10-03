@@ -38,10 +38,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
-  def elideNopQC[F[_]: Functor, G[_]: Functor](
-    FtoG: F ~> G//,
-    /*create: F[T[G]] => G[T[G]]*/)(
-    implicit QC: QScriptCore[T, ?] :<: F)
+  def elideNopQC[F[_]: Functor, G[_]: Functor]
+    (FtoG: F ~> G)
+    (implicit QC: QScriptCore[T, ?] :<: F)
       : QScriptCore[T, T[G]] => G[T[G]] = {
     case Filter(Embed(src), BoolLit(true)) => src
     case Map(Embed(src), mf) if mf ≟ HoleF => src
