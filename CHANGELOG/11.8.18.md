@@ -1,0 +1,1 @@
+- enable the Equals, NoNeedForMonad, and Overloading warts.

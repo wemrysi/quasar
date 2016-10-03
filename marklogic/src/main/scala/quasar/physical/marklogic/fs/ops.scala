@@ -86,10 +86,10 @@ object ops {
       ContentFactory.newContent(uri, str, createOptions)
     }
 
+    val (errs, contents) = xmlData.separate
+
     for {
-      cid  <- chunkId
-      (errs, contents) = xmlData.separate
-      cs   =  contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) }
+      cs  <- chunkId ∘ (cid => contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) })
       exs  <- lift(SessionIO.insertContentCollectErrors(cs)).into[S]
     } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(errs.length) +: errs)
   }

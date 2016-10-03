@@ -114,18 +114,15 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
 private[mongodb] object MongoDbIOWorkflowExecutor {
   import EnvironmentError._
 
-  /** The minimum MongoDbIO version required to be able to execute `Workflow`s. */
-  val MinMongoDbVersion = List(2, 6, 0)
-
   /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =
     new (MongoDbIO ~> EnvErrT[MongoDbIO, ?]) {
       def apply[A](m: MongoDbIO[A]) = EitherT(m.attemptMongo.run flatMap {
         case -\/(UnhandledFSError(ex)) => ex match {
           case _: MongoSocketOpenException =>
-            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+            connectionFailed(ex).left.point[MongoDbIO]
           case _: MongoSocketException =>
-            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+            connectionFailed(ex).left.point[MongoDbIO]
           case _ =>
             if (ex.getMessage contains "Command failed with error 18: 'auth failed'")
               invalidCredentials(ex.getMessage).left.point[MongoDbIO]

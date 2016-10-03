@@ -169,6 +169,7 @@ package object jscore {
     val simplify = expr.transCata(repeatedly(simplifyƒ))
 
     def substitute(oldExpr: JsCore, newExpr: JsCore): JsCore = {
+      @SuppressWarnings(Array("org.wartremover.warts.Equals"))
       def loop(x: JsCore, inScope: Set[JsCore]): JsCore =
         if (x == oldExpr && !(inScope contains x)) newExpr
         else

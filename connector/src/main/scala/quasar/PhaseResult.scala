@@ -20,20 +20,22 @@ import quasar.Predef._
 
 import argonaut._, Argonaut._
 import scalaz.Show
+import scalaz.syntax.show._
 
 sealed trait PhaseResult {
   def name: String
 }
 
 object PhaseResult {
-  final case class Tree(name: String, value: RenderedTree) extends PhaseResult {
-    override def toString = name + "\n" + Show[RenderedTree].shows(value)
-  }
-  final case class Detail(name: String, value: String) extends PhaseResult {
-    override def toString = name + "\n" + value
+  final case class Tree(name: String, value: RenderedTree) extends PhaseResult
+  final case class Detail(name: String, value: String)     extends PhaseResult
+
+  implicit def show: Show[PhaseResult] = Show.shows {
+    case Tree(name, value)   => name + "\n" + value.shows
+    case Detail(name, value) => name + "\n" + value
   }
 
-  implicit def phaseResultRenderTree: RenderTree[PhaseResult] = new RenderTree[PhaseResult] {
+  implicit def renderTree: RenderTree[PhaseResult] = new RenderTree[PhaseResult] {
     def render(v: PhaseResult) = v match {
       case Tree(name, value)   => NonTerminal(List("PhaseResult"), Some(name), List(value))
       case Detail(name, value) => NonTerminal(List("PhaseResult"), Some(name), List(Terminal(List("Detail"), Some(value))))

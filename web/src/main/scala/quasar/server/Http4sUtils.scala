@@ -90,8 +90,7 @@ object Http4sUtils {
   def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      builder    =  BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0")
-      server     <- builder.mountService(blueprint.svc).start
+      server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0").mountService(blueprint.svc).start
     } yield (server, actualPort)
   }
 
@@ -141,18 +140,18 @@ object Http4sUtils {
       val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)
     }
-    startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
+    startNew(initialPort) >> (servers(configQ.dequeue, false).unconsOption.map {
       case None => throw new java.lang.AssertionError("should never happen")
       case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
     })
   }
 
-  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] = for {
-    result <- startServers(port, service)
-    (servers, shutdown) = result
-    _ <- openBrowser(port).whenM(openClient)
-    _ <- stdout("Press Enter to stop.")
-    _ <- Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdown.unsafePerformSync))
-    _ <- servers.run // We need to run the servers in order to make sure everything is cleaned up properly
-  } yield ()
+  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] =
+    startServers(port, service) >>= {
+      case (servers, shutdown) =>
+        (openBrowser(port).whenM(openClient) *>
+          stdout("Press Enter to stop.") <*
+          Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdown.unsafePerformSync)) <*
+          servers.run) // We need to run the servers in order to make sure everything is cleaned up properly
+    }
 }

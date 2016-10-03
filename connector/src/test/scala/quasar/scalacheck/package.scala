@@ -38,4 +38,25 @@ package object scalacheck {
 
   implicit def shrinkISet[A: Order](implicit s: Shrink[Set[A]]): Shrink[ISet[A]] =
     Shrink(as => s.shrink(as.toSet).map(ISet.fromFoldable(_)))
+
+  /** Resize a generator, applying a scale factor so that the resulting
+    * values still respond to the incoming size value (which is controlled by
+    * the `maxSize` parameter), but typically scaled down to produce more
+    * modestly-sized values. */
+  def scaleSize[A](gen: Gen[A], f: Int => Int): Gen[A] =
+    Gen.sized(size => Gen.resize(f(size), gen))
+
+  /** Scaling function raising the incoming size to some power, typically less
+    * than 1. If your generator constructs values with dimension 2 (e.g.
+    * `List[List[Int]]`), then 0.5 is a good choice. */
+  def scalePow(exp: Double): Int => Int =
+    size => scala.math.pow(size.toDouble, exp).toInt
+
+  /** Scaling function which just adjusts the size so as to use at most
+    * `desiredLimit`, assuming the default `maxSize` is in effect. */
+  def scaleLinear(desiredLimit: Int): Int => Int = {
+    val externalLimit = 200
+    val factor = externalLimit/desiredLimit
+    _/factor
+  }
 }

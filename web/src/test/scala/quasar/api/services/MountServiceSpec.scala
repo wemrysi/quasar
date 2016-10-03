@@ -635,6 +635,30 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
       }
 
+      "succeed with filesystem path and nested view" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+
+          for {
+            _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+            _     <- M.mountView(d </> f, cfg._1, cfg._2)
+
+            r     <- service(Request(
+                       method = DELETE,
+                       uri = pathUri(d)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+
+            after <- M.lookupConfig(d).run
+          } yield {
+            (body must_== s"deleted ${printPath(d)}") and
+            (res.status must_== Ok)                   and
+            (mntd must beEmpty)                       and
+            (after must beNone)
+          }
+        }
+      }
+
       "succeed with view path" >> prop { (f: AFile) =>
         runTest { service =>
           val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")

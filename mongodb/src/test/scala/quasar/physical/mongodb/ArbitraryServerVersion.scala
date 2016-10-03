@@ -14,22 +14,17 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.sql.ExprArbitrary
 
-import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
+import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 
-trait VariablesArbitrary {
-  implicit val arbitraryVarName: Arbitrary[VarName] =
-    Arbitrary(arb[String].map(VarName(_)))
-
-  implicit val arbitraryVarValue: Arbitrary[VarValue] =
-    Arbitrary(ExprArbitrary.constExprGen.map(expr => VarValue(sql.pprint(expr))))
-
-  implicit val arbitraryVariables: Arbitrary[Variables] =
-    Arbitrary(arb[Map[VarName, VarValue]].map(Variables(_)))
+trait ArbitraryServerVersion {
+  implicit val arbVersion: Arbitrary[ServerVersion] = Arbitrary(for {
+    maj <- Gen.choose(0, 20)
+    min <- Gen.choose(0, 20)
+    rev <- Gen.option(Gen.choose(0, 20))
+    ext <- arbitrary[String]
+  } yield ServerVersion(maj, min, rev, ext))
 }
-
-object VariablesArbitrary extends VariablesArbitrary
