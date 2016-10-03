@@ -1,7 +1,11 @@
 {
   "name": "select wildcard with group by",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "pending",
+    "couchbase":  "pending"
+  },
 
   "query": "select * from zips where _id like \"8030%\" group by city",
 

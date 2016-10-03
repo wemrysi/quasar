@@ -1,7 +1,11 @@
 {
   "name": "variable with a non-trivial value",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "pending",
+    "couchbase":  "pending"
+  },
 
   "data": "days.data",
 

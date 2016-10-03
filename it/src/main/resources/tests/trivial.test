@@ -1,7 +1,11 @@
 {
   "name": "simple read",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "pending",
+    "couchbase":  "pending"
+  },
 
   "data": "smallZips.data",
 

@@ -203,7 +203,7 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
-  core, marklogic, mongodb, postgresql, skeleton, sparkcore,
+  core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
 //        /  \
@@ -314,6 +314,13 @@ lazy val connector = project
       Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val couchbase = project
+  .settings(name := "quasar-couchbase-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.couchbase)
+  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
@@ -379,6 +386,7 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    couchbase,
     marklogic,
     mongodb,
     postgresql,
