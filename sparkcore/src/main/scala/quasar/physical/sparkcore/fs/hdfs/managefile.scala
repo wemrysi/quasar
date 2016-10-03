@@ -29,8 +29,8 @@ import quasar.fs.impl.ensureMoveSemantics
 import java.lang.Exception
 import scala.util.control.NonFatal
 
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.Path
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -48,17 +48,15 @@ object managefile {
     s1: PhysErr :<: S
   ): ManageFile ~> Free[S, ?] = {
 
-    val hdfs: FileSystem = fileSystem()
-
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
         case Move(FileToFile(sf, df), semantics) =>
-          (ensureMoveSemantics[Free[S, ?]](sf, df, pathExists(hdfs)(_), semantics).toLeft(()) *>
-            move(sf, df, hdfs).liftM[FileSystemErrT]).run
+          (ensureMoveSemantics[Free[S, ?]](sf, df, pathExists(fileSystem) _, semantics).toLeft(()) *>
+            moveFile(sf, df, fileSystem).liftM[FileSystemErrT]).run
         case Move(DirToDir(sd, dd), semantics) =>
-          (ensureMoveSemantics[Free[S, ?]](sd, dd, pathExists(hdfs)(_), semantics).toLeft(()) *>
-            move(sd, dd, hdfs).liftM[FileSystemErrT]).run
-        case Delete(path) => delete(path, hdfs)
+          (ensureMoveSemantics[Free[S, ?]](sd, dd, pathExists(fileSystem) _, semantics).toLeft(()) *>
+            moveDir(sd, dd, fileSystem).liftM[FileSystemErrT]).run
+        case Delete(path) => delete(path, fileSystem)
         case TempFile(near) => tempFile(near)
       }
     }}
@@ -67,20 +65,30 @@ object managefile {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def pathExists[S[_]](hdfs: FileSystem)(f: APath)(
+  def pathExists[S[_]](fileSystem: () => FileSystem)(f: APath)(
     implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(toPath(f).map(path => hdfs.exists(path))).into[S]
+    lift(toPath(f).map{ path =>
+      val hdfs = fileSystem()
+      val exists = hdfs.exists(path)
+      hdfs.close
+      exists
+    }).into[S]
 
-  private def move[S[_]](src: APath, dst: APath, hdfs: FileSystem)(implicit
+  private def moveFile[S[_]](src: AFile, dst: AFile, fileSystem: () => FileSystem)(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): Free[S, Unit] = {
+    val hdfs: FileSystem = fileSystem()
     val move: Task[PhysicalError \/ Unit] = (for {
       srcPath <- toPath(src)
       dstPath <- toPath(dst)
+      dstParent <- toPath(fileParent(dst))
     } yield {
       val deleted = hdfs.delete(dstPath, true)
-      hdfs.rename(srcPath, dstPath)
+      val parentsCreated = hdfs.mkdirs(dstParent)
+      val result = hdfs.rename(srcPath, dstPath)
+      hdfs.close()
+      result
     }).as(().right[PhysicalError]).handle {
       case NonFatal(ex : Exception) => UnhandledFSError(ex).left[Unit]
     }
@@ -88,16 +96,40 @@ object managefile {
     Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
 
-  private def delete[S[_]](apath: APath, hdfs: FileSystem)(implicit
+  private def moveDir[S[_]](src: ADir, dst: ADir, fileSystem: () => FileSystem)(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Free[S, Unit] = {
+    val hdfs: FileSystem = fileSystem()
+    val move: Task[PhysicalError \/ Unit] = (for {
+      srcPath <- toPath(src)
+      dstPath <- toPath(dst)
+    } yield {
+      val deleted = hdfs.delete(dstPath, true)
+      val result = hdfs.rename(srcPath, dstPath)
+      hdfs.close()
+      result
+    }).as(().right[PhysicalError]).handle {
+      case NonFatal(ex : Exception) => UnhandledFSError(ex).left[Unit]
+    }
+
+    Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
+  }
+
+
+  private def delete[S[_]](apath: APath, fileSystem: () => FileSystem)(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): Free[S, FileSystemError \/ Unit] = {
+    val hdfs: FileSystem = fileSystem()
     val delete: Task[FileSystemError \/ Unit] = toPath(apath).map { path =>
-      if(!hdfs.exists(path))
-        pathErr(pathNotFound(apath)).left[Unit]
-      else {
+      val result = if(hdfs.exists(path))
         hdfs.delete(path, true).right[FileSystemError]
+      else {
+        pathErr(pathNotFound(apath)).left[Unit]
       }
+      hdfs.close()
+      result
     }.map(_.as(()))
 
     val deleteHandled: Task[PhysicalError \/ (FileSystemError \/ Unit)] =

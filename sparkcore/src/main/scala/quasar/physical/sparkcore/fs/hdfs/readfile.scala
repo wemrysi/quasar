@@ -33,10 +33,12 @@ import scalaz.concurrent.Task
 
 object readfile {
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => String)
-    (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[String]] =
-    read.asks { sc =>
-      sc.textFile(hdfsPathStr(f))
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => Task[String])(implicit
+    read: Read.Ops[SparkContext, S],
+    s1: Task :<: S
+  ): Free[S, RDD[String]] =
+    (lift(hdfsPathStr(f)).into[S]) >>= (pathStr => read.asks { sc =>
+      sc.textFile(pathStr)
         .zipWithIndex()
         .filter {
         case (value, index) =>
@@ -48,20 +50,19 @@ object readfile {
       }.map{
         case (value, index) => value
       }
-      
-    }
+    })
 
-  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => String, fileSystem: () => FileSystem)(
+  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: () => FileSystem)(
     implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(Task.delay {
-      fileSystem().exists(new Path(hdfsPathStr(f)))
+    lift(hdfsPathStr(f).map { pathStr =>
+      fileSystem().exists(new Path(pathStr))
     }).into[S]
 
   // TODO arbitrary value, more or less a good starting point
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](hdfsPathStr: AFile => String, fileSystem: () => FileSystem)(implicit
+  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: () => FileSystem)(implicit
     read: Read.Ops[SparkContext, S], s0: Task :<: S) =
     Input(
       (f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr),

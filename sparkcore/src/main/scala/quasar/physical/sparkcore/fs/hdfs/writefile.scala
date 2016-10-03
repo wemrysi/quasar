@@ -22,6 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, WriteFile._
+import pathy.Path.posixCodec
 
 import java.io.OutputStream;
 import java.io.BufferedWriter
@@ -37,43 +38,45 @@ object writefile {
 
   final case class HdfsWriteCursor(hdfs: FileSystem, bw: BufferedWriter)
 
-  final case class Input(hdfsPathStr: AFile => String, fileSystem: () => FileSystem)
+  private def toPath(apath: APath): Task[Path] = Task.delay {
+    new Path(posixCodec.unsafePrintPath(apath))
+  }
 
-  def chrooted[S[_]](prefix: ADir, input: Input)(implicit
+  def chrooted[S[_]](prefix: ADir, fileSystem: () => FileSystem)(implicit
     s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
     s1: MonotonicSeq :<: S,
     s2: Task :<: S
   ) : WriteFile ~> Free[S, ?] =
-    flatMapSNT(interpret(input)) compose chroot.writeFile[WriteFile](prefix)
+    flatMapSNT(interpret(fileSystem)) compose chroot.writeFile[WriteFile](prefix)
 
-  def interpret[S[_]](input: Input)(implicit
+  def interpret[S[_]](fileSystem: () => FileSystem)(implicit
     s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
     s1: MonotonicSeq :<: S,
     s2: Task :<: S
   ) : WriteFile ~> Free[S, ?] =
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wr: WriteFile[A]): Free[S, A] = wr  match {
-        case Open(f) => open(f, input)
+        case Open(f) => open(f, fileSystem)
         case Write(h, ch) => write(h, ch)
         case Close(h) => close(h)
       }
     }
 
-  def open[S[_]](f: AFile, input: Input) (implicit
+  def open[S[_]](f: AFile, fileSystem: () => FileSystem) (implicit
     writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
     sequence: MonotonicSeq.Ops[S],
     s2: Task :<: S
   ): Free[S, FileSystemError \/ WriteHandle] = {
 
-    def createCursor: Free[S, HdfsWriteCursor] = lift(Task.delay {
-      val hdfs: FileSystem = input.fileSystem()
-      val path: Path = new Path(input.hdfsPathStr(f))
-      val os: OutputStream = hdfs.create(path, new Progressable() {
-        override def progress(): Unit = {}
-      })
-      val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
-      HdfsWriteCursor(hdfs, bw)
-    }).into[S]
+    def createCursor: Free[S, HdfsWriteCursor] =
+      lift(toPath(f).map { path => {
+        val hdfs: FileSystem = fileSystem()
+        val os: OutputStream = hdfs.create(path, new Progressable() {
+          override def progress(): Unit = {}
+        })
+        val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
+        HdfsWriteCursor(hdfs, bw)}
+      }).into[S]
 
     for {
       hwc <- createCursor
