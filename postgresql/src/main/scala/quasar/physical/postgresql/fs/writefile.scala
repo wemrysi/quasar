@@ -59,7 +59,7 @@ object writefile {
   )(implicit
     S0: KeyValueStore[WriteHandle, TableName, ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S3: ConnectionIO :<: S
+    S2: ConnectionIO :<: S
   ): Free[S, FileSystemError \/ WriteHandle] =
     (for {
       dt   <- EitherT(dbTableFromPath(file).point[Free[S, ?]])

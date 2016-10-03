@@ -123,8 +123,9 @@ object managefile {
   ): Free[S, FileSystemError \/ Unit] = {
     val hdfs: FileSystem = fileSystem()
     val delete: Task[FileSystemError \/ Unit] = toPath(apath).map { path =>
-      val result = if(hdfs.exists(path))
+      val result = if(hdfs.exists(path)) {
         hdfs.delete(path, true).right[FileSystemError]
+      }
       else {
         pathErr(pathNotFound(apath)).left[Unit]
       }

@@ -3,7 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "marklogic":         "pending",
+        "couchbase":         "pending"
     },
     "data": "zips.data",
     "query": "select integer(_id), decimal(_id), to_string(pop), to_string(loc[0]), to_string(length(city) < 9) from zips",

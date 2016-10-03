@@ -46,7 +46,7 @@ object Bson {
   //       BsonValue => BsonF[BsonValue]
   val fromRepr: BsonValue => Bson = {
     case arr:  BsonArray             => Arr(arr.getValues.asScala.toList ∘ fromRepr)
-    case bin:  BsonBinary            => Binary(bin.getData)
+    case bin:  BsonBinary            => Binary.fromArray(bin.getData)
     case bool: BsonBoolean           => Bool(bool.getValue)
     case dt:   BsonDateTime          => Date(Instant.ofEpochMilli(dt.getValue))
     case doc:  BsonDocument          => Doc(doc.asScala.toList.toListMap ∘ fromRepr)
@@ -56,11 +56,11 @@ object Bson {
     case _:    BsonMaxKey            => MaxKey
     case _:    BsonMinKey            => MinKey
     case _:    BsonNull              => Null
-    case oid:  BsonObjectId          => ObjectId(oid.getValue.toByteArray)
+    case oid:  BsonObjectId          => ObjectId.fromArray(oid.getValue.toByteArray)
     case rex:  BsonRegularExpression => Regex(rex.getPattern, rex.getOptions)
     case str:  BsonString            => Text(str.getValue)
     case sym:  BsonSymbol            => Symbol(sym.getSymbol)
-    case tms:  BsonTimestamp         => Timestamp(Instant.ofEpochSecond(tms.getTime.toLong), tms.getInc)
+    case tms:  BsonTimestamp         => Timestamp.fromInstant(Instant.ofEpochSecond(tms.getTime.toLong), tms.getInc)
     case _:    BsonUndefined         => Undefined
       // NB: These types we can’t currently translate back to Bson, but we don’t
       //     expect them to appear.
@@ -97,7 +97,7 @@ object Bson {
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
   object Binary {
-    def apply(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
+    def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
   final case class Doc(value: ListMap[String, Bson])
       extends Bson with org.bson.conversions.Bson {
@@ -137,10 +137,10 @@ object Bson {
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
   object ObjectId {
-    def apply(array: Array[Byte]): ObjectId = ObjectId(ImmutableArray.fromArray(array))
+    def fromArray(array: Array[Byte]): ObjectId = ObjectId(ImmutableArray.fromArray(array))
 
-    def apply(str: String): Option[ObjectId] = {
-      \/.fromTryCatchNonFatal(new types.ObjectId(str)).toOption.map(oid => ObjectId(oid.toByteArray))
+    def fromString(str: String): Option[ObjectId] = {
+      \/.fromTryCatchNonFatal(new types.ObjectId(str)).toOption.map(oid => ObjectId.fromArray(oid.toByteArray))
     }
   }
   final case class Bool(value: Boolean) extends Bson {
@@ -202,7 +202,7 @@ object Bson {
     override def toString = "Timestamp(" + Instant.ofEpochSecond(epochSecond.toLong) + ", " + ordinal + ")"
   }
   object Timestamp {
-    def apply(instant: Instant, ordinal: Int): Timestamp =
+    def fromInstant(instant: Instant, ordinal: Int): Timestamp =
       Timestamp((instant.toEpochMilli/1000).toInt, ordinal)
   }
   final case object MinKey extends Bson {

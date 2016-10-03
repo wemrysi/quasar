@@ -436,6 +436,19 @@ abstract class MountingSpec[S[_]](
         r map (_ must beNone)
       }
 
+      "should remove a nested view mount" >>* {
+        val d = rootDir </> dir("tounmount")
+        val f = d </> file("nested")
+
+        val r =
+          mountFileSystem(d, dbType, uriB) *>
+          mountViewNoVars(f, exprA)        *>
+          unmount(d)                       *>
+          lookupConfig(f).run
+
+        r map (_ must beNone)
+      }
+
       "should fail when nothing mounted at path" >>* {
         val f = rootDir </> dir("nothing") </> file("there")
         mntErr.attempt(unmount(f)) map (dj => maybeNotFound(dj) must beSome(f))

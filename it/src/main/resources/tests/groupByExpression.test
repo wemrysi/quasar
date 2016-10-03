@@ -1,7 +1,11 @@
 {
   "name": "group by a computed value",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "pending",
+    "couchbase":  "pending"
+  },
 
   "data": "zips.data",
 

@@ -112,17 +112,15 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   "Mount Service" should {
     "GET" should {
       "succeed with correct filesystem path" >> prop { d: ADir =>
-        !hasDot(d) ==> {
-          runTest { service =>
-            for {
-              _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
-              r    <- service(Request(uri = pathUri(d)))
-              (res, _) = r
-              body <- lift(res.as[Json]).into[Eff]
-            } yield {
-              (body must_== Json("stub" -> Json("connectionUri" := "foo"))) and
-              (res.status must_== Ok)
-            }
+        runTest { service =>
+          for {
+            _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+            r    <- service(Request(uri = pathUri(d)))
+            (res, _) = r
+            body <- lift(res.as[Json]).into[Eff]
+          } yield {
+            (body must_== Json("stub" -> Json("connectionUri" := "foo"))) and
+            (res.status must_== Ok)
           }
         }
       }
@@ -145,20 +143,18 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       }
 
       "succeed with correct view path" >> prop { f: AFile =>
-        !hasDot(f) ==> {
-          runTest { service =>
-            val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
-            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
+        runTest { service =>
+          val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+          val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
-            for {
-              _    <- M.mountView(f, cfg._1, cfg._2)
+          for {
+            _    <- M.mountView(f, cfg._1, cfg._2)
 
-              r    <- service(Request(uri = pathUri(f)))
-              (res, _) = r
-              body <- lift(res.as[Json]).into[Eff]
-            } yield {
-              (body must_== cfgStr) and (res.status must_== Ok)
-            }
+            r    <- service(Request(uri = pathUri(f)))
+            (res, _) = r
+            body <- lift(res.as[Json]).into[Eff]
+          } yield {
+            (body must_== cfgStr) and (res.status must_== Ok)
           }
         }
       }
@@ -173,7 +169,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             err must beMountNotFoundError(d)
           }
         }
-      }.flakyTest("Falsified after 50 passed tests.\n[error]      > ARG_0: DirIn(DirIn(Root,DirName(V.gezymrosscw壐+lwegvfvpzyleoi/Nfbkpi)),DirName(sx/))\n[error]      > object[(path,\"/V.gezymrosscw壐 lwegvfvpzyleoi$sep$Nfbkpi/sx$sep$/\")] !== object[(path,\"/V.gezymrosscw壐+lwegvfvpzyleoi$sep$Nfbkpi/sx$sep$/\")] (QuasarSpecification.scala:31)")
+      }
 
       "be 404 with path type mismatch" >> prop { fp: AFile =>
         runTest { service =>
@@ -199,7 +195,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       "succeed with filesystem mount" >> prop { (srcHead: String, srcTail: RDir, dstHead: String, dstTail: RDir) =>
         // NB: distinct first segments means no possible conflict, but doesn't
         // hit every possible scenario.
-        (srcHead != "" && dstHead != "" && srcHead != dstHead && !hasDot(rootDir </> dir(srcHead) </> srcTail)) ==> {
+        (srcHead != "" && dstHead != "" && srcHead != dstHead) ==> {
           runTest { service =>
             val src = rootDir </> dir(srcHead) </> srcTail
             val dst = rootDir </> dir(dstHead) </> dstTail
@@ -225,7 +221,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             }
           }
         }
-      }.flakyTest("Falsified after 72 passed tests.\n[error]      > ARG_0: DirIn(DirIn(DirIn(Current,DirName(dc9e.r.oyoj뻱a.duic/퐿/9F56s.cizk/h.9c/.///\uECF0wcm7ixey/y..l)),DirName(rb沛yhjttifb/zr)),DirName(ud))\n[error]      > ARG_1: \"첹閕콝꾑럞㤃š\u0DE9ᝳⅪ꺱Ꝛ\uAB78\uEA45㮸昹灔侫\uF5A7\u2069Ꜳ鎭ᓋ孉묥뜍橏ꯠꬎ\uE690蠒䚰ᯧ踨绑鐴ꤠ冝먄踈橈\uEAF3\"\n[error]      > ARG_2: DirIn(DirIn(DirIn(DirIn(DirIn(Current,DirName(./g//7/h)),DirName(p.cpdt鞛ex)),DirName(bzbz/e1jk/oyl)),DirName(.x)),DirName(s))\n[error]      > ARG_3: \"+\"\n[error]      > ARG_3_ORIGINAL: \"协땴Ί㻝㦕ᖶꍀ畩꺶濚嬐\uEFBF+\uE7CD\u0C49厳䜫∭퓙亵\uE45A骏\u2459\uF7D7吺狸蓺뭣⣅醝ှ攽궞㛡癨鏲咒腆\uE183\uE34E龈諛渾管\uE475振엑ꊏ䖖檣綒\uEA12\uE504蚜喕蓱멳\uE4DF襽ٴࡀ젿䩊枏ꠇ駸䌖滬㡙ὑ裤㖧谻깔ཷ謞͟땫\uE151껕⼊䉞ힶ嶿\uED69\"\n[error]      > '{ \"error\": { \"status\": \"Path not found.\", \"detail\": { \"path\": \"/ /.$sep$g$sep$$sep$7$sep$h/p.cpdt鞛ex/bzbz$sep$e1jk$sep$oyl/.x/s/\" } } }'\n[error]      \n[error]       is not equal to \n[error]      \n[error]      'moved /+/.$sep$g$sep$$sep$7$sep$h/p.cpdt鞛ex/bzbz$sep$e1jk$sep$oyl/.x/s/ to /첹閕콝꾑럞㤃š\u0DE9ᝳⅪ꺱Ꝛ\uAB78\uEA45㮸昹灔侫\uF5A7\u2069Ꜳ鎭ᓋ孉묥뜍橏ꯠꬎ\uE690蠒䚰ᯧ踨绑鐴ꤠ冝먄踈橈\uEAF3/dc9e.r.oyoj뻱a.duic$sep$퐿$sep$9F56s.cizk$sep$h.9c$sep$.$sep$$sep$$sep$\uECF0wcm7ixey$sep$y..l/rb沛yhjttifb$sep$zr/ud/' (QuasarSpecification.scala:31)\n[error] Actual:   { \"error\": { \"status\": \"Path not found.\", \"detail\": { \"path\": \"/ /.$sep$g$sep$$sep$7$sep$h/p.cpdt鞛ex/bzbz$sep$e1jk$sep$oyl/.x/s/\" } } }\n[error] Expected: moved /+/.$sep$g$sep$$sep$7$sep$h/p.cpdt鞛ex/bzbz$sep$e1jk$sep$oyl/.x/s/ to /첹閕콝꾑럞㤃š\u0DE9ᝳⅪ꺱Ꝛ\uAB78\uEA45㮸昹灔侫\uF5A7\u2069Ꜳ鎭ᓋ孉묥뜍橏ꯠꬎ\uE690蠒䚰ᯧ踨绑鐴ꤠ冝먄踈橈\uEAF3/dc9e.r.oyoj뻱a.duic$sep$퐿$sep$9F56s.cizk$sep$h.9c$sep$.$sep$$sep$$sep$\uECF0wcm7ixey$sep$y..l/rb沛yhjttifb$sep$zr/ud/")
+      }
 
       "be 404 with missing source" >> prop { (src: ADir, dst: ADir) =>
         runTest { service =>
@@ -245,67 +241,61 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       }
 
       "be 400 with no specified Destination" >> prop { (src: ADir) =>
-        !hasDot(src) ==> {
-          runTest { service =>
-            for {
-              _   <- M.mountFileSystem(src, StubFs, fooUri)
+        runTest { service =>
+          for {
+            _   <- M.mountFileSystem(src, StubFs, fooUri)
 
-              r   <- service(Request(
-                        method = MOVE,
-                        uri = pathUri(src)))
+            r   <- service(Request(
+                      method = MOVE,
+                      uri = pathUri(src)))
 
-              (res, mntd) = r
-              err <- lift(res.as[ApiError]).into[Eff]
-            } yield {
-              (err must beHeaderMissingError("Destination")) and
-              (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
-            }
+            (res, mntd) = r
+            err <- lift(res.as[ApiError]).into[Eff]
+          } yield {
+            (err must beHeaderMissingError("Destination")) and
+            (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
           }
         }
       }
 
       "be 400 with relative path destination" >> prop { (src: ADir, dst: RDir) =>
-        !hasDot(src) ==> {
-          runTest { service =>
-            for {
-              _   <- M.mountFileSystem(src, StubFs, fooUri)
+        runTest { service =>
+          for {
+            _   <- M.mountFileSystem(src, StubFs, fooUri)
 
-              r   <- service(Request(
-                       method = MOVE,
-                       uri = pathUri(src),
-                       headers = Headers(destination(dst))))
+            r   <- service(Request(
+                     method = MOVE,
+                     uri = pathUri(src),
+                     headers = Headers(destination(dst))))
 
-              (res, mntd) = r
-              err <- lift(res.as[ApiError]).into[Eff]
-            } yield {
-              (err must equal(ApiError.apiError(
-                Status.BadRequest withReason "Expected an absolute directory.",
-                "path" := dst))) and
-              (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
-            }
+            (res, mntd) = r
+            err <- lift(res.as[ApiError]).into[Eff]
+          } yield {
+            (err must equal(ApiError.apiError(
+              Status.BadRequest withReason "Expected an absolute directory.",
+              "path" := dst))) and
+            (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
           }
         }
       }
 
       "be 400 with non-directory path destination" >> prop { (src: ADir, dst: AFile) =>
-        !hasDot(src) ==> {
-          runTest { service =>
-            for {
-              _   <- M.mountFileSystem(src, StubFs, fooUri)
+        runTest { service =>
+          for {
+            _   <- M.mountFileSystem(src, StubFs, fooUri)
 
-              r   <- service(Request(
-                       method = MOVE,
-                       uri = pathUri(src),
-                       headers = Headers(destination(dst))))
+            r   <- service(Request(
+                     method = MOVE,
+                     uri = pathUri(src),
+                     headers = Headers(destination(dst))))
 
-              (res, mntd) = r
-              err <- lift(res.as[ApiError]).into[Eff]
-            } yield {
-              (err must equal(ApiError.apiError(
-                Status.BadRequest withReason "Expected an absolute directory.",
-                "path" := dst))) and
-              (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
-            }
+            (res, mntd) = r
+            err <- lift(res.as[ApiError]).into[Eff]
+          } yield {
+            (err must equal(ApiError.apiError(
+              Status.BadRequest withReason "Expected an absolute directory.",
+              "path" := dst))) and
+            (mntd must_== Set(MR.mountFileSystem(src, StubFs, fooUri)))
           }
         }
       }
@@ -346,106 +336,98 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
 
       testBoth { reqBuilder =>
         "succeed with filesystem path" >> prop { (parent: ADir, fsDir: RDir) =>
-          !hasDot(parent </> fsDir) ==> {
-            runTest { service =>
-              for {
-                req   <- reqBuilder(parent, fsDir, """{"stub": { "connectionUri": "foo" } }""")
-                r     <- service(req)
-                (res, mntd) = r
-                body  <- lift(res.as[String]).into[Eff]
-                dst   =  parent </> fsDir
-                after <- M.lookupConfig(dst).run
-              } yield {
-                (body must_== s"added ${printPath(dst)}")                   and
-                (res.status must_== Ok)                                     and
-                (mntd must_== Set(MR.mountFileSystem(dst, StubFs, fooUri))) and
-                (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
-              }
+          runTest { service =>
+            for {
+              req   <- reqBuilder(parent, fsDir, """{"stub": { "connectionUri": "foo" } }""")
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              dst   =  parent </> fsDir
+              after <- M.lookupConfig(dst).run
+            } yield {
+              (body must_== s"added ${printPath(dst)}")                   and
+              (res.status must_== Ok)                                     and
+              (mntd must_== Set(MR.mountFileSystem(dst, StubFs, fooUri))) and
+              (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
             }
           }
-        }.flakyTest("Falsified after 86 passed tests.\n[error]        > ARG_0: DirIn(DirIn(DirIn(DirIn(DirIn(DirIn(Current,DirName(dd/zz/헷Ma0fd)),DirName(ur9/n煐rssa/dk/kva/urqcwxmxl/ndlae.b/qiDiosfosl/m盧zm)),DirName(vp)),DirName(r)),DirName(4q)),DirName(s))\n[error]        > ARG_1: DirIn(DirIn(DirIn(DirIn(DirIn(DirIn(DirIn(Root,DirName(.hif)),DirName(Wgqgec)),DirName(dbm/0+sz)),DirName(P/k./kA/zvzﻕ.yk낭qzkto)),DirName(왰/)),DirName(.npvk啁n)),DirName(//))\n[error]        > 'added /.hif/Wgqgec/dbm$sep$0 sz/P$sep$k.$sep$kA$sep$zvzﻕ.yk낭qzkto/왰$sep$/.npvk啁n/$sep$$sep$/dd$sep$zz$sep$헷Ma0fd/ur9$sep$n煐rssa$sep$dk$sep$kva$sep$urqcwxmxl$sep$ndlae.b$sep$qiDiosfosl$sep$m盧zm/vp/r/4q/s/'\n[error]        \n[error]         is not equal to \n[error]        \n[error]        'added /.hif/Wgqgec/dbm$sep$0+sz/P$sep$k.$sep$kA$sep$zvzﻕ.yk낭qzkto/왰$sep$/.npvk啁n/$sep$$sep$/dd$sep$zz$sep$헷Ma0fd/ur9$sep$n煐rssa$sep$dk$sep$kva$sep$urqcwxmxl$sep$ndlae.b$sep$qiDiosfosl$sep$m盧zm/vp/r/4q/s/' (QuasarSpecification.scala:31)\n[error] Actual:   ...sep$0[ ]sz/P$...\n[error] /s/\n[error] Expected: ...sep$0[+]sz/P$...\n[error] /s/")
+        }
 
         "succeed with view path" >> prop { (parent: ADir, f: RFile) =>
-          !hasDot(parent </> f) ==> {
-            runTest { service =>
-              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          runTest { service =>
+            val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
-              for {
-                req   <- reqBuilder(parent, f, cfgStr)
-                r     <- service(req)
-                (res, mntd) = r
-                body  <- lift(res.as[String]).into[Eff]
-                dst   =  parent </> f
-                after <- M.lookupConfig(dst).run
-              } yield {
-                (body must_== s"added ${printPath(dst)}")         and
-                (res.status must_== Ok)                           and
-                (mntd must_== Set(MR.mountView(dst, expr, vars))) and
-                (after must beSome(MountConfig.viewConfig(expr, vars)))
-              }
+            for {
+              req   <- reqBuilder(parent, f, cfgStr)
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              dst   =  parent </> f
+              after <- M.lookupConfig(dst).run
+            } yield {
+              (body must_== s"added ${printPath(dst)}")         and
+              (res.status must_== Ok)                           and
+              (mntd must_== Set(MR.mountView(dst, expr, vars))) and
+              (after must beSome(MountConfig.viewConfig(expr, vars)))
             }
           }
         }
 
         "succeed with view under existing fs path" >> prop { (fs: ADir, viewSuffix: RFile) =>
-          !hasDot(fs </> viewSuffix) ==> {
-            runTest { service =>
-              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          runTest { service =>
+            val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
-              val view = fs </> viewSuffix
+            val view = fs </> viewSuffix
 
-              for {
-                _         <- M.mountFileSystem(fs, StubFs, fooUri)
+            for {
+              _         <- M.mountFileSystem(fs, StubFs, fooUri)
 
-                req       <- reqBuilder(fs, viewSuffix, cfgStr)
-                r         <- service(req)
-                (res, mntd) = r
-                body      <- lift(res.as[String]).into[Eff]
+              req       <- reqBuilder(fs, viewSuffix, cfgStr)
+              r         <- service(req)
+              (res, mntd) = r
+              body      <- lift(res.as[String]).into[Eff]
 
-                afterFs   <- M.lookupConfig(fs).run
-                afterView <- M.lookupConfig(view).run
-              } yield {
-                (body must_== s"added ${printPath(view)}") and
-                (res.status must_== Ok)                    and
-                (mntd must_== Set(
-                  MR.mountFileSystem(fs, StubFs, fooUri),
-                  MR.mountView(view, expr, vars)
-                ))                                         and
-                (afterFs must beSome)                      and
-                (afterView must beSome(MountConfig.viewConfig(expr, vars)))
-              }
+              afterFs   <- M.lookupConfig(fs).run
+              afterView <- M.lookupConfig(view).run
+            } yield {
+              (body must_== s"added ${printPath(view)}") and
+              (res.status must_== Ok)                    and
+              (mntd must_== Set(
+                MR.mountFileSystem(fs, StubFs, fooUri),
+                MR.mountView(view, expr, vars)
+              ))                                         and
+              (afterFs must beSome)                      and
+              (afterView must beSome(MountConfig.viewConfig(expr, vars)))
             }
           }
         }
 
         "succeed with view 'above' existing fs path" >> prop { (d: ADir, view: RFile, fsSuffix: RDir) =>
-          !hasDot(d </> view) ==> {
-            runTest { service =>
-              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
-              val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          runTest { service =>
+            val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
-              val fs = d </> posixCodec.parseRelDir(posixCodec.printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
+            val fs = d </> posixCodec.parseRelDir(posixCodec.printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
 
-              for {
-                _     <- M.mountFileSystem(fs, StubFs, fooUri)
+            for {
+              _     <- M.mountFileSystem(fs, StubFs, fooUri)
 
-                req   <- reqBuilder(d, view, cfgStr)
-                r     <- service(req)
-                (res, mntd) = r
-                body  <- lift(res.as[String]).into[Eff]
-                vdst  =  d </> view
-                after <- M.lookupConfig(vdst).run
-              } yield {
-                (body must_== s"added ${printPath(vdst)}") and
-                (res.status must_== Ok)                    and
-                (mntd must_== Set(
-                  MR.mountFileSystem(fs, StubFs, fooUri),
-                  MR.mountView(vdst, expr, vars)
-                ))                                         and
-                (after must beSome(MountConfig.viewConfig(expr, vars)))
-              }
+              req   <- reqBuilder(d, view, cfgStr)
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              vdst  =  d </> view
+              after <- M.lookupConfig(vdst).run
+            } yield {
+              (body must_== s"added ${printPath(vdst)}") and
+              (res.status must_== Ok)                    and
+              (mntd must_== Set(
+                MR.mountFileSystem(fs, StubFs, fooUri),
+                MR.mountView(vdst, expr, vars)
+              ))                                         and
+              (after must beSome(MountConfig.viewConfig(expr, vars)))
             }
           }
         }
@@ -489,7 +471,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (mntd must beEmpty)
             }
           }
-        }.flakyTest("ARG_0: FileIn(Current,FileName(%7b9DyymB.g.x.kk쉛rpf1Waff\uFD4B⣹thqxslkuv/8x.op))\n[error]        > ARG_1: DirIn(DirIn(DirIn(DirIn(DirIn(Root,DirName(qaverlryzkrd6s/cw.btn\uECF6h0/▖i.hOdK윾g㳩lnc7.hglCsuml)),DirName(dx/gpkMjhim1)),DirName(juycm)),DirName(y)),DirName(9))\n[error]        > object[(path,\"/qaverlryzkrd6s$sep$cw.btn\uECF6h0$sep$▖i.hOdK윾g㳩lnc7.hglCsuml/dx$sep$gpkMjhim1/juycm/y/9/%7B9DyymB.g.x.kk쉛rpf1Waff\uFD4B⣹thqxslkuv$sep$8x.op\")] !== object[(path,\"/qaverlryzkrd6s$sep$cw.btn\uECF6h0$sep$▖i.hOdK윾g㳩lnc7.hglCsuml/dx$sep$gpkMjhim1/juycm/y/9/%7b9DyymB.g.x.kk쉛rpf1Waff\uFD4B⣹thqxslkuv$sep$8x.op\")]")
+        }
 
         "be 400 with view config and dir path in X-File-Name header" >> prop { (parent: ADir, viewDir: RDir) =>
           runTest { service =>
@@ -511,49 +493,43 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
 
         "be 400 with invalid JSON" >> prop { (parent: ADir, f: RFile) =>
-          !hasDot(parent </> f) ==> {
-            runTest { service =>
-              for {
-                req <- reqBuilder(parent, f, "{")
-                r   <- service(req)
-                (res, mntd) = r
-                err <- lift(res.as[ApiError]).into[Eff]
-              } yield {
-                (err must beApiErrorWithMessage(BadRequest withReason "Malformed input.")) and
-                (mntd must beEmpty)
-              }
+          runTest { service =>
+            for {
+              req <- reqBuilder(parent, f, "{")
+              r   <- service(req)
+              (res, mntd) = r
+              err <- lift(res.as[ApiError]).into[Eff]
+            } yield {
+              (err must beApiErrorWithMessage(BadRequest withReason "Malformed input.")) and
+              (mntd must beEmpty)
             }
           }
         }
 
         "be 400 with invalid connection uri" >> prop { (parent: ADir, d: RDir) =>
-          !hasDot(parent </> d) ==> {
-            runTest { service =>
-              for {
-                req <- reqBuilder(parent, d, """{ "stub": { "connectionUri": "invalid" } }""")
-                r   <- service(req)
-                (res, mntd) = r
-                err <- lift(res.as[ApiError]).into[Eff]
-              } yield {
-                (err must beInvalidConfigError("invalid connectionUri (simulated)")) and
-                (mntd must beEmpty)
-              }
+          runTest { service =>
+            for {
+              req <- reqBuilder(parent, d, """{ "stub": { "connectionUri": "invalid" } }""")
+              r   <- service(req)
+              (res, mntd) = r
+              err <- lift(res.as[ApiError]).into[Eff]
+            } yield {
+              (err must beInvalidConfigError("invalid connectionUri (simulated)")) and
+              (mntd must beEmpty)
             }
           }
         }
 
         "be 400 with invalid view URI" >> prop { (parent: ADir, f: RFile) =>
-          !hasDot(parent </> f) ==> {
-            runTest { service =>
-              for {
-                req <- reqBuilder(parent, f, """{ "view": { "connectionUri": "foo://bar" } }""")
-                r   <- service(req)
-                (res, mntd) = r
-                err <- lift(res.as[ApiError]).into[Eff]
-              } yield {
-                (err must beApiErrorWithMessage(BadRequest)) and
-                (mntd must beEmpty)
-              }
+          runTest { service =>
+            for {
+              req <- reqBuilder(parent, f, """{ "view": { "connectionUri": "foo://bar" } }""")
+              r   <- service(req)
+              (res, mntd) = r
+              err <- lift(res.as[ApiError]).into[Eff]
+            } yield {
+              (err must beApiErrorWithMessage(BadRequest)) and
+              (mntd must beEmpty)
             }
           }
         }
@@ -590,20 +566,18 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       }
 
       "be 400 with missing X-File-Name header" >> prop { (parent: ADir) =>
-        !hasDot(parent) ==> {
-          runTest { service =>
-            for {
-              req <- lift(Request(
-                       method = POST,
-                       uri = pathUri(parent))
-                     .withBody("""{ "stub": { "connectionUri": "foo" } }""")).into[Eff]
-              r   <- service(req)
-              (res, mntd) = r
-              err <- lift(res.as[ApiError]).into[Eff]
-            } yield {
-              (err must beHeaderMissingError("X-File-Name")) and
-              (mntd must beEmpty)
-            }
+        runTest { service =>
+          for {
+            req <- lift(Request(
+                     method = POST,
+                     uri = pathUri(parent))
+                   .withBody("""{ "stub": { "connectionUri": "foo" } }""")).into[Eff]
+            r   <- service(req)
+            (res, mntd) = r
+            err <- lift(res.as[ApiError]).into[Eff]
+          } yield {
+            (err must beHeaderMissingError("X-File-Name")) and
+            (mntd must beEmpty)
           }
         }
       }
@@ -613,27 +587,25 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       import org.http4s.Method.PUT
 
       "succeed with overwritten filesystem" >> prop { (fsDir: ADir) =>
-        !hasDot(fsDir) ==> {
-          runTest { service =>
-            for {
-              _     <- M.mountFileSystem(fsDir, StubFs, barUri)
+        runTest { service =>
+          for {
+            _     <- M.mountFileSystem(fsDir, StubFs, barUri)
 
-              req   <- lift(Request(
-                         method = PUT,
-                         uri = pathUri(fsDir))
-                       .withBody("""{ "stub": { "connectionUri": "foo" } }""")).into[Eff]
+            req   <- lift(Request(
+                       method = PUT,
+                       uri = pathUri(fsDir))
+                     .withBody("""{ "stub": { "connectionUri": "foo" } }""")).into[Eff]
 
-              r     <- service(req)
-              (res, mntd) = r
-              body  <- lift(res.as[String]).into[Eff]
+            r     <- service(req)
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookupConfig(fsDir).run
-            } yield {
-              (body must_== s"updated ${printPath(fsDir)}")                 and
-              (res.status must_== Ok)                                       and
-              (mntd must_== Set(MR.mountFileSystem(fsDir, StubFs, fooUri))) and
-              (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
-            }
+            after <- M.lookupConfig(fsDir).run
+          } yield {
+            (body must_== s"updated ${printPath(fsDir)}")                 and
+            (res.status must_== Ok)                                       and
+            (mntd must_== Set(MR.mountFileSystem(fsDir, StubFs, fooUri))) and
+            (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
           }
         }
       }
@@ -643,49 +615,69 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       import org.http4s.Method.DELETE
 
       "succeed with filesystem path" >> prop { (d: ADir) =>
-        !hasDot(d) ==> {
-          runTest { service =>
-            for {
-              _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+        runTest { service =>
+          for {
+            _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
 
-              r     <- service(Request(
-                         method = DELETE,
-                         uri = pathUri(d)))
-              (res, mntd) = r
-              body  <- lift(res.as[String]).into[Eff]
+            r     <- service(Request(
+                       method = DELETE,
+                       uri = pathUri(d)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookupConfig(d).run
-            } yield {
-              (body must_== s"deleted ${printPath(d)}") and
-              (res.status must_== Ok)                   and
-              (mntd must beEmpty)                       and
-              (after must beNone)
-            }
+            after <- M.lookupConfig(d).run
+          } yield {
+            (body must_== s"deleted ${printPath(d)}") and
+            (res.status must_== Ok)                   and
+            (mntd must beEmpty)                       and
+            (after must beNone)
+          }
+        }
+      }
+
+      "succeed with filesystem path and nested view" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+
+          for {
+            _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+            _     <- M.mountView(d </> f, cfg._1, cfg._2)
+
+            r     <- service(Request(
+                       method = DELETE,
+                       uri = pathUri(d)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+
+            after <- M.lookupConfig(d).run
+          } yield {
+            (body must_== s"deleted ${printPath(d)}") and
+            (res.status must_== Ok)                   and
+            (mntd must beEmpty)                       and
+            (after must beNone)
           }
         }
       }
 
       "succeed with view path" >> prop { (f: AFile) =>
-        !hasDot(f) ==> {
-          runTest { service =>
-            val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+        runTest { service =>
+          val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
 
-            for {
-              _     <- M.mountView(f, cfg._1, cfg._2)
+          for {
+            _     <- M.mountView(f, cfg._1, cfg._2)
 
-              r     <- service(Request(
-                         method = DELETE,
-                         uri = pathUri(f)))
-              (res, mntd) = r
-              body  <- lift(res.as[String]).into[Eff]
+            r     <- service(Request(
+                       method = DELETE,
+                       uri = pathUri(f)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookupConfig(f).run
-            } yield {
-              (body must_== s"deleted ${printPath(f)}") and
-              (res.status must_== Ok)                   and
-              (mntd must beEmpty)                       and
-              (after must beNone)
-            }
+            after <- M.lookupConfig(f).run
+          } yield {
+            (body must_== s"deleted ${printPath(f)}") and
+            (res.status must_== Ok)                   and
+            (mntd must beEmpty)                       and
+            (after must beNone)
           }
         }
       }

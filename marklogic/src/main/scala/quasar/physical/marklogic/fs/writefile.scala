@@ -37,8 +37,7 @@ object writefile {
     def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
       case WriteFile.Open(file) =>
         for {
-          id <- seq.next
-          writeHandle = WriteFile.WriteHandle(file, id)
+          writeHandle <- seq.next ∘ (WriteFile.WriteHandle(file, _))
           _  <- cursors.put(writeHandle, ())
           r  <- lift(ops.exists(file).ifM(
                   ().right[PathError].point[SessionIO],

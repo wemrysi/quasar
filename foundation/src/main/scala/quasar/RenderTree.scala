@@ -54,7 +54,7 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
 
     (this, that) match {
       case (RenderedTree(nodeType1, l1, children1), RenderedTree(nodeType2, l2, children2)) => {
-        if (nodeType1 != nodeType2 || l1 != l2)
+        if (nodeType1 =/= nodeType2 || l1 =/= l2)
           RenderedTree(List("[Root differs]"), None,
             prefixType(this, deleted) ::
             prefixType(that, added) ::
@@ -65,9 +65,9 @@ final case class RenderedTree(nodeType: List[String], label: Option[String], chi
             case (x :: xs, Nil) => prefixType(x, deleted) :: matchChildren(xs, Nil)
             case (Nil, x :: xs) => prefixType(x, added) :: matchChildren(Nil, xs)
 
-            case (a :: as, b :: bs)        if a.typeAndLabel == b.typeAndLabel  => a.diff(b) :: matchChildren(as, bs)
-            case (a1 :: a2 :: as, b :: bs) if a2.typeAndLabel == b.typeAndLabel => prefixType(a1, deleted) :: a2.diff(b) :: matchChildren(as, bs)
-            case (a :: as, b1 :: b2 :: bs) if a.typeAndLabel == b2.typeAndLabel => prefixType(b1, added) :: a.diff(b2) :: matchChildren(as, bs)
+            case (a :: as, b :: bs)        if a.typeAndLabel ≟ b.typeAndLabel  => a.diff(b) :: matchChildren(as, bs)
+            case (a1 :: a2 :: as, b :: bs) if a2.typeAndLabel ≟ b.typeAndLabel => prefixType(a1, deleted) :: a2.diff(b) :: matchChildren(as, bs)
+            case (a :: as, b1 :: b2 :: bs) if a.typeAndLabel ≟ b2.typeAndLabel => prefixType(b1, added) :: a.diff(b2) :: matchChildren(as, bs)
 
             case (a :: as, b :: bs) => prefixType(a, deleted) :: prefixType(b, added) :: matchChildren(as, bs)
           }
@@ -153,6 +153,7 @@ object NonTerminal {
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
 }
+@SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
 object RenderTree extends RenderTreeInstances {
   import RenderTree.ops._
 

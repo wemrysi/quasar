@@ -41,9 +41,11 @@ trait QScriptHelpers {
   val R  =        implicitly[Const[Read, ?] :<: QS]
   val QC =   implicitly[QScriptCore[Fix, ?] :<: QS]
   val TJ =     implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ =      implicitly[EquiJoin[Fix, ?] :<: QST]
-  val SR = implicitly[Const[ShiftedRead, ?] :<: QST]
-  val QS = implicitly[Injectable.Aux[QS, QST]]
+  implicit val QS: Injectable.Aux[QS, QScriptTotal[Fix, ?]] =
+    ::\::[QScriptCore[Fix, ?]](
+      ::\::[ThetaJoin[Fix, ?]](
+        ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
+
   def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))

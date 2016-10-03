@@ -66,14 +66,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         UnreferencedR,
         QC.inj(Union((),
-          Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar")))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
-          Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-            Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car")))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
-            Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-              Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city")))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
-              Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person")))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
-                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips")))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
+          Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF))))),
+          Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+            Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
+            Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+              Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
+              Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+                Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
+                Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))),
 
         QC.inj(LeftShift((),
           HoleF,
@@ -104,9 +104,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           QC.inj(LeftShift((), HoleF, Free.point(RightSide))),
           QC.inj(Take((),
             Free.point(SrcHole),
-            Free.roll(QST[QS].inject(QC.inj(Map(
-              Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-              IntLit[Fix, Hole](10)))))))).some)
+            Free.roll(QCT.inj(Map(
+              Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+              IntLit[Fix, Hole](10))))))).some)
     }
 
     "convert a simple read with path projects" in {
@@ -124,21 +124,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         RootR,
         TJ.inj(ThetaJoin((),
           chain[Free[?[_], Hole], QScriptTotal[Fix, ?]](
-            QST[QS].inject(QC.inj(Map(Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("foo"))))),
-            QST[QS].inject(QC.inj(LeftShift((),
+            QCT.inj(Map(Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("foo")))),
+            QCT.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide))))))))),
+                Free.roll(MakeArray(Free.point(RightSide)))))))),
           chain[Free[?[_], Hole], QScriptTotal[Fix, ?]](
-            QST[QS].inject(QC.inj(Map(Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("bar"))))),
-            QST[QS].inject(QC.inj(LeftShift((),
+            QCT.inj(Map(Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("bar")))),
+            QCT.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide))))))))),
+                Free.roll(MakeArray(Free.point(RightSide)))))))),
           BoolLit(true),
           Inner,
           Free.roll(Add(
@@ -175,20 +175,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         agg.Sum(lpRead("/person")).embed) must
       equal(chain(
         ReadR(rootDir </> file("person")),
-        QC.inj(LeftShift((),
-          Free.roll(ZipMapKeys(HoleF)),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(LeftSide))),
-            Free.roll(MakeArray(Free.point(RightSide))))))),
+        QC.inj(LeftShift((), HoleF, RightSideF)),
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
-          List(ReduceFuncs.Sum[FreeMap[Fix]](
-            Free.roll(ProjectIndex(
-              Free.roll(ProjectIndex(HoleF, IntLit(1))),
-              IntLit(1))))),
-          Free.point(ReduceIndex(0))))).some)
+          List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+          ReduceIndexF(0)))).some)
     }
 
+    // FIXME: Should be able to get rid of ZipMapKeys
     "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
       convert(
@@ -200,12 +194,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         RootR,
         QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("person")),
-          ProjectFieldR(
-            Free.point(RightSide),
-            StrLit("height")))),
+          RightSideF)),
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
-          List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+          List(ReduceFuncs.Sum[FreeMap[Fix]](ProjectFieldR(HoleF, StrLit("height")))),
           Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
     }
 
@@ -221,12 +213,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         RootR,
         QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("zips")),
-          ProjectFieldR(
-            Free.point(RightSide),
-            StrLit("loc")))),
+          ProjectFieldR(RightSideF, StrLit("loc")))),
         QC.inj(LeftShift((),
           HoleF,
-          Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide)))))).some)
+          Free.roll(MakeMap(StrLit("loc"), RightSideF))))).some)
     }
 
     "convert a constant shift array of size one" in {

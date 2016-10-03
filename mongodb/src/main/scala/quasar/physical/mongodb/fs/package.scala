@@ -153,8 +153,7 @@ package object fs {
 
   ////
 
-  private type Eff0[A] = Coproduct[EnvErr, CfgErr, A]
-  private type Eff[A]  = Coproduct[Task, Eff0, A]
+  private type Eff[A] = (Task :\: EnvErr :/: CfgErr)#M[A]
 
   private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
     (for {

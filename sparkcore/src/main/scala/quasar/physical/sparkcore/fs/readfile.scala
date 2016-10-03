@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp.ι
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
-import quasar.fs._, FileSystemError._, PathError._
+import quasar.fs._, FileSystemError._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
@@ -85,9 +85,15 @@ object readfile {
       _ <- kvs.put(h, cur)
     } yield h
 
+    def _empty: Free[S, ReadHandle] = for {
+      h <- freshHandle
+      cur = SparkCursor(None, 0)
+      _ <- kvs.put(h, cur)
+    } yield h
+
     input.fileExists(f).ifM(
       _open map (_.right[FileSystemError]),
-      pathErr(pathNotFound(f)).left.point[Free[S, ?]]
+     _empty map (_.right[FileSystemError])
     )
   }
 

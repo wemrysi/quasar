@@ -12,7 +12,7 @@ object Dependencies {
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
   private val nettyVersion      = "4.1.3.Final"
-  private val pathyVersion      = "0.2.1"
+  private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
   private val scalazVersion     = "7.2.4"
@@ -84,6 +84,10 @@ object Dependencies {
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+  )
+  val couchbase = Seq(
+    "com.couchbase.client" %  "java-client" % "2.3.2",
+    "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",

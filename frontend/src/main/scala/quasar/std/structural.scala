@@ -200,7 +200,7 @@ trait StructuralLib extends Library {
     noSimplification,
     partialTyperV[nat._2] {
       case Sized(v1, Const(Data.Set(elems))) =>
-        elems.traverse(e => v1.arrayElem(Const(e))).map(Coproduct(_))
+        elems.traverse(e => v1.arrayElem(Const(e))).map(Coproduct.fromSeq)
       case Sized(v1, v2) => v1.arrayElem(v2)
     },
     basicUntyper)

@@ -92,7 +92,7 @@ object DataArbitrary extends DataArbitrary {
       genDuration            map   (Data.Interval(_) ),
       genDate                map   (Data.Date(_)     ),
       genTime                map   (Data.Time(_)     ),
-      arbitrary[Array[Byte]] map   (Data.Binary(_)   ),
+      arbitrary[Array[Byte]] map   (Data.Binary.fromArray(_)),
       idSrc                  map   (Data.Id(_)       ))
 
   private def genInstant: Gen[Instant] =
