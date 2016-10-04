@@ -193,7 +193,7 @@ object Planner {
               }).right
             }, CoreMap.change))
 
-          def sth(a: Data, b: Data, f: List[(Data, Data) => Data]): Data = (a, b) match {
+          def merge(a: Data, b: Data, f: List[(Data, Data) => Data]): Data = (a, b) match {
             case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(Zip[List].zipWith(f,(l1.zip(l2))) {
               case (f, (l1, l2)) => f(l1,l2)
             })
@@ -204,7 +204,7 @@ object Planner {
             EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
               case (partitioner, trans, repair) =>
                 src.map(d => (partitioner(d), Data.Arr(trans.map(_(d))) : Data))
-                  .reduceByKey(sth(_,_, reducersFuncs))
+                  .reduceByKey(merge(_,_, reducersFuncs))
                   .map {
                   case (k, v) => repair(v)
                 }
