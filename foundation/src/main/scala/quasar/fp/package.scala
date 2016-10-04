@@ -340,6 +340,9 @@ package object fp
     with DebugOps
     with CatchableInstances {
 
+
+  import ski._
+
   type EnumT[F[_], A] = EnumeratorT[A, F]
 
   sealed trait Polymorphic[F[_], TC[_]] {
@@ -508,7 +511,7 @@ package object fp
   /** A specialization of `interpret` where the leaves are of the result type.
     */
   def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
-    interpret(fp.ski.ι, φ)
+    interpret(ι, φ)
 
   object Inj {
     def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
@@ -563,7 +566,7 @@ package object fp
   // TODO: This should definitely be in Matryoshka.
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
       T[F] =
-    f(t).fold(fp.ski.ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
+    f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
   def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
@@ -631,7 +634,7 @@ package object fp
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    co => co.run.fold(fp.ski.κ(co), f)
+    co => co.run.fold(κ(co), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),
