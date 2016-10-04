@@ -16,11 +16,13 @@
 
 package quasar
 
+import quasar.Predef.Boolean
+
 import scala.Predef.implicitly
 
 import java.lang.String
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._, FunctorT.ops._, Recursive.ops._
 import monocle.Prism
 import scalaz._
 
@@ -49,5 +51,10 @@ package object ejson {
     def fromExt[T[_[_]]: Corecursive]: Extension[T[EJson]] => T[EJson] =
       ExtEJson.inj(_).embed
 
+    def isNull[T[_[_]]: Recursive](ej: T[EJson]): Boolean =
+      CommonEJson.prj(ej.project).fold(false) {
+        case ejson.Null() => true
+        case _ => false
+    }
   }
 }

@@ -75,6 +75,7 @@ lazy val buildSettings = Seq(
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,                   // - see puffnfresh/wartremover#263
+    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
     Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see puffnfresh/wartremover#263
@@ -203,6 +204,8 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
+                    marklogicValidation,
+//    /  /  |  \  \    /
   core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,

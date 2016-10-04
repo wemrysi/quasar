@@ -17,20 +17,13 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xquery.syntax._
 
-object xs {
-  def byte(xqy: XQuery): XQuery =
-    XQuery(s"xs:byte($xqy)")
+import eu.timepit.refined.auto._
 
-  def decimal(xqy: XQuery): XQuery =
-    XQuery(s"xs:decimal($xqy)")
+object mem {
+  val m = module("mem", "http://xqdev.com/in-mem-update", "/MarkLogic/appservices/utils/in-mem-update.xqy")
 
-  def integer(xqy: XQuery): XQuery =
-    XQuery(s"xs:integer($xqy)")
-
-  def QName(xqy: XQuery): XQuery =
-    XQuery(s"xs:QName($xqy)")
-
-  def string(xqy: XQuery): XQuery =
-    XQuery(s"xs:string($xqy)")
+  def nodeInsertChild[F[_]: PrologW](node: XQuery, child: XQuery): F[XQuery] =
+    m("node-insert-child") apply (node, child)
 }

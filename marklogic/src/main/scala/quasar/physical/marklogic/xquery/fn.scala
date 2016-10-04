@@ -22,6 +22,9 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def avg(seq: XQuery): XQuery =
+    XQuery(s"fn:avg($seq)")
+
   def baseUri(node: XQuery): XQuery =
     XQuery(s"fn:base-uri($node)")
 
@@ -58,6 +61,9 @@ object fn {
   def filter(p: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:filter($p, $seq)")
 
+  def head(seq: XQuery): XQuery =
+    XQuery(s"fn:head($seq)")
+
   val last: XQuery =
     XQuery("fn:last()")
 
@@ -66,6 +72,12 @@ object fn {
 
   def map(f: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:map($f, $seq)")
+
+  def max(seq: XQuery): XQuery =
+    XQuery(s"fn:max($seq)")
+
+  def min(seq: XQuery): XQuery =
+    XQuery(s"fn:min($seq)")
 
   def nodeName(node: XQuery): XQuery =
     XQuery(s"fn:node-name($node)")
@@ -88,6 +100,9 @@ object fn {
   def stringLength(str: XQuery): XQuery =
     XQuery(s"fn:string-length($str)")
 
+  def stringJoin(strs: XQuery, sep: XQuery): XQuery =
+    XQuery(s"fn:string-join($strs, $sep)")
+
   def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:substring($str, ${startLoc}${asArg(length)})")
 
@@ -96,6 +111,9 @@ object fn {
 
   def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")
+
+  def sum(seq: XQuery): XQuery =
+    XQuery(s"fn:sum($seq)")
 
   def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
     XQuery(s"fn:tokenize($input, ${pattern}${asArg(flags)})")

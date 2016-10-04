@@ -365,6 +365,16 @@ package object fp
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
 
+  /** An endomorphism is a mapping from a category to itself.
+   *  It looks like scalaz already staked out "Endo" for the
+   *  lower version.
+   */
+  type EndoK[F[X]] = scalaz.NaturalTransformation[F, F]
+
+  // TODO generalize this and matryoshka.Delay into
+  // `type KleisliK[M[_], F[_], G[_]] = F ~> (M ∘ G)#λ`
+  type NTComp[F[X], G[Y]] = scalaz.NaturalTransformation[F, matryoshka.∘[G, F]#λ]
+
   implicit def ShowShowF[F[_], A: Show, FF[A] <: F[A]](implicit FS: ShowF[F]):
       Show[FF[A]] =
     new Show[FF[A]] { override def show(fa: FF[A]) = FS.show(fa) }
