@@ -71,7 +71,7 @@ object EncodeXQuery {
           val objEntries = entries.traverse[ValM, XQuery] {
             case (XQuery.StringLit(s), value) =>
               refineV[IsNCName](s).validation map { ncname =>
-                ejsxqy.mkObjectEntry[M] apply (ncname.get.xs, value)
+                ejsxqy.mkObjectEntry[M] apply (xs.QName(ncname.get.xs), value)
               } leftAs s"'$s' is not a valid XML QName.".wrapNel
 
             case (xqy, _) =>

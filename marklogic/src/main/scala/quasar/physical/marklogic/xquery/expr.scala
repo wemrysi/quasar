@@ -24,6 +24,7 @@ import scalaz._
 import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.syntax.foldable._
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.syntax.std.boolean._
 
@@ -38,6 +39,9 @@ object expr {
   val emptySeq: XQuery =
     XQuery("()")
 
+  def every(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
+    QuantifiedExpr(Quantifier.Every, NonEmptyList(ts, tss: _*))
+
   def for_(ts: (String, XQuery), tss: (String, XQuery)*): Flwor =
     Flwor(ts :: IList.fromList(tss.toList), IList.empty, None, IList.empty, false)
 
@@ -49,6 +53,12 @@ object expr {
 
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
+
+  def some(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
+    QuantifiedExpr(Quantifier.Some, NonEmptyList(ts, tss: _*))
+
+  def typeswitch(on: XQuery)(cases: TypeswitchCaseClause*): TypeswitchExpr =
+    TypeswitchExpr(on, cases.toList)
 
   final case class Flwor(
     tupleStreams: IList[(String, XQuery)],
@@ -110,5 +120,49 @@ object expr {
   final case class IfThenExpr(cond: XQuery, whenTrue: XQuery) {
     def else_(whenFalse: XQuery): XQuery =
       XQuery(s"if ($cond) then $whenTrue else $whenFalse")
+  }
+
+  final case class TypeswitchExpr(on: XQuery, cases: List[TypeswitchCaseClause]) {
+    def default(xqy: XQuery): XQuery =
+      default(TypeswitchDefaultClause(None, xqy))
+
+    def default(binding: BindingName, f: XQuery => XQuery): XQuery =
+      default(TypeswitchDefaultClause(Some(binding), f(binding.xqy)))
+
+    def default(dc: TypeswitchDefaultClause): XQuery = {
+      val body = (cases.map(_.render) :+ dc.render).map("  " + _).mkString("\n")
+      XQuery(s"typeswitch($on)\n$body")
+    }
+  }
+
+  final case class TypeswitchCaseClause(matching: TypedBinding \/ SequenceType, result: XQuery) {
+    def render: String =
+      s"case ${matching.fold(_.render, _.toString)} return $result"
+  }
+
+  final case class TypeswitchDefaultClause(binding: Option[BindingName], result: XQuery) {
+    def render: String = {
+      val bind = binding.map(_.xqy.shows + " ")
+      s"default ${~bind}return $result"
+    }
+  }
+
+  sealed abstract class Quantifier {
+    override def toString = this match {
+      case Quantifier.Some  => "some"
+      case Quantifier.Every => "every"
+    }
+  }
+
+  object Quantifier {
+    case object Some  extends Quantifier
+    case object Every extends Quantifier
+  }
+
+  final case class QuantifiedExpr(quantifier: Quantifier, tupleStreams: NonEmptyList[(String, XQuery)]) {
+    def satisfies(xqy: XQuery): XQuery = {
+      val streams = tupleStreams map { case (v, seq) => s"$v in $seq" } intercalate (", ")
+      XQuery(s"$quantifier $streams satisfies $xqy")
+    }
   }
 }
