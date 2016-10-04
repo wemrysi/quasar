@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
+import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
@@ -732,7 +733,10 @@ object MongoDbQScriptPlanner {
               WB.filter(src, List(cond), {
                 case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
               })).liftM[GenT]
-          case Union(src, lBranch, rBranch) => unimplemented
+          case Union(src, lBranch, rBranch) =>
+            (rebaseWB(joinHandler, funcHandler, lBranch, src) ⊛
+              rebaseWB(joinHandler, funcHandler, rBranch, src))(
+              WB.unionAll).join
           case Take(src, from, count) =>
             (rebaseWB(joinHandler, funcHandler, from, src) ⊛
               (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
@@ -744,6 +748,10 @@ object MongoDbQScriptPlanner {
           case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
+
+    def coEnvHmap[F[_], G[_], A](f: F ~> G) =
+      λ[CoEnv[A, F, ?] ~> CoEnv[A, G, ?]](fa => CoEnv(fa.run.map(f(_))))
+
 
     implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =

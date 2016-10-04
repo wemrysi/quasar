@@ -21,6 +21,7 @@ import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.RenderTree.ops._
 import quasar.SKI.κ
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
 import quasar.fp._

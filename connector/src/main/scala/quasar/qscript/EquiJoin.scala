@@ -17,8 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
+import quasar.fp._
 
 import matryoshka._
 import matryoshka.patterns._

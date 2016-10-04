@@ -22,7 +22,7 @@ import quasar.effect._
 import quasar.fs._
 import quasar.fp._, free._
 
-import pathy.Path._
+import pathy.Path, Path._
 import scalaz._, Scalaz._
 
 object Mounter {
@@ -54,10 +54,10 @@ object Mounter {
     def unmount0(req: MountRequest): FreeS[Unit] =
       free.lift(unmount(req)).into[S]
 
-    def handleRequest(req: MountRequest): MntE[Unit] = {
-      val failIfExisting: MntE[Unit] =
-        mountConfigs.get(req.path).as(pathExists(req.path)).toLeft(())
+    def failIfExisting(path: APath): MntE[Unit] =
+      mountConfigs.get(path).as(pathExists(path)).toLeft(())
 
+    def handleRequest(req: MountRequest): MntE[Unit] = {
       val putOrUnmount: MntE[Unit] =
         mountConfigs.compareAndPut(req.path, None, req.toConfig)
           .liftM[MntErrT].ifM(
@@ -65,7 +65,7 @@ object Mounter {
             unmount0(req).liftM[MntErrT] <*
               merr.raiseError(pathExists(req.path)))
 
-      failIfExisting *> mount0(req) *> putOrUnmount
+      failIfExisting(req.path) *> mount0(req) *> putOrUnmount
     }
 
     def lookupType(p: APath): OptionT[FreeS, MountType] =
@@ -83,6 +83,23 @@ object Mounter {
       mountConfigs.get(path)
         .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
         .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
+
+    def handleRemount(src: APath, dst: APath): MntE[Unit] = {
+      def reqOrFail(path: APath, cfg: MountConfig): MntE[MountRequest] =
+        OptionT(mkMountRequest(path, cfg).point[FreeS])
+          .toRight(MountingError.invalidConfig(cfg, "config type mismatch".wrapNel))
+
+      for {
+        cfg    <- mountConfigs.get(src).toRight(pathNotFound(src))
+        srcReq <- reqOrFail(src, cfg)
+        dstReq <- reqOrFail(dst, cfg)
+        _      <- mountConfigs.delete(src).liftM[MntErrT]
+        _      <- unmount0(srcReq).liftM[MntErrT]
+        upd    =  mountConfigs.compareAndPut(dst, None, dstReq.toConfig)
+        _      <- OptionT(upd.map(_.option(()))).toRight(pathExists(dst))
+        _      <- mount0(dstReq)
+      } yield ()
+    }
 
     λ[Mounting ~> FreeS] {
       case HavingPrefix(dir) =>
@@ -110,6 +127,24 @@ object Mounter {
               .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
+
+      case Remount(src, dst) =>
+        if (src ≟ dst)
+          mountConfigs.get(src).void.toRight(pathNotFound(src)).run
+        else {
+          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): FreeS[Unit] =
+            p.relativeTo(srcDir)
+              .map(rel => handleRemount(p, dstDir </> rel).run.void)
+              .sequence_
+
+          val moveNested: FreeS[Unit] =
+            (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
+              forPrefix(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
+
+          failIfExisting(dst) *>
+            handleRemount(src, dst) <*
+            moveNested.liftM[MntErrT]
+        }.run
     }
   }
 

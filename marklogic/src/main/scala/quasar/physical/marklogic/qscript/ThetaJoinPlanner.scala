@@ -17,8 +17,8 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.fp.ShowT
 import quasar.NameGenerator
+import quasar.contrib.matryoshka.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
