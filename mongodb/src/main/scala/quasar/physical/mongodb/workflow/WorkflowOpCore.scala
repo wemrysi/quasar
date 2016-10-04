@@ -116,7 +116,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
     idExclusion match {
       case IncludeId => all.collectFirst {
         case (IdName, _) => all
-      }.getOrElse((IdName, ExprOpCoreF.fixpoint[Fix, ExprOp].$include()) :: all)
+      }.getOrElse((IdName, fixExprOp.$include()) :: all)
       case _         => all
     }
   }
@@ -147,7 +147,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
             case (k, v) =>
               v.fold(
                 r => -\/(loop(Some(nest(k)), $ProjectF(p.src, r, p.idExclusion)).shape),
-                κ(\/-(ExprOpCoreF.fixpoint[Fix, ExprOp].$var(DocVar.ROOT(nest(k))))))
+                κ(\/-(fixExprOp.$var(DocVar.ROOT(nest(k))))))
           }),
         p.idExclusion)
     }
