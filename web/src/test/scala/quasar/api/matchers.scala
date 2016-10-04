@@ -18,7 +18,6 @@ package quasar.api
 
 import quasar.Predef._
 
-
 import argonaut._, Argonaut._
 import argonaut.ArgonautScalaz._
 import org.http4s.Status, Status._
