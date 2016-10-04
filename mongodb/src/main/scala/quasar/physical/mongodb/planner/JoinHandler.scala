@@ -48,8 +48,7 @@ object JoinHandler {
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-  private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
 
   def fallback[WF[_], F[_]: Monad](
       first: JoinHandler[WF, OptionT[F, ?]],

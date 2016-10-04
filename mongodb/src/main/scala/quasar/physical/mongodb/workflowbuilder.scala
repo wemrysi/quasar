@@ -52,8 +52,7 @@ object WorkflowBuilder {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   /**
    * Like ValueBuilder, this is a Leaf node which can be used to construct a more complicated WorkflowBuilder.

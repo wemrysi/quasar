@@ -43,8 +43,7 @@ object MongoDbQScriptPlanner {
 
   type OutputM[A] = PlannerError \/ A
 
-  val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =

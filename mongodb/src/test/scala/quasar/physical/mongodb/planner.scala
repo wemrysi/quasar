@@ -69,8 +69,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
   }
 
-  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
   val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
   import expr3_0Fp._
 

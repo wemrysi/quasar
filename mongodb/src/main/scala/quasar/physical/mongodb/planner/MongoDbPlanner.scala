@@ -639,8 +639,7 @@ object MongoDbPlanner {
 
     // NB: it's only safe to emit "core" expr ops here, but we always use the
     // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-    val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-    import exprFp.{I => _, _}
+    import fixExprOp.{ I => _, _ }
     val check = Check[Fix, ExprOp]
 
     object HasData {
@@ -1018,8 +1017,6 @@ object MongoDbPlanner {
         State(s => v.run(s).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
     }
   }
-
-  import Planner._
 
   val annotateƒ =
     GAlgebraZip[(Fix[LogicalPlan], ?), LogicalPlan].zip(
