@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -976,6 +976,11 @@ object MongoDbQScriptPlanner {
 
     type MongoQScript[A] =
       (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+    // This import is here to work around separate a compilation bug.
+    // Before moving it, ensure this file can be compiled without compiling
+    // other source files at the same time.
+    import eitherT._
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
