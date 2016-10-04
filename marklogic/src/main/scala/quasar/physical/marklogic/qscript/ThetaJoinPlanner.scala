@@ -30,6 +30,7 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
   extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
   import expr.{for_, let_}
 
+  // FIXME: Handle `JoinType`
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {

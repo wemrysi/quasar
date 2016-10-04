@@ -19,6 +19,7 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 import scalaz._
+import scalaz.std.iterable._
 
 sealed abstract class XQuery {
   import XQuery._
@@ -28,6 +29,9 @@ sealed abstract class XQuery {
       case XQuery.Step(s) => XQuery.Step(s"$s[$predicate]")
       case _              => XQuery(s"$this[$predicate]")
     }
+
+  def fnapply(args: XQuery*): XQuery =
+    XQuery(s"${this}${mkSeq(args)}")
 
   def unary_- : XQuery = XQuery(s"-$this")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
