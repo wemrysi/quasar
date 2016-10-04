@@ -679,10 +679,7 @@ object MapFuncs {
       Free.roll(Constant[T, Free[MapFunc[T, ?], A]](EJson.fromCommon[T].apply(ejson.Null[T[EJson]]())))
 
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Boolean = mf.resume.fold ({
-      case Constant(ej) => CommonEJson.prj(ej.project).fold(false) {
-        case ejson.Null() => true
-        case _ => false
-      }
+      case Constant(ej) => EJson.isNull(ej)
       case _ => false
     }, _ => false)
   }
