@@ -164,12 +164,7 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj{
-        // TODO consider ++
-        m1.foldLeft(m2){
-          case (acc, (k, v)) => if(acc.isDefinedAt(k)) acc else acc + (k -> v)
-        }
-      }
+      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 ++ m2)
       case _ => undefined
     }).right
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
