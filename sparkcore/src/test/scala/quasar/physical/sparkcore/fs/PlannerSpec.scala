@@ -21,7 +21,7 @@ import quasar.console
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
 import quasar.qscript.ReduceFuncs._
-import quasar.qscript.MapFuncs.StrLit
+import quasar.qscript.MapFuncs._
 import quasar.contrib.pathy._
 import quasar.Data
 import quasar.DataCodec
@@ -127,6 +127,37 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
         sc.stop
 
+      }).run.unsafePerformSync
+      ok
+    }
+
+    "core.filter" in {
+      newSc.map ( sc => {
+        val qscore = Planner.qscriptCore[Fix]
+        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+
+        val src: RDD[Data] = sc.parallelize(List(
+          Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
+        ))
+
+        def func: FreeMap[Fix] = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
+        val filter = quasar.qscript.Filter(src, func)
+
+        val state: SparkState[RDD[Data]] = alg(filter)
+        state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+          case rdd =>
+            val results = rdd.collect
+            println(results)
+            results.size must_== 1
+            results(0) must_== Data.Obj(ListMap(
+              "age" -> Data.Int(23),
+              "country" -> Data.Str("US")
+            ))
+        }
+
+        sc.stop
       }).run.unsafePerformSync
       ok
     }
