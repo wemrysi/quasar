@@ -66,7 +66,9 @@ object Dependencies {
   )
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion,
-    "org.apache.hadoop" % "hadoop-client" % "2.7.3" excludeAll ExclusionRule(organization = "javax.servlet"),
+    ("org.apache.hadoop" % "hadoop-client" % "2.7.3")
+      .exclude("commons-beanutils", "commons-beanutils-core")
+      .excludeAll(ExclusionRule(organization = "javax.servlet")),
     ("org.apache.spark" %% "spark-core" % "1.6.2")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-collections", "commons-collections")
