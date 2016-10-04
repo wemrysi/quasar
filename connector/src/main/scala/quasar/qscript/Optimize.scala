@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
@@ -115,7 +116,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     //       target.transAnaM(_.htraverse(FI.project)) ∘ (srcCo >> _)
     freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
       target)(
-      coEnvHtraverse(_)(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))))
+      coEnvHtraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply)
       .map(targ => (targ >> srcCo.fromCoEnv).toCoEnv[T])
 
   private val UnrefedSrc =

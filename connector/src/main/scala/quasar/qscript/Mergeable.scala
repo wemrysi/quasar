@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._

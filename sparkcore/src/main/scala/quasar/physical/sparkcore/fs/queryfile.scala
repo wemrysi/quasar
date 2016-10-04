@@ -17,15 +17,12 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.PlannerErrT
-import quasar.{PhaseResults, PhaseResultT, PhaseResult, LogicalPlan, Data}
+import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, PlannerErrT}
 import quasar.Planner._
 import quasar.RenderTree.ops._
-import quasar.fs.FileSystemError._
-import quasar.fp.free._
-import quasar.effect.{MonotonicSeq, Read, KeyValueStore}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.effect.Read
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free._
