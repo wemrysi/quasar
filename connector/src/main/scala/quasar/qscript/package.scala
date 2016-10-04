@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
@@ -75,6 +75,14 @@ package object qscript {
   implicit def qScriptReadToQscriptTotal[T[_[_]]]
       : Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read, ?]])
+
+  /** QScript that has gone through Read conversion and shifted conversion */
+  type QScriptShiftRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead, ?]])
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]
@@ -171,7 +179,18 @@ package object qscript {
     }
   }
 
-  // Heplers for creating `Injectable` instances
+  // TODO: Un-hardcode the coproduct, and make this simply a transform itself,
+  //       rather than a full traversal.
+  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
+    type FixedQScriptRead[A]      = QScriptRead[T, A]
+    type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
+    val optimize = new Optimize[T]
+    transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
+      .transCata(optimize.applyAll[FixedQScriptShiftRead].apply)
+      .transCata(liftFG(optimize.transformIncludeToExclude[FixedQScriptShiftRead]))
+  }
+
+  // Helpers for creating `Injectable` instances
 
   object ::\:: {
     def apply[F[_]] = new Aux[F]
