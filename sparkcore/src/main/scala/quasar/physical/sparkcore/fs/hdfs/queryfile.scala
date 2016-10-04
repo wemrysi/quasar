@@ -22,6 +22,7 @@ import quasar.DataCodec
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
+import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.contrib.pathy._
@@ -82,7 +83,7 @@ class queryfile(fileSystem:() => FileSystem) {
       exists
     })
 
-  def listContents(d: ADir): EitherT[Task, FileSystemError, Set[PathSegment]] =
+  def listContents(d: ADir): FileSystemErrT[Task, Set[PathSegment]] =
     EitherT(toPath(d).map(path => {
       val hdfs = fileSystem()
       val result = if(hdfs.exists(path)) {
