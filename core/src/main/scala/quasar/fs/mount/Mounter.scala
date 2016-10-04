@@ -23,7 +23,7 @@ import quasar.fs._
 import quasar.fp.ski._
 import quasar.fp._, free._
 
-import pathy.Path._
+import pathy.Path, Path._
 import scalaz._, Scalaz._
 
 object Mounter {
@@ -55,10 +55,10 @@ object Mounter {
     def unmount0(req: MountRequest): FreeS[Unit] =
       free.lift(unmount(req)).into[S]
 
-    def handleRequest(req: MountRequest): MntE[Unit] = {
-      val failIfExisting: MntE[Unit] =
-        mountConfigs.get(req.path).as(pathExists(req.path)).toLeft(())
+    def failIfExisting(path: APath): MntE[Unit] =
+      mountConfigs.get(path).as(pathExists(path)).toLeft(())
 
+    def handleRequest(req: MountRequest): MntE[Unit] = {
       val putOrUnmount: MntE[Unit] =
         mountConfigs.compareAndPut(req.path, None, req.toConfig)
           .liftM[MntErrT].ifM(
@@ -66,7 +66,7 @@ object Mounter {
             unmount0(req).liftM[MntErrT] <*
               merr.raiseError(pathExists(req.path)))
 
-      failIfExisting *> mount0(req) *> putOrUnmount
+      failIfExisting(req.path) *> mount0(req) *> putOrUnmount
     }
 
     def lookupType(p: APath): OptionT[FreeS, MountType] =
@@ -75,36 +75,77 @@ object Mounter {
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
       }
 
-    new (Mounting ~> FreeS) {
-      def apply[A](ma: Mounting[A]) = ma match {
-        case HavingPrefix(dir) =>
-          mountConfigs.keys flatMap { paths =>
-            paths.foldLeftM(Map[APath, MountType]())((m, p) =>
-              if (((dir: APath) =/= p) && p.relativeTo(dir).isDefined)
-                lookupType(p).map(m.updated(p, _)).getOrElse(m)
-              else
-                m.point[FreeS])
-          }
+    def forPrefix(dir: ADir): FreeS[Set[APath]] =
+      mountConfigs.keys.map(_
+        .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
+        .toSet)
 
-        case LookupType(path) =>
-          lookupType(path).run
+    def handleUnmount(path: APath): OptionT[FreeS, Unit] =
+      mountConfigs.get(path)
+        .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
+        .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
 
-        case LookupConfig(path) =>
-          mountConfigs.get(path).run
+    def handleRemount(src: APath, dst: APath): MntE[Unit] = {
+      def reqOrFail(path: APath, cfg: MountConfig): MntE[MountRequest] =
+        OptionT(mkMountRequest(path, cfg).point[FreeS])
+          .toRight(MountingError.invalidConfig(cfg, "config type mismatch".wrapNel))
 
-        case MountView(loc, query, vars) =>
-          handleRequest(MountRequest.mountView(loc, query, vars)).run
+      for {
+        cfg    <- mountConfigs.get(src).toRight(pathNotFound(src))
+        srcReq <- reqOrFail(src, cfg)
+        dstReq <- reqOrFail(dst, cfg)
+        _      <- mountConfigs.delete(src).liftM[MntErrT]
+        _      <- unmount0(srcReq).liftM[MntErrT]
+        upd    =  mountConfigs.compareAndPut(dst, None, dstReq.toConfig)
+        _      <- OptionT(upd.map(_.option(()))).toRight(pathExists(dst))
+        _      <- mount0(dstReq)
+      } yield ()
+    }
 
-        case MountFileSystem(loc, typ, uri) =>
-          handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
+    λ[Mounting ~> FreeS] {
+      case HavingPrefix(dir) =>
+        for {
+          paths <- forPrefix(dir)
+          pairs <- paths.toList.traverse(p => lookupType(p).strengthL(p).run)
+        } yield pairs.flatMap(_.toList).toMap
 
-        case Unmount(path) =>
-          mountConfigs.get(path)
-            .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
-            .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
-            .toRight(pathNotFound(path))
-            .run
-      }
+      case LookupType(path) =>
+        lookupType(path).run
+
+      case LookupConfig(path) =>
+        mountConfigs.get(path).run
+
+      case MountView(loc, query, vars) =>
+        handleRequest(MountRequest.mountView(loc, query, vars)).run
+
+      case MountFileSystem(loc, typ, uri) =>
+        handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
+
+      case Unmount(path) =>
+        handleUnmount(path)
+          .flatMapF(_ =>
+            refineType(path).swap.foldMap(forPrefix)
+              .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
+          .toRight(pathNotFound(path))
+          .run
+
+      case Remount(src, dst) =>
+        if (src ≟ dst)
+          mountConfigs.get(src).void.toRight(pathNotFound(src)).run
+        else {
+          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): FreeS[Unit] =
+            p.relativeTo(srcDir)
+              .map(rel => handleRemount(p, dstDir </> rel).run.void)
+              .sequence_
+
+          val moveNested: FreeS[Unit] =
+            (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
+              forPrefix(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
+
+          failIfExisting(dst) *>
+            handleRemount(src, dst) <*
+            moveNested.liftM[MntErrT]
+        }.run
     }
   }
 
@@ -112,19 +153,15 @@ object Mounter {
     *
     * Useful in scenarios where only the bookkeeping of mounts is needed.
     */
-  def trivial[S[_]](implicit S: MountConfigs :<: S): Mounting ~> Free[S, ?] =
-    new (Mounting ~> Free[S, ?]) {
-      type F[A] = Coproduct[Id, S, A]
-      type M[A] = Free[S, A]
-      val mnt = Mounter[Id, F](κ(().right), κ(()))
-      def apply[A](m: Mounting[A]) =
-        mnt(m).foldMap[M](pointNT[M] :+: liftFT[S])
-    }
+  def trivial[S[_]](implicit S: MountConfigs :<: S) = {
+    type F[A] = Coproduct[Id, S, A]
+    val mnt   = Mounter[Id, F](κ(().right), κ(()))
 
-  ////
+    λ[Mounting ~> Free[S, ?]](m => mnt(m) foldMap (pointNT[Free[S, ?]] :+: liftFT[S]))
+  }
 
   private val pathNotFound = MountingError.pathError composePrism PathError.pathNotFound
-  private val pathExists = MountingError.pathError composePrism PathError.pathExists
+  private val pathExists   = MountingError.pathError composePrism PathError.pathExists
 
   private def mkMountRequest(path: APath, cfg: MountConfig): Option[MountRequest] =
     refineType(path).fold(

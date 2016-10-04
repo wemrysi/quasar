@@ -2,7 +2,8 @@
     "name": "join with multiple conditions",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "couchbase":         "pending"
     },
     "data": "../slamengine_commits.data",
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth

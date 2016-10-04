@@ -1,6 +1,10 @@
 {
     "name": "select wildcard and field",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
     "data": "largeZips.data",
     "query": "select *, pop/1000 as popInK from largeZips",
     "predicate": "containsAtLeast",

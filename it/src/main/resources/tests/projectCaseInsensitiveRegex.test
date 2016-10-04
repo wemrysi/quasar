@@ -3,7 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "marklogic":         "pending",
+        "couchbase":         "pending"
     },
     "data": "largeZips.data",
     "query": "select city, city ~* \"boU\", city !~* \"Bou\" from largeZips",

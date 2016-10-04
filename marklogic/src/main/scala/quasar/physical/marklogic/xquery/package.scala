@@ -51,16 +51,16 @@ package object xquery {
     }
   }
 
-  final case class ParamName(value: QName) {
-    def as(tpe: SequenceType): FunctionParam = FunctionParam(this, tpe)
+  final case class BindingName(value: QName) {
+    def as(tpe: SequenceType): TypedBinding = TypedBinding(this, tpe)
     def xqy: XQuery = XQuery(s"$$${value}")
   }
 
-  object ParamName {
-    implicit val order: Order[ParamName] =
+  object BindingName {
+    implicit val order: Order[BindingName] =
       Order.orderBy(_.value)
 
-    implicit val show: Show[ParamName] =
+    implicit val show: Show[BindingName] =
       Show.shows(_.xqy.shows)
   }
 
@@ -76,16 +76,16 @@ package object xquery {
       Show.showFromToString
   }
 
-  final case class FunctionParam(name: ParamName, tpe: SequenceType) {
+  final case class TypedBinding(name: BindingName, tpe: SequenceType) {
     def render: String = s"${name.xqy} as $tpe"
   }
 
-  object FunctionParam {
-    implicit val order: Order[FunctionParam] =
+  object TypedBinding {
+    implicit val order: Order[TypedBinding] =
       Order.orderBy(fp => (fp.name, fp.tpe))
 
-    implicit val show: Show[FunctionParam] =
-      Show.shows(fp => s"FunctionParam(${fp.render})")
+    implicit val show: Show[TypedBinding] =
+      Show.shows(fp => s"TypedBinding(${fp.render})")
   }
 
   def asArg(opt: Option[XQuery]): String =

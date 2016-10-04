@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 
-import matryoshka._
+import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
@@ -63,19 +63,25 @@ package object qscript {
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  implicit def qScriptToQscriptTotal[T[_[_]]]: Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-        Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]]))
+  implicit def qScriptToQscriptTotal[T[_[_]]]
+      : Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[DeadEnd, ?]])
 
   /** QScript that has gone through Read conversion. */
   type QScriptRead[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-        Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]]))
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read, ?]])
+
+  /** QScript that has gone through Read conversion and shifted conversion */
+  type QScriptShiftRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead, ?]])
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]
@@ -92,6 +98,13 @@ package object qscript {
   }
 
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def LeftSideF[T[_[_]]]: JoinFunc[T] =
+    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
+  def RightSideF[T[_[_]]]: JoinFunc[T] =
+    Free.point[MapFunc[T, ?], JoinSide](RightSide)
+  def ReduceIndexF[T[_[_]]](i: Int): Free[MapFunc[T, ?], ReduceIndex] =
+    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
+
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
   final case class SrcMerge[A, B](src: A, left: B, right: B)
@@ -131,6 +144,40 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
+  def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
+    (struct: FreeMap[T], repair0: JoinFunc[T])
+      : Option[(FreeMap[T], JoinFunc[T])] = {
+    def rewrite(elem: FreeMap[T], dup: FreeMap[T] => Unary[T, FreeMap[T]])
+        : Option[(FreeMap[T], JoinFunc[T])] = {
+      val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = repair0.toCoEnv[T]
+
+      val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = RightSideF.toCoEnv[T]
+
+      def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+        Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(RightSideF, IntLit(idx))).toCoEnv[T]
+
+      val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+      val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
+      val rightCount: Int = repair.para(count(rightSide))
+
+      if (repair.para(count(oneRef)) ≟ rightCount)
+        // all `RightSide` access is through `oneRef`
+        (elem, transApoT(repair)(substitute(oneRef, rightSide)).fromCoEnv).some
+      else if (repair.para(count(zeroRef)) ≟ rightCount)
+        // all `RightSide` access is through `zeroRef`
+        (Free.roll[MapFunc[T, ?], Hole](dup(elem)),
+          transApoT(repair)(substitute(zeroRef, rightSide)).fromCoEnv).some
+      else
+        None
+    }
+
+    struct.resume match {
+      case -\/(ZipArrayIndices(elem)) => rewrite(elem, DupArrayIndices(_))
+      case -\/(ZipMapKeys(elem)) => rewrite(elem, DupMapKeys(_))
+      case _ => None
+    }
+  }
+
   // TODO: move to matryoshka
 
   implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
@@ -152,12 +199,36 @@ package object qscript {
         }
     }
 
-  def envtHmap[F[_], G[_], E, A](f: F ~> G): EnvT[E, F, ?] ~> EnvT[E, G, ?] =
-    new (EnvT[E, F, ?] ~> EnvT[E, G, ?]) {
-      def apply[A](env: EnvT[E, F, A]) = EnvT((env.ask, f(env.lower)))
-    }
+  def envtHmap[F[_], G[_], E, A](f: F ~> G) = λ[EnvT[E, F, ?] ~> EnvT[E, G, ?]](env => EnvT(env.ask -> f(env.lower)))
+  def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 
-  def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
-    def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
+  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
+    type FixedQScriptRead[A]      = QScriptRead[T, A]
+    type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
+    val optimize = new Optimize[T]
+    transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
+      .transCata(optimize.applyAll[FixedQScriptShiftRead].apply)
+      .transCata(liftFG(optimize.transformIncludeToExclude[FixedQScriptShiftRead]))
   }
+
+  // Heplers for creating `Injectable` instances
+
+  object ::\:: {
+    def apply[F[_]] = new Aux[F]
+
+    final class Aux[F[_]] {
+      def apply[T[_[_]], G[_]]
+        (i: Injectable.Aux[G, QScriptTotal[T, ?]])
+        (implicit F: F :<: QScriptTotal[T, ?])
+          : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
+        Injectable.coproduct(Injectable.inject[F, QScriptTotal[T, ?]], i)
+    }
+  }
+
+  def ::/::[T[_[_]], F[_], G[_]]
+    (implicit F: F :<: QScriptTotal[T, ?], G: G :<: QScriptTotal[T, ?])
+      : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(
+      Injectable.inject[F, QScriptTotal[T, ?]],
+      Injectable.inject[G, QScriptTotal[T, ?]])
 }

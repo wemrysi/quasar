@@ -1,0 +1,1 @@
+- [#1448] move nested views when a mount is moved

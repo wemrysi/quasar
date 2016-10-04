@@ -2,7 +2,8 @@
     "name": "perform 3-way inner equi-join",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "couchbase":         "pending"
     },
     "data": "../largeZips.data",
     "query": "select z1.city, z2.state

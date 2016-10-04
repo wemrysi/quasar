@@ -4,7 +4,8 @@
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "marklogic":         "pending",
+        "couchbase":         "pending"
     },
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (

@@ -1,6 +1,10 @@
 {
     "name": "merge differently-nested flattens",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (
                 userId                 LIKE \"%Dr%\" OR

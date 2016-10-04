@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 import matryoshka._
@@ -41,10 +42,62 @@ trait TTypes[T[_[_]]] {
 
 object TTypes {
   def normalizable[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] = new NormalizableT[T]
+  def simplifiableProjection[T[_[_]]]                                  = new SimplifiableProjectionT[T]
+}
+
+class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
+  import SimplifyProjection._
+
+  private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
+  private def applyToBranch(branch: FreeQS[T]): FreeQS[T] = branch mapSuspension simplify
+
+  def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
+    λ[ProjectBucket ~> G] {
+      case BucketField(src, value, field) => QC inj Map(src, Free roll MapFuncs.ProjectField(value, field))
+      case BucketIndex(src, value, index) => QC inj Map(src, Free roll MapFuncs.ProjectIndex(value, index))
+    }
+  )
+
+  def QScriptCore[G[_]](implicit QC: QScriptCore :<: G) = make(
+    λ[QScriptCore ~> G](fa =>
+      QC inj (fa match {
+        case Union(src, lb, rb) => Union(src, applyToBranch(lb), applyToBranch(rb))
+        case Drop(src, lb, rb)  => Drop(src, applyToBranch(lb), applyToBranch(rb))
+        case Take(src, lb, rb)  => Take(src, applyToBranch(lb), applyToBranch(rb))
+        case _                  => fa
+      })
+    )
+  )
+  def ThetaJoin[G[_]](implicit TJ: ThetaJoin :<: G) = make(
+    λ[ThetaJoin ~> G](tj =>
+      TJ inj quasar.qscript.ThetaJoin(
+        tj.src,
+        applyToBranch(tj.lBranch),
+        applyToBranch(tj.rBranch),
+        tj.on,
+        tj.f,
+        tj.combine
+      )
+    )
+  )
+  def EquiJoin[G[_]](implicit EJ: EquiJoin :<: G) = make(
+    λ[EquiJoin ~> G](ej =>
+      EJ inj quasar.qscript.EquiJoin(
+        ej.src,
+        applyToBranch(ej.lBranch),
+        applyToBranch(ej.rBranch),
+        ej.lKey,
+        ej.rKey,
+        ej.f,
+        ej.combine
+      )
+    )
+  )
 }
 
 // ShowT is needed for debugging
 class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends TTypes[T] {
+  import Normalizable._
   lazy val opt = new Optimize[T]
 
   def freeTC(free: FreeQS[T]): FreeQS[T] = {
@@ -52,64 +105,129 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
       liftCo(opt.applyToFreeQS[QScriptTotal])
     )
   }
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] = {
-    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(
-      repeatedly(MapFunc.normalize[T, A]) compose orOriginal(MapFunc.foldConstant[T, A])
-    )
+
+  def freeTCEq(free: FreeQS[T]): Option[FreeQS[T]] = {
+    val freeNormalized = freeTC(free)
+    (free ≟ freeNormalized).fold(None, freeNormalized.some)
   }
 
-  def EquiJoin = new Normalizable[EquiJoin] {
-    val normalize = λ[EndoK[EquiJoin]](ej =>
-      quasar.qscript.EquiJoin(
-        ej.src,
-        freeTC(ej.lBranch),
-        freeTC(ej.rBranch),
-        freeMF(ej.lKey),
-        freeMF(ej.rKey),
-        ej.f,
-        freeMF(ej.combine))
-    )
-  }
-  def ThetaJoin = new Normalizable[ThetaJoin] {
-    val normalize = λ[EndoK[ThetaJoin]](tj =>
-      quasar.qscript.ThetaJoin(
-        tj.src,
-        freeTC(tj.lBranch),
-        freeTC(tj.rBranch),
-        freeMF(tj.on),
-        tj.f,
-        freeMF(tj.combine))
-    )
+  def freeMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+    val fmNormalized = freeMF[A](fm)
+    (fm ≟ fmNormalized).fold(None, fmNormalized.some)
   }
 
-  def QScriptCore = new Normalizable[QScriptCore] {
-    val normalize = λ[EndoK[QScriptCore]] {
-      case Map(src, f)                           => Map(src, freeMF(f))
-      case LeftShift(src, s, r)                  => LeftShift(src, freeMF(s), freeMF(r))
-      case Reduce(src, bucket, reducers, repair) =>
-        val normBuck = freeMF(bucket)
-        Reduce(
-          src,
-          // NB: all single-bucket reductions should reduce on `null`
-          normBuck.resume.fold({
-            case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
-            case _                    => normBuck
-          }, κ(normBuck)),
-          reducers.map(_.map(freeMF(_))),
-          freeMF(repair))
-      case Sort(src, bucket, order) => Sort(src, freeMF(bucket), order.map(_.leftMap(freeMF(_))))
-      case Union(src, l, r)         => Union(src, freeTC(l), freeTC(r))
-      case Filter(src, f)           => Filter(src, freeMF(f))
-      case Take(src, from, count)   => Take(src, freeTC(from), freeTC(count))
-      case Drop(src, from, count)   => Drop(src, freeTC(from), freeTC(count))
-      case Unreferenced()           => Unreferenced()
+  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
+
+  def makeNorm[A, B, C](
+    lOrig: A, rOrig: B)(
+    left: A => Option[A], right: B => Option[B])(
+    f: (A, B) => C):
+      Option[C] =
+    (left(lOrig), right(rOrig)) match {
+      case (None, None) => None
+      case (l, r)       => f(l.getOrElse(lOrig), r.getOrElse(rOrig)).some
     }
+
+  def EquiJoin = make(
+    λ[EquiJoin ~> (Option ∘ EquiJoin)#λ](ej =>
+      (freeTCEq(ej.lBranch), freeTCEq(ej.rBranch), freeMFEq(ej.lKey), freeMFEq(ej.rKey), freeMFEq(ej.combine)) match {
+        case (None, None, None, None, None) => None
+        case (lBranchNorm, rBranchNorm, lKeyNorm, rKeyNorm, combineNorm) =>
+          quasar.qscript.EquiJoin(
+            ej.src,
+            lBranchNorm.getOrElse(ej.lBranch),
+            rBranchNorm.getOrElse(ej.rBranch),
+            lKeyNorm.getOrElse(ej.lKey),
+            rKeyNorm.getOrElse(ej.rKey),
+            ej.f,
+            combineNorm.getOrElse(ej.combine)).some
+      }))
+
+  def ThetaJoin = make(
+    λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj =>
+      (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), freeMFEq(tj.on), freeMFEq(tj.combine)) match {
+        case (None, None, None, None) => None
+        case (lBranchNorm, rBranchNorm, onNorm, combineNorm) =>
+          quasar.qscript.ThetaJoin(
+            tj.src,
+            lBranchNorm.getOrElse(tj.lBranch),
+            rBranchNorm.getOrElse(tj.rBranch),
+            onNorm.getOrElse(tj.on),
+            tj.f,
+            combineNorm.getOrElse(tj.combine)).some
+      }))
+
+  def QScriptCore = {
+    // NB: all single-bucket reductions should reduce on `null`
+    def normalizeBucket(bucket: FreeMap[T]): FreeMap[T] = bucket.resume.fold({
+      case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
+      case _                    => bucket
+    }, κ(bucket))
+
+    make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+      case Reduce(src, bucket, reducers, repair) => {
+        val reducersOpt: List[Option[ReduceFunc[FreeMap[T]]]] =
+          reducers.map(_.traverse(freeMFEq[Hole](_)))
+
+        val reducersNormOpt: Option[List[ReduceFunc[FreeMap[T]]]] =
+          if (reducersOpt.map(_.toList).flatten.isEmpty)
+            None
+          else
+            Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)).some
+
+        val bucketNormOpt: Option[FreeMap[T]] = freeMFEq(bucket)
+
+        val bucketNormConst: Option[FreeMap[T]] =
+          bucketNormOpt.getOrElse(bucket).resume.fold({
+            case MapFuncs.Constant(ej) if EJson.isNull(ej) => None
+            case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]().some
+            case _ => bucketNormOpt
+          }, _ => bucketNormOpt)
+
+        (bucketNormConst, reducersNormOpt, freeMFEq(repair)) match {
+          case (None, None, None) =>
+            None
+          case (bucketNorm, reducersNorm, repairNorm)  =>
+            Reduce(
+              src,
+              bucketNorm.getOrElse(bucket),
+              reducersNorm.getOrElse(reducers),
+              repairNorm.getOrElse(repair)).some
+        }
+      }
+          
+      case Sort(src, bucket, order) => {
+        val orderOpt: List[Option[(FreeMap[T], SortDir)]] =
+          order.map {
+            _.leftMap(freeMFEq(_)) match {
+              case (Some(fm), dir) => Some((fm, dir))
+              case (_, _)          => None
+            }
+          }
+
+        val orderNormOpt: Option[List[(FreeMap[T], SortDir)]] =
+          if (orderOpt.map(_.toList).flatten.isEmpty)
+            None
+          else
+            Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)).some
+
+        makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
+      }
+      case Map(src, f)            => freeMFEq(f).map(Map(src, _))
+      case LeftShift(src, s, r)   => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, _))
+      case Union(src, l, r)       => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
+      case Filter(src, f)         => freeMFEq(f).map(Filter(src, _))
+      case Take(src, from, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Take(src, _, _))
+      case Drop(src, from, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Drop(src, _, _))
+      case Unreferenced()         => None
+    })
   }
 
-  def ProjectBucket = new Normalizable[ProjectBucket] {
-    val normalize = λ[EndoK[ProjectBucket]] {
-      case BucketField(a, v, f) => BucketField(a, freeMF(v), freeMF(f))
-      case BucketIndex(a, v, i) => BucketField(a, freeMF(v), freeMF(i))
+  def ProjectBucket = make(
+    λ[ProjectBucket ~> (Option ∘ ProjectBucket)#λ] {
+      case BucketField(a, v, f) => makeNorm(v, f)(freeMFEq(_), freeMFEq(_))(BucketField(a, _, _))
+      case BucketIndex(a, v, i) => makeNorm(v, i)(freeMFEq(_), freeMFEq(_))(BucketIndex(a, _, _))
     }
-  }
+  )
 }

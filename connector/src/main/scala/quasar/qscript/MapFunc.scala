@@ -170,52 +170,62 @@ object MapFunc {
 
   // Transform effectively constant `MapFunc` into a `Constant` value.
   // This is a mini-evaluator for constant qscript values.
-  def foldConstant[T[_[_]]: Recursive: Corecursive, A]: CoMFR[T, A] => Option[CoMFR[T, A]] = {
-    def exprCommon(result: ejson.Common[T[EJson]]): Option[CoMFR[T, A]] =
-      Some(CoEnv(Constant(EJson.fromCommon.apply(result)).right))
-
-    def exprExt(result: ejson.Extension[T[EJson]]): Option[CoMFR[T, A]] =
-      Some(CoEnv(Constant(EJson.fromExt.apply(result)).right))
-
+  def foldConstant[T[_[_]]: Recursive: Corecursive, A]
+    (implicit C: ejson.Common :<: ejson.EJson, E: ejson.Extension :<: ejson.EJson)
+      : CoMFR[T, A] => Option[T[EJson]] = {
     object EjConstCommon {
-      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Common[T[EJson]]] = tco match {
-        case Embed(CoEnv(\/-(Constant(Embed(ejson.Common(v)))))) => Some(v)
-        case _                                                   => None
-      }
+      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Common[T[EJson]]] =
+        tco match {
+          case Embed(CoEnv(\/-(Constant(Embed(ejson.Common(v)))))) => Some(v)
+          case _                                                   => None
+        }
     }
 
     object EjConstExtension {
-      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Extension[T[EJson]]] = tco match {
-        case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-        case _                                                      => None
-      }
+      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Extension[T[EJson]]] =
+        tco match {
+          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
+          case _                                                      => None
+        }
     }
 
-    _.run.fold(
+    _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
       κ(None),
       {
         // relations
-        case And(EjConstCommon(ejson.Bool(v1)), EjConstCommon(ejson.Bool(v2))) => exprCommon(ejson.Bool(v1 && v2))
-        case Or(EjConstCommon(ejson.Bool(v1)), EjConstCommon(ejson.Bool(v2)))  => exprCommon(ejson.Bool(v1 || v2))
-        case Not(EjConstCommon(ejson.Bool(v1)))                                => exprCommon(ejson.Bool(!v1))
+        case And(EjConstCommon(ejson.Bool(v1)), EjConstCommon(ejson.Bool(v2))) =>
+          C.inj(ejson.Bool(v1 && v2)).some
+        case Or(EjConstCommon(ejson.Bool(v1)), EjConstCommon(ejson.Bool(v2)))  =>
+          C.inj(ejson.Bool(v1 || v2)).some
+        case Not(EjConstCommon(ejson.Bool(v1)))                                =>
+          C.inj(ejson.Bool(!v1)).some
 
         // string
-        case Lower(EjConstCommon(ejson.Str(v1))) => exprCommon(ejson.Str(v1.toLowerCase))
-        case Upper(EjConstCommon(ejson.Str(v1))) => exprCommon(ejson.Str(v1.toUpperCase))
+        case Lower(EjConstCommon(ejson.Str(v1))) =>
+          C.inj(ejson.Str(v1.toLowerCase)).some
+        case Upper(EjConstCommon(ejson.Str(v1))) =>
+          C.inj(ejson.Str(v1.toUpperCase)).some
 
         // structural
-        case MakeArray(Embed(CoEnv(\/-(Constant(v1)))))                               => exprCommon(ejson.Arr(List(v1)))
-        case MakeMap(EjConstCommon(ejson.Str(v1)), Embed(CoEnv(\/-(Constant(v2)))))   => exprExt(ejson.Map(List(EJson.fromCommon.apply(ejson.Str(v1)) -> v2)))
-        case ConcatArrays(EjConstCommon(ejson.Arr(v1)), EjConstCommon(ejson.Arr(v2))) => exprCommon(ejson.Arr(v1 ++ v2))
-
+        case MakeArray(Embed(CoEnv(\/-(Constant(v1)))))                               =>
+          C.inj(ejson.Arr(List(v1))).some
+        case MakeMap(EjConstCommon(ejson.Str(v1)), Embed(CoEnv(\/-(Constant(v2)))))   =>
+          E.inj(ejson.Map(List(C.inj(ejson.Str[T[ejson.EJson]](v1)).embed -> v2))).some
+        case ConcatArrays(EjConstCommon(ejson.Arr(v1)), EjConstCommon(ejson.Arr(v2))) =>
+          C.inj(ejson.Arr(v1 ++ v2)).some
         case _ => None
-      })
+      }) ∘ (_.embed)
   }
+
+  def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]
+      : CoMFR[T, A] => CoMFR[T, A] =
+    repeatedly(rewrite[T, A]) ⋘
+      orOriginal(foldConstant[T, A].apply(_) ∘ (const => CoEnv(Constant(const).right)))
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]:
+  def rewrite[T[_[_]]: Recursive: Corecursive: EqualT, A]:
       CoMFR[T, A] => Option[CoMFR[T, A]] = {
     _.run.fold(
       κ(None),
@@ -669,10 +679,7 @@ object MapFuncs {
       Free.roll(Constant[T, Free[MapFunc[T, ?], A]](EJson.fromCommon[T].apply(ejson.Null[T[EJson]]())))
 
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Boolean = mf.resume.fold ({
-      case Constant(ej) => CommonEJson.prj(ej.project).fold(false) {
-        case ejson.Null() => true
-        case _ => false
-      }
+      case Constant(ej) => EJson.isNull(ej)
       case _ => false
     }, _ => false)
   }

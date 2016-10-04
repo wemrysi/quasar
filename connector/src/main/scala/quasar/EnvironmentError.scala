@@ -31,7 +31,7 @@ object EnvironmentError {
     extends EnvironmentError
   final case class InvalidCredentials private[quasar] (message: String)
     extends EnvironmentError
-  final case class UnsupportedVersion private[quasar] (backendName: String, version: List[Int])
+  final case class UnsupportedVersion private[quasar] (backendName: String, version: String)
     extends EnvironmentError
 
   val connectionFailed: Prism[EnvironmentError, Throwable] =
@@ -52,8 +52,8 @@ object EnvironmentError {
       case _ => None
     } (InvalidCredentials(_))
 
-  val unsupportedVersion: Prism[EnvironmentError, (String, List[Int])] =
-    Prism[EnvironmentError, (String, List[Int])] {
+  val unsupportedVersion: Prism[EnvironmentError, (String, String)] =
+    Prism[EnvironmentError, (String, String)] {
       case UnsupportedVersion(name, version) => Some((name, version))
       case _ => None
     } ((UnsupportedVersion(_, _)).tupled)
@@ -67,7 +67,7 @@ object EnvironmentError {
       case InvalidCredentials(msg) =>
         s"Invalid credentials: $msg"
       case UnsupportedVersion(name, version) =>
-        s"Unsupported $name version: ${version.mkString(".")}"
+        s"Unsupported $name version: $version"
     }
 
   implicit val environmentErrorEncodeJson: EncodeJson[EnvironmentError] = {
