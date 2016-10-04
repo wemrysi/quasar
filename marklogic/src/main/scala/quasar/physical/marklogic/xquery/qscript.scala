@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.SKI.ι
+import quasar.fp.ski.ι
 import quasar.physical.marklogic.xml.namespaces._
 
 import java.lang.SuppressWarnings
