@@ -808,6 +808,8 @@ object MongoDbPlanner {
           lift(Arity2(HasWorkflow, HasInt).map((WB.skip(_, _)).tupled))
         case Take =>
           lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
+        case Union =>
+          lift(Arity2(HasWorkflow, HasWorkflow)) >>= ((WB.unionAll(_, _)).tupled)
         case InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin =>
           args match {
             case Sized(left, right, comp) =>
