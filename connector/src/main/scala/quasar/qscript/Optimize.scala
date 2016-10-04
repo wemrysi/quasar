@@ -166,6 +166,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => QC.inj(x)
   }
 
+  def transformIncludeToExclude[F[_]: Functor](
+    implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[F]] => F[T[F]] = {
+    case x @ Map(Embed(src), indexOne) if indexOne ≟ Free.roll(ProjectIndex(HoleF, IntLit(1))) =>
+      SR.prj(src).cata(
+        const => SR.inj(Const[ShiftedRead, T[F]](ShiftedRead(const.getConst.path, ExcludeId))),
+        QC.inj(x))
+    case x => QC.inj(x)
+  }
+
   def swapMapCount[F[_], G[_]: Functor]
     (GtoF: G ~> (Option ∘ F)#λ)
     (implicit QC: QScriptCore[T, ?] :<: F)
