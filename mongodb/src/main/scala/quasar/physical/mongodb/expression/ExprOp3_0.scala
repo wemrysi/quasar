@@ -19,7 +19,7 @@ package quasar.physical.mongodb.expression
 import quasar.Predef._
 import quasar._, Planner._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.physical.mongodb.Bson
 import quasar.jscore, jscore.JsFn
 

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import numeric._
 import quasar.Optimizer
 import quasar.Planner.UnsupportedPlan

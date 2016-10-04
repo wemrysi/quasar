@@ -206,7 +206,7 @@ trait WriterTInstances {
 
 trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
-    import SKI._
+    import fp.ski._
 
     /** A new task which runs a cleanup task only in the case of failure, and
       * ignores any result from the cleanup task.
@@ -242,7 +242,7 @@ trait PartialFunctionOps {
 
 trait JsonOps {
   import argonaut._
-  import SKI._
+  import fp.ski._
 
   def optional[A: DecodeJson](cur: ACursor): DecodeResult[Option[A]] =
     cur.either.fold(
@@ -312,27 +312,6 @@ trait DebugOps {
   }
 }
 
-object SKI extends Serializable {
-  // NB: Unicode has double-struck and bold versions of the letters, which might
-  //     be more appropriate, but the code points are larger than 2 bytes, so
-  //     Scala doesn't handle them.
-
-
-  /** Probably not useful; implemented here mostly because it's amusing. */
-  def σ[A, B, C](x: A => B => C, y: A => B, z: A): C = x(z)(y(z))
-
-  /** A shorter name for the constant function of 1, 2, 3, or 6 args.
-    * NB: the argument is eager here, so use `_ => ...` instead if you need it
-    *     to be thunked.
-    */
-  def κ[A, B](x: B): A => B                                  = _ => x
-  def κ2[A, B, C](x: C): (A, B) => C                         = (_, _) => x
-  def κ3[A, B, C, D](x: D): (A, B, C) => D                   = (_, _, _) => x
-  def κ6[A, B, C, D, E, F, G](x: G): (A, B, C, D, E, F) => G = (_, _, _, _, _, _) => x
-
-  /** A shorter name for the identity function. */
-  def ι[A]: A => A = x => x
-}
 
 trait LowPriorityCoEnvImplicits {
   // TODO: move to matryoshka
@@ -529,7 +508,7 @@ package object fp
   /** A specialization of `interpret` where the leaves are of the result type.
     */
   def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
-    interpret(SKI.ι, φ)
+    interpret(fp.ski.ι, φ)
 
   object Inj {
     def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
@@ -584,7 +563,7 @@ package object fp
   // TODO: This should definitely be in Matryoshka.
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
       T[F] =
-    f(t).fold(SKI.ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
+    f(t).fold(fp.ski.ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
   def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
@@ -652,7 +631,7 @@ package object fp
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    co => co.run.fold(SKI.κ(co), f)
+    co => co.run.fold(fp.ski.κ(co), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),

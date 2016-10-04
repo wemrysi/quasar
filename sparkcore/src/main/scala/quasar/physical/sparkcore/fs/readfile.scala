@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._, FileSystemError._, PathError._

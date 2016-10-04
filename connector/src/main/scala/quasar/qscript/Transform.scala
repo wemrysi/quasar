@@ -19,7 +19,7 @@ package quasar.qscript
 import quasar._
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Planner._

@@ -18,7 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._

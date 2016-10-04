@@ -21,7 +21,7 @@ import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.namegen._
 import quasar.sql.JoinDir
-import quasar.SKI._
+import quasar.fp.ski._
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}

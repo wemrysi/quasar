@@ -18,7 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import monocle.{Lens, Prism}
 import pathy.Path._

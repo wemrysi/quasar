@@ -17,7 +17,7 @@
 package quasar.contrib
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import argonaut._
 import _root_.pathy.Path, Path._

@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly
 import quasar.contrib.pathy._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs._, FileSystemError._, FileSystemTest._
 import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection

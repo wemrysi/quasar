@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs._
 
 import java.lang.{Boolean => JBoolean}

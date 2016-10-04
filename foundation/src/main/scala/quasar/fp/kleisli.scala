@@ -16,7 +16,7 @@
 
 package quasar.fp
 
-import quasar.SKI._
+import quasar.fp.ski._
 
 import scalaz._
 

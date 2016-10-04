@@ -23,7 +23,7 @@ import quasar.DataCodec
 import quasar._
 import quasar.Planner._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._

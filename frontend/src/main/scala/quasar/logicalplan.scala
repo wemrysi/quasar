@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fp.binder._
 import quasar.namegen._
 

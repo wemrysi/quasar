@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.fp._, eitherT._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}

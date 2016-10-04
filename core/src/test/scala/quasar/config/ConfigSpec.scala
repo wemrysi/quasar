@@ -18,7 +18,7 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs.mount.ConnectionUri
 
 import argonaut._

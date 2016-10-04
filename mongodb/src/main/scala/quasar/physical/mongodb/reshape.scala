@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._

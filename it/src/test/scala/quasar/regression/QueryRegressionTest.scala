@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._, free._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.FilesystemQueries
 import quasar.fs.mount.{Mounts, hierarchical}

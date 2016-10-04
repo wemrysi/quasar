@@ -18,7 +18,7 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import argonaut._, Argonaut._
 import org.http4s._, Status.Ok

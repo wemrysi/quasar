@@ -19,7 +19,7 @@ package quasar.physical.mongodb.workflow
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},

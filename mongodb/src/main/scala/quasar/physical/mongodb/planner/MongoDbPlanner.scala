@@ -21,7 +21,7 @@ import quasar.{fs => _, _}, Type._
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.shapeless._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}

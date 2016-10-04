@@ -23,7 +23,7 @@ import quasar.std.{DateLib, StringLib}
 import quasar.Data
 import quasar.qscript._
 import quasar.Planner._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import scala.math
 

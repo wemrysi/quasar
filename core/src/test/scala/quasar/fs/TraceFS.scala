@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._

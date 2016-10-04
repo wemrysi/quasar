@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.RenderTree
 import quasar.fp._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.physical.mongodb.workflowtask._
 
 import monocle.Prism

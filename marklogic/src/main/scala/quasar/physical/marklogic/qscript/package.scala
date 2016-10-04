@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
