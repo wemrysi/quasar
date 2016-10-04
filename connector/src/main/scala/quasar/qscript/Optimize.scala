@@ -241,20 +241,22 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // - convert any remaning projects to maps
   // - coalesce nodes
   // - normalize mapfunc
-  def applyAll[F[_]: Traverse: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
+  def applyNormalizations[F[_]: Traverse: Normalizable, G[_]: Traverse](
+    prism: PrismNT[G, F],
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    implicit C: Coalesce.Aux[T, F, F],
              QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
-      F[T[F]] => F[T[F]] =
-    (Normalizable[F].normalize(_: F[T[F]])) ⋙
+      F[T[G]] => G[T[G]] =
+    repeatedly(Normalizable[F].normalize(_: F[T[G]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideOneSidedJoin[F, F](rebaseT[F])) ⋙
-      repeatedly(C.coalesce(idPrism)) ⋙
-      liftFG(coalesceMapJoin[F, F](idPrism.get)) ⋙
-      liftFF(orOriginal(swapMapCount[F, F](idPrism.get))) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T, T[F]]))) ⋙
-      liftFG(elideNopQC[F, F](idPrism.reverseGet))
+      liftFG(elideOneSidedJoin[F, G](rebase)) ⋙
+      repeatedly(C.coalesce[G](prism)) ⋙
+      liftFG(coalesceMapJoin[F, G](prism.get)) ⋙
+      liftFF(orOriginal(swapMapCount[F, G](prism.get))) ⋙
+      liftFF(repeatedly(compactQC(_: QScriptCore[T, T[G]]))) ⋙
+      (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
@@ -262,15 +264,15 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
-      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideOneSidedJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
-      repeatedly(C.coalesce[CoEnv[Hole, F, ?]](coenvPrism)) ⋙
-      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
-      liftFF(orOriginal(swapMapCount[F, CoEnv[Hole, F, ?]](coenvPrism.get))) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T, T[CoEnv[Hole, F, ?]]]))) ⋙
-      (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopQC[F, CoEnv[Hole, F, ?]](coenvPrism.reverseGet)))
+    applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo)
 
+  def applyAll[F[_]: Traverse: Normalizable](
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore[T, ?] :<: F,
+             TJ: ThetaJoin[T, ?] :<: F,
+             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+      F[T[F]] => F[T[F]] =
+    applyNormalizations[F, F](idPrism, rebaseT)
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle

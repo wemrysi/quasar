@@ -30,6 +30,7 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
+// TODO factor out the many calls to `transCata` into a single function
 class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   val opt = new Optimize[Fix]
 
@@ -65,7 +66,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val run =
         (SimplifyProjection[QSI, QSI].simplifyProjection(_: QSI[Fix[QSI]])) ⋙
           liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
-          Normalizable[QSI].normalize ⋙
+          orOriginal(Normalizable[QSI].normalize(_: QSI[Fix[QSI]])) ⋙
           liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
           liftFF(repeatedly(opt.compactQC(_: QScriptCore[Fix, Fix[QSI]])))
 
@@ -110,7 +111,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
 
-      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+      exp.embed.transCata[QS](orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
     }
 
     "elide a join with a constant on one side" in {
@@ -159,7 +160,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
 
-      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+      exp.embed.transCata(orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
     }
 
     "elide a join in the branch of a join" in {
@@ -234,7 +235,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Free.roll(Constant(
             ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
 
-      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+      exp.embed.transCata(orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
     }
 
     "simplify a ThetaJoin" in {

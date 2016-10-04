@@ -18,22 +18,26 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-import scalaz._
+
+import matryoshka._
+import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 @typeclass trait Normalizable[F[_]] {
-  def normalize: EndoK[F]
+  def normalize: NTComp[F, Option]
 }
 
+// it would be nice to use the `NTComp` alias here, but it cannot compile
 trait NormalizableInstances {
   implicit def const[A] = new Normalizable[Const[A, ?]] {
-    def normalize = reflNT[Const[A, ?]]
+    def normalize = λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None)
   }
-  implicit def coproduct[F[_] : Normalizable, G[_] : Normalizable] = new Normalizable[Coproduct[F, G, ?]] {
-    def normalize = λ[EndoK[Coproduct[F, G, ?]]](sp => Coproduct(sp.run.bimap(Normalizable[F] normalize _, Normalizable[G] normalize _)))
+  implicit def coproduct[F[_]: Normalizable, G[_]: Normalizable] = new Normalizable[Coproduct[F, G, ?]] {
+    def normalize = λ[Coproduct[F, G, ?] ~> (Option ∘ Coproduct[F, G, ?])#λ](
+      _.run.bitraverse(Normalizable[F].normalize(_), Normalizable[G].normalize(_)).map(Coproduct(_)))
   }
 }
 
 object Normalizable extends NormalizableInstances {
-  def make[F[_]](f: EndoK[F]): Normalizable[F] = new Normalizable[F] { val normalize = f }
+  def make[F[_]](f: NTComp[F, Option]): Normalizable[F] = new Normalizable[F] { val normalize = f }
 }
