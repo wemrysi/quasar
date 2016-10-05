@@ -19,7 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.RenderTree.ops._
 import quasar.SKI.κ
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -68,7 +67,7 @@ object queryfile {
       val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", main.render))
+        Vector(PhaseResult.detail("XQuery", main.render))
 
       val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -84,9 +83,8 @@ object queryfile {
       val planning = for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
         shifted =  shiftRead[Fix](qs)
-        shftdRT =  shifted.cata(linearize).reverse.render
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
-                     PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
+                     PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse)))
         mod     <- plan(shifted).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(

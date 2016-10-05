@@ -18,7 +18,7 @@ package quasar.repl
 
 import quasar.Predef._
 
-import quasar.{Data, DataCodec, PhaseResult, Variables}
+import quasar.{Data, DataCodec, PhaseResults, Variables}
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
@@ -230,13 +230,15 @@ object Repl {
   ): Free[S, Option[String]] =
     M.lookupType(path).map(_.fold(_.value, "view")).run
 
-  def printLog[S[_]](debugLevel: DebugLevel, log: Vector[PhaseResult])(implicit
+  def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
+
+  def printLog[S[_]](debugLevel: DebugLevel, log: PhaseResults)(implicit
     P: ConsoleIO.Ops[S]
   ): Free[S, Unit] =
     debugLevel match {
       case DebugLevel.Silent  => ().point[Free[S, ?]]
-      case DebugLevel.Normal  => P.println(log.takeRight(1).mkString("\n\n") + "\n")
-      case DebugLevel.Verbose => P.println(log.mkString("\n\n") + "\n")
+      case DebugLevel.Normal  => P.println(showPhaseResults(log.takeRight(1)) + "\n")
+      case DebugLevel.Verbose => P.println(showPhaseResults(log) + "\n")
     }
 
   def summarize[S[_]](max: Int, format: OutputFormat)(rows: IndexedSeq[Data])(implicit

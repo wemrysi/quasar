@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import quasar.Predef._
-import quasar.{fs => _, _}, Type._
+import quasar.{fs => _, _}, RenderTree.ops._, Type._
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.shapeless._
 import quasar.fp._
@@ -102,7 +102,7 @@ object MongoDbPlanner {
       val HasStr: Output => OutputM[String] = _.flatMap {
         _._1(Nil)(ident("_")) match {
           case Literal(Js.Str(str)) => str.right
-          case x => FuncApply(func.name, "JS string", x.shows).left
+          case x => FuncApply(func.name, "JS string", x.render.shows).left
         }
       }
 
@@ -1108,10 +1108,9 @@ object MongoDbPlanner {
     (logical: Fix[LogicalPlan])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
-      ev1: Show[Fix[WorkflowBuilderF[WF, ?]]],
-      ev2: RenderTree[Fix[WF]],
-      ev3: ExprOpCoreF :<: EX,
-      ev4: EX :<: ExprOp)
+      ev1: RenderTree[Fix[WF]],
+      ev2: ExprOpCoreF :<: EX,
+      ev3: EX :<: ExprOp)
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WF]] = {
 
     // NB: Locally add state on top of the result monad so everything
@@ -1124,8 +1123,7 @@ object MongoDbPlanner {
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
-        val result = PhaseResult.Tree(label, RenderTree[A].render(a))
-        (Writer(Vector(result), a): W[A]).liftM[PlanT].liftM[GenT]
+        (Writer(Vector(PhaseResult.tree(label, a)), a): W[A]).liftM[PlanT].liftM[GenT]
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
