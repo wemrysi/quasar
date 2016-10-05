@@ -1,5 +1,1 @@
-- have Coalesce push Take/Drop later, rather than earlier
-- add an `optimize` transformation to finalize QScript (which pulls Take/Drop earlier)
-- implement Mergable for ProjectBucket
-- fix conversions of Take and Drop from LP
-- eliminate many ThetaJoins from queries
+- avoid creating unnecessary autojoins
