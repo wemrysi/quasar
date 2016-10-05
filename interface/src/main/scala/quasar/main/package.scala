@@ -287,7 +287,7 @@ package object main {
         free.foldMapNT(MountEff.interpreter[S](hrchFsRef, mntdFsRef))
 
       val mounter: Mounting ~> Free[G, ?] =
-        quasar.fs.mount.Mounter[MountEffM, G](
+        quasar.fs.mount.Mounter.kvs[MountEffM, G](
           mountHandler.mount[MountEff](_),
           mountHandler.unmount[MountEff](_))
 
