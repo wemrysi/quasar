@@ -16,9 +16,10 @@
 
 package quasar.qscript
 
-import quasar._
-import quasar.ejson._
 import quasar.Predef._
+import quasar._
+import quasar.contrib.matryoshka._
+import quasar.ejson._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.std.StdLib._

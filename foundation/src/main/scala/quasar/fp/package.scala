@@ -18,8 +18,9 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
+import quasar.contrib.matryoshka._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._, TraverseT.ops._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -313,25 +314,12 @@ trait DebugOps {
 }
 
 
-trait LowPriorityCoEnvImplicits {
-  // TODO: move to matryoshka
-
-  implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
-    CoEnv.bitraverse[F, E].rightTraverse
-}
-
-trait CoEnvInstances extends LowPriorityCoEnvImplicits {
-  implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
-    CoEnv.bifunctor[F].rightFunctor
-}
-
 package object fp
     extends TreeInstances
     with ListMapInstances
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
-    with CoEnvInstances
     with ToCatchableOps
     with PartialFunctionOps
     with JsonOps
@@ -461,127 +449,10 @@ package object fp
 
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
-  // TODO: Move to Matryoshka
-
-  /** Algebra transformation that allows a standard algebra to be used on a
-    * CoEnv structure (given a function that converts the leaves to the result
-    * type).
-    */
-  def interpret[F[_], A, B](f: A => B, φ: Algebra[F, B]):
-      Algebra[CoEnv[A, F, ?], B] =
-    interpretM[Id, F, A, B](f, φ)
-
-  def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]):
-      AlgebraM[M, CoEnv[A, F, ?], B] =
-    ginterpretM[Id, M, F, A, B](f, φ)
-
-  def ginterpretM[W[_], M[_], F[_], A, B](f: A => M[B], φ: GAlgebraM[W, M, F, B]):
-      GAlgebraM[W, M, CoEnv[A, F, ?], B] =
-    _.run.fold(f, φ)
-
-  /** A specialization of `interpret` where the leaves are of the result type.
-    */
-  def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
-    interpret(ι, φ)
-
-  implicit val equalTFix: EqualT[Fix] = new EqualT[Fix] {
-    def equal[F[_]](tf1: Fix[F], tf2: Fix[F])(implicit del: Delay[Equal, F]): Boolean =
-      del(equalT[F](del)).equal(tf1.unFix, tf2.unFix)
-  }
-
-  implicit def equalTEqual[T[_[_]], F[_]](implicit T: EqualT[T], F: Delay[Equal, F]):
-      Equal[T[F]] =
-    T.equalT[F](F)
-
-  implicit val showTFix: ShowT[Fix] = new ShowT[Fix] {
-    override def show[F[_]](tf: Fix[F])(implicit del: Delay[Show, F]): Cord =
-      del(showT[F](del)).show(tf.unFix)
-  }
-
-  implicit def showTShow[T[_[_]], F[_]](implicit T: ShowT[T], F: Delay[Show, F]):
-      Show[T[F]] =
-    T.showT[F](F)
-
-  def elgotM[M[_]: Monad, F[_]: Traverse, A, B](a: A)(φ: F[B] => M[B], ψ: A => M[B \/ F[A]]):
-      M[B] = {
-    def h(a: A): M[B] = ψ(a) >>= (_.traverse(_.traverse(h) >>= φ).map(_.merge))
-    h(a)
-  }
-
-  // TODO: This should definitely be in Matryoshka.
-  // apomorphism - short circuit by returning left
-  def substitute[T[_[_]], F[_]](original: T[F], replacement: T[F])(implicit T: Equal[T[F]]):
-      T[F] => T[F] \/ T[F] =
-   tf => if (tf ≟ original) replacement.left else tf.right
-
-  // TODO: This should definitely be in Matryoshka.
-  def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
-      T[F] =
-    f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
-
-  def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
-    free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
-
-  def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
-    free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
-
-  def freeGcataM[W[_]: Comonad: Traverse, M[_]: Monad, F[_]: Traverse, E, A](
-    free: Free[F, E])(
-    k: DistributiveLaw[CoEnv[E, F, ?], W],
-    φ: GAlgebraM[W, M, CoEnv[E, F, ?], A]):
-      M[A] =
-    free.ghyloM[W, Id, M, CoEnv[E, F, ?], A](k, distAna, φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
-
-  def distTraverse[F[_]: Traverse, G[_]: Applicative] =
-    new DistributiveLaw[F, G] {
-      def apply[A](fga: F[G[A]]) = fga.sequence
-    }
-
   implicit final class FreeOps[F[_], E](val self: Free[F, E]) extends scala.AnyVal {
     final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =
       self.ana(CoEnv.freeIso[E, F].reverseGet)
   }
-
-  // TODO[matryoshka]: Should be an HMap instance
-  def coEnvHmap[F[_], G[_], A, B](fa: CoEnv[A, F, B])(f: F ~> G) =
-    CoEnv(fa.run.map(f(_)))
-
-  // TODO[matryoshka]: Should be an HTraverse instance
-  def coEnvHtraverse[G[_]: Applicative, F[_], H[_], A, B](
-    fa: CoEnv[A, F, B])(
-    f: F ~> (G ∘ H)#λ) =
-    fa.run.traverse(f(_)).map(CoEnv(_))
-
-  implicit final class CoEnvOps[T[_[_]], F[_], E](val self: T[CoEnv[E, F, ?]]) extends scala.AnyVal {
-    final def fromCoEnv(implicit fa: Functor[F], tr: Recursive[T]): Free[F, E] =
-      self.cata(CoEnv.freeIso[E, F].get)
-  }
-
-  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
-    */
-  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, G[_]: Functor, A, B](
-    free: Free[F, A])(
-    f: CoEnv[A, F, T[CoEnv[B, G, ?]]] => CoEnv[B, G, T[CoEnv[B, G, ?]]]):
-      Free[G, B] =
-    free.toCoEnv[T].transCata[CoEnv[B, G, ?]](f).fromCoEnv
-
-  def freeTransCataM[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Traverse, G[_]: Functor, A, B](
-    free: Free[F, A])(
-    f: CoEnv[A, F, T[CoEnv[B, G, ?]]] => M[CoEnv[B, G, T[CoEnv[B, G, ?]]]]):
-      M[Free[G, B]] =
-    free.toCoEnv[T].transCataM[M, CoEnv[B, G, ?]](f) ∘ (_.fromCoEnv)
-
-  def transFutu[T[_[_]]: FunctorT: Corecursive, F[_]: Functor, G[_]: Traverse]
-    (t: T[F])
-    (f: GCoalgebraicTransform[T, Free[G, ?], F, G]):
-      T[G] =
-    FunctorT[T].map(t)(f(_).copoint.map(freeCata(_)(interpret[G, T[F], T[G]](transFutu(_)(f), _.embed))))
-
-  def freeTransFutu[T[_[_]]: Recursive: Corecursive, F[_]: Functor, G[_]: Traverse, A, B]
-    (free: Free[F, A])
-    (f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[B, G, Free[CoEnv[B, G, ?], T[CoEnv[A, F, ?]]]])
-      : Free[G, B] =
-    transFutu(free.toCoEnv[T])(f).fromCoEnv
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
@@ -595,6 +466,11 @@ package object fp
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
     λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
+  )
+
+  def envTPrism[T[_[_]], F[_], A](empty: A) = PrismNT[EnvT[A, F, ?], F](
+    λ[EnvT[A, F, ?] ~> λ[α => Option[F[α]]]](_.run._2.some),
+    λ[F ~> EnvT[A, F, ?]](fb => EnvT((empty, fb)))
   )
 }
 
@@ -611,17 +487,6 @@ package fp {
   @typeclass
   trait SemigroupF[F[_]] {
     @op("⊹", true) def append[A: Semigroup](fa1: F[A], fa2: F[A]): F[A]
-  }
-  @typeclass
-  trait EqualT[T[_[_]]] {
-    def equal[F[_]](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F]): Boolean
-    def equalT[F[_]](delay: Delay[Equal, F]): Equal[T[F]] = Equal.equal[T[F]](equal[F](_, _)(delay))
-  }
-  @typeclass
-  trait ShowT[T[_[_]]] {
-    def show[F[_]](tf: T[F])(implicit del: Delay[Show, F]): Cord    = Cord(shows(tf))
-    def shows[F[_]](tf: T[F])(implicit del: Delay[Show, F]): String = show(tf).toString
-    def showT[F[_]](delay: Delay[Show, F]): Show[T[F]]              = Show.show[T[F]](show[F](_)(delay))
   }
 
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.

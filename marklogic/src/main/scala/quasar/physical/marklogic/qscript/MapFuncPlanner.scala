@@ -18,8 +18,8 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.contrib.matryoshka.ShowT
 import quasar.ejson.EJson
-import quasar.fp.ShowT
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.{ErrorMessages, MonadError_}
 import quasar.physical.marklogic.ejson.EncodeXQuery

@@ -83,9 +83,7 @@ object ArbitraryExprOp {
 }
 
 class ExpressionSpec extends quasar.Qspec {
-
-  val fpCore = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import fpCore._
+  import fixExprOp._
   val fp3_0 = ExprOp3_0F.fixpoint[Fix, ExprOp]
   import fp3_0._
 

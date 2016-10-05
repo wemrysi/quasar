@@ -18,9 +18,10 @@ package quasar.physical.marklogic
 
 import quasar.fp.ski.κ
 import quasar.NameGenerator
-import quasar.fp.{freeCataM, interpretM, ShowT}
+import quasar.fp.ski.κ
+import quasar.contrib.matryoshka.{freeCataM, interpretM, ShowT}
+import quasar.physical.marklogic.xquery.{PrologW, XQuery}
 import quasar.qscript._
-import quasar.physical.marklogic.xquery._
 
 import matryoshka.Recursive
 import scalaz._, Scalaz._
