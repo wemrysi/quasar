@@ -1,0 +1,1 @@
+- refactor Mounter so that a different persistence strategy can be plugged in

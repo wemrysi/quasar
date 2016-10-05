@@ -48,7 +48,7 @@ object MountConfig {
       case FileSystemConfig(typ, uri) => (typ, uri)
     } ((FileSystemConfig(_, _)).tupled)
 
-  implicit val mountConfigShow: Show[MountConfig] =
+  implicit val show: Show[MountConfig] =
     Show.shows {
       case ViewConfig(expr, vars) =>
         viewConfigUri.reverseGet((expr, vars))
@@ -56,13 +56,8 @@ object MountConfig {
         s"[${typ.value}] ${uri.value}"
     }
 
-/** TODO: Equal[Sql[A]]
-  implicit val mountConfigEqual: Equal[MountConfig] =
-    Equal.equalBy[MountConfig, Fix[Sql] \/ (FileSystemType, Json)] {
-      case ViewConfig(query)           => query.left
-      case FileSystemConfig(typ, json) => (typ, json).right
-    }
-*/
+  implicit def equal: Equal[MountConfig] =
+    Equal.equalBy(MountConfig.toConfigPair)
 
   val toConfigPair: MountConfig => (String, ConnectionUri) = {
     case ViewConfig(query, vars) =>
