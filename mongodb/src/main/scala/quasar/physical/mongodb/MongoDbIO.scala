@@ -323,9 +323,9 @@ object MongoDbIO {
     def decodeField(s: String): BsonField = BsonField.Name(s)
 
     val decodeType: PartialFunction[java.lang.Object, IndexType] = {
-      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending
-      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending
-      case "hashed"                                => IndexType.Hashed
+      case x: java.lang.Number if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Number if x.intValue ≟ -1 => IndexType.Descending
+      case "hashed"                               => IndexType.Hashed
     }
 
     def decodeIndex(doc: Document): Option[Index] =
