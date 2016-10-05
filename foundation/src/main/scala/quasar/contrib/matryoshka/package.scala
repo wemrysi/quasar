@@ -151,6 +151,13 @@ package object matryoshka extends CoEnvInstances {
         }
     }
 
+  implicit def envtTraverse[F[_]: Traverse, X]: Traverse[EnvT[X, F, ?]] = new Traverse[EnvT[X, F, ?]] {
+    def traverseImpl[G[_]: Applicative, A, B](envT: EnvT[X, F, A])(f: A => G[B]): G[EnvT[X, F, B]] =
+      envT.run match {
+        case (x, fa) => fa.traverse(f).map(fb => EnvT((x, fb)))
+      }
+  }
+
   def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 }
 

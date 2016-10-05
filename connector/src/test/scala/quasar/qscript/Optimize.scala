@@ -27,6 +27,7 @@ import quasar.qscript.MapFuncs._
 import scala.Predef.implicitly
 
 import matryoshka._, FunctorT.ops._
+import matryoshka.patterns._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -64,31 +65,15 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   // write an `Equal[PlannerError]` and test for specific errors too
   "optimizer" should {
     "elide a no-op map in a constant boolean" in {
-       val query = LP.Constant(Data.Bool(true))
-       val run = liftFG(opt.elideNopQC[QSI, QSI](idPrism.reverseGet))
+      val query = LP.Constant(Data.Bool(true))
+      val run: QSI[Fix[EnvT[Ann[Fix], QSI, ?]]] => EnvT[Ann[Fix], QSI, Fix[EnvT[Ann[Fix], QSI, ?]]] = {
+        fa => QCI.prj(fa).fold(envTPrism(EmptyAnn[Fix]).reverseGet(fa))(opt.elideNopQC[QSI, EnvT[Ann[Fix], QSI, ?]](envTPrism(EmptyAnn[Fix]).reverseGet))
+      }
 
-       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
-         equal(chain(
-           UnreferencedI,
-           QCI.inj(Map((), BoolLit(true)))).some)
-    }
-
-    "optimize a basic read" in {
-      val run =
-        (SimplifyProjection[QSI, QSI].simplifyProjection(_: QSI[Fix[QSI]])) ⋙
-          liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
-          orOriginal(Normalizable[QSI].normalize(_: QSI[Fix[QSI]])) ⋙
-          liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
-          liftFF(repeatedly(opt.compactQC(_: QScriptCore[Fix, Fix[QSI]])))
-
-      val query = lpRead("/foo")
-
-      QueryFile.convertAndNormalize(query)(run).toOption must
-      equal(chain(
-        RootI,
-        QCI.inj(LeftShift((),
-          ProjectFieldR(HoleF, StrLit("foo")),
-          Free.point(RightSide)))).some)
+      QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
+        equal(chain(
+          UnreferencedI,
+          QCI.inj(Map((), BoolLit(true)))).some)
     }
 
     "coalesce a Map into a subsequent LeftShift" in {
