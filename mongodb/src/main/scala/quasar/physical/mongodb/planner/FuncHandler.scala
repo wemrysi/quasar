@@ -37,17 +37,13 @@ final case class FuncHandler[T[_[_]], F[_]](run: MapFunc[T, ?] ~> λ[α => Optio
 object FuncHandler {
   type M[F[_], A] = Option[Free[F, A]]
 
-  def handleOpsCore[T[_[_]]]: FuncHandler[T, ExprOpCoreF] = {
-    implicit def hole[D](d: D): Free[ExprOpCoreF, D] = Free.pure(d)
+  def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {
+    implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
-    new FuncHandler[T, ExprOpCoreF](new (MapFunc[T, ?] ~> M[ExprOpCoreF, ?]) {
-      def apply[A](fa: MapFunc[T, A]): M[ExprOpCoreF, A] = {
-        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], ExprOpCoreF]
+    new FuncHandler[T, EX](new (MapFunc[T, ?] ~> M[EX, ?]) {
+      def apply[A](fa: MapFunc[T, A]): M[EX, A] = {
+        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], EX]
         import fp._
-
-        // TODO: use $trunc on 3.2+
-        def trunc(expr: Free[ExprOpCoreF, A]): Free[ExprOpCoreF, A] =
-          $subtract(expr, $mod(expr, $literal(Bson.Int32(1))))
 
         fa.some collect {
           case Add(a1, a2)           => $add(a1, a2)
@@ -170,7 +166,33 @@ object FuncHandler {
     })
   }
 
-  def handle2_6[T[_[_]]]: FuncHandler[T, Expr2_6] = handleOpsCore
-  def handle3_0[T[_[_]]]: FuncHandler[T, Expr3_0] = handleOps3_0 orElse handle2_6
-  def handle3_2[T[_[_]]]: FuncHandler[T, Expr3_2] = handleOps3_2 orElse handle3_0
+  def trunc2_6[EX[_]: Functor](implicit inj: ExprOpCoreF :<: EX): Free[EX, ?] ~> Free[EX, ?] =
+    new (Free[EX, ?] ~> Free[EX, ?]) {
+      def apply[A](expr: Free[EX, A]): Free[EX, A] = {
+        val fp = ExprOpCoreF.fixpoint[Free[?[_], A], EX]
+        import fp._
+
+        $subtract(expr, $mod(expr, $literal(Bson.Int32(1))))
+      }
+    }
+
+  def trunc3_2[EX[_]: Functor](implicit inj: ExprOp3_2F :<: EX): Free[EX, ?] ~> Free[EX, ?] =
+    new (Free[EX, ?] ~> Free[EX, ?]) {
+      def apply[A](expr: Free[EX, A]): Free[EX, A] = {
+        val fp = ExprOp3_2F.fixpoint[Free[?[_], A], EX]
+        import fp._
+
+        $trunc(expr)
+      }
+    }
+
+  def handle2_6[T[_[_]]]: FuncHandler[T, Expr2_6] =
+    handleOpsCore(trunc2_6[Expr2_6])
+  def handle3_0[T[_[_]]]: FuncHandler[T, Expr3_0] =
+    handleOps3_0 orElse
+    handleOpsCore(trunc2_6[Expr3_0])
+  def handle3_2[T[_[_]]]: FuncHandler[T, Expr3_2] =
+    handleOps3_2[T].orElse[ExprOp3_0F, Expr3_2](
+    handleOps3_0[T]) orElse
+    handleOpsCore(trunc3_2[Expr3_2])
 }
