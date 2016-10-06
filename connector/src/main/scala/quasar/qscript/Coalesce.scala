@@ -52,7 +52,6 @@ object Coalesce {
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
 
-      val FI = scala.Predef.implicitly[Injectable.Aux[QScriptCore[T, ?], QScriptTotal[T, ?]]]
       // TODO: I feel like this must be some standard fold.
       def sequenceReduce[T[_[_]]: EqualT](rf: ReduceFunc[(FreeMap[T], JoinFunc[T])])
           : Option[(FreeMap[T], ReduceFunc[JoinFunc[T]])] =
@@ -89,6 +88,14 @@ object Coalesce {
               LeftShift(srcInner, struct, mf >> repair).some
             case Reduce(srcInner, bucket, funcs, repair) =>
               Reduce(srcInner, bucket, funcs, mf >> repair).some
+            case Drop(innerSrc, lb, rb) =>
+              Drop(innerSrc,
+                Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
+                rb).some
+            case Take(innerSrc, lb, rb) =>
+              Take(innerSrc,
+                Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
+                rb).some
             case _ => None
           })
         case LeftShift(Embed(src), struct, shiftRepair) =>
@@ -138,18 +145,6 @@ object Coalesce {
                 freeTransCata(bucket >> mf)(MapFunc.normalize),
                 reducers.map(_.map(red => freeTransCata(red >> mf)(MapFunc.normalize))),
                 redRepair).some
-            case _ => None
-          }
-        // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce
-        //       repair function to after Take/Drop.
-        case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
-          from.resume.swap.toOption >>= FI.project >>= {
-            case Map(fromInner, mf) => Map(FToOut.reverseGet(QC.inj(Take(src, fromInner, count))).embed, mf).some
-            case _ => None
-          }
-        case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
-          from.resume.swap.toOption >>= FI.project >>= {
-            case Map(fromInner, mf) => Map(FToOut.reverseGet(QC.inj(Drop(src, fromInner, count))).embed, mf).some
             case _ => None
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {
