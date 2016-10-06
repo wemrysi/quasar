@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.contrib.pathy._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._

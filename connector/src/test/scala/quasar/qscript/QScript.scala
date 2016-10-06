@@ -17,12 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan => LP}
+import quasar.{Data, LogicalPlan => LP, Type}
 import quasar.ejson, ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
 import quasar.std.StdLib, StdLib._
+
+import scala.collection.immutable.{Map => ScalaMap}
 
 import matryoshka._
 import pathy.Path._
@@ -93,8 +95,66 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a basic select with type checking" in {
       val lp = fullCompileExp("select foo from bar")
       val qs = convert(listContents.some, lp)
-      qs must equal(chain(RootR).some) // TODO incorrect expectation
-    }.pendingUntilFixed
+      qs must equal(chain(
+        ReadR(rootDir </> file("bar")),
+        QC.inj(LeftShift((),
+          HoleF,
+          Free.roll(MakeMap(
+            StrLit("foo"),
+            Free.roll(Guard(
+              RightSideF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              ProjectFieldR(RightSideF, StrLit("foo")),
+              Free.roll(Undefined())))))))).some)
+    }
+
+    "convert a basic reduction" in {
+      val lp = fullCompileExp("select sum(pop) from bar")
+      val qs = convert(listContents.some, lp)
+      qs must equal(chain(
+        ReadR(rootDir </> file("bar")),
+        QC.inj(LeftShift((), HoleF, RightSideF)),
+        QC.inj(Reduce((),
+          NullLit(),
+          List(ReduceFuncs.Sum(
+            Free.roll(Guard(
+              HoleF, Type.Obj(ScalaMap(), Type.Top.some),
+              Free.roll(Guard(
+                ProjectFieldR(HoleF, StrLit("pop")),
+                Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
+                ProjectFieldR(HoleF, StrLit("pop")),
+                Free.roll(Undefined()))),
+              Free.roll(Undefined()))))),
+          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0)))))).some)
+    }
+
+    "convert a multi-field select" in {
+      val lp = fullCompileExp("select city, state from bar")
+      val qs = convert(listContents.some, lp)
+      qs must equal(chain(
+        ReadR(rootDir </> file("bar")),
+        QC.inj(LeftShift((),
+          HoleF,
+          Free.roll(ConcatMaps(
+            Free.roll(MakeMap(
+              StrLit("city"),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  RightSideF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  RightSideF,
+                  Free.roll(Undefined()))),
+                StrLit("city")))),
+            Free.roll(MakeMap(
+              StrLit("state"),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  RightSideF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  RightSideF,
+                  Free.roll(Undefined()))),
+                StrLit("state"))))))))).some)
+    }
 
     "convert a simple take" in pending {
       convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
@@ -319,7 +379,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(Reduce((),
           HoleF, // FIXME provenance needs to be here
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
-          Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
+          Free.roll(MakeMap[Fix, FreeMapA[Fix, ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed

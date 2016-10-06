@@ -19,11 +19,12 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.xquery.{xs => xxs}
 
 import scala.math.Integral
 
 import eu.timepit.refined.api.Refined
-import scalaz.{Functor, ISet}
+import scalaz.{Functor, ISet, Id}
 import scalaz.std.iterable._
 import scalaz.syntax.either._
 import scalaz.syntax.functor._
@@ -48,8 +49,11 @@ object syntax {
     BindingName(QName.local(NCName(bindingName)))
 
   final implicit class TypedBindingOps(val tb: TypedBinding) extends scala.AnyVal {
+    def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
+      result(tb.name.xqy) map (TypeswitchCaseClause(tb.left, _))
+
     def return_(result: XQuery => XQuery): TypeswitchCaseClause =
-      TypeswitchCaseClause(tb.left, result(tb.name.xqy))
+      return_[Id.Id](result)
   }
 
   final implicit class SequenceTypeOps(val tpe: SequenceType) {
@@ -69,6 +73,7 @@ object syntax {
   final implicit class QNameOps(val qn: QName) extends scala.AnyVal {
     def apply(args: XQuery*): XQuery = XQuery(s"${qn}${mkSeq(args)}")
     def :#(arity: Int): XQuery = XQuery(s"${qn}#$arity")
+    def xqy: XQuery = xxs.QName(xs)
     def xs: XQuery = qn.shows.xs
   }
 

@@ -49,6 +49,7 @@ package object main {
     quasar.physical.postgresql.fs.definition[PhysFsEff],
     quasar.physical.marklogic.fs.definition[PhysFsEff],
     quasar.physical.sparkcore.fs.local.definition[PhysFsEff],
+    quasar.physical.sparkcore.fs.hdfs.definition[PhysFsEff],
     quasar.physical.couchbase.fs.definition[PhysFsEff]
   ).fold
 

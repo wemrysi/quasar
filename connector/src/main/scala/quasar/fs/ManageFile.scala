@@ -21,6 +21,7 @@ import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.ski._
 
 import monocle.Prism
 import pathy.{Path => PPath}, PPath._

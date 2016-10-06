@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{RenderTree, Terminal}
 import quasar.contrib.pathy._
-import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 
 import scala.AnyVal

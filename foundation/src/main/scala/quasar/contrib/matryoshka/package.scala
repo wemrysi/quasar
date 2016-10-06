@@ -17,6 +17,7 @@
 package quasar.contrib
 
 import quasar.fp._
+import quasar.fp.ski._
 
 import _root_.matryoshka._, Recursive.ops._, TraverseT.ops._
 import _root_.matryoshka.patterns._

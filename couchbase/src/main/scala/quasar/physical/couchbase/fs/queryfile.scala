@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.{Read, MonotonicSeq}
 import quasar.fp._, free._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.physical.couchbase.common._
 import quasar.qscript._

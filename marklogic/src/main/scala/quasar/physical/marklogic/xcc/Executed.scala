@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef.Unit
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 
 import monocle.Iso
 import scalaz.{Show, Order}

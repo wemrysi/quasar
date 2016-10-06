@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -71,7 +72,7 @@ object MongoDbQScriptPlanner {
 
   def processMapFuncExpr[T[_[_]]: Recursive: ShowT, EX[_]: Traverse, A](
     funcHandler: FuncHandler[T, EX])(
-    fm: Free[MapFunc[T, ?],  A])(
+    fm: FreeMapA[T,  A])(
     recovery: A => OutputM[Fix[ExprOp]])(
     implicit inj: EX :<: ExprOp):
       OutputM[Fix[ExprOp]] =
@@ -81,7 +82,7 @@ object MongoDbQScriptPlanner {
         expression(funcHandler)))
 
   def processMapFunc[T[_[_]]: Recursive: ShowT, A](
-    fm: Free[MapFunc[T, ?],  A])(
+    fm: FreeMapA[T,  A])(
     recovery: A => JsCore):
       OutputM[JsCore] =
     freeCataM(fm)(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
@@ -877,7 +878,7 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def getJsRed[T[_[_]]: Recursive: ShowT](jr: Free[MapFunc[T, ?], ReduceIndex]):
+  def getJsRed[T[_[_]]: Recursive: ShowT](jr: FreeMapA[T, ReduceIndex]):
       OutputM[JsFn] =
     processMapFunc(jr)(ri => jscore.ident(ri.idx.toString)) ∘ (JsFn(JsFn.defaultName, _))
 
@@ -957,7 +958,6 @@ object MongoDbQScriptPlanner {
     funcHandler: FuncHandler[T, EX])(
     lp: T[LogicalPlan])(
     implicit ev0: WorkflowOpCoreF :<: WF,
-             ev1: Show[WorkflowBuilder[WF]],
              ev2: WorkflowBuilder.Ops[WF],
              ev3: EX :<: ExprOp,
              ev4: RenderTree[Fix[WF]]):
@@ -984,8 +984,7 @@ object MongoDbQScriptPlanner {
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
-        val result = PhaseResult.Tree(label, RenderTree[A].render(a))
-        (WriterT((Vector(result): PhaseResults, a).point[MongoDbIO])).liftM[PlanT].liftM[GenT]
+        (WriterT((Vector(PhaseResult.tree(label, a)), a).point[MongoDbIO])).liftM[PlanT].liftM[GenT]
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =

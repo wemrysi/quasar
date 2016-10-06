@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import numeric._
 import quasar.Optimizer
 import quasar.Planner.UnsupportedPlan
@@ -198,7 +199,7 @@ object InMemory {
 
     private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
       queryResponsesL.st map (qrs =>
-        Vector(PhaseResult.Detail("Lookup in Memory", executionPlan(lp, qrs).description)))
+        Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).description)))
 
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")

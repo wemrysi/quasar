@@ -23,7 +23,7 @@ import quasar.std.{DateLib, StringLib}
 import quasar.Data
 import quasar.qscript._
 import quasar.Planner._
-import quasar.SKI._
+import quasar.fp.ski._
 
 import scala.math
 
@@ -31,7 +31,7 @@ import org.threeten.bp.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
-object CoreMap {
+object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 
@@ -164,11 +164,7 @@ object CoreMap {
       case _ => undefined
     }).right
     case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj{
-        m1.foldLeft(m2){
-          case (acc, (k, v)) => if(acc.isDefinedAt(k)) acc else acc + (k -> v)
-        }
-      }
+      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 ++ m2)
       case _ => undefined
     }).right
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {

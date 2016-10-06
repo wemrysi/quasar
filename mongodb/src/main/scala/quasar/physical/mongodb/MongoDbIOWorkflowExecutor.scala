@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.{EnvironmentError, EnvErrT}
 import quasar.fs._
 import quasar.physical.mongodb.execution._

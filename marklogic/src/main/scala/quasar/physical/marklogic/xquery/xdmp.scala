@@ -56,4 +56,16 @@ object xdmp {
 
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
+
+  def quarterFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:quarter-from-date($date)")
+
+  def weekFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:week-from-date($date)")
+
+  def weekdayFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:weekday-from-date($date)")
+
+  def yeardayFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:yearday-from-date($date)")
 }

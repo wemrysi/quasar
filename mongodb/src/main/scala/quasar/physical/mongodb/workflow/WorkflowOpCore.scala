@@ -19,6 +19,7 @@ package quasar.physical.mongodb.workflow
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
@@ -918,7 +919,7 @@ object WorkflowOpCoreF {
       }
     }
 
-  implicit def renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
+  implicit val renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
     new RenderTree[WorkflowOpCoreF[Unit]] {
       val wfType = "Workflow" :: Nil
 

@@ -23,6 +23,7 @@ import quasar.api.matchers._
 import quasar.api.services.Fixture._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.sql.Sql
