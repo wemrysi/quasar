@@ -114,7 +114,7 @@ object Mounter {
       case Unmount(path) =>
         handleUnmount(path)
           .flatMapF(_ =>
-            refineType(path).swap.fold[F[Set[APath]]](κ(Set.empty.point[F]), store.descendants)
+            refineType(path).swap.foldMapM(store.descendants)
               .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
