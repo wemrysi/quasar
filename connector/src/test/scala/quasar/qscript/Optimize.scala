@@ -55,7 +55,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
-  implicit def qsiToQscriptTotal[T[_[_]]]: Injectable.Aux[QSI, QST] =
+  implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
     Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QST],
       Injectable.coproduct(Injectable.inject[ProjectBucket[Fix, ?], QST],
         Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QST],
