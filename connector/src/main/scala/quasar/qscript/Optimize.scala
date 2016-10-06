@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._

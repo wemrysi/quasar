@@ -16,7 +16,6 @@
 
 package quasar.server
 
-import quasar.Predef._
 import quasar.build.BuildInfo
 
 import argonaut._, Argonaut._

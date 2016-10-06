@@ -16,6 +16,7 @@
 
 package quasar.fs.mount
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}

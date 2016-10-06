@@ -16,6 +16,7 @@
 
 package quasar.api.services.query
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.api._, ToQResponse.ops._

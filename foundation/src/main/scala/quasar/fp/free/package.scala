@@ -16,8 +16,6 @@
 
 package quasar.fp
 
-import quasar.Predef._
-
 import scalaz._
 
 package object free {

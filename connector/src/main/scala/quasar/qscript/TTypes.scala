@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
@@ -198,7 +199,7 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
               repairNorm.getOrElse(repair)).some
         }
       }
-          
+
       case Sort(src, bucket, order) => {
         val orderOpt: List[Option[(FreeMap[T], SortDir)]] =
           order.map {

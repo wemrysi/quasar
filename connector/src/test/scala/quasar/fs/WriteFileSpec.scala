@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
@@ -100,7 +101,10 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       }
 
       s"$n with empty input should create an empty file" >> prop { f: AFile =>
-        val p = wt(f, Process.empty) ++ query.fileExistsM(f).liftM[Process]
+        // This doesn't work unless it's scala.Nothing. The type alias in Predef will fail.
+        //   https://issues.scala-lang.org/browse/SI-9951
+        val empty: Process0[Data] = Process.empty[scala.Nothing, Data]
+        val p = wt(f, empty) ++ query.fileExistsM(f).liftM[Process]
 
         MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(Vector(true))
       }
