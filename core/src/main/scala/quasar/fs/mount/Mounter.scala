@@ -39,8 +39,6 @@ object Mounter {
     /** Associate a value with a path that is not already present, or else do
       * nothing. Yields true if the write occurred. */
     def insert(path: APath, value: V): F[Boolean]
-    /** Put the store back into a usable state after a failed `insert`. */
-    def recover: F[Unit]
     /** Remove a path and its value, if present, or do nothing */
     def delete(path: APath): F[Unit]
   }
@@ -69,7 +67,7 @@ object Mounter {
         store.insert(req.path, req.toConfig)
           .liftM[MntErrT].ifM(
             merr.point(()),
-            (store.recover *> unmount(req)).liftM[MntErrT] <*
+            unmount(req).liftM[MntErrT] <*
               merr.raiseError(pathExists(req.path)))
 
       failIfExisting(req.path) *> mount(req) *> putOrUnmount
@@ -174,7 +172,6 @@ object Mounter {
           mountConfigs.compareAndPut(path, None, value)
         def delete(path: APath) =
           mountConfigs.delete(path)
-        val recover = ().point[Free[S, ?]]
       })
   }
 
