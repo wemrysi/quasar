@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.RenderTree.ops._
-import quasar.SKI.κ
 import quasar.Func.Input2
+import quasar.fp.ski.κ
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq

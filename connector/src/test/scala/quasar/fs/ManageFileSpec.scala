@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.fp._, eitherT._
+import quasar.fp.ski._
 
 import pathy.Path._
 import scalaz._, Scalaz._

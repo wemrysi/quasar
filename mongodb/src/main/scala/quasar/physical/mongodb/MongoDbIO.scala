@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.effect.Failure
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 
 import java.lang.{Boolean => JBoolean}
@@ -323,9 +324,9 @@ object MongoDbIO {
     def decodeField(s: String): BsonField = BsonField.Name(s)
 
     val decodeType: PartialFunction[java.lang.Object, IndexType] = {
-      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending
-      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending
-      case "hashed"                                => IndexType.Hashed
+      case x: java.lang.Number if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Number if x.intValue ≟ -1 => IndexType.Descending
+      case "hashed"                               => IndexType.Hashed
     }
 
     def decodeIndex(doc: Document): Option[Index] =

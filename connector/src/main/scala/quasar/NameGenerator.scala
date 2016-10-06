@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.effect.MonotonicSeq
 
 import simulacrum.typeclass

@@ -18,7 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Func, TypeArbitrary}
-import quasar.fp._
+import quasar.fp.ski._
 
 class SetSpec extends quasar.Qspec with TypeArbitrary {
   import SetLib._

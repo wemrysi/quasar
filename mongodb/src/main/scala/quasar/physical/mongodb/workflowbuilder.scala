@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._

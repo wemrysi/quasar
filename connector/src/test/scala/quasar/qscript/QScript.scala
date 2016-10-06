@@ -17,12 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan => LP}
+import quasar.{Data, LogicalPlan => LP, Type}
 import quasar.ejson, ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
 import quasar.std.StdLib, StdLib._
+
+import scala.collection.immutable.{Map => ScalaMap}
 
 import matryoshka._
 import pathy.Path._
@@ -93,8 +95,18 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a basic select with type checking" in {
       val lp = fullCompileExp("select foo from bar")
       val qs = convert(listContents.some, lp)
-      qs must equal(chain(RootR).some) // TODO incorrect expectation
-    }.pendingUntilFixed
+      qs must equal(chain(
+        ReadR(rootDir </> file("bar")),
+        QC.inj(LeftShift((),
+          HoleF,
+          Free.roll(MakeMap(
+            StrLit("foo"),
+            Free.roll(Guard(
+              RightSideF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              ProjectFieldR(RightSideF, StrLit("foo")),
+              Free.roll(Undefined())))))))).some)
+    }
 
     "convert a simple take" in pending {
       convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must

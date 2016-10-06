@@ -20,8 +20,10 @@ import quasar.Predef._
 import quasar._, quasar.Planner._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
-import quasar.fp._
+import quasar.fp.ski._
 import quasar.qscript._
+import quasar.contrib.pathy.AFile
+import quasar.qscript.ReduceFuncs._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -108,6 +110,41 @@ object Planner {
           rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
       }
 
+      private def reduceData: ReduceFunc[_] => (Data, Data) => Data = {
+        case Count(_) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
+          case _ => Data.NA
+        }
+        case Sum(_) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a + b)
+          case _ => Data.NA
+        }
+        case Min(_) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a.min(b))
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a.min(b))
+          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case _ => Data.NA
+        }
+        case Max(_) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Int(a), Data.Int(b)) => Data.Int(a.max(b))
+          case (Data.Number(a), Data.Number(b)) => Data.Dec(a.max(b))
+          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case _ => Data.NA
+        }
+        case Avg(_) => ??? // TODO implement avg
+        case Arbitrary(_) => (d1: Data, d2: Data) => d1
+        case UnshiftArray(a) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Arr(a), Data.Arr(b)) => Data.Arr(a ++ b)
+          case _ => Data.NA
+        }
+        case UnshiftMap(a1, a2) => (d1: Data, d2: Data) => (d1, d2) match {
+          case (Data.Obj(a), Data.Obj(b)) => Data.Obj(a ++ b)
+          case _ => Data.NA
+        }
+
+      }
+
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
@@ -119,7 +156,57 @@ object Planner {
             }
           )
         case Reduce(src, bucket, reducers, repair) =>
-          unimplemented("reduce")
+          val maybePartitioner: PlannerError \/ (Data => Data) =
+            freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+
+          val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
+            case Count(a) => a >>> {
+              case Data.NA => Data.Int(0)
+              case _ => Data.Int(1)
+            }
+            case Sum(a) => a
+            case Min(a) => a
+            case Max(a) => a
+            case Avg(a) => a
+            case Arbitrary(a) => a
+            case UnshiftArray(a) => a >>> ((d: Data) => Data.Arr(List(d)))
+            case UnshiftMap(a1, a2) => ((d: Data) => a1(d) match {
+              case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))
+              case _ => Data.NA
+            })
+          }
+
+          val maybeTransformers: PlannerError \/ List[Data => Data] =
+            reducers.traverse(red => (red.traverse(freeCataM(_: FreeMap[T])(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)))).map(extractFunc))
+
+          val reducersFuncs: List[(Data,Data) => Data] =
+            reducers.map(reduceData)
+
+          val maybeRepair: PlannerError \/ (Data => Data) =
+            freeCataM(repair)(interpretM({
+              case ReduceIndex(i) => ((x: Data) => x match {
+                case Data.Arr(elems) => elems(i)
+                case _ => Data.NA
+              }).right
+            }, CoreMap.change))
+
+          def merge(a: Data, b: Data, f: List[(Data, Data) => Data]): Data = (a, b) match {
+            case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(Zip[List].zipWith(f,(l1.zip(l2))) {
+              case (f, (l1, l2)) => f(l1,l2)
+            })
+            case _ => Data.NA
+          }
+
+          StateT((sc: SparkContext) =>
+            EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
+              case (partitioner, trans, repair) =>
+                src.map(d => (partitioner(d), Data.Arr(trans.map(_(d))) : Data))
+                  .reduceByKey(merge(_,_, reducersFuncs))
+                  .map {
+                  case (k, v) => repair(v)
+                }
+            }).map((sc, _)).point[Task])
+          )
         case Sort(src, bucket, order) =>
           unimplemented("sort")
         case Filter(src, f) =>

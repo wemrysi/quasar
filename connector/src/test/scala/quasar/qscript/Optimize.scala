@@ -27,7 +27,6 @@ import quasar.qscript.MapFuncs._
 import scala.Predef.implicitly
 
 import matryoshka._, FunctorT.ops._
-import matryoshka.patterns._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -55,8 +54,8 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   "optimizer" should {
     "elide a no-op map in a constant boolean" in {
       val query = LP.Constant(Data.Bool(true))
-      val run: QSI[Fix[EnvT[Ann[Fix], QSI, ?]]] => EnvT[Ann[Fix], QSI, Fix[EnvT[Ann[Fix], QSI, ?]]] = {
-        fa => QCI.prj(fa).fold(envTPrism(EmptyAnn[Fix]).reverseGet(fa))(opt.elideNopQC[QSI, EnvT[Ann[Fix], QSI, ?]](envTPrism(EmptyAnn[Fix]).reverseGet))
+      val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] = {
+        fa => QCI.prj(fa).fold(fa)(opt.elideNopQC(idPrism[QSI].reverseGet))
       }
 
       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
