@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.RenderTree.ops._
 
 import argonaut._, Argonaut._
 import scalaz.Show
@@ -30,9 +31,13 @@ object PhaseResult {
   final case class Tree(name: String, value: RenderedTree) extends PhaseResult
   final case class Detail(name: String, value: String)     extends PhaseResult
 
+  def tree[A: RenderTree](name: String, value: A): PhaseResult =
+    Tree(name, value.render)
+  def detail(name: String, value: String): PhaseResult = Detail(name, value)
+
   implicit def show: Show[PhaseResult] = Show.shows {
-    case Tree(name, value)   => name + "\n" + value.shows
-    case Detail(name, value) => name + "\n" + value
+    case Tree(name, value)   => name + ":\n" + value.shows
+    case Detail(name, value) => name + ":\n" + value
   }
 
   implicit def renderTree: RenderTree[PhaseResult] = new RenderTree[PhaseResult] {

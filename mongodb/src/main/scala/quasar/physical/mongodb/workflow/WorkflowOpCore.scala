@@ -919,7 +919,7 @@ object WorkflowOpCoreF {
       }
     }
 
-  implicit def renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
+  implicit val renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
     new RenderTree[WorkflowOpCoreF[Unit]] {
       val wfType = "Workflow" :: Nil
 

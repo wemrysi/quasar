@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
 
 import matryoshka._, TraverseT.ops._
@@ -128,12 +127,6 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
       // call, so an explicit reference to pathy's Show is needed.
       def render(v: pathy.Path[B,T,S]) = Terminal(List("Path"), pathy.Path.PathShow.shows(v).some)
     }
-
-  // NB: RenderTree should `extend Show[A]`, but Scalaz type classes don’t mesh
-  //     with Simulacrum ones.
-  implicit def RenderTreeToShow[N: RenderTree]: Show[N] = new Show[N] {
-    override def show(v: N) = v.render.show
-  }
 }
 
 sealed trait ListMapInstances {

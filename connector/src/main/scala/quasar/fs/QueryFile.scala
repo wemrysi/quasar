@@ -125,7 +125,7 @@ object QueryFile {
     EitherT(Writer(
       qs.fold(
         κ(Vector()),
-        a => Vector(PhaseResult.Tree("QScript", a.cata(transform.linearize).reverse.render))),
+        a => Vector(PhaseResult.tree("QScript", a.cata(transform.linearize).reverse))),
       qs))
   }
 
@@ -167,8 +167,9 @@ object QueryFile {
         simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>
-      val renderedTree = qs.cata(transform.linearize).reverse.render
-      mtell.writer(Vector(PhaseResult.Tree("QScript", renderedTree)), qs)
+      mtell.writer(
+        Vector(PhaseResult.tree("QScript", qs.cata(transform.linearize).reverse)),
+        qs)
     }
   }
 
