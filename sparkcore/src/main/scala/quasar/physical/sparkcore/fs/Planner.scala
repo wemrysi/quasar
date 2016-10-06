@@ -41,6 +41,7 @@ import simulacrum.typeclass
 object Planner {
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
+  type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
   def unimplemented(what: String): SparkState[RDD[Data]] =
     EitherT[Task, PlannerError, RDD[Data]](InternalError(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
@@ -269,12 +270,49 @@ object Planner {
           })
       }
     }
-  
+
   implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = _ => unimplemented("join")
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
+        case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
+          val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
+          val srcState = src.point[SparkState]
+
+          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = StateT((sc: SparkContext) =>
+              EitherT(freeCataM(kf)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).map(func => (sc, func))
+          )
+          
+
+          val merger: SparkState[Data => Data] = StateT((sc: SparkContext) =>
+            EitherT((freeCataM(combine)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
+              case LeftSide => ((x: Data) => x match {
+                case Data.Arr(elems) => elems(0)
+                case _ => Data.NA
+              }).right
+              case RightSide => ((x: Data) => x match {
+                case Data.Arr(elems) => elems(1)
+                case _ => Data.NA
+              }).right
+            }, CoreMap.change))).point[Task]).map(func => (sc, func)))
+
+          for {
+            lk <- genKey(lKey)
+            rk <- genKey(rKey)
+            lRdd <- freeCataM(lBranch)(interpretM(κ(srcState), algebraM))
+            rRdd <- freeCataM(rBranch)(interpretM(κ(srcState), algebraM))
+            merge <- merger
+          } yield {
+            val klRdd = lRdd.map(d => (lk(d), d))
+            val krRdd = rRdd.map(d => (rk(d), d))
+
+            klRdd.join(krRdd).map {
+              case (k, (l, r)) => merge(Data.Arr(List(l, r)))
+            }
+          }
+        case _ => ???
+      }
     }
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
