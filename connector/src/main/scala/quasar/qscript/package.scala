@@ -116,9 +116,6 @@ package object qscript {
   import MapFunc._
   import MapFuncs._
 
-  def EquiJF[T[_[_]]]: JoinFunc[T] =
-    Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
-
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
       Option[(FreeMap[T], NEL[FreeMap[T]])] =
     buckets match {

@@ -48,6 +48,52 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x                                 => FtoG(QC.inj(x))
   }
 
+  def unifySimpleBranches[F[_], A]
+    (src: A, l: FreeQS[T], r: FreeQS[T], combine: JoinFunc[T])
+    (implicit
+      QC: QScriptCore[T, ?] :<: F,
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      : Option[F[A]] =
+    (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+      case (-\/(m1), -\/(m2)) =>
+        (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
+          // both sides only map over the same data
+          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
+            QC.inj(Map(src, combine >>= {
+              case LeftSide  => mf1
+              case RightSide => mf2
+            })).some
+          // neither side references the src
+          case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2)))
+              if src1 ≟ UnrefedSrc && src2 ≟ UnrefedSrc =>
+            QC.inj(Map(src, combine >>= {
+              case LeftSide  => mf1
+              case RightSide => mf2
+            })).some
+          case (_, _) => None
+        }
+      // one side maps over the src while the other passes the src untouched
+      case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj) match {
+        case Some(Map(\/-(SrcHole), mf1)) =>
+          QC.inj(Map(src, combine >>= {
+            case LeftSide  => mf1
+            case RightSide => HoleF
+          })).some
+        case _ => None
+      }
+      case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj) match {
+        case Some(Map(\/-(SrcHole), mf2)) =>
+          QC.inj(Map(src, combine >>= {
+            case LeftSide  => HoleF
+            case RightSide => mf2
+          })).some
+        case _ => None
+      }
+      case (\/-(SrcHole), \/-(SrcHole)) =>
+        QC.inj(Map(src, combine.as(SrcHole))).some
+      case (_, _) => None
+    }
+
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]]
@@ -55,48 +101,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       TJ: ThetaJoin[T, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]]) =
-    λ[ThetaJoin[T, ?] ~> F] {
-      case ThetaJoin(src, l, r, on, Inner, combine)
-          if l ≟ Free.point(SrcHole) && r ≟ Free.point(SrcHole) && on ≟ EquiJF =>
-        QC.inj(Map(src, combine.map(_ => SrcHole: Hole)))
-      case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
-        (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
-          case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
-            // both sides only map over the same data
-            case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
-              QC.inj(Map(src, combine >>= {
-                case LeftSide  => mf1
-                case RightSide => mf2
-              }))
-            // neither side references the src
-            case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2)))
-                if src1 ≟ UnrefedSrc && src2 ≟ UnrefedSrc =>
-              QC.inj(Map(src, combine >>= {
-                case LeftSide  => mf1
-                case RightSide => mf2
-              }))
-            case (_, _) => TJ.inj(x)
-          }
-          // one side maps over the src while the other passes the src untouched
-          case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj) match {
-            case Some(Map(\/-(SrcHole), mf1)) =>
-              QC.inj(Map(src, combine >>= {
-                case LeftSide  => mf1
-                case RightSide => HoleF
-              }))
-            case _ => TJ.inj(x)
-          }
-          case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj) match {
-            case Some(Map(\/-(SrcHole), mf2)) =>
-              QC.inj(Map(src, combine >>= {
-                case LeftSide  => HoleF
-                case RightSide => mf2
-              }))
-            case _ => TJ.inj(x)
-          }
-          case (_, _) => TJ.inj(x)
-        }
-      case x => TJ.inj(x)
+    new (ThetaJoin[T, ?] ~> F) {
+      def apply[A](fa: ThetaJoin[T, A]) = fa match {
+        case ThetaJoin(src, l, r, on, _, combine) =>
+          unifySimpleBranches[F, A](src, l, r, combine).getOrElse(TJ.inj(fa))
+        case _ => TJ.inj(fa)
+      }
     }
 
   def rebaseT[F[_]: Traverse](
@@ -126,13 +136,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * need to integrate one branch of the join into the source of the resulting
     * map.
     */
+  // FIXME: This really needs to ensure that the condition is that of an
+  //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideOneSidedJoin[F[_], G[_]](
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       ThetaJoin[T, T[G]] => F[T[G]] = {
-    case tj @ ThetaJoin(src, left, right, on, Inner, combine) if on ≟ BoolLit(true) =>
+    case tj @ ThetaJoin(src, left, right, on, Inner, combine)
+        =>
       (left.resume.leftMap(_.map(_.resume)), right.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
           case (Some(Map(-\/(src1), mf1)), _) if src1 ≟ UnrefedSrc =>
