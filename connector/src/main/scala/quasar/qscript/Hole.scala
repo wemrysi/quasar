@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp.ski._
 
 import monocle.Iso
 import scalaz._

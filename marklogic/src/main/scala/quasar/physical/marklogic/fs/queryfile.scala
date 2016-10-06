@@ -19,7 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.SKI.κ
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -27,6 +26,7 @@ import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._

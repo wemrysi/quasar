@@ -177,23 +177,28 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => QC.inj(x)
   }
 
+  /** Pull more work to _after_ count operations, limiting the dataset. */
+  // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce
+  //       repair function to after Take/Drop.
   def swapMapCount[F[_], G[_]: Functor]
-    (GtoF: G ~> (Option ∘ F)#λ)
+    (FtoG: F ~> G)
     (implicit QC: QScriptCore[T, ?] :<: F)
       : QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
-    case Map(Embed(src), mf) =>
-      GtoF(src) >>= QC.prj >>= {
-        case Drop(innerSrc, lb, rb) =>
-          Drop(innerSrc,
-            Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
-            rb).some
-        case Take(innerSrc, lb, rb) =>
-          Take(innerSrc,
-            Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
-            rb).some
-        case _ => None
-      }
-    case _ => None
+    val FI = scala.Predef.implicitly[Injectable.Aux[QScriptCore[T, ?], QScriptTotal[T, ?]]]
+
+    {
+      case Take(src, from, count) =>
+        from.resume.swap.toOption >>= FI.project >>= {
+          case Map(fromInner, mf) => Map(FtoG(QC.inj(Take(src, fromInner, count))).embed, mf).some
+          case _ => None
+        }
+      case Drop(src, from, count) =>
+        from.resume.swap.toOption >>= FI.project >>= {
+          case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
+          case _ => None
+        }
+      case _ => None
+    }
   }
 
   def compactQC: QScriptCore[T, ?] ~> (Option ∘ QScriptCore[T, ?])#λ =
@@ -265,7 +270,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(elideOneSidedJoin[F, G](rebase)) ⋙
       repeatedly(C.coalesce[G](prism)) ⋙
       liftFG(coalesceMapJoin[F, G](prism.get)) ⋙
-      liftFF(orOriginal(swapMapCount[F, G](prism.get))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T, T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
@@ -284,6 +288,15 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[F]] => F[T[F]] =
     applyNormalizations[F, F](idPrism, rebaseT)
+
+  /** Should only be applied after all other QScript transformations. This gives
+    * the final, optimized QScript for conversion.
+    */
+  def optimize[F[_], G[_]: Functor]
+    (FtoG: F ~> G)
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : F[T[G]] => F[T[G]] =
+    liftFF[QScriptCore[T, ?], F, T[G]](repeatedly(swapMapCount(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle

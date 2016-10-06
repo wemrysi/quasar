@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.fp.ski._
 
 import matryoshka._
 import scalaz._, Scalaz._

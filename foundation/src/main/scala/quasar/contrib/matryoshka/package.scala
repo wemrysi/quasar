@@ -17,6 +17,7 @@
 package quasar.contrib
 
 import quasar.fp._
+import quasar.fp.ski._
 
 import _root_.matryoshka._, Recursive.ops._, TraverseT.ops._
 import _root_.matryoshka.patterns._
@@ -150,6 +151,13 @@ package object matryoshka extends CoEnvInstances {
           envt => Cord("EnvT(") ++ envt.ask.show ++ Cord(", ") ++ F(sh).show(envt.lower) ++ Cord(")")
         }
     }
+
+  implicit def envtTraverse[F[_]: Traverse, X]: Traverse[EnvT[X, F, ?]] = new Traverse[EnvT[X, F, ?]] {
+    def traverseImpl[G[_]: Applicative, A, B](envT: EnvT[X, F, A])(f: A => G[B]): G[EnvT[X, F, B]] =
+      envT.run match {
+        case (x, fa) => fa.traverse(f).map(fb => EnvT((x, fb)))
+      }
+  }
 
   def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 }

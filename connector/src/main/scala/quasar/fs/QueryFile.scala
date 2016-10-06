@@ -22,13 +22,13 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.eitherT._
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
-import matryoshka.patterns._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.iteratee._
 import scalaz.stream.Process
 
@@ -62,10 +62,9 @@ object QueryFile {
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata(orOriginal(Optimizer.elideLets[T]))
-      .transCataM(transform.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[T], QC.inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[T], QS, T[QS]]).lower) ⋙ eval))
+    lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
+      .cataM[PlannerError \/ ?, (Ann[T], T[QS])](newLP => transform.lpToQScript(newLP.map(_ ∘ (_.transCata(eval)))))
+      .map(qs => QC.inj(quasar.qscript.Map(qs._2, qs._1.values)).embed.transCata(eval))
   }
 
   def simplifyAndNormalize

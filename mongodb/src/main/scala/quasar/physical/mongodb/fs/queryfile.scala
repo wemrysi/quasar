@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._

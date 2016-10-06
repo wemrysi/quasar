@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
 
 import java.net.URI

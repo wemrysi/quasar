@@ -19,7 +19,8 @@ package quasar.physical.postgresql.fs
 import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
-import quasar.fp.{κ2, free}, free._
+import quasar.fp.free, free._
+import quasar.fp.ski.κ2
 import quasar.fs._
 import quasar.physical.postgresql.common._
 
