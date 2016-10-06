@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -957,7 +958,6 @@ object MongoDbQScriptPlanner {
     funcHandler: FuncHandler[T, EX])(
     lp: T[LogicalPlan])(
     implicit ev0: WorkflowOpCoreF :<: WF,
-             ev1: Show[WorkflowBuilder[WF]],
              ev2: WorkflowBuilder.Ops[WF],
              ev3: EX :<: ExprOp,
              ev4: RenderTree[Fix[WF]]):
@@ -984,8 +984,7 @@ object MongoDbQScriptPlanner {
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
-        val result = PhaseResult.Tree(label, RenderTree[A].render(a))
-        (WriterT((Vector(result): PhaseResults, a).point[MongoDbIO])).liftM[PlanT].liftM[GenT]
+        (WriterT((Vector(PhaseResult.tree(label, a)), a).point[MongoDbIO])).liftM[PlanT].liftM[GenT]
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =

@@ -17,7 +17,7 @@
 package quasar.config
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp.ski._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -3531,7 +3532,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             val refs = Refs[WorkflowF].refs(op.wf)
             val missing = refs.collect { case v @ DocVar(_, Some(f)) if !shape.contains(f.flatten.head) => v }
             if (missing.isEmpty) Nil
-            else List(missing.map(_.bson).mkString(", ") + " missing in\n" + Fix[WorkflowF](op.wf).show)
+            else List(missing.map(_.bson).mkString(", ") + " missing in\n" + Fix[WorkflowF](op.wf).render.shows)
           }.getOrElse(Nil)
         case _ => Nil
       }) aka "dangling references"

@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef.{None, Option, PartialFunction, String, Unit}
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.EnvironmentError
 import quasar.fs.{FileSystem, FileSystemType}
 

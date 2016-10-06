@@ -16,8 +16,9 @@
 
 package quasar.physical.marklogic
 
+import quasar.fp.ski.κ
 import quasar.NameGenerator
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.contrib.matryoshka.{freeCataM, interpretM, ShowT}
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
 import quasar.qscript._

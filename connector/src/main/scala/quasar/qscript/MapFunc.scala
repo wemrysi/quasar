@@ -21,6 +21,7 @@ import quasar._
 import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
@@ -574,9 +575,9 @@ object MapFuncs {
   @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** @see https://www.postgresql.org/docs/9.2/static/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT */
   @Lenses final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time.
-    */
+  /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
 
 

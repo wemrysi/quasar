@@ -19,6 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.effect._
 import quasar.fp._, free._
+import quasar.fp.ski._
 
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._

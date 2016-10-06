@@ -178,7 +178,8 @@ object RenderTree extends RenderTreeInstances {
     }
 
   /** For use with `<|`, mostly. */
-  def print[A: RenderTree](label: String, a: A): Unit = println(label + ":\n" + a.show)
+  def print[A: RenderTree](label: String, a: A): Unit =
+    println(label + ":\n" + a.render.shows)
 
   // FIXME: needs puffnfresh/wartremover#226 fixed
   @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))

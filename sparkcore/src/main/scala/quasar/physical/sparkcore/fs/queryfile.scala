@@ -19,7 +19,6 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, PlannerErrT}
 import quasar.Planner._
-import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
@@ -71,7 +70,7 @@ object queryfile {
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       for {
         qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp).map(shiftRead[Fix])
-        _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
+        _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", qs)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }
 
@@ -118,7 +117,7 @@ object queryfile {
       injectFT.apply {
         sparkStuff >>= (mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
       }
     }.join
   }
@@ -147,7 +146,7 @@ object queryfile {
       .map(_.leftMap(planningFailed(lp, _)))
       .map {
       disj => EitherT(disj.traverse {
-        case (rh, rdd) => Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), rh)
+        case (rh, rdd) => Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), rh)
       })
     }
   }

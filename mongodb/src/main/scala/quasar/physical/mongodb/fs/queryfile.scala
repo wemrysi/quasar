@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
@@ -281,7 +282,7 @@ private final class QueryFileInterpreter[C](
 
   private def logProgram(prog: JavaScriptPrg): MongoLogWF[Unit] =
     MonadTell[MongoLogWF, PhaseResults].tell(Vector(
-      PhaseResult.Detail("MongoDB", Js.Stmts(prog.toList).pprint(0))))
+      PhaseResult.detail("MongoDB", Js.Stmts(prog.toList).pprint(0))))
 
   private def collections(lp: Fix[LogicalPlan]): PathError \/ Set[Collection] =
     // NB: documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`

@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
 
 import matryoshka._, TraverseT.ops._
@@ -128,12 +127,6 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
       // call, so an explicit reference to pathy's Show is needed.
       def render(v: pathy.Path[B,T,S]) = Terminal(List("Path"), pathy.Path.PathShow.shows(v).some)
     }
-
-  // NB: RenderTree should `extend Show[A]`, but Scalaz type classes don’t mesh
-  //     with Simulacrum ones.
-  implicit def RenderTreeToShow[N: RenderTree]: Show[N] = new Show[N] {
-    override def show(v: N) = v.render.show
-  }
 }
 
 sealed trait ListMapInstances {
@@ -207,7 +200,7 @@ trait WriterTInstances {
 
 trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
-    import SKI._
+    import fp.ski._
 
     /** A new task which runs a cleanup task only in the case of failure, and
       * ignores any result from the cleanup task.
@@ -243,7 +236,7 @@ trait PartialFunctionOps {
 
 trait JsonOps {
   import argonaut._
-  import SKI._
+  import fp.ski._
 
   def optional[A: DecodeJson](cur: ACursor): DecodeResult[Option[A]] =
     cur.either.fold(
@@ -313,28 +306,6 @@ trait DebugOps {
   }
 }
 
-trait SKI {
-  // NB: Unicode has double-struck and bold versions of the letters, which might
-  //     be more appropriate, but the code points are larger than 2 bytes, so
-  //     Scala doesn't handle them.
-
-
-  /** Probably not useful; implemented here mostly because it's amusing. */
-  def σ[A, B, C](x: A => B => C, y: A => B, z: A): C = x(z)(y(z))
-
-  /** A shorter name for the constant function of 1, 2, 3, or 6 args.
-    * NB: the argument is eager here, so use `_ => ...` instead if you need it
-    *     to be thunked.
-    */
-  def κ[A, B](x: B): A => B                                  = _ => x
-  def κ2[A, B, C](x: C): (A, B) => C                         = (_, _) => x
-  def κ3[A, B, C, D](x: D): (A, B, C) => D                   = (_, _, _) => x
-  def κ6[A, B, C, D, E, F, G](x: G): (A, B, C, D, E, F) => G = (_, _, _, _, _, _) => x
-
-  /** A shorter name for the identity function. */
-  def ι[A]: A => A = x => x
-}
-object SKI extends SKI
 
 package object fp
     extends TreeInstances
@@ -348,8 +319,10 @@ package object fp
     with ProcessOps
     with QFoldableOps
     with DebugOps
-    with SKI
     with CatchableInstances {
+
+
+  import ski._
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
 
@@ -480,18 +453,11 @@ package object fp
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),
-    reflNT[F]
-  )
+    reflNT[F])
 
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
-    λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
-  )
-
-  def envTPrism[T[_[_]], F[_], A](empty: A) = PrismNT[EnvT[A, F, ?], F](
-    λ[EnvT[A, F, ?] ~> λ[α => Option[F[α]]]](_.run._2.some),
-    λ[F ~> EnvT[A, F, ?]](fb => EnvT((empty, fb)))
-  )
+    λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A])))
 }
 
 package fp {

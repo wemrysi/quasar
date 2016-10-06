@@ -19,8 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.RenderTree.ops._
-import quasar.SKI.κ
+import quasar.Func.Input2
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -28,12 +27,14 @@ import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
+import quasar.std.DateLib.Extract
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, concurrent._
@@ -68,7 +69,11 @@ object queryfile {
       val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", main.render))
+        Vector(PhaseResult.detail("XQuery", main.render))
+
+      def extractErr(partName: String, msg: String): FileSystemError =
+        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
+          LogicalPlan.InvokeF(Extract, Input2(partName, "<date/time>")), Some(msg)))
 
       val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -84,17 +89,22 @@ object queryfile {
       val planning = for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
         shifted =  shiftRead[Fix](qs)
-        shftdRT =  shifted.cata(linearize).reverse.render
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
-                     PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
+                     PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse)))
         mod     <- plan(shifted).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
                          // TODO: Change to include the QScript context when supported
                          LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
 
+                     case UnrecognizedDatePart(n) =>
+                       extractErr(n, mlerr.shows)
+
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
+
+                     case UnsupportedDatePart(n) =>
+                       extractErr(n, mlerr.shows)
                    })
         a       <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a

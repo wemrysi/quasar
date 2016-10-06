@@ -17,13 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
 // NB: Should we use char lits instead?
-class Provenance[T[_[_]]: Corecursive] {
+class Provenance[T[_[_]]: Corecursive: EqualT] {
   private def tagIdentity[A](tag: String, mf: Free[MapFunc[T, ?], A]):
       Free[MapFunc[T, ?], A] =
     Free.roll(MakeMap[T, Free[MapFunc[T, ?], A]](StrLit(tag), mf))
@@ -62,7 +63,7 @@ class Provenance[T[_[_]]: Corecursive] {
   def joinProvenances(leftBuckets: List[FreeMap[T]], rightBuckets: List[FreeMap[T]]):
       List[FreeMap[T]] =
     leftBuckets.alignWith(rightBuckets) {
-      case \&/.Both(l, r) => join(l, r)
+      case \&/.Both(l, r) => if (l ≟ r) l else join(l, r)
       case \&/.This(l)    => join(l, NullLit())
       case \&/.That(r)    => join(NullLit(), r)
     }

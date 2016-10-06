@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.workflow
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp.ski._
 
 import simulacrum.typeclass
 import scalaz._

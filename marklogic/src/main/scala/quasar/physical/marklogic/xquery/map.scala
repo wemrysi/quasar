@@ -39,7 +39,7 @@ object map {
   def map(): XQuery = map(IList[XQuery]())
 
   def new_[F[_]: Foldable](entries: F[XQuery]): XQuery =
-    XQuery(s"map:new${mkSeq(entries)}")
+    XQuery(s"map:new(${mkSeq(entries)})")
 
   def put(map: XQuery, key: XQuery, value: XQuery): XQuery =
     XQuery(s"map:put($map, $key, $value)")

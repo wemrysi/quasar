@@ -1,0 +1,2 @@
+- fix REPL debug output
+- remove RenderTree-generated Show instances

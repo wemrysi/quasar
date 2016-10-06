@@ -18,7 +18,7 @@ package quasar.physical.mongodb.accumulator
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal}
-import quasar.fp._
+import quasar.fp.ski._
 import quasar.physical.mongodb.expression.ExprOpOps
 
 import matryoshka._
