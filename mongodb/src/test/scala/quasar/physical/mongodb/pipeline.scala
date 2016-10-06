@@ -23,16 +23,13 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
 
-import matryoshka.Fix
 import org.scalacheck._
 import scalaz._
 
 class PipelineSpec extends quasar.Qspec with ArbBsonField {
   import CollectionUtil._
   import ArbitraryExprOp._
-
-  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
 
   implicit def arbitraryOp: Arbitrary[PipelineOp] = Arbitrary { Gen.resize(5, Gen.sized { size =>
     // Note: Gen.oneOf is overridden and this variant requires two explicit args

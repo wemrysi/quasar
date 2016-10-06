@@ -2,7 +2,8 @@
   "name": "filter on time_of_day",
 
   "backends": {
-    "postgresql":        "pending"
+    "postgresql":        "pending",
+    "couchbase":         "pending"
   },
 
   "data": "../days.data",

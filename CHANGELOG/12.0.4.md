@@ -1,0 +1,1 @@
+- Normalize returns Option.

@@ -18,7 +18,8 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.fp._, eitherT._
+import quasar.contrib.matryoshka._
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
@@ -43,8 +44,7 @@ object MongoDbQScriptPlanner {
 
   type OutputM[A] = PlannerError \/ A
 
-  val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -733,7 +733,10 @@ object MongoDbQScriptPlanner {
               WB.filter(src, List(cond), {
                 case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
               })).liftM[GenT]
-          case Union(src, lBranch, rBranch) => unimplemented
+          case Union(src, lBranch, rBranch) =>
+            (rebaseWB(joinHandler, funcHandler, lBranch, src) ⊛
+              rebaseWB(joinHandler, funcHandler, rBranch, src))(
+              WB.unionAll).join
           case Take(src, from, count) =>
             (rebaseWB(joinHandler, funcHandler, from, src) ⊛
               (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
@@ -745,6 +748,10 @@ object MongoDbQScriptPlanner {
           case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
+
+    def coEnvHmap[F[_], G[_], A](f: F ~> G) =
+      λ[CoEnv[A, F, ?] ~> CoEnv[A, G, ?]](fa => CoEnv(fa.run.map(f(_))))
+
 
     implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
@@ -971,6 +978,11 @@ object MongoDbQScriptPlanner {
     type MongoQScript[A] =
       (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
 
+    // This import is here to work around separate a compilation bug.
+    // Before moving it, ensure this file can be compiled without compiling
+    // other source files at the same time.
+    import eitherT._
+
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
         val result = PhaseResult.Tree(label, RenderTree[A].render(a))
@@ -996,9 +1008,8 @@ object MongoDbQScriptPlanner {
         qs.transCataM[PlannerError \/ ?, MongoQScriptInterim](tf =>
           (liftFGM(assumeReadType[T, MongoQScriptInterim](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
             SimplifyJoin[T, QScriptRead[T, ?], MongoQScriptInterim].simplifyJoin(idPrism.reverseGet)
-          ).apply(tf) ∘
-            Normalizable[MongoQScriptInterim].normalize).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
-            Normalizable[MongoQScript].normalize)))
+          ).apply(tf)).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
+            repeatedly(Normalizable[MongoQScript].normalize(_: MongoQScript[T[MongoQScript]])))))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])

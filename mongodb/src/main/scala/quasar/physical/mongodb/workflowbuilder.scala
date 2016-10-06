@@ -53,8 +53,7 @@ object WorkflowBuilder {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   /**
    * Like ValueBuilder, this is a Leaf node which can be used to construct a more complicated WorkflowBuilder.
@@ -732,7 +731,7 @@ object WorkflowBuilder {
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[(Fix[F], Base)] =
+      : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
@@ -1732,6 +1731,36 @@ object WorkflowBuilder {
 
       impl(left, right, unflipped)
     }
+
+    def unionAll
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: Show[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            l,
+            chain(r,
+              $map($MapF.mapFresh, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
+
+    def union
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: Show[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            chain(l, $map($MapF.mapValKey, ListMap())),
+            chain(r,
+              $map($MapF.mapValKey, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
   }
   object Ops {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =

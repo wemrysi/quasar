@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._

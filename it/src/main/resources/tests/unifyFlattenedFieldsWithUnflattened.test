@@ -1,6 +1,10 @@
 {
     "name": "unify flattened fields with unflattened field",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
     "data": "zips.data",
     "query": "select _id as zip, loc[*] from zips order by loc[*] limit 10",
     "predicate": "containsExactly",

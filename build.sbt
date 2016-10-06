@@ -75,6 +75,7 @@ lazy val buildSettings = Seq(
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,                   // - see puffnfresh/wartremover#263
+    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
     Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see puffnfresh/wartremover#263
@@ -203,7 +204,9 @@ lazy val root = project.in(file("."))
 //     \     |             \    |     /
         connector,  //      interface,
 //      / / | \ \
-  core, marklogic, mongodb, postgresql, skeleton, sparkcore,
+                    marklogicValidation,
+//    /  /  |  \  \    /
+  core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
 //        /  \
@@ -314,6 +317,13 @@ lazy val connector = project
       Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val couchbase = project
+  .settings(name := "quasar-couchbase-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.couchbase)
+  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
@@ -379,6 +389,7 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    couchbase,
     marklogic,
     mongodb,
     postgresql,

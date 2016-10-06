@@ -18,6 +18,7 @@ package quasar.main
 
 import quasar.Predef._
 import quasar.{Data, queryPlan, Variables}
+import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
@@ -76,4 +77,15 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
       .flatMap(lp => execToCompExec(lp.fold(
         d => fsErrToExec(W.saveThese(out, d.toVector).flatMap(fse => EitherT.fromDisjunction(fse.headOption <\/ out))),
         Q.execute(_, out))))
+
+  /** Returns the physical execution plan for the given SQL^2 query. */
+  def explainQuery(
+    query: Fix[Sql],
+    vars: Variables,
+    basePath: ADir
+  ): CompExecM[ExecutionPlan] =
+    compToCompExec(queryPlan(query, vars, basePath, 0L, None))
+      .flatMap(lp => execToCompExec(lp.fold(
+        κ(ExecutionPlan(FileSystemType("none"), "Constant").point[ExecM]),
+        Q.explain(_))))
 }

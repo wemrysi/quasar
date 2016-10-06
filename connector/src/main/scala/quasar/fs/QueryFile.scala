@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar._, Planner._, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
@@ -46,7 +47,7 @@ object QueryFile {
   def convertAndNormalize
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
-    (eval: QS[T[QS]] => QS[T[QS]])
+    (eval: QS[T[EnvT[Ann[T], QS, ?]]] => EnvT[Ann[T], QS, T[EnvT[Ann[T], QS, ?]]])
     (implicit
       CQ: Coalesce.Aux[T, QS, QS],
       DE:    Const[DeadEnd, ?] :<: QS,
@@ -62,10 +63,11 @@ object QueryFile {
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata(orOriginal(Optimizer.elideLets[T]))
-      .transCataM(transform.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[T], QC.inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[T], QS, T[QS]]).lower) ⋙ eval))
+    lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
+      .transCataM[λ[α => PlannerError \/ α], EnvT[Ann[T], QS, ?]](newLP => transform.lpToQScript(newLP.map(_.transCata[EnvT[Ann[T], QS, ?]](env => EnvT((env.ask, eval(env.lower).lower)))))).map(qs =>
+        EnvT((EmptyAnn[T], QC.inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+          .transCata[EnvT[Ann[T], QS, ?]](env => EnvT((env.ask, eval(env.lower).lower)))
+          .transCata[QS]((_: EnvT[Ann[T], QS, T[QS]]).lower))
   }
 
   def simplifyAndNormalize
@@ -120,7 +122,7 @@ object QueryFile {
     val optimize = new Optimize[T]
 
     val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyToEnvT).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
@@ -161,7 +163,7 @@ object QueryFile {
     val qs =
       merr.map(
         merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).fold(
+          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyToEnvT).fold(
             perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
             merr.point(_)))(
           optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(

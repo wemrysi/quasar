@@ -17,8 +17,8 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.fp.ShowT
 import quasar.NameGenerator
+import quasar.contrib.matryoshka.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -30,6 +30,7 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
   extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
   import expr.{for_, let_}
 
+  // FIXME: Handle `JoinType`
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {

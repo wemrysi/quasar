@@ -30,7 +30,9 @@ class MongoDbIOSpec extends QuasarSpecification {
 
     backend.name should {
       "get mongo version" in {
-        serverVersion.run(testClient).unsafePerformSync.length must beGreaterThanOrEqualTo(2)
+        implicit val ord: scala.math.Ordering[ServerVersion] = Order[ServerVersion].toScalaOrdering
+
+        serverVersion.run(testClient).unsafePerformSync must beGreaterThan(ServerVersion(2, 6, None, ""))
       }
 
       "get stats" in {

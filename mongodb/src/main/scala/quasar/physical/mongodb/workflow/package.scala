@@ -83,8 +83,7 @@ package object workflow {
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type here, so they're immediately injected into ExprOp.
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna(normalize)

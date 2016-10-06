@@ -21,6 +21,7 @@ import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.RenderTree.ops._
 import quasar.fp.ski.κ
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
@@ -34,7 +35,7 @@ import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -57,11 +58,7 @@ object queryfile {
       f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type MLQScript[A]      = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
-      implicit val mlQScripToQScriptTotal: Injectable.Aux[MLQScript, QScriptTotal[Fix, ?]] =
-        Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-          Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-            Injectable.inject[Const[ShiftedRead, ?], QScriptTotal[Fix, ?]]))
+      type MLQScript[A]      = QScriptShiftRead[Fix, A]
       type MLPlan[A]         = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
       type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
       type QSR[A]            = QScriptRead[Fix, A]
@@ -86,8 +83,7 @@ object queryfile {
 
       val planning = for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
-        shifted =  transFutu(qs)(ShiftRead[Fix, QSR, MLQScript].shiftRead(idPrism.reverseGet)(_: QSR[Fix[QSR]]))
-                     .transCata(optimize.applyAll)
+        shifted =  shiftRead[Fix](qs)
         shftdRT =  shifted.cata(linearize).reverse.render
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
                      PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))

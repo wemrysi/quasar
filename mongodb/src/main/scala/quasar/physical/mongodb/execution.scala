@@ -23,7 +23,6 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
 
-import matryoshka.Fix
 import scalaz._, Scalaz._
 
 private[mongodb] object execution {
@@ -46,8 +45,7 @@ private[mongodb] object execution {
 
   // NB: need to construct core exprs in the type used for pipeline ops.
   // FIXME: For now, that's just the core type itself.
-  private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
 
   /** Extractor to determine whether a `$GroupF` represents a simple `count()`. */
   object Countable {

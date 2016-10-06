@@ -18,8 +18,8 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.contrib.matryoshka.ShowT
 import quasar.ejson.EJson
-import quasar.fp.ShowT
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.{ErrorMessages, MonadError_}
 import quasar.physical.marklogic.ejson.EncodeXQuery
@@ -57,7 +57,6 @@ object MapFuncPlanner {
     case Power(b, e) => math.pow(b, e).point[F]
 
     // relations
-    // TODO: When to use value vs. general comparisons?
     case Not(x) => fn.not(x).point[F]
     case Eq(x, y) => (x eq y).point[F]
     case Neq(x, y) => (x ne y).point[F]
@@ -84,7 +83,7 @@ object MapFuncPlanner {
       def withLitKey(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
           val qn = QName.local(NCName(ncname))
-          ejson.singletonObject[F] apply (qn.xs, v)
+          ejson.singletonObject[F] apply (xs.QName(qn.xs), v)
         } getOrElse invalidQName(s)
 
       k match {
@@ -104,19 +103,21 @@ object MapFuncPlanner {
     case ConcatMaps(x, y) =>
       ejson.objectConcat[F] apply (x, y)
 
+    // TODO: We may need to cast atomic `Data` values here as their type
+    //       information is lost at this point.
     case ProjectField(src, field) =>
       def projectLit(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
           freshVar[F] map { m =>
             let_(m -> src) return_ {
-              m.xqy `/` child(QName.local(NCName(ncname)))
+              m.xqy `/` child(QName.local(NCName(ncname))) `/` child.node()
             }
           }
         } getOrElse invalidQName(s)
 
       field match {
         case XQuery.Step(_) =>
-          (src `/` field).point[F]
+          (src `/` field `/` child.node()).point[F]
 
         // Makes numeric strings valid QNames by prepending an underscore
         case XQuery.StringLit(IntegralNumber(s)) =>
@@ -128,18 +129,13 @@ object MapFuncPlanner {
         case _ =>
           (freshVar[F] |@| freshVar[F]) { (m, k) =>
             let_(m -> src, k -> field) return_ {
-              m.xqy `/` k.xqy
+              m.xqy `/` k.xqy `/` child.node()
             }
           }
       }
 
-    // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
-      (freshVar[F] |@| ejson.arrayEltN.qn[F]) { (i, arrElt) =>
-        let_(i -> idx) return_ {
-          arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
-        }
-      }
+      ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
     // other
     case Range(x, y)   => (x to y).point[F]

@@ -1,7 +1,11 @@
 {
     "name": "splice a wildcard with multiple constants",
 
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+      "postgresql": "pending",
+      "marklogic":  "pending",
+      "couchbase":  "pending"
+    },
 
     "data": "largeZips.data",
 

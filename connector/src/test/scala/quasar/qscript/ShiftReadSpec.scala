@@ -16,14 +16,20 @@
 
 package quasar.qscript
 
+import quasar.Predef._
+import quasar.{Data, LogicalPlan => LP}
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
+import quasar.std.StdLib._
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
+  val optimize = new Optimize[Fix]
+
   "shiftRead" should {
     "eliminate Read nodes from a simple query" in {
       val sampleFile = rootDir </> file("bar")
@@ -38,9 +44,25 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
 
       // TODO: Optimize away the `IncludeId`.
       newQScript.transCata(optimize.applyAll) must_=
-      Fix(QS.inject(QC.inj(Map(
-        Fix(SR.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
-        Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+      Fix(QCT.inj(Map(
+        Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
+        Free.roll(ProjectIndex(HoleF, IntLit(1))))))
     }
+  }
+
+  "shift a simple aggregated read" in {
+    convert(listContents.some,
+      structural.MakeObject(
+        LP.Constant(Data.Str("0")),
+        agg.Count(lpRead("/foo/bar")).embed).embed).map(
+      transFutu(_)(ShiftRead[Fix, QS, QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)(_))
+        .transCata(optimize.applyAll[QScriptTotal[Fix, ?]])) must
+    equal(chain(
+      SRT.inj(Const[ShiftedRead, Fix[QScriptTotal[Fix, ?]]](
+        ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
+      QCT.inj(Reduce((),
+        NullLit(),
+        List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
+        Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
   }
 }
