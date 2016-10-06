@@ -24,6 +24,9 @@ import eu.timepit.refined.auto._
 object mem {
   val m = module("mem", "http://xqdev.com/in-mem-update", "/MarkLogic/appservices/utils/in-mem-update.xqy")
 
+  def nodeDelete[F[_]: PrologW](node: XQuery): F[XQuery] =
+    m("node-delete") apply node
+
   def nodeInsertChild[F[_]: PrologW](node: XQuery, child: XQuery): F[XQuery] =
     m("node-insert-child") apply (node, child)
 }

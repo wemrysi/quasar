@@ -17,14 +17,13 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.physical.marklogic.xml.namespaces._
 
 import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, every, func, let_}, axes.child
+  import syntax._, expr.{attribute, element, every, for_, func, if_, let_}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -57,7 +56,7 @@ object ejson {
         $("arr1") as SequenceType("element()"),
         $("arr2") as SequenceType("element()")
       ).as(SequenceType(s"element($ename)")) { (arr1: XQuery, arr2: XQuery) =>
-        mkArray[F] apply mkSeq_(arr1 `/` child(aelt), arr2 `/` child(aelt))
+        mkArray[F] apply (ename.xqy, mkSeq_(arr1 `/` child(aelt), arr2 `/` child(aelt)))
       }
     }.join
 
@@ -72,6 +71,47 @@ object ejson {
       }
     }
 
+  // ejson:array-dup-indices($arr as element()) as element()
+  def arrayDupIndices[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("array-dup-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
+      declare(fname)(
+        $("arr") as SequenceType("element()")
+      ).as(SequenceType("element()")) { arr: XQuery =>
+        val elts = "$elts"
+        seqToArray[F].apply(fn.nodeName(arr), 0.xqy to mkSeq_(fn.count(elts.xqy) - 1.xqy)) map { inner =>
+          let_(elts -> (arr `/` child(aelt))) return_ {
+            if_ (fn.empty(elts.xqy)) then_ arr else_ inner
+          }
+        }
+      }
+    }.join
+
+  // ejson:array-zip-indices($arr as element()) as element()
+  def arrayZipIndices[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("array-zip-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
+      declare(fname)(
+        $("arr") as SequenceType("element()")
+      ).as(SequenceType("element()")) { arr: XQuery =>
+        val (i, elts, zelts) = ("$i", "$elts", "$zelts")
+
+        for {
+          ixelt <- mkArrayElt[F] apply i.xqy
+          pair  <- mkArray_[F](mkSeq_(ixelt, elts.xqy(i.xqy)))
+          zpair <- mkArrayElt[F] apply pair
+          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts.xqy)
+        } yield {
+          let_(elts -> (arr `/` child(aelt))) return_ {
+            if_ (fn.empty(elts.xqy))
+            .then_ { arr }
+            .else_ {
+              let_(zelts -> for_(i -> (1.xqy to fn.count(elts.xqy))).return_(zpair))
+              .return_(zarr)
+            }
+          }
+        }
+      }
+    }.join
+
   // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("is-array").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
@@ -79,6 +119,16 @@ object ejson {
         $("node") as SequenceType("node()")
       ).as(SequenceType("xs:boolean")) { node =>
         fn.not(fn.empty(node(axes.attribute(tname) === "array".xs)))
+      }
+    }
+
+  // ejson:is-null($node as node()) as xs:boolean
+  def isNull[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("is-null").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
+      declare(fname)(
+        $("node") as SequenceType("node()")
+      ).as(SequenceType("xs:boolean")) { node =>
+        fn.not(fn.empty(node(axes.attribute(tname) === "null".xs)))
       }
     }
 
@@ -92,17 +142,19 @@ object ejson {
       }
     }
 
-  // ejson:make-array($elements as element(ejson:array-element)*) as element(ejson:ejson)
-  def mkArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("make-array").qn[F] |@| ejsonN.qn |@| ejsonN.xs |@| arrayEltN.qn |@| typeAttrN.xs) {
-      (fname, ename, ejsxs, aelt, tpexs) =>
-
+  // ejson:make-array($name as xs:QName, $elements as element(ejson:array-element)*) as element()
+  def mkArray[F[_]: PrologW]: F[FunctionDecl2] =
+    (ejs.name("make-array").qn[F] |@| arrayEltN.qn |@| typeAttrN.xs) { (fname, aelt, tpexs) =>
       declare(fname)(
+        $("name"    ) as SequenceType(s"xs:QName"),
         $("elements") as SequenceType(s"element($aelt)*")
-      ).as(SequenceType(s"element($ename)")) { elts =>
-        element { ejsxs } { mkSeq_(attribute { tpexs } { "array".xs }, elts) }
+      ).as(SequenceType(s"element()")) { (name, elts) =>
+        element { name } { mkSeq_(attribute { tpexs } { "array".xs }, elts) }
       }
     }
+
+  def mkArray_[F[_]: PrologW](elements: XQuery): F[XQuery] =
+    ejsonN.qn[F] flatMap (ename => mkArray[F].apply(ename.xqy, elements))
 
   // ejson:make-array-element($value as item()*) as element(ejson:array-element)
   def mkArrayElt[F[_]: PrologW]: F[FunctionDecl1] =
@@ -174,20 +226,23 @@ object ejson {
       }
     }
 
-  // ejson:seq-to-array($items as item()*) as element(ejson:ejson)
-  def seqToArray[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
-    (ejs.name("seq-to-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
+  // ejson:seq-to-array($name as xs:QName, $items as item()*) as element()
+  def seqToArray[F[_]: PrologW]: F[FunctionDecl2] =
+    ejs.name("seq-to-array").qn[F] flatMap { fname =>
       declare(fname)(
+        $("name")  as SequenceType("xs:QName"),
         $("items") as SequenceType("item()*")
-      ).as(SequenceType(s"element($ename)")) { items: XQuery =>
+      ).as(SequenceType(s"element()")) { (name: XQuery, items: XQuery) =>
         val x = "$x"
-
         for {
           arrElt <- mkArrayElt[F] apply x.xqy
-          arr    <- mkArray[F] apply fn.map(func(x) { arrElt }, items)
+          arr    <- mkArray[F] apply (name, fn.map(func(x) { arrElt }, items))
         } yield arr
       }
-    }.join
+    }
+
+  def seqToArray_[F[_]: PrologW](items: XQuery): F[XQuery] =
+    ejsonN.qn[F] flatMap (ename => seqToArray[F].apply(ename.xqy, items))
 
   // ejson:singleton-array($item as item()*) as element(ejson:ejson)
   def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
@@ -195,7 +250,7 @@ object ejson {
       declare(fname)(
         $("item") as SequenceType.Top
       ).as(SequenceType(s"element($ename)")) { item: XQuery =>
-        mkArrayElt[F].apply(item) flatMap (xqy => mkArray[F].apply(xqy))
+        mkArrayElt[F].apply(item) flatMap (xqy => mkArray[F].apply(ename.xqy, xqy))
       }
     }.join
 

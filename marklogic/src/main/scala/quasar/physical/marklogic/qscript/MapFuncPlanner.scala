@@ -47,32 +47,75 @@ object MapFuncPlanner {
         msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
         _.point[F]))
 
+    case Length(arrOrstr) => qscript.length[F] apply arrOrstr
+
+    // time
+    case Date(s)             => xs.date(s).point[F]
+    case Time(s)             => xs.time(s).point[F]
+    case Timestamp(s)        => xs.dateTime(s).point[F]
+    case Interval(s)         => xs.dayTimeDuration(s).point[F]
+    case TimeOfDay(dt)       => xs.time(dt).point[F]
+    case ToTimestamp(millis) => qscript.timestampToDateTime[F] apply (millis)
+    case Now()               => fn.currentDateTime.point[F]
+
+    case Extract(XQuery.StringLit(part), time) => part match {
+      case "century"         => fn.ceiling(fn.yearFromDateTime(xs.dateTime(time)) div 100.xqy).point[F]
+      case "day"             => fn.dayFromDateTime(xs.dateTime(time)).point[F]
+      case "decade"          => fn.floor(fn.yearFromDateTime(xs.dateTime(time)) div 10.xqy).point[F]
+      case "dow"             => mkSeq_(xdmp.weekdayFromDate(xs.date(time)) - 1.xqy).point[F]
+      case "doy"             => xdmp.yeardayFromDate(xs.date(time)).point[F]
+      case "epoch"           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
+      case "hour"            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
+      case "isodow"          => xdmp.weekdayFromDate(xs.date(time)).point[F]
+      case "isoyear"         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
+      case "microseconds"    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
+      case "millennium"      => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
+      case "milliseconds"    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
+      case "minute"          => fn.minutesFromDateTime(xs.dateTime(time)).point[F]
+      case "month"           => fn.monthFromDateTime(xs.dateTime(time)).point[F]
+      case "quarter"         => xdmp.quarterFromDate(xs.date(time)).point[F]
+      case "second"          => fn.secondsFromDateTime(xs.dateTime(time)).point[F]
+      case "timezone"        => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
+      case "timezone_hour"   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+      case "timezone_minute" => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+      case "week"            => xdmp.weekFromDate(xs.date(time)).point[F]
+      case "year"            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
+      case other             => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrecognizedDatePart(other))
+    }
+
     // math
-    case Negate(x) => (-x).point[F]
-    case Add(x, y) => (x + y).point[F]
+    case Negate(x)      => (-x).point[F]
+    case Add(x, y)      => (x + y).point[F]
     case Multiply(x, y) => (x * y).point[F]
     case Subtract(x, y) => (x - y).point[F]
-    case Divide(x, y) => (x div y).point[F]
-    case Modulo(x, y) => (x mod y).point[F]
-    case Power(b, e) => math.pow(b, e).point[F]
+    case Divide(x, y)   => (x div y).point[F]
+    case Modulo(x, y)   => (x mod y).point[F]
+    case Power(b, e)    => math.pow(b, e).point[F]
 
     // relations
-    case Not(x) => fn.not(x).point[F]
-    case Eq(x, y) => (x eq y).point[F]
-    case Neq(x, y) => (x ne y).point[F]
-    case Lt(x, y) => (x lt y).point[F]
-    case Lte(x, y) => (x le y).point[F]
-    case Gt(x, y) => (x gt y).point[F]
-    case Gte(x, y) => (x ge y).point[F]
-    case And(x, y) => (x and y).point[F]
-    case Or(x, y) => (x or y).point[F]
-
-    case Cond(p, t, f) => if_(p).then_(t).else_(f).point[F]
+    case Not(x)              => fn.not(x).point[F]
+    case Eq(x, y)            => (x eq y).point[F]
+    case Neq(x, y)           => (x ne y).point[F]
+    case Lt(x, y)            => (x lt y).point[F]
+    case Lte(x, y)           => (x le y).point[F]
+    case Gt(x, y)            => (x gt y).point[F]
+    case Gte(x, y)           => (x ge y).point[F]
+    case And(x, y)           => (x and y).point[F]
+    case Or(x, y)            => (x or y).point[F]
+    case Coalesce(x, y)      => qscript.coalesce[F] apply (x, y)
+    case Between(v1, v2, v3) => mkSeq_(mkSeq_(v2 le v1) and mkSeq_(v1 le v3)).point[F]
+    case Cond(p, t, f)       => if_(p).then_(t).else_(f).point[F]
 
     // string
-    case Lower(s) => fn.lowerCase(s).point[F]
-    case Upper(s) => fn.upperCase(s).point[F]
-    case ToString(x) => fn.string(x).point[F]
+    case Lower(s)               => fn.lowerCase(s).point[F]
+    case Upper(s)               => fn.upperCase(s).point[F]
+    case Bool(s)                => xs.boolean(s).point[F]
+    case Integer(s)             => xs.integer(s).point[F]
+    case Decimal(s)             => xs.decimal(s).point[F]
+    case Null(s)                => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
+                                     (n, e) => if_ (s eq "null".xs) then_ n else_ e)
+    case ToString(x)            => fn.string(x).point[F]
+    case Search(in, ptn, ci)    => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
@@ -81,10 +124,8 @@ object MapFuncPlanner {
 
     case MakeMap(k, v) =>
       def withLitKey(s: String): F[XQuery] =
-        refineV[IsNCName](s).disjunction map { ncname =>
-          val qn = QName.local(NCName(ncname))
-          ejson.singletonObject[F] apply (xs.QName(qn.xs), v)
-        } getOrElse invalidQName(s)
+        whenValidQName(s)(qn =>
+          ejson.singletonObject[F] apply (xs.QName(qn.xs), v))
 
       k match {
         // Makes numeric strings valid QNames by prepending an underscore
@@ -103,17 +144,19 @@ object MapFuncPlanner {
     case ConcatMaps(x, y) =>
       ejson.objectConcat[F] apply (x, y)
 
+    case ProjectIndex(arr, idx) =>
+      ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
+
     // TODO: We may need to cast atomic `Data` values here as their type
     //       information is lost at this point.
     case ProjectField(src, field) =>
       def projectLit(s: String): F[XQuery] =
-        refineV[IsNCName](s).disjunction map { ncname =>
+        whenValidQName(s)(qn =>
           freshVar[F] map { m =>
             let_(m -> src) return_ {
-              m.xqy `/` child(QName.local(NCName(ncname))) `/` child.node()
+              m.xqy `/` child(qn) `/` child.node()
             }
-          }
-        } getOrElse invalidQName(s)
+          })
 
       field match {
         case XQuery.Step(_) =>
@@ -126,21 +169,35 @@ object MapFuncPlanner {
         case XQuery.StringLit(s) =>
           projectLit(s)
 
-        case _ =>
-          (freshVar[F] |@| freshVar[F]) { (m, k) =>
-            let_(m -> src, k -> field) return_ {
-              m.xqy `/` k.xqy `/` child.node()
-            }
-          }
+        case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
 
-    case ProjectIndex(arr, idx) =>
-      ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
+    case DeleteField(src, field) =>
+      def deleteLit(s: String): F[XQuery] =
+        whenValidQName(s)(qn => for {
+          m <- freshVar[F]
+          n <- mem.nodeDelete[F](m.xqy)
+        } yield let_(m -> src) return_ n)
+
+      field match {
+        case XQuery.Step(_) =>
+          mem.nodeDelete[F](src `/` field)
+
+        case XQuery.StringLit(IntegralNumber(n)) =>
+          deleteLit("_" + n)
+
+        case XQuery.StringLit(s) =>
+          deleteLit(s)
+
+        case _ => qscript.deleteField[F] apply (src, xs.QName(field))
+      }
 
     // other
-    case Range(x, y)   => (x to y).point[F]
-
-    case ZipMapKeys(m) => qscript.zipMapNodeKeys[F] apply m
+    case DupMapKeys(m)       => qscript.elementDupKeys[F]    apply m
+    case DupArrayIndices(a)  => ejson.arrayDupIndices[F]     apply a
+    case ZipMapKeys(m)       => qscript.zipMapElementKeys[F] apply m
+    case ZipArrayIndices(a)  => ejson.arrayZipIndices[F]     apply a
+    case Range(x, y)         => (x to y).point[F]
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
     case Guard(_, _, cont, _) =>
@@ -153,6 +210,11 @@ object MapFuncPlanner {
 
   // A string consisting only of digits.
   private val IntegralNumber = "^(\\d+)$".r
+
+  private def whenValidQName[F[_]: MonadPlanErr, A](s: String)(f: QName => F[A]): F[A] =
+    refineV[IsNCName](s).disjunction
+      .map(ncname => f(QName.local(NCName(ncname))))
+      .getOrElse(invalidQName(s))
 
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(
