@@ -104,14 +104,14 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR.embed,
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
-              Free.roll(DET.inj(Const[DeadEnd, Free[QScriptTotal[Fix, ?], Hole]](Root))),
+              Free.roll(DET.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
               ProjectFieldR(HoleF, StrLit("city"))))),
             Free.roll(ZipMapKeys(HoleF)),
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
           Free.roll(QCT.inj(Map(
-            Free.roll(QCT.inj(Unreferenced[Fix, Free[QScriptTotal[Fix, ?], Hole]]())),
+            Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
           Inner,
