@@ -1,0 +1,3 @@
+- Lower Free[MapFunc...] noise with type alias.
+- Utilize FreeQS alias more places.
+- More consistent definition of Injectable.

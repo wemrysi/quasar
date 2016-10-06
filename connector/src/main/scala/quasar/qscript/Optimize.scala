@@ -221,7 +221,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
           }
 
           // reset the indices in `repair0`
-          val repair: Free[MapFunc[T, ?], Int] = repair0.map {
+          val repair: FreeMapA[T, Int] = repair0.map {
             case ReduceIndex(idx) => indices.indexOf(idx)
           }
 

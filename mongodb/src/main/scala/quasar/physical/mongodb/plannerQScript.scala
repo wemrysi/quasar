@@ -71,7 +71,7 @@ object MongoDbQScriptPlanner {
 
   def processMapFuncExpr[T[_[_]]: Recursive: ShowT, EX[_]: Traverse, A](
     funcHandler: FuncHandler[T, EX])(
-    fm: Free[MapFunc[T, ?],  A])(
+    fm: FreeMapA[T,  A])(
     recovery: A => OutputM[Fix[ExprOp]])(
     implicit inj: EX :<: ExprOp):
       OutputM[Fix[ExprOp]] =
@@ -81,7 +81,7 @@ object MongoDbQScriptPlanner {
         expression(funcHandler)))
 
   def processMapFunc[T[_[_]]: Recursive: ShowT, A](
-    fm: Free[MapFunc[T, ?],  A])(
+    fm: FreeMapA[T,  A])(
     recovery: A => JsCore):
       OutputM[JsCore] =
     freeCataM(fm)(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
@@ -877,7 +877,7 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def getJsRed[T[_[_]]: Recursive: ShowT](jr: Free[MapFunc[T, ?], ReduceIndex]):
+  def getJsRed[T[_[_]]: Recursive: ShowT](jr: FreeMapA[T, ReduceIndex]):
       OutputM[JsFn] =
     processMapFunc(jr)(ri => jscore.ident(ri.idx.toString)) ∘ (JsFn(JsFn.defaultName, _))
 
