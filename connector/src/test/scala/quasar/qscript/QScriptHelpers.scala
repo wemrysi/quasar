@@ -61,8 +61,8 @@ trait QScriptHelpers {
   val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
   def ProjectFieldR[A](
-    src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
-      Free[MapFunc[Fix, ?], A] =
+    src: FreeMapA[Fix, A], field: FreeMapA[Fix, A]):
+      FreeMapA[Fix, A] =
     Free.roll(ProjectField(src, field))
 
   def lpRead(path: String): Fix[LP] =

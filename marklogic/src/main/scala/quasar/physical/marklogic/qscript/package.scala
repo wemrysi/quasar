@@ -71,7 +71,7 @@ package object qscript {
     }
 
   def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
-    freeMap: Free[MapFunc[T, ?], A])(
+    freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))

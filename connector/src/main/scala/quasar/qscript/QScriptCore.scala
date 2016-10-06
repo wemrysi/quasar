@@ -87,7 +87,7 @@ object ReduceIndex {
   src: A,
   bucket: FreeMap[T],
   reducers: List[ReduceFunc[FreeMap[T]]],
-  repair: Free[MapFunc[T, ?], ReduceIndex])
+  repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with

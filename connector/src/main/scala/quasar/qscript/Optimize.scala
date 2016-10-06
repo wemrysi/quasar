@@ -105,7 +105,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       Option[T[F]] =
     freeCata[QScriptTotal[T, ?], T[QScriptTotal[T, ?]], T[QScriptTotal[T, ?]]](
-      target.as(src.transAna(FI.inject)))(recover(_.embed)).transAnaM(FI.project)
+      target.as(src.transAna(FI.inject)))(recover(_.embed)).transAnaM(FI project _)
 
   def rebaseTCo[F[_]: Traverse](
     target: FreeQS[T])(
@@ -113,7 +113,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
-    //       target.transAnaM(_.htraverse(FI.project)) ∘ (srcCo >> _)
+    //       target.transAnaM(_.htraverse(FI project _)) ∘ (srcCo >> _)
     freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
       target)(
       coEnvHtraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply)
@@ -188,12 +188,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
     {
       case Take(src, from, count) =>
-        from.resume.swap.toOption >>= FI.project >>= {
+        from.resume.swap.toOption >>= (FI project _) >>= {
           case Map(fromInner, mf) => Map(FtoG(QC.inj(Take(src, fromInner, count))).embed, mf).some
           case _ => None
         }
       case Drop(src, from, count) =>
-        from.resume.swap.toOption >>= FI.project >>= {
+        from.resume.swap.toOption >>= (FI project _) >>= {
           case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
           case _ => None
         }
@@ -221,7 +221,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
           }
 
           // reset the indices in `repair0`
-          val repair: Free[MapFunc[T, ?], Int] = repair0.map {
+          val repair: FreeMapA[T, Int] = repair0.map {
             case ReduceIndex(idx) => indices.indexOf(idx)
           }
 

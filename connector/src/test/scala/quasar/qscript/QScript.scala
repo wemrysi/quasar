@@ -331,7 +331,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(Reduce((),
           HoleF, // FIXME provenance needs to be here
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
-          Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
+          Free.roll(MakeMap[Fix, FreeMapA[Fix, ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed

@@ -65,8 +65,8 @@ abstract class DiscoverPathInstances {
       : T[OUT] =
     elems.foldRight1(
       (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[OUT]]()).embed,
-        elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
-        acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
+        elem.cata[FreeQS[T]](g => Free.roll(FI.inject(g))),
+        acc.cata[FreeQS[T]](g => Free.roll(FI.inject(g))))).embed)
 
   private def makeRead[T[_[_]], F[_]]
     (dir: ADir, file: FileName)
