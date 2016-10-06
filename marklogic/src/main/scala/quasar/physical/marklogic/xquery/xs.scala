@@ -19,8 +19,20 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object xs {
+  def boolean(xqy: XQuery): XQuery =
+    XQuery(s"xs:boolean($xqy)")
+
   def byte(xqy: XQuery): XQuery =
     XQuery(s"xs:byte($xqy)")
+
+  def date(xqy: XQuery): XQuery =
+    XQuery(s"xs:date($xqy)")
+
+  def dateTime(xqy: XQuery): XQuery =
+    XQuery(s"xs:dateTime($xqy)")
+
+  def dayTimeDuration(xqy: XQuery): XQuery =
+    XQuery(s"xs:dayTimeDuration($xqy)")
 
   def decimal(xqy: XQuery): XQuery =
     XQuery(s"xs:decimal($xqy)")
@@ -33,4 +45,7 @@ object xs {
 
   def string(xqy: XQuery): XQuery =
     XQuery(s"xs:string($xqy)")
+
+  def time(xqy: XQuery): XQuery =
+    XQuery(s"xs:time($xqy)")
 }
