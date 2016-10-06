@@ -112,7 +112,7 @@ package object hdfs {
     def hdfsPathStr: AFile => Task[String] = (afile: AFile) => Task.delay {
       sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
     }
-    // TODO consider closing over task or read 
+    // TODO function is not needed since it is closed over Task
     def fileSystem: () => Task[HdfsFileSystem] = () => Task.delay {
       val conf = new Configuration()
       conf.setBoolean("fs.hdfs.impl.disable.cache", true)
