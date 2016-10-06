@@ -59,22 +59,19 @@ class Transform
 
   val prov = new Provenance[T]
 
-  type Target[A] = EnvT[Ann[T], F, A]
-  type TargetT = Target[T[Target]]
-  type FreeEnv = Free[Target, Hole]
-
-  type Envs = List[Target[ExternallyManaged]]
+  type Target = (Ann[T], T[F])
+  type LinearF = List[F[ExternallyManaged]]
 
   case class ZipperSides(
     lSide: FreeMap[T],
     rSide: FreeMap[T])
 
   case class ZipperTails(
-    lTail: Envs,
-    rTail: Envs)
+    lTail: LinearF,
+    rTail: LinearF)
 
   case class ZipperAcc(
-    acc: Envs,
+    acc: LinearF,
     sides: ZipperSides,
     tails: ZipperTails)
 
@@ -83,33 +80,29 @@ class Transform
       Algebra[F, List[F[ExternallyManaged]]] =
     fl => fl.as[ExternallyManaged](Extern) :: fl.fold
 
-  def linearizeEnv[E, F[_]: Functor: Foldable]:
-      Algebra[EnvT[E, F, ?], List[EnvT[E, F, ExternallyManaged]]] =
-    fl => fl.as[ExternallyManaged](Extern) :: fl.lower.fold
-
-
-  def delinearizeInner[A]: Coalgebra[Target, List[Target[A]]] = {
-    case Nil => EnvT((EmptyAnn, DE.inj(Const[DeadEnd, List[Target[A]]](Root))))
-    case h :: t => h.map(_ => t)
+  def delinearizeInner[A]: Coalgebra[F, List[F[A]]] = {
+    case Nil    => DE.inj(Const[DeadEnd, List[F[A]]](Root))
+    case h :: t => h.as(t)
   }
 
   def delinearizeTargets[F[_]: Functor, A]:
-      ElgotCoalgebra[Hole \/ ?, Target, List[Target[A]]] = {
-    case Nil    => SrcHole.left[Target[List[Target[A]]]]
+      ElgotCoalgebra[Hole \/ ?, F, List[F[A]]] = {
+    case Nil    => SrcHole.left[F[List[F[A]]]]
     case h :: t => h.as(t).right
   }
 
-  val consZipped: Algebra[ListF[Target[ExternallyManaged], ?], ZipperAcc] = {
+  val consZipped: Algebra[ListF[F[ExternallyManaged], ?], ZipperAcc] = {
     case NilF() => ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
-  val zipper: ElgotCoalgebra[
-      ZipperAcc \/ ?,
-      ListF[Target[ExternallyManaged], ?],
-      (ZipperSides, ZipperTails)] = {
+  val zipper:
+      ElgotCoalgebra[
+        ZipperAcc \/ ?,
+        ListF[F[ExternallyManaged], ?],
+        (ZipperSides, ZipperTails)] = {
     case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[ExternallyManaged], (ZipperSides, ZipperTails)]](
+      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[F[ExternallyManaged], (ZipperSides, ZipperTails)]](
         ZipperAcc(Nil, zs, zt).left) {
           case SrcMerge(inn, lmf, rmf) =>
             ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
@@ -118,11 +111,15 @@ class Transform
       ZipperAcc(Nil, sides, tails).left
   }
 
-  type MergeResult = (T[Target], FreeMap[T], FreeMap[T], Free[Target, Hole], Free[Target, Hole])
 
-  def merge(left: T[Target], right: T[Target]): MergeResult = {
-    val lLin: Envs = left.cata(linearizeEnv).reverse
-    val rLin: Envs = right.cata(linearizeEnv).reverse
+  /** Contains a common src, the MapFuncs required to access the left and right
+    * sides, and the FreeQS that were unmergeable on either side.
+    */
+  type MergeResult = (T[F], FreeMap[T], FreeMap[T], Free[F, Hole], Free[F, Hole])
+
+  def merge(left: T[F], right: T[F]): MergeResult = {
+    val lLin = left.cata(linearize).reverse
+    val rLin = right.cata(linearize).reverse
 
     val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
       elgot(
@@ -130,95 +127,69 @@ class Transform
         consZipped, zipper)
 
     val leftF =
-      foldIso(CoEnv.freeIso[Hole, Target])
-        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
+      foldIso(CoEnv.freeIso[Hole, F])
+        .get(lTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
 
     val rightF =
-      foldIso(CoEnv.freeIso[Hole, Target])
-        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
+      foldIso(CoEnv.freeIso[Hole, F])
+        .get(rTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
 
-    val commonSrc: T[Target] =
-      common.reverse.ana[T, Target](delinearizeInner)
+    val commonSrc: T[F] = common.reverse.ana[T, F](delinearizeInner)
 
     (commonSrc, lMap, rMap, leftF, rightF)
   }
 
-  def rebaseBranch(br: Free[Target, Hole], fm: FreeMap[T]):
-      Free[Target, Hole] =
-    // TODO: Special-casing the `point` case should be unnecessary after
-    //       optimizations are applied across all branches.
-    if (fm ≟ Free.point(SrcHole))
-      br
-    else
-      br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Hole](SrcHole), fm)))))
+  def rebaseBranch(br: Free[F, Hole], fm: FreeMap[T]): Free[F, Hole] =
+    br >> Free.roll(QC.inj(Map(Free.point[F, Hole](SrcHole), fm)))
 
   def useMerge(
-    res: MergeResult,
-    ap: (T[Target], Free[Target, Hole], Free[Target, Hole]) => (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
-      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
+    left: T[F], right: T[F],
+    ap: (T[F], Free[F, Hole], Free[F, Hole]) => (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
+      (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
 
-    val (src, lMap, rMap, lBranch, rBranch) = res
+    val (src, lMap, rMap, lBranch, rBranch) = merge(left, right)
 
-    if (lBranch ≟ Free.point(SrcHole) && rBranch ≟ Free.point(SrcHole)) {
-      concatBuckets(src.project.ask.provenance) match {
-        case Some((buck, newBucks)) =>
-          val (mf, baccess, laccess, raccess) = concat3(buck, lMap, rMap)
-          (QC.inj(Map(src, mf)), newBucks.list.toList.map(_ >> baccess), laccess, raccess)
-        case None =>
-          (QC.inj(Map(src, HoleF[T])), Nil, lMap, rMap)
-      }
-    } else {
-      val leftRebase = rebaseBranch(lBranch, lMap)
-      val rightRebase = rebaseBranch(rBranch, rMap)
-      ap(src, leftRebase, rightRebase)
-    }
+    ap(src, rebaseBranch(lBranch, lMap), rebaseBranch(rBranch, rMap))
   }
-
-  def someAnn[A](
-    v: Target[Free[Target, A]] \/ A,
-    default: T[Target]):
-      Ann[T] =
-    v.fold(_.ask, κ(default.project.ask))
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
     * right values.
     */
-  def autojoin(left: T[Target], right: T[Target]):
-      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
-    useMerge(merge(left, right), (src, lBranch, rBranch) => {
+  def autojoin(left: Target, right: Target):
+      (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
+    useMerge(left._2, right._2, (src, lBranch, rBranch) => {
       val lcomp = lBranch.resume
       val rcomp = rBranch.resume
       val (combine, lacc, racc) =
         concat[T, JoinSide](Free.point(LeftSide), Free.point(RightSide))
 
-      val lann = someAnn(lcomp, src)
-      val rann = someAnn(rcomp, src)
-      val commonProvLength = src.project.ask.provenance.length
+      val lann = left._1
+      val rann = right._1
 
-      val left = concatBuckets(lann.provenance.drop(lann.provenance.length - commonProvLength))
-      val right = concatBuckets(rann.provenance.drop(rann.provenance.length - commonProvLength))
+      // FIXME: Need a better prov representation, to know when the provs are
+      //        the same even when the paths to the values differ.
+      val commonProv =
+        lann.provenance.reverse.zip(rann.provenance.reverse).reverse.foldRightM[List[FreeMap[T]] \/ ?, List[FreeMap[T]]](Nil) {
+          case ((l, r), acc) => if (l ≟ r) (l :: acc).right else acc.left
+        }.merge
 
-      val condition = (left, right) match {
-        case (None, None) =>
-          BoolLit[T, JoinSide](true) // when both sides are empty, perform a full cross
-        case (Some(l), Some(r)) =>
-          Free.roll[MapFunc[T, ?], JoinSide](Eq(
-            l._1.map(κ(LeftSide)),
-            r._1.map(κ(RightSide))))
-        case (_, _) =>
-          BoolLit[T, JoinSide](false) // this case should never be hit
-      }
+      val commonBuck = concatBuckets(commonProv)
 
-      val tj = TJ.inj(ThetaJoin(
-        src,
-        lBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
-        rBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
-        // FIXME: not quite right – e.g., if there is a reduction in a branch the
-        //        condition won’t line up.
-        condition,
-        Inner,
-        combine))
+      val condition = commonBuck.fold(
+        BoolLit[T, JoinSide](true))( // when both sides are empty, perform a full cross
+        c => Free.roll[MapFunc[T, ?], JoinSide](Eq(
+          c._1.map(κ(LeftSide)),
+          c._1.map(κ(RightSide)))))
+
+      val tj =
+        TJ.inj(ThetaJoin(
+          src,
+          lBranch.mapSuspension(FI.inject),
+          rBranch.mapSuspension(FI.inject),
+          condition,
+          Inner,
+          combine)).embed
 
       (tj,
         prov.joinProvenances(
@@ -232,11 +203,11 @@ class Transform
   /** A convenience for a pair of autojoins, does the same thing, but returns
     * access to all three values.
     */
-  def autojoin3(left: T[Target], center: T[Target], right: T[Target]):
-      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T], FreeMap[T]) = {
+  def autojoin3(left: Target, center: Target, right: Target):
+      (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val (lsrc, lbuckets, lval, cval) = autojoin(left, center)
     val (fullSrc, fullBuckets, bval, rval) =
-      autojoin(EnvT((Ann[T](lbuckets, HoleF), lsrc)).embed, right)
+      autojoin((Ann(lbuckets, HoleF), lsrc), right)
 
     // the holes in `bval` reference `fullSrc`
     // so we replace the holes in `lval` with `bval` because the holes in `lval >> bval` must reference `fullSrc`
@@ -245,77 +216,70 @@ class Transform
   }
 
   def merge2Map(
-    values: Func.Input[T[Target], nat._2])(
+    values: Func.Input[Target, nat._2])(
     func: (FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
-      TargetT = {
+      Target = {
     val (src, buckets, lval, rval) = autojoin(values(0), values(1))
     concatBuckets(buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(lval, rval)))
-        EnvT((
-          Ann[T](newBucks.list.toList.map(_ >> b), v),
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+        (Ann[T](newBucks.list.toList.map(_ >> b), v),
+          QC.inj(Map(src, merged)).embed)
       }
       case None =>
-        EnvT((
-          EmptyAnn[T],
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, Free.roll(func(lval, rval))))))
+        (EmptyAnn[T], QC.inj(Map(src, Free.roll(func(lval, rval)))).embed)
     }
   }
 
   // TODO unify with `merge2Map`
   def merge3Map(
-    values: Func.Input[T[Target], nat._3])(
+    values: Func.Input[Target, nat._3])(
     func: (FreeMap[T], FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
-      Target[T[Target]] = {
+      Target = {
     val (src, buckets, lval, cval, rval) = autojoin3(values(0), values(1), values(2))
     concatBuckets(buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(lval, cval, rval)))
-        EnvT((
-          Ann[T](newBucks.list.toList.map(_ >> b), v),
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+        (Ann[T](newBucks.list.toList.map(_ >> b), v),
+          QC.inj(Map(src, merged)).embed)
       }
       case None =>
-        EnvT((
-          EmptyAnn[T],
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, Free.roll(func(lval, cval, rval))))))
+        (EmptyAnn[T],
+          QC.inj(Map(src, Free.roll(func(lval, cval, rval)))).embed)
     }
   }
 
-  def shiftValues(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
-      Target[T[Target]] = {
-    val Ann(provs, value) = input.project.ask
+  def shiftValues(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
+      Target = {
+    val Ann(provs, value) = input._1
     val (sides, leftAccess, rightAccess) =
       concat(
         Free.point[MapFunc[T, ?], JoinSide](LeftSide),
         Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
-    EnvT((
-      Ann(
-        prov.shiftMap(Free.roll[MapFunc[T, ?], Hole](ProjectIndex(rightAccess, IntLit(0)))) :: provs.map(_ >> leftAccess),
-        Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
-      QC.inj(LeftShift(input, Free.roll(f(value)), sides))))
+    (Ann[T](
+      prov.shiftMap(Free.roll[MapFunc[T, ?], Hole](ProjectIndex(rightAccess, IntLit(0)))) :: provs.map(_ >> leftAccess),
+      Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
+      QC.inj(LeftShift(input._2, Free.roll(f(value)), sides)).embed)
   }
 
-  def shiftIds(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
-      Target[T[Target]] = {
-    val Ann(provs, value) = input.project.ask
+  def shiftIds(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
+      Target = {
+    val Ann(provs, value) = input._1
     val (sides, leftAccess, rightAccess) =
       concat(
         Free.point[MapFunc[T, ?], JoinSide](LeftSide),
         Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
-    EnvT((
-      Ann(
-        prov.shiftMap(rightAccess) :: provs.map(_ >> leftAccess),
-        rightAccess),
-      QC.inj(LeftShift(input, Free.roll(f(value)), sides))))
+    (Ann(
+      prov.shiftMap(rightAccess) :: provs.map(_ >> leftAccess),
+      rightAccess),
+      QC.inj(LeftShift(input._2, Free.roll(f(value)), sides)).embed)
   }
 
-  def flatten(input: Target[T[Target]]): Target[T[Target]] = {
-    val EnvT((Ann(buckets, value), fa)) = input
-    EnvT((Ann(prov.nestProvenances(buckets), value), fa))
+  def flatten(input: Target): Target = {
+    val (Ann(buckets, value), fa) = input
+    (Ann(prov.nestProvenances(buckets), value), fa)
   }
 
   // NB: More complicated LeftShifts are generated as an optimization:
@@ -323,8 +287,8 @@ class Transform
   // after: LeftShift(cs, struct, comb.flatMap(LeftSide => mf.map(_ => LeftSide), RS => repair))
   def invokeExpansion1(
     func: UnaryFunc,
-    values: Func.Input[T[Target], nat._1]):
-      Target[T[Target]] =
+    values: Func.Input[Target, nat._1]):
+      Target =
     func match {
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -371,8 +335,8 @@ class Transform
       case structural.ShiftArrayIndices => shiftIds(values(0), DupArrayIndices(_))
     }
 
-  def invokeExpansion2(func: BinaryFunc, values: Func.Input[T[Target], nat._2]):
-      TargetT =
+  def invokeExpansion2(func: BinaryFunc, values: Func.Input[Target, nat._2]):
+      Target =
     func match {
       case set.Range =>
         val (src, buckets, lval, rval) = autojoin(values(0), values(1))
@@ -381,96 +345,85 @@ class Transform
             Free.point[MapFunc[T, ?], JoinSide](LeftSide),
             Free.point[MapFunc[T, ?], JoinSide](RightSide))
 
-        EnvT((
-          Ann[T](
-            NullLit[T, Hole]() :: buckets.map(_ >> leftAccess),
-            rightAccess),
+        (Ann[T](
+          NullLit[T, Hole]() :: buckets.map(_ >> leftAccess),
+          rightAccess),
           QC.inj(LeftShift(
-            EnvT((EmptyAnn[T], src)).embed,
+            src,
             Free.roll(Range(lval, rval)),
-            sides))))
+            sides)).embed)
     }
 
   def invokeReduction1(
     func: UnaryFunc,
-    values: Func.Input[T[Target], nat._1]):
-      TargetT = {
-    val Ann(provs, reduce) = values(0).project.ask
+    values: Func.Input[Target, nat._1]):
+      Target = {
+    val Ann(provs, reduce) = values(0)._1
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
-    provs.tailOption.fold(values(0).project) { tail =>
+    provs.tailOption.fold(values(0)) { tail =>
       concatBuckets(tail) match {
         case Some((newProvs, provAccess)) =>
-          EnvT[Ann[T], F, T[Target]]((
-            Ann[T](
-              provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-            QC.inj(Reduce[T, T[Target]](
-              values(0),
+          (Ann[T](
+            provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+            QC.inj(Reduce[T, T[F]](
+              values(0)._2,
               newProvs,
               List(
                 ReduceFuncs.Arbitrary(newProvs),
                 ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+                Free.roll(MakeArray(Free.point(ReduceIndex(1)))))))).embed)
         case None =>
-          EnvT[Ann[T], F, T[Target]]((
-            EmptyAnn[T],
-            QC.inj(Reduce[T, T[Target]](
-              values(0),
+          (EmptyAnn[T],
+            QC.inj(Reduce[T, T[F]](
+              values(0)._2,
               NullLit(),
               List(ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
-              Free.point(ReduceIndex(0))))))
+              Free.point(ReduceIndex(0)))).embed)
       }
     }
   }
 
-  def invokeReduction2(
-    func: BinaryFunc,
-    values: Func.Input[T[Target], nat._2]):
-      TargetT = {
+  def invokeReduction2(func: BinaryFunc, values: Func.Input[Target, nat._2])
+      : Target = {
     val (src, provs, lMap, rMap) = autojoin(values(0), values(1))
 
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
-    provs.tailOption.fold(EnvT((EmptyAnn[T], src))) { tail =>
+    provs.tailOption.fold((EmptyAnn[T], src)) { tail =>
       concatBuckets(tail) match {
         case Some((newProvs, provAccess)) =>
-          EnvT[Ann[T], F, T[Target]]((
-            Ann[T](
-              provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-            QC.inj(Reduce[T, T[Target]](
-              values(0),
+          (Ann[T](
+            provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+            QC.inj(Reduce[T, T[F]](
+              values(0)._2,
               newProvs,
               List(
                 ReduceFuncs.Arbitrary(newProvs),
                 ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+                Free.roll(MakeArray(Free.point(ReduceIndex(1)))))))).embed)
         case None =>
-          EnvT[Ann[T], F, T[Target]]((
-            EmptyAnn[T],
-            QC.inj(Reduce[T, T[Target]](
-              values(0),
+          (EmptyAnn[T],
+            QC.inj(Reduce[T, T[F]](
+              values(0)._2,
               NullLit(),
               List(ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
-              Free.point(ReduceIndex(0))))))
+              Free.point(ReduceIndex(0)))).embed)
       }
     }
   }
 
-  def invokeThetaJoin(
-    values: Func.Input[T[Target], nat._3],
-    tpe: JoinType):
-      PlannerError \/ TargetT = {
+  def invokeThetaJoin(values: Func.Input[Target, nat._3], tpe: JoinType)
+      : PlannerError \/ Target = {
     val condError: PlannerError \/ JoinFunc[T] = {
       // FIXME: This won’t work where we join a collection against itself
-      //        We only apply _some_ optimizations at this point to maintain the
-      //        TJ at the end, but that‘s still not guaranteed
-      TJ.prj(values(2).transCata[F](v => (new Optimize).applyAll[F].apply(v.lower)).project).fold(
+      TJ.prj(values(2)._2.project).fold(
         (InternalError(s"non theta join condition found: ${values(2).shows}"): PlannerError).left[JoinFunc[T]])(
         _.combine.right[PlannerError])
     }
@@ -481,9 +434,9 @@ class Transform
       Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc[T, ?], JoinSide](RightSide)))))
 
     condError.map { cond =>
-      val (commonSrc, lMap, rMap, leftSide, rightSide) = merge(values(0), values(1))
-      val Ann(leftBuckets, leftValue) = leftSide.resume.fold(_.ask, _ => EmptyAnn[T])
-      val Ann(rightBuckets, rightValue) = leftSide.resume.fold(_.ask, _ => EmptyAnn[T])
+      val (commonSrc, lMap, rMap, leftSide, rightSide) = merge(values(0)._2, values(1)._2)
+      val Ann(leftBuckets, leftValue) = values(0)._1
+      val Ann(rightBuckets, rightValue) = values(1)._1
 
       val buckets: List[FreeMap[T]] =
         prov.joinProvenances(leftBuckets, rightBuckets)
@@ -493,28 +446,26 @@ class Transform
       //   case RightSide => rightValue.map(κ(RightSide))
       // }
 
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
+      (Ann[T](buckets, HoleF[T]),
         TJ.inj(ThetaJoin(
           commonSrc,
-          rebaseBranch(leftSide, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
-          rebaseBranch(rightSide, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(leftSide, lMap).mapSuspension(FI.inject),
+          rebaseBranch(rightSide, rMap).mapSuspension(FI.inject),
           cond,
           tpe,
-          combine))))
+          combine)).embed)
      }
    }
 
-  def ProjectTarget(prefix: TargetT, field: FreeMap[T]): TargetT = {
-    val Ann(provenance, values) = prefix.ask
-    EnvT[Ann[T], F, T[Target]]((
-      Ann[T](prov.projectField(field) :: provenance, values),
-      PB.inj(BucketField(prefix.embed, HoleF[T], field))))
+  def ProjectTarget(prefix: Target, field: FreeMap[T]): Target = {
+    val Ann(provenance, values) = prefix._1
+    (Ann[T](prov.projectField(field) :: provenance, values),
+      PB.inj(BucketField(prefix._2, HoleF[T], field)).embed)
   }
 
-  def pathToProj(path: pathy.Path[_, _, _]): TargetT =
-    pathy.Path.peel(path).fold[TargetT](
-      EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](Root))))) {
+  def pathToProj(path: pathy.Path[_, _, _]): Target =
+    pathy.Path.peel(path).fold[Target](
+      (EmptyAnn[T], DE.inj(Const[DeadEnd, T[F]](Root)).embed)) {
       case (p, n) =>
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
@@ -528,13 +479,13 @@ class Transform
   }
 
   // TODO: Replace disjunction with validation.
-  def lpToQScript: LogicalPlan[T[Target]] => PlannerError \/ TargetT = {
+  def lpToQScript: AlgebraM[PlannerError \/ ?, LogicalPlan, (Ann[T], T[F])] = {
     case LogicalPlan.ReadF(path) =>
       // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
       //       however doing that would break the old Mongo backend, and we can
       //       handle it here for now. But it should be moved to the SQL²
       //       compiler when the old Mongo backend is replaced. (#1298)
-      shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
+      shiftValues(pathToProj(path), ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
       fromData(data).fold[PlannerError \/ MapFunc[T, FreeMap[T]]](
@@ -543,48 +494,43 @@ class Transform
           case d       => NonRepresentableData(d).left
         },
         Constant[T, FreeMap[T]](_).right) ∘ (mf =>
-        EnvT((
-          EmptyAnn[T],
+        (EmptyAnn[T],
           QC.inj(Map(
-            EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], QC.inj(Unreferenced[T, T[Target]]()))).embed,
-            Free.roll[MapFunc[T, ?], Hole](mf))))))
+            QC.inj(Unreferenced[T, T[F]]()).embed,
+            Free.roll[MapFunc[T, ?], Hole](mf))).embed))
 
     case LogicalPlan.FreeF(name) =>
-      (Planner.UnboundVariable(name): PlannerError).left[TargetT]
+      (Planner.UnboundVariable(name): PlannerError).left[Target]
 
     case LogicalPlan.LetF(name, form, body) =>
-      (Planner.InternalError("un-elided Let"): PlannerError).left[TargetT]
+      (Planner.InternalError("un-elided Let"): PlannerError).left[Target]
 
     case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
-      val Ann(buckets, value) = a1.project.ask
+      val Ann(buckets, value) = a1._1
       concatBuckets(buckets) match {
         case Some((buck, newBuckets)) =>
           val (mf, bucketAccess, valAccess) =
             concat[T, Hole](buck, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))
-          EnvT((
-            Ann(newBuckets.list.toList.map(_ >> bucketAccess), valAccess),
-            QC.inj(Map(a1, mf)))).right
+          (Ann(newBuckets.list.toList.map(_ >> bucketAccess), valAccess),
+            QC.inj(Map(a1._2, mf)).embed).right
         case None =>
-          EnvT((
-            EmptyAnn[T],
-            QC.inj(Map(a1, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))))).right
+          (EmptyAnn[T],
+            QC.inj(Map(a1._2, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))).embed).right
       }
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
-        PB.inj(BucketField(EnvT((EmptyAnn[T], src)).embed, lval, rval)))).right
+      (Ann[T](buckets, HoleF[T]),
+        PB.inj(BucketField(src, lval, rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
-        PB.inj(BucketIndex(EnvT((EmptyAnn[T], src)).embed, lval, rval)))).right
+      (Ann[T](buckets, HoleF[T]),
+        PB.inj(BucketIndex(src, lval, rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Mapping =>
@@ -603,26 +549,28 @@ class Transform
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
-      val (src, buckets, lval, rval) = autojoin(a1, a2)
-      val left: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), lval))
-      val right: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), rval))
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
-        QC.inj(Take(
-          EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI.inject),
-          Free.roll(right).mapSuspension(FI.inject))))).right
+      val (qs, buckets, lacc, racc) = useMerge(a1._2, a2._2, (src, lfree, rfree) => {
+        (QC.inj(Take(src,
+          lfree.mapSuspension(FI.inject),
+          rfree.mapSuspension(FI.inject))).embed,
+          a1._1.provenance,
+          HoleF,
+          HoleF)
+      })
+
+      (Ann(buckets, HoleF), qs).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
-      val (src, buckets, lval, rval) = autojoin(a1, a2)
-      val left: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), lval))
-      val right: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), rval))
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
-        QC.inj(Drop(
-          EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI.inject),
-          Free.roll(right).mapSuspension(FI.inject))))).right
+      val (qs, buckets, lacc, racc) = useMerge(a1._2, a2._2, (src, lfree, rfree) => {
+        (QC.inj(Drop(src,
+          lfree.mapSuspension(FI.inject),
+          rfree.mapSuspension(FI.inject))).embed,
+          a1._1.provenance,
+          HoleF,
+          HoleF)
+      })
+
+      (Ann(buckets, HoleF), qs).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
@@ -654,36 +602,25 @@ class Transform
         directionsList.map { bucketsList.zip(_) }
 
       lists.map(pairs =>
-        EnvT((
-          Ann[T](bucketsSrc, HoleF[T]),
-          QC.inj(Sort(
-            EnvT((EmptyAnn[T], src)).embed,
-            ordering,
-            pairs)))))
+        (Ann[T](bucketsSrc, HoleF[T]),
+          QC.inj(Sort(src, ordering, pairs)).embed))
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      EnvT((
-        Ann[T](buckets, HoleF[T]),
-        QC.inj(Map(
-          EnvT((
-            EmptyAnn[T],
-            QC.inj(Filter(EnvT((EmptyAnn[T], src)).embed, rval)))).embed,
-          lval)))).right
+      (Ann[T](buckets, HoleF[T]),
+        QC.inj(Map(QC.inj(Filter(src, rval)).embed, lval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Squashing =>
-      val Ann(buckets, value) = a1.project.ask
+      val Ann(buckets, value) = a1._1
       concatBuckets(prov.squashProvenances(buckets)) match {
         case Some((buck, newBuckets)) =>
           val (mf, buckAccess, valAccess) = concat(buck, value)
-          EnvT((
-            Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
-            QC.inj(Map(a1, mf)))).right
+          (Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
+            QC.inj(Map(a1._2, mf)).embed).right
         case None =>
-          EnvT((
-            EmptyAnn[T],
-            QC.inj(Map(a1, value)))).right
+          (EmptyAnn[T],
+            QC.inj(Map(a1._2, value)).embed).right
       }
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
@@ -696,45 +633,51 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(set.GroupBy, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      EnvT((Ann(prov.swapProvenances(rval :: buckets), lval), src)).right
+      (Ann(prov.swapProvenances(rval :: buckets), lval), src).right
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
-      val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {
+      val (qs, buckets, lacc, racc) = useMerge(a1._2, a2._2, (src, lfree, rfree) => {
         (QC.inj(Union(src,
-          lfree.mapSuspension(FI.inject.compose(envtLowerNT)),
-          rfree.mapSuspension(FI.inject.compose(envtLowerNT)))),
-          prov.unionProvenances(
-            someAnn(lfree.resume, src).provenance,
-            someAnn(rfree.resume, src).provenance),
+          lfree.mapSuspension(FI.inject),
+          rfree.mapSuspension(FI.inject))).embed,
+          prov.unionProvenances(a1._1.provenance, a2._1.provenance),
           HoleF,
           HoleF)
       })
 
-      EnvT((Ann(buckets, HoleF), qs)).right
+      (Ann(buckets, HoleF), qs).right
 
     case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) =>
-      val (src, lMap, rMap, left, right) = merge(a1, a2)
-      EnvT((
-        src.project.ask,
-        TJ.inj(ThetaJoin(
+      val (qs, buckets, lacc, racc) = useMerge(a1._2, a2._2, (src, lfree, rfree) => {
+        (TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          lfree.mapSuspension(FI.inject),
+          rfree.mapSuspension(FI.inject),
           EquiJF,
           Inner,
-          Free.point(LeftSide))))).right
+          LeftSideF)).embed,
+          prov.joinProvenances(a1._1.provenance, a2._1.provenance),
+          HoleF,
+          HoleF)
+      })
+
+      (Ann(buckets, HoleF), qs).right
 
     case LogicalPlan.InvokeFUnapply(set.Except, Sized(a1, a2)) =>
-      val (src, lMap, rMap, left, right) = merge(a1, a2)
-      EnvT((
-        left.resume.fold(_.ask, κ(src.project.ask)),
-        TJ.inj(ThetaJoin(
+      val (qs, buckets, lacc, racc) = useMerge(a1._2, a2._2, (src, lfree, rfree) => {
+        (TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
-          Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
+          lfree.mapSuspension(FI.inject),
+          rfree.mapSuspension(FI.inject),
+          BoolLit(false),
           LeftOuter,
-          Free.point(LeftSide))))).right
+          LeftSideF)).embed,
+          a1._1.provenance,
+          HoleF,
+          HoleF)
+      })
+
+      (Ann(buckets, HoleF), qs).right
 
     case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Transformation =>

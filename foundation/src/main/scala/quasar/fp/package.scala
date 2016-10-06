@@ -460,18 +460,11 @@ package object fp
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),
-    reflNT[F]
-  )
+    reflNT[F])
 
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
-    λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A]))
-  )
-
-  def envTPrism[T[_[_]], F[_], A](empty: A) = PrismNT[EnvT[A, F, ?], F](
-    λ[EnvT[A, F, ?] ~> λ[α => Option[F[α]]]](_.run._2.some),
-    λ[F ~> EnvT[A, F, ?]](fb => EnvT((empty, fb)))
-  )
+    λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A])))
 }
 
 package fp {

@@ -252,6 +252,7 @@ abstract class DiscoverPathInstances {
         case ThetaJoin(src, lb, rb, on, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
+        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(TJ.inj(in).embed))
       }
     }
 
@@ -270,6 +271,7 @@ abstract class DiscoverPathInstances {
         case EquiJoin(src, lb, rb, lk, rk, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, lk, rk, jType, combine)))
+        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(EJ.inj(in).embed))
       }
     }
 

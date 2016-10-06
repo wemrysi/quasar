@@ -21,7 +21,6 @@ import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import simulacrum.typeclass
 import scalaz._, Scalaz._
 
@@ -46,9 +45,9 @@ import scalaz._, Scalaz._
   def mergeSrcs(
     fm1: FreeMap[IT],
     fm2: FreeMap[IT],
-    a1: EnvT[Ann[IT], F, ExternallyManaged],
-    a2: EnvT[Ann[IT], F, ExternallyManaged]):
-      Option[SrcMerge[EnvT[Ann[IT], F, ExternallyManaged], FreeMap[IT]]]
+    a1: F[ExternallyManaged],
+    a2: F[ExternallyManaged])
+      : Option[SrcMerge[F[ExternallyManaged], FreeMap[IT]]]
 }
 
 object Mergeable {
@@ -66,9 +65,9 @@ object Mergeable {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], Const[A, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], Const[A, ?], ExternallyManaged]) =
-        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[A, ?], ExternallyManaged], FreeMap[IT]](p1, left, right))
+        p1: Const[A, ExternallyManaged],
+        p2: Const[A, ExternallyManaged]) =
+        (p1 ≟ p2).option(SrcMerge[Const[A, ExternallyManaged], FreeMap[IT]](p1, HoleF, HoleF))
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](
@@ -81,18 +80,18 @@ object Mergeable {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        cp1: EnvT[Ann[IT], Coproduct[F, G, ?], ExternallyManaged],
-        cp2: EnvT[Ann[IT], Coproduct[F, G, ?], ExternallyManaged]) =
-        (cp1.lower.run, cp2.lower.run) match {
+        cp1: Coproduct[F, G, ExternallyManaged],
+        cp2: Coproduct[F, G, ExternallyManaged]) =
+        (cp1.run, cp2.run) match {
           case (-\/(left1), -\/(left2)) =>
-            F.mergeSrcs(left, right, EnvT((cp1.ask, left1)), EnvT((cp2.ask, left2))).map {
+            F.mergeSrcs(left, right, left1, left2).map {
               case SrcMerge(src, left, right) =>
-                SrcMerge(envtHmap(FC)(src), left, right)
+                SrcMerge(FC.inj(src), left, right)
             }
           case (\/-(right1), \/-(right2)) =>
-            G.mergeSrcs(left, right, EnvT((cp1.ask, right1)), EnvT((cp2.ask, right2))).map {
+            G.mergeSrcs(left, right, right1, right2).map {
               case SrcMerge(src, left, right) =>
-                SrcMerge(envtHmap(GC)(src), left, right)
+                SrcMerge(GC.inj(src), left, right)
             }
           case (_, _) => None
         }
