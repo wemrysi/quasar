@@ -380,7 +380,7 @@ lazy val sparkcore = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces

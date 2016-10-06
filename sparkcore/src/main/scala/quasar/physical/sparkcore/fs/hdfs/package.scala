@@ -22,6 +22,7 @@ import quasar.fs.QueryFile.ResultHandle
 import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
+import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
 import quasar.effect._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
@@ -33,56 +34,55 @@ import quasar.fs.mount.FileSystemDef._
 import quasar.fs.mount.ConnectionUri
 import quasar.contrib.pathy._
 
-
-import java.io.PrintWriter
+import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
+import org.apache.hadoop.conf.Configuration;
+import java.net.URI
 
 import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-package object local {
+package object hdfs {
 
   import corequeryfile.RddState
 
-  val FsType = FileSystemType("sparklocal")
+  val FsType = FileSystemType("spark-hdfs")
 
   type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
-  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff0, A]
+  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
   type Eff3[A] = Coproduct[PhysErr, Eff2, A]
   type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
 
-  final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
+  final case class SparkFSConf(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
   def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
 
     def error(msg: String): DefinitionError \/ SparkFSConf =
       NonEmptyList(msg).left[EnvironmentError].left[SparkFSConf]
 
-    def forge(master: String, rootPath: String): DefinitionError \/ SparkFSConf =
+    def forge(master: String, hdfsUriStr: String, rootPath: String): DefinitionError \/ SparkFSConf =
       posixCodec.parseAbsDir(rootPath)
         .map { prefix =>
-        SparkFSConf(new SparkConf().setMaster(master), sandboxAbs(prefix))
+        SparkFSConf(new SparkConf().setMaster(master), hdfsUriStr, sandboxAbs(prefix))
       }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
 
-    // TODO use spark://host:port/var/hadoop
-    // note: that some master configs can be in different shape than spark://host:port
     uri.value.split('|').toList match {
-      case master :: prefixPath :: Nil => forge(master, prefixPath)
+      case master :: hdfsUriStr :: prefixPath :: Nil => forge(master, hdfsUriStr, prefixPath)
       case _ =>
         error("Missing master and prefixPath (seperated by |)" +
-          " e.g spark://host:port|/var/hadoop/")
+          " e.g spark://spark_host:port|hdfs://hdfs_host:port|/user/")
     }
   }
 
-  final case class SparkFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
+  final case class SparkHdfsFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
   private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): Free[S, SparkFSDef[S]] = {
+  ): Free[S, SparkHdfsFSDef[S]] = {
 
     val genSc = Task.delay {
       new SparkContext(sparkConf.setAppName("quasar"))
@@ -91,39 +91,52 @@ package object local {
     lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, PrintWriter]) |@|
+      TaskRef(Map.empty[WriteHandle, HdfsWriteCursor]) |@|
       genSc) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, printWriters, sc) =>
+      (genState, rddStates, sparkCursors, writeCursors, sc) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
-      (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
+      (KeyValueStore.impl.fromTaskRef[WriteHandle, HdfsWriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+      SparkHdfsFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
   }
 
-  private def fsInterpret(fsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-    corequeryfile.chrooted[Eff](queryfile.input, fsConf.prefix),
-    corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
-    writefile.chrooted[Eff](fsConf.prefix),
-    managefile.chrooted[Eff](fsConf.prefix))
+  private def fsInterpret(sparkFsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = {
+
+    def hdfsPathStr: AFile => Task[String] = (afile: AFile) => Task.delay {
+      sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
+    }
+    // TODO function is not needed since it is closed over Task
+    def fileSystem: () => Task[HdfsFileSystem] = () => Task.delay {
+      val conf = new Configuration()
+      conf.setBoolean("fs.hdfs.impl.disable.cache", true)
+      HdfsFileSystem.get(new URI(sparkFsConf.hdfsUriStr), conf)
+    }
+
+    interpretFileSystem(
+      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), sparkFsConf.prefix),
+      corereadfile.chrooted(readfile.input[Eff](hdfsPathStr, fileSystem), sparkFsConf.prefix),
+      writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
+      managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))
+  }
 
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
         for {
-          fsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
+          sparkFsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
           res <- {
-            sparkFsDef(fsConf.sparkConf).map {
-              case SparkFSDef(run, close) =>
+            sparkFsDef(sparkFsConf.sparkConf).map {
+              case SparkHdfsFSDef(run, close) =>
                 FileSystemDef.DefinitionResult[Free[S, ?]](
-                  fsInterpret(fsConf) andThen run,
+                  fsInterpret(sparkFsConf) andThen run,
                   close)
             }.liftM[DefErrT]
           }

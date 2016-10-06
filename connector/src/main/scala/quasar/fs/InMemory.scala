@@ -199,7 +199,7 @@ object InMemory {
 
     private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
       queryResponsesL.st map (qrs =>
-        Vector(PhaseResult.Detail("Lookup in Memory", executionPlan(lp, qrs).description)))
+        Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).description)))
 
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")

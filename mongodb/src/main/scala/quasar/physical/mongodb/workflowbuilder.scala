@@ -1767,6 +1767,9 @@ object WorkflowBuilder {
       new Ops[F]
   }
 
+  // FIXME: These implicits should not be here, because this is not a companion
+  //        object, and therefore not on the search path.
+
   implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
     (implicit
       RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
@@ -1786,9 +1789,7 @@ object WorkflowBuilder {
         case spb @ ShapePreservingBuilderF(src, inputs, op) =>
           val nt = "ShapePreservingBuilder" :: nodeType
           NonTerminal(nt, None,
-            render(src) ::
-              (inputs.map(render) :+
-                Terminal("Op" :: nt, Some(spb.dummyOp.shows))))
+            render(src) :: (inputs.map(render) :+ spb.dummyOp.render))
         case ValueBuilderF(value) =>
           Terminal("ValueBuilder" :: nodeType, Some(value.shows))
         case ExprBuilderF(src, expr) =>
@@ -1833,4 +1834,15 @@ object WorkflowBuilder {
             render(src) :: structure.map(RC.render))
       }
     }
+
+  // TODO: Perhaps remove this, and explicitly `render` in the places that
+  //       depend on it.
+  implicit def WorkflowBuilderShow[F[_]: Coalesce]
+    (implicit
+      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
+      RC: RenderTree[Contents[Expr]],
+      RF: RenderTree[Fix[F]],
+      ev: WorkflowOpCoreF :<: F)
+      : Show[WorkflowBuilder[F]] =
+    Show.show(_.render.show)
 }

@@ -19,9 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.RenderTree.ops._
 import quasar.Func.Input2
-import quasar.fp.ski.κ
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -29,6 +27,7 @@ import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._
@@ -70,7 +69,7 @@ object queryfile {
       val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", main.render))
+        Vector(PhaseResult.detail("XQuery", main.render))
 
       def extractErr(partName: String, msg: String): FileSystemError =
         FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
@@ -90,9 +89,8 @@ object queryfile {
       val planning = for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
         shifted =  shiftRead[Fix](qs)
-        shftdRT =  shifted.cata(linearize).reverse.render
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
-                     PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
+                     PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse)))
         mod     <- plan(shifted).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
