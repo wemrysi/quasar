@@ -280,12 +280,9 @@ object Planner {
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
 
-          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = StateT((sc: SparkContext) =>
-              EitherT(freeCataM(kf)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).map(func => (sc, func))
-          )
+          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = EitherT(freeCataM(kf)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).liftM[SparkStateT]
           
-
-          val merger: SparkState[Data => Data] = StateT((sc: SparkContext) =>
+          val merger: SparkState[Data => Data] = 
             EitherT((freeCataM(combine)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
               case LeftSide => ((x: Data) => x match {
                 case Data.Arr(elems) => elems(0)
@@ -295,7 +292,7 @@ object Planner {
                 case Data.Arr(elems) => elems(1)
                 case _ => Data.NA
               }).right
-            }, CoreMap.change))).point[Task]).map(func => (sc, func)))
+            }, CoreMap.change))).point[Task]).liftM[SparkStateT]
 
           for {
             lk <- genKey(lKey)
