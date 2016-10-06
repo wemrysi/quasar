@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+ML_IMG_NAME="quasarml/marklogic:8.0-5.8"
+ML_CNT_NAME="ml8"
+ML_ADMIN_PREFIX="http://localhost:8001/admin/v1"
+ML_USERNAME="marklogic"
+ML_PASSWORD="marklogic"
+
+if [[ -z "${ML_DOCKERHUB_USERNAME-}" || -z "${ML_DOCKERHUB_PASSWORD-}" ]]; then
+  echo "ERROR: ML_DOCKERHUB_USERNAME and ML_DOCKERHUB_PASSWORD must be set."
+  exit 1
+fi
+
+# Login to dockerhub
+docker login -u "$ML_DOCKERHUB_USERNAME" -p "$ML_DOCKERHUB_PASSWORD"
+
+# Start the MarkLogic container
+docker run -d --name $ML_CNT_NAME -p 8000-8002:8000-8002 $ML_IMG_NAME
+
+# Allow the server to start
+sleep 20
+
+# Initialize the server with the license info
+curl --anyauth -i -X POST -d "" ${ML_ADMIN_PREFIX}/init
+
+# Allow the server to restart
+sleep 20
+
+# Add the admin user
+curl -i -X POST --data "admin-username=${ML_USERNAME}&admin-password=${ML_PASSWORD}" ${ML_ADMIN_PREFIX}/instance-admin
+
+# TODO: Add indexes as needed to speedup tests
