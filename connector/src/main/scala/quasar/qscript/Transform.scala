@@ -438,28 +438,30 @@ class Transform
       Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc[T, ?], JoinSide](RightSide)))))
 
     condError.map { cond =>
-      val (commonSrc, lMap, rMap, leftSide, rightSide) = merge(values(0)._2, values(1)._2)
-      val Ann(leftBuckets, leftValue) = values(0)._1
-      val Ann(rightBuckets, rightValue) = values(1)._1
+      val (qs, buckets, lacc, racc) = merge(values(0)._2, values(1)._2) ((commonSrc, lBranch, rBranch) => {
+        val Ann(leftBuckets, leftValue) = values(0)._1
+        val Ann(rightBuckets, rightValue) = values(1)._1
 
-      val buckets: List[FreeMap[T]] =
-        prov.joinProvenances(leftBuckets, rightBuckets)
+        // cond >>= {
+        //   case LeftSide => leftValue.map(κ(LeftSide))
+        //   case RightSide => rightValue.map(κ(RightSide))
+        // }
 
-      // cond >>= {
-      //   case LeftSide => leftValue.map(κ(LeftSide))
-      //   case RightSide => rightValue.map(κ(RightSide))
-      // }
-
-      (Ann[T](buckets, HoleF[T]),
-        TJ.inj(ThetaJoin(
+        (TJ.inj(ThetaJoin(
           commonSrc,
-          rebaseBranch(leftSide, lMap).mapSuspension(FI.inject),
-          rebaseBranch(rightSide, rMap).mapSuspension(FI.inject),
+          lBranch.mapSuspension(FI.inject),
+          rBranch.mapSuspension(FI.inject),
           cond,
           tpe,
-          combine)).embed)
-     }
-   }
+          combine)).embed,
+          prov.joinProvenances(leftBuckets, rightBuckets),
+          HoleF,
+          HoleF)
+      })
+
+      (Ann(buckets, HoleF), qs)
+    }
+  }
 
   def ProjectTarget(prefix: Target, field: FreeMap[T]): Target = {
     val Ann(provenance, values) = prefix._1
