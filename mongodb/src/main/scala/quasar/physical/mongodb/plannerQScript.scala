@@ -87,6 +87,8 @@ object MongoDbQScriptPlanner {
       OutputM[JsCore] =
     freeCataM(fm)(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
 
+  def unimplemented(name: String) = InternalError(s"unimplemented $name").left
+
   // TODO: Should have a JsFn version of this for $reduce nodes.
   val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
     import quasar.qscript.ReduceFuncs._
@@ -109,8 +111,6 @@ object MongoDbQScriptPlanner {
       AlgebraM[OutputM, MapFunc[T, ?], Fix[ExprOp]] = {
     import MapFuncs._
 
-    val unimplemented = InternalError("unimplemented").left
-
     def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
       freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
 
@@ -122,11 +122,12 @@ object MongoDbQScriptPlanner {
         v1.cataM(BsonCodec.fromEJson).bimap(
           κ(NonRepresentableEJson(v1.shows)),
           $literal(_))
+      case Now() => unimplemented("Now expression")
 
-      case Date(a1) => unimplemented
-      case Time(a1) => unimplemented
-      case Timestamp(a1) => unimplemented
-      case Interval(a1) => unimplemented
+      case Date(a1) => unimplemented("Date expression")
+      case Time(a1) => unimplemented("Time expression")
+      case Timestamp(a1) => unimplemented("Timestamp expression")
+      case Interval(a1) => unimplemented("Interval expression")
 
       // TODO: when each of these is broken out as a separate Func, these will
       // go to the funcHandler.
@@ -161,21 +162,21 @@ object MongoDbQScriptPlanner {
         case _              =>
           InternalError(field + " is not a valid time period").left
       }
-      case IfUndefined(a1, a2) => unimplemented
+      case IfUndefined(a1, a2) => unimplemented("IfUndefined expression")
 
-      case Within(a1, a2) => unimplemented
+      case Within(a1, a2) => unimplemented("Within expression")
 
-      case Integer(a1) => unimplemented
-      case Decimal(a1) => unimplemented
-      case ToString(a1) => unimplemented
+      case Integer(a1) => unimplemented("Integer expression")
+      case Decimal(a1) => unimplemented("Decimal expression")
+      case ToString(a1) => unimplemented("ToString expression")
 
-      case MakeArray(a1) => unimplemented
-      case MakeMap(a1, a2) => unimplemented
-      case ConcatMaps(a1, a2) => unimplemented
+      case MakeArray(a1) => unimplemented("MakeArray expression")
+      case MakeMap(a1, a2) => unimplemented("MakeMap expression")
+      case ConcatMaps(a1, a2) => unimplemented("ConcatMap expression")
       case ProjectField($var(DocField(base)), $literal(Bson.Text(field))) =>
         $var(DocField(base \ BsonField.Name(field))).right
-      case ProjectIndex(a1, a2)  => unimplemented
-      case DeleteField(a1, a2)  => unimplemented
+      case ProjectIndex(a1, a2)  => unimplemented("ProjectIndex expression")
+      case DeleteField(a1, a2)  => unimplemented("DeleteField expression")
 
       // NB: This is maybe a NOP for Fix[ExprOp]s, as they (all?) safely
       //     short-circuit when given the wrong type. However, our guards may be
@@ -183,11 +184,11 @@ object MongoDbQScriptPlanner {
       //     short-circuit, so …
       case Guard(_, _, cont, _) => cont.right
 
-      case DupArrayIndices(_) => unimplemented
-      case DupMapKeys(_)      => unimplemented
-      case Range(_, _)        => unimplemented
-      case ZipArrayIndices(_) => unimplemented
-      case ZipMapKeys(_)      => unimplemented
+      case DupArrayIndices(_) => unimplemented("DupArrayindices expression")
+      case DupMapKeys(_)      => unimplemented("DupMapKeys expression")
+      case Range(_, _)        => unimplemented("Range expression")
+      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices expression")
+      case ZipMapKeys(_)      => unimplemented("ZipMapKeys expression")
     }
 
     mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
@@ -202,13 +203,11 @@ object MongoDbQScriptPlanner {
 
     import MapFuncs._
 
-    val unimplemented = InternalError("unimplemented").left
-
     {
       case Constant(v1) => v1.cata(Data.fromEJson).toJs \/> NonRepresentableEJson(v1.shows)
       // FIXME: Not correct
       case Undefined() => ident("undefined").right
-      case Now() => unimplemented
+      case Now() => New(Name("Date"), Nil).right
 
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).right
@@ -225,7 +224,7 @@ object MongoDbQScriptPlanner {
         If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
           Call(ident("ISODate"), List(a1)),
           ident("undefined")).right
-      case Interval(a1) => unimplemented
+      case Interval(a1) => unimplemented("Interval JS")
       case TimeOfDay(a1) => {
         def pad2(x: JsCore) =
           Let(Name("x"), x,
@@ -252,7 +251,7 @@ object MongoDbQScriptPlanner {
             Literal(Js.Str(".")),
             pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).right
       }
-      case ToTimestamp(a1) => unimplemented
+      case ToTimestamp(a1) => unimplemented("ToTimestamp JS")
       // FIXME: Handle non-constant strings as well
       case Extract(Literal(Js.Str(str)), x) =>
         str match {
@@ -330,7 +329,7 @@ object MongoDbQScriptPlanner {
         If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1).right
       case And(a1, a2) => BinOp(jscore.And, a1, a2).right
       case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).right
-      case Coalesce(a1, a2) => unimplemented
+      case Coalesce(a1, a2) => unimplemented("Coalesce JS")
       case Between(a1, a2, a3) =>
         Call(ident("&&"), List(
           Call(ident("<="), List(a2, a1)),
@@ -385,15 +384,15 @@ object MongoDbQScriptPlanner {
           List(a1)).right
       case Substring(a1, a2, a3) =>
         Call(Select(a1, "substr"), List(a2, a3)).right
-      // case ToId(a1) => Call(ident("ObjectId"), List(a1)).right
 
-      case MakeArray(a1) => unimplemented
-      case MakeMap(a1, a2) => unimplemented
+      case MakeArray(a1) => Arr(List(a1)).right
+      case MakeMap(Literal(Js.Str(str)), a2) => Obj(ListMap(Name(str) -> a2)).right
+      case MakeMap(a1, a2) => unimplemented("MakeMap JS")
       case ConcatArrays(a1, a2) => BinOp(jscore.Add, a1, a2).right
-      case ConcatMaps(a1, a2) => unimplemented
+      case ConcatMaps(a1, a2) => unimplemented("ConcatMaps JS")
       case ProjectField(a1, a2) => Access(a1, a2).right
       case ProjectIndex(a1, a2) => Access(a1, a2).right
-      case DeleteField(a1, a2)  => unimplemented
+      case DeleteField(a1, a2)  => unimplemented("DeleteField JS")
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -418,11 +417,11 @@ object MongoDbQScriptPlanner {
           InternalError("uncheckable type").left)(
           f => If(f(expr), cont, fallback).right)
 
-      case DupArrayIndices(_) => unimplemented
-      case DupMapKeys(_)      => unimplemented
-      case Range(_, _)        => unimplemented
-      case ZipArrayIndices(_) => unimplemented
-      case ZipMapKeys(_)      => unimplemented
+      case DupArrayIndices(_) => unimplemented("DupArrayIndices JS")
+      case DupMapKeys(_)      => unimplemented("DupMapKeys JS")
+      case Range(_, _)        => unimplemented("Range JS")
+      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices JS")
+      case ZipMapKeys(_)      => unimplemented("ZipMapKeys JS")
     }
   }
 
@@ -485,7 +484,7 @@ object MongoDbQScriptPlanner {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.Date] =
         v._1.project match {
           case Constant(d @ Data.Date(_)) => Some(d)
-          case _                         => None
+          case _                          => None
         }
     }
 
@@ -673,8 +672,9 @@ object MongoDbQScriptPlanner {
                    ev3: EX :<: ExprOp):
         AlgebraM[StateT[OutputM, NameGen, ?], F, WorkflowBuilder[WF]]
 
-    def unimplemented[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
-      StateT(κ((InternalError("unimplemented"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
+    def unimplemented[WF[_]](name: String)
+        : StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
+      StateT(κ((InternalError(s"unimplemented $name"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
 
     def shouldNotBeReached[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
       StateT(κ((InternalError("should not be reached"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
@@ -709,8 +709,9 @@ object MongoDbQScriptPlanner {
                    ev1: Show[WorkflowBuilder[WF]],
                    WB: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) = {
-          case qscript.Map(src, f) => getExprBuilder[T, WF, EX](funcHandler)(src, f).liftM[GenT]
-          case LeftShift(src, struct, repair) => unimplemented
+          case qscript.Map(src, f) =>
+            getExprBuilder[T, WF, EX](funcHandler)(src, f).liftM[GenT]
+          case LeftShift(src, struct, repair) => unimplemented("LeftShift")
           // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
           //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
           case Reduce(src, bucket, reducers, repair) =>
@@ -748,10 +749,6 @@ object MongoDbQScriptPlanner {
           case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
-
-    def coEnvHmap[F[_], G[_], A](f: F ~> G) =
-      λ[CoEnv[A, F, ?] ~> CoEnv[A, G, ?]](fa => CoEnv(fa.run.map(f(_))))
-
 
     implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
@@ -1002,12 +999,9 @@ object MongoDbQScriptPlanner {
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
-      opt <- log("QScript (Mongo-specific)")(liftError(
-        qs.transCataM[PlannerError \/ ?, MongoQScriptInterim](tf =>
-          (liftFGM(assumeReadType[T, MongoQScriptInterim](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
-            SimplifyJoin[T, QScriptRead[T, ?], MongoQScriptInterim].simplifyJoin(idPrism.reverseGet)
-          ).apply(tf)).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
-            repeatedly(Normalizable[MongoQScript].normalize(_: MongoQScript[T[MongoQScript]])))))
+      opt <- log("QScript (Mongo-specific)")(
+        shiftRead(qs).transCata[MongoQScript](
+          SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet)).point[M])
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
