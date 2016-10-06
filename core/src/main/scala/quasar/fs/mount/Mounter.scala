@@ -31,10 +31,17 @@ object Mounter {
   /** A kind of key-value store where the keys are absolute paths, with an
     * additional operation to efficiently look up nested paths. */
   trait PathStore[F[_], V] {
+    /** The current value for a path, if any. */
     def get(path: APath): OptionT[F, V]
+    /** All paths which are nested within the given path and for which a value
+      * is present. */
     def descendants(dir: ADir): F[Set[APath]]
+    /** Associate a value with a path that is not already present, or else do
+      * nothing. Yields true if the write occurred. */
     def insert(path: APath, value: V): F[Boolean]
+    /** Put the store back into a usable state after a failed `insert`. */
     def recover: F[Unit]
+    /** Remove a path and its value, if present, or do nothing */
     def delete(path: APath): F[Unit]
   }
 
@@ -51,7 +58,13 @@ object Mounter {
     def failIfExisting(path: APath): MntE[Unit] =
       store.get(path).as(pathExists(path)).toLeft(())
 
-    def handleRequest(req: MountRequest): MntE[Unit] = {
+    def getType(p: APath): OptionT[F, MountType] =
+      store.get(p).map {
+        case ViewConfig(_, _)         => MountType.viewMount()
+        case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
+      }
+
+    def handleMount(req: MountRequest): MntE[Unit] = {
       val putOrUnmount: MntE[Unit] =
         store.insert(req.path, req.toConfig)
           .liftM[MntErrT].ifM(
@@ -61,12 +74,6 @@ object Mounter {
 
       failIfExisting(req.path) *> mount(req) *> putOrUnmount
     }
-
-    def getType(p: APath): OptionT[F, MountType] =
-      store.get(p).map {
-        case ViewConfig(_, _)         => MountType.viewMount()
-        case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
-      }
 
     def handleUnmount(path: APath): OptionT[F, Unit] =
       store.get(path)
@@ -106,10 +113,10 @@ object Mounter {
         store.get(path).run
 
       case MountView(loc, query, vars) =>
-        handleRequest(MountRequest.mountView(loc, query, vars)).run
+        handleMount(MountRequest.mountView(loc, query, vars)).run
 
       case MountFileSystem(loc, typ, uri) =>
-        handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
+        handleMount(MountRequest.mountFileSystem(loc, typ, uri)).run
 
       case Unmount(path) =>
         handleUnmount(path)
