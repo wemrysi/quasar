@@ -22,6 +22,7 @@ import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.main.FilesystemQueries

@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}

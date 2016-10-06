@@ -22,6 +22,7 @@ import quasar.{BinaryFunc, Data, Func, GenericFunc, LogicalPlan, Reduction, Sema
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.binder._
 import quasar.std.StdLib, StdLib._
 import quasar.sql.{SemanticAnalysis => SA}, SA._

@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.eitherT._
 import quasar.qscript._
 
