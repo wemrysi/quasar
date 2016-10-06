@@ -113,7 +113,7 @@ package object hdfs {
       sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
     }
     // TODO consider closing over task or read 
-    def fileSystem: () => HdfsFileSystem = () => {
+    def fileSystem: () => Task[HdfsFileSystem] = () => Task.delay {
       val conf = new Configuration()
       conf.setBoolean("fs.hdfs.impl.disable.cache", true)
       HdfsFileSystem.get(new URI(sparkFsConf.hdfsUriStr), conf)

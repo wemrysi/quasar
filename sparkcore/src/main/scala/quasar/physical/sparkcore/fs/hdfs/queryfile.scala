@@ -40,15 +40,14 @@ import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
-class queryfile(fileSystem:() => FileSystem) {
+class queryfile(fileSystem:() => Task[FileSystem]) {
 
   private def toPath(apath: APath): Task[Path] = Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = fileSystem().map { hdfs =>
     val pathStr = posixCodec.unsafePrintPath(file)
-    val hdfs = fileSystem()
     val host = hdfs.getUri().getHost()
     val port = hdfs.getUri().getPort()
     val url = s"hdfs://$host:$port$pathStr"
@@ -56,8 +55,10 @@ class queryfile(fileSystem:() => FileSystem) {
     sc.textFile(url)
   }
 
-  def store(rdd: RDD[Data], out: AFile): Task[Unit] = toPath(out).map { path =>
-    val hdfs = fileSystem()
+  def store(rdd: RDD[Data], out: AFile): Task[Unit] = for {
+    path <- toPath(out)
+    hdfs <- fileSystem()
+  } yield {
     val os: OutputStream = hdfs.create(path, new Progressable() {
       override def progress(): Unit = {}
     })
@@ -75,26 +76,28 @@ class queryfile(fileSystem:() => FileSystem) {
     hdfs.close()
   }
 
-  def fileExists(f: AFile): Task[Boolean] =
-    toPath(f).map(path => {
-      val hdfs = fileSystem()
-      val exists = hdfs.exists(path)
-      hdfs.close()
-      exists
-    })
+  def fileExists(f: AFile): Task[Boolean] = for {
+    path <- toPath(f)
+    hdfs <- fileSystem()
+  } yield {
+    val exists = hdfs.exists(path)
+    hdfs.close()
+    exists
+  }
 
-  def listContents(d: ADir): FileSystemErrT[Task, Set[PathSegment]] =
-    EitherT(toPath(d).map(path => {
-      val hdfs = fileSystem()
-      val result = if(hdfs.exists(path)) {
-        hdfs.listStatus(path).toSet.map {
-          case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
-          case directory => DirName(directory.getPath().getName()).left[FileName]
-        }.right[FileSystemError]
-      } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-      hdfs.close
-      result
-    }))
+  def listContents(d: ADir): FileSystemErrT[Task, Set[PathSegment]] = EitherT(for {
+    path <- toPath(d)
+    hdfs <- fileSystem()
+  } yield {
+    val result = if(hdfs.exists(path)) {
+      hdfs.listStatus(path).toSet.map {
+        case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
+        case directory => DirName(directory.getPath().getName()).left[FileName]
+      }.right[FileSystemError]
+    } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
+    hdfs.close
+    result
+  })
 
   def readChunkSize: Int = 5000
 
@@ -103,5 +106,5 @@ class queryfile(fileSystem:() => FileSystem) {
 }
 
 object queryfile {
-  def input(fileSystem:() => FileSystem): Input = new queryfile(fileSystem).input
+  def input(fileSystem:() => Task[FileSystem]): Input = new queryfile(fileSystem).input
 }

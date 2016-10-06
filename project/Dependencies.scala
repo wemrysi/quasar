@@ -67,7 +67,6 @@ object Dependencies {
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion,
     ("org.apache.hadoop" % "hadoop-client" % "2.7.3")
-      .exclude("commons-collections", "commons-collections")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-logging", "commons-logging")
       .exclude("xerces", "xercesImpl")

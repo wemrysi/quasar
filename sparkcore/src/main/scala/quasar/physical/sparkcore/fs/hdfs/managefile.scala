@@ -37,13 +37,13 @@ import scalaz.concurrent.Task
 
 object managefile {
 
-  def chrooted[S[_]](prefix: ADir, fileSystem: () => FileSystem)(implicit
+  def chrooted[S[_]](prefix: ADir, fileSystem: () => Task[FileSystem])(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): ManageFile ~> Free[S, ?] =
     flatMapSNT(interpret(fileSystem)) compose chroot.manageFile[ManageFile](prefix)
 
-  def interpret[S[_]](fileSystem: () => FileSystem)(implicit
+  def interpret[S[_]](fileSystem: () => Task[FileSystem])(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): ManageFile ~> Free[S, ?] = {
@@ -65,21 +65,22 @@ object managefile {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def pathExists[S[_]](fileSystem: () => FileSystem)(f: APath)(
-    implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(toPath(f).map{ path =>
-      val hdfs = fileSystem()
+  def pathExists[S[_]](fileSystem: () => Task[FileSystem])(f: APath)(
+    implicit s0: Task :<: S): Free[S, Boolean] = lift(for {
+      path <- toPath(f)
+      hdfs <- fileSystem()
+    } yield {
       val exists = hdfs.exists(path)
       hdfs.close
       exists
     }).into[S]
 
-  private def moveFile[S[_]](src: AFile, dst: AFile, fileSystem: () => FileSystem)(implicit
+  private def moveFile[S[_]](src: AFile, dst: AFile, fileSystem: () => Task[FileSystem])(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): Free[S, Unit] = {
-    val hdfs: FileSystem = fileSystem()
     val move: Task[PhysicalError \/ Unit] = (for {
+      hdfs <- fileSystem()
       srcPath <- toPath(src)
       dstPath <- toPath(dst)
       dstParent <- toPath(fileParent(dst))
@@ -96,12 +97,12 @@ object managefile {
     Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
 
-  private def moveDir[S[_]](src: ADir, dst: ADir, fileSystem: () => FileSystem)(implicit
+  private def moveDir[S[_]](src: ADir, dst: ADir, fileSystem: () => Task[FileSystem])(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): Free[S, Unit] = {
-    val hdfs: FileSystem = fileSystem()
     val move: Task[PhysicalError \/ Unit] = (for {
+      hdfs <- fileSystem()
       srcPath <- toPath(src)
       dstPath <- toPath(dst)
     } yield {
@@ -117,12 +118,15 @@ object managefile {
   }
 
 
-  private def delete[S[_]](apath: APath, fileSystem: () => FileSystem)(implicit
+  private def delete[S[_]](apath: APath, fileSystem: () => Task[FileSystem])(implicit
     s0: Task :<: S,
     s1: PhysErr :<: S
   ): Free[S, FileSystemError \/ Unit] = {
-    val hdfs: FileSystem = fileSystem()
-    val delete: Task[FileSystemError \/ Unit] = toPath(apath).map { path =>
+
+    val delete: Task[FileSystemError \/ Unit] = for {
+      path <- toPath(apath)
+      hdfs <- fileSystem()
+    } yield {
       val result = if(hdfs.exists(path)) {
         hdfs.delete(path, true).right[FileSystemError]
       }
@@ -130,8 +134,8 @@ object managefile {
         pathErr(pathNotFound(apath)).left[Unit]
       }
       hdfs.close()
-      result
-    }.map(_.as(()))
+      result.as(())
+    }
 
     val deleteHandled: Task[PhysicalError \/ (FileSystemError \/ Unit)] =
       delete.map(_.right[PhysicalError]).handle {

@@ -42,14 +42,14 @@ object writefile {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def chrooted[S[_]](prefix: ADir, fileSystem: () => FileSystem)(implicit
+  def chrooted[S[_]](prefix: ADir, fileSystem: () => Task[FileSystem])(implicit
     s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
     s1: MonotonicSeq :<: S,
     s2: Task :<: S
   ) : WriteFile ~> Free[S, ?] =
     flatMapSNT(interpret(fileSystem)) compose chroot.writeFile[WriteFile](prefix)
 
-  def interpret[S[_]](fileSystem: () => FileSystem)(implicit
+  def interpret[S[_]](fileSystem: () => Task[FileSystem])(implicit
     s0: KeyValueStore[WriteHandle, HdfsWriteCursor, ?] :<: S,
     s1: MonotonicSeq :<: S,
     s2: Task :<: S
@@ -62,21 +62,22 @@ object writefile {
       }
     }
 
-  def open[S[_]](f: AFile, fileSystem: () => FileSystem) (implicit
+  def open[S[_]](f: AFile, fileSystem: () => Task[FileSystem]) (implicit
     writers: KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, S],
     sequence: MonotonicSeq.Ops[S],
     s2: Task :<: S
   ): Free[S, FileSystemError \/ WriteHandle] = {
 
-    def createCursor: Free[S, HdfsWriteCursor] =
-      lift(toPath(f).map { path => {
-        val hdfs: FileSystem = fileSystem()
-        val os: OutputStream = hdfs.create(path, new Progressable() {
-          override def progress(): Unit = {}
-        })
-        val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
-        HdfsWriteCursor(hdfs, bw)}
-      }).into[S]
+    def createCursor: Free[S, HdfsWriteCursor] = lift(for {
+      path <- toPath(f)
+      hdfs <- fileSystem()
+    } yield {
+      val os: OutputStream = hdfs.create(path, new Progressable() {
+        override def progress(): Unit = {}
+      })
+      val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
+      HdfsWriteCursor(hdfs, bw)
+    }).into[S]
 
     for {
       hwc <- createCursor

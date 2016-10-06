@@ -52,17 +52,17 @@ object readfile {
       }
     })
 
-  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: () => FileSystem)(
+  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: () => Task[FileSystem])(
     implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(hdfsPathStr(f).map { pathStr =>
-      fileSystem().exists(new Path(pathStr))
+    lift(hdfsPathStr(f).flatMap { pathStr =>
+      fileSystem().map(fs => fs.exists(new Path(pathStr)))
     }).into[S]
 
   // TODO arbitrary value, more or less a good starting point
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: () => FileSystem)(implicit
+  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: () => Task[FileSystem])(implicit
     read: Read.Ops[SparkContext, S], s0: Task :<: S) =
     Input(
       (f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr),
