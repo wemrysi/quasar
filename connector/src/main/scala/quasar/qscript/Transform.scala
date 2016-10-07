@@ -57,10 +57,11 @@ class Transform
     eq:         Delay[Equal, F],
     show:       Delay[Show, F]) {
 
-  val prov = new Provenance[T]
+  private val prov = new Provenance[T]
+  private val rewrite = new Rewrite[T]
 
-  type Target = (Ann[T], T[F])
-  type LinearF = List[F[ExternallyManaged]]
+  private type Target = (Ann[T], T[F])
+  private type LinearF = List[F[ExternallyManaged]]
 
   case class ZipperSides(
     lSide: FreeMap[T],
@@ -80,23 +81,23 @@ class Transform
       Algebra[F, List[F[ExternallyManaged]]] =
     fl => fl.as[ExternallyManaged](Extern) :: fl.fold
 
-  def delinearizeInner[A]: Coalgebra[F, List[F[A]]] = {
+  private def delinearizeInner[A]: Coalgebra[F, List[F[A]]] = {
     case Nil    => DE.inj(Const[DeadEnd, List[F[A]]](Root))
     case h :: t => h.as(t)
   }
 
-  def delinearizeTargets[F[_]: Functor, A]:
+  private def delinearizeTargets[F[_]: Functor, A]:
       ElgotCoalgebra[Hole \/ ?, F, List[F[A]]] = {
     case Nil    => SrcHole.left[F[List[F[A]]]]
     case h :: t => h.as(t).right
   }
 
-  val consZipped: Algebra[ListF[F[ExternallyManaged], ?], ZipperAcc] = {
+  private val consZipped: Algebra[ListF[F[ExternallyManaged], ?], ZipperAcc] = {
     case NilF() => ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
-  val zipper:
+  private val zipper:
       ElgotCoalgebra[
         ZipperAcc \/ ?,
         ListF[F[ExternallyManaged], ?],
@@ -115,9 +116,9 @@ class Transform
   /** Contains a common src, the MapFuncs required to access the left and right
     * sides, and the FreeQS that were unmergeable on either side.
     */
-  type MergeResult = (T[F], FreeQS[T], FreeQS[T])
+  private type MergeResult = (T[F], FreeQS[T], FreeQS[T])
 
-  def merge(left: T[F], right: T[F]): MergeResult = {
+  private def merge(left: T[F], right: T[F]): MergeResult = {
     val lLin = left.cata(linearize).reverse
     val rLin = right.cata(linearize).reverse
 
@@ -139,16 +140,16 @@ class Transform
       rebaseBranch(rightF, rMap).mapSuspension(FI.inject))
   }
 
-  def rebaseBranch(br: Free[F, Hole], fm: FreeMap[T]): Free[F, Hole] =
+  private def rebaseBranch(br: Free[F, Hole], fm: FreeMap[T]): Free[F, Hole] =
     freeTransCata[T, F, F, Hole, Hole](
       br >> Free.roll(QC.inj(Map(Free.point[F, Hole](SrcHole), fm))))(
-      liftCo((new Rewrite[T]).normalizeCoEnv[F]))
+      liftCo(rewrite.normalizeCoEnv[F]))
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
     * right values.
     */
-  def autojoin(left: Target, right: Target)
+  private def autojoin(left: Target, right: Target)
       : (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
     val lann = left._1
     val rann = right._1
@@ -157,7 +158,7 @@ class Transform
 
     val (src, lBranch, rBranch) = merge(left._2, right._2)
 
-    (new Rewrite[T]).unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine).fold {
+    rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine).fold {
       // FIXME: Need a better prov representation, to know when the provs are
       //        the same even when the paths to the values differ.
       val commonProv =
@@ -189,7 +190,7 @@ class Transform
   /** A convenience for a pair of autojoins, does the same thing, but returns
     * access to all three values.
     */
-  def autojoin3(left: Target, center: Target, right: Target):
+  private def autojoin3(left: Target, center: Target, right: Target):
       (T[F], List[FreeMap[T]], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val (lsrc, lbuckets, lval, cval) = autojoin(left, center)
     val (fullSrc, fullBuckets, bval, rval) =
@@ -201,7 +202,7 @@ class Transform
     (fullSrc, fullBuckets, lval >> bval, cval >> bval, rval)
   }
 
-  def merge2Map(
+  private def merge2Map(
     values: Func.Input[Target, nat._2])(
     func: (FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
       Target = {
@@ -218,7 +219,7 @@ class Transform
   }
 
   // TODO unify with `merge2Map`
-  def merge3Map(
+  private def merge3Map(
     values: Func.Input[Target, nat._3])(
     func: (FreeMap[T], FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
       Target = {
@@ -235,7 +236,7 @@ class Transform
     }
   }
 
-  def shiftValues(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
+  private def shiftValues(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
       Target = {
     val Ann(provs, value) = input._1
     val (sides, leftAccess, rightAccess) =
@@ -249,7 +250,7 @@ class Transform
       QC.inj(LeftShift(input._2, Free.roll(f(value)), sides)).embed)
   }
 
-  def shiftIds(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
+  private def shiftIds(input: Target, f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
       Target = {
     val Ann(provs, value) = input._1
     val (sides, leftAccess, rightAccess) =
@@ -263,7 +264,7 @@ class Transform
       QC.inj(LeftShift(input._2, Free.roll(f(value)), sides)).embed)
   }
 
-  def flatten(input: Target): Target = {
+  private def flatten(input: Target): Target = {
     val (Ann(buckets, value), fa) = input
     (Ann(prov.nestProvenances(buckets), value), fa)
   }
@@ -271,7 +272,7 @@ class Transform
   // NB: More complicated LeftShifts are generated as an optimization:
   // before: ThetaJoin(cs, Map(Hole, mf), LeftShift(Hole, struct, repair), comb)
   // after: LeftShift(cs, struct, comb.flatMap(LeftSide => mf.map(_ => LeftSide), RS => repair))
-  def invokeExpansion1(
+  private def invokeExpansion1(
     func: UnaryFunc,
     values: Func.Input[Target, nat._1]):
       Target =
@@ -321,7 +322,7 @@ class Transform
       case structural.ShiftArrayIndices => shiftIds(values(0), DupArrayIndices(_))
     }
 
-  def invokeExpansion2(func: BinaryFunc, values: Func.Input[Target, nat._2]):
+  private def invokeExpansion2(func: BinaryFunc, values: Func.Input[Target, nat._2]):
       Target =
     func match {
       case set.Range =>
@@ -340,7 +341,7 @@ class Transform
             sides)).embed)
     }
 
-  def invokeReduction1(
+  private def invokeReduction1(
     func: UnaryFunc,
     values: Func.Input[Target, nat._1]):
       Target = {
@@ -373,7 +374,7 @@ class Transform
     }
   }
 
-  def invokeReduction2(func: BinaryFunc, values: Func.Input[Target, nat._2])
+  private def invokeReduction2(func: BinaryFunc, values: Func.Input[Target, nat._2])
       : Target = {
     val (src, provs, lMap, rMap) = autojoin(values(0), values(1))
 
@@ -405,7 +406,7 @@ class Transform
     }
   }
 
-  def invokeThetaJoin(values: Func.Input[Target, nat._3], tpe: JoinType)
+  private def invokeThetaJoin(values: Func.Input[Target, nat._3], tpe: JoinType)
       : PlannerError \/ Target = {
     val condError: PlannerError \/ JoinFunc[T] = {
       // FIXME: This won’t work where we join a collection against itself
@@ -441,20 +442,20 @@ class Transform
     }
   }
 
-  def ProjectTarget(prefix: Target, field: FreeMap[T]): Target = {
+  private def ProjectTarget(prefix: Target, field: FreeMap[T]): Target = {
     val Ann(provenance, values) = prefix._1
     (Ann[T](prov.projectField(field) :: provenance, values),
       PB.inj(BucketField(prefix._2, HoleF[T], field)).embed)
   }
 
-  def pathToProj(path: pathy.Path[_, _, _]): Target =
+  private def pathToProj(path: pathy.Path[_, _, _]): Target =
     pathy.Path.peel(path).fold[Target](
       (EmptyAnn[T], DE.inj(Const[DeadEnd, T[F]](Root)).embed)) {
       case (p, n) =>
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
 
-  def fromData[T[_[_]]: Corecursive](data: Data): Data \/ T[EJson] = {
+  private def fromData[T[_[_]]: Corecursive](data: Data): Data \/ T[EJson] = {
     data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
       interpretM[Data \/ ?, EJson, Data, T[EJson]](
         _.left,
