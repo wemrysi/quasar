@@ -58,30 +58,27 @@ object MapFuncPlanner {
     case ToTimestamp(millis) => qscript.timestampToDateTime[F] apply (millis)
     case Now()               => fn.currentDateTime.point[F]
 
-    case Extract(XQuery.StringLit(part), time) => part match {
-      case "century"         => fn.ceiling(fn.yearFromDateTime(xs.dateTime(time)) div 100.xqy).point[F]
-      case "day"             => fn.dayFromDateTime(xs.dateTime(time)).point[F]
-      case "decade"          => fn.floor(fn.yearFromDateTime(xs.dateTime(time)) div 10.xqy).point[F]
-      case "dow"             => mkSeq_(xdmp.weekdayFromDate(xs.date(time)) - 1.xqy).point[F]
-      case "doy"             => xdmp.yeardayFromDate(xs.date(time)).point[F]
-      case "epoch"           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
-      case "hour"            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
-      case "isodow"          => xdmp.weekdayFromDate(xs.date(time)).point[F]
-      case "isoyear"         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
-      case "microseconds"    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
-      case "millennium"      => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
-      case "milliseconds"    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
-      case "minute"          => fn.minutesFromDateTime(xs.dateTime(time)).point[F]
-      case "month"           => fn.monthFromDateTime(xs.dateTime(time)).point[F]
-      case "quarter"         => xdmp.quarterFromDate(xs.date(time)).point[F]
-      case "second"          => fn.secondsFromDateTime(xs.dateTime(time)).point[F]
-      case "timezone"        => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
-      case "timezone_hour"   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
-      case "timezone_minute" => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
-      case "week"            => xdmp.weekFromDate(xs.date(time)).point[F]
-      case "year"            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
-      case other             => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrecognizedDatePart(other))
-    }
+    case ExtractCentury(time)         => fn.ceiling(fn.yearFromDateTime(xs.dateTime(time)) div 100.xqy).point[F]
+    case ExtractDayOfMonth(time)      => fn.dayFromDateTime(xs.dateTime(time)).point[F]
+    case ExtractDecade(time)          => fn.floor(fn.yearFromDateTime(xs.dateTime(time)) div 10.xqy).point[F]
+    case ExtractDayOfWeek(time)       => mkSeq_(xdmp.weekdayFromDate(xs.date(time)) - 1.xqy).point[F]
+    case ExtractDayOfYear(time)       => xdmp.yeardayFromDate(xs.date(time)).point[F]
+    case ExtractEpoch(time)           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
+    case ExtractHour(time)            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
+    case ExtractIsoDayOfWeek(time)    => xdmp.weekdayFromDate(xs.date(time)).point[F]
+    case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
+    case ExtractMicroseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
+    case ExtractMillenium(time)       => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
+    case ExtractMilliseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
+    case ExtractMinute(time)          => fn.minutesFromDateTime(xs.dateTime(time)).point[F]
+    case ExtractMonth(time)           => fn.monthFromDateTime(xs.dateTime(time)).point[F]
+    case ExtractQuarter(time)         => xdmp.quarterFromDate(xs.date(time)).point[F]
+    case ExtractSecond(time)          => fn.secondsFromDateTime(xs.dateTime(time)).point[F]
+    // case ExtractTimezone(time)       => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
+    // case ExtractTimezoneHour(time)   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    // case ExtractTimezoneMinute(time) => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    case ExtractWeek(time)            => xdmp.weekFromDate(xs.date(time)).point[F]
+    case ExtractYear(time)            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
 
     // math
     case Negate(x)      => (-x).point[F]
