@@ -46,6 +46,7 @@ object FuncHandler {
         import fp._
 
         fa.some collect {
+          case Undefined()           => $literal(Bson.Undefined)
           case Add(a1, a2)           => $add(a1, a2)
           case Multiply(a1, a2)      => $multiply(a1, a2)
           case Subtract(a1, a2)      => $subtract(a1, a2)

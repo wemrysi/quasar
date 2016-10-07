@@ -29,118 +29,114 @@ import scalaz._, Scalaz._
 object Mounter {
   import Mounting._, MountConfig._
 
-  /** `Mounting` interpreter interpreting into `KeyValueStore`, using the
-    * supplied functions to handle mount and unmount requests.
-    *
-    * @param mount   Called to handle a mount request.
-    * @param unmount Called to handle the removal/undoing of a mount request.
-    */
-  def apply[F[_], S[_]](
-    mount: MountRequest => F[MountingError \/ Unit],
-    unmount: MountRequest => F[Unit]
-  )(implicit
-    S0: F :<: S,
-    S1: MountConfigs :<: S
-  ): Mounting ~> Free[S, ?] = {
+  /** A kind of key-value store where the keys are absolute paths, with an
+    * additional operation to efficiently look up nested paths. */
+  trait PathStore[F[_], V] {
+    /** The current value for a path, if any. */
+    def get(path: APath): OptionT[F, V]
+    /** All paths which are nested within the given path and for which a value
+      * is present. */
+    def descendants(dir: ADir): F[Set[APath]]
+    /** Associate a value with a path that is not already present, or else do
+      * nothing. Yields true if the write occurred. */
+    def insert(path: APath, value: V): F[Boolean]
+    /** Remove a path and its value, if present, or do nothing */
+    def delete(path: APath): F[Unit]
+  }
 
-    type FreeS[A]  = Free[S, A]
-    type MntE[A]   = MntErrT[FreeS, A]
+  /** `Mounting` interpreter */
+  def apply[F[_]: Monad](
+    mount: MountRequest => MntErrT[F, Unit],
+    unmount: MountRequest => F[Unit],
+    store: PathStore[F, MountConfig]
+  ): Mounting ~> F = {
+    type MntE[A] = MntErrT[F, A]
 
-    val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
     val merr = MonadError[MntE, MountingError]
 
-    def mount0(req: MountRequest): MntE[Unit] =
-      EitherT[FreeS, MountingError, Unit](free.lift(mount(req)).into[S])
-
-    def unmount0(req: MountRequest): FreeS[Unit] =
-      free.lift(unmount(req)).into[S]
-
     def failIfExisting(path: APath): MntE[Unit] =
-      mountConfigs.get(path).as(pathExists(path)).toLeft(())
+      store.get(path).as(pathExists(path)).toLeft(())
 
-    def handleRequest(req: MountRequest): MntE[Unit] = {
-      val putOrUnmount: MntE[Unit] =
-        mountConfigs.compareAndPut(req.path, None, req.toConfig)
-          .liftM[MntErrT].ifM(
-            merr.point(()),
-            unmount0(req).liftM[MntErrT] <*
-              merr.raiseError(pathExists(req.path)))
-
-      failIfExisting(req.path) *> mount0(req) *> putOrUnmount
-    }
-
-    def lookupType(p: APath): OptionT[FreeS, MountType] =
-      mountConfigs.get(p).map {
+    def getType(p: APath): OptionT[F, MountType] =
+      store.get(p).map {
         case ViewConfig(_, _)         => MountType.viewMount()
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
       }
 
-    def forPrefix(dir: ADir): FreeS[Set[APath]] =
-      mountConfigs.keys.map(_
-        .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
-        .toSet)
+    def handleMount(req: MountRequest): MntE[Unit] = {
+      val putOrUnmount: MntE[Unit] =
+        store.insert(req.path, req.toConfig)
+          .liftM[MntErrT].ifM(
+            merr.point(()),
+            unmount(req).liftM[MntErrT] <*
+              merr.raiseError(pathExists(req.path)))
 
-    def handleUnmount(path: APath): OptionT[FreeS, Unit] =
-      mountConfigs.get(path)
-        .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[FreeS]))
-        .flatMapF(req => mountConfigs.delete(path) *> unmount0(req))
+      failIfExisting(req.path) *> mount(req) *> putOrUnmount
+    }
+
+    def handleUnmount(path: APath): OptionT[F, Unit] =
+      store.get(path)
+        .flatMap(cfg => OptionT(mkMountRequest(path, cfg).point[F]))
+        .flatMapF(req => store.delete(path) *> unmount(req))
 
     def handleRemount(src: APath, dst: APath): MntE[Unit] = {
       def reqOrFail(path: APath, cfg: MountConfig): MntE[MountRequest] =
-        OptionT(mkMountRequest(path, cfg).point[FreeS])
+        OptionT(mkMountRequest(path, cfg).point[F])
           .toRight(MountingError.invalidConfig(cfg, "config type mismatch".wrapNel))
 
       for {
-        cfg    <- mountConfigs.get(src).toRight(pathNotFound(src))
+        cfg    <- store.get(src).toRight(pathNotFound(src))
         srcReq <- reqOrFail(src, cfg)
         dstReq <- reqOrFail(dst, cfg)
-        _      <- mountConfigs.delete(src).liftM[MntErrT]
-        _      <- unmount0(srcReq).liftM[MntErrT]
-        upd    =  mountConfigs.compareAndPut(dst, None, dstReq.toConfig)
+
+        _      <- store.delete(src).liftM[MntErrT]
+        _      <- unmount(srcReq).liftM[MntErrT]
+
+        upd    =  store.insert(dst, dstReq.toConfig)
         _      <- OptionT(upd.map(_.option(()))).toRight(pathExists(dst))
-        _      <- mount0(dstReq)
+        _      <- mount(dstReq)
       } yield ()
     }
 
-    λ[Mounting ~> FreeS] {
+    λ[Mounting ~> F] {
       case HavingPrefix(dir) =>
         for {
-          paths <- forPrefix(dir)
-          pairs <- paths.toList.traverse(p => lookupType(p).strengthL(p).run)
+          paths <- store.descendants(dir)
+          pairs <- paths.toList.traverse(p => getType(p).strengthL(p).run)
         } yield pairs.flatMap(_.toList).toMap
 
       case LookupType(path) =>
-        lookupType(path).run
+        getType(path).run
 
       case LookupConfig(path) =>
-        mountConfigs.get(path).run
+        store.get(path).run
 
       case MountView(loc, query, vars) =>
-        handleRequest(MountRequest.mountView(loc, query, vars)).run
+        handleMount(MountRequest.mountView(loc, query, vars)).run
 
       case MountFileSystem(loc, typ, uri) =>
-        handleRequest(MountRequest.mountFileSystem(loc, typ, uri)).run
+        handleMount(MountRequest.mountFileSystem(loc, typ, uri)).run
 
       case Unmount(path) =>
         handleUnmount(path)
           .flatMapF(_ =>
-            refineType(path).swap.foldMap(forPrefix)
+            refineType(path).swap.foldMapM(store.descendants)
               .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
 
       case Remount(src, dst) =>
         if (src ≟ dst)
-          mountConfigs.get(src).void.toRight(pathNotFound(src)).run
+          store.get(src).void.toRight(pathNotFound(src)).run
         else {
-          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): FreeS[Unit] =
+          def move[T](srcDir: ADir, dstDir: ADir, p: Path[Abs,T,Sandboxed]): F[Unit] =
             p.relativeTo(srcDir)
               .map(rel => handleRemount(p, dstDir </> rel).run.void)
               .sequence_
 
-          val moveNested: FreeS[Unit] =
+          val moveNested: F[Unit] =
             (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
-              forPrefix(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
+              store.descendants(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
 
           failIfExisting(dst) *>
             handleRemount(src, dst) <*
@@ -149,13 +145,44 @@ object Mounter {
     }
   }
 
+  /** `Mounting` interpreter using `KeyValueStore` to persist the configuration,
+    * and the supplied functions to handle mount and unmount requests.
+    *
+    * @param mount   Called to handle a mount request.
+    * @param unmount Called to handle the removal/undoing of a mount request.
+    */
+  def kvs[F[_], S[_]](
+    mount: MountRequest => F[MountingError \/ Unit],
+    unmount: MountRequest => F[Unit]
+  )(implicit
+    S0: F :<: S,
+    S1: MountConfigs :<: S
+  ): Mounting ~> Free[S, ?] = {
+    val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
+    Mounter[Free[S, ?]](
+      req => EitherT[Free[S, ?], MountingError, Unit](free.lift(mount(req)).into[S]),
+      req => free.lift(unmount(req)).into[S],
+      new PathStore[Free[S, ?], MountConfig] {
+        def get(path: APath) =
+          mountConfigs.get(path)
+        def descendants(dir: ADir) =
+          mountConfigs.keys.map(_
+            .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
+            .toSet)
+        def insert(path: APath, value: MountConfig) =
+          mountConfigs.compareAndPut(path, None, value)
+        def delete(path: APath) =
+          mountConfigs.delete(path)
+      })
+  }
+
   /** A mounter where all mount requests succeed trivially.
     *
     * Useful in scenarios where only the bookkeeping of mounts is needed.
     */
-  def trivial[S[_]](implicit S: MountConfigs :<: S) = {
+  def trivial[S[_]](implicit S: MountConfigs :<: S): Mounting ~> Free[S, ?] = {
     type F[A] = Coproduct[Id, S, A]
-    val mnt   = Mounter[Id, F](κ(().right), κ(()))
+    val mnt   = Mounter.kvs[Id, F](κ(().right), κ(()))
 
     λ[Mounting ~> Free[S, ?]](m => mnt(m) foldMap (pointNT[Free[S, ?]] :+: liftFT[S]))
   }

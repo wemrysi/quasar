@@ -54,8 +54,6 @@ object MapFunc {
     * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
-    private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
-
     def unapply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Recursive, A](
       mf: CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         Option[List[T[CoEnv[A, MapFunc[T2, ?], ?]]]] =
@@ -66,7 +64,7 @@ object MapFunc {
             (mf, acc) => (mf.project.run.toOption >>=
               {
                 case MakeArray(value) => (value :: acc).some
-                case Constant(Embed(Inj(ejson.Arr(values)))) =>
+                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
                   (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant(v).right).embed) ++ acc).some
                 case _ => None
               }))
@@ -79,8 +77,6 @@ object MapFunc {
     * possible, and punt otherwise.
     */
   object StaticArrayPrefix {
-    private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
-
     def unapply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Recursive, A](
       mf: CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         Option[List[T[CoEnv[A, MapFunc[T2, ?], ?]]]] =
@@ -92,7 +88,7 @@ object MapFunc {
               κ(acc.left),
               _ match {
                 case MakeArray(value) => (value :: acc).right
-                case Constant(Embed(Inj(ejson.Arr(values)))) =>
+                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
                   (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant(v).right).embed) ++ acc).right
                 case _ => acc.left
               })).merge.some
@@ -106,8 +102,6 @@ object MapFunc {
     * also arbitrary expressions that may evaluate to an array of any size.
     */
   object ConcatArraysN {
-    private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
-
     // TODO[matryoshka]: Once we handle directly recursive types, this
     //                   overloading can go away.
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
@@ -129,7 +123,7 @@ object MapFunc {
       mf.run.fold(
         κ(None),
         {
-          case MakeArray(_) | Constant(Embed(Inj(ejson.Arr(_)))) =>
+          case MakeArray(_) | Constant(Embed(ejson.Common(ejson.Arr(_)))) =>
             List(mf.embed).some
           case ConcatArrays(h, t) =>
             (unapply(h.project).getOrElse(List(h)) ++
@@ -144,8 +138,6 @@ object MapFunc {
 
   // TODO subtyping is preventing embeding of MapFuncs
   object ConcatMapsN {
-    private implicit def implicitPrio[F[_], G[_]]: Inject[F, Coproduct[F, G, ?]] = Inject.leftInjectInstance
-
     def apply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Corecursive, A](args: List[T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]] = {
       args.toList match {
@@ -160,7 +152,7 @@ object MapFunc {
       mf.run.fold(
         κ(None),
         {
-          case MakeMap(_, _) | Constant(Embed(Inj(ejson.Map(_)))) =>
+          case MakeMap(_, _) | Constant(Embed(ejson.Extension(ejson.Map(_)))) =>
             List(mf.embed).some
           case ConcatMaps(h, t) =>
             (unapply(h.project).getOrElse(List(h)) ++
