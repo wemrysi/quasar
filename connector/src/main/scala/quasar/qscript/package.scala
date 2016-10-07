@@ -84,9 +84,10 @@ package object qscript {
       : Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead, ?]])
 
-  type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
-  type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]
-  type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
+  type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
+  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
+  type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
+  type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
 
@@ -103,7 +104,7 @@ package object qscript {
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](RightSide)
-  def ReduceIndexF[T[_[_]]](i: Int): Free[MapFunc[T, ?], ReduceIndex] =
+  def ReduceIndexF[T[_[_]]](i: Int): FreeMapA[T, ReduceIndex] =
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
@@ -114,9 +115,6 @@ package object qscript {
 
   import MapFunc._
   import MapFuncs._
-
-  def EquiJF[T[_[_]]]: JoinFunc[T] =
-    Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
       Option[(FreeMap[T], NEL[FreeMap[T]])] =
@@ -131,15 +129,15 @@ package object qscript {
     }
 
   def concat[T[_[_]]: Corecursive, A](
-    l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
-      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T]) =
+    l: FreeMapA[T, A], r: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
 
   def concat3[T[_[_]]: Corecursive, A](
-    l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
-      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
