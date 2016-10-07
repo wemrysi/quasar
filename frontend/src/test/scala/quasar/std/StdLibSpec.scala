@@ -328,6 +328,14 @@ abstract class StdLibSpec extends Qspec {
         "midnight 2016-10-02" >> {
           unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(0))
         }
+
+        "2016-10-08" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-08")), Data.Int(6))
+        }
+
+        "noon 2016-10-08" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-08T12:00:00.000Z")), Data.Int(6))
+        }
       }
 
       "ExtractDayOfYear" >> {
