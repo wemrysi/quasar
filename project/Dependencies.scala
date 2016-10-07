@@ -1,5 +1,7 @@
 package quasar.project
 
+import scala.Option
+import java.lang.System
 import scala.collection.Seq
 
 import sbt._, Keys._
@@ -64,16 +66,22 @@ object Dependencies {
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
+
+  val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
+
+  def buildSparkScope = if(buildSparkCore == "yes") "provided" else "compile"
+
   def sparkcore = Seq(
-    "io.netty"          %  "netty-all"  % nettyVersion,
-    ("org.apache.spark" %% "spark-core" % "1.6.2")
+    "io.netty"          %  "netty-all"  % nettyVersion % buildSparkScope,
+    ("org.apache.spark" %% "spark-core" % "1.6.2") 
       .exclude("commons-collections", "commons-collections")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-logging", "commons-logging")
       .exclude("com.esotericsoftware.minlog", "minlog")
       .exclude("org.spark-project.spark", "unused")
-      .exclude("io.netty", "netty-all")
+      .exclude("io.netty", "netty-all") % buildSparkScope
   )
+
   def marklogicValidation = Seq(
     "eu.timepit" %% "refined" %  refinedVersion
   )
