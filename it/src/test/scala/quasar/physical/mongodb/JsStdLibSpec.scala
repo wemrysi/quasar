@@ -36,8 +36,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Lower, _)   => notHandled.left
-    case (string.Upper, _)   => notHandled.left
+    case (string.Lower, _)   => Skipped("TODO").left
+    case (string.Upper, _)   => Skipped("TODO").left
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
@@ -46,8 +46,14 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (relations.Cond, _) => notHandled.left
-    case (relations.Coalesce, _) => notHandled.left
+    case (relations.Cond, _)     => Skipped("TODO").left
+    case (relations.Coalesce, _) => Skipped("TODO").left
+
+    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
+    // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
+    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
     case _                  => ().right
   }
