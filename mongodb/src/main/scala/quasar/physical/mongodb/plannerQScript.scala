@@ -29,7 +29,7 @@ import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
-import quasar.physical.mongodb.planner.{FuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
+import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
@@ -102,6 +102,9 @@ object MongoDbQScriptPlanner {
     }
   }
 
+  private def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
+    freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
+
   def expression[T[_[_]]: Recursive: ShowT, EX[_]: Traverse](
     funcHandler: FuncHandler[T, EX])(
       implicit inj: EX :<: ExprOp):
@@ -109,9 +112,6 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     val unimplemented = InternalError("unimplemented").left
-
-    def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
-      freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
 
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler.run(mf).map(t => unpack(t.mapSuspension(inj)))
@@ -173,137 +173,19 @@ object MongoDbQScriptPlanner {
 
     val unimplemented = InternalError("unimplemented").left
 
-    {
+    def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
+      JsFuncHandler(mf).map(unpack[Fix, JsCoreF])
+
+    val handleSpecial: MapFunc[T, JsCore] => OutputM[JsCore] = {
       case Constant(v1) => v1.cata(Data.fromEJson).toJs \/> NonRepresentableEJson(v1.shows)
       // FIXME: Not correct
       case Undefined() => ident("undefined").right
-      case Now() => unimplemented
+      // TODO: case Now() => ???
 
-      case Length(a1) =>
-        Call(ident("NumberLong"), List(Select(a1, "length"))).right
-
-      case Date(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).right
-      case Time(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
-          a1,
-          ident("undefined")).right
-      case Timestamp(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).right
-      case Interval(a1) => unimplemented
-      case TimeOfDay(a1) => {
-        def pad2(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-              ident("x")))
-        def pad3(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x"))))
-        Let(Name("t"), a1,
-          binop(jscore.Add,
-            pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
-            Literal(Js.Str(".")),
-            pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).right
-      }
-      case ToTimestamp(a1) => unimplemented
-      // // FIXME: Handle non-constant strings as well
-      // case Extract(Literal(Js.Str(str)), x) =>
-      //   str match {
-      //     case "century"      => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-      //     case "day"          => \/-(Call(Select(x, "getDate"), Nil)) // (day of month)
-      //     case "decade"       => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-      //     // NB: MongoDB's Date's getDay (during filtering at least) seems to
-      //     //     be monday=0 ... sunday=6, apparently in violation of the
-      //     // JavaScript convention.
-      //     case "dow"          =>
-      //       \/-(If(BinOp(jscore.Eq,
-      //         Call(Select(x, "getDay"), Nil),
-      //         Literal(Js.Num(6, false))),
-      //         Literal(Js.Num(0, false)),
-      //         BinOp(jscore.Add,
-      //           Call(Select(x, "getDay"), Nil),
-      //           Literal(Js.Num(1, false)))))
-      //     // TODO: case "doy"          => \/- (unimplemented)
-      //     // TODO: epoch
-      //     case "hour"         => \/-(Call(Select(x, "getHours"), Nil))
-      //     case "isodow"       =>
-      //       \/-(BinOp(jscore.Add,
-      //         Call(Select(x, "getDay"), Nil),
-      //         Literal(Js.Num(1, false))))
-      //     // TODO: isoyear
-      //     case "microseconds" =>
-      //       \/-(BinOp(Mult,
-      //         BinOp(jscore.Add,
-      //           Call(Select(x, "getMilliseconds"), Nil),
-      //           BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-      //         Literal(Js.Num(1000, false))))
-      //     case "millennium"   => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-      //     case "milliseconds" =>
-      //       \/-(BinOp(jscore.Add,
-      //         Call(Select(x, "getMilliseconds"), Nil),
-      //         BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-      //     case "minute"       => \/-(Call(Select(x, "getMinutes"), Nil))
-      //     case "month"        =>
-      //       \/-(BinOp(jscore.Add,
-      //         Call(Select(x, "getMonth"), Nil),
-      //         Literal(Js.Num(1, false))))
-      //     case "quarter"      =>
-      //       \/-(BinOp(jscore.Add,
-      //         BinOp(BitOr,
-      //           BinOp(Div,
-      //             Call(Select(x, "getMonth"), Nil),
-      //             Literal(Js.Num(3, false))),
-      //           Literal(Js.Num(0, false))),
-      //         Literal(Js.Num(1, false))))
-      //     case "second"       => \/-(Call(Select(x, "getSeconds"), Nil))
-      //     // TODO: timezone, timezone_hour, timezone_minute
-      //     // case "week"         => \/- (unimplemented)
-      //     case "year"         => \/-(Call(Select(x, "getFullYear"), Nil))
-      //
-      //     case _ => -\/(FuncApply("extract", "valid time period", str))
-      //   }
-
-      case Negate(a1)       => UnOp(Neg, a1).right
-      case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).right
-      case Multiply(a1, a2) => BinOp(Mult, a1, a2).right
-      case Subtract(a1, a2) => BinOp(Sub, a1, a2).right
-      case Divide(a1, a2)   => BinOp(Div, a1, a2).right
-      case Modulo(a1, a2)   => BinOp(Mod, a1, a2).right
-      case Power(a1, a2)    => Call(Select(ident("Math"), "pow"), List(a1, a2)).right
-
-      case Not(a1)     => UnOp(jscore.Not, a1).right
-      case Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2).right
-      case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2).right
-      case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2).right
-      case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2).right
-      case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2).right
-      case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2).right
       case IfUndefined(a1, a2) =>
         // TODO: Only evaluate `value` once.
         If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1).right
-      case And(a1, a2) => BinOp(jscore.And, a1, a2).right
-      case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).right
       case Coalesce(a1, a2) => unimplemented
-      case Between(a1, a2, a3) =>
-        Call(ident("&&"), List(
-          Call(ident("<="), List(a2, a1)),
-          Call(ident("<="), List(a1, a3)))).right
       case Cond(a1, a2, a3) => If(a1, a2, a3).right
 
       case Within(a1, a2) =>
@@ -311,53 +193,10 @@ object MongoDbQScriptPlanner {
           Literal(Js.Num(-1, false)),
           Call(Select(a2, "indexOf"), List(a1))).right
 
+      // TODO: move these to JsFuncHandler
       case Lower(a1) => Call(Select(a1, "toLowerCase"), Nil).right
       case Upper(a1) => Call(Select(a1, "toLUpperCase"), Nil).right
-      case Bool(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("true"))),
-          Literal(Js.Bool(true)),
-          If(BinOp(jscore.Eq, a1, Literal(Js.Str("false"))),
-            Literal(Js.Bool(false)),
-            ident("undefined"))).right
-      case Integer(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.intRegex + "$")))), "test"), List(a1)),
-          Call(ident("NumberLong"), List(a1)),
-          ident("undefined")).right
-      case Decimal(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.floatRegex + "$")))), "test"), List(a1)),
-            Call(ident("parseFloat"), List(a1)),
-            ident("undefined")).right
-      case Null(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("null"))),
-          Literal(Js.Null),
-          ident("undefined")).right
-      case ToString(a1) =>
-        If(isInt(a1),
-          // NB: This is a terrible way to turn an int into a string, but the
-          //     only one that doesn’t involve converting to a decimal and
-          //     losing precision.
-          Call(Select(Call(ident("String"), List(a1)), "replace"), List(
-            Call(ident("RegExp"), List(
-              Literal(Js.Str("[^-0-9]+")),
-              Literal(Js.Str("g")))),
-            Literal(Js.Str("")))),
-          If(binop(jscore.Or, isTimestamp(a1), isDate(a1)),
-            Call(Select(a1, "toISOString"), Nil),
-            Call(ident("String"), List(a1)))).right
-      case Search(a1, a2, a3) =>
-        Call(
-          Select(
-            New(Name("RegExp"), List(
-              a2,
-              If(a3, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
-            "test"),
-          List(a1)).right
-      case Substring(a1, a2, a3) =>
-        If(BinOp(jscore.Lt, a2, Literal(Js.Num(0, false))),
-          Literal(Js.Str("")),
-          If(BinOp(jscore.Lt, a3, Literal(Js.Num(0, false))),
-            Call(Select(a1, "substr"), List(a2, Select(a1, "length"))),
-            Call(Select(a1, "substr"), List(a2, a3)))).right
+
       // case ToId(a1) => Call(ident("ObjectId"), List(a1)).right
 
       case MakeArray(a1) => unimplemented
@@ -397,8 +236,10 @@ object MongoDbQScriptPlanner {
       case ZipArrayIndices(_) => unimplemented
       case ZipMapKeys(_)      => unimplemented
 
-      case _ => unimplemented  // HACK
+      case _ => unimplemented
     }
+
+    mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
   }
 
   /** Need this until the old connector goes away and we can redefine `Selector`

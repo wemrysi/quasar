@@ -108,6 +108,7 @@ object JsFuncHandler {
         If(Call(select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(str)),
           Call(ident("ISODate"), List(str)),
           ident("undefined"))
+      // TODO: case Interval(str) =>
       case ToString(value) =>
         If(isInt(value),
           // NB: This is a terrible way to turn an int into a string, but the
@@ -121,6 +122,7 @@ object JsFuncHandler {
           If(BinOp(jscore.Or, isTimestamp(value), isDate(value)),
             Call(select(value, "toISOString"), Nil),
             Call(ident("String"), List(value))))
+      // TODO: case ToTimestamp(str) =>
 
       case TimeOfDay(date) =>
         def pad2(x: Free[JsCoreF, A]) =
