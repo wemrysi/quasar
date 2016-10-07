@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar._, Planner.PlannerError
 import quasar.std._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs.DataCursor
-import quasar.std.{StdLibSpec, StdLibTestRunner}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
