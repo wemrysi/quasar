@@ -193,7 +193,7 @@ object RenderTree extends RenderTreeInstances {
 }
 
 sealed abstract class RenderTreeInstances {
-  implicit val unit: RenderTree[Unit] =
+  implicit lazy val unit: RenderTree[Unit] =
     make(_ => Terminal(List("()", "Unit"), None))
 
   implicit def recursive[T[_[_]]: Recursive, F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[T[F]] =

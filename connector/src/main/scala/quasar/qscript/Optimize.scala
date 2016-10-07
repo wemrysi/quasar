@@ -288,11 +288,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
   /** Should only be applied after all other QScript transformations. This gives
     * the final, optimized QScript for conversion.
     */
-  def optimize[F[_], G[_]: Functor]
-    (FtoG: F ~> G)
-    (implicit QC: QScriptCore :<: F)
-      : F[T[G]] => F[T[G]] =
-    liftFF[QScriptCore, F, T[G]](repeatedly(swapMapCount(FtoG)))
+  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(implicit QC: QScriptCore :<: F): F[T[G]] => F[T[G]] =
+    liftFF(repeatedly(swapMapCount(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
