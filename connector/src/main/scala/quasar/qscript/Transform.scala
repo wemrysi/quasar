@@ -142,7 +142,7 @@ class Transform
   def rebaseBranch(br: Free[F, Hole], fm: FreeMap[T]): Free[F, Hole] =
     freeTransCata[T, F, F, Hole, Hole](
       br >> Free.roll(QC.inj(Map(Free.point[F, Hole](SrcHole), fm))))(
-      liftCo((new Optimize[T]).applyToFreeQS[F]))
+      liftCo((new Rewrite[T]).normalizeCoEnv[F]))
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -157,7 +157,7 @@ class Transform
 
     val (src, lBranch, rBranch) = merge(left._2, right._2)
 
-    (new Optimize[T]).unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine).fold {
+    (new Rewrite[T]).unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine).fold {
       // FIXME: Need a better prov representation, to know when the provs are
       //        the same even when the paths to the values differ.
       val commonProv =

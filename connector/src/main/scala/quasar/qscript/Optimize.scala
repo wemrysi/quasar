@@ -30,7 +30,7 @@ import matryoshka._,
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
 
-class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
+class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
@@ -261,7 +261,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(compactQC(_: QScriptCore[T, T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
-  def applyToFreeQS[F[_]: Traverse: Normalizable](
+  def normalizeCoEnv[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
@@ -269,7 +269,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
     applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo)
 
-  def applyAll[F[_]: Traverse: Normalizable](
+  def normalize[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
