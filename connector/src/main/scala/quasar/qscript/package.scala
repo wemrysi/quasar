@@ -177,6 +177,13 @@ package object qscript {
     }
   }
 
+  /** A variant of `repeatedly` that works with `Inject` instances. */
+  def injectRepeatedly[F [_], G[_], A]
+    (op: F[A] => Option[G[A]])
+    (implicit F: F :<: G)
+      : F[A] => G[A] =
+    fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
+
   // TODO: Un-hardcode the coproduct, and make this simply a transform itself,
   //       rather than a full traversal.
   def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
@@ -184,8 +191,9 @@ package object qscript {
     type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
     val optimize = new Optimize[T]
     transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
-      .transCata(optimize.applyAll[FixedQScriptShiftRead].apply)
-      .transCata(liftFG(optimize.transformIncludeToExclude[FixedQScriptShiftRead]))
+      .transCata(
+        optimize.applyAll[FixedQScriptShiftRead] ⋙
+          liftFG(injectRepeatedly(quasar.qscript.Coalesce[T, FixedQScriptShiftRead, FixedQScriptShiftRead].coalesceSR[FixedQScriptShiftRead](idPrism))))
   }
 
   // Helpers for creating `Injectable` instances

@@ -462,6 +462,14 @@ class Transform
       Data.toEJson[EJson].apply(_).right)
   }
 
+  /** We carry around metadata with pointers to provenance and result value as
+    * we build up QScript. At the point where a particular chain ends (E.g., the
+    * final result, or the `count` of a Take/Drop, we need to make sure we
+    * extract the result pointed to by the metadata.
+    */
+  def reifyResult[A](ann: Ann[T], src: A): QScriptCore[T, A] =
+    quasar.qscript.Map(src, ann.values)
+
   // TODO: Replace disjunction with validation.
   def lpToQScript: AlgebraM[PlannerError \/ ?, LogicalPlan, (Ann[T], T[F])] = {
     case LogicalPlan.ReadF(path) =>
@@ -535,12 +543,12 @@ class Transform
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Take(src, lfree, rfree)).embed).right
+      (a1._1, QC.inj(Take(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Drop(src, lfree, rfree)).embed).right
+      (a1._1, QC.inj(Drop(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
