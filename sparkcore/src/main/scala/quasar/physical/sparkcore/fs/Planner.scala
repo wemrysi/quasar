@@ -324,7 +324,6 @@ object Planner {
               }
             }
           }
-        case _ => ???
       }
     }
   
