@@ -183,69 +183,6 @@ object MongoDbPlanner {
               Literal(Js.Num(-1, false)),
               Call(Select(array, "indexOf"), List(value))))
 
-        // // TODO: when each of these is broken out as a separate Func, these will
-        // // go to JsFuncHandler.
-        // case Extract =>
-        //   args match {
-        //     case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
-        //       case (field, (sel, inputs)) => ((field match {
-        //         case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-        //         case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
-        //         case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-        //         // Note: MongoDB's Date's getDay (during filtering at least) seems to be monday=0 ... sunday=6,
-        //         // apparently in violation of the JavaScript convention.
-        //         case "dow"          =>
-        //           \/-(x => If(BinOp(jscore.Eq,
-        //             Call(Select(x, "getDay"), Nil),
-        //             Literal(Js.Num(6, false))),
-        //             Literal(Js.Num(0, false)),
-        //             BinOp(jscore.Add,
-        //               Call(Select(x, "getDay"), Nil),
-        //               Literal(Js.Num(1, false)))))
-        //         // TODO: case "doy"          => \/- (???)
-        //         // TODO: epoch
-        //         case "hour"         => \/-(x => Call(Select(x, "getHours"), Nil))
-        //         case "isodow"       =>
-        //           \/-(x => BinOp(jscore.Add,
-        //             Call(Select(x, "getDay"), Nil),
-        //             Literal(Js.Num(1, false))))
-        //         // TODO: isoyear
-        //         case "microseconds" =>
-        //           \/-(x => BinOp(Mult,
-        //             BinOp(jscore.Add,
-        //               Call(Select(x, "getMilliseconds"), Nil),
-        //               BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-        //             Literal(Js.Num(1000, false))))
-        //         case "millennium"   => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-        //         case "milliseconds" =>
-        //           \/-(x => BinOp(jscore.Add,
-        //             Call(Select(x, "getMilliseconds"), Nil),
-        //             BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-        //         case "minute"       => \/-(x => Call(Select(x, "getMinutes"), Nil))
-        //         case "month"        =>
-        //           \/-(x => BinOp(jscore.Add,
-        //             Call(Select(x, "getMonth"), Nil),
-        //             Literal(Js.Num(1, false))))
-        //         case "quarter"      =>
-        //           \/-(x => BinOp(jscore.Add,
-        //             BinOp(BitOr,
-        //               BinOp(Div,
-        //                 Call(Select(x, "getMonth"), Nil),
-        //                 Literal(Js.Num(3, false))),
-        //               Literal(Js.Num(0, false))),
-        //             Literal(Js.Num(1, false))))
-        //         case "second"       => \/-(x => Call(Select(x, "getSeconds"), Nil))
-        //         // TODO: timezone, timezone_hour, timezone_minute
-        //         // case "week"         => \/- (???)
-        //         case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
-        //
-        //         case _ => -\/(FuncApply(func.name, "valid time period", field))
-        //       }): PlannerError \/ (JsCore => JsCore)).map(x =>
-        //         ({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(sel(list)(Ident(JsFn.defaultName)))) },
-        //           inputs.map(There(1, _))): PartialJs)
-        //     }.join
-        //   }
-
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
 
         case MakeObject => args match {
@@ -264,6 +201,7 @@ object MongoDbPlanner {
           }
         }
         case MakeArray => Arity1(x => Arr(List(x)))
+
         case _ => -\/(UnsupportedFunction(func.name, "in JS planner".some))
       })
     }
