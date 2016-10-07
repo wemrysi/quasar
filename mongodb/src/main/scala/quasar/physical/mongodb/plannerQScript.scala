@@ -180,7 +180,6 @@ object MongoDbQScriptPlanner {
       case Constant(v1) => v1.cata(Data.fromEJson).toJs \/> NonRepresentableEJson(v1.shows)
       // FIXME: Not correct
       case Undefined() => ident("undefined").right
-      // TODO: case Now() => ???
 
       case IfUndefined(a1, a2) =>
         // TODO: Only evaluate `value` once.
