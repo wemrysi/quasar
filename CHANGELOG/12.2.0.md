@@ -1,0 +1,2 @@
+- Add implementation of Reduce for Spark connectors
+- Fix Spark serialization issues

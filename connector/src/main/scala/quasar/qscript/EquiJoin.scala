@@ -17,11 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.fp._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
+import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -93,8 +93,9 @@ object EquiJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) = None
+        p1: EquiJoin[IT, ExternallyManaged],
+        p2: EquiJoin[IT, ExternallyManaged]) =
+        None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[EquiJoin[T, ?]] =

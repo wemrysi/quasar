@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.jscore._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
@@ -28,8 +29,7 @@ import scalaz._, Scalaz._
 
 package object optimize {
   object pipeline {
-    private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-    import exprCoreFp._
+    import fixExprOp._
 
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {

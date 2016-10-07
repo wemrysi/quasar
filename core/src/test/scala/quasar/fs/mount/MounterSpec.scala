@@ -19,6 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.effect._
 import quasar.fp._, free._
+import quasar.fp.ski._
 
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -43,7 +44,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
   def interpName = "Mounter"
 
   def interpret = {
-    val mm = Mounter[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
+    val mm = Mounter.kvs[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
 
     val interpEff =
       mm :+: injectFT[MountingFailure, MEff] :+: injectFT[PathMismatchFailure, MEff]

@@ -19,6 +19,7 @@ package quasar
 import quasar.ejson.{Common, EJson, Extension}
 import quasar.ejson.FacadeOps._
 import quasar.Predef._
+import quasar.fp.ski._
 import quasar.fp._
 import quasar.javascript.{Js}
 
@@ -176,6 +177,10 @@ object Data {
 
     override def toString = "Binary(Array[Byte](" + value.mkString(", ") + "))"
 
+    /**
+      * scala equality needs to remain for Spark to work
+      * @see Planner.qscriptCore
+      */
     override def equals(that: Any): Boolean = that match {
       case Binary(value2) => value ≟ value2
       case _ => false

@@ -1,7 +1,11 @@
 {
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
 
     "data": "zips.data",
 

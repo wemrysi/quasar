@@ -16,11 +16,12 @@
 
 package quasar.physical.marklogic
 
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.NameGenerator
-import quasar.fp.{freeCataM, interpretM, ShowT}
-import quasar.qscript._
+import quasar.fp.ski.κ
+import quasar.contrib.matryoshka.{freeCataM, interpretM, ShowT}
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
+import quasar.qscript._
 
 import matryoshka.Recursive
 import scalaz._, Scalaz._
@@ -70,7 +71,7 @@ package object qscript {
     }
 
   def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
-    freeMap: Free[MapFunc[T, ?], A])(
+    freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))

@@ -18,10 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -74,7 +74,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
-  * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
+  * result of the bucket MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
   * `bucket` partitions the values into buckets based on the result of the
   * expression, `reducers` applies the provided reduction to each expression,
@@ -87,7 +87,7 @@ object ReduceIndex {
   src: A,
   bucket: FreeMap[T],
   reducers: List[ReduceFunc[FreeMap[T]]],
-  repair: Free[MapFunc[T, ?], ReduceIndex])
+  repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
@@ -224,32 +224,19 @@ object QScriptCore {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged]) =
+        p1: QScriptCore[IT, ExternallyManaged],
+        p2: QScriptCore[IT, ExternallyManaged]) =
         (p1, p2) match {
-          case (EnvT((Ann(b1, v1), Map(_, m1))),
-                EnvT((Ann(_,  v2), Map(_, m2)))) =>
+          case (Map(_, m1), Map(_, m2)) =>
             // TODO: optimize cases where one side is a subset of the other
-            val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
-            concatBuckets(b1.map(_ >> m1)) match {
-              case Some((buck, newBuckets)) => {
-                val (full, buckAccess, valAccess) = concat(buck, mf)
-                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                  EnvT((
-                    Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
-                    Map(Extern, full))),
-                  lv,
-                  rv).some
-              }
-              case None =>
-                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                  EnvT((EmptyAnn[T], Map(Extern, mf))),
-                  lv,
-                  rv).some
-            }
-
-          case (EnvT((Ann(b1, _), Reduce(_, bucket1, func1, rep1))),
-                EnvT((Ann(_,  _), Reduce(_, bucket2, func2, rep2)))) =>
+            val (mf, lv, rv) = concat(m1 >> left, m2 >> right)
+            SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+              Map(Extern, mf),
+              lv,
+              rv).some
+          case (
+            Reduce(_, bucket1, func1, rep1),
+            Reduce(_, bucket2, func2, rep2)) =>
             val mapL = bucket1 >> left
             val mapR = bucket2 >> right
 
@@ -258,16 +245,15 @@ object QScriptCore {
               val funcR = func1.map(_.map(_ >> right))
               val (newRep, lrep, rrep) = concat(rep1, rep2.map(_.incr(func1.length)))
 
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                EnvT((
-                  Ann(b1, HoleF),
-                  Reduce(Extern, mapL, funcL ++ funcR, newRep))),
+              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                Reduce(Extern, mapL, funcL ++ funcR, newRep),
                 lrep,
                 rrep)
             }
 
-          case (EnvT((Ann(b1, _), LeftShift(_, struct1, repair1))),
-                EnvT((Ann(_,  _), LeftShift(_, struct2, repair2)))) =>
+          case (
+            LeftShift(_, struct1, repair1),
+            LeftShift(_, struct2, repair2)) =>
             val (repair, repL, repR) = concat(repair1, repair2)
 
             val norm = TTypes.normalizable[T]
@@ -283,10 +269,8 @@ object QScriptCore {
               struct: FreeMap[IT],
               projL: Option[FreeMap[IT]],
               projR: Option[FreeMap[IT]]) =
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                EnvT((
-                  Ann(b1, HoleF),
-                  LeftShift(Extern, struct, repair))),
+              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                LeftShift(Extern, struct, repair),
                 projL.fold(repL)(repL >> _),
                 projR.fold(repR)(repR >> _)).some
 

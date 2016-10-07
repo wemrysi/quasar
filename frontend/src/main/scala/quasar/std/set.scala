@@ -18,6 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar._, LogicalPlan._
 
 import scala.collection.immutable.NumericRange

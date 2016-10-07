@@ -79,8 +79,9 @@ object Dependencies {
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion,
     ("org.apache.spark" %% "spark-core" % "1.6.2")
-      .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-collections", "commons-collections")
+      .exclude("commons-beanutils", "commons-beanutils-core")
+      .exclude("commons-logging", "commons-logging")
       .exclude("com.esotericsoftware.minlog", "minlog")
       .exclude("org.spark-project.spark", "unused")
       .exclude("io.netty", "netty-all")
@@ -94,6 +95,10 @@ object Dependencies {
     "com.fasterxml.uuid"         %  "java-uuid-generator" % "3.1.4",
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+  )
+  val couchbase = Seq(
+    "com.couchbase.client" %  "java-client" % "2.3.2",
+    "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",

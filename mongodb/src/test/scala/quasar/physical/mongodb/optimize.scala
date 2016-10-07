@@ -29,9 +29,7 @@ import scalaz._, Scalaz._
 
 class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
   import CollectionUtil._
-
-  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
 
   "simplifyGroupƒ" should {
     "elide useless reduction" in {

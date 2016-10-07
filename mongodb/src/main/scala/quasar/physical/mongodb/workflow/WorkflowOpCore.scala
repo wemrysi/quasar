@@ -19,6 +19,7 @@ package quasar.physical.mongodb.workflow
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
@@ -116,7 +117,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
     idExclusion match {
       case IncludeId => all.collectFirst {
         case (IdName, _) => all
-      }.getOrElse((IdName, ExprOpCoreF.fixpoint[Fix, ExprOp].$include()) :: all)
+      }.getOrElse((IdName, fixExprOp.$include()) :: all)
       case _         => all
     }
   }
@@ -147,7 +148,7 @@ final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHan
             case (k, v) =>
               v.fold(
                 r => -\/(loop(Some(nest(k)), $ProjectF(p.src, r, p.idExclusion)).shape),
-                κ(\/-(ExprOpCoreF.fixpoint[Fix, ExprOp].$var(DocVar.ROOT(nest(k))))))
+                κ(\/-(fixExprOp.$var(DocVar.ROOT(nest(k))))))
           }),
         p.idExclusion)
     }
@@ -489,6 +490,10 @@ object $MapF {
       List(Js.Return(Js.AnonElem(List(key, value)))))
   def mapMap(ident: String, transform: Js.Expr) =
     mapKeyVal(("key", ident), Js.Ident("key"), transform)
+  val mapFresh =
+    mapKeyVal(("key", "value"), Js.Call(Js.Ident("ObjectId"), Nil), Js.Ident("value"))
+  val mapValKey =
+    mapKeyVal(("key", "value"), Js.Ident("value"), Js.Ident("value"))
   val mapNOP = mapMap("value", Js.Ident("value"))
 
   def finalizerFn(fn: JsFn) =
@@ -914,7 +919,7 @@ object WorkflowOpCoreF {
       }
     }
 
-  implicit def renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
+  implicit val renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
     new RenderTree[WorkflowOpCoreF[Unit]] {
       val wfType = "Workflow" :: Nil
 

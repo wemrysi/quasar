@@ -25,7 +25,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
-  import DataArbitrary._, FileSystemError._, PathError._
+  import DataArbitrary._
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" >> prop {
@@ -43,17 +43,6 @@ class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
 
         MemTask.runLogE(p).run.run(emptyMem)
           .unsafePerformSync.leftMap(_.readMap) must_=== ((Map.empty, \/.right(xs take n)))
-      }
-    }.set(maxSize = 10)
-
-    "scan should automatically close the read handle on failure" >> prop {
-      (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
-        val reads = List(xs.right, pathErr(pathNotFound(f)).left)
-
-        MemFixTask.runLogWithReads(reads, read.scanAll(f)).run
-          .leftMap(_.readMap)
-          .run(emptyMem)
-          .unsafePerformSync must_=== ((Map.empty, \/.left(pathErr(pathNotFound(f)))))
       }
     }.set(maxSize = 10)
   }

@@ -48,9 +48,24 @@ object xdmp {
   def documentProperties(uris: XQuery*): XQuery =
     XQuery(s"xdmp:document-properties${mkSeq(uris)}")
 
+  def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
+    XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
+
   def nodeKind(node: XQuery): XQuery =
     XQuery(s"xdmp:node-kind($node)")
 
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
+
+  def quarterFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:quarter-from-date($date)")
+
+  def weekFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:week-from-date($date)")
+
+  def weekdayFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:weekday-from-date($date)")
+
+  def yeardayFromDate(date: XQuery): XQuery =
+    XQuery(s"xdmp:yearday-from-date($date)")
 }

@@ -38,6 +38,8 @@ package object expression {
   /** The type for expressions supporting the most advanced capabilities. */
   type ExprOp[A] = Expr3_2[A]
 
+  val fixExprOp = ExprOpCoreF.fixpoint[Fix, ExprOp]
+
   val DocField = Prism.partial[DocVar, BsonField] {
     case DocVar.ROOT(Some(tail)) => tail
   } (DocVar.ROOT(_))

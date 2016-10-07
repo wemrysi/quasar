@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fs.FileSystemType
 
 import monocle.Prism

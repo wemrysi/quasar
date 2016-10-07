@@ -41,13 +41,11 @@ trait QScriptHelpers {
   val R  =        implicitly[Const[Read, ?] :<: QS]
   val QC =   implicitly[QScriptCore[Fix, ?] :<: QS]
   val TJ =     implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ =      implicitly[EquiJoin[Fix, ?] :<: QST]
-  val SR = implicitly[Const[ShiftedRead, ?] :<: QST]
   implicit val QS: Injectable.Aux[QS, QScriptTotal[Fix, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-        Injectable.coproduct(Injectable.inject[Const[Read, ?], QScriptTotal[Fix, ?]],
-          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[Fix, ?]])))
+    ::\::[QScriptCore[Fix, ?]](
+      ::\::[ThetaJoin[Fix, ?]](
+        ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
+
   def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
@@ -63,8 +61,8 @@ trait QScriptHelpers {
   val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
   def ProjectFieldR[A](
-    src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
-      Free[MapFunc[Fix, ?], A] =
+    src: FreeMapA[Fix, A], field: FreeMapA[Fix, A]):
+      FreeMapA[Fix, A] =
     Free.roll(ProjectField(src, field))
 
   def lpRead(path: String): Fix[LP] =

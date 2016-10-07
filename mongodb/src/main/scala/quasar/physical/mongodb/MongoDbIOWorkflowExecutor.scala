@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.{EnvironmentError, EnvErrT}
 import quasar.fs._
 import quasar.physical.mongodb.execution._
@@ -113,9 +113,6 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
 
 private[mongodb] object MongoDbIOWorkflowExecutor {
   import EnvironmentError._
-
-  /** The minimum MongoDbIO version required to be able to execute `Workflow`s. */
-  val MinMongoDbVersion = List(2, 6, 0)
 
   /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =

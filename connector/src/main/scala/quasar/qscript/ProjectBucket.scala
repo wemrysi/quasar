@@ -18,10 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -101,10 +101,22 @@ object ProjectBucket {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) = None
+        p1: ProjectBucket[IT, ExternallyManaged],
+        p2: ProjectBucket[IT, ExternallyManaged]) =
+        (p1, p2) match {
+          case (BucketField(s1, v1, n1), BucketField(s2, v2, n2)) =>
+            val new1: ProjectBucket[T, ExternallyManaged] = BucketField(s1, v1 >> left, n1 >> left)
+            val new2: ProjectBucket[T, ExternallyManaged] = BucketField(s2, v2 >> right, n2 >> right)
+            (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
+          case (BucketIndex(s1, v1, n1), BucketIndex(s2, v2, n2)) =>
+            val new1: ProjectBucket[T, ExternallyManaged] = BucketIndex(s1, v1 >> left, n1 >> left)
+            val new2: ProjectBucket[T, ExternallyManaged] = BucketIndex(s2, v2 >> right, n2 >> right)
+            (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
+          case (_, _) => None
+      }
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]: Normalizable[ProjectBucket[T, ?]] =
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]
+      : Normalizable[ProjectBucket[T, ?]] =
     TTypes.normalizable[T].ProjectBucket
 }

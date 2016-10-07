@@ -28,9 +28,15 @@ import quasar.fs.WriteFile.WriteHandle
 import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs.mount.FileSystemDef._
+import quasar.EnvironmentError
+import quasar.fs.mount.FileSystemDef._
+import quasar.fs.mount.ConnectionUri
+import quasar.contrib.pathy._
+
 
 import java.io.PrintWriter
 
+import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -47,6 +53,29 @@ package object local {
   type Eff2[A] = Coproduct[Task, Eff1, A]
   type Eff3[A] = Coproduct[PhysErr, Eff2, A]
   type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
+
+  final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
+
+  def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
+
+    def error(msg: String): DefinitionError \/ SparkFSConf =
+      NonEmptyList(msg).left[EnvironmentError].left[SparkFSConf]
+
+    def forge(master: String, rootPath: String): DefinitionError \/ SparkFSConf =
+      posixCodec.parseAbsDir(rootPath)
+        .map { prefix =>
+        SparkFSConf(new SparkConf().setMaster(master), sandboxAbs(prefix))
+      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+
+    // TODO use spark://host:port/var/hadoop
+    // note: that some master configs can be in different shape than spark://host:port
+    uri.value.split('|').toList match {
+      case master :: prefixPath :: Nil => forge(master, prefixPath)
+      case _ =>
+        error("Missing master and prefixPath (seperated by |)" +
+          " e.g spark://host:port|/var/hadoop/")
+    }
+  }
 
   final case class SparkFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 

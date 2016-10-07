@@ -17,6 +17,7 @@
 package quasar.sql
 
 import quasar.Predef._
+import quasar.fp.ski._
 import quasar.fp._
 import quasar.std._
 

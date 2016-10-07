@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.{EnvironmentError, QuasarSpecification}
 import quasar.fs._
 

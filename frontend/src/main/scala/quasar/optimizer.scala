@@ -21,7 +21,7 @@ import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.namegen._
 import quasar.sql.JoinDir
-
+import quasar.fp.ski._
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}
@@ -71,7 +71,8 @@ object Optimizer {
     case _ => None
   }
 
-  def simplify(t: Fix[LogicalPlan]): Fix[LogicalPlan] = t.transCata(repeatedly(simplifyƒ))
+  def simplify[T[_[_]]: Recursive: Corecursive](t: T[LogicalPlan]): T[LogicalPlan] =
+    t.transCata[LogicalPlan](repeatedly(simplifyƒ[T]))
 
   val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {
     case FreeF(name) => Set(name)

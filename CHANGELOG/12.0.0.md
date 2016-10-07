@@ -1,0 +1,2 @@
+- Add Couchbase ReadFile, WriteFile, ManageFile, and QueryFile interpreters
+- Data service returns an empty response for a file that doesn't exist instead of a 404

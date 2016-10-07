@@ -50,8 +50,7 @@ package object quasar {
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
       EitherT(r.point[PhaseResultW]) flatMap { a =>
-        val pr = PhaseResult.Tree(label, RenderTree[A].render(a))
-        (a.set(Vector(pr)): PhaseResultW[A]).liftM[SemanticErrsT]
+        (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
       }
 
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or

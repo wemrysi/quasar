@@ -17,15 +17,11 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.PlannerErrT
-import quasar.{PhaseResults, PhaseResultT, PhaseResult, LogicalPlan, Data}
+import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, PlannerErrT}
 import quasar.Planner._
-import quasar.RenderTree.ops._
-import quasar.fs.FileSystemError._
-import quasar.fp.free._
-import quasar.effect.{MonotonicSeq, Read, KeyValueStore}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.effect.Read
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free._
@@ -40,14 +36,7 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript[A] =
-     (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
-
-  // This is an exact copy from marklogic's queryfile.
-  implicit val sparkQScriptToQScriptTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-        Injectable.inject[Const[ShiftedRead, ?], QScriptTotal[Fix, ?]]))
+  type SparkQScript[A] = QScriptShiftRead[Fix, A]
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
@@ -80,8 +69,8 @@ object queryfile {
       val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       for {
-        qs <- (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)).map(transFutu(_)(ShiftRead[Fix, QScriptRead[Fix, ?], SparkQScript].shiftRead(idPrism.reverseGet)(_)).transCata(optimize.applyAll[SparkQScript]))
-        _ <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
+        qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp).map(shiftRead[Fix])
+        _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", qs)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }
 
@@ -128,7 +117,7 @@ object queryfile {
       injectFT.apply {
         sparkStuff >>= (mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
       }
     }.join
   }
@@ -157,7 +146,7 @@ object queryfile {
       .map(_.leftMap(planningFailed(lp, _)))
       .map {
       disj => EitherT(disj.traverse {
-        case (rh, rdd) => Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), rh)
+        case (rh, rdd) => Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), rh)
       })
     }
   }

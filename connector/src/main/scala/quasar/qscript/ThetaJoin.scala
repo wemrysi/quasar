@@ -18,10 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -87,8 +87,9 @@ object ThetaJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], ThetaJoin[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], ThetaJoin[IT, ?], ExternallyManaged]) = None
+        p1: ThetaJoin[IT, ExternallyManaged],
+        p2: ThetaJoin[IT, ExternallyManaged]) =
+        None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[ThetaJoin[T, ?]] =

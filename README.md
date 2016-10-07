@@ -467,11 +467,11 @@ Creates a new mount point or replaces an existing mount point using the JSON con
 
 ### DELETE /mount/fs/[path]
 
-Deletes an existing mount point, if any exists at the given path. If no such mount exists, the request succeeds but the response has no content.
+Deletes an existing mount point, if any exists at the given path. If no such mount exists, the request succeeds but the response has no content. Mounts that are nested within the mount being deleted (i.e. views) are also deleted.
 
 ### MOVE /mount/fs/[path]
 
-Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount.
+Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount. Mounts that are nested within the mount being moved (i.e. views) are moved along with it.
 
 ### PUT /server/port
 
@@ -633,7 +633,7 @@ You can also discuss issues on Gitter: [quasar-analytics/quasar](https://gitter.
 
 ## Legal
 
-Copyright &copy; 2014 - 2015 SlamData Inc.
+Copyright &copy; 2014 - 2016 SlamData Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

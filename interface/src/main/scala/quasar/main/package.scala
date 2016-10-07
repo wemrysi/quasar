@@ -48,7 +48,9 @@ package object main {
     quasar.physical.mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff],
     quasar.physical.postgresql.fs.definition[PhysFsEff],
     quasar.physical.marklogic.fs.definition[PhysFsEff],
-    quasar.physical.sparkcore.fs.local.definition[PhysFsEff]
+    quasar.physical.sparkcore.fs.local.definition[PhysFsEff],
+    quasar.physical.sparkcore.fs.hdfs.definition[PhysFsEff],
+    quasar.physical.couchbase.fs.definition[PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which
@@ -286,7 +288,7 @@ package object main {
         free.foldMapNT(MountEff.interpreter[S](hrchFsRef, mntdFsRef))
 
       val mounter: Mounting ~> Free[G, ?] =
-        quasar.fs.mount.Mounter[MountEffM, G](
+        quasar.fs.mount.Mounter.kvs[MountEffM, G](
           mountHandler.mount[MountEff](_),
           mountHandler.unmount[MountEff](_))
 

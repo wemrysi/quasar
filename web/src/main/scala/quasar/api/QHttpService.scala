@@ -18,7 +18,7 @@ package quasar.api
 
 import quasar.Predef.PartialFunction
 import quasar.fp.free
-import quasar.SKI._
+import quasar.fp.ski._
 import org.http4s.{Request, Status, HttpService}
 import scalaz._
 

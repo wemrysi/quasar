@@ -41,12 +41,6 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases {
     def |>[B](f: A => B): B = f(lhs)
   }
 
-  /** An endomorphism is a mapping from a category to itself.
-   *  It looks like scalaz already staked out "Endo" for the
-   *  lower version.
-   */
-  type EndoK[F[X]] = scalaz.NaturalTransformation[F, F]
-
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec
   type SuppressWarnings = java.lang.SuppressWarnings

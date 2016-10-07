@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, PhaseResult, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import numeric._
 import quasar.Optimizer
 
@@ -121,6 +122,10 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
       _ <- resultL(h) := some(data)
     } yield h
   }
+
+  private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
+    queryResponsesL.st map (qrs =>
+      Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).description)))
 
   private def simpleEvaluation(lp0: FixPlan): ER[Chunks] = {
     import quasar.LogicalPlan._

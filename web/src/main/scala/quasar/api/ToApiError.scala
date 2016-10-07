@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
 import quasar.sql._
@@ -218,7 +219,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           InternalServerError withReason "Unsupported query plan.",
           err.message,
-          "term" := lp.void.shows
+          "term" := lp.void.render.shows
         ) :?+ ("reason" :?= hint)
       case FuncApply(fn, exp, act) =>
         fromMsg(

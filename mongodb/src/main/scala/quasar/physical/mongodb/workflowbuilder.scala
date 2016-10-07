@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
@@ -52,8 +53,7 @@ object WorkflowBuilder {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   /**
    * Like ValueBuilder, this is a Leaf node which can be used to construct a more complicated WorkflowBuilder.
@@ -731,7 +731,7 @@ object WorkflowBuilder {
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[(Fix[F], Base)] =
+      : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
@@ -1731,11 +1731,44 @@ object WorkflowBuilder {
 
       impl(left, right, unflipped)
     }
+
+    def unionAll
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: Show[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            l,
+            chain(r,
+              $map($MapF.mapFresh, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
+
+    def union
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: Show[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            chain(l, $map($MapF.mapValKey, ListMap())),
+            chain(r,
+              $map($MapF.mapValKey, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
   }
   object Ops {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =
       new Ops[F]
   }
+
+  // FIXME: These implicits should not be here, because this is not a companion
+  //        object, and therefore not on the search path.
 
   implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
     (implicit
@@ -1756,9 +1789,7 @@ object WorkflowBuilder {
         case spb @ ShapePreservingBuilderF(src, inputs, op) =>
           val nt = "ShapePreservingBuilder" :: nodeType
           NonTerminal(nt, None,
-            render(src) ::
-              (inputs.map(render) :+
-                Terminal("Op" :: nt, Some(spb.dummyOp.shows))))
+            render(src) :: (inputs.map(render) :+ spb.dummyOp.render))
         case ValueBuilderF(value) =>
           Terminal("ValueBuilder" :: nodeType, Some(value.shows))
         case ExprBuilderF(src, expr) =>
@@ -1803,4 +1834,15 @@ object WorkflowBuilder {
             render(src) :: structure.map(RC.render))
       }
     }
+
+  // TODO: Perhaps remove this, and explicitly `render` in the places that
+  //       depend on it.
+  implicit def WorkflowBuilderShow[F[_]: Coalesce]
+    (implicit
+      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
+      RC: RenderTree[Contents[Expr]],
+      RF: RenderTree[Fix[F]],
+      ev: WorkflowOpCoreF :<: F)
+      : Show[WorkflowBuilder[F]] =
+    Show.show(_.render.show)
 }

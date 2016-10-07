@@ -44,7 +44,7 @@ object EncodeXQuery {
   implicit def commonEncodeXQuery[M[_]: NameGenerator: PrologW]: EncodeXQuery[M, ejson.Common] =
     new EncodeXQuery[M, ejson.Common] {
       val encodeXQuery: AlgebraM[M, ejson.Common, XQuery] = {
-        case ejson.Arr(xs) => ejsxqy.seqToArray[M] apply mkSeq(xs)
+        case ejson.Arr(xs) => ejsxqy.seqToArray_[M](mkSeq(xs))
         case ejson.Null()  => ejsxqy.null_[M]
         case ejson.Bool(b) => b.fold(fn.True, fn.False).point[M]
         case ejson.Str(s)  => s.xs.point[M]
@@ -71,7 +71,7 @@ object EncodeXQuery {
           val objEntries = entries.traverse[ValM, XQuery] {
             case (XQuery.StringLit(s), value) =>
               refineV[IsNCName](s).validation map { ncname =>
-                ejsxqy.mkObjectEntry[M] apply (ncname.get.xs, value)
+                ejsxqy.mkObjectEntry[M] apply (xs.QName(ncname.get.xs), value)
               } leftAs s"'$s' is not a valid XML QName.".wrapNel
 
             case (xqy, _) =>
