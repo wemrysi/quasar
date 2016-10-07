@@ -304,9 +304,17 @@ object Planner {
             val klRdd = lRdd.map(d => (lk(d), d))
             val krRdd = rRdd.map(d => (rk(d), d))
 
-            klRdd.join(krRdd).map {
-              case (k, (l, r)) => merge(Data.Arr(List(l, r)))
+            jt match {
+              case Inner => klRdd.join(krRdd).map {
+                case (k, (l, r)) => merge(Data.Arr(List(l, r)))
+              }
+              case LeftOuter => klRdd.leftOuterJoin(krRdd).map {
+                case (k, (l, Some(r))) => merge(Data.Arr(List(l, r)))
+                case (k, (l, None)) => merge(Data.Arr(List(l, Data.Null)))
+              }
+              case _ => ???
             }
+
           }
         case _ => ???
       }
