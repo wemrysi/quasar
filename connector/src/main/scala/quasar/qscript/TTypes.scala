@@ -41,6 +41,7 @@ trait TTypes[T[_[_]]] {
   type ProjectBucket[A] = quasar.qscript.ProjectBucket[T, A]
   type ThetaJoin[A]     = quasar.qscript.ThetaJoin[T, A]
   type MapFunc[A]       = quasar.qscript.MapFunc[T, A]
+  type FreeQS           = quasar.qscript.FreeQS[T]
 }
 
 object TTypes {
@@ -52,7 +53,7 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
   import SimplifyProjection._
 
   private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
-  private def applyToBranch(branch: FreeQS[T]): FreeQS[T] = branch mapSuspension simplify
+  private def applyToBranch(branch: FreeQS): FreeQS = branch mapSuspension simplify
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
@@ -103,13 +104,13 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
   import Normalizable._
   lazy val opt = new Optimize[T]
 
-  def freeTC(free: FreeQS[T]): FreeQS[T] = {
+  def freeTC(free: FreeQS): FreeQS = {
     freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
       liftCo(opt.applyToFreeQS[QScriptTotal])
     )
   }
 
-  def freeTCEq(free: FreeQS[T]): Option[FreeQS[T]] = {
+  def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
     (free ≟ freeNormalized).fold(None, freeNormalized.some)
   }

@@ -16,7 +16,6 @@
 
 package quasar.qscript
 
-import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
@@ -29,9 +28,11 @@ import matryoshka._,
   FunctorT.ops._,
   TraverseT.nonInheritedOps._
 import matryoshka.patterns._
-import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
+import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject.{ reflexiveInjectInstance => _, _ }, Leibniz._
 
-class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
+class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] {
+  private val UnrefedSrc: QScriptTotal[FreeQS] =
+    Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
@@ -42,20 +43,20 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   def elideNopQC[F[_]: Functor, G[_]: Functor]
     (FtoG: F ~> G)
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : QScriptCore[T, T[G]] => G[T[G]] = {
+    (implicit QC: QScriptCore :<: F)
+      : QScriptCore[T[G]] => G[T[G]] = {
     case Filter(Embed(src), BoolLit(true)) => src
     case Map(Embed(src), mf) if mf ≟ HoleF => src
     case x                                 => FtoG(QC.inj(x))
   }
 
   def unifySimpleBranches[F[_], A]
-    (src: A, l: FreeQS[T], r: FreeQS[T], combine: JoinFunc[T])
+    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc[T])
     (implicit
-      QC: QScriptCore[T, ?] :<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      QC: QScriptCore :<: F,
+      FI: Injectable.Aux[F, QScriptTotal])
       : Option[F[A]] =
-    (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+    (l.resumeTwice, r.resumeTwice) match {
       case (-\/(m1), -\/(m2)) =>
         (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
           // both sides only map over the same data
@@ -99,11 +100,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]]
     (implicit
-      TJ: ThetaJoin[T, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
-      FI: Injectable.Aux[F, QScriptTotal[T, ?]]) =
-    new (ThetaJoin[T, ?] ~> F) {
-      def apply[A](fa: ThetaJoin[T, A]) = fa match {
+      TJ: ThetaJoin :<: F,
+      QC: QScriptCore :<: F,
+      FI: Injectable.Aux[F, QScriptTotal]) =
+    new (ThetaJoin ~> F) {
+      def apply[A](fa: ThetaJoin[A]) = fa match {
         case ThetaJoin(src, l, r, on, _, combine) =>
           unifySimpleBranches[F, A](src, l, r, combine).getOrElse(TJ.inj(fa))
         case _ => TJ.inj(fa)
@@ -111,27 +112,24 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     }
 
   def rebaseT[F[_]: Traverse](
-    target: FreeQS[T])(
+    target: FreeQS)(
     src: T[F])(
-    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+    implicit FI: Injectable.Aux[F, QScriptTotal]):
       Option[T[F]] =
-    freeCata[QScriptTotal[T, ?], T[QScriptTotal[T, ?]], T[QScriptTotal[T, ?]]](
+    freeCata[QScriptTotal, T[QScriptTotal], T[QScriptTotal]](
       target.as(src.transAna(FI.inject)))(recover(_.embed)).transAnaM(FI project _)
 
   def rebaseTCo[F[_]: Traverse](
-    target: FreeQS[T])(
+    target: FreeQS)(
     srcCo: T[CoEnv[Hole, F, ?]])(
-    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+    implicit FI: Injectable.Aux[F, QScriptTotal]):
       Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
     //       target.transAnaM(_.htraverse(FI project _)) ∘ (srcCo >> _)
-    freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
+    freeTransCataM[T, Option, QScriptTotal, F, Hole, Hole](
       target)(
-      coEnvHtraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply)
+      coEnvHtraverse(λ[QScriptTotal ~> (Option ∘ F)#λ](FI.project(_))).apply)
       .map(targ => (targ >> srcCo.fromCoEnv).toCoEnv[T])
-
-  private val UnrefedSrc =
-    Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Unreferenced[T, FreeQS[T]]())
 
   /** Similar to [[elideNopJoin]], this has a more constrained type, because we
     * need to integrate one branch of the join into the source of the resulting
@@ -140,14 +138,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideOneSidedJoin[F[_], G[_]](
-    rebase: FreeQS[T] => T[G] => Option[T[G]])(
-    implicit TJ: ThetaJoin[T, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F,
-             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
-      ThetaJoin[T, T[G]] => F[T[G]] = {
+    rebase: FreeQS => T[G] => Option[T[G]])(
+    implicit TJ: ThetaJoin :<: F,
+             QC: QScriptCore :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
+      ThetaJoin[T[G]] => F[T[G]] = {
     case tj @ ThetaJoin(src, left, right, on, Inner, combine)
         =>
-      (left.resume.leftMap(_.map(_.resume)), right.resume.leftMap(_.map(_.resume))) match {
+      (left.resumeTwice, right.resumeTwice) match {
         case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
           case (Some(Map(-\/(src1), mf1)), _) if src1 ≟ UnrefedSrc =>
             rebase(tj.rBranch)(tj.src).fold(
@@ -172,8 +170,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   def coalesceMapJoin[F[_], G[_]: Functor](
     GtoF: G ~> λ[α => Option[F[α]]])(
-    implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
-      QScriptCore[T, T[G]] => F[T[G]] = {
+    implicit QC: QScriptCore :<: F, TJ: ThetaJoin :<: F):
+      QScriptCore[T[G]] => F[T[G]] = {
     case x @ Map(Embed(src), mf) =>
       (GtoF(src) >>= TJ.prj).fold(
         QC.inj(x))(
@@ -182,8 +180,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   }
 
   def transformIncludeToExclude[F[_]: Functor](
-    implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
-      QScriptCore[T, T[F]] => F[T[F]] = {
+    implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore :<: F):
+      QScriptCore[T[F]] => F[T[F]] = {
     case x @ Map(Embed(src), indexOne) if indexOne ≟ Free.roll(ProjectIndex(HoleF, IntLit(1))) =>
       SR.prj(src).cata(
         const => SR.inj(Const[ShiftedRead, T[F]](ShiftedRead(const.getConst.path, ExcludeId))),
@@ -196,9 +194,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   //       repair function to after Take/Drop.
   def swapMapCount[F[_], G[_]: Functor]
     (FtoG: F ~> G)
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
-    val FI = scala.Predef.implicitly[Injectable.Aux[QScriptCore[T, ?], QScriptTotal[T, ?]]]
+    (implicit QC: QScriptCore :<: F)
+      : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
+
+    val FI = Injectable.inject[QScriptCore, QScriptTotal]
 
     {
       case Take(src, from, count) =>
@@ -215,38 +214,21 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     }
   }
 
-  def compactQC: QScriptCore[T, ?] ~> (Option ∘ QScriptCore[T, ?])#λ =
-    new (QScriptCore[T, ?] ~> (Option ∘ QScriptCore[T, ?])#λ) {
-      def apply[A](fa: QScriptCore[T, A]) = fa match  {
-        case LeftShift(src, struct, repair) =>
-          rewriteShift(struct, repair) ∘
-            (LeftShift(src, _: FreeMap[T], _: JoinFunc[T])).tupled
+  def compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+    case LeftShift(src, struct, repair) =>
+      rewriteShift(struct, repair) ∘ (xy => LeftShift(src, xy._1, xy._2))
 
-        case Reduce(src, bucket, reducers0, repair0) => {
-          // `reducers`: the reduce funcs that are used
-          // `indices`: the indices into `reducers0` that are used
-          val (reducers, indices): (List[ReduceFunc[FreeMap[T]]], List[Int]) = {
-            val used: Set[Int] = repair0.foldLeft(Set[Int]()) {
-              case (acc, redIdx) => acc + redIdx.idx
-            }
-            reducers0.zipWithIndex.filter {
-              case (_, idx) => used.contains(idx)
-            }.unzip
-          }
+    case Reduce(src, bucket, reducers, repair0) =>
+      // `indices`: the indices into `reducers` that are used
+      val used    = repair0.map(_.idx).toSet
+      val indices = reducers.indices filter used
+      val repair  = repair0 map (r => r.copy(indices indexOf r.idx))
+      val done    = repair ≟ repair0 || (repair element ReduceIndex.Empty)
 
-          // reset the indices in `repair0`
-          val repair: FreeMapA[T, Int] = repair0.map {
-            case ReduceIndex(idx) => indices.indexOf(idx)
-          }
+      !done option Reduce(src, bucket, (indices map reducers).toList, repair)
 
-          if (repair.map(ReduceIndex(_)) ≟ repair0 || repair.element(-1))
-            None
-          else
-            Reduce(src, bucket, reducers, repair.map(ReduceIndex(_))).some
-        }
-        case _ => None
-      }
-    }
+    case _ => None
+  }
 
   // /** Chains multiple transformations together, each of which can fail to change
   //   * anything.
@@ -273,33 +255,33 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // - normalize mapfunc
   def applyNormalizations[F[_]: Traverse: Normalizable, G[_]: Traverse](
     prism: PrismNT[G, F],
-    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    rebase: FreeQS => T[G] => Option[T[G]])(
     implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore[T, ?] :<: F,
-             TJ: ThetaJoin[T, ?] :<: F,
-             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+             QC: QScriptCore :<: F,
+             TJ: ThetaJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
       F[T[G]] => G[T[G]] =
     repeatedly(Normalizable[F].normalize(_: F[T[G]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideOneSidedJoin[F, G](rebase)) ⋙
       repeatedly(C.coalesce[G](prism)) ⋙
       liftFG(coalesceMapJoin[F, G](prism.get)) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T, T[G]]))) ⋙
+      liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore[T, ?] :<: F,
-             TJ: ThetaJoin[T, ?] :<: F,
-             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+             QC: QScriptCore :<: F,
+             TJ: ThetaJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
     applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo)
 
   def applyAll[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore[T, ?] :<: F,
-             TJ: ThetaJoin[T, ?] :<: F,
-             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+             QC: QScriptCore :<: F,
+             TJ: ThetaJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
     applyNormalizations[F, F](idPrism, rebaseT)
 
@@ -308,9 +290,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     */
   def optimize[F[_], G[_]: Functor]
     (FtoG: F ~> G)
-    (implicit QC: QScriptCore[T, ?] :<: F)
+    (implicit QC: QScriptCore :<: F)
       : F[T[G]] => F[T[G]] =
-    liftFF[QScriptCore[T, ?], F, T[G]](repeatedly(swapMapCount(FtoG)))
+    liftFF[QScriptCore, F, T[G]](repeatedly(swapMapCount(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
@@ -325,8 +307,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],
       R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore[T, ?] :<: OUT,
-      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
+      QC: QScriptCore :<: OUT,
+      FI: Injectable.Aux[OUT, QScriptTotal])
       : T[IN] => M[T[OUT]] =
     _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)
 }
