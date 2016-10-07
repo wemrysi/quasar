@@ -362,6 +362,98 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       ok
     }
 
+    "equiJoin.rightOuter" in {
+
+      newSc.map ( sc => {
+        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+
+        val src: RDD[Data] = sc.parallelize(List(
+          Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+          Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US")))),
+          Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US")))),
+          Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
+        ))
+
+        def func(country: String): FreeMap[Fix] =
+          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+
+        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
+          Free.roll(MakeMap(StrLit("right"), RightSideF))
+        ))
+
+        val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, RightOuter, combine)
+
+        val state: SparkState[RDD[Data]] = alg(equiJoin)
+        state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+          case rdd =>
+            rdd.collect.toList must_== List(
+              Data.Obj(ListMap(
+                "left" ->  Data.Null,
+                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+              )),
+              Data.Obj(ListMap(
+                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+              ))
+              )
+        }
+        sc.stop
+      }).run.unsafePerformSync
+      ok
+    }
+
+    "equiJoin.fullOuter" in {
+
+      newSc.map ( sc => {
+        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+
+        val src: RDD[Data] = sc.parallelize(List(
+          Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+          Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
+          Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US")))),
+          Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US")))),
+          Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
+        ))
+
+        def func(country: String): FreeMap[Fix] =
+          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+
+        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
+          Free.roll(MakeMap(StrLit("right"), RightSideF))
+        ))
+
+        val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, FullOuter, combine)
+
+        val state: SparkState[RDD[Data]] = alg(equiJoin)
+        state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+          case rdd =>
+            rdd.collect.toList must_== List(
+              Data.Obj(ListMap(
+                "left" ->  Data.Null,
+                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+              )),
+              Data.Obj(ListMap(
+                "left" ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
+                "right" -> Data.Null
+              )),
+              Data.Obj(ListMap(
+                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+              ))
+              )
+        }
+        sc.stop
+      }).run.unsafePerformSync
+      ok
+    }
 
   }
 

@@ -312,9 +312,17 @@ object Planner {
                 case (k, (l, Some(r))) => merge(Data.Arr(List(l, r)))
                 case (k, (l, None)) => merge(Data.Arr(List(l, Data.Null)))
               }
-              case _ => ???
+              case RightOuter => klRdd.rightOuterJoin(krRdd).map {
+                case (k, (Some(l), r)) => merge(Data.Arr(List(l, r)))
+                case (k, (None, r)) => merge(Data.Arr(List(Data.Null, r)))
+              }
+              case FullOuter => klRdd.fullOuterJoin(krRdd).map {
+                case (k, (Some(l), Some(r))) => merge(Data.Arr(List(l, r)))
+                case (k, (Some(l), None)) => merge(Data.Arr(List(l, Data.Null)))
+                case (k, (None, Some(r))) => merge(Data.Arr(List(Data.Null, r)))
+                case (k, (None, None)) => merge(Data.Arr(List(Data.Null, Data.Null)))
+              }
             }
-
           }
         case _ => ???
       }
