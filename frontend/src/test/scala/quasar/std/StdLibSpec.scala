@@ -787,8 +787,11 @@ abstract class StdLibSpec extends Qspec {
           binary(Eq(_, _).embed, x, x, Data.Bool(true))
         }
 
-        "any non-numeric values with different types" >> prop { (x: Data, y: Data) =>
-          x.dataType != y.dataType ==>
+        "any values with different types" >> prop { (x: Data, y: Data) =>
+          // ...provide they are not both Numeric (Int | Dec)
+          (x.dataType != y.dataType &&
+            !((Type.Numeric contains x.dataType) &&
+              (Type.Numeric contains y.dataType))) ==>
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
@@ -824,7 +827,7 @@ abstract class StdLibSpec extends Qspec {
           binary(Neq(_, _).embed, x, x, Data.Bool(false))
         }
 
-        "anyvalues with different types" >> prop { (x: Data, y: Data) =>
+        "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provide they are not both Numeric (Int | Dec)
           (x.dataType != y.dataType &&
             !((Type.Numeric contains x.dataType) &&
