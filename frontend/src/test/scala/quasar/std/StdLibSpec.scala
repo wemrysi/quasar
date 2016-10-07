@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Qspec}, LogicalPlan._
+import quasar.{Data, LogicalPlan, Qspec, Type}, LogicalPlan._
 
 import matryoshka._
 import org.specs2.execute._
@@ -824,8 +824,11 @@ abstract class StdLibSpec extends Qspec {
           binary(Neq(_, _).embed, x, x, Data.Bool(false))
         }
 
-        "any non-numeric values with different types" >> prop { (x: Data, y: Data) =>
-          x.dataType != y.dataType ==>
+        "anyvalues with different types" >> prop { (x: Data, y: Data) =>
+          // ...provide they are not both Numeric (Int | Dec)
+          (x.dataType != y.dataType &&
+            !((Type.Numeric contains x.dataType) &&
+              (Type.Numeric contains y.dataType))) ==>
             binary(Neq(_, _).embed, x, y, Data.Bool(true))
         }
 
