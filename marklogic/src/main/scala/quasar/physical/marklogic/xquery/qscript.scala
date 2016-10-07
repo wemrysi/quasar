@@ -120,6 +120,20 @@ object qscript {
       }
     }
 
+  // qscript:element-left-shift($elt as element()) as item()*
+  def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
+    (qs.name("element-left-shift").qn[F] |@| ejson.arrayEltN.qn |@| ejson.isArray) { (fname, aelt, isArr) =>
+      declare(fname)(
+        $("elt") as SequenceType("element()")
+      ).as(SequenceType("item()*")) { elt: XQuery =>
+        isArr(elt) map { eltIsArray =>
+          if_ (eltIsArray)
+          .then_ { elt `/` child(aelt) `/` child.node() }
+          .else_ { elt `/` child.node() }
+        }
+      }
+    }.join
+
   // qscript:identity($x as item()*) as item()*
   def identity[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("identity").qn[F] map { fname =>
@@ -172,16 +186,6 @@ object qscript {
       }
     }
 
-  // qscript:node-left-shift($node as node()*) as item()*
-  def nodeLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.name("node-left-shift").qn[F] map { fname =>
-      declare(fname)(
-        $("node") as SequenceType("node()*")
-      ).as(SequenceType("item()*")) { n =>
-        n `/` child.node() `/` child.node()
-      }
-    }
-
   // qscript:project-field($src as element(), $field as xs:QName) as item()*
   def projectField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.name("project-field").qn[F] map { fname =>
@@ -189,10 +193,7 @@ object qscript {
         $("src")   as SequenceType("element()"),
         $("field") as SequenceType("xs:QName")
       ).as(SequenceType.Top) { (src: XQuery, field: XQuery) =>
-        val n = "$n"
-        for_    (n -> (src `/` child.element()))
-        .where_ (fn.nodeName(n.xqy) eq field)
-        .return_(n.xqy `/` child.node())
+        fn.filter(func("$n")(fn.nodeName("$n".xqy) eq field), src `/` child.element())
       }
     }
 
@@ -323,7 +324,7 @@ object qscript {
 
         for {
           kelt    <- ejson.mkArrayElt[F] apply n.xqy
-          velt    <- ejson.mkArrayElt[F] apply (c.xqy `/` child.node())
+          velt    <- ejson.mkArrayElt[F] apply c.xqy
           kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
           kvEnt   <- ejson.mkObjectEntry[F] apply (n.xqy, kvArr)
           entries =  for_ (c -> elt `/` child.element())

@@ -46,7 +46,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         rs      <- freshVar[F]
         r       <- freshVar[F]
         extract <- mapFuncXQuery(struct, l.xqy)
-        lshift  <- qscript.nodeLeftShift[F] apply (v.xqy)
+        lshift  <- qscript.elementLeftShift[F] apply (v.xqy)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
       } yield for_ (l -> src) let_ (v -> extract, rs -> lshift) return_ fn.map(func(r)(merge), rs.xqy)
 
@@ -131,7 +131,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case Min(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Sum(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F](fm, _))
-    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.singletonArray[F].apply(_)))
+    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.seqToArray_[F](_)))
     case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F](kfm, x).tuple(mapFuncXQuery[T, F](vfm, x)).flatMap {
                                    case (k, v) => ejson.singletonObject[F].apply(k, v)
                                  })

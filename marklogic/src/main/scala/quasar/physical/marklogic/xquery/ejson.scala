@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, every, for_, func, if_, let_}, axes.child
+  import syntax._, expr.{attribute, element, every, for_, func, if_, let_, typeswitch}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -112,6 +112,7 @@ object ejson {
       }
     }.join
 
+  // TODO: DRY up these predicates, they have the same impl.
   // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("is-array").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
@@ -185,7 +186,10 @@ object ejson {
         $("key") as SequenceType("xs:QName"),
         $("value") as SequenceType.Top
       ).as(SequenceType(s"element()")) { (key, value) =>
-        element { key } { value }
+        typeswitch(value)(
+          $("e") as SequenceType("element()") return_ (e =>
+            element { key } { mkSeq_(e `/` axes.attribute.node(), e `/` child.node()) })
+        ) default (element { key } { value })
       }
     }
 
@@ -243,16 +247,6 @@ object ejson {
 
   def seqToArray_[F[_]: PrologW](items: XQuery): F[XQuery] =
     ejsonN.qn[F] flatMap (ename => seqToArray[F].apply(ename.xqy, items))
-
-  // ejson:singleton-array($item as item()*) as element(ejson:ejson)
-  def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("singleton-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
-      declare(fname)(
-        $("item") as SequenceType.Top
-      ).as(SequenceType(s"element($ename)")) { item: XQuery =>
-        mkArrayElt[F].apply(item) flatMap (xqy => mkArray[F].apply(ename.xqy, xqy))
-      }
-    }.join
 
   // ejson:singleton-object($key as xs:string, $value as item()*) as element(ejson:ejson)
   def singletonObject[F[_]: PrologW]: F[FunctionDecl2] =
