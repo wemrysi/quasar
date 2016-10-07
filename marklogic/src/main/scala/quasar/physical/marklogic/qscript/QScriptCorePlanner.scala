@@ -143,9 +143,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
   }
 
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              =>
-      combiner(fm)((st, x) => mapFuncXQuery[T, F](fm, x) >>= (qscript.incAvg[F].apply(st, _)))
-
+    case Avg(fm)              => combiner(fm)(qscript.incAvg[F].apply(_, _))
     case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
     case Max(fm)              => combiner(fm)((x, y) => fn.max(mkSeq_(x, y)).point[F])
     case Min(fm)              => combiner(fm)((x, y) => fn.min(mkSeq_(x, y)).point[F])

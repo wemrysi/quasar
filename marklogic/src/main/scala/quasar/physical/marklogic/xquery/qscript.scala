@@ -136,8 +136,8 @@ object qscript {
         val (c, a, y) = ("$c", "$a", "$y")
         incAvgState[F].apply(c.xqy, y.xqy) map { nextSt =>
           let_(
-            c -> (map.get(st, "cnt".xqy) + 1.xqy),
-            a -> map.get(st, "avg".xqy),
+            c -> (map.get(st, "cnt".xs) + 1.xqy),
+            a -> map.get(st, "avg".xs),
             y -> (a.xqy + mkSeq_(mkSeq_(x - a.xqy) div c.xqy)))
           .return_(nextSt)
         }
@@ -149,7 +149,7 @@ object qscript {
     qs.name("inc-avg-state").qn[F] map { fname =>
       declare(fname)(
         $("cnt") as SequenceType("xs:integer"),
-        $("avg") as SequenceType("xs:decimal")
+        $("avg") as SequenceType("xs:double")
       ).as(SequenceType("map:map")) { (cnt, avg) =>
         map.new_(IList(
           map.entry("cnt".xs, cnt),
@@ -236,12 +236,12 @@ object qscript {
       }
     }.join
 
-  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:decimal
+  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:double
   def secondsSinceEpoch[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("seconds-since-epoch").qn[F] map { fname =>
       declare(fname)(
         $("dt") as SequenceType("xs:dateTime")
-      ).as(SequenceType("xs:decimal")) { dt =>
+      ).as(SequenceType("xs:double")) { dt =>
         mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
       }
     }
@@ -283,7 +283,7 @@ object qscript {
       }
     }
 
-  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:decimal
+  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:integer
   def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("timezone-offset-seconds").qn[F] map { fname =>
       declare(fname)(
