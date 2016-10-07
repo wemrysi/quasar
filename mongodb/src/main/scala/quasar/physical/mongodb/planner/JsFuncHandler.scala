@@ -150,6 +150,64 @@ object JsFuncHandler {
             Literal(Js.Str(".")),
             pad3(Call(select(ident("t"), "getUTCMilliseconds"), Nil))))
 
+      case ExtractCentury(date) =>
+        BinOp(jscore.Div, Call(select(date, "getFullYear"), Nil), Literal(Js.Num(100, false)))
+      case ExtractDayOfMonth(date) => Call(select(date, "getDate"), Nil)
+      case ExtractDecade(date) =>
+        BinOp(jscore.Div, Call(select(date, "getFullYear"), Nil), Literal(Js.Num(10, false)))
+      case ExtractDayOfWeek(date) =>
+        // NB: MongoDB's Date's getDay (during filtering at least) seems to
+        // be monday=0 ... sunday=6, apparently in violation of the JavaScript
+        // convention.
+        If(
+          BinOp(jscore.Eq,
+            Call(select(date, "getDay"), Nil),
+            Literal(Js.Num(6, false))),
+          Literal(Js.Num(0, false)),
+          BinOp(jscore.Add,
+            Call(select(date, "getDay"), Nil),
+            Literal(Js.Num(1, false))))
+      // TODO: case ExtractDayOfYear(date) =>
+      case ExtractEpoch(date) =>
+        BinOp(jscore.Div, Call(select(date, "valueOf"), Nil), Literal(Js.Num(1000, false)))
+      case ExtractHour(date) => Call(select(date, "getHours"), Nil)
+      case ExtractIsoDayOfWeek(date) =>
+        BinOp(jscore.Add,
+          Call(select(date, "getDay"), Nil),
+          Literal(Js.Num(1, false)))
+      // TODO: case ExtractIsoYear(date) =>
+      case ExtractMicroseconds(date) =>
+        BinOp(jscore.Mult,
+          BinOp(jscore.Add,
+            Call(select(date, "getMilliseconds"), Nil),
+            BinOp(jscore.Mult, Call(select(date, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
+          Literal(Js.Num(1000, false)))
+      case ExtractMillenium(date) =>
+        BinOp(jscore.Div, Call(select(date, "getFullYear"), Nil), Literal(Js.Num(1000, false)))
+      case ExtractMilliseconds(date) =>
+        BinOp(jscore.Add,
+          Call(select(date, "getMilliseconds"), Nil),
+          BinOp(jscore.Mult, Call(select(date, "getSeconds"), Nil), Literal(Js.Num(1000, false))))
+      case ExtractMinute(date) =>
+        Call(select(date, "getMinutes"), Nil)
+      case ExtractMonth(date) =>
+        BinOp(jscore.Add,
+          Call(select(date, "getMonth"), Nil),
+          Literal(Js.Num(1, false)))
+      case ExtractQuarter(date) =>
+        BinOp(jscore.Add,
+          BinOp(jscore.BitOr,
+            BinOp(jscore.Div,
+              Call(select(date, "getMonth"), Nil),
+              Literal(Js.Num(3, false))),
+            Literal(Js.Num(0, false))),
+          Literal(Js.Num(1, false)))
+      case ExtractSecond(date) => Call(select(date, "getSeconds"), Nil)
+      // TODO: case ExtractWeek(date) =>
+      case ExtractYear(date) => Call(select(date, "getFullYear"), Nil)
+
+      case Now() => Call(select(ident("Date"), "now"), Nil)
+
       case ProjectField(obj, field) => Access(obj, field)
       case ProjectIndex(arr, index) => Access(arr, index)
     }
