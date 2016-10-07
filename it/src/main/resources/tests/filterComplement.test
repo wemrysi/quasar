@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "pending",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select count(*) from zips where state not in (\"AZ\", \"CO\")",

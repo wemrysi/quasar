@@ -3,7 +3,7 @@
   "backends": {
     "postgresql": "pending",
     "marklogic":  "pending",
-    "couchbase":  "pending"
+    "couchbase":  "skip"
   },
   "data": "olympics.data",
   "query": "select distinct discipline as d from olympics",

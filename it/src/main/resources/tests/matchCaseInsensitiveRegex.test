@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "pending",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select * from zips where city ~* \"^bOu\"",

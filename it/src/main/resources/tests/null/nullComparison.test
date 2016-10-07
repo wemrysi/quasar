@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "pending",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "data": "nulls.data",
     "query": "select distinct (val != null) as expr from nulls where val != null",

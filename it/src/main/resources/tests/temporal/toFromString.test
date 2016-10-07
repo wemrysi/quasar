@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "../days.data",
     "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 20)), timestamp(str), to_string(ts) from `../days`",

@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "../slamengine_commits.data",
     "query": "SELECT p.author.login, COUNT(*)

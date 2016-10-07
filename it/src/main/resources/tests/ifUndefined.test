@@ -4,7 +4,7 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "zips.data",
     "query": "select foo ?? pop, city ?? false from zips",

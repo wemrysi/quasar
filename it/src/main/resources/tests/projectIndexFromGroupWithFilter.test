@@ -4,7 +4,7 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0].sha, count(*) as count from slamengine_commits where parents[0].sha like \"5%\" group by parents[0].sha",

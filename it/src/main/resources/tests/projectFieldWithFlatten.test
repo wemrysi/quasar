@@ -4,7 +4,7 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "usa_factbook.data",
     "query": "select intro from usa_factbook where geo{*}.text = \"19,924 km\"",

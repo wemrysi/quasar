@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "zips.data",
     "query": "select * from zips where pop < loc[1] limit 10",

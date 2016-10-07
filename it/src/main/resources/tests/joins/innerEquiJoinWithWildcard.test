@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "../largeZips.data",
     "query": "select * from `../largeZips` join `../largeZips` as z2 on largeZips._id = z2._id",

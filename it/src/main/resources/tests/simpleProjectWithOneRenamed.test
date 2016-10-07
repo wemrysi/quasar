@@ -8,7 +8,7 @@
     "mongodb_3_2":       "pending",
     "postgresql":        "pending",
     "marklogic":         "pending",
-    "couchbase":         "pending"
+    "couchbase":         "skip"
   },
 
   "data": "zips.data",

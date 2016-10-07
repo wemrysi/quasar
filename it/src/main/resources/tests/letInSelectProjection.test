@@ -4,7 +4,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "pending",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
 
     "data": ["cars.data", "zips.data"],
