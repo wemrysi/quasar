@@ -22,8 +22,7 @@ import quasar.{Data, DataCodec, PhaseResults, Variables}
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
-import quasar.fp._
-import quasar.fp.numeric._
+import quasar.fp._, ski._, numeric._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.main.{FilesystemQueries, Prettify}
@@ -49,6 +48,7 @@ object Repl {
       |  cd [path]
       |  [query]
       |  [id] <- [query]
+      |  explain [query]
       |  ls [path]
       |  save [path] [value]
       |  append [path] [value]
@@ -204,6 +204,21 @@ object Repl {
             _     <- runQuery(state, query)(
                       ds => summarize[S](state.summaryCount, state.format)(ds))
           } yield ())
+
+      case Explain(q) =>
+        for {
+          state <- RS.get
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          t     <- fsQ.explainQuery(expr, vars, state.cwd).run.run.run
+          (log, result) = t
+          _     <- printLog(state.debugLevel, log)
+          _     <- result.fold(
+                    serr => DF.fail(serr.shows),
+                    _.fold(
+                      perr => DF.fail(perr.shows),
+                      κ(().point[Free[S, ?]])))
+        } yield ()
 
       case Save(f, v) =>
         write(W.saveThese(_, _), f, v)
