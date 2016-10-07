@@ -128,13 +128,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0)))))).some)
     }
 
-    "convert a basic take" in {
+    "convert a simple wildcard take" in {
       val lp = fullCompileExp("select * from bar limit 10")
       val qs = convert(listContents.some, lp)
       qs must equal(
         QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
           Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> file("bar"))))), HoleF, RightSideF))),
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
+    }
+
+    "convert a simple take through a path" in {
+      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
+        equal(
+          QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, RightSideF))),
+            Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
     }
 
     "convert a multi-field select" in {
@@ -163,19 +171,6 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   RightSideF,
                   Free.roll(Undefined()))),
                 StrLit("state"))))))))).some)
-    }
-
-    "convert a simple take" in pending {
-      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
-      equal(
-        chain(
-          ReadR(rootDir </> dir("foo") </> file("bar")),
-          QC.inj(LeftShift((), HoleF, Free.point(RightSide))),
-          QC.inj(Take((),
-            Free.point(SrcHole),
-            Free.roll(QCT.inj(Map(
-              Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
-              IntLit[Fix, Hole](10))))))).some)
     }
 
     "convert a simple read with path projects" in {
