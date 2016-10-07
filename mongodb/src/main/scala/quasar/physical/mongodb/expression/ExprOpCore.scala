@@ -366,12 +366,15 @@ object ExprOpCoreF {
         case $toLowerF(a)            => invoke(a, "toLowerCase")
         case $toUpperF(a)            => invoke(a, "toUpperCase")
 
-        case $yearF(a)               => invoke(a, "getFullYear")
+        case $yearF(a)               => invoke(a, "getUTCFullYear")
         // case $dayOfYear(a)           => // TODO: no JS equivalent
-        case $monthF(a)              => invoke(a, "getMonth")
-        case $dayOfMonthF(a)         => invoke(a, "getDate")
+        case $monthF(a)              => invoke(a, "getUTCMonth")
+        case $dayOfMonthF(a)         => invoke(a, "getUTCDate")
         // case $week(a)                => // TODO: no JS equivalent
-        case $dayOfWeekF(a)          => invoke(a, "getDay")
+        case $dayOfWeekF(a)          => expr1(a)(x =>
+          jscore.BinOp(jscore.Add,
+            jscore.Call(jscore.Select(x, "getUTCDay"), Nil),
+            jscore.Literal(Js.Num(1, false))))
         case $hourF(a)               => invoke(a, "getUTCHours")
         case $minuteF(a)             => invoke(a, "getUTCMinutes")
         case $secondF(a)             => invoke(a, "getUTCSeconds")
