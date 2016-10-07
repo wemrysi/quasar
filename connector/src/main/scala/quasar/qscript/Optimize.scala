@@ -245,7 +245,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // - convert any remaning projects to maps
   // - coalesce nodes
   // - normalize mapfunc
-  def applyNormalizations[F[_]: Traverse: Normalizable, G[_]: Traverse](
+  private def applyNormalizations[F[_]: Traverse: Normalizable, G[_]: Traverse](
     prism: PrismNT[G, F],
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit C: Coalesce.Aux[T, F, F],
@@ -253,7 +253,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[G]] => G[T[G]] =
-    repeatedly(Normalizable[F].normalize(_: F[T[G]])) ⋙
+    repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F].apply[T[G]])) ⋙
       liftFG(injectRepeatedly(elideOneSidedJoin[F, G](rebase))) ⋙
       repeatedly(C.coalesceQC[G](prism)) ⋙

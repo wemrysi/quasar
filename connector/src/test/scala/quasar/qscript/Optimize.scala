@@ -34,7 +34,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   val opt = new Optimize[Fix]
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[QS](orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]])))
+    expr.transCata[QS](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def applyAllExpr(expr: Fix[QS]): Fix[QS] =
     expr.transCata[QS](opt.applyAll[QS])
