@@ -123,10 +123,6 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
     } yield h
   }
 
-  private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
-    queryResponsesL.st map (qrs =>
-      Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).description)))
-
   private def simpleEvaluation(lp0: FixPlan): ER[Chunks] = {
     import quasar.LogicalPlan._
     import quasar.std.StdLib.set.{Drop, Take}
@@ -173,12 +169,10 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
     phaseResults(lp) tuple planMapL.st.map(executionPlan(lp, _))
 
   def openForRead(f: AFile, off: Natural, lim: Option[Positive]): FLR[ReadHandle] =
-    fileL(f).st >>= (_.fold[State[InMemState, FileSystemError \/ ReadHandle]](
-      unknownPath(f))(
-      κ(for {
-        h <- nextSeq ∘ (ReadHandle(f, _))
-        _ <- readingL(h) := Reading(f, off, lim, 0).some
-      } yield h.right)))
+    for {
+      h <- nextSeq ∘ (ReadHandle(f, _))
+      _ <- readingL(h) := Reading(f, off, lim, 0).some
+    } yield h.right
 
   def read(h: ReadHandle): FLR[Chunks] =
     readingL(h) flatMap {
@@ -186,7 +180,7 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
       case Some(r @ Reading(f, _, _, _)) =>
         fileL(f).st flatMap {
           case Some(xs) => doRead(h, r, xs)
-          case _        => unknownPath(f)
+          case _        => Vector() /** non-existent file returns empty content now */
         }
     }
 
@@ -208,14 +202,15 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
 
   import MoveSemantics._
 
-  def deleteFile(f: AFile): FLR[Unit] = deleteF(f) map (_.fold[LR[Unit]](unknownPath(f))(_ => ()))
-
-  def deleteDir(d: ADir): InMemoryFs[FileSystemError \/ Unit] =
+  def deleteDir(d: ADir): FLR[Unit] =
     for {
       ss <- fileMapL.st ∘ (_.keys.toStream.map(_ relativeTo d).unite)
       r  <- ss.traverse(f => EitherT(deleteFile(d </> f))).run ∘
               (_ >>= (_.nonEmpty either (()) or unknownPath(d)))
     } yield r
+
+  def deleteFile(f: AFile): FLR[Unit] =
+    (fileL(f) <:= None) map (_.void \/> unknownPath(f))
 
   def moveDir(src: ADir, dst: ADir, s: MoveSemantics): FLR[Unit] =
     for {

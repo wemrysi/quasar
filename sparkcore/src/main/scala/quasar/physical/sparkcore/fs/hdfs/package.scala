@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar.fs._
 import quasar.fs.QueryFile.ResultHandle
-import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+import quasar.fs.mount._, FileSystemDef._
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
@@ -28,9 +28,7 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fp.TaskRef
 import quasar.fp.free._
-import quasar.fs.mount.FileSystemDef._
 import quasar.EnvironmentError
-import quasar.fs.mount.FileSystemDef._
 import quasar.fs.mount.ConnectionUri
 import quasar.contrib.pathy._
 
@@ -129,7 +127,7 @@ package object hdfs {
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case (FsType, uri) =>
+      case FsCfg(FsType, uri) =>
         for {
           sparkFsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
           res <- {
