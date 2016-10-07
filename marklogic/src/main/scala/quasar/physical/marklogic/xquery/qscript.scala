@@ -323,10 +323,10 @@ object qscript {
         val n = "$name"
 
         for {
-          kelt    <- ejson.mkArrayElt[F] apply n.xqy
-          velt    <- ejson.mkArrayElt[F] apply c.xqy
+          kelt    <- ejson.mkArrayElt[F](n.xqy)
+          velt    <- ejson.mkArrayElt[F](c.xqy)
           kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
-          kvEnt   <- ejson.mkObjectEntry[F] apply (n.xqy, kvArr)
+          kvEnt   <- ejson.renameOrWrap[F] apply (n.xqy, kvArr)
           entries =  for_ (c -> elt `/` child.element())
                      .let_(n -> fn.nodeName(c.xqy))
                      .return_(kvEnt)
