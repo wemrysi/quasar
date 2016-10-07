@@ -68,7 +68,7 @@ trait StdLibTestRunner {
 abstract class StdLibSpec extends Qspec {
   def closeTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
-      x == y || ((x - y)/y).abs.toDouble < err
+      x == y || ((x - y).abs/(y.abs max err)).toDouble < err
 
     def apply[S <: Data](s: Expectable[S]) = {
       val v = s.value
