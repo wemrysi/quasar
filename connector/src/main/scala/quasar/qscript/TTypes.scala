@@ -112,12 +112,12 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
-    (free ≟ freeNormalized).fold(None, freeNormalized.some)
+    (free ≠ freeNormalized).option(freeNormalized)
   }
 
   def freeMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
     val fmNormalized = freeMF[A](fm)
-    (fm ≟ fmNormalized).fold(None, fmNormalized.some)
+    (fm ≠ fmNormalized).option(fmNormalized)
   }
 
   def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
@@ -175,19 +175,17 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
           reducers.map(_.traverse(freeMFEq[Hole](_)))
 
         val reducersNormOpt: Option[List[ReduceFunc[FreeMap[T]]]] =
-          if (reducersOpt.map(_.toList).flatten.isEmpty)
-            None
-          else
-            Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)).some
+          (!reducersOpt.map(_.toList).flatten.isEmpty).option(
+            Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)))
 
         val bucketNormOpt: Option[FreeMap[T]] = freeMFEq(bucket)
 
         val bucketNormConst: Option[FreeMap[T]] =
           bucketNormOpt.getOrElse(bucket).resume.fold({
-            case MapFuncs.Constant(ej) if EJson.isNull(ej) => None
-            case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]().some
+            case MapFuncs.Constant(ej) =>
+              (!EJson.isNull(ej)).option(MapFuncs.NullLit[T, Hole]())
             case _ => bucketNormOpt
-          }, _ => bucketNormOpt)
+          }, κ(bucketNormOpt))
 
         (bucketNormConst, reducersNormOpt, freeMFEq(repair)) match {
           case (None, None, None) =>
@@ -211,10 +209,8 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
           }
 
         val orderNormOpt: Option[List[(FreeMap[T], SortDir)]] =
-          if (orderOpt.map(_.toList).flatten.isEmpty)
-            None
-          else
-            Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)).some
+          (!orderOpt.map(_.toList).flatten.isEmpty).option(
+            Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)))
 
         makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
       }

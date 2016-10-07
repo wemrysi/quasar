@@ -128,6 +128,15 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0)))))).some)
     }
 
+    "convert a basic take" in {
+      val lp = fullCompileExp("select * from bar limit 10")
+      val qs = convert(listContents.some, lp)
+      qs must equal(
+        QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+          Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> file("bar"))))), HoleF, RightSideF))),
+          Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
+    }
+
     "convert a multi-field select" in {
       val lp = fullCompileExp("select city, state from bar")
       val qs = convert(listContents.some, lp)

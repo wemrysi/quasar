@@ -98,17 +98,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
 
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
-  def elideNopJoin[F[_]]
-    (implicit
-      TJ: ThetaJoin :<: F,
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal]) =
-    new (ThetaJoin ~> F) {
-      def apply[A](fa: ThetaJoin[A]) = fa match {
-        case ThetaJoin(src, l, r, on, _, combine) =>
-          unifySimpleBranches[F, A](src, l, r, combine).getOrElse(TJ.inj(fa))
-        case _ => TJ.inj(fa)
-      }
+  def elideNopJoin[F[_]](implicit QC: QScriptCore :<: F, FI: Injectable.Aux[F, QScriptTotal]) =
+    λ[ThetaJoin ~> (Option ∘ F)#λ] {
+      case ThetaJoin(src, l, r, on, _, combine) => unifySimpleBranches(src, l, r, combine)(QC, FI)
+      case _                                    => None
     }
 
   def rebaseT[F[_]: Traverse](
@@ -139,54 +132,30 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideOneSidedJoin[F[_], G[_]](
     rebase: FreeQS => T[G] => Option[T[G]])(
-    implicit TJ: ThetaJoin :<: F,
-             QC: QScriptCore :<: F,
+    implicit QC: QScriptCore :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
-      ThetaJoin[T[G]] => F[T[G]] = {
-    case tj @ ThetaJoin(src, left, right, on, Inner, combine)
-        =>
+      ThetaJoin[T[G]] => Option[F[T[G]]] = {
+
+    case ThetaJoin(src, left, right, on, Inner, combine) =>
       (left.resumeTwice, right.resumeTwice) match {
         case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
           case (Some(Map(-\/(src1), mf1)), _) if src1 ≟ UnrefedSrc =>
-            rebase(tj.rBranch)(tj.src).fold(
-              TJ.inj(tj))(
-              tf => QC.inj(Map(tf, tj.combine >>= {
+            rebase(right)(src).map(
+              tf => QC.inj(Map(tf, combine >>= {
                 case LeftSide  => mf1
                 case RightSide => HoleF
               })))
           case (_, Some(Map(-\/(src2), mf2))) if src2 ≟ UnrefedSrc =>
-            rebase(tj.lBranch)(tj.src).fold(
-              TJ.inj(tj))(
-              tf => QC.inj(Map(tf, tj.combine >>= {
+            rebase(left)(src).map(
+              tf => QC.inj(Map(tf, combine >>= {
                 case LeftSide  => HoleF
                 case RightSide => mf2
               })))
-          case (_, _)=> TJ.inj(tj)
+          case (_, _)=> None
         }
-        case (_, _) => TJ.inj(tj)
+        case (_, _) => None
       }
-    case tj => TJ.inj(tj)
-  }
-
-  def coalesceMapJoin[F[_], G[_]: Functor](
-    GtoF: G ~> λ[α => Option[F[α]]])(
-    implicit QC: QScriptCore :<: F, TJ: ThetaJoin :<: F):
-      QScriptCore[T[G]] => F[T[G]] = {
-    case x @ Map(Embed(src), mf) =>
-      (GtoF(src) >>= TJ.prj).fold(
-        QC.inj(x))(
-        tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc[T]))(tj)))
-    case x => QC.inj(x)
-  }
-
-  def transformIncludeToExclude[F[_]: Functor](
-    implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore :<: F):
-      QScriptCore[T[F]] => F[T[F]] = {
-    case x @ Map(Embed(src), indexOne) if indexOne ≟ Free.roll(ProjectIndex(HoleF, IntLit(1))) =>
-      SR.prj(src).cata(
-        const => SR.inj(Const[ShiftedRead, T[F]](ShiftedRead(const.getConst.path, ExcludeId))),
-        QC.inj(x))
-    case x => QC.inj(x)
+    case _ => None
   }
 
   /** Pull more work to _after_ count operations, limiting the dataset. */
@@ -262,10 +231,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[G]] => G[T[G]] =
     repeatedly(Normalizable[F].normalize(_: F[T[G]])) ⋙
-      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideOneSidedJoin[F, G](rebase)) ⋙
-      repeatedly(C.coalesce[G](prism)) ⋙
-      liftFG(coalesceMapJoin[F, G](prism.get)) ⋙
+      liftFG(injectRepeatedly(elideNopJoin[F].apply[T[G]])) ⋙
+      liftFG(injectRepeatedly(elideOneSidedJoin[F, G](rebase))) ⋙
+      repeatedly(C.coalesceQC[G](prism)) ⋙
+      liftFG(injectRepeatedly(C.coalesceTJ[G](prism.get))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
