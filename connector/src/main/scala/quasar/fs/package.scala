@@ -16,7 +16,6 @@
 
 package quasar
 
-import quasar.Predef._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._

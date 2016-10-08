@@ -37,6 +37,8 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 }
 
 object ReduceIndex {
+  val Empty = ReduceIndex(-1)
+
   implicit def equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
 
