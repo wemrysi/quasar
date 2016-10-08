@@ -159,9 +159,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
   }
 
   /** Pull more work to _after_ count operations, limiting the dataset. */
-  // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce
-  //       repair function to after Take/Drop.
-  def swapMapCount[F[_], G[_]: Functor]
+  // TODO: we should be able to pull _most_ of a Reduce repair function to after a Subset
+  def swapMapSubset[F[_], G[_]: Functor]
     (FtoG: F ~> G)
     (implicit QC: QScriptCore :<: F)
       : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
@@ -169,14 +168,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
     val FI = Injectable.inject[QScriptCore, QScriptTotal]
 
     {
-      case Take(src, from, count) =>
+      case Subset(src, from, sel, count) =>
         from.resume.swap.toOption >>= (FI project _) >>= {
-          case Map(fromInner, mf) => Map(FtoG(QC.inj(Take(src, fromInner, count))).embed, mf).some
-          case _ => None
-        }
-      case Drop(src, from, count) =>
-        from.resume.swap.toOption >>= (FI project _) >>= {
-          case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
+          case Map(fromInner, mf) =>
+            Map(FtoG(QC.inj(Subset(src, fromInner, sel, count))).embed, mf).some
           case _ => None
         }
       case _ => None
@@ -212,9 +207,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
 
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
-  // - Take/Drop can have a normalized order _if_ their counts are constant
+  // - Subset can have a normalized order _if_ their counts are constant
   //   (maybe in some additional cases)
-  // - Take/Drop can be moved ahead of Map
 
   // The order of optimizations is roughly this:
   // - elide NOPs
@@ -257,8 +251,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T]
   /** Should only be applied after all other QScript transformations. This gives
     * the final, optimized QScript for conversion.
     */
-  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(implicit QC: QScriptCore :<: F): F[T[G]] => F[T[G]] =
-    liftFF(repeatedly(swapMapCount(FtoG)))
+  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(implicit QC: QScriptCore :<: F)
+      : F[T[G]] => F[T[G]] =
+    liftFF(repeatedly(swapMapSubset(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle

@@ -224,12 +224,9 @@ abstract class DiscoverPathInstances {
         case Union(src, lb, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Union(s, l, r)))
-        case Take(src, lb, rb) if !src.isThat =>
+        case Subset(src, lb, sel, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Take(s, l, r)))
-        case Drop(src, lb, rb) if !src.isThat =>
-          convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Drop(s, l, r)))
+            QC.inj(Subset(s, l, sel, r)))
 
         case x => x.traverse(unionAll(g)) ∘ (in => \&/-(QC.inj(in).embed))
       }

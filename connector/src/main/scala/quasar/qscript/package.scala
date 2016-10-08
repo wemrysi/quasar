@@ -143,6 +143,15 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
+  def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+    (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
+    val optimize = new Optimize[T]
+
+    freeTransCata(
+      br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))(
+      liftCo(optimize.applyToFreeQS))
+  }
+
   def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
     (struct: FreeMap[T], repair0: JoinFunc[T])
       : Option[(FreeMap[T], JoinFunc[T])] = {

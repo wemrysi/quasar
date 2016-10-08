@@ -132,8 +132,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val lp = fullCompileExp("select * from bar limit 10")
       val qs = convert(listContents.some, lp)
       qs must equal(
-        QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+        QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
           Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> file("bar"))))), HoleF, RightSideF))),
+          Take,
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
     }
 
@@ -171,8 +172,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         chain(
           ReadR(rootDir </> dir("foo") </> file("bar")),
           QC.inj(LeftShift((), HoleF, Free.point(RightSide))),
-          QC.inj(Take((),
+          QC.inj(Subset((),
             Free.point(SrcHole),
+            Take,
             Free.roll(QCT.inj(Map(
               Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
               IntLit[Fix, Hole](10))))))).some)

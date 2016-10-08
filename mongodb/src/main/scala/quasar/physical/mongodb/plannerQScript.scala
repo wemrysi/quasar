@@ -26,12 +26,12 @@ import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
-import quasar.physical.mongodb.WorkflowBuilder._
+import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner.{FuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
-import quasar.physical.mongodb.workflow._
+import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 import javascript._
@@ -174,8 +174,9 @@ object MongoDbQScriptPlanner {
       case MakeArray(a1) => unimplemented("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented("MakeMap expression")
       case ConcatMaps(a1, a2) => unimplemented("ConcatMap expression")
-      case ProjectField($var(DocField(base)), $literal(Bson.Text(field))) =>
-        $var(DocField(base \ BsonField.Name(field))).right
+      case ProjectField($var(dv), $literal(Bson.Text(field))) =>
+        $var(dv \ BsonField.Name(field)).right
+      case ProjectField(a1, a2) => unimplemented(s"ProjectField expression")
       case ProjectIndex(a1, a2)  => unimplemented("ProjectIndex expression")
       case DeleteField(a1, a2)  => unimplemented("DeleteField expression")
 
@@ -696,7 +697,20 @@ object MongoDbQScriptPlanner {
                    ev1: Show[WorkflowBuilder[WF]],
                    WB: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
-          qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
+          qs => Collection
+            .fromFile(qs.getConst.path)
+            .bimap(
+              PlanPathError(_): PlannerError,
+              coll => {
+                val dataset = WB.read(coll)
+                // TODO: exclude `_id` here?
+                qs.getConst.idStatus match {
+                  case IncludeId =>
+                    ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
+                  case ExcludeId => dataset
+                }
+              })
+            .liftM[GenT]
       }
 
     implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
@@ -718,14 +732,14 @@ object MongoDbQScriptPlanner {
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder(funcHandler)(src, bucket) ⊛
               reducers.traverse(_.traverse(getExpr(funcHandler))) ⊛
-              getJsRed(repair))((b, red, rep) =>
+              handleRedRepair(funcHandler, repair))((b, red, rep) =>
               ExprBuilder(
                 GroupBuilder(src,
                   List(b),
                   Contents.Doc(red.zipWithIndex.map(ai =>
                     (BsonField.Name(ai._2.toString),
                       accumulator(ai._1).left[Fix[ExprOp]])).toListMap)),
-                rep.left)).liftM[GenT]
+                rep)).liftM[GenT]
           case Sort(src, bucket, order) =>
             val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
             keys.traverse(getExprBuilder(funcHandler)(src, _))
@@ -739,14 +753,15 @@ object MongoDbQScriptPlanner {
             (rebaseWB(joinHandler, funcHandler, lBranch, src) ⊛
               rebaseWB(joinHandler, funcHandler, rBranch, src))(
               WB.unionAll).join
-          case Take(src, from, count) =>
+          case Subset(src, from, sel, count) =>
             (rebaseWB(joinHandler, funcHandler, from, src) ⊛
               (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-              WB.limit)
-          case Drop(src, from, count) =>
-            (rebaseWB(joinHandler, funcHandler, from, src) ⊛
-              (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-              WB.skip)
+              sel match {
+                case Drop => WB.skip
+                case Take => WB.limit
+                // TODO: Better sampling
+                case Sample => WB.limit
+              })
           case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
@@ -866,8 +881,8 @@ object MongoDbQScriptPlanner {
     src: WorkflowBuilder[WF], fm: FreeMap[T])(
     implicit ev: EX :<: ExprOp):
       OutputM[WorkflowBuilder[WF]] =
-    (getExpr(funcHandler)(fm).map(_.right[JsFn]) <+> getJsFn(fm).map(_.left[Fix[ExprOp]])) ∘
-      (ExprBuilder(src, _))
+    // TODO: identify cases for ArrayBuilder, DocBuilder, and SpliceBuilder.
+    handleFreeMap(funcHandler, fm) ∘ (ExprBuilder(src, _))
 
   def getJsMerge[T[_[_]]: Recursive: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):
       OutputM[JsFn] =
@@ -876,9 +891,32 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
+  def meh[M[_]: Functor: Plus, A](a: A)(exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
+      : M[Expr] =
+    exf(a).map(_.right[JsFn]) <+> jsf(a).map(_.left[Fix[ExprOp]])
+
+  def handleFreeMap[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Expr] =
+    meh(fm)(getExpr(funcHandler)(_), getJsFn[T])
+
+  def handleRedRepair[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Expr] =
+    meh(jr)(getExprRed(funcHandler)(_), getJsRed[T])
+
+  def getExprRed[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX])
+    (jr: FreeMapA[T, ReduceIndex])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Fix[ExprOp]] =
+    processMapFuncExpr(funcHandler)(jr)(ri => $field(ri.idx.toString).right)
+
   def getJsRed[T[_[_]]: Recursive: ShowT](jr: FreeMapA[T, ReduceIndex]):
       OutputM[JsFn] =
-    processMapFunc(jr)(ri => jscore.ident(ri.idx.toString)) ∘ (JsFn(JsFn.defaultName, _))
+    processMapFunc(jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.toString))) ∘ (JsFn(JsFn.defaultName, _))
 
   def rebaseWB[T[_[_]], WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse](
     joinHandler: JoinHandler[WF, WorkflowBuilder.M],
@@ -969,9 +1007,6 @@ object MongoDbQScriptPlanner {
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
-    type MongoQScriptInterim[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[Read, ?])#M[A]
-
     type MongoQScript[A] =
       (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
 
@@ -992,6 +1027,7 @@ object MongoDbQScriptPlanner {
       EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
 
     val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
+    val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     val lc = listContents andThen (ss => EitherT(ss.run.liftM[PhaseResultT]))
 
@@ -1001,8 +1037,14 @@ object MongoDbQScriptPlanner {
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(
-        shiftRead(qs).transCata[MongoQScript](
-          SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet)).point[M])
+        shiftRead(qs)
+          .transCata[MongoQScript](SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet))
+          .transAna(
+            repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
+            repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
+            repeatedly(C.coalesceSR[MongoQScript](idPrism)))
+          .transCata(optimize.optimize(idPrism.reverseGet))
+          .point[M])
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
