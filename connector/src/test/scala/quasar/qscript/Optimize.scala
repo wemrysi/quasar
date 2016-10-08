@@ -43,7 +43,8 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     expr.transCata[QST](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
-    expr.transCata[QST](liftFG(opt.transformIncludeToExclude[QST]))
+    expr.transCata(
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST](idPrism))))
 
   type QSI[A] =
     (QScriptCore[Fix, ?] :\: ProjectBucket[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[DeadEnd, ?])#M[A]
@@ -84,7 +85,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           HoleF,
           Free.point[MapFunc[Fix, ?], JoinSide](RightSide))
 
-      Coalesce[Fix, QScriptCore[Fix, ?], QScriptCore[Fix, ?]].coalesce(idPrism).apply(exp) must
+      Coalesce[Fix, QScriptCore[Fix, ?], QScriptCore[Fix, ?]].coalesceQC(idPrism).apply(exp) must
       equal(
         LeftShift(
           Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
@@ -299,11 +300,17 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
       val sampleFile = rootDir </> file("bar")
 
-      val originalQScript = Fix(QS.inject(QC.inj(Map(
-        Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
-        Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+      val originalQScript =
+        QCT.inj(Map(
+          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
+          Free.roll(Add(
+            Free.roll(ProjectIndex(HoleF, IntLit(1))),
+            Free.roll(ProjectIndex(HoleF, IntLit(1))))))).embed
 
-      val expectedQScript = Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))))
+      val expectedQScript =
+        QCT.inj(Map(
+          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
+          Free.roll(Add(HoleF, HoleF)))).embed
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
     }

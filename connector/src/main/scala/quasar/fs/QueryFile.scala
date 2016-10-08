@@ -64,7 +64,7 @@ object QueryFile {
     //       so we don’t duplicate work.
     lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
       .cataM[PlannerError \/ ?, (Ann[T], T[QS])](newLP => transform.lpToQScript(newLP.map(_ ∘ (_.transCata(eval)))))
-      .map(qs => QC.inj(quasar.qscript.Map(qs._2, qs._1.values)).embed.transCata(eval))
+      .map(qs => QC.inj((transform.reifyResult(qs._1, qs._2))).embed.transCata(eval))
   }
 
   def simplifyAndNormalize

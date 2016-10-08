@@ -50,11 +50,14 @@ object ShiftRead {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[T, F, G]) = ev
 
+  private def ShiftTotal[T[_[_]]: Recursive: Corecursive] =
+    ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]]
+
   def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T]):
       FreeQS[T] =
     freeTransFutu(branch)((co: CoEnv[Hole, QScriptTotal[T, ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]) => co.run.fold(
       κ(co.map(Free.point[CoEnv[Hole, QScriptTotal[T, ?], ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]])),
-      ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
+      ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
   implicit def read[T[_[_]]: Recursive: Corecursive, F[_]]
     (implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F)

@@ -99,7 +99,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   "Data Service" should {
     "GET" >> {
-      "respond with NotFound" >> {
+      "respond with empty response" >> {
         "if file does not exist" >> prop { file: AFile =>
           val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
           response.status must_= Status.Ok
