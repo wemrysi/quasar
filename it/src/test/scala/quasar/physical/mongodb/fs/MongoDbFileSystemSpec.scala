@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb.fs
 
+import scala.Predef.$conforms
 import quasar.Predef._
 
 import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly

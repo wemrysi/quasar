@@ -16,6 +16,7 @@
 
 package quasar.std
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._
 
