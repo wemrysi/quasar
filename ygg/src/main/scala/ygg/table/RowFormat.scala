@@ -16,11 +16,11 @@
 
 package ygg.table
 
+import scala.Predef.{ $conforms, assert }
 import ygg.common._
 import scalaz._, Scalaz._
 import ygg.data._
 import ByteBufferPool._
-import scala.Predef.assert
 import scala.math.signum
 
 trait ColumnEncoder {

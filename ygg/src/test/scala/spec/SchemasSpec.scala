@@ -16,6 +16,7 @@
 
 package ygg.tests
 
+import scala.Predef.$conforms
 import scalaz._, Scalaz._
 import ygg._, common._, json._
 import ygg.json.{ JType => J }

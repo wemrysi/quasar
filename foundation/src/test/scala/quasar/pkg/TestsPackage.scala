@@ -16,6 +16,7 @@
 
 package quasar.pkg
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import scala.collection.mutable.Builder
 import scala.language.postfixOps

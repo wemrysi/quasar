@@ -16,6 +16,7 @@
 
 package ygg.tests
 
+import scala.Predef.$conforms
 import ygg.common._
 import ygg.table._
 import TableTestSupport._

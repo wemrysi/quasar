@@ -16,6 +16,7 @@
 
 package ygg.table
 
+import scala.Predef.$conforms
 import ygg.common._
 import scalaz._, Scalaz._
 import ygg.data._

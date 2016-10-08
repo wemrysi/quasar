@@ -16,6 +16,7 @@
 
 package ygg.tests
 
+import scala.Predef.$conforms
 import ygg.cf
 import ygg.common._
 import scala.util.Random

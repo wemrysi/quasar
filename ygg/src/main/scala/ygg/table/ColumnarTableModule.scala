@@ -16,6 +16,7 @@
 
 package ygg.table
 
+import scala.Predef.$conforms
 import scalaz._, Scalaz._, Ordering._
 import ygg._, common._, data._, json._
 import ygg.cf.{ Remap, Empty }

@@ -16,6 +16,7 @@
 
 package ygg.tests
 
+import scala.Predef.$conforms
 import ygg._, common._, data._
 
 class RingDequeSpec extends quasar.Qspec {
