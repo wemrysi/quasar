@@ -215,8 +215,8 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
     b2 must_== b4
     b1 must_== b3
     b1 must_== b5
-    println("parsed array (%d bytes):  sync=%dms  async=%dms  unpacked=%dms" format (b1, t1, t3, t5))
-    println("parsed stream (%d bytes): sync=%dms  async=%dms" format (b2, t2, t4))
+    // println("parsed array (%d bytes):  sync=%dms  async=%dms  unpacked=%dms" format (b1, t1, t3, t5))
+    // println("parsed stream (%d bytes): sync=%dms  async=%dms" format (b2, t2, t4))
     ok
   }
 }
