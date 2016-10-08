@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._

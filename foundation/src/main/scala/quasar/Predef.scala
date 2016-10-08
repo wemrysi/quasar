@@ -93,7 +93,6 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases {
   def ??? : Nothing = throw new java.lang.RuntimeException("not implemented")
 
   @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
-  implicit def $conforms[A]: P.<:<[A, A]                             = P.$conforms[A]
   implicit def ArrowAssoc[A]: A => P.ArrowAssoc[A]                   = P.ArrowAssoc[A] _
   implicit def genericArrayOps[T]: Array[T] => C.mutable.ArrayOps[T] = P.genericArrayOps[T] _
 
