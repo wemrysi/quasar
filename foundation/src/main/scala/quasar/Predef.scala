@@ -76,8 +76,6 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
   val  Stream     = I.Stream
   val  #::        = Stream.#::
 
-  type inline = scala.inline
-
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def ??? : Nothing = throw new java.lang.RuntimeException("not implemented")
 
@@ -114,6 +112,8 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
 }
 
 abstract class LowPriorityImplicits {
-  @inline implicit def augmentString(x: String): I.StringOps                     = P.augmentString(x)
-  implicit def genericWrapArray[T](x: scala.Array[T]): C.mutable.WrappedArray[T] = P.genericWrapArray[T](x)
+  self: Predef =>
+
+  @inline implicit def augmentString(x: String): I.StringOps               = P.augmentString(x)
+  implicit def genericWrapArray[T](x: Array[T]): C.mutable.WrappedArray[T] = P.genericWrapArray[T](x)
 }

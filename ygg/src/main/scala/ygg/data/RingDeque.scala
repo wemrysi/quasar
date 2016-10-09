@@ -26,7 +26,7 @@ import ygg.common._
   *
   * No objects were allocated in the making of this film.
   */
-final class RingDeque[@spec(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
+final class RingDeque[@spec(Boolean, Int, Long, Double) A: CTag](_bound: Int) {
   val bound = _bound + 1
 
   private val ring  = new Array[A](bound)

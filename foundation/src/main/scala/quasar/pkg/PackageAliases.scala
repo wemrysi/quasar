@@ -44,6 +44,7 @@ trait PackageAliases {
   type Traversable[+A]        = scala.collection.Traversable[A]
   type Try[+A]                = scala.util.Try[A]
   type Vec[+A]                = scala.Vector[A]
+  type inline                 = scala.inline
   type jClass                 = java.lang.Class[_]
   type jConcurrentMap[K, V]   = java.util.concurrent.ConcurrentMap[K, V]
   type jPath                  = java.nio.file.Path
@@ -72,7 +73,6 @@ trait PackageAliases {
   val ArrayBuffer             = scm.ArrayBuffer
   val Boolean                 = scala.Boolean
   val Double                  = scala.Double
-  val Float                   = scala.Float
   val Left                    = scala.util.Left
   val ListBuffer              = scm.ListBuffer
   val Right                   = scala.util.Right
@@ -80,6 +80,8 @@ trait PackageAliases {
   val Try                     = scala.util.Try
   val Vec                     = scala.Vector
   val scSeq                   = scala.collection.Seq
+  val sciQueue                = sci.Queue
+  val sciTreeMap              = sci.TreeMap
   val scmMap                  = scm.HashMap
   val scmPriorityQueue        = scm.PriorityQueue
   val scmSet                  = scm.HashSet

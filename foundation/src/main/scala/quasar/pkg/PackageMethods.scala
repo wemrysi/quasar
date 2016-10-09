@@ -16,13 +16,7 @@
 
 package quasar.pkg
 
-import scala.collection.{ mutable => scm, immutable => sci }
-
-@java.lang.SuppressWarnings(scala.Array(
-  "org.wartremover.warts.MutableDataStructures",
-  "org.wartremover.warts.AsInstanceOf",
-  "org.wartremover.warts.Overloading"
-))
+@java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Overloading"))
 trait PackageMethods {
   self: quasar.Predef =>
 
@@ -35,18 +29,14 @@ trait PackageMethods {
   def discard[A](value: A): Unit                                     = () // for avoiding "discarding non-Unit value" warnings
   def doto[A](x: A)(f: A => Any): A                                  = { discard(f(x)) ; x }
   def jClassLoader[A: CTag]: ClassLoader                             = jClass[A].getClassLoader
-  def jClass[A: CTag]: jClass                                        = classTag[A].runtimeClass.asInstanceOf[jClass]
+  def jClass[A: CTag]: jClass                                        = classTag[A].runtimeClass
   def jPath(path: String): jPath                                     = java.nio.file.Paths get path
   def jResource(c: jClass, name: String): InputStream                = c getResourceAsStream name
   def jResource[A: CTag](name: String): InputStream                  = jResource(jClass[A], name)
-  def mutableQueue[A: Ord](xs: A*): scmPriorityQueue[A]              = scmPriorityQueue(xs: _*)(implicitly[Ord[A]].toScalaOrdering)
   def randomBool(): Boolean                                          = scala.util.Random.nextBoolean
   def randomDouble(): Double                                         = scala.util.Random.nextDouble
   def randomInt(end: Int): Int                                       = scala.util.Random.nextInt(end)
   def randomUuid(): UUID                                             = java.util.UUID.randomUUID
-  def sciQueue[A](): sciQueue[A]                                     = sci.Queue[A]()
-  def sciTreeMap[K: smOrdering, V](xs: (K, V)*): sciTreeMap[K, V]    = sci.TreeMap[K, V](xs: _*)
-  def scmSet[A](): scmSet[A]                                         = scm.HashSet[A]()
   def systemMillis(): Long                                           = java.lang.System.currentTimeMillis()
   def utf8Bytes(s: String): Array[Byte]                              = s getBytes utf8Charset
   def utf8Charset: Charset                                           = java.nio.charset.Charset forName "UTF-8"

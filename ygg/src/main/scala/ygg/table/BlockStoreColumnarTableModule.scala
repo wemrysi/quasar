@@ -86,7 +86,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       def cells: Iterable[Cell]
       def compare(cl: Cell, cr: Cell): Ordering
 
-      lazy val ordering = Ord.order[Cell](compare(_, _))
+      lazy val ordering: Ord[Cell] = Ord.order[Cell](compare(_, _))
     }
 
     object CellMatrix {
@@ -165,12 +165,13 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         // right now.
         val cellMatrix = CellMatrix(cells)(keyf)
 
-        val queue = mutableQueue(cells: _*)(
+        val ord: Order[Cell] = (
           if (inputSortOrder.isAscending)
             cellMatrix.ordering.reverseOrder
           else
             cellMatrix.ordering
         )
+        val queue = scmPriorityQueue(cells: _*)(ord.toScalaOrdering)
 
         val (finishedSize, expired) = consumeToBoundary(queue, cellMatrix, 0)
 
