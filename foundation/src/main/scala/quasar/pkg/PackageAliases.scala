@@ -31,9 +31,9 @@ trait PackageAliases {
   type ArrayBuffer[A]         = scm.ArrayBuffer[A]
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
   type CTag[A]                = scala.reflect.ClassTag[A]
-  type ClassLoader            = java.lang.ClassLoader
   type Dynamic                = scala.Dynamic
   type Either[+A, +B]         = scala.util.Either[A, B]
+  type EndoA[A]               = A => A
   type Float                  = scala.Float
   type ListBuffer[A]          = scm.ListBuffer[A]
   type PairOf[+A]             = A -> A
@@ -45,9 +45,6 @@ trait PackageAliases {
   type Try[+A]                = scala.util.Try[A]
   type Vec[+A]                = scala.Vector[A]
   type inline                 = scala.inline
-  type jClass                 = java.lang.Class[_]
-  type jConcurrentMap[K, V]   = java.util.concurrent.ConcurrentMap[K, V]
-  type jPath                  = java.nio.file.Path
   type scIterable[A]          = scala.collection.Iterable[A]
   type scIterator[+A]         = scala.collection.Iterator[A]
   type scMap[K, V]            = scala.collection.Map[K, V]
@@ -94,6 +91,7 @@ trait PackageAliases {
   type ByteBuffer           = java.nio.ByteBuffer
   type CharBuffer           = java.nio.CharBuffer
   type Charset              = java.nio.charset.Charset
+  type ClassLoader          = java.lang.ClassLoader
   type Comparator[A]        = java.util.Comparator[A]
   type Exception            = java.lang.Exception
   type FileInputStream      = java.io.FileInputStream
@@ -107,8 +105,11 @@ trait PackageAliases {
   type Properties           = java.util.Properties
   type StringBuilder        = java.lang.StringBuilder
   type UUID                 = java.util.UUID
+  type jClass               = java.lang.Class[_]
+  type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
   type jFile                = java.io.File
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
+  type jPath                = java.nio.file.Path
 
   // other outside libs
   type Cmp    = scalaz.Ordering
