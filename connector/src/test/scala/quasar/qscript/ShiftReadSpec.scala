@@ -28,12 +28,11 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
-  val optimize = new Optimize[Fix]
+  val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {
     "eliminate Read nodes from a simple query" in {
       val sampleFile = rootDir </> file("bar")
-      val optimize = new Optimize[Fix]
 
       val qScript =
         chain(
@@ -42,8 +41,8 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
 
       val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
 
-      // TODO: Optimize away the `IncludeId`.
-      newQScript.transCata(optimize.applyAll) must_=
+      // TODO: Rewrite away the `IncludeId`.
+      newQScript.transCata(rewrite.normalize) must_=
       Fix(QCT.inj(Map(
         Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
         Free.roll(ProjectIndex(HoleF, IntLit(1))))))
@@ -56,7 +55,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
         LP.Constant(Data.Str("0")),
         agg.Count(lpRead("/foo/bar")).embed).embed).map(
       transFutu(_)(ShiftRead[Fix, QS, QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)(_))
-        .transCata(optimize.applyAll[QScriptTotal[Fix, ?]])) must
+        .transCata(rewrite.normalize[QScriptTotal[Fix, ?]])) must
     equal(chain(
       SRT.inj(Const[ShiftedRead, Fix[QScriptTotal[Fix, ?]]](
         ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
