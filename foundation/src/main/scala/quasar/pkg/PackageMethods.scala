@@ -32,7 +32,6 @@ trait PackageMethods {
   def byteBuffer(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
   def charBuffer(size: Int): CharBuffer                              = java.nio.CharBuffer.allocate(size)
   def charBuffer(xs: String): CharBuffer                             = java.nio.CharBuffer.wrap(xs)
-  def classTag[A](implicit z: CTag[A]): CTag[A]                      = z
   def discard[A](value: A): Unit                                     = () // for avoiding "discarding non-Unit value" warnings
   def doto[A](x: A)(f: A => Any): A                                  = { discard(f(x)) ; x }
   def jClassLoader[A: CTag]: ClassLoader                             = jClass[A].getClassLoader
@@ -52,4 +51,13 @@ trait PackageMethods {
   def utf8Bytes(s: String): Array[Byte]                              = s getBytes utf8Charset
   def utf8Charset: Charset                                           = java.nio.charset.Charset forName "UTF-8"
   def uuid(s: String): UUID                                          = java.util.UUID fromString s
+
+  @inline final def classTag[A](implicit z: CTag[A]): CTag[A] = z
+  @inline final def implicitly[A](implicit value: A): A       = value
+
+  implicit def quasarExtensionOps[A](x: A) = new QuasarExtensionOps(x)
+}
+
+final class QuasarExtensionOps[A](private val lhs: A) extends scala.AnyVal {
+  def |>[B](f: A => B): B = f(lhs)
 }

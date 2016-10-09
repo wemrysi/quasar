@@ -20,26 +20,15 @@ import scala.{Predef => P}
 import scala.{collection => C}
 import scala.collection.{immutable => I}
 import scala.{runtime => R}
-import scala.inline
-import java.lang.String
 
 object Predef extends Predef
 
 class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with quasar.pkg.PackageMethods {
-  type AnyVal = scala.AnyVal
-  type StringBuilder = java.lang.StringBuilder
-
   /** The typelevel Predef additions which makes literal
    *  types more reasonable to use.
    */
   type ValueOf[A]                           = scala.ValueOf[A]
   def valueOf[A](implicit z: ValueOf[A]): A = z.value
-
-  @inline final def implicitly[A](implicit value: A): A = value
-
-  implicit class QuasarPredefOps[A](private val lhs: A) {
-    def |>[B](f: A => B): B = f(lhs)
-  }
 
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec
@@ -115,11 +104,9 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
   val  List     = I.List
   val  Nil      = I.Nil
   val  ::       = I.::
-  type Traversable[+A] = scala.collection.Traversable[A]
   type Option[A] = scala.Option[A] // use scalaz.Maybe instead
   val  Option    = scala.Option
   val  None      = scala.None
-  type Some[A]   = scala.Some[A]
   val  Some      = scala.Some
   type Nothing = scala.Nothing // make functors invariant
   type Throwable = java.lang.Throwable
