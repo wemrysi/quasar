@@ -960,8 +960,6 @@ object MongoDbQScriptPlanner {
              ev3: EX :<: ExprOp,
              ev4: RenderTree[Fix[WF]]):
       EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WF]] = {
-    val optimize = new Optimize[T]
-
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
     type PlanT[X[_], A] = EitherT[X, FileSystemError, A]

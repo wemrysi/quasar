@@ -66,7 +66,6 @@ object queryfile {
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
-      val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.detail("XQuery", main.render))
