@@ -17,7 +17,7 @@
 package quasar.api.services.query
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar._, RenderTree.ops._
 import quasar.api._, ToQResponse.ops._
 import quasar.api.services._
@@ -33,7 +33,6 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
-
   def service[S[_]](
     implicit
     Q: QueryFile.Ops[S],

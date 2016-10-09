@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
+import quasar.fs.mount._, FileSystemDef.DefErrT
 
 import doobie.imports._
 import scalaz._, Scalaz._

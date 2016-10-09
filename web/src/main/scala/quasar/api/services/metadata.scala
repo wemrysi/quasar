@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
@@ -26,7 +26,7 @@ import quasar.fs.mount._
 import scala.math.Ordering
 
 import argonaut._, Argonaut._
-import org.http4s._, dsl._
+import org.http4s.dsl._
 import pathy.Path._
 import scalaz._
 import scalaz.syntax.monad._

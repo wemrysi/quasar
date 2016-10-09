@@ -20,9 +20,6 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._
-
-import scala.Predef.{ArrowAssoc, augmentString, intWrapper}
-
 import scalaz._, Scalaz._
 
 object Prettify {
