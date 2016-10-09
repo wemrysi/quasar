@@ -18,13 +18,62 @@ package ygg
 
 import scalaz._, Scalaz._, Ordering._
 import ygg.data._
+import java.io.{ ByteArrayOutputStream, BufferedInputStream }
 import java.nio.file._
 import java.lang.Comparable
+import java.math.MathContext.UNLIMITED
 
-package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
+package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases {
+  private val InputStreamBufferSize = 8192
+
+  def slurpString(in: InputStream): String = new String(slurp(in), utf8Charset)
+  def slurp(in: InputStream): Array[Byte]  = slurp(new BufferedInputStream(in))
+
+  def slurp(in: BufferedInputStream): Array[Byte] = {
+    val out = new ByteArrayOutputStream
+    val buf = new Array[Byte](InputStreamBufferSize)
+    def loop(): Array[Byte] = in read buf match {
+      case -1 => out.toByteArray
+      case n  => out.write(buf, 0, n) ; loop()
+    }
+    try loop() finally in.close()
+  }
+  def slurp(in: BufferedInputStream, len: Int): Array[Byte] = {
+    val buf = new Array[Byte](len)
+    def loop(remaining: Int): Array[Byte] = {
+      if (remaining == 0) buf
+      else in.read(buf, len - remaining, remaining) match {
+        case -1 => buf
+        case n  => loop(remaining - n)
+      }
+    }
+    try loop(len) finally in.close()
+  }
+
+
+  def systemArraycopy(src: AnyRef, srcPos: Int, dest: AnyRef, destPos: Int, length: Int): Unit =
+    java.lang.System.arraycopy(src, srcPos, dest, destPos, length)
+
+  def emptyStreamT[A](): StreamT[Need, A]             = StreamT.empty[Need, A]
+  def singleStreamT[A](value: => A): StreamT[Need, A] = value :: emptyStreamT[A]()
+  def abort(msg: String): Nothing                     = throw new RuntimeException(msg)
+  def newScratchDir(): jFile                          = Files.createTempDirectory("ygg").toFile
+
+  def lp[T](label: String): T => Unit                 = (t: T) => println(label + ": " + t)
+  def lpf[T](label: String)(f: T => Any): T => Unit   = (t: T) => println(label + ": " + f(t))
+
+  def breakOut[From, T, To](implicit b: CBF[Nothing, T, To]): CBF[From, T, To] = scala.collection.breakOut[From, T, To](b)
+
+  def warn[A](msg: String)(value: => A): A = {
+    java.lang.System.err.println(msg)
+    value
+  }
+
+  object decimal extends DecimalConstructors(UNLIMITED)
+
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
-    def slurpString(): String     = new String(slurpBytes, Utf8Charset)
+    def slurpString(): String     = new String(slurpBytes, utf8Charset)
   }
 
   implicit class YggScalaVectorOps[A](private val xs: Vec[A]) {
@@ -131,5 +180,17 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
       val last = bs.getBitsLength - 1
       loopLongs(last, bs.getBits, last * 64, Nil)
     }
+  }
+}
+
+package common {
+  class DecimalConstructors(mc: java.math.MathContext) {
+    def apply(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, mc)
+    def apply(d: String): BigDecimal                       = BigDecimal(d, mc)
+    def apply(d: Int): BigDecimal                          = decimal(d.toLong)
+    def apply(d: Long): BigDecimal                         = BigDecimal.decimal(d, mc)
+    def apply(d: Double): BigDecimal                       = BigDecimal.decimal(d, mc)
+    def apply(d: Float): BigDecimal                        = BigDecimal.decimal(d, mc)
+    def apply(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, mc)
   }
 }

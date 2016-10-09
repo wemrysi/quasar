@@ -25,7 +25,7 @@ import java.lang.String
 
 object Predef extends Predef
 
-class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases {
+class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with quasar.pkg.PackageMethods {
   type AnyVal = scala.AnyVal
   type StringBuilder = java.lang.StringBuilder
 

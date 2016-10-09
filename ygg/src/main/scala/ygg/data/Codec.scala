@@ -403,9 +403,9 @@ object Codec {
     }
 
     def writeUnsafe(a: String, sink: ByteBuffer): Unit = {
-      val bytes = a.getBytes(Utf8Charset)
+      val bytes = a.getBytes(utf8Charset)
       writePackedInt(bytes.length, sink)
-      discard( sink.put(a.getBytes(Utf8Charset)) )
+      discard( sink.put(a.getBytes(utf8Charset)) )
     }
 
     def writeInit(a: String, sink: ByteBuffer): Option[S] = {
@@ -414,7 +414,7 @@ object Codec {
         writePackedInt(strEncodedSize(a), sink)
 
         val source  = charBuffer(a)
-        val encoder = Utf8Charset.newEncoder
+        val encoder = utf8Charset.newEncoder
 
         if (encoder.encode(source, sink, true) == CoderResult.OVERFLOW) {
           Some(Right((source, encoder)))
@@ -438,7 +438,7 @@ object Codec {
     def read(src: ByteBuffer): String = {
       val bytes = new Array[Byte](readPackedInt(src))
       src.get(bytes)
-      new String(bytes, Utf8Charset)
+      new String(bytes, utf8Charset)
     }
 
     override def skip(buf: ByteBuffer): Unit = {
@@ -474,7 +474,7 @@ object Codec {
     x => (x.unscaledValue.toByteArray, x.scale.toLong),
     (u, s) => new BigDec(new java.math.BigInteger(u), s.toInt))
 
-  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, decimal)
+  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, decimal(_))
 
   final class IndexedSeqCodec[A](val elemCodec: Codec[A]) extends Codec[IndexedSeq[A]] {
 
