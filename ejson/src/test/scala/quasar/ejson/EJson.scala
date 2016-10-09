@@ -28,11 +28,6 @@ import quasar.pkg.tests._
 class EJsonSpecs extends Spec {
   type WrapArb[F[_]] = Arbitrary ~> (Arbitrary ∘ F)#λ
 
-  /** Long value that can safely be represented in any possible backend
-    * (including those using JavaScript.)
-    */
-  val SafeInt: Gen[Long] = Gen.choose(-1000L, 1000L)
-
   implicit val arbitraryCommon = new WrapArb[Common] {
     def apply[α](arb: Arbitrary[α]) = Arbitrary(
       Gen.oneOf(

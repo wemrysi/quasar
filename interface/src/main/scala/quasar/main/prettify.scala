@@ -95,7 +95,7 @@ object Prettify {
   }
 
   def unflatten(values: ListMap[Path, Data]): Data = {
-    val init = Data.Obj(ListMap())
+    val init = Data.Obj()
 
     def append(v: Data, p: Path, d: Data): Data = (v, p) match {
       case (Data.Obj(values), Path(FieldSeg(s) :: Nil)) =>

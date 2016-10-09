@@ -48,14 +48,16 @@ trait ScalacheckSupport {
   val Gen       = org.scalacheck.Gen
   val Pretty    = org.scalacheck.util.Pretty
   val Prop      = org.scalacheck.Prop
+  val Shrink    = org.scalacheck.Shrink
 
   type Arbitrary[A]            = org.scalacheck.Arbitrary[A]
   type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
   type Gen[+A]                 = org.scalacheck.Gen[A]
   type Pretty                  = org.scalacheck.util.Pretty
   type Prop                    = org.scalacheck.Prop
+  type Shrink[A]               = org.scalacheck.Shrink[A]
 
-  import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency }
+  import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency, alphaNumChar }
 
   def choose(lo: Int, hi: Int): Gen[Int]    = Gen.choose(lo, hi)
   def choose(lo: Long, hi: Long): Gen[Long] = Gen.choose(lo, hi)
@@ -89,22 +91,23 @@ trait ScalacheckSupport {
   def mapOfN[K, V](len: Int, k: Gen[K], v: Gen[V]): Gen[sciMap[K, V]] =
     (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
-  def genIndex(size: Int): Gen[Int]    = choose(0, size - 1)
+  def genAlphaNumString: Gen[String]   = alphaNumChar.list ^^ (_.mkString)
+  def genBigDecimal: Gen[BigDecimal]   = Arbitrary.arbBigDecimal.arbitrary
+  def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genBool: Gen[Boolean]            = oneOf(true, false)
   def genByte: Gen[Byte]               = choose(Byte.MinValue, Byte.MaxValue) ^^ (_.toByte)
   def genChar: Gen[Char]               = choose(Char.MinValue, Char.MaxValue) ^^ (_.toChar)
+  def genDouble: Gen[Double]           = Arbitrary.arbDouble.arbitrary
+  def genIdentifier: Gen[String]       = identifier filter (_ != null)
+  def genIndex(size: Int): Gen[Int]    = choose(0, size - 1)
   def genInt: Gen[Int]                 = choose(Int.MinValue, Int.MaxValue)
   def genLong: Gen[Long]               = choose(Long.MinValue, Long.MaxValue)
-  def genDouble: Gen[Double]           = Arbitrary.arbDouble.arbitrary
-  def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
-  def genString: Gen[String]           = Arbitrary.arbString.arbitrary
-  def genBigDecimal: Gen[BigDecimal]   = Arbitrary.arbBigDecimal.arbitrary
-  def genIdentifier: Gen[String]       = identifier filter (_ != null)
-  def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
-  def genPosInt: Gen[Int]              = choose(1, Int.MaxValue)
   def genMinus10To10: Gen[Int]         = choose(-10, 10)
-  def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
   def genOffsetAndLen: Gen[Int -> Int] = (genMinus10To10, 0 upTo 20).zip
+  def genPosInt: Gen[Int]              = choose(1, Int.MaxValue)
+  def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
+  def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
+  def genString: Gen[String]           = Arbitrary.arbString.arbitrary
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)

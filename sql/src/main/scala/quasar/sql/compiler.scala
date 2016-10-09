@@ -308,7 +308,7 @@ trait Compiler[F[_]] {
       }
 
       fields.reduceOption((a,b) => Fix(ObjectConcat(a, b)))
-        .getOrElse(LogicalPlan.Constant(Data.Obj(ListMap())))
+        .getOrElse(LogicalPlan.Constant(Data.Obj()))
     }
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LogicalPlan]] =
