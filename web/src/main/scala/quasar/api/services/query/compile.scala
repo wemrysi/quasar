@@ -28,11 +28,11 @@ import quasar.fs._
 
 import argonaut._, Argonaut._
 import matryoshka._
-import org.http4s.dsl._
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
+  import org.http4s.dsl._
 
   def service[S[_]](
     implicit

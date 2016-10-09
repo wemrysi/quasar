@@ -94,7 +94,7 @@ object MapFuncPlanner {
 
     // relations
     case Not(x)              => fn.not(x).point[F]
-    case Eq(x, y)            => (x eq y).point[F]
+    case MapFuncs.Eq(x, y)   => (x eq y).point[F]
     case Neq(x, y)           => (x ne y).point[F]
     case Lt(x, y)            => (x lt y).point[F]
     case Lte(x, y)           => (x le y).point[F]

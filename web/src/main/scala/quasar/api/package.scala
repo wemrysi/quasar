@@ -14,14 +14,28 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
-
-import java.io.File
 
 import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
@@ -216,8 +230,8 @@ package object api {
     from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
 
   def staticFileService(basePath: String): HttpService = {
-    def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
-      if (file.isDirectory) StaticFile.fromFile(new File(file, "index.html"), Some(req))
+    def pathCollector(file: jFile, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
+      if (file.isDirectory) StaticFile.fromFile(new jFile(file, "index.html"), Some(req))
       else if (!file.isFile) None
       else StaticFile.fromFile(file, Some(req))
     }

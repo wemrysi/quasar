@@ -190,7 +190,7 @@ package common {
     def apply(d: Int): BigDecimal                          = decimal(d.toLong)
     def apply(d: Long): BigDecimal                         = BigDecimal.decimal(d, mc)
     def apply(d: Double): BigDecimal                       = BigDecimal.decimal(d, mc)
-    def apply(d: Float): BigDecimal                        = BigDecimal.decimal(d, mc)
+    def apply(d: scala.Float): BigDecimal                  = BigDecimal.decimal(d, mc)
     def apply(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, mc)
   }
 }

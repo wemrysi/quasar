@@ -242,11 +242,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           Free.roll(RT.inj(Const(Read(rootDir </> file("bar"))))),
           Free.roll(And(Free.roll(And(
             // reversed equality
-            Free.roll(Eq(
+            Free.roll(MapFuncs.Eq(
               Free.roll(ProjectField(Free.point(RightSide), StrLit("r_id"))),
               Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_id"))))),
             // more complicated expression, duplicated refs
-            Free.roll(Eq(
+            Free.roll(MapFuncs.Eq(
               Free.roll(Add(
                 Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_min"))),
                 Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_max"))))),

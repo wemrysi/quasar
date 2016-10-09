@@ -16,11 +16,10 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
-
 import quasar._
+import quasar.Predef.{ Eq => _, _ }
 import quasar.jscore._
-import quasar.javascript.{Js}
+import quasar.javascript.Js
 
 package object javascript {
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
