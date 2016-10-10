@@ -500,7 +500,7 @@ trait Compiler[F[_]] {
               case "isodow"       => date.ExtractIsoDayOfWeek
               case "isoyear"      => date.ExtractIsoYear
               case "microseconds" => date.ExtractMicroseconds
-              case "millenium"    => date.ExtractMillenium
+              case "millennium"   => date.ExtractMillennium
               case "milliseconds" => date.ExtractMilliseconds
               case "minute"       => date.ExtractMinute
               case "month"        => date.ExtractMonth

@@ -191,7 +191,7 @@ object JsFuncHandler {
               Call(select(date, "getUTCSeconds"), Nil),
               Literal(Js.Num(1000, false)))),
           Literal(Js.Num(1000, false)))
-      case ExtractMillenium(date) =>
+      case ExtractMillennium(date) =>
         Call(select(ident("Math"), "ceil"), List(
           BinOp(jscore.Div,
             Call(select(date, "getUTCFullYear"), Nil),

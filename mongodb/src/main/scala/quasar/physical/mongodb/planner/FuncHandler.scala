@@ -108,7 +108,7 @@ object FuncHandler {
                 $multiply($second(a1), $literal(Bson.Int32(1000))),
                 $millisecond(a1)),
               $literal(Bson.Int32(1000)))
-          case ExtractMillenium(a1) =>
+          case ExtractMillennium(a1) =>
             trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
           case ExtractMilliseconds(a1) =>
             $add(

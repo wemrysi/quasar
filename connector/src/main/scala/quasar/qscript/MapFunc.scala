@@ -296,7 +296,7 @@ object MapFunc {
         case ExtractIsoDayOfWeek(a1) => f(a1) ∘ (ExtractIsoDayOfWeek(_))
         case ExtractIsoYear(a1) => f(a1) ∘ (ExtractIsoYear(_))
         case ExtractMicroseconds(a1) => f(a1) ∘ (ExtractMicroseconds(_))
-        case ExtractMillenium(a1) => f(a1) ∘ (ExtractMillenium(_))
+        case ExtractMillennium(a1) => f(a1) ∘ (ExtractMillennium(_))
         case ExtractMilliseconds(a1) => f(a1) ∘ (ExtractMilliseconds(_))
         case ExtractMinute(a1) => f(a1) ∘ (ExtractMinute(_))
         case ExtractMonth(a1) => f(a1) ∘ (ExtractMonth(_))
@@ -383,7 +383,7 @@ object MapFunc {
         case (ExtractIsoDayOfWeek(a1), ExtractIsoDayOfWeek(a2)) => in.equal(a1, a2)
         case (ExtractIsoYear(a1), ExtractIsoYear(a2)) => in.equal(a1, a2)
         case (ExtractMicroseconds(a1), ExtractMicroseconds(a2)) => in.equal(a1, a2)
-        case (ExtractMillenium(a1), ExtractMillenium(a2)) => in.equal(a1, a2)
+        case (ExtractMillennium(a1), ExtractMillennium(a2)) => in.equal(a1, a2)
         case (ExtractMilliseconds(a1), ExtractMilliseconds(a2)) => in.equal(a1, a2)
         case (ExtractMinute(a1), ExtractMinute(a2)) => in.equal(a1, a2)
         case (ExtractMonth(a1), ExtractMonth(a2)) => in.equal(a1, a2)
@@ -475,7 +475,7 @@ object MapFunc {
           case ExtractIsoDayOfWeek(a1) => shz("ExtractIsoDayOfWeek", a1)
           case ExtractIsoYear(a1) => shz("ExtractIsoYear", a1)
           case ExtractMicroseconds(a1) => shz("ExtractMicroseconds", a1)
-          case ExtractMillenium(a1) => shz("ExtractMillenium", a1)
+          case ExtractMillennium(a1) => shz("ExtractMillennium", a1)
           case ExtractMilliseconds(a1) => shz("ExtractMilliseconds", a1)
           case ExtractMinute(a1) => shz("ExtractMinute", a1)
           case ExtractMonth(a1) => shz("ExtractMonth", a1)
@@ -561,7 +561,7 @@ object MapFunc {
       case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
       case date.ExtractIsoYear => ExtractIsoYear(_)
       case date.ExtractMicroseconds => ExtractMicroseconds(_)
-      case date.ExtractMillenium => ExtractMillenium(_)
+      case date.ExtractMillennium => ExtractMillennium(_)
       case date.ExtractMilliseconds => ExtractMilliseconds(_)
       case date.ExtractMinute => ExtractMinute(_)
       case date.ExtractMonth => ExtractMonth(_)
@@ -662,7 +662,7 @@ object MapFuncs {
   @Lenses final case class ExtractIsoDayOfWeek[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractIsoYear[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMicroseconds[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractMillenium[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMillennium[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMilliseconds[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMinute[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMonth[T[_[_]], A](a1: A) extends Unary[T, A]

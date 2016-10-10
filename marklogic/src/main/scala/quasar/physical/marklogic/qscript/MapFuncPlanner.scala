@@ -68,7 +68,7 @@ object MapFuncPlanner {
     case ExtractIsoDayOfWeek(time)    => xdmp.weekdayFromDate(xs.date(time)).point[F]
     case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
     case ExtractMicroseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
-    case ExtractMillenium(time)       => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
+    case ExtractMillennium(time)       => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
     case ExtractMilliseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
     case ExtractMinute(time)          => fn.minutesFromDateTime(xs.dateTime(time)).point[F]
     case ExtractMonth(time)           => fn.monthFromDateTime(xs.dateTime(time)).point[F]

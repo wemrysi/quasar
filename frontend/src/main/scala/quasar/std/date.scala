@@ -93,8 +93,8 @@ trait DateLib extends Library {
     "on the first week containing Jan. 4).")
   val ExtractMicroseconds = extract("extract_microseconds",
     "Pulls out the microseconds subfield from a date/time value (including seconds).")
-  val ExtractMillenium    = extract("extract_millenium",
-    "Pulls out the millenium subfield from a date/time value (currently year/1000).")
+  val ExtractMillennium    = extract("extract_millennium",
+    "Pulls out the millennium subfield from a date/time value (currently year/1000).")
   val ExtractMilliseconds = extract("extract_milliseconds",
     "Pulls out the milliseconds subfield from a date/time value (including seconds).")
   val ExtractMinute       = extract("extract_minute",
@@ -197,7 +197,7 @@ trait DateLib extends Library {
   def unaryFunctions: List[GenericFunc[nat._1]] =
     ExtractCentury :: ExtractDayOfMonth :: ExtractDecade :: ExtractDayOfWeek ::
     ExtractDayOfYear :: ExtractEpoch :: ExtractHour :: ExtractIsoDayOfWeek ::
-    ExtractIsoYear :: ExtractMicroseconds :: ExtractMillenium ::
+    ExtractIsoYear :: ExtractMicroseconds :: ExtractMillennium ::
     ExtractMilliseconds :: ExtractMinute :: ExtractMonth :: ExtractQuarter ::
     ExtractSecond :: ExtractWeek :: ExtractYear ::
     Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil

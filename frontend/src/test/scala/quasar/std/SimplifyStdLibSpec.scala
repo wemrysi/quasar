@@ -46,7 +46,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (date.ExtractIsoDayOfWeek, _) => notHandled
     case (date.ExtractIsoYear, _) => notHandled
     case (date.ExtractMicroseconds, _) => notHandled
-    case (date.ExtractMillenium, _) => notHandled
+    case (date.ExtractMillennium, _) => notHandled
     case (date.ExtractMilliseconds, _) => notHandled
     case (date.ExtractMinute, _) => notHandled
     case (date.ExtractMonth, _) => notHandled

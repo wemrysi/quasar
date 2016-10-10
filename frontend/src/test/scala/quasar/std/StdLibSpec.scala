@@ -431,29 +431,29 @@ abstract class StdLibSpec extends Qspec {
       }
 
 
-      "ExtractMillenium" >> {
+      "ExtractMillennium" >> {
         "0001-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
         }
 
         "2000-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
         }
 
         "2001-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
         }
 
         "midnight 0001-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
         }
 
         "midnight 2000-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
         }
 
         "midnight 2001-01-01" >> {
-          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
         }
       }
 

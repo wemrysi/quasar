@@ -80,7 +80,7 @@ object CoreMap extends Serializable {
     case ExtractIsoDayOfWeek(f) => InternalError("not implemented").left // TODO
     case ExtractIsoYear(f) => InternalError("not implemented").left // TODO
     case ExtractMicroseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMillenium(f) => InternalError("not implemented").left // TODO
+    case ExtractMillennium(f) => InternalError("not implemented").left // TODO
     case ExtractMilliseconds(f) => InternalError("not implemented").left // TODO
     case ExtractMinute(f) => InternalError("not implemented").left // TODO
     case ExtractMonth(f) => InternalError("not implemented").left // TODO
