@@ -233,7 +233,7 @@ trait MathLib extends Library {
       case Sized(v1, TOne() ) => success(v1)
       case Sized(v1, TZero()) => failure(NonEmptyList(GenericError("Division by zero")))
 
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Int(v1 / v2)))
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 / v2)))
 
       // TODO: handle interval divided by Dec (not provided by threeten). See SD-582.
@@ -256,7 +256,7 @@ trait MathLib extends Library {
     Mapping,
     "-",
     "Reverses the sign of a numeric or interval value",
-    MathRel, 
+    MathRel,
     Func.Input1(MathRel),
     noSimplification,
     partialTyperV[nat._1] {
@@ -272,16 +272,16 @@ trait MathLib extends Library {
     })
 
   val Modulo = BinaryFunc(
-    Mapping, 
+    Mapping,
     "(%)",
     "Finds the remainder of one number divided by another",
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
     noSimplification,
     (partialTyperV[nat._2] {
-      case Sized(v1, TOne())  => success(v1)
       case Sized(v1, TZero()) => failure(NonEmptyList(GenericError("Division by zero")))
 
+      case Sized(v1 @ Type.Const(Data.Int(_)), TOne())                     => success(TZero())
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Int(v1 % v2)))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))
     }) ||| numericWidening,

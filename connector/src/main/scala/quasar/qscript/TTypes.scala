@@ -103,11 +103,11 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
 // ShowT is needed for debugging
 class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends TTypes[T] {
   import Normalizable._
-  lazy val opt = new Optimize[T]
+  lazy val rewrite = new Rewrite[T]
 
   def freeTC(free: FreeQS): FreeQS = {
     freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
-      liftCo(opt.applyToFreeQS[QScriptTotal])
+      liftCo(rewrite.normalizeCoEnv[QScriptTotal])
     )
   }
 
