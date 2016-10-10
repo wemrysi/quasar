@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar._
+import quasar._, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
@@ -545,6 +545,102 @@ object MapFunc {
               tpe.show ++ Cord(", ") ++
               sh.show(a2) ++ Cord(", ") ++
               sh.show(a3) ++ Cord(")")
+        }
+      }
+    }
+
+  implicit def renderTree[T[_[_]]](implicit ev0: Show[T[EJson]], ev1: RenderTree[Type]): Delay[RenderTree, MapFunc[T, ?]] =
+    new Delay[RenderTree, MapFunc[T, ?]] {
+      val nt = "MapFunc" :: Nil
+
+      @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+      def apply[A](r: RenderTree[A]): RenderTree[MapFunc[T, A]] = {
+        def nAry(typ: String, as: A*): RenderedTree =
+          NonTerminal(typ :: nt, None, as.toList.map(r.render(_)))
+
+        RenderTree.make {
+          // nullary
+          case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)  // TODO: use RenderTree[T[EJson]]?
+          case Undefined() => Terminal("Undefined" :: nt, None)
+          case Now() => Terminal("Now" :: nt, None)
+
+          // unary
+          case ExtractCentury(a1) => nAry("ExtractCentury", a1)
+          case ExtractDayOfMonth(a1) => nAry("ExtractDayOfMonth", a1)
+          case ExtractDecade(a1) => nAry("ExtractDecade", a1)
+          case ExtractDayOfWeek(a1) => nAry("ExtractDayOfWeek", a1)
+          case ExtractDayOfYear(a1) => nAry("ExtractDayOfYear", a1)
+          case ExtractEpoch(a1) => nAry("ExtractEpoch", a1)
+          case ExtractHour(a1) => nAry("ExtractHour", a1)
+          case ExtractIsoDayOfWeek(a1) => nAry("ExtractIsoDayOfWeek", a1)
+          case ExtractIsoYear(a1) => nAry("ExtractIsoYear", a1)
+          case ExtractMicroseconds(a1) => nAry("ExtractMicroseconds", a1)
+          case ExtractMillennium(a1) => nAry("ExtractMillennium", a1)
+          case ExtractMilliseconds(a1) => nAry("ExtractMilliseconds", a1)
+          case ExtractMinute(a1) => nAry("ExtractMinute", a1)
+          case ExtractMonth(a1) => nAry("ExtractMonth", a1)
+          case ExtractQuarter(a1) => nAry("ExtractQuarter", a1)
+          case ExtractSecond(a1) => nAry("ExtractSecond", a1)
+          case ExtractTimezone(a1) => nAry("ExtractTimezone", a1)
+          case ExtractTimezoneHour(a1) => nAry("ExtractTimezoneHour", a1)
+          case ExtractTimezoneMinute(a1) => nAry("ExtractTimezoneMinute", a1)
+          case ExtractWeek(a1) => nAry("ExtractWeek", a1)
+          case ExtractYear(a1) => nAry("ExtractYear", a1)
+          case Date(a1) => nAry("Date", a1)
+          case Time(a1) => nAry("Time", a1)
+          case Timestamp(a1) => nAry("Timestamp", a1)
+          case Interval(a1) => nAry("Interval", a1)
+          case TimeOfDay(a1) => nAry("TimeOfDay", a1)
+          case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case Negate(a1) => nAry("Negate", a1)
+          case Not(a1) => nAry("Not", a1)
+          case Length(a1) => nAry("Length", a1)
+          case Lower(a1) => nAry("Lower", a1)
+          case Upper(a1) => nAry("Upper", a1)
+          case Bool(a1) => nAry("Bool", a1)
+          case Integer(a1) => nAry("Integer", a1)
+          case Decimal(a1) => nAry("Decimal", a1)
+          case Null(a1) => nAry("Null", a1)
+          case ToString(a1) => nAry("ToString", a1)
+          case MakeArray(a1) => nAry("MakeArray", a1)
+          case DupArrayIndices(a1) => nAry("DupArrayIndices", a1)
+          case DupMapKeys(a1) => nAry("DupMapKeys", a1)
+          case ZipArrayIndices(a1) => nAry("ZipArrayIndices", a1)
+          case ZipMapKeys(a1) => nAry("ZipMapKeys", a1)
+
+          // binary
+          case Add(a1, a2) => nAry("Add", a1, a2)
+          case Multiply(a1, a2) => nAry("Multiply", a1, a2)
+          case Subtract(a1, a2) => nAry("Subtract", a1, a2)
+          case Divide(a1, a2) => nAry("Divide", a1, a2)
+          case Modulo(a1, a2) => nAry("Modulo", a1, a2)
+          case Power(a1, a2) => nAry("Power", a1, a2)
+          case Eq(a1, a2) => nAry("Eq", a1, a2)
+          case Neq(a1, a2) => nAry("Neq", a1, a2)
+          case Lt(a1, a2) => nAry("Lt", a1, a2)
+          case Lte(a1, a2) => nAry("Lte", a1, a2)
+          case Gt(a1, a2) => nAry("Gt", a1, a2)
+          case Gte(a1, a2) => nAry("Gte", a1, a2)
+          case IfUndefined(a1, a2) => nAry("IfUndefined", a1, a2)
+          case And(a1, a2) => nAry("And", a1, a2)
+          case Or(a1, a2) => nAry("Or", a1, a2)
+          case Coalesce(a1, a2) => nAry("Coalesce", a1, a2)
+          case Within(a1, a2) => nAry("Within", a1, a2)
+          case MakeMap(a1, a2) => nAry("MakeMap", a1, a2)
+          case ConcatMaps(a1, a2) => nAry("ConcatMaps", a1, a2)
+          case ProjectIndex(a1, a2) => nAry("ProjectIndex", a1, a2)
+          case ProjectField(a1, a2) => nAry("ProjectField", a1, a2)
+          case DeleteField(a1, a2) => nAry("DeleteField", a1, a2)
+          case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
+          case Range(a1, a2) => nAry("Range", a1, a2)
+
+          //  ternary
+          case Between(a1, a2, a3) => nAry("Between", a1, a2, a3)
+          case Cond(a1, a2, a3) => nAry("Cond", a1, a2, a3)
+          case Search(a1, a2, a3) => nAry("Search", a1, a2, a3)
+          case Substring(a1, a2, a3) => nAry("Substring", a1, a2, a3)
+          case Guard(a1, tpe, a2, a3) => NonTerminal("Guard" :: nt, None,
+            List(r.render(a1), tpe.render, r.render(a2), r.render(a3)))
         }
       }
     }

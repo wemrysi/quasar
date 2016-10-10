@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar.{NonTerminal, Terminal, RenderTree}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -47,6 +47,10 @@ object ReduceIndex {
       case ReduceIndex(idx) =>
         Cord("ReduceIndex(") ++ idx.show ++ Cord(")")
     }
+
+  implicit def renderTree: RenderTree[ReduceIndex] = RenderTree.make {
+    case ReduceIndex(idx) => Terminal(List("ReduceIndex"), idx.shows.some)
+  }
 }
 
 /** Flattens nested structure, converting each value into a data set, which are
@@ -208,9 +212,66 @@ object QScriptCore {
         }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]:
-      Delay[RenderTree, QScriptCore[T, ?]] =
-    RenderTree.delayFromShow
+  // TODO: use the RenderTree for FreeQS, which contains QScriptTotal, which
+  // contains QScriptCore...
+  implicit def renderTree[T[_[_]]: ShowT](implicit
+      // FQ:  RenderTree[FreeQS[T]],
+      FM:  RenderTree[FreeMap[T]],
+      JF:  RenderTree[JoinFunc[T]],
+      RF:  RenderTree[ReduceFunc[FreeMap[T]]],
+      FMR: RenderTree[FreeMapA[T, ReduceIndex]])
+      : Delay[RenderTree, QScriptCore[T, ?]] =
+    new Delay[RenderTree, QScriptCore[T, ?]] {
+      def apply[A](RA: RenderTree[A]): RenderTree[QScriptCore[T, A]] =
+        new RenderTree[QScriptCore[T, A]] {
+          val nt = List("QScriptCore")
+
+          def nested[A: RenderTree](label: String, a: A) =
+            NonTerminal(label :: nt, None, a.render :: Nil)
+
+          def render(v: QScriptCore[T, A]) =
+            v match {
+              case Map(src, f) =>
+                NonTerminal("Map" :: nt, None,
+                  RA.render(src) :: FM.render(f) :: Nil)
+              case LeftShift(src, struct, repair) =>
+                NonTerminal("LeftShift" :: nt, None,
+                  RA.render(src) ::
+                    nested("Struct", struct) ::
+                    nested("Repair", repair) ::
+                    Nil)
+              case Reduce(src, bucket, reducers, repair) =>
+                NonTerminal("Reduce" :: nt, None,
+                  RA.render(src) ::
+                    nested("Bucket", bucket) ::
+                    NonTerminal("Reducers" :: nt, None, reducers.map(RF.render(_))) ::
+                    nested("Repair", repair) ::
+                    Nil)
+              case Sort(src, bucket, order) =>
+                NonTerminal("Sort" :: nt, None,
+                  RA.render(src) :: nested("Bucket", bucket) ::
+                    NonTerminal("Order" :: "Sort" :: nt, None, order.map { case (x, dir) =>
+                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }) ::
+                    Nil)
+              case Union(src, lBranch, rBranch) =>
+                NonTerminal("Union" :: nt, None, List(
+                  RA.render(src),
+                  Terminal("LeftBranch" :: nt, lBranch.shows.some),
+                  Terminal("RightBranch" :: nt, rBranch.shows.some)))
+              case Filter(src, func) =>
+                NonTerminal("Filter" :: nt, None, List(
+                  RA.render(src),
+                  func.render))
+              case Subset(src, from, sel, count) =>
+                NonTerminal("Subset" :: nt, sel.shows.some, List(
+                  RA.render(src),
+                  Terminal("From" :: nt, from.shows.some),
+                  Terminal("Count" :: nt, count.shows.some)))
+              case Unreferenced()             =>
+                Terminal("Unreferenced" :: nt, None)
+            }
+        }
+    }
 
   implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
