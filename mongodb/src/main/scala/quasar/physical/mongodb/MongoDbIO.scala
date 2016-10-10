@@ -357,15 +357,9 @@ object MongoDbIO {
   def fail[A](t: Throwable): MongoDbIO[A] =
     liftTask(Task.fail(t))
 
-  def runNT(client: MongoClient): MongoDbIO ~> Task =
-    new (MongoDbIO ~> Task) {
-      def apply[A](m: MongoDbIO[A]) = m.run(client)
-    }
+  def runNT(client: MongoClient) = λ[MongoDbIO ~> Task](_ run client)
 
-  val liftTask: Task ~> MongoDbIO =
-    new (Task ~> MongoDbIO) {
-      def apply[A](t: Task[A]) = lift(_ => t)
-    }
+  val liftTask = λ[Task ~> MongoDbIO](t => lift(_ => t))
 
   /** Returns the underlying, configured aggregate iterable for applying the
     * given pipeline to the source collection.
