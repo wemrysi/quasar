@@ -47,18 +47,20 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST](idPrism))))
 
   type QSI[A] =
-    (QScriptCore[Fix, ?] :\: ProjectBucket[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[DeadEnd, ?])#M[A]
-  val DEI =     implicitly[Const[DeadEnd, ?] :<: QSI]
-  val PBI = implicitly[ProjectBucket[Fix, ?] :<: QSI]
-  val QCI =   implicitly[QScriptCore[Fix, ?] :<: QSI]
-  val TJI =     implicitly[ThetaJoin[Fix, ?] :<: QSI]
+    (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
+
+  val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
+  val PBI =     implicitly[ProjectBucket :<: QSI]
+  val QCI =       implicitly[QScriptCore :<: QSI]
+  val TJI =         implicitly[ThetaJoin :<: QSI]
+
   val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
   implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QST],
-      Injectable.coproduct(Injectable.inject[ProjectBucket[Fix, ?], QST],
-        Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QST],
+    Injectable.coproduct(Injectable.inject[QScriptCore, QST],
+      Injectable.coproduct(Injectable.inject[ProjectBucket, QST],
+        Injectable.coproduct(Injectable.inject[ThetaJoin, QST],
           Injectable.inject[Const[DeadEnd, ?], QST])))
 
   // TODO instead of calling `.toOption` on the `\/`
@@ -80,17 +82,17 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val exp =
         LeftShift(
           Map(
-            Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+            Unreferenced[Fix, Fix[QScriptCore]]().embed,
             BoolLit[Fix, Hole](true)).embed,
           HoleF,
-          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))
+          Free.point[MapFunc, JoinSide](RightSide))
 
-      Coalesce[Fix, QScriptCore[Fix, ?], QScriptCore[Fix, ?]].coalesceQC(idPrism).apply(exp) must
+      Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
       equal(
         LeftShift(
-          Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+          Unreferenced[Fix, Fix[QScriptCore]]().embed,
           BoolLit[Fix, Hole](true),
-          Free.point[MapFunc[Fix, ?], JoinSide](RightSide)).some)
+          Free.point[MapFunc, JoinSide](RightSide)).some)
     }
 
     "fold a constant array value" in {
@@ -116,14 +118,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           RootR.embed,
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
-              Free.roll(DET.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+              Free.roll(DET.inj(Const[DeadEnd, FreeQS](Root))),
               ProjectFieldR(HoleF, StrLit("city"))))),
             Free.roll(ZipMapKeys(HoleF)),
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
           Free.roll(QCT.inj(Map(
-            Free.roll(QCT.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+            Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
           Inner,
