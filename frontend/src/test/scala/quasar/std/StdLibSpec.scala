@@ -559,6 +559,10 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      // TODO: ExtractTimezone
+      // TODO: ExtractTimezoneHour
+      // TODO: ExtractTimezoneMinute
+
       "ExtractWeek" >> {
         // NB: current implementation, which is not consistent with IsoYear
 

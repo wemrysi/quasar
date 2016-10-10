@@ -74,9 +74,9 @@ object MapFuncPlanner {
     case ExtractMonth(time)           => fn.monthFromDateTime(xs.dateTime(time)).point[F]
     case ExtractQuarter(time)         => xdmp.quarterFromDate(xs.date(time)).point[F]
     case ExtractSecond(time)          => fn.secondsFromDateTime(xs.dateTime(time)).point[F]
-    // case ExtractTimezone(time)       => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
-    // case ExtractTimezoneHour(time)   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
-    // case ExtractTimezoneMinute(time) => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    case ExtractTimezone(time)       => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
+    case ExtractTimezoneHour(time)   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    case ExtractTimezoneMinute(time) => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
     case ExtractWeek(time)            => xdmp.weekFromDate(xs.date(time)).point[F]
     case ExtractYear(time)            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
 

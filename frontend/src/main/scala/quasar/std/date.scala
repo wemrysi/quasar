@@ -105,7 +105,12 @@ trait DateLib extends Library {
     "Pulls out the quarter subfield from a date/time value (1-4).")
   val ExtractSecond = extract("extract_second",
     "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
-  // TODO: Timezone, TimezoneHour, TimezoneMinute
+  val ExtractTimezone = extract("extract_timezone",
+    "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
+  val ExtractTimezoneHour = extract("extract_timezone_hour",
+    "Pulls out the hour component of the timezone subfield from a date/time value.")
+  val ExtractTimezoneMinute = extract("extract_timezone_minute",
+    "Pulls out the minute component of the timezone subfield from a date/time value.")
   val ExtractWeek = extract("extract_week",
     "Pulls out the week subfield from a date/time value (1-53).")
   val ExtractYear = extract("extract_year",

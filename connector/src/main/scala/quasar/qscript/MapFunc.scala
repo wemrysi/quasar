@@ -302,6 +302,9 @@ object MapFunc {
         case ExtractMonth(a1) => f(a1) ∘ (ExtractMonth(_))
         case ExtractQuarter(a1) => f(a1) ∘ (ExtractQuarter(_))
         case ExtractSecond(a1) => f(a1) ∘ (ExtractSecond(_))
+        case ExtractTimezone(a1) => f(a1) ∘ (ExtractTimezone(_))
+        case ExtractTimezoneHour(a1) => f(a1) ∘ (ExtractTimezoneHour(_))
+        case ExtractTimezoneMinute(a1) => f(a1) ∘ (ExtractTimezoneMinute(_))
         case ExtractWeek(a1) => f(a1) ∘ (ExtractWeek(_))
         case ExtractYear(a1) => f(a1) ∘ (ExtractYear(_))
         case Date(a1) => f(a1) ∘ (Date(_))
@@ -386,6 +389,9 @@ object MapFunc {
         case (ExtractMonth(a1), ExtractMonth(a2)) => in.equal(a1, a2)
         case (ExtractQuarter(a1), ExtractQuarter(a2)) => in.equal(a1, a2)
         case (ExtractSecond(a1), ExtractSecond(a2)) => in.equal(a1, a2)
+        case (ExtractTimezone(a1), ExtractTimezone(a2)) => in.equal(a1, a2)
+        case (ExtractTimezoneHour(a1), ExtractTimezoneHour(a2)) => in.equal(a1, a2)
+        case (ExtractTimezoneMinute(a1), ExtractTimezoneMinute(a2)) => in.equal(a1, a2)
         case (ExtractWeek(a1), ExtractWeek(a2)) => in.equal(a1, a2)
         case (ExtractYear(a1), ExtractYear(a2)) => in.equal(a1, a2)
         case (Date(a1), Date(b1)) => in.equal(a1, b1)
@@ -475,6 +481,9 @@ object MapFunc {
           case ExtractMonth(a1) => shz("ExtractMonth", a1)
           case ExtractQuarter(a1) => shz("ExtractQuarter", a1)
           case ExtractSecond(a1) => shz("ExtractSecond", a1)
+          case ExtractTimezone(a1) => shz("ExtractTimezone", a1)
+          case ExtractTimezoneHour(a1) => shz("ExtractTimezoneHour", a1)
+          case ExtractTimezoneMinute(a1) => shz("ExtractTimezoneMinute", a1)
           case ExtractWeek(a1) => shz("ExtractWeek", a1)
           case ExtractYear(a1) => shz("ExtractYear", a1)
           case Date(a1) => shz("Date", a1)
@@ -558,6 +567,9 @@ object MapFunc {
       case date.ExtractMonth => ExtractMonth(_)
       case date.ExtractQuarter => ExtractQuarter(_)
       case date.ExtractSecond => ExtractSecond(_)
+      case date.ExtractTimezone => ExtractTimezone(_)
+      case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
+      case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
       case date.ExtractWeek => ExtractWeek(_)
       case date.ExtractYear => ExtractYear(_)
       case date.Date => Date(_)
@@ -656,6 +668,9 @@ object MapFuncs {
   @Lenses final case class ExtractMonth[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractQuarter[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractSecond[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimezone[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimezoneHour[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimezoneMinute[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractWeek[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractYear[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Date[T[_[_]], A](a1: A) extends Unary[T, A]
