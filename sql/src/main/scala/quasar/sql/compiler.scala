@@ -30,7 +30,7 @@ import quasar.sql.{SemanticAnalysis => SA}, SA._
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
-import shapeless.{Data => _, :: => _, _}
+import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 trait Compiler[F[_]] {
   import identity._
@@ -485,6 +485,39 @@ trait Compiler[F[_]] {
             } yield
               if ((rName: String) ≟ name) table
               else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
+
+      case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
+        args.traverse(compile0).flatMap {
+          case Fix(LogicalPlan.ConstantF(Data.Str(part))) :: expr :: Nil =>
+            (part.some collect {
+              case "century"      => date.ExtractCentury
+              case "day"          => date.ExtractDayOfMonth
+              case "decade"       => date.ExtractDecade
+              case "dow"          => date.ExtractDayOfWeek
+              case "doy"          => date.ExtractDayOfYear
+              case "epoch"        => date.ExtractEpoch
+              case "hour"         => date.ExtractHour
+              case "isodow"       => date.ExtractIsoDayOfWeek
+              case "isoyear"      => date.ExtractIsoYear
+              case "microseconds" => date.ExtractMicroseconds
+              case "millennium"   => date.ExtractMillennium
+              case "milliseconds" => date.ExtractMilliseconds
+              case "minute"       => date.ExtractMinute
+              case "month"        => date.ExtractMonth
+              case "quarter"      => date.ExtractQuarter
+              case "second"       => date.ExtractSecond
+              case "week"         => date.ExtractWeek
+              case "year"         => date.ExtractYear
+            }).cata(
+              f => emit(Fix(f(expr))),
+              fail(UnexpectedDatePart("\"" + part + "\"")))
+
+          case _ :: _ :: Nil =>
+            fail(UnexpectedDatePart(pprint[Cofree[?[_], Annotations]](args(0))))
+
+          case _ =>
+            fail(WrongArgumentCount("DATE_PART", 2, args.length))
+        }
 
       case InvokeFunction(name, List(a1)) =>
         findUnaryFunction(name).flatMap(compileFunction[nat._1](_, Func.Input1(a1)))

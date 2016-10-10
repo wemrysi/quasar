@@ -15,7 +15,7 @@
   "nb": "Currently pending for Mongo because the shape is somehow not handled for JS.
          Also `doy` and `week` are missing because we currently have no JS implementation.",
   "query": "select
-              date_part(\"millenium\", timestamp(commit.committer.date)) as millenium,
+              date_part(\"millennium\", timestamp(commit.committer.date)) as millenium,
               date_part(\"century\", timestamp(commit.committer.date)) as century,
               date_part(\"decade\", timestamp(commit.committer.date)) as decade,
               date_part(\"year\", timestamp(commit.committer.date)) as year,
@@ -37,7 +37,7 @@
   "expected": [
     {
       "id": "33031",
-      "millenium": 2, "century": 20, "decade": 201, "year": 2015,
+      "millennium": 2, "century": 20, "decade": 201, "year": 2015,
       "doy": 1
     }
   ]

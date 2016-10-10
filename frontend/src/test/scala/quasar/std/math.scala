@@ -97,9 +97,9 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
       expr should beSuccessful(Const(Int(2)))
     }
 
-    "fold truncating division" in {
+    "fold non-truncating division" in {
       val expr = Divide.tpe(Func.Input2(Const(Int(5)), Const(Int(2))))
-      expr should beSuccessful(Const(Int(2)))
+      expr should beSuccessful(Const(Dec(2.5)))
     }
 
     "fold simple division (dec)" in {

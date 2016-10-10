@@ -17,41 +17,89 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}, LogicalPlan._
+import quasar.{Data, GenericFunc, LogicalPlan}, LogicalPlan._
+import quasar.RenderTree.ops._
+import quasar.fp.ski._
+import quasar.std.StdLib._
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import org.specs2.execute._
 import org.scalacheck.Arbitrary, Arbitrary._
+import scalaz.{Failure => _, _}, Scalaz._
+import shapeless.Nat
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
 class SimplifyStdLibSpec extends StdLibSpec {
-  def run(lp: Fix[LogicalPlan], expected: Data): Result = {
-    val simple = ensureCorrectTypes(lp).disjunction
-    (simple must beRightDisjunction(LogicalPlan.Constant(expected))).toResult
+  val notHandled: Result \/ Unit = Skipped("not simplified").left
+
+  def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (relations.Between, _) => notHandled
+
+    case (date.ExtractCentury, _) => notHandled
+    case (date.ExtractDayOfMonth, _) => notHandled
+    case (date.ExtractDecade, _) => notHandled
+    case (date.ExtractDayOfWeek, _) => notHandled
+    case (date.ExtractDayOfYear, _) => notHandled
+    case (date.ExtractEpoch, _) => notHandled
+    case (date.ExtractHour, _) => notHandled
+    case (date.ExtractIsoDayOfWeek, _) => notHandled
+    case (date.ExtractIsoYear, _) => notHandled
+    case (date.ExtractMicroseconds, _) => notHandled
+    case (date.ExtractMillennium, _) => notHandled
+    case (date.ExtractMilliseconds, _) => notHandled
+    case (date.ExtractMinute, _) => notHandled
+    case (date.ExtractMonth, _) => notHandled
+    case (date.ExtractQuarter, _) => notHandled
+    case (date.ExtractSecond, _) => notHandled
+    case (date.ExtractWeek, _) => notHandled
+    case (date.ExtractYear, _) => notHandled
+
+    case _ => ().right
   }
 
+  /** Identify constructs that are expected not to be implemented. */
+  def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
+    case LogicalPlan.InvokeF(func, _) => shortCircuit(func, args)
+    case _ => ().right
+  }
+
+  def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
+    prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
+      .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
+
+  def run(lp: Fix[LogicalPlan], expected: Data): Result =
+    ensureCorrectTypes(lp).disjunction match {
+      case  \/-(Fix(LogicalPlan.ConstantF(d))) => (d must closeTo(expected)).toResult
+      case  \/-(v) => Failure("not a constant", v.render.shows)
+      case -\/ (err) => Failure("simplification failed", err.toString)
+    }
+
   val runner = new StdLibTestRunner {
-      def nullary(prg: Fix[LogicalPlan], expected: Data) =
+    def nullary(prg: Fix[LogicalPlan], expected: Data) =
+      check(Nil, κ(prg)) getOrElse
         run(prg, expected)
 
-      def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
+    def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
+      check(List(arg), { case List(arg1) => prg(arg1) }) getOrElse
         run(prg(LogicalPlan.Constant(arg)), expected)
 
-      def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
+    def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
+      check(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }) getOrElse
         run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2)), expected)
 
-      def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
+    def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
+      check(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }) getOrElse
         run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2), LogicalPlan.Constant(arg3)), expected)
 
-      def intDomain = arbitrary[BigInt]
+    def intDomain = arbitrary[BigInt]
 
-      // NB: BigDecimal parsing cannot handle values that are too close to the
-      // edges of its range.
-      def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
+    // NB: BigDecimal parsing cannot handle values that are too close to the
+    // edges of its range.
+    def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
-      def stringDomain = arbitrary[String]
-    }
+    def stringDomain = arbitrary[String]
+  }
 
   tests(runner)
 }
