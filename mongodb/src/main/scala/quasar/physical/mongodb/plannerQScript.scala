@@ -891,7 +891,7 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def meh[M[_]: Functor: Plus, A](a: A)(exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
+  def exprOrJs[M[_]: Functor: Plus, A](a: A)(exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
       : M[Expr] =
     exf(a).map(_.right[JsFn]) <+> jsf(a).map(_.left[Fix[ExprOp]])
 
@@ -899,13 +899,13 @@ object MongoDbQScriptPlanner {
     (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
     (implicit ev: EX :<: ExprOp)
       : OutputM[Expr] =
-    meh(fm)(getExpr(funcHandler)(_), getJsFn[T])
+    exprOrJs(fm)(getExpr(funcHandler)(_), getJsFn[T])
 
   def handleRedRepair[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
     (implicit ev: EX :<: ExprOp)
       : OutputM[Expr] =
-    meh(jr)(getExprRed(funcHandler)(_), getJsRed[T])
+    exprOrJs(jr)(getExprRed(funcHandler)(_), getJsRed[T])
 
   def getExprRed[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
