@@ -90,6 +90,9 @@ object SemanticError {
   final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
     def message = "Invalid path: " + posixCodec.unsafePrintPath(path) + hint.map(" (" + _ + ")").getOrElse("")
   }
+  final case class UnexpectedDatePart(part: String) extends SemanticError {
+    def message = "Invalid selector for DATE_PART: " + part + " (expected \"century\", \"day\", etc.)"
+  }
 
   // TODO: Add other prisms when necessary (unless we enable the "No Any" wart first)
   val genericError: Prism[SemanticError, String] =

@@ -70,7 +70,24 @@ object CoreMap extends Serializable {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => undefined
     }).right
-    case Extract(f1, f2) => InternalError("not implemented").left // TODO - waits for Moss changes
+    case ExtractCentury(f) => InternalError("not implemented").left // TODO
+    case ExtractDayOfMonth(f) => InternalError("not implemented").left // TODO
+    case ExtractDecade(f) => InternalError("not implemented").left // TODO
+    case ExtractDayOfWeek(f) => InternalError("not implemented").left // TODO
+    case ExtractDayOfYear(f) => InternalError("not implemented").left // TODO
+    case ExtractEpoch(f) => InternalError("not implemented").left // TODO
+    case ExtractHour(f) => InternalError("not implemented").left // TODO
+    case ExtractIsoDayOfWeek(f) => InternalError("not implemented").left // TODO
+    case ExtractIsoYear(f) => InternalError("not implemented").left // TODO
+    case ExtractMicroseconds(f) => InternalError("not implemented").left // TODO
+    case ExtractMillennium(f) => InternalError("not implemented").left // TODO
+    case ExtractMilliseconds(f) => InternalError("not implemented").left // TODO
+    case ExtractMinute(f) => InternalError("not implemented").left // TODO
+    case ExtractMonth(f) => InternalError("not implemented").left // TODO
+    case ExtractQuarter(f) => InternalError("not implemented").left // TODO
+    case ExtractSecond(f) => InternalError("not implemented").left // TODO
+    case ExtractWeek(f) => InternalError("not implemented").left // TODO
+    case ExtractYear(f) => InternalError("not implemented").left // TODO
     case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
