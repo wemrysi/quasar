@@ -158,7 +158,7 @@ class Transform
 
     val (src, lBranch, rBranch) = merge(left._2, right._2)
 
-    rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine).fold {
+    rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rewrite.rebaseT).fold {
       // FIXME: Need a better prov representation, to know when the provs are
       //        the same even when the paths to the values differ.
       val commonProv =
