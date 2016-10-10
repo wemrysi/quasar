@@ -69,10 +69,6 @@ object queryfile {
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.detail("XQuery", main.render))
 
-      def extractErr(partName: String, msg: String): FileSystemError =
-        FileSystemError.planningFailed(lp, QPlanner.UnsupportedFunction(
-          partName, "in planner".some))
-
       val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
@@ -99,7 +95,8 @@ object queryfile {
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
 
                      case UnsupportedDatePart(n) =>
-                       extractErr(n, mlerr.shows)
+                       FileSystemError.planningFailed(lp, QPlanner.UnsupportedFunction(
+                         n, "in planner".some))
                    })
         a       <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
