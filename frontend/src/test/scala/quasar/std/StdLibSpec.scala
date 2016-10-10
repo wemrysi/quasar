@@ -642,10 +642,12 @@ abstract class StdLibSpec extends Qspec {
           binary(Multiply(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong * y.toLong))
         }
 
+        // TODO: figure out what domain can be tested here (tends to overflow)
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Multiply(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x * y))
         // }
 
+        // TODO: figure out what domain can be tested here
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
         // }
@@ -676,6 +678,7 @@ abstract class StdLibSpec extends Qspec {
             binary(Power(_, _).embed, Data.Int(0), Data.Int(y), Data.Int(0))
         }
 
+        // TODO: figure out what domain can be tested here (negatives?)
         // "0 to Dec" >> prop { (y: BigDecimal) =>
         //   y != 0 ==>
         //     binary(Power(_, _).embed, Data.Int(0), Data.Dec(y), Data.Int(0))
@@ -714,10 +717,12 @@ abstract class StdLibSpec extends Qspec {
             binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Dec(x.toDouble / y.toDouble))
         }
 
+        // TODO: figure out what domain can be tested here
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Divide(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x / y))
         // }
 
+        // TODO: figure out what domain can be tested here
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Divide(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x / y))
         // }
@@ -749,10 +754,12 @@ abstract class StdLibSpec extends Qspec {
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
 
+        // TODO: figure out what domain can be tested here
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
         // }
 
+        // TODO: figure out what domain can be tested here
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
         // }
@@ -792,7 +799,7 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
-          // ...provide they are not both Numeric (Int | Dec)
+          // ...provided they are not both Numeric (Int | Dec)
           (x.dataType != y.dataType &&
             !((Type.Numeric contains x.dataType) &&
               (Type.Numeric contains y.dataType))) ==>
@@ -832,7 +839,7 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
-          // ...provide they are not both Numeric (Int | Dec)
+          // ...provided they are not both Numeric (Int | Dec)
           (x.dataType != y.dataType &&
             !((Type.Numeric contains x.dataType) &&
               (Type.Numeric contains y.dataType))) ==>
