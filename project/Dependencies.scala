@@ -13,7 +13,7 @@ object Dependencies {
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
-  private val nettyVersion      = "4.1.3.Final"
+  private val nettyVersion      = "4.0.29.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
@@ -59,7 +59,7 @@ object Dependencies {
   )
   def mongodb = Seq(
     "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
-    "io.netty"    % "netty-buffer"         % nettyVersion,
+    // "io.netty"    % "netty-buffer"         % nettyVersion,
     "io.netty"    % "netty-handler"        % nettyVersion
   )
   val postgresql = Seq(
@@ -73,13 +73,14 @@ object Dependencies {
 
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion % buildSparkScope,
-    ("org.apache.spark" %% "spark-core" % "1.6.2") 
+    ("org.apache.spark" %% "spark-core" % "2.0.1") 
       .exclude("commons-collections", "commons-collections")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-logging", "commons-logging")
       .exclude("com.esotericsoftware.minlog", "minlog")
-      .exclude("org.spark-project.spark", "unused")
-      .exclude("io.netty", "netty-all") % buildSparkScope
+      .exclude("org.spark-project.spark", "unused") 
+      .exclude("io.netty", "netty-all")
+      .exclude("io.netty", "netty") % buildSparkScope
   )
 
   def marklogicValidation = Seq(
