@@ -116,7 +116,7 @@ class Transform
   /** Contains a common src, the MapFuncs required to access the left and right
     * sides, and the FreeQS that were unmergeable on either side.
     */
-  private type MergeResult = (T[F], FreeQS, FreeQS)
+  private case class MergeResult(src: T[F], lval: FreeQS, rval: FreeQS)
 
   private def merge(left: T[F], right: T[F]): MergeResult = {
     val lLin = left.cata(linearize).reverse
@@ -135,7 +135,7 @@ class Transform
       foldIso(CoEnv.freeIso[Hole, F])
         .get(rTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
 
-    (common.reverse.ana[T, F](delinearizeInner),
+    MergeResult(common.reverse.ana[T, F](delinearizeInner),
       rebaseBranch(leftF, lMap).mapSuspension(FI.inject),
       rebaseBranch(rightF, rMap).mapSuspension(FI.inject))
   }
@@ -158,9 +158,9 @@ class Transform
     val (combine, lacc, racc) =
       concat[T, JoinSide](Free.point(LeftSide), Free.point(RightSide))
 
-    val (src, lBranch, rBranch) = merge(left._2, right._2)
+    val merged: MergeResult = merge(left._2, right._2)
 
-    rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rewrite.rebaseT).fold {
+    rewrite.unifySimpleBranches[F, T[F]](merged.src, merged.lval, merged.rval, combine)(rewrite.rebaseT).fold {
       // FIXME: Need a better prov representation, to know when the provs are
       //        the same even when the paths to the values differ.
       val commonProv =
@@ -176,7 +176,7 @@ class Transform
           c._1.map(κ(LeftSide)),
           c._1.map(κ(RightSide)))))
 
-      AutoJoinResult(TJ.inj(ThetaJoin(src, lBranch, rBranch, condition, Inner, combine)).embed,
+      AutoJoinResult(TJ.inj(ThetaJoin(merged.src, merged.lval, merged.rval, condition, Inner, combine)).embed,
         prov.joinProvenances(
           lann.provenance.map(_ >> lacc),
           rann.provenance.map(_ >> racc)),
@@ -424,7 +424,7 @@ class Transform
       Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc, JoinSide](RightSide)))))
 
     condError.map { cond =>
-      val (commonSrc, lBranch, rBranch) = merge(values(0)._2, values(1)._2)
+      val merged: MergeResult = merge(values(0)._2, values(1)._2)
 
       val Ann(leftBuckets, leftValue) = values(0)._1
       val Ann(rightBuckets, rightValue) = values(1)._1
@@ -436,9 +436,9 @@ class Transform
 
       (Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
         TJ.inj(ThetaJoin(
-          commonSrc,
-          lBranch,
-          rBranch,
+          merged.src,
+          merged.lval,
+          merged.rval,
           cond,
           tpe,
           combine)).embed)
@@ -545,14 +545,14 @@ class Transform
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val merged: MergeResult = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Take(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
+      (a1._1, QC.inj(Take(merged.src, merged.lval, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val merged: MergeResult = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Drop(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
+      (a1._1, QC.inj(Drop(merged.src, merged.lval, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val AutoJoin3Result(src, bucketsSrc, ordering, buckets, directions) =
@@ -619,31 +619,31 @@ class Transform
       (Ann(prov.swapProvenances(join.rval :: join.buckets), join.lval), join.src).right
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val merged: MergeResult = merge(a1._2, a2._2)
 
       (Ann(prov.unionProvenances(a1._1.provenance, a2._1.provenance), HoleF),
-        QC.inj(Union(src, lfree, rfree)).embed).right
+        QC.inj(Union(merged.src, merged.lval, merged.rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val merged: MergeResult = merge(a1._2, a2._2)
 
       (Ann(prov.joinProvenances(a1._1.provenance, a2._1.provenance), HoleF),
         TJ.inj(ThetaJoin(
-          src,
-          lfree,
-          rfree,
+          merged.src,
+          merged.lval,
+          merged.rval,
           Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide))),
           Inner,
           LeftSideF)).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.Except, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val merged: MergeResult = merge(a1._2, a2._2)
 
       (Ann(a1._1.provenance, HoleF),
         TJ.inj(ThetaJoin(
-          src,
-          lfree,
-          rfree,
+          merged.src,
+          merged.lval,
+          merged.rval,
           BoolLit(false),
           LeftOuter,
           LeftSideF)).embed).right
