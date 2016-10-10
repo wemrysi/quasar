@@ -22,55 +22,65 @@ import quasar._
 import quasar.jscore._
 import quasar.javascript.{Js}
 
-package object javascript {
+import matryoshka._
+
+final case class javascript[T[_[_]]: Corecursive]() {
+  private type R = T[JsCoreF]
+
+  @inline private implicit def convert(x: JsCoreF[R]): R =
+    x.embed
+
+  private val jsFp = jscore.fixpoint[T]
+  import jsFp._
+
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
-  def toJsDate(value: Bson.Date): JsCore =
+  def toJsDate(value: Bson.Date): R =
     New(Name("Date"), List(Literal(Js.Str(value.value.toString))))
 
   /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
-  def toJsObjectId(value: Bson.ObjectId): JsCore =
+  def toJsObjectId(value: Bson.ObjectId): R =
     New(Name("ObjectId"), List(Literal(Js.Str(value.str))))
 
-  def isNull(expr: JsCore): JsCore =
+  def isNull(expr: R): R =
     BinOp(Eq, Literal(Js.Null), expr)
 
-  def isAnyNumber(expr: JsCore): JsCore =
+  def isAnyNumber(expr: R): R =
     BinOp(Or, isDec(expr), isInt(expr))
 
-  def isInt(expr: JsCore): JsCore =
+  def isInt[A](expr: R): R =
     BinOp(Or,
       BinOp(Instance, expr, ident("NumberInt")),
       BinOp(Instance, expr, ident("NumberLong")))
 
-  def isDec(expr: JsCore): JsCore =
+  def isDec(expr: R): R =
     Call(ident("isNumber"), List(expr))
 
-  def isString(expr: JsCore): JsCore =
+  def isString(expr: R): R =
     Call(ident("isString"), List(expr))
 
-  def isObjectOrArray(expr: JsCore): JsCore =
+  def isObjectOrArray(expr: R): R =
     Call(ident("isObject"), List(expr))
 
-  def isArray(expr: JsCore): JsCore =
-    Call(Select(ident("Array"), "isArray"), List(expr))
+  def isArray(expr: R): R =
+    Call(select(ident("Array"), "isArray"), List(expr))
 
-  def isObject(expr: JsCore): JsCore =
+  def isObject(expr: R): R =
     BinOp(And,
       isObjectOrArray(expr),
       UnOp(Not, isArray(expr)))
 
-  def isBoolean(expr: JsCore): JsCore =
-    BinOp(Eq, UnOp(TypeOf, expr), jscore.Literal(Js.Str("boolean")))
+  def isBoolean(expr: R): R =
+    BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))
 
-  def isTimestamp(expr: JsCore): JsCore =
-    jscore.BinOp(jscore.Instance, expr, jscore.ident("Timestamp"))
+  def isTimestamp(expr: R): R =
+    BinOp(Instance, expr, ident("Timestamp"))
 
-  def isDate(expr: JsCore): JsCore =
-    jscore.BinOp(jscore.Instance, expr, jscore.ident("Date"))
+  def isDate(expr: R): R =
+    BinOp(Instance, expr, ident("Date"))
 
-  def isBinary(expr: JsCore): JsCore =
-    jscore.BinOp(jscore.Instance, expr, jscore.ident("Binary"))
+  def isBinary(expr: R): R =
+    BinOp(Instance, expr, ident("Binary"))
 
-  def isObjectId(expr: JsCore): JsCore =
-    jscore.BinOp(jscore.Instance, expr, jscore.ident("ObjectId"))
+  def isObjectId(expr: R): R =
+    BinOp(Instance, expr, ident("ObjectId"))
 }

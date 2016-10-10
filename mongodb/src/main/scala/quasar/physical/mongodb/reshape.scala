@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._

@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb.expression
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.fp._
 import quasar.physical.mongodb.{Bson, BsonField}

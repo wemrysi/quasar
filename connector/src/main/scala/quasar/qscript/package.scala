@@ -189,10 +189,10 @@ package object qscript {
   def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
     type FixedQScriptRead[A]      = QScriptRead[T, A]
     type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
     transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
       .transCata(
-        optimize.applyAll[FixedQScriptShiftRead] ⋙
+        rewrite.normalize[FixedQScriptShiftRead] ⋙
           liftFG(injectRepeatedly(quasar.qscript.Coalesce[T, FixedQScriptShiftRead, FixedQScriptShiftRead].coalesceSR[FixedQScriptShiftRead](idPrism))))
   }
 

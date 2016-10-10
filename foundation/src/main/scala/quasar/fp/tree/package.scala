@@ -16,7 +16,6 @@
 
 package quasar.fp
 
-import quasar.Predef._
 import quasar.contrib.matryoshka._
 
 import matryoshka._

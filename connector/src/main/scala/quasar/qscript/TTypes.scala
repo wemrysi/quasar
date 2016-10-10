@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
@@ -40,6 +41,7 @@ trait TTypes[T[_[_]]] {
   type ProjectBucket[A] = quasar.qscript.ProjectBucket[T, A]
   type ThetaJoin[A]     = quasar.qscript.ThetaJoin[T, A]
   type MapFunc[A]       = quasar.qscript.MapFunc[T, A]
+  type FreeQS           = quasar.qscript.FreeQS[T]
 }
 
 object TTypes {
@@ -51,7 +53,7 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
   import SimplifyProjection._
 
   private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
-  private def applyToBranch(branch: FreeQS[T]): FreeQS[T] = branch mapSuspension simplify
+  private def applyToBranch(branch: FreeQS): FreeQS = branch mapSuspension simplify
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
@@ -100,18 +102,15 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
 // ShowT is needed for debugging
 class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends TTypes[T] {
   import Normalizable._
-  lazy val opt = new Optimize[T]
+  lazy val rewrite = new Rewrite[T]
 
-  def freeTC(free: FreeQS[T]): FreeQS[T] = {
+  def freeTC(free: FreeQS): FreeQS = {
     freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
-      liftCo(opt.applyToFreeQS[QScriptTotal])
+      liftCo(rewrite.normalizeCoEnv[QScriptTotal])
     )
   }
 
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
-    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
-
-  def freeTCEq(free: FreeQS[T]): Option[FreeQS[T]] = {
+  def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
     (free ≠ freeNormalized).option(freeNormalized)
   }
@@ -120,6 +119,9 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
     val fmNormalized = freeMF[A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
+
+  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(

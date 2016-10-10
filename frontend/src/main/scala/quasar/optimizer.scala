@@ -16,6 +16,7 @@
 
 package quasar
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._

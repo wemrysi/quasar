@@ -30,14 +30,14 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  val opt = new Optimize[Fix]
+class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+  val rewrite = new Rewrite[Fix]
+
+  def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
+    expr.transCata[QS](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[QS](orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]])))
-
-  def applyAllExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[QS](opt.applyAll[QS])
+    expr.transCata[QS](rewrite.normalize[QS])
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[QST](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
@@ -63,11 +63,11 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
-  "optimizer" should {
+  "rewriter" should {
     "elide a no-op map in a constant boolean" in {
       val query = LP.Constant(Data.Bool(true))
       val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] = {
-        fa => QCI.prj(fa).fold(fa)(opt.elideNopQC(idPrism[QSI].reverseGet))
+        fa => QCI.prj(fa).fold(fa)(rewrite.elideNopQC(idPrism[QSI].reverseGet))
       }
 
       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
@@ -107,7 +107,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
 
-      normalizeExpr(exp.embed) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "elide a join with a constant on one side" in {
@@ -134,7 +134,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
             Free.point(RightSide))))
 
       // TODO: only require a single pass
-      applyAllExpr(applyAllExpr(exp.embed)) must equal(
+      normalizeExpr(normalizeExpr(exp.embed)) must equal(
         chain(
           RootR,
           QC.inj(LeftShift((),
@@ -156,7 +156,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
 
-      normalizeExpr(exp.embed) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "elide a join in the branch of a join" in {
@@ -189,7 +189,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
             Free.roll(MakeArray(Free.point(RightSide)))))))
 
       // TODO: only require a single pass
-      applyAllExpr(applyAllExpr(exp.embed)) must
+      normalizeExpr(normalizeExpr(exp.embed)) must
         equal(
           QC.inj(LeftShift(
             RootR.embed,
@@ -231,7 +231,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Free.roll(Constant(
             ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
 
-      normalizeExpr(exp) must equal(expected.embed)
+      normalizeFExpr(exp) must equal(expected.embed)
     }
 
     "simplify a ThetaJoin" in {

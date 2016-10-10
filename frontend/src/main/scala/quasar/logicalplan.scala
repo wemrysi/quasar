@@ -16,6 +16,7 @@
 
 package quasar
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
