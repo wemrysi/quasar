@@ -73,6 +73,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   import fixExprOp._
   val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
   import expr3_0Fp._
+  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix, ExprOp] = ExprOp3_2F.fixpoint[Fix, ExprOp]
+  import expr3_2Fp._
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
@@ -355,9 +357,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                  $and(
                    $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
-                 $add(
-                   $divide($dayOfYear($field("baz")), $literal(Bson.Int32(92))),
-                   $literal(Bson.Int32(1))),
+                 $trunc(
+                   $add(
+                     $divide($dayOfYear($field("baz")), $literal(Bson.Int32(92))),
+                     $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
            IgnoreId)))
     }
@@ -580,7 +583,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple js filter" in {
-      import javascript._
+      val mjs: javascript[Fix] = javascript[Fix]
+      import mjs._
 
       plan("select * from zips where length(city) < 4") must
       beWorkflow(chain[Workflow](
@@ -606,7 +610,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan filter with js and non-js" in {
-      import javascript._
+      val mjs: javascript[Fix] = javascript[Fix]
+      import mjs._
 
       plan("select * from zips where length(city) < 4 and pop < 20000") must
       beWorkflow(chain[Workflow](
@@ -4051,7 +4056,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }.pendingUntilFixed("SD-1249")
 
     "include correct phases with planner error" in {
-      planLog("""select date_part("foo", bar) from zips""").map(_.map(_.name)) must
+      planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked",

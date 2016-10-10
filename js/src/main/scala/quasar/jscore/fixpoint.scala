@@ -19,7 +19,36 @@ package quasar.jscore
 import quasar.Predef._
 import quasar.javascript.Js
 
-import matryoshka.Fix
+import matryoshka._
+
+final case class fixpoint[T[_[_]]: Corecursive]() {
+  type R = T[JsCoreF]
+
+  @inline private implicit def convert(x: JsCoreF[R]): R =
+    x.embed
+
+  def Literal(value: Js.Lit): R                          = LiteralF[R](value)
+  def Ident(value: Name): R                              = IdentF[R](value)
+  def Access(expr: R, key: R): R                         = AccessF(expr, key)
+  def Call(callee: R, args: List[R]): R                  = CallF(callee, args)
+  def New(name: Name, args: List[R]): R                  = NewF(name, args)
+  def If(condition: R, consequent: R, alternative: R): R = IfF(condition, consequent, alternative)
+  def UnOp(op: UnaryOperator, arg: R): R                 = UnOpF(op, arg)
+  def BinOp(op: BinaryOperator, left: R, right: R): R    = BinOpF(op, left, right)
+  def Arr(values: List[R]): R                            = ArrF(values)
+  def Fun(params: List[Name], body: R): R                = FunF(params, body)
+  def Obj(values: ListMap[Name, R]): R                   = ObjF(values)
+  def Let(name: Name, expr: R, body: R): R               = LetF(name, expr, body)
+  def SpliceObjects(srcs: List[R]): R                    = SpliceObjectsF(srcs)
+  def SpliceArrays(srcs: List[R]): R                     = SpliceArraysF(srcs)
+
+  def ident(name: String): R = Ident(Name(name))
+  def select(expr: R, name: String): R = Access(expr, Literal(Js.Str(name)))
+  def binop(op: BinaryOperator, a1: R, args: R*): R = args.toList match {
+    case Nil    => a1
+    case h :: t => BinOp(op, a1, binop(op, h, t: _*))
+  }
+}
 
 object Literal {
   def apply(value: Js.Lit): JsCore = Fix(LiteralF(value))

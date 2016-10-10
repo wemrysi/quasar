@@ -365,8 +365,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "0" ->
-              Extract[FLP](
-                Constant(Data.Str("day")),
+              ExtractDayOfMonth[FLP](
                 ObjectProject(read("foo"), Constant(Data.Str("baz")))))))
     }
 

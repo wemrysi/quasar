@@ -22,7 +22,6 @@ import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField}
-import quasar.physical.mongodb.javascript._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -293,6 +292,9 @@ object ExprOpCoreF {
     // FIXME: Define a proper `Show[ExprOpCoreF]` instance.
     @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOpCoreF, JsFn] = {
+      val mjs = quasar.physical.mongodb.javascript[Fix]
+      import mjs._
+
       def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
         \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
       def expr2(x1: JsFn, x2: JsFn)(f: (JsCore, JsCore) => JsCore): PlannerError \/ JsFn =
@@ -364,12 +366,15 @@ object ExprOpCoreF {
         case $toLowerF(a)            => invoke(a, "toLowerCase")
         case $toUpperF(a)            => invoke(a, "toUpperCase")
 
-        case $yearF(a)               => invoke(a, "getFullYear")
+        case $yearF(a)               => invoke(a, "getUTCFullYear")
         // case $dayOfYear(a)           => // TODO: no JS equivalent
-        case $monthF(a)              => invoke(a, "getMonth")
-        case $dayOfMonthF(a)         => invoke(a, "getDate")
+        case $monthF(a)              => invoke(a, "getUTCMonth")
+        case $dayOfMonthF(a)         => invoke(a, "getUTCDate")
         // case $week(a)                => // TODO: no JS equivalent
-        case $dayOfWeekF(a)          => invoke(a, "getDay")
+        case $dayOfWeekF(a)          => expr1(a)(x =>
+          jscore.BinOp(jscore.Add,
+            jscore.Call(jscore.Select(x, "getUTCDay"), Nil),
+            jscore.Literal(Js.Num(1, false))))
         case $hourF(a)               => invoke(a, "getUTCHours")
         case $minuteF(a)             => invoke(a, "getUTCMinutes")
         case $secondF(a)             => invoke(a, "getUTCSeconds")
