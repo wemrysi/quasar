@@ -46,6 +46,7 @@ trait TTypes[T[_[_]]] {
   type JoinFunc         = quasar.qscript.JoinFunc[T]
   type FreeQS           = quasar.qscript.FreeQS[T]
   type Ann              = quasar.qscript.Ann[T]
+  type Target[F[_]]     = quasar.qscript.Target[T, F]
 }
 
 object TTypes {

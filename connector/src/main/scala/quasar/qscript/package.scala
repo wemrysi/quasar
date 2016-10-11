@@ -99,6 +99,16 @@ package object qscript {
       Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
   }
 
+  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
+
+  object Target {
+    implicit def equal[T[_[_]]: EqualT, F[_]: EqualF]: Equal[Target[T, F]] =
+      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
+
+    implicit def show[T[_[_]]: ShowT, F[_]: ShowF]: Show[Target[T, F]] =
+      Show.show(target => Cord("Target(") ++ target.ann.show ++ Cord(", ") ++ target.value.show ++ Cord(")"))
+  }
+
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
