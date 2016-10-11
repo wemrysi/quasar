@@ -54,10 +54,10 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
       structural.MakeObject(
         LP.Constant(Data.Str("0")),
         agg.Count(lpRead("/foo/bar")).embed).embed).map(
-      transFutu(_)(ShiftRead[Fix, QS, QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)(_))
-        .transCata(rewrite.normalize[QScriptTotal[Fix, ?]])) must
+      transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
+        .transCata(rewrite.normalize[QST])) must
     equal(chain(
-      SRT.inj(Const[ShiftedRead, Fix[QScriptTotal[Fix, ?]]](
+      SRT.inj(Const[ShiftedRead, Fix[QST]](
         ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
       QCT.inj(Reduce((),
         NullLit(),

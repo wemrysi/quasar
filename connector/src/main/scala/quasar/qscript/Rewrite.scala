@@ -71,7 +71,7 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
   }
 
   def unifySimpleBranches[F[_], A]
-    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc[T])
+    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
     (rebase: FreeQS => A => Option[A])
     (implicit
       QC: QScriptCore :<: F,
