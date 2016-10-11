@@ -48,7 +48,6 @@ object util {
     S1: EnvErr :<: S,
     S2: CfgErr :<: S
   ): Free[S, AMongoClient] = {
-    type M[A] = Free[S, A]
     val cfgErr = Failure.Ops[ConfigError, S]
     val envErr = Failure.Ops[EnvironmentError, S]
 

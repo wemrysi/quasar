@@ -600,11 +600,6 @@ package object workflow {
             case src => src
           }
 
-        val uncleanƒ: F[Fix[F]] => Fix[F] = {
-          case WorkflowOpCoreF(x @ $SimpleMapF(_, _, _)) => I.inj(x.raw).embed
-          case x                                         => x.embed
-        }
-
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case WorkflowOpCoreF(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
             case $project(src, shape, _)  =>

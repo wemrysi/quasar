@@ -802,9 +802,6 @@ object MongoDbQScriptPlanner {
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
       StateT[F, NameGen, A](ng => EitherT(sa.run(ng).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]))
 
-    def liftError[A](ea: PlannerError \/ A): M[A] =
-      EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
-
     val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 

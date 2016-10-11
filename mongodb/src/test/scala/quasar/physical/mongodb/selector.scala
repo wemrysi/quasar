@@ -102,7 +102,7 @@ class SelectorSpec extends quasar.Qspec  {
 
     "constructors" should {
       "define nested $and and $or" in {
-        val cs =
+        val _ =
           Or(
             And(
               Doc(BsonField.Name("foo") -> Gt(10)),

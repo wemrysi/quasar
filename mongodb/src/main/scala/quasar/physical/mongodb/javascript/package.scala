@@ -27,9 +27,6 @@ import matryoshka._
 final case class javascript[T[_[_]]: Corecursive]() {
   private type R = T[JsCoreF]
 
-  @inline private implicit def convert(x: JsCoreF[R]): R =
-    x.embed
-
   private val jsFp = jscore.fixpoint[T]
   import jsFp._
 

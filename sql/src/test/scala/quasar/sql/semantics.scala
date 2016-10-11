@@ -27,8 +27,6 @@ import pathy.Path._
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
-    val compiler = Compiler.trampoline
-
     def transform[T[_[_]]: Recursive: Corecursive](q: T[Sql]): T[Sql] =
       q.transCata(orOriginal(projectSortKeysƒ))
 

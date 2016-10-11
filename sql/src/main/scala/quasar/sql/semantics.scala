@@ -32,7 +32,6 @@ object SemanticAnalysis {
   type Failure = NonEmptyList[SemanticError]
 
   private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
-  private def succeed[A](s: A) = Validation.success[Failure, A](s)
 
   sealed trait Synthetic
   object Synthetic {

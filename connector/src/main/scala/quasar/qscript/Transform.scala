@@ -491,18 +491,17 @@ class Transform
     case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized((Ann(buckets, _), src)))
         if func.effect ≟ Mapping =>
-      val Ann(buckets, value) = a1._1
       concatBuckets(buckets) match {
         case Some((buck, newBuckets)) =>
           val (mf, bucketAccess, valAccess) =
             concat[T, Hole](buck, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))
           (Ann(newBuckets.list.toList.map(_ >> bucketAccess), valAccess),
-            QC.inj(Map(a1._2, mf)).embed).right
+            QC.inj(Map(src, mf)).embed).right
         case None =>
           (EmptyAnn[T],
-            QC.inj(Map(a1._2, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))).embed).right
+            QC.inj(Map(src, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))).embed).right
       }
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
