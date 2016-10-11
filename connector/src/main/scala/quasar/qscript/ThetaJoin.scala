@@ -101,7 +101,4 @@ object ThetaJoin {
             }
         }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[ThetaJoin[T, ?]] =
-    TTypes.normalizable[T].ThetaJoin
 }
