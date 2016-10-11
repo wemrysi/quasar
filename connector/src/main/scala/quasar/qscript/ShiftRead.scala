@@ -85,10 +85,8 @@ object ShiftRead {
         GtoH(QC.inj(qc match {
           case Union(src, lb, rb) =>
             Union(Free.point(src), applyToBranch(lb), applyToBranch(rb))
-          case Drop(src, lb, rb) =>
-            Drop(Free.point(src), applyToBranch(lb), applyToBranch(rb))
-          case Take(src, lb, rb) =>
-            Take(Free.point(src), applyToBranch(lb), applyToBranch(rb))
+          case Subset(src, lb, sel, rb) =>
+            Subset(Free.point(src), applyToBranch(lb), sel, applyToBranch(rb))
           case _ => qc.map(Free.point)
         }))
       )

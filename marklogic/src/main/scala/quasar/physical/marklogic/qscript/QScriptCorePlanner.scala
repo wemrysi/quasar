@@ -89,23 +89,19 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
       } yield fn.filter(func(x) { p }, src)
 
     // NB: XQuery sequences use 1-based indexing.
-    case Take(src, from, count) =>
+    case Subset(src, from, sel, count) =>
       for {
         s   <- freshVar[F]
         f   <- freshVar[F]
         c   <- freshVar[F]
         fm  <- rebaseXQuery(from, s.xqy)
         ct  <- rebaseXQuery(count, s.xqy)
-      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
-
-    case Drop(src, from, count) =>
-      for {
-        s  <- freshVar[F]
-        f  <- freshVar[F]
-        c  <- freshVar[F]
-        fm <- rebaseXQuery(from, s.xqy)
-        ct <- rebaseXQuery(count, s.xqy)
-      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
+      } yield let_(s -> src, f -> fm, c -> ct) return_ (sel match {
+        case Drop => fn.subsequence(f.xqy, c.xqy + 1.xqy)
+        case Take => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+        // TODO: Better sampling
+        case Sample => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+      })
 
     case Unreferenced() =>
       "Unreferenced".xs.point[F]
