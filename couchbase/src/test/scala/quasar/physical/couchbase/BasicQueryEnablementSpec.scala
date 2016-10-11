@@ -178,7 +178,7 @@ class BasicQueryEnablementSpec
           QC.inj(Reduce(
             (),
             NullLit(), // reduce on a constant bucket, which is normalized to Null
-            List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+            List(ReduceFuncs.Sum[FreeMap](HoleF)),
             Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))))
 
       val n1ql = n1qlFromQS(qs)

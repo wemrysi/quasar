@@ -201,11 +201,11 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                           |  n1ql:    $n1qlStr""".stripMargin('|'))))
       } yield partialQueryString(n1qlStr)
 
-    case qscript.Take(src, from, count) =>
-      takeOrDrop(src, from, count.left)
-
-    case qscript.Drop(src, from, count) =>
-      takeOrDrop(src, from, count.right)
+    case qscript.Subset(src, from, op, count) => op match {
+      case Drop   => takeOrDrop(src, from, count.right)
+      case Take   => takeOrDrop(src, from, count.left)
+      case Sample => ???
+    }
 
     case qscript.Unreferenced() =>
       partialQueryString("(select value [])").point[M]
