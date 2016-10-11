@@ -132,16 +132,19 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val lp = fullCompileExp("select * from bar limit 10")
       val qs = convert(listContents.some, lp)
       qs must equal(
-        QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+        QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
           Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> file("bar"))))), HoleF, RightSideF))),
+          Take,
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
     }
 
     "convert a simple take through a path" in {
       convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
         equal(
-          QC.inj(Take(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+          QC.inj(Subset(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
             Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, RightSideF))),
+            Take,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed.some)
     }
 

@@ -222,11 +222,14 @@ object Planner {
               })).point[Task]
             }
           )
-        case Take(src, from, count) =>
-          filterOut(fromFile, src, from, count, (i: Index, c: Count) => i < c)
-          
-        case Drop(src, from, count) =>
-          filterOut(fromFile, src, from, count, (i: Index, c: Count) => i >= c)
+        case Subset(src, from, sel, count) =>
+          filterOut(fromFile, src, from, count,
+            sel match {
+              case Drop => (i: Index, c: Count) => i >= c
+              case Take => (i: Index, c: Count) => i < c
+              // TODO: Better sampling
+              case Sample => (i: Index, c: Count) => i < c
+            })
 
         case LeftShift(src, struct, repair) =>
 
