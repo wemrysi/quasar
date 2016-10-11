@@ -60,7 +60,7 @@ class Transform
   private val prov = new Provenance[T]
   private val rewrite = new Rewrite[T]
 
-  private type Target = (Ann[T], T[F])
+  private type Target = (Ann, T[F])
   private type LinearF = List[F[ExternallyManaged]]
 
   case class ZipperSides(
@@ -207,7 +207,7 @@ class Transform
     concatBuckets(join.buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(join.lval, join.rval)))
-        (Ann[T](newBucks.list.toList.map(_ >> b), v),
+        (Ann(newBucks.list.toList.map(_ >> b), v),
           QC.inj(Map(join.src, merged)).embed)
       }
       case None =>
@@ -224,7 +224,7 @@ class Transform
     concatBuckets(join.buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(join.lval, join.cval, join.rval)))
-        (Ann[T](newBucks.list.toList.map(_ >> b), v),
+        (Ann(newBucks.list.toList.map(_ >> b), v),
           QC.inj(Map(join.src, merged)).embed)
       }
       case None =>
@@ -241,7 +241,7 @@ class Transform
         Free.point[MapFunc, JoinSide](LeftSide),
         Free.point[MapFunc, JoinSide](RightSide))
 
-    (Ann[T](
+    (Ann(
       prov.shiftMap(Free.roll[MapFunc, Hole](ProjectIndex(rightAccess, IntLit(0)))) :: provs.map(_ >> leftAccess),
       Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
       QC.inj(LeftShift(input._2, Free.roll(f(value)), sides)).embed)
@@ -329,7 +329,7 @@ class Transform
             Free.point[MapFunc, JoinSide](LeftSide),
             Free.point[MapFunc, JoinSide](RightSide))
 
-        (Ann[T](
+        (Ann(
           NullLit[T, Hole]() :: join.buckets.map(_ >> leftAccess),
           rightAccess),
           QC.inj(LeftShift(
@@ -348,7 +348,7 @@ class Transform
     provs.tailOption.fold(values(0)) { tail =>
       concatBuckets(tail) match {
         case Some((newProvs, provAccess)) =>
-          (Ann[T](
+          (Ann(
             provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
             Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
             QC.inj(Reduce[T, T[F]](
@@ -380,7 +380,7 @@ class Transform
     join.buckets.tailOption.fold((EmptyAnn[T], join.src)) { tail =>
       concatBuckets(tail) match {
         case Some((newProvs, provAccess)) =>
-          (Ann[T](
+          (Ann(
             provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
             Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
             QC.inj(Reduce[T, T[F]](
@@ -437,7 +437,7 @@ class Transform
 
   private def ProjectTarget(prefix: Target, field: FreeMap): Target = {
     val Ann(provenance, values) = prefix._1
-    (Ann[T](prov.projectField(field) :: provenance, values),
+    (Ann(prov.projectField(field) :: provenance, values),
       PB.inj(BucketField(prefix._2, HoleF[T], field)).embed)
   }
 
@@ -461,11 +461,11 @@ class Transform
     * final result, or the `count` of a Subset, we need to make sure we
     * extract the result pointed to by the metadata.
     */
-  def reifyResult[A](ann: Ann[T], src: A): QScriptCore[A] =
+  def reifyResult[A](ann: Ann, src: A): QScriptCore[A] =
     quasar.qscript.Map(src, ann.values)
 
   // TODO: Replace disjunction with validation.
-  def lpToQScript: AlgebraM[PlannerError \/ ?, LogicalPlan, (Ann[T], T[F])] = {
+  def lpToQScript: AlgebraM[PlannerError \/ ?, LogicalPlan, (Ann, T[F])] = {
     case LogicalPlan.ReadF(path) =>
       // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
       //       however doing that would break the old Mongo backend, and we can
@@ -510,12 +510,12 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      (Ann[T](join.buckets, HoleF[T]),
+      (Ann(join.buckets, HoleF[T]),
         PB.inj(BucketField(join.src, join.lval, join.rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      (Ann[T](join.buckets, HoleF[T]),
+      (Ann(join.buckets, HoleF[T]),
         PB.inj(BucketIndex(join.src, join.lval, join.rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
@@ -575,12 +575,12 @@ class Transform
         directionsList.map { bucketsList.zip(_) }
 
       lists.map(pairs =>
-        (Ann[T](bucketsSrc, HoleF[T]),
+        (Ann(bucketsSrc, HoleF[T]),
           QC.inj(Sort(src, ordering, pairs)).embed))
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      (Ann[T](join.buckets, HoleF[T]),
+      (Ann(join.buckets, HoleF[T]),
         QC.inj(Map(QC.inj(Filter(join.src, join.rval)).embed, join.lval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
