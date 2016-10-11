@@ -81,11 +81,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
     (svc, ref)
   }
 
+  def restrict[M[_], S[_], T[_]](f: T ~> M)(implicit S: S :<: T) =
+    f compose injectNT[S, T]
+
   def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
     type RW[A] = ReadWriteT[ResponseOr, A]
     HttpService.lift(req => runFs(mem) flatMap { fs =>
       val fs0: Eff ~> ResponseOr = effRespOr(fs)
-      val g: WriteFile ~> RW = amendWrites(free.restrict[ResponseOr, WriteFile, Eff](fs0))
+      val g: WriteFile ~> RW = amendWrites(restrict[ResponseOr, WriteFile, Eff](fs0))
       val f: Eff ~> RW = liftMT[ResponseOr, ReadWriteT] compose fs0
 
       val fsErrs: Eff ~> ResponseOr =
