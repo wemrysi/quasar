@@ -264,24 +264,4 @@ object ejson {
         mkObjectEntry[F].apply(key, value) flatMap (xqy => mkObject[F].apply(xqy))
       }
     }.join
-
-  // ejson:unshift-object(
-  //   $keyf as function(item()) as xs:string,
-  //   $valf as function(item()) as item()*,
-  //   $seq  as item()*
-  // ) as element(ejson:ejson)
-  def unshiftObject[F[_]: PrologW]: F[FunctionDecl3] =
-    (ejs.name("unshift-object").qn[F] |@| ejsonN.qn) { (fname, ename) =>
-      declare(fname)(
-        $("keyf") as SequenceType("function(item()) as xs:QName"),
-        $("valf") as SequenceType("function(item()) as item()*"),
-        $("seq")  as SequenceType("item()*")
-      ).as(SequenceType(s"element($ename)")) { (keyf: XQuery, valf: XQuery, seq: XQuery) =>
-        val x = "$x"
-        for {
-          entry <- mkObjectEntry[F].apply(keyf.fnapply(x.xqy), valf.fnapply(x.xqy))
-          obj   <- mkObject[F].apply(fn.map(func(x)(entry), seq))
-        } yield obj
-      }
-    }.join
 }

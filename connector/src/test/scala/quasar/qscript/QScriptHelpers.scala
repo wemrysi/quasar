@@ -58,7 +58,6 @@ trait QScriptHelpers extends TTypes[Fix] {
   val QCT =           implicitly[QScriptCore :<: QST]
   val TJT =             implicitly[ThetaJoin :<: QST]
   val EJT =              implicitly[EquiJoin :<: QST]
-  val PBT =         implicitly[ProjectBucket :<: QST]
   val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):

@@ -106,9 +106,6 @@ object FsPath {
     if (os.isWin) parseWinAbsDir(s) else parseOther(codecForOS(os))
   }
 
-  def parseSystemAbsDir(s: String): OptionT[Task, Aux[Abs, Dir, Sandboxed]] =
-    forCurrentOS(parseAbsDir(_, s))
-
   def parseAbsFile(os: OS, s: String): Option[Aux[Abs, File, Sandboxed]] = {
     def parseOther(codec: PathCodec) =
       codec.parseAbsFile(s) >>= (p => sandboxFsPathIn(rootDir, Uniform(p)))
@@ -123,14 +120,8 @@ object FsPath {
     if (os.isWin) parseWinAbsAsDir(s) else parseOther(codecForOS(os))
   }
 
-  def parseSystemAbsFile(s: String): OptionT[Task, Aux[Abs, File, Sandboxed]] =
-    forCurrentOS(parseAbsFile(_, s))
-
   def parseRelFile(os: OS, s: String): Option[Aux[Rel, File, Sandboxed]] =
     codecForOS(os).parseRelFile(s) >>= (p => sandboxFsPathIn(currentDir, Uniform(p)))
-
-  def parseSystemRelFile(s: String): OptionT[Task, Aux[Rel, File, Sandboxed]] =
-    forCurrentOS(parseRelFile(_, s))
 
   def parseFile(os: OS, s: String): Option[FsPath[File, Sandboxed]] =
     parseAbsFile(os, s).map(_.forgetBase) orElse parseRelFile(os, s).map(_.forgetBase)

@@ -33,11 +33,6 @@ package object matryoshka extends CoEnvInstances {
       Show[T[F]] =
     T.showT[F](F)
 
-  def elgotM[M[_]: Monad, F[_]: Traverse, A, B](a: A)(φ: F[B] => M[B], ψ: A => M[B \/ F[A]]):
-      M[B] = {
-    def h(a: A): M[B] = ψ(a) >>= (_.traverse(_.traverse(h) >>= φ).map(_.merge))
-    h(a)
-  }
   /** Algebra transformation that allows a standard algebra to be used on a
     * CoEnv structure (given a function that converts the leaves to the result
     * type).
@@ -76,31 +71,9 @@ package object matryoshka extends CoEnvInstances {
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
     free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
 
-  def freeGcataM[W[_]: Comonad: Traverse, M[_]: Monad, F[_]: Traverse, E, A](
-    free: Free[F, E])(
-    k: DistributiveLaw[CoEnv[E, F, ?], W],
-    φ: GAlgebraM[W, M, CoEnv[E, F, ?], A]):
-      M[A] =
-    free.ghyloM[W, Id, M, CoEnv[E, F, ?], A](k, distAna, φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
-
-  def distTraverse[F[_]: Traverse, G[_]: Applicative] =
-    new DistributiveLaw[F, G] {
-      def apply[A](fga: F[G[A]]) = fga.sequence
-    }
-
-  // TODO[matryoshka]: Should be an HMap instance
-  def coEnvHmap[F[_], G[_], A](f: F ~> G) =
-    λ[CoEnv[A, F, ?] ~> CoEnv[A, G, ?]](fa => CoEnv(fa.run.map(f(_))))
-
   // TODO[matryoshka]: Should be an HTraverse instance
   def coEnvHtraverse[G[_]: Applicative, F[_], H[_], A](f: F ~> (G ∘ H)#λ) =
     λ[CoEnv[A, F, ?] ~> (G ∘ CoEnv[A, H, ?])#λ](_.run.traverse(f(_)).map(CoEnv(_)))
-
-  def envtHmap[F[_], G[_], E, A](f: F ~> G) =
-    λ[EnvT[E, F, ?] ~> EnvT[E, G, ?]](env => EnvT((env.ask, f(env.lower))))
-
-  def envtHtraverse[G[_]: Applicative, F[_], H[_], A](f: F ~> (G ∘ H)#λ) =
-    λ[EnvT[A, F, ?] ~> (G ∘ EnvT[A, H, ?])#λ](_.run.traverse(f(_)).map(EnvT(_)))
 
   implicit final class CoEnvOps[T[_[_]], F[_], E](val self: T[CoEnv[E, F, ?]]) extends scala.AnyVal {
     final def fromCoEnv(implicit fa: Functor[F], tr: Recursive[T]): Free[F, E] =
@@ -158,8 +131,6 @@ package object matryoshka extends CoEnvInstances {
         case (x, fa) => fa.traverse(f).map(fb => EnvT((x, fb)))
       }
   }
-
-  def envtLowerNT[F[_], E]                  = λ[EnvT[E, F, ?] ~> F](_.lower)
 }
 
 trait LowPriorityCoEnvImplicits {

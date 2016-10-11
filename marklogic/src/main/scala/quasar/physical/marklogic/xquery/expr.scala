@@ -76,9 +76,6 @@ object expr {
     def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
       copy(orderSpecs = s :: IList.fromList(ss.toList))
 
-    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
-      orderBy(s, ss: _*).copy(orderIsStable = true)
-
     def return_(expr: XQuery): XQuery = {
       val forClause = {
         val bindings = tupleStreams map {

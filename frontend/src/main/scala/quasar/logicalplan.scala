@@ -500,7 +500,6 @@ object LogicalPlan {
   }
 
   def lpParaZygoHistoS[S, A, B] = lpParaZygoHistoM[State[S, ?], A, B] _
-  def lpParaZygoHisto[A, B] = lpParaZygoHistoM[Id, A, B] _
 
   /** The set of paths referenced in the given plan. */
   def paths(lp: Fix[LogicalPlan]): Set[FPath] =

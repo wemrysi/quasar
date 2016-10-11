@@ -22,7 +22,6 @@ import quasar.{BinaryFunc, Data, Func, GenericFunc, LogicalPlan, Reduction, Sema
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.fp.binder._
 import quasar.std.StdLib, StdLib._
 import quasar.sql.{SemanticAnalysis => SA}, SA._
@@ -171,10 +170,6 @@ trait Compiler[F[_]] {
       CompilerM[A] =
     StateT[M, CompilerState, A]((s: CompilerState) =>
       EitherT.eitherT(v.map(s -> _).point[F]))
-
-  private def whatif[S, A](f: StateT[M, S, A])(implicit m: Monad[F]):
-      StateT[M, S, A] =
-    read((s: S) => s).flatMap(oldState => f.imap(κ(oldState)))
 
   private def mod(f: CompilerState => CompilerState)(implicit m: Monad[F]):
       CompilerM[Unit] =

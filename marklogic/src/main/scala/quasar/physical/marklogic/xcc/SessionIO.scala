@@ -65,9 +65,6 @@ object SessionIO {
       .as(executed)
   }
 
-  def executeModule_(main: MainModule): SessionIO[Executed] =
-    executeModule(main, new RequestOptions)
-
   def evaluateQuery(query: XQuery, options: RequestOptions): SessionIO[QueryResults] =
     evaluateModule(defaultModule(query), options)
 
@@ -101,9 +98,6 @@ object SessionIO {
 
   def setTransactionMode(tm: Session.TransactionMode): SessionIO[Executed] =
     SessionIO(_.setTransactionMode(tm)).as(executed)
-
-  def transactionMode: SessionIO[Session.TransactionMode] =
-    SessionIO(_.getTransactionMode)
 
   def fail[A](t: Throwable): SessionIO[A] =
     liftT(Task.fail(t))

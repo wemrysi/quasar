@@ -157,9 +157,6 @@ object qscript {
       }
     }
 
-  def isDocumentNode(node: XQuery): XQuery =
-    xdmp.nodeKind(node) === "document".xs
-
   def length[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("length").qn[F] map { fname =>
       declare(fname)(

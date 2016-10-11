@@ -40,12 +40,6 @@ object EnvironmentError {
       case _ => None
     } (ConnectionFailed(_))
 
-  val insufficientPermissions: Prism[EnvironmentError, String] =
-    Prism[EnvironmentError, String] {
-      case InsufficientPermissions(msg) => Some(msg)
-      case _ => None
-    } (InsufficientPermissions(_))
-
   val invalidCredentials: Prism[EnvironmentError, String] =
     Prism[EnvironmentError, String] {
       case InvalidCredentials(msg) => Some(msg)

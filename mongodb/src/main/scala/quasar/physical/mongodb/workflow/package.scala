@@ -223,8 +223,6 @@ package object workflow {
 
     def applySelector(s: Selector): Selector = s.mapUpFields(PartialFunction(applyFieldName _))
 
-    def applyMap[A](m: ListMap[BsonField, A]): ListMap[BsonField, A] = m.map(t => applyFieldName(t._1) -> t._2)
-
     def applyNel[A](m: NonEmptyList[(BsonField, A)]): NonEmptyList[(BsonField, A)] = m.map(t => applyFieldName(t._1) -> t._2)
 
     def apply[A <: F[_]](op: A): A

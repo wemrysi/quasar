@@ -455,8 +455,6 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
-  private def stripQuotes(s:String) = s.substring(1, s.length-1)
-
   def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
     phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)

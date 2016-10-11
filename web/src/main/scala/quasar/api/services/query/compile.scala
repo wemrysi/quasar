@@ -16,7 +16,6 @@
 
 package quasar.api.services.query
 
-import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.api._, ToQResponse.ops._
@@ -44,11 +43,6 @@ object compile {
         case PhaseResult.Tree(name, value)   => value.asJson
         case PhaseResult.Detail(name, value) => value.asJson
       }
-
-    def dataResponse(data: List[Data]): QResponse[S] =
-      QResponse.string(Ok,
-        "Results\n" +
-          data.map(_.toJs.toList).flatten.map(_.toJs.pprint(0)).mkString("\n"))
 
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(

@@ -36,7 +36,6 @@ import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
 import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
-import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 object MongoDbQScriptPlanner {
@@ -756,12 +755,6 @@ object MongoDbQScriptPlanner {
     case x => -\/(FuncApply("", "64-bit integer", x.shows))
   }
 
-  // This is maybe worth putting in Matryoshka?
-  def findFirst[T[_[_]]: Recursive, F[_]: Functor: Foldable, A](
-    f: PartialFunction[T[F], A]):
-      CoalgebraM[A \/ ?, F, T[F]] =
-    tf => (f.lift(tf) \/> tf.project).swap
-
   object Roll {
     def unapply[S[_]: Functor, A](obj: Free[S, A]): Option[S[Free[S, A]]] =
       obj.resume.swap.toOption
@@ -769,33 +762,6 @@ object MongoDbQScriptPlanner {
 
   object Point {
     def unapply[S[_]: Functor, A](obj: Free[S, A]): Option[A] = obj.resume.toOption
-  }
-
-  def elideMoreGeneralGuards[T[_[_]]: Recursive](subType: Type):
-      CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] =>
-        PlannerError \/ CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] = {
-    case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
-      if (typ.contains(subType)) cont.project.right
-      else if (!subType.contains(typ))
-        InternalError("can only contain " + subType + ", but a(n) " + typ + " is expected").left
-      else free.right
-    case x => x.right
-  }
-
-  // TODO: Allow backends to provide a “Read” type to the typechecker, which
-  //       represents the type of values that can be stored in a collection.
-  //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
-  //       generate more correct PatternGuards in the first place, rather than
-  //       trying to strip out unnecessary ones after the fact
-  def assumeReadType[T[_[_]]: Recursive: Corecursive, F[_]: Functor](typ: Type)(
-    implicit QC: QScriptCore[T, ?] :<: F, R: Const[Read, ?] :<: F):
-      QScriptCore[T, T[F]] => PlannerError \/ F[T[F]] = {
-    case m @ qscript.Map(src, mf) =>
-      R.prj(src.project).fold(
-        QC.inj(m).right[PlannerError])(
-        κ(freeTransCataM(mf)(elideMoreGeneralGuards(typ)) ∘
-          (mf => QC.inj(qscript.Map(src, mf)))))
-    case qc => QC.inj(qc).right
   }
 
   type GenT[X[_], A]  = StateT[X, NameGen, A]

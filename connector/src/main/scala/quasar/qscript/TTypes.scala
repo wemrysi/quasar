@@ -167,12 +167,6 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
       }))
 
   def QScriptCore = {
-    // NB: all single-bucket reductions should reduce on `null`
-    def normalizeBucket(bucket: FreeMap): FreeMap = bucket.resume.fold({
-      case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
-      case _                    => bucket
-    }, κ(bucket))
-
     make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
       case Reduce(src, bucket, reducers, repair) => {
         val reducersOpt: List[Option[ReduceFunc[FreeMap]]] =

@@ -22,7 +22,7 @@ import scala.Predef.implicitly
 
 import java.lang.String
 
-import matryoshka._, FunctorT.ops._, Recursive.ops._
+import matryoshka._, Recursive.ops._
 import monocle.Prism
 import scalaz._
 
@@ -41,9 +41,6 @@ package object ejson {
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
-
-    def fromJsonT[T[_[_]]: FunctorT: Corecursive]: T[Json] => T[EJson] =
-      _.transAna(fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
 
     def fromCommon[T[_[_]]: Corecursive]: Common[T[EJson]] => T[EJson] =
       CommonEJson.inj(_).embed

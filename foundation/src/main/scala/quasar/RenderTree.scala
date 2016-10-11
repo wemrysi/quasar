@@ -28,7 +28,6 @@ import simulacrum.typeclass
 final case class RenderedTree(nodeType: List[String], label: Option[String], children: List[RenderedTree]) {
   def simpleType: Option[String] = nodeType.headOption
 
-  def relabel(f: String => String) = this.copy(label = label.map(f))
   def retype(f: List[String] => List[String]) = this.copy(nodeType = f(nodeType))
 
   /**

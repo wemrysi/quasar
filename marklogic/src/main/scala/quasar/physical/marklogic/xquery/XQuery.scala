@@ -38,7 +38,6 @@ sealed abstract class XQuery {
   def +(other: XQuery): XQuery = XQuery(s"$this + $other")
   def *(other: XQuery): XQuery = XQuery(s"$this * $other")
   def div(other: XQuery): XQuery = XQuery(s"$this div $other")
-  def idiv(other: XQuery): XQuery = XQuery(s"$this idiv $other")
   def mod(other: XQuery): XQuery = XQuery(s"$this mod $other")
   def and(other: XQuery): XQuery = XQuery(s"$this and $other")
   def or(other: XQuery): XQuery = XQuery(s"$this or $other")

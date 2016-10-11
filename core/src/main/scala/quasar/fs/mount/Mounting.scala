@@ -101,10 +101,6 @@ object Mounting {
     def viewsHavingPrefix(dir: ADir): F[Set[AFile]] =
       rPathsHavingPrefix(dir).map(_.foldMap(_.toSet))
 
-    /** The filesystems mounted at paths having the given prefix. */
-    def fsHavingPrefix(dir: ADir): F[Set[ADir]] =
-      rPathsHavingPrefix(dir).map(_.foldMap(_.swap.toSet))
-
     /** Whether the given path refers to a mount. */
     def exists(path: APath): F[Boolean] =
       lookupType(path).isDefined

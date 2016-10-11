@@ -144,15 +144,6 @@ object MongoDbPlanner {
         }
       }
 
-      def makeSimpleCall(func: String, args: List[JsCore]): JsCore =
-        Call(ident(func), args)
-
-      def makeSimpleBinop(op: BinaryOperator): Output =
-        Arity2(BinOp(op, _, _))
-
-      def makeSimpleUnop(op: UnaryOperator): Output =
-        Arity1(UnOp(op, _))
-
       ((func, args) match {
         // NB: this one is missing from MapFunc.
         case (ToId, _) => None

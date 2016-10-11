@@ -39,7 +39,6 @@ class Provenance[T[_[_]]: Corecursive: EqualT] {
   def projectField[A](mf: FreeMapA[T, A]) = tagIdentity("f", mf)
   def projectIndex[A](mf: FreeMapA[T, A]) = tagIdentity("i", mf)
   def shiftMap[A](mf: FreeMapA[T, A]) = tagIdentity("m", mf)
-  def shiftArray[A](mf: FreeMapA[T, A]) = tagIdentity("a", mf)
 
   def join[A](left: FreeMapA[T, A], right: FreeMapA[T, A]) =
     tagIdentity("j",

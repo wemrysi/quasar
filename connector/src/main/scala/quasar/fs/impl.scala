@@ -93,19 +93,6 @@ object impl {
     )
   }
 
-   def readFromDataCursor[S[_], F[_]: Functor, C](
-    open: (AFile, ReadOpts) => Free[S, FileSystemError \/ C]
-  )(implicit
-    C:  DataCursor[F, C],
-    S0: F :<: S,
-    S1: KeyValueStore[ReadFile.ReadHandle, C, ?] :<: S,
-    S2: MonotonicSeq :<: S
-  ): ReadFile ~> Free[S, ?] =
-    read[S, C](
-      open,
-      c => lift(C.nextChunk(c).map(_.right[FileSystemError].strengthL(c))).into[S],
-      c => lift(C.close(c)).into[S])
-
   type ReadStream[F[_]] = Process[F, FileSystemError \/ Vector[Data]]
 
   def readFromProcess[S[_], F[_]: Monad: Catchable](

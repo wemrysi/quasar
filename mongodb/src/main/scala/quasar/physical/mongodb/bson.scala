@@ -248,9 +248,7 @@ sealed trait BsonField {
   def asField : String = "$" + asText
   def asVar   : String = "$$" + asText
 
-  def bson      = Bson.Text(asText)
-  def bsonField = Bson.Text(asField)
-  def bsonVar   = Bson.Text(asVar)
+  def bson = Bson.Text(asText)
 
   import BsonField._
 
