@@ -73,7 +73,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "core.map" in {
       newSc.map ( sc => {
         val qscore = Planner.qscriptCore[Fix]
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -81,7 +81,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
         ))
 
-        def func: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("country"))
+        def func: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
         val map = quasar.qscript.Map(src, func)
 
         val state: SparkState[RDD[Data]] = alg(map)
@@ -103,7 +103,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "core.reduce" in {
       newSc.map ( sc => {
         val qscore = Planner.qscriptCore[Fix]
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -111,9 +111,9 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
         ))
 
-        def bucket: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("country"))
-        def reducers: List[ReduceFunc[FreeMap[Fix]]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
-        def repair: Free[MapFunc[Fix, ?], ReduceIndex] = Free.point(ReduceIndex(0))
+        def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+        def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
+        def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
         val reduce = Reduce(src, bucket, reducers, repair)
 
         val state: SparkState[RDD[Data]] = alg(reduce)
