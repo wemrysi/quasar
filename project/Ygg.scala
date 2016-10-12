@@ -39,12 +39,14 @@ object Ygg {
     .dependsOn('foundation % BothScopes, 'frontend)
     .settings(name := "quasar-macros-internal")
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+    .settings(scalacOptions += "-language:experimental.macros")
   )
 
   def macros1(p: Project): Project = ( p
     .dependsOn('foundation % BothScopes)
     .settings(name := "quasar-macros1-internal")
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+    .settings(scalacOptions += "-language:experimental.macros")
   )
 
   def ygg(p: Project): Project = ( p

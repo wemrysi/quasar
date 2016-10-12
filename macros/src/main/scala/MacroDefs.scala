@@ -18,7 +18,6 @@ package ygg.macros
 
 import quasar.Predef._
 import scala.{ Any, StringContext }
-import scala.language.experimental.macros
 import jawn.Facade
 
 class JsonStringContexts[A] {

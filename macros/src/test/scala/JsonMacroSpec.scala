@@ -16,7 +16,6 @@
 
 package quasar.macros
 
-import scala.language.experimental.macros
 import scala.{ Any, StringContext }
 import scala.reflect.ClassTag
 import scala.Predef.implicitly

@@ -18,7 +18,6 @@ package ygg.macros
 
 import quasar.Predef._
 import scala.{ Any, StringContext }
-import scala.language.experimental.{ macros => mmmms }
 import ygg.json._
 
 object Json {
