@@ -22,6 +22,40 @@ import ygg._, common._, data._, json._, trans._
 import org.mapdb._
 import JDBM._
 
+final case class JDBMState(prefix: String, fdb: Option[jFile -> DB], indices: IndexMap, insertCount: Long) {
+  def commit() = fdb foreach { _._2.commit() }
+
+  def closed(): JDBMState = fdb match {
+    case Some((f, db)) =>
+      db.close()
+      JDBMState(prefix, None, indices, insertCount)
+    case None => this
+  }
+
+  def opened(): (jFile, DB, JDBMState) = fdb match {
+    case Some((f, db)) => (f, db, this)
+    case None          =>
+      // Open a JDBM3 DB for use in sorting under a temp directory
+      val dbFile = new jFile(newScratchDir(), prefix)
+      val db     = DBMaker.fileDB(dbFile.getCanonicalPath).make()
+      (dbFile, db, JDBMState(prefix, Some((dbFile, db)), indices, insertCount))
+  }
+}
+object JDBMState {
+  def empty(prefix: String) = JDBMState(prefix, None, Map(), 0l)
+}
+
+final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
+
+private object addGlobalIdScanner extends Scanner {
+  type A = Long
+  val init = 0l
+  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
+    val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
+    (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
+  }
+}
+
 trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
@@ -29,40 +63,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     import SliceTransform._
 
     lazy val sortMergeEngine = new MergeEngine
-
-    case class JDBMState(prefix: String, fdb: Option[jFile -> DB], indices: IndexMap, insertCount: Long) {
-      def commit() = fdb foreach { _._2.commit() }
-
-      def closed(): JDBMState = fdb match {
-        case Some((f, db)) =>
-          db.close()
-          JDBMState(prefix, None, indices, insertCount)
-        case None => this
-      }
-
-      def opened(): (jFile, DB, JDBMState) = fdb match {
-        case Some((f, db)) => (f, db, this)
-        case None          =>
-          // Open a JDBM3 DB for use in sorting under a temp directory
-          val dbFile = new jFile(newScratchDir(), prefix)
-          val db     = DBMaker.fileDB(dbFile.getCanonicalPath).make()
-          (dbFile, db, JDBMState(prefix, Some((dbFile, db)), indices, insertCount))
-      }
-    }
-    object JDBMState {
-      def empty(prefix: String) = JDBMState(prefix, None, Map(), 0l)
-    }
-
-    case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
-
-    object addGlobalIdScanner extends Scanner {
-      type A = Long
-      val init = 0l
-      def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
-        val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
-        (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
-      }
-    }
 
     def addGlobalId(spec: TransSpec1) = {
       Scan(WrapArray(spec), addGlobalIdScanner)
