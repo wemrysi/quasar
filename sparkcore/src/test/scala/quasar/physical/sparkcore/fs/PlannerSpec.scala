@@ -17,26 +17,20 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.console
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
 import quasar.qscript.ReduceFuncs._
 import quasar.qscript.MapFuncs._
 import quasar.contrib.pathy._
 import quasar.Data
-import quasar.DataCodec
 import quasar.qscript._
-
-// Required for shapeless cast functionality (l.cast[Data.Obj])
-import scala.Predef.classOf
 
 import matryoshka.{Hole => _, _}
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.specs2.scalaz.DisjunctionMatchers
 import pathy.Path._
-import scalaz._, Scalaz._, scalaz.concurrent.Task
-import shapeless.{Const => _, _}, shapeless.syntax.typeable._
+import scalaz._, scalaz.concurrent.Task
 
 class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
 
@@ -418,12 +412,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             rdd.collect.toList must_== List(
               Data.Obj(ListMap(
-                "left" ->  Data.Null,
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
-              )),
-              Data.Obj(ListMap(
                 "left" ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
                 "right" -> Data.Null
+              )),
+              Data.Obj(ListMap(
+                "left" ->  Data.Null,
+                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
               )),
               Data.Obj(ListMap(
                 "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -445,21 +439,11 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       sc.parallelize(List())
     }
 
-  private def withSparkContext[A](f: SparkContext => Task[A]): Task[A] = for {
-    uriStr <- console.readEnv("QUASAR_SPARK_LOCAL").getOrElseF(Task.fail(new scala.Exception("Could not read spark environment variable")))
-    // TODO[quicklens]: Consider using this implementation once https://github.com/adamw/quicklens/issues/29 has been fixed
-    // uriData.when[Data.Obj].at("sparklocal").when[Data.Obj].at("connectionUri").when[Data.Str].get
-    masterAndRoot <- OptionT((for {
-      uriData <- DataCodec.parse(uriStr)(DataCodec.Precise).toOption
-      uriObj  <- uriData.cast[Data.Obj]
-      slData  <- uriObj.value.get("sparklocal")
-      slObj   <- slData.cast[Data.Obj]
-      uri     <- slObj.value.get("connectionUri").flatMap(_.cast[Data.Str])
-    } yield uri.value).point[Task]).getOrElseF(Task.fail(new scala.Exception("Could not parse spark configuration")))
-    master = masterAndRoot.split('|')(0)
-    config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
-    sc     <- Task.delay(new SparkContext(config))
-    result <- f(sc)
-    _      <- Task.delay(sc.stop)
-  } yield result
+  private def withSparkContext[A](f: SparkContext => Task[A]): Task[A] = {
+    val config = new SparkConf().setMaster("local").setAppName("PlannerSpec")
+    for {
+      sc     <- Task.delay(new SparkContext(config))
+      result <- f(sc).onFinish(_ => Task.delay(sc.stop))
+    } yield result
+  }
 }
