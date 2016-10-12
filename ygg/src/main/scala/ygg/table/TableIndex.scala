@@ -20,8 +20,6 @@ import scala.Predef.$conforms
 import ygg.common._
 import scalaz._, Scalaz._
 import ygg.data._
-import trans.{ TransSpec1 }
-import SliceTransform.composeSliceTransform
 
 class TableIndex(private[table] val indices: List[SliceIndex]) {
 

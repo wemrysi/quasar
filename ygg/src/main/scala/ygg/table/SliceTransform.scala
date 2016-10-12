@@ -21,8 +21,6 @@ import scalaz._, Scalaz._
 import ConcatHelpers._
 import scala.Predef.assert
 
-trait SliceTransforms extends TableModule
-
 object SliceTransform {
   def identity[A](initial: A) = SliceTransform1.liftM[A](initial, (a: A, s: Slice) => (a, s))
   def left[A](initial: A)     = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sl))

@@ -60,8 +60,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
   trait BlockStoreColumnarTableCompanion extends ColumnarTableCompanion {
-    import SliceTransform._
-
     lazy val sortMergeEngine = new MergeEngine
 
     def addGlobalId(spec: TransSpec1) = {
@@ -774,7 +772,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
   class ExternalTable(slices: NeedSlices, size: TableSize) extends Table(slices, size) {
     import Table.{ Table => _, _ }
-    import SliceTransform.composeSliceTransform
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 

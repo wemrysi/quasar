@@ -17,7 +17,8 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg._, common._, data._, json._, table._, trans._
+import ygg._, common._, data._, json._, table._
+import trans.DerefObjectStatic
 
 abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   self =>

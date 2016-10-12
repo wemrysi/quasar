@@ -18,7 +18,6 @@ package ygg.table
 
 import scalaz._, Scalaz._
 import ygg.common._
-import trans._
 
 object Sampling {
   private def rng: scala.util.Random = scala.util.Random

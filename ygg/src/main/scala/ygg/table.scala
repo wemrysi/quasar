@@ -20,6 +20,10 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 package object table {
+  type TransSpec1                 = trans.TransSpec1
+  type TransSpec[A <: SourceType] = trans.TransSpec[A]
+  type SourceType                 = trans.SourceType
+
   type NeedSlices = NeedStreamT[Slice]
   type NeedTable  = Need[Table]
   type RowId      = Int
@@ -28,6 +32,9 @@ package object table {
   type ColumnMap  = Map[ColumnRef, Column]
 
   val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
+
+  def composeSliceTransform(spec: TransSpec1): SliceTransform1[_]             = SliceTransform.composeSliceTransform(spec)
+  def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = SliceTransform.composeSliceTransform2(spec)
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
     0 until prefixLength foreach { i =>

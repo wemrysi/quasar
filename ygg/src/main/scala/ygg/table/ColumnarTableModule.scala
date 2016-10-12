@@ -26,7 +26,7 @@ final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
 }
 
-trait ColumnarTableModule extends TableModule with SliceTransforms {
+trait ColumnarTableModule extends TableModule {
   outer =>
 
   import trans._
@@ -296,8 +296,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms {
     self: Table =>
 
     type Table = outer.Table
-
-    import SliceTransform._
 
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
 
