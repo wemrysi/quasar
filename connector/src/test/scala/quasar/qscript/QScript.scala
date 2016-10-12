@@ -315,7 +315,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))).embed,
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed).embed).embed) must
       equal(chain(
-        RootR,
+        QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
@@ -338,7 +338,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed,
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))).embed).embed).embed).embed) must
       equal(chain(
-        RootR,
+        QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(

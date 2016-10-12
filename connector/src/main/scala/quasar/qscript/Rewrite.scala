@@ -28,7 +28,10 @@ import matryoshka._,
   FunctorT.ops._,
   TraverseT.nonInheritedOps._
 import matryoshka.patterns._
-import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject.{ reflexiveInjectInstance => _, _ }, Leibniz._
+import scalaz.{:+: => _, Divide => _, _},
+  Inject.{ reflexiveInjectInstance => _, _ },
+  Leibniz._,
+  Scalaz._
 
 class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] {
   private val UnrefedSrc: QScriptTotal[FreeQS] =
@@ -100,6 +103,12 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
                 case LeftSide  => mf1
                 case RightSide => HoleF
               })))
+          case (Some(Unreferenced()), _) =>
+            rebase(r)(src) >>= (
+              tf => combine.traverseM[Option, Hole] {
+                case LeftSide  => None
+                case RightSide => HoleF.some
+              } ∘ (comb => QC.inj(Map(tf, comb))))
           // only the left side references the source
           case (_, Some(Map(-\/(src2), mf2))) if src2 ≟ UnrefedSrc =>
             rebase(l)(src).map(
@@ -107,6 +116,12 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
                 case LeftSide  => HoleF
                 case RightSide => mf2
               })))
+          case (_, Some(Unreferenced())) =>
+            rebase(l)(src) >>= (
+              tf => combine.traverseM[Option, Hole] {
+                case LeftSide  => HoleF.some
+                case RightSide => None
+              } ∘ (comb => QC.inj(Map(tf, comb))))
           case (_, _) => None
         }
       // one side maps over the src while the other passes the src untouched
@@ -116,6 +131,11 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
             case LeftSide  => mf1
             case RightSide => HoleF
           })).some
+        case Some(Unreferenced()) =>
+          combine.traverseM[Option, Hole] {
+            case LeftSide  => None
+            case RightSide => HoleF.some
+          } ∘ (comb => QC.inj(Map(src, comb)))
         case _ => None
       }
       // the other side maps over the src while the one passes the src untouched
@@ -125,6 +145,11 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
             case LeftSide  => HoleF
             case RightSide => mf2
           })).some
+        case Some(Unreferenced()) =>
+          combine.traverseM[Option, Hole] {
+            case LeftSide  => HoleF.some
+            case RightSide => None
+          } ∘ (comb => QC.inj(Map(src, comb)))
         case _ => None
       }
       // both sides are the src
@@ -211,9 +236,9 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
       F[T[G]] => G[T[G]] =
     repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
+      liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       repeatedly(C.coalesceQC[G](prism)) ⋙
       liftFG(injectRepeatedly(C.coalesceTJ[G](prism.get))) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
   def normalizeCoEnv[F[_]: Traverse: Normalizable](

@@ -181,6 +181,12 @@ object Coalesce {
           })
         case LeftShift(Embed(src), struct, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
+            case LeftShift(innerSrc, innerStruct, innerRepair)
+                if !shiftRepair.element(LeftSide) && struct != HoleF =>
+              LeftShift(
+                FToOut.reverseGet(QC.inj(LeftShift(innerSrc, innerStruct, struct >> innerRepair))).embed,
+                HoleF,
+                shiftRepair).some
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)

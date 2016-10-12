@@ -64,7 +64,7 @@ object QueryFile {
     //       so we don’t duplicate work.
     lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
       .cataM[PlannerError \/ ?, (Ann[T], T[QS])](newLP => transform.lpToQScript(newLP.map(_ ∘ (_.transCata(eval)))))
-      .map(qs => QC.inj((transform.reifyResult(qs._1, qs._2))).embed.transCata(eval))
+      .map(qs => QC.inj((transform.reifyResult(qs._1, qs._2))).embed.transAna(eval))
   }
 
   def simplifyAndNormalize
@@ -85,8 +85,8 @@ object QueryFile {
     _.transAna(SP.simplifyProjection)
       // TODO: Rather than explicitly applying multiple times, we should apply
       //       repeatedly until unchanged.
-      .transCata(rewrite.normalize)
-      .transCata(rewrite.normalize)
+      .transAna(rewrite.normalize)
+      .transAna(rewrite.normalize)
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
