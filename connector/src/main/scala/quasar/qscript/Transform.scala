@@ -138,8 +138,9 @@ class Transform
       rebaseBranch(rightF, rMap))
   }
 
-  private case class AutoJoinResult(src: T[F], buckets: List[FreeMap], lval: FreeMap, rval: FreeMap)
-  private case class AutoJoin3Result(src: T[F], buckets: List[FreeMap], lval: FreeMap, cval: FreeMap, rval: FreeMap)
+  private case class AutoJoinBase(src: T[F], buckets: List[FreeMap])
+  private case class AutoJoinResult(base: AutoJoinBase, lval: FreeMap, rval: FreeMap)
+  private case class AutoJoin3Result(base: AutoJoinBase, lval: FreeMap, cval: FreeMap, rval: FreeMap)
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -163,21 +164,25 @@ class Transform
 
       val commonBuck = concatBuckets(commonProv)
 
-      val condition = commonBuck.fold(
+      val condition: JoinFunc = commonBuck.fold(
         BoolLit[T, JoinSide](true))( // when both sides are empty, perform a full cross
         c => Free.roll[MapFunc, JoinSide](Eq(
           c._1.map(κ(LeftSide)),
           c._1.map(κ(RightSide)))))
 
-      AutoJoinResult(TJ.inj(ThetaJoin(merged.src, merged.lval, merged.rval, condition, Inner, combine)).embed,
-        prov.joinProvenances(
-          lann.provenance.map(_ >> lacc),
-          rann.provenance.map(_ >> racc)),
+      val base = AutoJoinBase(
+        TJ.inj(ThetaJoin(merged.src, merged.lval, merged.rval, condition, Inner, combine)).embed,
+          prov.joinProvenances(
+            lann.provenance.map(_ >> lacc),
+            rann.provenance.map(_ >> racc)))
+
+      AutoJoinResult(
+        base,
         lann.values >> lacc,
         rann.values >> racc)
     } (qs =>
-      AutoJoinResult(qs.embed,
-        lann.provenance.map(_ >> lacc),
+      AutoJoinResult(
+        AutoJoinBase(qs.embed, lann.provenance.map(_ >> lacc)),
         lann.values >> lacc,
         rann.values >> racc))
   }
@@ -187,15 +192,15 @@ class Transform
     */
   private def autojoin3(left: Target[F], center: Target[F], right: Target[F]):
       AutoJoin3Result = {
-    val AutoJoinResult(lsrc, lbuckets, lval, cval) =
+    val AutoJoinResult(AutoJoinBase(lsrc, lbuckets), lval, cval) =
       autojoin(left, center)
-    val AutoJoinResult(fullSrc, fullBuckets, bval, rval) =
+    val AutoJoinResult(base, bval, rval) =
       autojoin(Target(Ann(lbuckets, HoleF), lsrc), right)
 
     // the holes in `bval` reference `fullSrc`
     // so we replace the holes in `lval` with `bval` because the holes in `lval >> bval` must reference `fullSrc`
     // and `bval` applied to `fullSrc` gives us access to `lsrc`, so we apply `lval` after `bval`
-    AutoJoin3Result(fullSrc, fullBuckets, lval >> bval, cval >> bval, rval)
+    AutoJoin3Result(base, lval >> bval, cval >> bval, rval)
   }
 
   private def merge2Map(
@@ -203,14 +208,14 @@ class Transform
     func: (FreeMap, FreeMap) => MapFunc[FreeMap]):
       Target[F] = {
     val join: AutoJoinResult = autojoin(values(0), values(1))
-    concatBuckets(join.buckets) match {
+    concatBuckets(join.base.buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(join.lval, join.rval)))
         Target(Ann(newBucks.list.toList.map(_ >> b), v),
-          QC.inj(Map(join.src, merged)).embed)
+          QC.inj(Map(join.base.src, merged)).embed)
       }
       case None =>
-        Target(EmptyAnn[T], QC.inj(Map(join.src, Free.roll(func(join.lval, join.rval)))).embed)
+        Target(EmptyAnn[T], QC.inj(Map(join.base.src, Free.roll(func(join.lval, join.rval)))).embed)
     }
   }
 
@@ -220,15 +225,15 @@ class Transform
     func: (FreeMap, FreeMap, FreeMap) => MapFunc[FreeMap]):
       Target[F] = {
     val join: AutoJoin3Result = autojoin3(values(0), values(1), values(2))
-    concatBuckets(join.buckets) match {
+    concatBuckets(join.base.buckets) match {
       case Some((bucks, newBucks)) => {
         val (merged, b, v) = concat(bucks, Free.roll(func(join.lval, join.cval, join.rval)))
         Target(Ann(newBucks.list.toList.map(_ >> b), v),
-          QC.inj(Map(join.src, merged)).embed)
+          QC.inj(Map(join.base.src, merged)).embed)
       }
       case None =>
         Target(EmptyAnn[T],
-          QC.inj(Map(join.src, Free.roll(func(join.lval, join.cval, join.rval)))).embed)
+          QC.inj(Map(join.base.src, Free.roll(func(join.lval, join.cval, join.rval)))).embed)
     }
   }
 
@@ -329,10 +334,10 @@ class Transform
             Free.point[MapFunc, JoinSide](RightSide))
 
         Target(Ann(
-          NullLit[T, Hole]() :: join.buckets.map(_ >> leftAccess),
+          NullLit[T, Hole]() :: join.base.buckets.map(_ >> leftAccess),
           rightAccess),
           QC.inj(LeftShift(
-            join.src,
+            join.base.src,
             Free.roll(Range(join.lval, join.rval)),
             sides)).embed)
     }
@@ -376,7 +381,7 @@ class Transform
 
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
-    join.buckets.tailOption.fold(Target(EmptyAnn[T], join.src)) { tail =>
+    join.base.buckets.tailOption.fold(Target(EmptyAnn[T], join.base.src)) { tail =>
       concatBuckets(tail) match {
         case Some((newProvs, provAccess)) =>
           Target(Ann(
@@ -509,13 +514,13 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      Target(Ann(join.buckets, HoleF[T]),
-        PB.inj(BucketField(join.src, join.lval, join.rval)).embed).right
+      Target(Ann(join.base.buckets, HoleF[T]),
+        PB.inj(BucketField(join.base.src, join.lval, join.rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      Target(Ann(join.buckets, HoleF[T]),
-        PB.inj(BucketIndex(join.src, join.lval, join.rval)).embed).right
+      Target(Ann(join.base.buckets, HoleF[T]),
+        PB.inj(BucketIndex(join.base.src, join.lval, join.rval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Mapping =>
@@ -544,7 +549,7 @@ class Transform
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoin3Result(src, bucketsSrc, ordering, buckets, directions) =
+      val AutoJoin3Result(AutoJoinBase(src, bucketsSrc), ordering, buckets, directions) =
         autojoin3(a1, a2, a3)
 
       val bucketsList: List[FreeMap] = buckets.toCoEnv[T].project match {
@@ -579,8 +584,8 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      Target(Ann(join.buckets, HoleF[T]),
-        QC.inj(Map(QC.inj(Filter(join.src, join.rval)).embed, join.lval)).embed).right
+      Target(Ann(join.base.buckets, HoleF[T]),
+        QC.inj(Map(QC.inj(Filter(join.base.src, join.rval)).embed, join.lval)).embed).right
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Squashing =>
@@ -605,7 +610,7 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(set.GroupBy, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
-      Target(Ann(prov.swapProvenances(join.rval :: join.buckets), join.lval), join.src).right
+      Target(Ann(prov.swapProvenances(join.rval :: join.base.buckets), join.lval), join.base.src).right
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
