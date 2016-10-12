@@ -17,8 +17,9 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar.{Data, Func, UnaryFunc, GenericFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
+
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, Validation.success
 import shapeless.{Data => _, _}
@@ -57,15 +58,63 @@ trait DateLib extends Library {
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
-  val Extract = BinaryFunc(
-    Mapping,
-    "date_part",
-    "Pulls out a part of the date. The first argument is one of the strings defined for Postgres’ `date_type function. This is a partial function – using an unsupported string has undefined results.",
-    Type.Numeric,
-    Func.Input2(Type.Str, Type.Temporal),
-    noSimplification,
-    constTyper[nat._2](Type.Numeric),
-    basicUntyper)
+
+  private def extract(name: String, help: String) =
+    UnaryFunc(
+      Mapping, name, help,
+      Type.Numeric,
+      Func.Input1(Type.Temporal),
+      noSimplification,
+      constTyper[nat._1](Type.Numeric),
+      basicUntyper)
+
+  val ExtractCentury      = extract("extract_century",
+    "Pulls out the century subfield from a date/time value (currently year/100).")
+  val ExtractDayOfMonth   = extract("extract_day_of_month",
+    "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
+  val ExtractDecade       = extract("extract_decade",
+    "Pulls out the decade subfield from a date/time value (year/10).")
+  val ExtractDayOfWeek    = extract("extract_day_of_week",
+    "Pulls out the day of week (`dow`) subfield from a date/time value " +
+    "(Sunday: 0 to Saturday: 7).")
+  val ExtractDayOfYear    = extract("extract_day_of_year",
+    "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
+  val ExtractEpoch        = extract("extract_epoch",
+    "Pulls out the epoch subfield from a date/time value. For dates and " +
+    "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
+    "For intervals, the number of seconds in the interval.")
+  val ExtractHour         = extract("extract_hour",
+    "Pulls out the hour subfield from a date/time value (0-23).")
+  val ExtractIsoDayOfWeek       = extract("extract_iso_day_of_week",
+    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
+    "(Monday: 1 to Sunday: 7).")
+  val ExtractIsoYear      = extract("extract_iso_year",
+    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
+    "on the first week containing Jan. 4).")
+  val ExtractMicroseconds = extract("extract_microseconds",
+    "Pulls out the microseconds subfield from a date/time value (including seconds).")
+  val ExtractMillennium    = extract("extract_millennium",
+    "Pulls out the millennium subfield from a date/time value (currently year/1000).")
+  val ExtractMilliseconds = extract("extract_milliseconds",
+    "Pulls out the milliseconds subfield from a date/time value (including seconds).")
+  val ExtractMinute       = extract("extract_minute",
+    "Pulls out the minute subfield from a date/time value (0-59).")
+  val ExtractMonth        = extract("extract_month",
+    "Pulls out the month subfield from a date/time value (1-12).")
+  val ExtractQuarter      = extract("extract_quarter",
+    "Pulls out the quarter subfield from a date/time value (1-4).")
+  val ExtractSecond = extract("extract_second",
+    "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
+  val ExtractTimezone = extract("extract_timezone",
+    "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
+  val ExtractTimezoneHour = extract("extract_timezone_hour",
+    "Pulls out the hour component of the timezone subfield from a date/time value.")
+  val ExtractTimezoneMinute = extract("extract_timezone_minute",
+    "Pulls out the minute component of the timezone subfield from a date/time value.")
+  val ExtractWeek = extract("extract_week",
+    "Pulls out the week subfield from a date/time value (1-53).")
+  val ExtractYear = extract("extract_year",
+    "Pulls out the year subfield from a date/time value.")
 
   val Date = UnaryFunc(
     Mapping,
@@ -146,9 +195,14 @@ trait DateLib extends Library {
     basicUntyper)
 
   def unaryFunctions: List[GenericFunc[nat._1]] =
+    ExtractCentury :: ExtractDayOfMonth :: ExtractDecade :: ExtractDayOfWeek ::
+    ExtractDayOfYear :: ExtractEpoch :: ExtractHour :: ExtractIsoDayOfWeek ::
+    ExtractIsoYear :: ExtractMicroseconds :: ExtractMillennium ::
+    ExtractMilliseconds :: ExtractMinute :: ExtractMonth :: ExtractQuarter ::
+    ExtractSecond :: ExtractWeek :: ExtractYear ::
     Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil
 
-  def binaryFunctions: List[GenericFunc[nat._2]] = Extract :: Nil
+  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
   def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 

@@ -65,8 +65,8 @@ abstract class DiscoverPathInstances {
       : T[OUT] =
     elems.foldRight1(
       (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[OUT]]()).embed,
-        elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
-        acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
+        elem.cata[FreeQS[T]](g => Free.roll(FI.inject(g))),
+        acc.cata[FreeQS[T]](g => Free.roll(FI.inject(g))))).embed)
 
   private def makeRead[T[_[_]], F[_]]
     (dir: ADir, file: FileName)
@@ -224,12 +224,9 @@ abstract class DiscoverPathInstances {
         case Union(src, lb, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Union(s, l, r)))
-        case Take(src, lb, rb) if !src.isThat =>
+        case Subset(src, lb, sel, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Take(s, l, r)))
-        case Drop(src, lb, rb) if !src.isThat =>
-          convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Drop(s, l, r)))
+            QC.inj(Subset(s, l, sel, r)))
 
         case x => x.traverse(unionAll(g)) ∘ (in => \&/-(QC.inj(in).embed))
       }

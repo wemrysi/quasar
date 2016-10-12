@@ -1,0 +1,4 @@
+- use “result pointers” properly
+- expand `Coalesce` to cover cases with different constraints on the coproduct
+- generalize `coalesceSR` (née `transformIncludeToExclude`) to handle branches and Reduce nodes
+- convert many more normalizations to return `Option` (and be applied repeatedly)

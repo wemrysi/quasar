@@ -29,24 +29,25 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait QScriptHelpers {
+trait QScriptHelpers extends TTypes[Fix] {
   type QS[A] =
-    (QScriptCore[Fix, ?] :\:
-      ThetaJoin[Fix, ?] :\:
+    (QScriptCore :\:
+      ThetaJoin :\:
       Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  type QST[A] = QScriptTotal[Fix, A]
-
-  val DE =     implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  =        implicitly[Const[Read, ?] :<: QS]
-  val QC =   implicitly[QScriptCore[Fix, ?] :<: QS]
-  val TJ =     implicitly[ThetaJoin[Fix, ?] :<: QS]
-  implicit val QS: Injectable.Aux[QS, QScriptTotal[Fix, ?]] =
-    ::\::[QScriptCore[Fix, ?]](
-      ::\::[ThetaJoin[Fix, ?]](
+  implicit val QS: Injectable.Aux[QS, QST] =
+    ::\::[QScriptCore](
+      ::\::[ThetaJoin](
         ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
 
-  def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
+  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
+  val R  =    implicitly[Const[Read, ?] :<: QS]
+  val QC =       implicitly[QScriptCore :<: QS]
+  val TJ =         implicitly[ThetaJoin :<: QS]
+
+  type QST[A] = QScriptTotal[A]
+
+  def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
@@ -54,15 +55,14 @@ trait QScriptHelpers {
 
   val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
   val RT  =        implicitly[Const[Read, ?] :<: QST]
-  val QCT =   implicitly[QScriptCore[Fix, ?] :<: QST]
-  val TJT =     implicitly[ThetaJoin[Fix, ?] :<: QST]
-  val EJT =      implicitly[EquiJoin[Fix, ?] :<: QST]
-  val PBT = implicitly[ProjectBucket[Fix, ?] :<: QST]
+  val QCT =           implicitly[QScriptCore :<: QST]
+  val TJT =             implicitly[ThetaJoin :<: QST]
+  val EJT =              implicitly[EquiJoin :<: QST]
+  val PBT =         implicitly[ProjectBucket :<: QST]
   val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
-  def ProjectFieldR[A](
-    src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
-      Free[MapFunc[Fix, ?], A] =
+  def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
     Free.roll(ProjectField(src, field))
 
   def lpRead(path: String): Fix[LP] =

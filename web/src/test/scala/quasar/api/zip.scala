@@ -16,6 +16,7 @@
 
 package quasar.api
 
+import scala.Predef.$conforms
 import quasar.fp.numeric._
 
 import org.scalacheck.Arbitrary

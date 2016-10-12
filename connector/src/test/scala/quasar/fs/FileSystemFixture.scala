@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._

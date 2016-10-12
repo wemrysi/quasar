@@ -44,7 +44,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
   def interpName = "Mounter"
 
   def interpret = {
-    val mm = Mounter[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
+    val mm = Mounter.kvs[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
 
     val interpEff =
       mm :+: injectFT[MountingFailure, MEff] :+: injectFT[PathMismatchFailure, MEff]
