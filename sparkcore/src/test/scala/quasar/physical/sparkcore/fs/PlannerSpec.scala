@@ -41,8 +41,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   val equi = Planner.equiJoin[Fix]
   val sr = Planner.shiftedread[Fix]
   val qscore = Planner.qscriptCore[Fix]
-  def compileCore: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
-  def compileJoin: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+  def compileCore: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+  def compileJoin: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
 
   "Planner" should {
     "shiftedread" in {
