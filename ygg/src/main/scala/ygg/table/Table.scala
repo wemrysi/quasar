@@ -65,7 +65,6 @@ trait Table {
 
   type NeedTable = Need[Table]
   type Table >: this.type <: ygg.table.Table
-  type Companion <: TableCompanion[Table]
 
   def companion: TableCompanion[Table]
 
