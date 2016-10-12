@@ -87,9 +87,9 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * Despite being in M, the TableIndex will be eagerly constructed
       * as soon as the underlying slices are available.
       */
-    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
+    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
 
-      def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
+      def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[Need, SliceIndex]): Need[TableIndex] =
         stream.uncons flatMap {
           case None             => Need(new TableIndex(buf.toList))
           case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
@@ -267,7 +267,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * Despite being in M, the SliceIndex will be eagerly constructed
       * as soon as the underlying Slice is available.
       */
-    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
+    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): Need[SliceIndex] = {
 
       val sts = groupKeys.map(composeSliceTransform).toArray
       val vt  = composeSliceTransform(valueSpec)
@@ -287,7 +287,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * necessary to associate them into the maps and sets we
       * ultimately need to construct the SliceIndex.
       */
-    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): M[SliceIndex] = {
+    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): Need[SliceIndex] = {
       val numKeys = sts.length
       val n       = slice.size
       val vals    = scmMap[Int, scmSet[RValue]]()

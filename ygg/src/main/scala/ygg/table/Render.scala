@@ -23,15 +23,15 @@ import java.lang.Character.{ codePointAt, forDigit }
 object Render {
   def renderTable(table: Table, prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
     val slices = table.slices
-    def wrap(stream: StreamT[M, CharBuffer]) = {
+    def wrap(stream: StreamT[Need, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") charBuffer(prefix) :: stream
       else if (prefix == "") stream ++ singleStreamT(charBuffer(suffix))
       else charBuffer(prefix) :: (stream ++ singleStreamT(charBuffer(suffix)))
     }
 
-    def foldFlatMap(slices: NeedSlices, rendered: Boolean): StreamT[M, CharBuffer] = {
-      StreamT[M, CharBuffer](slices.step map {
+    def foldFlatMap(slices: NeedSlices, rendered: Boolean): StreamT[Need, CharBuffer] = {
+      StreamT[Need, CharBuffer](slices.step map {
         case StreamT.Skip(tail)         => StreamT.Skip(foldFlatMap(tail(), rendered))
         case StreamT.Done               => StreamT.Done
         case StreamT.Yield(slice, tail) =>
@@ -45,7 +45,7 @@ object Render {
     wrap(foldFlatMap(slices, false))
   }
 
-  def renderSlice(self: Slice, delimiter: String): (StreamT[M, CharBuffer], Boolean) = {
+  def renderSlice(self: Slice, delimiter: String): (StreamT[Need, CharBuffer], Boolean) = {
     import self._
 
     if (columns.isEmpty) {

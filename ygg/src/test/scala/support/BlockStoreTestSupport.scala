@@ -43,7 +43,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
 
         val stream = projections.foldLeft(StreamT.empty[Need, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
+          val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
             Some(Schema.flatten(tpe, struct.toVector).toSet)
           }
 

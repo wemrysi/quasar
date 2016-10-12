@@ -26,14 +26,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
   protected class MergeEngine[KeyType, BlockData <: BlockProjectionData[KeyType]] {
-    case class CellState(index: Int, maxKey: KeyType, slice0: Slice, succf: KeyType => M[Option[BlockData]], remap: Array[Int], position: Int) {
+    case class CellState(index: Int, maxKey: KeyType, slice0: Slice, succf: KeyType => Need[Option[BlockData]], remap: Array[Int], position: Int) {
       def toCell = {
         new Cell(index, maxKey, slice0)(succf, remap.clone, position)
       }
     }
 
     object CellState {
-      def apply(index: Int, maxKey: KeyType, slice0: Slice, succf: KeyType => M[Option[BlockData]]) = {
+      def apply(index: Int, maxKey: KeyType, slice0: Slice, succf: KeyType => Need[Option[BlockData]]) = {
         val remap = new Array[Int](slice0.size)
         new CellState(index, maxKey, slice0, succf, remap, 0)
       }
@@ -425,7 +425,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                   val remission = req.nonEmpty.option(rhead.mapColumns(cf.filter(0, rhead.size, req)))
                   (remission map { e =>
                     writeAlignedSlices(rkey, e, rbs, "alignRight", SortAscending)
-                  } getOrElse rbs.point[M]) map { (lbs, _) }
+                  } getOrElse rbs.point[Need]) map { (lbs, _) }
               }
 
               //println("Requested more left; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
@@ -459,7 +459,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                       val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.filter(0, lhead.size, leq)))
                       (lemission map { e =>
                         writeAlignedSlices(lkey, e, lbs, "alignLeft", SortAscending)
-                      } getOrElse lbs.point[M]) map { (_, rbs) }
+                      } getOrElse lbs.point[Need]) map { (_, rbs) }
 
                     case RightSpan =>
                       //println("No more data on right, but in a span so continuing on left.")
@@ -574,12 +574,12 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
               case None =>
                 //println("uncons right returned none")
-                (Table.empty, Table.empty).point[M]
+                (Table.empty, Table.empty).point[Need]
             }
 
           case None =>
             //println("uncons left returned none")
-            (Table.empty, Table.empty).point[M]
+            (Table.empty, Table.empty).point[Need]
         }
       }
 
