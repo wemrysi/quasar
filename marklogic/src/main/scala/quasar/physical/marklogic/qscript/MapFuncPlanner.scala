@@ -50,34 +50,35 @@ object MapFuncPlanner {
     case Length(arrOrstr) => qscript.length[F] apply arrOrstr
 
     // time
-    case Date(s)             => xs.date(s).point[F]
-    case Time(s)             => xs.time(s).point[F]
-    case Timestamp(s)        => xs.dateTime(s).point[F]
-    case Interval(s)         => xs.dayTimeDuration(s).point[F]
-    case TimeOfDay(dt)       => xs.time(dt).point[F]
-    case ToTimestamp(millis) => qscript.timestampToDateTime[F] apply (millis)
-    case Now()               => fn.currentDateTime.point[F]
+    case Date(s)                      => qscript.asDate[F] apply s
+    case Time(s)                      => xs.time(s).point[F]
+    case Timestamp(s)                 => xs.dateTime(s).point[F]
+    case Interval(s)                  => xs.dayTimeDuration(s).point[F]
+    case TimeOfDay(dt)                => xs.time(dt).point[F]
+    case ToTimestamp(millis)          => qscript.timestampToDateTime[F] apply millis
+    case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => fn.ceiling(fn.yearFromDateTime(xs.dateTime(time)) div 100.xqy).point[F]
     case ExtractDayOfMonth(time)      => fn.dayFromDateTime(xs.dateTime(time)).point[F]
     case ExtractDecade(time)          => fn.floor(fn.yearFromDateTime(xs.dateTime(time)) div 10.xqy).point[F]
-    case ExtractDayOfWeek(time)       => mkSeq_(xdmp.weekdayFromDate(xs.date(time)) - 1.xqy).point[F]
-    case ExtractDayOfYear(time)       => xdmp.yeardayFromDate(xs.date(time)).point[F]
+    case ExtractDayOfWeek(time)       => qscript.asDate[F].apply(time) map (d =>
+                                           mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
+    case ExtractDayOfYear(time)       => qscript.asDate[F].apply(time) map (xdmp.yeardayFromDate)
     case ExtractEpoch(time)           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
     case ExtractHour(time)            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
-    case ExtractIsoDayOfWeek(time)    => xdmp.weekdayFromDate(xs.date(time)).point[F]
+    case ExtractIsoDayOfWeek(time)    => qscript.asDate[F].apply(time) map (xdmp.weekdayFromDate)
     case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
     case ExtractMicroseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
-    case ExtractMillennium(time)       => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
+    case ExtractMillennium(time)      => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
     case ExtractMilliseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
     case ExtractMinute(time)          => fn.minutesFromDateTime(xs.dateTime(time)).point[F]
     case ExtractMonth(time)           => fn.monthFromDateTime(xs.dateTime(time)).point[F]
-    case ExtractQuarter(time)         => xdmp.quarterFromDate(xs.date(time)).point[F]
+    case ExtractQuarter(time)         => qscript.asDate[F].apply(time) map (xdmp.quarterFromDate)
     case ExtractSecond(time)          => fn.secondsFromDateTime(xs.dateTime(time)).point[F]
-    case ExtractTimezone(time)       => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
-    case ExtractTimezoneHour(time)   => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
-    case ExtractTimezoneMinute(time) => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
-    case ExtractWeek(time)            => xdmp.weekFromDate(xs.date(time)).point[F]
+    case ExtractTimezone(time)        => qscript.timezoneOffsetSeconds[F] apply (xs.dateTime(time))
+    case ExtractTimezoneHour(time)    => fn.hoursFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    case ExtractTimezoneMinute(time)  => fn.minutesFromDuration(fn.timezoneFromDateTime(xs.dateTime(time))).point[F]
+    case ExtractWeek(time)            => qscript.asDate[F].apply(time) map (xdmp.weekFromDate)
     case ExtractYear(time)            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
 
     // math
