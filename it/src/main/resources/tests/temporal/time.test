@@ -3,7 +3,8 @@
 
   "backends": {
     "postgresql":        "pending",
-    "couchbase":         "pending"
+    "couchbase":         "pending",
+    "marklogic":         "skip"
   },
 
   "data": "../days.data",

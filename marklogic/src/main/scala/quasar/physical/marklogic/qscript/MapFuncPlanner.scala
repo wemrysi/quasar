@@ -117,7 +117,7 @@ object MapFuncPlanner {
 
     // structural
     case MakeArray(x) =>
-      ejson.singletonArray[F] apply x
+      ejson.seqToArray_[F](x)
 
     case MakeMap(k, v) =>
       def withLitKey(s: String): F[XQuery] =
@@ -144,20 +144,15 @@ object MapFuncPlanner {
     case ProjectIndex(arr, idx) =>
       ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
-    // TODO: We may need to cast atomic `Data` values here as their type
-    //       information is lost at this point.
     case ProjectField(src, field) =>
       def projectLit(s: String): F[XQuery] =
-        whenValidQName(s)(qn =>
-          freshVar[F] map { m =>
-            let_(m -> src) return_ {
-              m.xqy `/` child(qn) `/` child.node()
-            }
-          })
+        whenValidQName(s)(qn => freshVar[F] map { m =>
+          let_(m -> src) return_ (m.xqy `/` child(qn))
+        })
 
       field match {
         case XQuery.Step(_) =>
-          (src `/` field `/` child.node()).point[F]
+          (src `/` field).point[F]
 
         // Makes numeric strings valid QNames by prepending an underscore
         case XQuery.StringLit(IntegralNumber(s)) =>

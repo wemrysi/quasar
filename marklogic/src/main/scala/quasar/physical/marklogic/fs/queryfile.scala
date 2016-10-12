@@ -34,7 +34,7 @@ import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -64,6 +64,7 @@ object queryfile {
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
+      val rewrite = new Rewrite[Fix]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.detail("XQuery", main.render))
@@ -84,7 +85,10 @@ object queryfile {
         shifted =  shiftRead[Fix](qs)
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
                      PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse)))
-        mod     <- plan(shifted).leftMap(mlerr => mlerr match {
+        optmzed =  shifted.transCata(rewrite.optimize(reflNT))
+        _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
+                     PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse)))
+        mod     <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
                          // TODO: Change to include the QScript context when supported

@@ -1,7 +1,7 @@
 {
   "name": "date_part, after conversion to JS (see #1238)",
 
-  "backends": { "mongodb_read_only": "pending", "postgresql": "pending", "marklogic": "pending" },
+  "backends": { "mongodb_read_only": "pending", "postgresql": "pending", "marklogic": "skip" },
 
   "data": "../slamengine_commits.data",
 
