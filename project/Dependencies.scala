@@ -13,7 +13,7 @@ object Dependencies {
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
-  private val nettyVersion      = "4.0.29.Final"
+  private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
@@ -59,7 +59,7 @@ object Dependencies {
   )
   def mongodb = Seq(
     "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
-    // "io.netty"    % "netty-buffer"         % nettyVersion,
+    "io.netty"    % "netty-buffer"         % nettyVersion,
     "io.netty"    % "netty-handler"        % nettyVersion
   )
   val postgresql = Seq(
