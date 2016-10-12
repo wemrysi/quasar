@@ -34,8 +34,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
 
-  def jdbmCommitInterval: Long = 200000l
-
   def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
     case x: GroupingSource                       => Vector(x)
     case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)

@@ -172,6 +172,8 @@ object aligns {
 }
 
 object JDBM {
+  def jdbmCommitInterval: Long = 200000l
+
   type Bytes             = Array[Byte]
   type BtoBEntry         = jMapEntry[Bytes, Bytes]
   type BtoBIterator      = scIterator[BtoBEntry]
