@@ -158,7 +158,7 @@ object qscript {
       }
     }
 
-  // qscript:inc-avg-state($cntavg as map:map, $x as item()*) as map:map
+  // qscript:inc-avg-state($cnt as xs:integer, $avg as xs:double) as map:map
   def incAvgState[F[_]: PrologW]: F[FunctionDecl2] =
     qs.name("inc-avg-state").qn[F] map { fname =>
       declare(fname)(
