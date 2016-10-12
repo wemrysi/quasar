@@ -549,28 +549,31 @@ class Transform
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoin3Result(AutoJoinBase(src, bucketsSrc), dataset, keys, directions) =
-        autojoin3(a1, a2, a3)
+      val AutoJoinResult(AutoJoinBase(src, bucketsSrc), dataset, keys) =
+        autojoin(a1, a2)
 
       val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
         case StaticArray(as) => as.map(_.fromCoEnv)
-        case mf => List(mf.embed.fromCoEnv)
+        case mf              => List(mf.embed.fromCoEnv)
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
-        val orderStrs: PlannerError \/ List[String] =
-          directions.toCoEnv[T].project match {
-            case StaticArray(as) => {
-              as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
-            }
-            case StrLit(str) => List(str).right
-            case _ => InternalError("unsupported ordering function").left
-          }
+        val orderStrs: PlannerError \/ List[String] = {
+	  QC.prj(a3.value.project) match {
+	    case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
+	      mf.toCoEnv[T].project match {
+                case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
+                case StrLit(str)     => List(str).right
+                case _               => InternalError("unsupported ordering function").left
+	      }
+	    case None => InternalError("oops").left
+	  }
+	}
         orderStrs.flatMap {
           _.traverse {
-            case "ASC" => SortDir.Ascending.right
+            case "ASC"  => SortDir.Ascending.right
             case "DESC" => SortDir.Descending.right
-            case _ => InternalError("unsupported ordering direction").left
+            case _      => InternalError("unsupported ordering direction").left
           }
         }
       }
