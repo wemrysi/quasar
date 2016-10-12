@@ -9,5 +9,5 @@ tmp
 .settings
 *.sw*
 tags
-scripts/marklogic/MarkLogic.rpm
+scripts/marklogic/docker/
 .ml-dev-cookies

@@ -30,6 +30,7 @@ cache:
   directories:
   - $HOME/.ivy2/cache
   - $HOME/.sbt
+  - scripts/marklogic/docker
 
 before_cache:
 - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
