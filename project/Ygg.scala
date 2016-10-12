@@ -6,15 +6,18 @@ import scala.Seq
 
 object Ygg {
   def imports = """
-    import quasar._, Predef._, sql._
+    import quasar._, Predef._
     import scalaz._, Scalaz._
     import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
-    import quasar.physical.jsonfile.fs._
   """.trim
 
-  def testImports = imports + "\n" + """
-    import quasar.sql.SqlQueries._
-    import quasar.sql.fixpoint._
+  def yggImports = imports + "\n" + """
+    import ygg._, common._, json._, table._, trans._
+  """.trim
+
+  def jsonfileTestImports = imports + "\n" + """
+    import quasar.physical.jsonfile.fs._
+    import quasar.sql._, SqlQueries._, fixpoint._
   """.trim
 
   def yggDropWarts = Seq(
@@ -55,12 +58,13 @@ object Ygg {
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+    .settings(initialCommands in (Compile, console) := yggImports)
   )
 
   def jsonfile(p: Project): Project = ( p
     .dependsOn('connector % BothScopes, 'ygg % BothScopes)
     .settings(name := "quasar-jsonfile-internal")
     .settings(initialCommands in (Compile, console) := imports)
-    .settings(initialCommands in (Test, console) := testImports)
+    .settings(initialCommands in (Test, console) := jsonfileTestImports)
   )
 }

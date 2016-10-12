@@ -22,9 +22,9 @@ import ConcatHelpers._
 import scala.Predef.assert
 
 object SliceTransform {
-  def identity[A](initial: A) = SliceTransform1.liftM[A](initial, (a: A, s: Slice) => (a, s))
-  def left[A](initial: A)     = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sl))
-  def right[A](initial: A)    = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sr))
+  def identity[A](initial: A): SliceTransform1[A] = SliceTransform1.liftM[A](initial, (a, s) => (a, s))
+  def left[A](initial: A): SliceTransform2[A]     = SliceTransform2.liftM[A](initial, (a, l, r) => (a, l))
+  def right[A](initial: A): SliceTransform2[A]    = SliceTransform2.liftM[A](initial, (a, l, r) => (a, r))
 
   def composeSliceTransform(spec: TransSpec1): SliceTransform1[_] = composeSliceTransform2(spec).parallel
 
