@@ -18,8 +18,8 @@ package ygg.table
 
 import ygg.common._
 
-class DerefSliceOps(private val source: Slice) extends AnyVal {
-  def dereferencedColumns(derefBy: Int =?> CPathNode): Map[ColumnRef, Column] = {
+class DerefSliceOps(private val source: Slice) {
+  def dereferencedColumns(derefBy: Int =?> CPathNode): ColumnMap = {
     val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] = source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {
       case (acc, (ColumnRef(CPath(root, xs @ _ *), ctype), col)) =>
         val resultRef = ColumnRef(CPath(xs: _*), ctype)
@@ -27,7 +27,7 @@ class DerefSliceOps(private val source: Slice) extends AnyVal {
         acc + (root -> (acc.getOrElse(root, Map()) + (resultRef -> col)))
     }
 
-    val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] = source.columns.collect {
+    val indexableArrays: Map[ColumnRef, HomogeneousArrayColumn[_]] = source.columns.fields.collect {
       case (ColumnRef(CPath(CPathArray, xs @ _ *), ctype), col: HomogeneousArrayColumn[_]) =>
         (ColumnRef(CPath(xs: _*), ctype), col)
     }.toMap
@@ -38,7 +38,7 @@ class DerefSliceOps(private val source: Slice) extends AnyVal {
       case _ => forwardIndex get node
     }
 
-    source.columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
+    EagerColumnMap(source.columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
       case (acc, ColumnRef(CPath(_, xs @ _ *), ctype)) =>
         val resultRef = ColumnRef(CPath(xs: _*), ctype)
 
@@ -203,6 +203,6 @@ class DerefSliceOps(private val source: Slice) extends AnyVal {
         }
 
         acc + (resultRef -> acc.getOrElse(resultRef, resultCol))
-    }
+    }.toVector)
   }
 }

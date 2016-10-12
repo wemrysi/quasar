@@ -13,6 +13,7 @@ object Ygg {
 
   def yggImports = imports + "\n" + """
     import ygg._, common._, json._, table._, trans._
+    import ygg.table.{ PlayTable => p }
   """.trim
 
   def jsonfileTestImports = imports + "\n" + """

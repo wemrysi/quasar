@@ -116,4 +116,6 @@ trait PackageAliases {
   type Ord[A] = scalaz.Order[A]
   val Ord     = scalaz.Order
   val Eq      = scalaz.Equal
+
+  type ToSelf[A] = A => A
 }

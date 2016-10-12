@@ -60,11 +60,11 @@ trait ColumnarTableModule extends TableModule {
     def empty: Table = Table(emptyStreamT(), ExactSize(0))
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
-      singleStreamT(Slice(vs.length, Map(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
+      singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
       ExactSize(vs.length)
     )
     def constSingletonTable(singleType: CType, column: Column): Table = Table(
-      singleStreamT(Slice(1, Map(ColumnRef.id(singleType) -> column))),
+      singleStreamT(Slice(1, columnMap(ColumnRef.id(singleType) -> column))),
       ExactSize(1)
     )
 

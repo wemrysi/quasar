@@ -25,7 +25,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
   def newGroupId: GroupId = idGen.nextId()
 
   private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {
-    @tailrec def buildColArrays(from: Stream[JValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
+    @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): (ArrayColumnMap, Int) = {
       from match {
         case jv #:: xs =>
           val refs = Slice.withIdsAndValues(jv, into, sliceIndex, sliceSize)
@@ -36,7 +36,8 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     }
 
     val (prefix, suffix) = sampleData.splitAt(sliceSize)
-    val slice            = Slice(buildColArrays(prefix.toStream, Map.empty[ColumnRef, ArrayColumn[_]], 0))
+    val (refs, size)     = buildColArrays(prefix.toStream, Map(), 0)
+    val slice            = Slice(size, refs)
 
     (slice, suffix)
   }

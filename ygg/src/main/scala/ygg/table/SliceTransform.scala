@@ -126,19 +126,19 @@ object SliceTransform {
 
         l0.zip(r0) { (sl, sr) =>
           Slice(sl.size, {
-            val (leftNonNum, leftNum) = sl.columns partition {
+            val (leftNonNum, leftNum) = sl.columns.fields partition {
               case (ColumnRef(_, CLong | CDouble | CNum), _) => false
               case _                                         => true
             }
 
-            val (rightNonNum, rightNum) = sr.columns partition {
+            val (rightNonNum, rightNum) = sr.columns.fields partition {
               case (ColumnRef(_, CLong | CDouble | CNum), _) => false
               case _                                         => true
             }
 
             val groupedNonNum = cogroup(
-              (leftNonNum mapValues (s => List(s))),
-              (rightNonNum mapValues (s => List(s)))
+              leftNonNum.toMap mapValues (s => List(s)),
+              rightNonNum.toMap mapValues (s => List(s))
             )
 
             type ECCC = Either[Column, Column -> Column]
@@ -176,7 +176,7 @@ object SliceTransform {
               }
             }
 
-            val groupedNum = cogroup(stripTypes(leftNum), stripTypes(rightNum))
+            val groupedNum = cogroup(stripTypes(EagerColumnMap(leftNum)), stripTypes(EagerColumnMap(rightNum)))
             val simplifiedGroupedNum = groupedNum map {
               case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
               case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
@@ -460,11 +460,11 @@ object SliceTransform {
                 rightMask.flip(0, size)
 
                 val grouped = cogroup(
-                  leftS.columns mapValues (s => List(s)),
-                  rightS.columns mapValues (s => List(s))
-                )
+                  leftS.columns.asMap mapValues (s => List(s)),
+                  rightS.columns.asMap mapValues (s => List(s))
+                ).toVector
 
-                val joined: ColumnMap = grouped.map({
+                val joined = EagerColumnMap(grouped map {
                   case (ref, Left3(col))  => ref -> cf.filter(0, size, leftMask)(col).get
                   case (ref, Right3(col)) => ref -> cf.filter(0, size, rightMask)(col).get
                   case (ref, Middle3((left :: Nil, right :: Nil))) => {
@@ -474,10 +474,10 @@ object SliceTransform {
                     ref -> cf.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
                   }
                   case (_, x) => abort("Unexpected: " + x)
-                })(breakOut)
+                })
 
                 joined
-            } getOrElse Map()
+            } getOrElse columnMap()
           })
         }
       }

@@ -98,7 +98,7 @@ object Sampling {
 
     def toSlice(maxSize: Int): Slice = Slice(size min maxSize, cols.toMap)
 
-    val ops: Array[ColumnOps] = slice.columns.map(colOpsFor)(breakOut)
+    val ops: Array[ColumnOps] = slice.columns.toArray map colOpsFor
 
     def insert(src: Int, dest: Int): Unit = {
       var k = 0

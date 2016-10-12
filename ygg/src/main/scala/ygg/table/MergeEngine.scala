@@ -180,13 +180,12 @@ class MergeEngine {
 
         val emission = Slice(
           finishedSize,
-          (completeSlices.flatMap(_.columns) ++ prefixes.flatMap(_.columns)).groupBy(_._1) map {
-            case (ref, columns) =>
-              (columns.size match {
-                case 1 => columns.head
-                case _ => ref -> ArraySetColumn(ref.ctype, columns.map(_._2).toArray)
-              }): ColumnRef -> Column
-          }
+          EagerColumnMap(
+            (completeSlices.flatMap(_.columns.fields) ++ prefixes.flatMap(_.columns.fields)).groupBy(_._1).toVector map {
+              case (ref, Seq(c)) => c
+              case (ref, columns) => ref -> ArraySetColumn(ref.ctype, columns.map(_._2).toArray)
+            }
+          )
         )
 
         val successorStatesM = expired.map(_.succ).sequence.map(_.toStream.flatten)

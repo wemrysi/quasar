@@ -17,19 +17,23 @@
 package ygg
 
 import ygg.common._
-import scalaz._, Scalaz._, Ordering._
+import scalaz.{ =?> => _, _}, Scalaz._, Ordering._
 
 package object table {
   type TransSpec1   = trans.TransSpec1
   type TransSpec[A] = trans.TransSpec[A]
   type SourceType   = trans.SourceType
 
-  type NeedSlices = NeedStreamT[Slice]
-  type NeedTable  = Need[Table]
-  type RowId      = Int
-  type Identity   = Long
-  type Identities = Array[Identity]
-  type ColumnMap  = Map[ColumnRef, Column]
+  type NeedSlices     = NeedStreamT[Slice]
+  type NeedTable      = Need[Table]
+  type RowId          = Int
+  type Identity       = Long
+  type Identities     = Array[Identity]
+  type ColumnKV       = ColumnRef -> Column
+  type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
+
+  def columnMap(xs: ColumnKV*): EagerColumnMap             = EagerColumnMap(xs.toVector)
+  def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap = LazyColumnMap(() => expr.toVector)
 
   val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
 

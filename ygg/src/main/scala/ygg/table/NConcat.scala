@@ -48,7 +48,7 @@ object ConcatHelpers {
     case _                              => false
   }
 
-  def collectIndices(columns: ColumnMap) = columns.collect {
+  def collectIndices(columns: ColumnMap) = columns.fields.collect {
     case (ref @ ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => (i, xs, ref, col)
   }
 

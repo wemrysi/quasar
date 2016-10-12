@@ -57,7 +57,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def mapRoot(f: CF1): Slice =
     Slice(source.size, {
       val resultColumns = for {
-        col    <- source.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
+        col    <- source.columns.fields collect { case (ref, col) if ref.selector == CPath.Identity => col }
         result <- f(col)
       } yield result
 
@@ -67,16 +67,18 @@ class SliceOps(private val source: Slice) extends AnyVal {
     })
 
   def mapColumns(f: CF1): Slice =
-    Slice(source.size, {
-      val resultColumns: scSeq[ColumnRef -> Column] = for {
-        (ref, col) <- source.columns.toSeq
-        result     <- f(col)
-      } yield (ref.copy(ctype = result.tpe), result)
+    Slice(
+      source.size,
+      EagerColumnMap({
+        val resultColumns = source.columns.fields flatMap {
+          case (ref, col) => f(col) map (result => ref.copy(ctype = result.tpe) -> result)
+        }
 
-      resultColumns.groupBy(_._1) map {
-        case (ref, pairs) => (ref, pairs.map(_._2).reduceLeft((c1, c2) => Column.unionRightSemigroup.append(c1, c2)))
-      } toMap
-    })
+        resultColumns.groupBy(_._1).toVector map {
+          case (ref, pairs) => (ref, pairs.map(_._2).reduceLeft((c1, c2) => Column.unionRightSemigroup.append(c1, c2)))
+        }
+      })
+    )
 
   def toArray[A](implicit tpe0: CValueType[A]): Slice = {
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
@@ -214,22 +216,22 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def deref(node: CPathNode): Slice = Slice(
     source.size,
-    node match {
+    EagerColumnMap(node match {
       case CPathIndex(i) =>
-        source.columns collect {
+        source.columns.fields collect {
           case (ColumnRef(CPath(CPathArray, xs @ _ *), CArrayType(elemType)), col: HomogeneousArrayColumn[_]) =>
-            (ColumnRef(CPath(xs: _*), elemType), col.select(i))
+            ColumnRef(CPath(xs: _*), elemType) -> col.select(i)
 
           case (ColumnRef(CPath(CPathIndex(`i`), xs @ _ *), ctype), col) =>
-            (ColumnRef(CPath(xs: _*), ctype), col)
+            ColumnRef(CPath(xs: _*), ctype) -> col
         }
 
       case _ =>
-        source.columns collect {
+        source.columns.fields collect {
           case (ColumnRef(CPath(`node`, xs @ _ *), ctype), col) =>
-            (ColumnRef(CPath(xs: _*), ctype), col)
+            ColumnRef(CPath(xs: _*), ctype) -> col
         }
-    }
+    })
   )
 
   def wrap(wrapper: CPathNode): Slice = Slice(
@@ -237,18 +239,18 @@ class SliceOps(private val source: Slice) extends AnyVal {
     // This is a little weird; CPathArray actually wraps in CPathIndex(0).
     // Unfortunately, CArrayType(_) cannot wrap CNullTypes, so we can't just
     // arbitrarily wrap everything in a CPathArray.
-    wrapper match {
+    EagerColumnMap(wrapper match {
       case CPathArray =>
-        source.columns map {
+        source.columns.fields map {
           case (ColumnRef(CPath(nodes @ _ *), ctype), col) =>
-            (ColumnRef(CPath(CPathIndex(0) +: nodes: _*), ctype), col)
+            ColumnRef(CPath(CPathIndex(0) +: nodes: _*), ctype) -> col
         }
       case _ =>
-        source.columns map {
+        source.columns.fields map {
           case (ColumnRef(CPath(nodes @ _ *), ctype), col) =>
-            (ColumnRef(CPath(wrapper +: nodes: _*), ctype), col)
+            ColumnRef(CPath(wrapper +: nodes: _*), ctype) -> col
         }
-    }
+    })
   )
 
   // ARRAYS:
@@ -370,12 +372,13 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(size, source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) })
 
   def typedSubsumes(jtpe: JType): Slice = {
-    val tuples: Seq[CPath -> CType] = source.columns.map({ case (ColumnRef(path, ctpe), _) => (path, ctpe) })(breakOut)
-    val columns = if (Schema.subsumes(tuples, jtpe)) {
-      source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
-    } else {
-      Map.empty[ColumnRef, Column]
-    }
+    val tuples: Seq[CPath -> CType] = source.columns.fields map { case (ColumnRef(path, ctpe), _) => path -> ctpe }
+    val columns = EagerColumnMap(
+      if (Schema.subsumes(tuples, jtpe)) {
+        source.columns.fields filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
+      }
+      else Vector()
+    )
 
     Slice(source.size, columns)
   }
@@ -407,7 +410,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
   }
 
   def arraySwap(index: Int): Slice =
-    Slice(source.size, source.columns collect {
+    Slice(
+      source.size,
+      EagerColumnMap(source.columns.fields collect {
       case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
         (ColumnRef(cPath, cType), new HomogeneousArrayColumn[a] {
           val tpe                   = col.tpe
@@ -438,7 +443,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         (ColumnRef(CPath(CPathIndex(0) +: xs: _*), ctype), col)
 
       case c @ (ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => c
-    })
+    }))
 
   // Takes an array where the indices correspond to indices in this slice,
   // and the values give the indices in the sparsened slice.
@@ -672,13 +677,16 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def sortBy(prefixes: Vector[CPath], sortOrder: DesiredSortOrder): Slice = {
     // TODO This is slow... Faster would require a prefix map or something... argh.
-    val keySlice = Slice(source.size, prefixes.zipWithIndex.flatMap({
-      case (prefix, i) =>
-        source.columns collect {
-          case (ColumnRef(path, tpe), col) if path hasPrefix prefix =>
-            (ColumnRef(CPathIndex(i) \ path, tpe), col)
-        }
-    })(breakOut))
+    val keySlice = Slice(
+      source.size,
+      EagerColumnMap(prefixes.zipWithIndex.flatMap({
+        case (prefix, i) =>
+          source.columns.fields collect {
+            case (ColumnRef(path, tpe), col) if path hasPrefix prefix =>
+              (ColumnRef(CPathIndex(i) \ path, tpe), col)
+          }
+      }))
+    )
 
     source sortWith (keySlice, sortOrder = SortAscending) _1
   }
@@ -869,11 +877,13 @@ object Slice {
   implicit def sliceOps(s: Slice): SliceOps           = new SliceOps(s)
   implicit def derefSliceOps(s: Slice): DerefSliceOps = new DerefSliceOps(s)
 
-  def empty: Slice                                = apply(0, Map())
+  def empty: Slice                                = apply(0, columnMap())
   def apply(size: Int, columns: ColumnMap): Slice = new DirectSlice(size, columns)
   def apply(pair: ColumnMap -> Int): Slice        = apply(pair._2, pair._1)
 
-  def updateRefs(rv: RValue, into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
+  def unapply(x: Slice) = Some(x.size -> x.columns)
+
+  def updateRefs(rv: RValue, into: ArrayColumnMap, sliceIndex: Int, sliceSize: Int): ArrayColumnMap = {
     rv.flattenWithPath.foldLeft(into) {
       case (acc, (cpath, CUndefined)) => acc
       case (acc, (cpath, cvalue)) =>
@@ -937,8 +947,7 @@ object Slice {
           case x =>
             abort(s"Unexpected arg $x")
         }
-
-        acc + (ref -> updatedColumn)
+        acc.updated(ref, updatedColumn)
     }
   }
 
@@ -947,7 +956,7 @@ object Slice {
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
 
-    @tailrec def buildColArrays(from: Stream[RValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
+    @tailrec def buildColArrays(from: Stream[RValue], into: ArrayColumnMap, sliceIndex: Int): (ArrayColumnMap, Int) = {
       from match {
         case jv #:: xs =>
           val refs = updateRefs(jv, into, sliceIndex, sliceSize)
@@ -957,7 +966,8 @@ object Slice {
       }
     }
 
-    Slice(buildColArrays(values, Map.empty[ColumnRef, ArrayColumn[_]], 0))
+    val (refs, size) = buildColArrays(values, Map(), 0)
+    Slice(size, EagerColumnMap(refs.toVector))
   }
 
   /**
@@ -995,7 +1005,7 @@ object Slice {
     * Given a JValue, an existing map of columnrefs to column data,
     * a sliceIndex, and a sliceSize, return an updated map.
     */
-  def withIdsAndValues(jv: JValue, into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
+  def withIdsAndValues(jv: JValue, into: ArrayColumnMap, sliceIndex: Int, sliceSize: Int): ArrayColumnMap = {
     jv.flattenWithPath.foldLeft(into) {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>

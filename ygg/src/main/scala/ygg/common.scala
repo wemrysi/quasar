@@ -75,6 +75,10 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
     def slurpBytes(): Array[Byte] = Files readAllBytes p
     def slurpString(): String     = new String(slurpBytes, utf8Charset)
   }
+  implicit class jFileOps(private val f: jFile) {
+    def slurpBytes(): Array[Byte] = f.toPath.slurpBytes()
+    def slurpString(): String     = f.toPath.slurpString()
+  }
 
   implicit class YggScalaVectorOps[A](private val xs: Vec[A]) {
     def reverse_:::(that: Vec[A]): Vec[A] = that.reverse ++ xs

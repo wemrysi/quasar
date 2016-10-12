@@ -27,7 +27,7 @@ class SliceSpec extends quasar.Qspec {
   }
 
   private def columnsByCPath(slice: Slice): Map[CPath, List[Column]] = {
-    val byCPath = slice.columns.groupBy(_._1.selector)
+    val byCPath = slice.columns.fields.groupBy(_._1.selector)
     byCPath.mapValues(_.map(_._2).toList)
   }
 

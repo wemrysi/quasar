@@ -25,7 +25,6 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
 
   import SampleData._
 
-  type ToSelf[A] = A => A
   type ASD       = Arbitrary[SampleData]
   type TTable    = Table { type Table = self.Table }
 
@@ -130,9 +129,9 @@ trait TableModuleTestSupport extends TableModule {
       "sum" -> new Scanner {
         type A = BigDecimal
         val init = BigDecimal(0)
-        def scan(a: BigDecimal, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
+        def scan(a: BigDecimal, cols: ColumnMap, range: Range): A -> ColumnMap = {
           val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
-          val prioritized = identityPath.values filter {
+          val prioritized = identityPath.map(_._2) filter {
             case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
             case _                                                => false
           }
