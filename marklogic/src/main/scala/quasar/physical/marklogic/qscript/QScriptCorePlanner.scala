@@ -46,7 +46,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         rs      <- freshVar[F]
         r       <- freshVar[F]
         extract <- mapFuncXQuery(struct, l.xqy)
-        lshift  <- qscript.nodeLeftShift[F] apply (v.xqy)
+        lshift  <- qscript.elementLeftShift[F] apply (v.xqy)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
       } yield for_ (l -> src) let_ (v -> extract, rs -> lshift) return_ fn.map(func(r)(merge), rs.xqy)
 
@@ -89,23 +89,19 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
       } yield fn.filter(func(x) { p }, src)
 
     // NB: XQuery sequences use 1-based indexing.
-    case Take(src, from, count) =>
+    case Subset(src, from, sel, count) =>
       for {
         s   <- freshVar[F]
         f   <- freshVar[F]
         c   <- freshVar[F]
         fm  <- rebaseXQuery(from, s.xqy)
         ct  <- rebaseXQuery(count, s.xqy)
-      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
-
-    case Drop(src, from, count) =>
-      for {
-        s  <- freshVar[F]
-        f  <- freshVar[F]
-        c  <- freshVar[F]
-        fm <- rebaseXQuery(from, s.xqy)
-        ct <- rebaseXQuery(count, s.xqy)
-      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
+      } yield let_(s -> src, f -> fm, c -> ct) return_ (sel match {
+        case Drop => fn.subsequence(f.xqy, c.xqy + 1.xqy)
+        case Take => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+        // TODO: Better sampling
+        case Sample => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+      })
 
     case Unreferenced() =>
       "Unreferenced".xs.point[F]
@@ -131,7 +127,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case Min(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Sum(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F](fm, _))
-    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.singletonArray[F].apply(_)))
+    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.seqToArray_[F](_)))
     case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F](kfm, x).tuple(mapFuncXQuery[T, F](vfm, x)).flatMap {
                                    case (k, v) => ejson.singletonObject[F].apply(k, v)
                                  })
@@ -143,9 +139,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
   }
 
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              =>
-      combiner(fm)((st, x) => mapFuncXQuery[T, F](fm, x) >>= (qscript.incAvg[F].apply(st, _)))
-
+    case Avg(fm)              => combiner(fm)(qscript.incAvg[F].apply(_, _))
     case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
     case Max(fm)              => combiner(fm)((x, y) => fn.max(mkSeq_(x, y)).point[F])
     case Min(fm)              => combiner(fm)((x, y) => fn.min(mkSeq_(x, y)).point[F])

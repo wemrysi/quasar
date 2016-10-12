@@ -89,16 +89,6 @@ package object qscript {
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
-  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
-
-  object Ann {
-    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
-      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
-
-    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
-      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
-  }
-
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
@@ -109,8 +99,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
-
-  final case class SrcMerge[A, B](src: A, left: B, right: B)
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
@@ -143,6 +131,15 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+
+  def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+    (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
+    val rewrite = new Rewrite[T]
+
+    freeTransCata(
+      br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))(
+      liftCo(rewrite.normalizeCoEnv))
+  }
 
   def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
     (struct: FreeMap[T], repair0: JoinFunc[T])
@@ -178,15 +175,23 @@ package object qscript {
     }
   }
 
+  /** A variant of `repeatedly` that works with `Inject` instances. */
+  def injectRepeatedly[F [_], G[_], A]
+    (op: F[A] => Option[G[A]])
+    (implicit F: F :<: G)
+      : F[A] => G[A] =
+    fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
+
   // TODO: Un-hardcode the coproduct, and make this simply a transform itself,
   //       rather than a full traversal.
   def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](qs: T[QScriptRead[T,?]]): T[QScriptShiftRead[T,?]] = {
     type FixedQScriptRead[A]      = QScriptRead[T, A]
     type FixedQScriptShiftRead[A] = QScriptShiftRead[T, A]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
     transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
-      .transCata(optimize.applyAll[FixedQScriptShiftRead].apply)
-      .transCata(liftFG(optimize.transformIncludeToExclude[FixedQScriptShiftRead]))
+      .transCata(
+        rewrite.normalize[FixedQScriptShiftRead] ⋙
+          liftFG(injectRepeatedly(quasar.qscript.Coalesce[T, FixedQScriptShiftRead, FixedQScriptShiftRead].coalesceSR[FixedQScriptShiftRead](idPrism))))
   }
 
   // Helpers for creating `Injectable` instances
@@ -209,4 +214,28 @@ package object qscript {
     Injectable.coproduct(
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
+}
+
+package qscript {
+  final case class SrcMerge[A, B](src: A, left: B, right: B)
+
+  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+
+  object Ann {
+    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
+      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+
+    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
+      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
+  }
+
+  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
+
+  object Target {
+    implicit def equal[T[_[_]]: EqualT, F[_]: EqualF]: Equal[Target[T, F]] =
+      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
+
+    implicit def show[T[_[_]]: ShowT, F[_]: ShowF]: Show[Target[T, F]] =
+      Show.show(target => Cord("Target(") ++ target.ann.show ++ Cord(", ") ++ target.value.show ++ Cord(")"))
+  }
 }

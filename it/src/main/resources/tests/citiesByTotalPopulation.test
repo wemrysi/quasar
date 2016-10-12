@@ -2,7 +2,7 @@
     "name": "top 5 cities by total population",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "zips.data",

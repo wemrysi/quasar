@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.contrib.matryoshka._
@@ -25,15 +26,14 @@ import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
-import quasar.physical.mongodb.WorkflowBuilder._
+import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
-import quasar.physical.mongodb.planner.{FuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
-import quasar.physical.mongodb.workflow._
+import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
+import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
-import javascript._
 
 import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
 import matryoshka.patterns.CoEnv
@@ -105,14 +105,14 @@ object MongoDbQScriptPlanner {
     }
   }
 
+  private def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
+    freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
+
   def expression[T[_[_]]: Recursive: ShowT, EX[_]: Traverse](
     funcHandler: FuncHandler[T, EX])(
       implicit inj: EX :<: ExprOp):
       AlgebraM[OutputM, MapFunc[T, ?], Fix[ExprOp]] = {
     import MapFuncs._
-
-    def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
-      freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
 
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler.run(mf).map(t => unpack(t.mapSuspension(inj)))
@@ -129,39 +129,6 @@ object MongoDbQScriptPlanner {
       case Timestamp(a1) => unimplemented("Timestamp expression")
       case Interval(a1) => unimplemented("Interval expression")
 
-      // TODO: when each of these is broken out as a separate Func, these will
-      // go to the funcHandler.
-      case Extract(Embed($literalF(Bson.Text(field))), a2) => field match {
-        case "century" => $divide($year(a2), $literal(Bson.Int32(100))).right
-        case "day" => $dayOfMonth(a2).right
-        case "decade" => $divide($year(a2), $literal(Bson.Int32(10))).right
-        case "dow" => $add($dayOfWeek(a2), $literal(Bson.Int32(-1))).right
-        case "doy" => $dayOfYear(a2).right
-        // TODO: epoch
-        case "hour" => $hour(a2).right
-        case "isodow" =>
-          $cond($eq($dayOfWeek(a2), $literal(Bson.Int32(1))),
-            $literal(Bson.Int32(7)),
-            $add($dayOfWeek(a2), $literal(Bson.Int32(-1)))).right
-        // TODO: isoyear
-        case "microseconds" =>
-          $multiply($millisecond(a2), $literal(Bson.Int32(1000))).right
-        case "millennium" =>
-          $divide($year(a2), $literal(Bson.Int32(1000))).right
-        case "milliseconds" => $millisecond(a2).right
-        case "minute"       => $minute(a2).right
-        case "month"        => $month(a2).right
-        case "quarter"      => // TODO: handle leap years
-          $add(
-            $divide($dayOfYear(a2), $literal(Bson.Int32(92))),
-            $literal(Bson.Int32(1))).right
-        case "second"       => $second(a2).right
-            // TODO: timezone, timezone_hour, timezone_minute
-        case "week"         => $week(a2).right
-        case "year"         => $year(a2).right
-        case _              =>
-          InternalError(field + " is not a valid time period").left
-      }
       case IfUndefined(a1, a2) => unimplemented("IfUndefined expression")
 
       case Within(a1, a2) => unimplemented("Within expression")
@@ -173,8 +140,9 @@ object MongoDbQScriptPlanner {
       case MakeArray(a1) => unimplemented("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented("MakeMap expression")
       case ConcatMaps(a1, a2) => unimplemented("ConcatMap expression")
-      case ProjectField($var(DocField(base)), $literal(Bson.Text(field))) =>
-        $var(DocField(base \ BsonField.Name(field))).right
+      case ProjectField($var(dv), $literal(Bson.Text(field))) =>
+        $var(dv \ BsonField.Name(field)).right
+      case ProjectField(a1, a2) => unimplemented(s"ProjectField expression")
       case ProjectIndex(a1, a2)  => unimplemented("ProjectIndex expression")
       case DeleteField(a1, a2)  => unimplemented("DeleteField expression")
 
@@ -203,137 +171,20 @@ object MongoDbQScriptPlanner {
 
     import MapFuncs._
 
-    {
+    val mjs = quasar.physical.mongodb.javascript[Fix]
+    import mjs._
+
+    def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
+      JsFuncHandler(mf).map(unpack[Fix, JsCoreF])
+
+    val handleSpecial: MapFunc[T, JsCore] => OutputM[JsCore] = {
       case Constant(v1) => v1.cata(Data.fromEJson).toJs \/> NonRepresentableEJson(v1.shows)
       // FIXME: Not correct
       case Undefined() => ident("undefined").right
-      case Now() => New(Name("Date"), Nil).right
 
-      case Length(a1) =>
-        Call(ident("NumberLong"), List(Select(a1, "length"))).right
-
-      case Date(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).right
-      case Time(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
-          a1,
-          ident("undefined")).right
-      case Timestamp(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).right
-      case Interval(a1) => unimplemented("Interval JS")
-      case TimeOfDay(a1) => {
-        def pad2(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-              ident("x")))
-        def pad3(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-              BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x"))))
-        Let(Name("t"), a1,
-          binop(jscore.Add,
-            pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
-            Literal(Js.Str(".")),
-            pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).right
-      }
-      case ToTimestamp(a1) => unimplemented("ToTimestamp JS")
-      // FIXME: Handle non-constant strings as well
-      case Extract(Literal(Js.Str(str)), x) =>
-        str match {
-          case "century"      => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-          case "day"          => \/-(Call(Select(x, "getDate"), Nil)) // (day of month)
-          case "decade"       => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-          // NB: MongoDB's Date's getDay (during filtering at least) seems to
-          //     be monday=0 ... sunday=6, apparently in violation of the
-          // JavaScript convention.
-          case "dow"          =>
-            \/-(If(BinOp(jscore.Eq,
-              Call(Select(x, "getDay"), Nil),
-              Literal(Js.Num(6, false))),
-              Literal(Js.Num(0, false)),
-              BinOp(jscore.Add,
-                Call(Select(x, "getDay"), Nil),
-                Literal(Js.Num(1, false)))))
-          // TODO: case "doy"          => \/- (unimplemented)
-          // TODO: epoch
-          case "hour"         => \/-(Call(Select(x, "getHours"), Nil))
-          case "isodow"       =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getDay"), Nil),
-              Literal(Js.Num(1, false))))
-          // TODO: isoyear
-          case "microseconds" =>
-            \/-(BinOp(Mult,
-              BinOp(jscore.Add,
-                Call(Select(x, "getMilliseconds"), Nil),
-                BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-              Literal(Js.Num(1000, false))))
-          case "millennium"   => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-          case "milliseconds" =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getMilliseconds"), Nil),
-              BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-          case "minute"       => \/-(Call(Select(x, "getMinutes"), Nil))
-          case "month"        =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getMonth"), Nil),
-              Literal(Js.Num(1, false))))
-          case "quarter"      =>
-            \/-(BinOp(jscore.Add,
-              BinOp(BitOr,
-                BinOp(Div,
-                  Call(Select(x, "getMonth"), Nil),
-                  Literal(Js.Num(3, false))),
-                Literal(Js.Num(0, false))),
-              Literal(Js.Num(1, false))))
-          case "second"       => \/-(Call(Select(x, "getSeconds"), Nil))
-          // TODO: timezone, timezone_hour, timezone_minute
-          // case "week"         => \/- (unimplemented)
-          case "year"         => \/-(Call(Select(x, "getFullYear"), Nil))
-
-          case _ => -\/(FuncApply("extract", "valid time period", str))
-        }
-
-      case Negate(a1)       => UnOp(Neg, a1).right
-      case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).right
-      case Multiply(a1, a2) => BinOp(Mult, a1, a2).right
-      case Subtract(a1, a2) => BinOp(Sub, a1, a2).right
-      case Divide(a1, a2)   => BinOp(Div, a1, a2).right
-      case Modulo(a1, a2)   => BinOp(Mod, a1, a2).right
-      case Power(a1, a2)    => Call(Select(ident("Math"), "pow"), List(a1, a2)).right
-
-      case Not(a1)     => UnOp(jscore.Not, a1).right
-      case Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2).right
-      case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2).right
-      case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2).right
-      case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2).right
-      case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2).right
-      case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2).right
       case IfUndefined(a1, a2) =>
         // TODO: Only evaluate `value` once.
         If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1).right
-      case And(a1, a2) => BinOp(jscore.And, a1, a2).right
-      case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).right
-      case Coalesce(a1, a2) => unimplemented("Coalesce JS")
-      case Between(a1, a2, a3) =>
-        Call(ident("&&"), List(
-          Call(ident("<="), List(a2, a1)),
-          Call(ident("<="), List(a1, a3)))).right
       case Cond(a1, a2, a3) => If(a1, a2, a3).right
 
       case Within(a1, a2) =>
@@ -341,49 +192,9 @@ object MongoDbQScriptPlanner {
           Literal(Js.Num(-1, false)),
           Call(Select(a2, "indexOf"), List(a1))).right
 
+      // TODO: move these to JsFuncHandler
       case Lower(a1) => Call(Select(a1, "toLowerCase"), Nil).right
       case Upper(a1) => Call(Select(a1, "toLUpperCase"), Nil).right
-      case Bool(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("true"))),
-          Literal(Js.Bool(true)),
-          If(BinOp(jscore.Eq, a1, Literal(Js.Str("false"))),
-            Literal(Js.Bool(false)),
-            ident("undefined"))).right
-      case Integer(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.intRegex + "$")))), "test"), List(a1)),
-          Call(ident("NumberLong"), List(a1)),
-          ident("undefined")).right
-      case Decimal(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.floatRegex + "$")))), "test"), List(a1)),
-            Call(ident("parseFloat"), List(a1)),
-            ident("undefined")).right
-      case Null(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("null"))),
-          Literal(Js.Null),
-          ident("undefined")).right
-      case ToString(a1) =>
-        If(isInt(a1),
-          // NB: This is a terrible way to turn an int into a string, but the
-          //     only one that doesn’t involve converting to a decimal and
-          //     losing precision.
-          Call(Select(Call(ident("String"), List(a1)), "replace"), List(
-            Call(ident("RegExp"), List(
-              Literal(Js.Str("[^-0-9]+")),
-              Literal(Js.Str("g")))),
-            Literal(Js.Str("")))),
-          If(binop(jscore.Or, isTimestamp(a1), isDate(a1)),
-            Call(Select(a1, "toISOString"), Nil),
-            Call(ident("String"), List(a1)))).right
-      case Search(a1, a2, a3) =>
-        Call(
-          Select(
-            New(Name("RegExp"), List(
-              a2,
-              If(a3, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
-            "test"),
-          List(a1)).right
-      case Substring(a1, a2, a3) =>
-        Call(Select(a1, "substr"), List(a2, a3)).right
 
       case MakeArray(a1) => Arr(List(a1)).right
       case MakeMap(Literal(Js.Str(str)), a2) => Obj(ListMap(Name(str) -> a2)).right
@@ -422,7 +233,11 @@ object MongoDbQScriptPlanner {
       case Range(_, _)        => unimplemented("Range JS")
       case ZipArrayIndices(_) => unimplemented("ZipArrayIndices JS")
       case ZipMapKeys(_)      => unimplemented("ZipMapKeys JS")
+
+      case _ => scala.sys.error("doesn't happen")
     }
+
+    mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
   }
 
   /** Need this until the old connector goes away and we can redefine `Selector`
@@ -695,7 +510,20 @@ object MongoDbQScriptPlanner {
                    ev1: Show[WorkflowBuilder[WF]],
                    WB: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
-          qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
+          qs => Collection
+            .fromFile(qs.getConst.path)
+            .bimap(
+              PlanPathError(_): PlannerError,
+              coll => {
+                val dataset = WB.read(coll)
+                // TODO: exclude `_id` here?
+                qs.getConst.idStatus match {
+                  case IncludeId =>
+                    ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
+                  case ExcludeId => dataset
+                }
+              })
+            .liftM[GenT]
       }
 
     implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
@@ -717,14 +545,14 @@ object MongoDbQScriptPlanner {
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder(funcHandler)(src, bucket) ⊛
               reducers.traverse(_.traverse(getExpr(funcHandler))) ⊛
-              getJsRed(repair))((b, red, rep) =>
+              handleRedRepair(funcHandler, repair))((b, red, rep) =>
               ExprBuilder(
                 GroupBuilder(src,
                   List(b),
                   Contents.Doc(red.zipWithIndex.map(ai =>
                     (BsonField.Name(ai._2.toString),
                       accumulator(ai._1).left[Fix[ExprOp]])).toListMap)),
-                rep.left)).liftM[GenT]
+                rep)).liftM[GenT]
           case Sort(src, bucket, order) =>
             val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
             keys.traverse(getExprBuilder(funcHandler)(src, _))
@@ -738,14 +566,15 @@ object MongoDbQScriptPlanner {
             (rebaseWB(joinHandler, funcHandler, lBranch, src) ⊛
               rebaseWB(joinHandler, funcHandler, rBranch, src))(
               WB.unionAll).join
-          case Take(src, from, count) =>
+          case Subset(src, from, sel, count) =>
             (rebaseWB(joinHandler, funcHandler, from, src) ⊛
               (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-              WB.limit)
-          case Drop(src, from, count) =>
-            (rebaseWB(joinHandler, funcHandler, from, src) ⊛
-              (rebaseWB(joinHandler, funcHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-              WB.skip)
+              sel match {
+                case Drop => WB.skip
+                case Take => WB.limit
+                // TODO: Better sampling
+                case Sample => WB.limit
+              })
           case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
@@ -865,8 +694,8 @@ object MongoDbQScriptPlanner {
     src: WorkflowBuilder[WF], fm: FreeMap[T])(
     implicit ev: EX :<: ExprOp):
       OutputM[WorkflowBuilder[WF]] =
-    (getExpr(funcHandler)(fm).map(_.right[JsFn]) <+> getJsFn(fm).map(_.left[Fix[ExprOp]])) ∘
-      (ExprBuilder(src, _))
+    // TODO: identify cases for ArrayBuilder, DocBuilder, and SpliceBuilder.
+    handleFreeMap(funcHandler, fm) ∘ (ExprBuilder(src, _))
 
   def getJsMerge[T[_[_]]: Recursive: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):
       OutputM[JsFn] =
@@ -875,9 +704,32 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
+  def exprOrJs[M[_]: Functor: Plus, A](a: A)(exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
+      : M[Expr] =
+    exf(a).map(_.right[JsFn]) <+> jsf(a).map(_.left[Fix[ExprOp]])
+
+  def handleFreeMap[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Expr] =
+    exprOrJs(fm)(getExpr(funcHandler)(_), getJsFn[T])
+
+  def handleRedRepair[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Expr] =
+    exprOrJs(jr)(getExprRed(funcHandler)(_), getJsRed[T])
+
+  def getExprRed[T[_[_]]: Recursive: ShowT, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX])
+    (jr: FreeMapA[T, ReduceIndex])
+    (implicit ev: EX :<: ExprOp)
+      : OutputM[Fix[ExprOp]] =
+    processMapFuncExpr(funcHandler)(jr)(ri => $field(ri.idx.toString).right)
+
   def getJsRed[T[_[_]]: Recursive: ShowT](jr: FreeMapA[T, ReduceIndex]):
       OutputM[JsFn] =
-    processMapFunc(jr)(ri => jscore.ident(ri.idx.toString)) ∘ (JsFn(JsFn.defaultName, _))
+    processMapFunc(jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.toString))) ∘ (JsFn(JsFn.defaultName, _))
 
   def rebaseWB[T[_[_]], WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse](
     joinHandler: JoinHandler[WF, WorkflowBuilder.M],
@@ -959,7 +811,7 @@ object MongoDbQScriptPlanner {
              ev3: EX :<: ExprOp,
              ev4: RenderTree[Fix[WF]]):
       EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WF]] = {
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
@@ -967,9 +819,6 @@ object MongoDbQScriptPlanner {
     type W[A]           = WriterT[MongoDbIO, PhaseResults, A]
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
-
-    type MongoQScriptInterim[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[Read, ?])#M[A]
 
     type MongoQScript[A] =
       (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
@@ -991,6 +840,7 @@ object MongoDbQScriptPlanner {
       EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
 
     val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
+    val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     val lc = listContents andThen (ss => EitherT(ss.run.liftM[PhaseResultT]))
 
@@ -1000,8 +850,14 @@ object MongoDbQScriptPlanner {
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(
-        shiftRead(qs).transCata[MongoQScript](
-          SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet)).point[M])
+        shiftRead(qs)
+          .transCata[MongoQScript](SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet))
+          .transAna(
+            repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
+            repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
+            repeatedly(C.coalesceSR[MongoQScript](idPrism)))
+          .transCata(rewrite.optimize(idPrism.reverseGet))
+          .point[M])
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])

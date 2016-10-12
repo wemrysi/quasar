@@ -16,7 +16,6 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
