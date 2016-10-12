@@ -16,7 +16,6 @@
 
 package quasar
 
-import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp._
 

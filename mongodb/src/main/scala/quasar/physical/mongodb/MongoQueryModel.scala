@@ -16,8 +16,6 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
-
 import scalaz.Scalaz._
 
 sealed trait MongoQueryModel

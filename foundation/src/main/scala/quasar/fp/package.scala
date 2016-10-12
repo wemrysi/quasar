@@ -397,35 +397,23 @@ package object fp
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
 
-  implicit def coproductEqual[F[_], G[_]](
-    implicit F: Delay[Equal, F], G: Delay[Equal, G]):
-      Delay[Equal, Coproduct[F, G, ?]] =
-    new Delay[Equal, Coproduct[F, G, ?]] {
-      def apply[α](eq: Equal[α]) =
-        Equal.equal((cp1, cp2) => (cp1.run, cp2.run) match {
-          case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
-          case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
-          case (_,       _)       => false
-        })
-    }
+  implicit def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]) = λ[Equal ~> DelayedFG[F, G]#Equal](eq =>
+    Equal equal ((cp1, cp2) =>
+      (cp1.run, cp2.run) match {
+        case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
+        case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
+        case (_,       _)       => false
+      }
+    )
+  )
+  implicit def coproductShow[F[_], G[_]](implicit F: Delay[Show, F], G: Delay[Show, G]) =
+    λ[Show ~> DelayedFG[F, G]#Show](sh => Show show (_.run.fold(F(sh).show, G(sh).show)))
 
-  implicit def coproductShow[F[_], G[_]](
-    implicit F: Delay[Show, F], G: Delay[Show, G]):
-      Delay[Show, Coproduct[F, G, ?]] =
-    new Delay[Show, Coproduct[F, G, ?]] {
-      def apply[α](sh: Show[α]) = Show.show(_.run.fold(F(sh).show, G(sh).show))
-    }
+  implicit def constEqual[A: Equal] =
+    λ[Equal ~> DelayedA[A]#Equal](_ => Equal equal (_.getConst === _.getConst))
 
-  implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] = new Delay[Equal, Const[A, ?]] {
-    def apply[B](eq: Equal[B]): Equal[Const[A, B]] =
-      Equal.equal((c1, c2) => c1.getConst === c2.getConst)
-  }
-
-  implicit def constShow[A: Show]: Delay[Show, Const[A, ?]] =
-    new Delay[Show, Const[A, ?]] {
-      def apply[B](showB: Show[B]): Show[Const[A, B]] =
-        Show.show(const => Show[A].show(const.getConst))
-    }
+  implicit def constShow[A: Show] =
+    λ[Show ~> DelayedA[A]#Show](_ => Show show (Show[A] show _.getConst))
 
   implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
     Equal.equal((a, b) => a.unsized ≟ b.unsized)
@@ -442,9 +430,15 @@ package object fp
 
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
-  implicit final class FreeOps[F[_], E](val self: Free[F, E]) extends scala.AnyVal {
-    final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =
-      self.ana(CoEnv.freeIso[E, F].reverseGet)
+  implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
+    type Self    = Free[F, A]
+    type Step[X] = F[X] \/ A
+
+    def resumeTwice(implicit F: Functor[F]): Step[Step[Self]] =
+      self.resume leftMap (_ map (_.resume))
+
+    def toCoEnv[T[_[_]]: Corecursive](implicit F: Functor[F]): T[CoEnv[A, F, ?]] =
+      self ana CoEnv.freeIso[A, F].reverseGet
   }
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
@@ -497,5 +491,18 @@ package fp {
   object Inj {
     def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
       F.prj(g)
+  }
+
+  // type Delay[F[_], G[_]] = F ~> λ[A => F[G[A]]]
+  trait DelayedA[A] {
+    /** The B is discarded in each case; the type was fixed by A. */
+    type Show[B]       = scalaz.Show[Const[A, B]]
+    type Equal[B]      = scalaz.Equal[Const[A, B]]
+    type RenderTree[B] = quasar.RenderTree[Const[A, B]]
+  }
+  trait DelayedFG[F[_], G[_]] {
+    type Equal[A]      = scalaz.Equal[Coproduct[F, G, A]]
+    type Show[A]       = scalaz.Show[Coproduct[F, G, A]]
+    type RenderTree[A] = quasar.RenderTree[Coproduct[F, G, A]]
   }
 }

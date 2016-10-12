@@ -16,7 +16,6 @@
 
 package quasar.fs
 
-import quasar.Predef._
 import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.contrib.pathy._
 import quasar.fp._

@@ -2,7 +2,7 @@
     "name": "filter on `!= null`",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "nulls.data",

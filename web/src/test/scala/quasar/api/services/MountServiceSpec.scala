@@ -16,6 +16,7 @@
 
 package quasar.api.services
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
@@ -60,7 +61,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
     (TaskRef(Set.empty[MR]) |@| TaskRef(Map.empty[APath, MountConfig]))
       .tupled.flatMap { case (mountedRef, configsRef) =>
 
-      val mounter: Mounting ~> Free[MEff, ?] = Mounter[Task, MEff](
+      val mounter: Mounting ~> Free[MEff, ?] = Mounter.kvs[Task, MEff](
         {
           case MR.MountFileSystem(_, typ, `invalidUri`) =>
             MountingError.invalidConfig(

@@ -25,9 +25,8 @@ import scalaz._, Scalaz._
 
 // NB: Should we use char lits instead?
 class Provenance[T[_[_]]: Corecursive: EqualT] {
-  private def tagIdentity[A](tag: String, mf: Free[MapFunc[T, ?], A]):
-      Free[MapFunc[T, ?], A] =
-    Free.roll(MakeMap[T, Free[MapFunc[T, ?], A]](StrLit(tag), mf))
+  private def tagIdentity[A](tag: String, mf: Free[MapFunc[T, ?], A]): FreeMapA[T, A] =
+    Free.roll(MakeMap[T, FreeMapA[T, A]](StrLit(tag), mf))
 
   // provenances:
   // projectfield: f
@@ -37,28 +36,28 @@ class Provenance[T[_[_]]: Corecursive: EqualT] {
   // nest:         n []
   // shiftmap:     m
   // shiftarray:   a
-  def projectField[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("f", mf)
-  def projectIndex[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("i", mf)
-  def shiftMap[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("m", mf)
-  def shiftArray[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("a", mf)
+  def projectField[A](mf: FreeMapA[T, A]) = tagIdentity("f", mf)
+  def projectIndex[A](mf: FreeMapA[T, A]) = tagIdentity("i", mf)
+  def shiftMap[A](mf: FreeMapA[T, A]) = tagIdentity("m", mf)
+  def shiftArray[A](mf: FreeMapA[T, A]) = tagIdentity("a", mf)
 
-  def join[A](left: Free[MapFunc[T, ?], A], right: Free[MapFunc[T, ?], A]) =
+  def join[A](left: FreeMapA[T, A], right: FreeMapA[T, A]) =
     tagIdentity("j",
       Free.roll(ConcatArrays(
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](left)),
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](right)))))
+        Free.roll(MakeArray[T, FreeMapA[T, A]](left)),
+        Free.roll(MakeArray[T, FreeMapA[T, A]](right)))))
 
-  def union[A](left: Free[MapFunc[T, ?], A], right: Free[MapFunc[T, ?], A]) =
+  def union[A](left: FreeMapA[T, A], right: FreeMapA[T, A]) =
     tagIdentity("u",
       Free.roll(ConcatArrays(
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](left)),
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](right)))))
+        Free.roll(MakeArray[T, FreeMapA[T, A]](left)),
+        Free.roll(MakeArray[T, FreeMapA[T, A]](right)))))
 
-  def nest[A](car: Free[MapFunc[T, ?], A], cadr: Free[MapFunc[T, ?], A]) =
+  def nest[A](car: FreeMapA[T, A], cadr: FreeMapA[T, A]) =
     tagIdentity("n",
       Free.roll(ConcatArrays(
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](car)),
-        Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](cadr)))))
+        Free.roll(MakeArray[T, FreeMapA[T, A]](car)),
+        Free.roll(MakeArray[T, FreeMapA[T, A]](cadr)))))
 
   def joinProvenances(leftBuckets: List[FreeMap[T]], rightBuckets: List[FreeMap[T]]):
       List[FreeMap[T]] =

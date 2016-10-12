@@ -48,10 +48,10 @@ object ContentSourceIO {
   def fail[A](t: Throwable): ContentSourceIO[A] =
     liftT(Task.fail(t))
 
-  val liftT: Task ~> ContentSourceIO =
-    new (Task ~> ContentSourceIO) {
-      def apply[A](ta: Task[A]) = lift(κ(ta))
-    }
+  val liftT        = λ[Task ~> ContentSourceIO](ta => lift(κ(ta)))
+  val runSessionIO = λ[SessionIO ~> ContentSourceIO](sio =>
+    newSession_ flatMap (session => liftT(sio.run(session).onFinish(κ(Task.delay(session.close)))))
+  )
 
   def resultCursor(qr: SessionIO[QueryResults], chunkSize: Positive): ContentSourceIO[ResultCursor] =
     newSession(some(streamingOptions)) flatMap { s =>
@@ -70,18 +70,7 @@ object ContentSourceIO {
     Process.bracket(newSession(some(streamingOptions)))(closeSession)(itemStream)
   }
 
-  def runNT(cs: ContentSource): ContentSourceIO ~> Task =
-    new (ContentSourceIO ~> Task) {
-      def apply[A](csio: ContentSourceIO[A]) = csio.run(cs)
-    }
-
-  val runSessionIO: SessionIO ~> ContentSourceIO =
-    new (SessionIO ~> ContentSourceIO) {
-      def apply[A](sio: SessionIO[A]) =
-        newSession_ flatMap { session =>
-          liftT(sio.run(session).onFinish(κ(Task.delay(session.close))))
-        }
-    }
+  def runNT(cs: ContentSource) = λ[ContentSourceIO ~> Task](_ run cs)
 
   implicit val contentSourceIOInstance: Monad[ContentSourceIO] with Catchable[ContentSourceIO] =
     new Monad[ContentSourceIO] with Catchable[ContentSourceIO] {

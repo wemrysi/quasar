@@ -1,0 +1,2 @@
+- Remove $conforms from Predef.
+- Eliminate type constructor boilerplate.

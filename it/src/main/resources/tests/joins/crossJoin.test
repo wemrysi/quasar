@@ -4,7 +4,8 @@
   "backends": {
     "mongodb_read_only": "pending",
     "postgresql":        "pending",
-    "couchbase":         "pending"
+    "couchbase":         "pending",
+    "marklogic":         "skip"
   },
 
   "data": "../largeZips.data",

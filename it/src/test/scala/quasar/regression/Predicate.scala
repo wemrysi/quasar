@@ -16,6 +16,7 @@
 
 package quasar.regression
 
+import scala.Predef.$conforms
 import quasar.Predef._
 
 import argonaut._, Argonaut._

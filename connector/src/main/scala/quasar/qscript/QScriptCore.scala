@@ -37,6 +37,8 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 }
 
 object ReduceIndex {
+  val Empty = ReduceIndex(-1)
+
   implicit def equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
 
@@ -87,7 +89,7 @@ object ReduceIndex {
   src: A,
   bucket: FreeMap[T],
   reducers: List[ReduceFunc[FreeMap[T]]],
-  repair: Free[MapFunc[T, ?], ReduceIndex])
+  repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
@@ -119,10 +121,9 @@ object ReduceIndex {
 @Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class Take[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
-    extends QScriptCore[T, A]
-
-@Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
+/** Chooses a subset of values from a dataset, given a count. */
+@Lenses final case class Subset[T[_[_]], A]
+  (src: A, from: FreeQS[T], op: SelectionOp, count: FreeQS[T])
     extends QScriptCore[T, A]
 
 /** A placeholder value that can appear in plans, but will never be referenced
@@ -148,8 +149,7 @@ object QScriptCore {
           case (Union(a1, l1, r1), Union(a2, l2, r2)) =>
             eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
-          case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
-          case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
+          case (Subset(a1, f1, s1, c1), Subset(a2, f2, s2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && s1 ≟ s2 && c1 ≟ c2
           case (Unreferenced(), Unreferenced()) => true
           case (_, _) => false
         }
@@ -167,8 +167,7 @@ object QScriptCore {
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Union(a, l, r)             => f(a) ∘ (Union(_, l, r))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
-          case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
-          case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
+          case Subset(a, from, sel, c)    => f(a) ∘ (Subset(_, from, sel, c))
           case Unreferenced()             => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
         }
     }
@@ -200,13 +199,10 @@ object QScriptCore {
           case Filter(a, func) => Cord("Filter(") ++
             s.show(a) ++ Cord(",") ++
             func.show ++ Cord(")")
-          case Take(a, f, c) => Cord("Take(") ++
+          case Subset(a, f, sel, c) => Cord("Subset(") ++
             s.show(a) ++ Cord(",") ++
             f.show ++ Cord(",") ++
-            c.show ++ Cord(")")
-          case Drop(a, f, c) => Cord("Drop(") ++
-            s.show(a) ++ Cord(",") ++
-            f.show ++ Cord(",") ++
+            sel.show ++ Cord(",") ++
             c.show ++ Cord(")")
           case Unreferenced() => Cord("Unreferenced")
         }

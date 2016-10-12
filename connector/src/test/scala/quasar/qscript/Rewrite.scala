@@ -30,32 +30,46 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-// TODO factor out the many calls to `transCata` into a single function
-class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  val opt = new Optimize[Fix]
+class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+  val rewrite = new Rewrite[Fix]
+
+  def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
+    expr.transCata[QS](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
+
+  def normalizeExpr(expr: Fix[QS]): Fix[QS] =
+    expr.transCata[QS](rewrite.normalize[QS])
+
+  def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
+    expr.transCata[QST](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
+
+  def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
+    expr.transCata(
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST](idPrism))))
 
   type QSI[A] =
-    (QScriptCore[Fix, ?] :\: ProjectBucket[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[DeadEnd, ?])#M[A]
-  val DEI =     implicitly[Const[DeadEnd, ?] :<: QSI]
-  val PBI = implicitly[ProjectBucket[Fix, ?] :<: QSI]
-  val QCI =   implicitly[QScriptCore[Fix, ?] :<: QSI]
-  val TJI =     implicitly[ThetaJoin[Fix, ?] :<: QSI]
+    (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
+
+  val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
+  val PBI =     implicitly[ProjectBucket :<: QSI]
+  val QCI =       implicitly[QScriptCore :<: QSI]
+  val TJI =         implicitly[ThetaJoin :<: QSI]
+
   val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
-  implicit def qsiToQscriptTotal[T[_[_]]]: Injectable.Aux[QSI, QScriptTotal[Fix, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-      Injectable.coproduct(Injectable.inject[ProjectBucket[Fix, ?], QScriptTotal[Fix, ?]],
-        Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[Fix, ?]])))
+  implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
+    Injectable.coproduct(Injectable.inject[QScriptCore, QST],
+      Injectable.coproduct(Injectable.inject[ProjectBucket, QST],
+        Injectable.coproduct(Injectable.inject[ThetaJoin, QST],
+          Injectable.inject[Const[DeadEnd, ?], QST])))
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
-  "optimizer" should {
+  "rewriter" should {
     "elide a no-op map in a constant boolean" in {
       val query = LP.Constant(Data.Bool(true))
       val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] = {
-        fa => QCI.prj(fa).fold(fa)(opt.elideNopQC(idPrism[QSI].reverseGet))
+        fa => QCI.prj(fa).fold(fa)(rewrite.elideNopQC(idPrism[QSI].reverseGet))
       }
 
       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
@@ -68,17 +82,17 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val exp =
         LeftShift(
           Map(
-            Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+            Unreferenced[Fix, Fix[QScriptCore]]().embed,
             BoolLit[Fix, Hole](true)).embed,
           HoleF,
-          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))
+          Free.point[MapFunc, JoinSide](RightSide))
 
-      Coalesce[Fix, QScriptCore[Fix, ?], QScriptCore[Fix, ?]].coalesce(idPrism).apply(exp) must
+      Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
       equal(
         LeftShift(
-          Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+          Unreferenced[Fix, Fix[QScriptCore]]().embed,
           BoolLit[Fix, Hole](true),
-          Free.point[MapFunc[Fix, ?], JoinSide](RightSide)).some)
+          Free.point[MapFunc, JoinSide](RightSide)).some)
     }
 
     "fold a constant array value" in {
@@ -95,23 +109,23 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
 
-      exp.embed.transCata[QS](orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "elide a join with a constant on one side" in {
-      val exp =
+      val exp: QS[Fix[QS]] =
         TJ.inj(ThetaJoin(
           RootR.embed,
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
-              Free.roll(DET.inj(Const[DeadEnd, Free[QScriptTotal[Fix, ?], Hole]](Root))),
+              Free.roll(DET.inj(Const[DeadEnd, FreeQS](Root))),
               ProjectFieldR(HoleF, StrLit("city"))))),
             Free.roll(ZipMapKeys(HoleF)),
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
           Free.roll(QCT.inj(Map(
-            Free.roll(QCT.inj(Unreferenced[Fix, Free[QScriptTotal[Fix, ?], Hole]]())),
+            Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
           Inner,
@@ -119,10 +133,10 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
             Free.roll(ProjectIndex(
               Free.roll(ProjectIndex(Free.point(LeftSide), IntLit(1))),
               IntLit(1))),
-            Free.point(RightSide)))).embed
+            Free.point(RightSide))))
 
       // TODO: only require a single pass
-      exp.transCata(opt.applyAll[QS]).transCata(opt.applyAll[QS]) must equal(
+      normalizeExpr(normalizeExpr(exp.embed)) must equal(
         chain(
           RootR,
           QC.inj(LeftShift((),
@@ -144,13 +158,13 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           RootR,
           Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
 
-      exp.embed.transCata(orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "elide a join in the branch of a join" in {
-      val exp =
-        TJT.inj(ThetaJoin(
-          DET.inj(Const[DeadEnd, Fix[QScriptTotal[Fix, ?]]](Root)).embed,
+      val exp: QS[Fix[QS]] =
+        TJ.inj(ThetaJoin(
+          RootR.embed,
           Free.roll(QCT.inj(Map(
             Free.roll(QCT.inj(Unreferenced())),
             StrLit("name")))),
@@ -174,25 +188,25 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Inner,
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.point(LeftSide))),
-            Free.roll(MakeArray(Free.point(RightSide))))))).embed
+            Free.roll(MakeArray(Free.point(RightSide)))))))
 
       // TODO: only require a single pass
-      exp.transCata(opt.applyAll[QST]).transCata(opt.applyAll[QST]) must
-      equal(
-        QCT.inj(LeftShift(
-          DET.inj(Const[DeadEnd, Fix[QST]](Root)).embed,
-          Free.roll(ZipMapKeys(HoleF)),
-          Free.roll(ConcatArrays(
-            Free.roll(Constant(
-              ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))),
-            Free.roll(MakeArray(
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(
-                  Free.roll(ConcatArrays(
-                    Free.roll(MakeArray(Free.point(LeftSide))),
-                    Free.roll(MakeArray(Free.point(RightSide))))))),
-                Free.roll(Constant(
-                  ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))))))))))).embed)
+      normalizeExpr(normalizeExpr(exp.embed)) must
+        equal(
+          QC.inj(LeftShift(
+            RootR.embed,
+            Free.roll(ZipMapKeys(HoleF)),
+            Free.roll(ConcatArrays(
+              Free.roll(Constant(
+                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))),
+              Free.roll(MakeArray(
+                Free.roll(ConcatArrays(
+                  Free.roll(MakeArray(
+                    Free.roll(ConcatArrays(
+                      Free.roll(MakeArray(Free.point(LeftSide))),
+                      Free.roll(MakeArray(Free.point(RightSide))))))),
+                  Free.roll(Constant(
+                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))))))))))).embed)
     }
 
     "fold nested boolean values" in {
@@ -219,11 +233,11 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Free.roll(Constant(
             ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
 
-      exp.embed.transCata(orOriginal(Normalizable[QS].normalize(_: QS[Fix[QS]]))) must equal(expected.embed)
+      normalizeFExpr(exp) must equal(expected.embed)
     }
 
     "simplify a ThetaJoin" in {
-      val exp: Fix[QS] =
+      val exp: QS[Fix[QS]] =
         TJ.inj(ThetaJoin(
           QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
           Free.roll(RT.inj(Const(Read(rootDir </> file("foo"))))),
@@ -246,9 +260,9 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
               Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_lat"))),
               Free.roll(ProjectField(Free.point(RightSide), StrLit("r_lat"))))))),
           Inner,
-          Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide))))).embed
+          Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide)))))
 
-      exp.transCata(SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet)) must equal(
+      simplifyJoinExpr(exp.embed) must equal(
         QCT.inj(Map(
           QCT.inj(Filter(
             EJT.inj(EquiJoin(
@@ -284,16 +298,23 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
             Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
             Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))))))).embed)
     }
+
     "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
       val sampleFile = rootDir </> file("bar")
 
-      val originalQScript = Fix(QS.inject(QC.inj(Map(
-        Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
-        Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+      val originalQScript =
+        QCT.inj(Map(
+          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
+          Free.roll(Add(
+            Free.roll(ProjectIndex(HoleF, IntLit(1))),
+            Free.roll(ProjectIndex(HoleF, IntLit(1))))))).embed
 
-      val expectedQScript = Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))))
+      val expectedQScript =
+        QCT.inj(Map(
+          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
+          Free.roll(Add(HoleF, HoleF)))).embed
 
-      originalQScript.transCata(liftFG(opt.transformIncludeToExclude[QST])) must_= expectedQScript
+      includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
   }
 }
