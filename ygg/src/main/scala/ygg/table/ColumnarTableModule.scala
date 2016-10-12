@@ -26,13 +26,18 @@ final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
 }
 
-trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesModule {
+trait ColumnarTableModule extends TableModule with SliceTransforms {
   outer =>
 
   import trans._
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
+
+  implicit val TR = new TableRep[Table] {
+    type Companion = Table.type
+    def companion = Table
+  }
 
   def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
     case x: GroupingSource                       => Vector(x)

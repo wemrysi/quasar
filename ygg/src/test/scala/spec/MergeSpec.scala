@@ -19,7 +19,7 @@ package ygg.tests
 import scalaz.{ Source => _, _ }, Scalaz._
 import ygg._, common._, table._, trans._
 
-class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
+class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport {
 
   implicit val fid = NaturalTransformation.refl[Need]
 

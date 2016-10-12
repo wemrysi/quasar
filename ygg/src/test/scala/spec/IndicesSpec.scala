@@ -21,7 +21,7 @@ import ygg._, common._, json._, table._, trans._
 
 // TODO: mix in a trait rather than defining Table directly
 
-class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
+class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport {
 
   class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
     def companion                                                                                                                   = Table

@@ -20,6 +20,13 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._
 import trans._
 
+trait TableRep[T] {
+  type Table = T with ygg.table.Table
+  type Companion <: TableCompanion[Table]
+
+  def companion: Companion
+}
+
 trait ColumnarTableCompanion[T <: ygg.table.ColumnarTable] extends TableCompanion[T]
 trait ColumnarTable extends Table {
   type Table >: this.type <: ygg.table.ColumnarTable
@@ -165,7 +172,7 @@ final case class LazyTable[T <: ygg.table.Table](underlying: Need[ygg.table.Tabl
   lazy val table: ygg.table.Table { type Table = T } = underlying.value
   type Table = table.Table
 
-  def companion: TableCompanion[Table]                                                                                                = table.companion
+  def companion: TableCompanion[T]                                                                                                    = table.companion
   def slices: NeedSlices                                                                                                              = table.slices
   def size: TableSize                                                                                                                 = table.size
   def load(apiKey: APIKey, tpe: JType): NeedTable                                                                                     = underlying flatMap (_.load(apiKey, tpe))
