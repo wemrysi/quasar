@@ -112,7 +112,6 @@ class Transform
       ZipperAcc(Nil, sides, tails).left
   }
 
-
   /** Contains a common src, the MapFuncs required to access the left and right
     * sides, and the FreeQS that were unmergeable on either side.
     */
@@ -129,21 +128,16 @@ class Transform
 
     val leftF =
       foldIso(CoEnv.freeIso[Hole, F])
-        .get(lTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
+        .get(lTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_)))).mapSuspension(FI.inject)
 
     val rightF =
       foldIso(CoEnv.freeIso[Hole, F])
-        .get(rTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
+        .get(rTail.reverse.ana[T, CoEnv[Hole, F, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_)))).mapSuspension(FI.inject)
 
     (common.reverse.ana[T, F](delinearizeInner),
-      rebaseBranch(leftF, lMap).mapSuspension(FI.inject),
-      rebaseBranch(rightF, rMap).mapSuspension(FI.inject))
+      rebaseBranch(leftF, lMap),
+      rebaseBranch(rightF, rMap))
   }
-
-  private def rebaseBranch(br: Free[F, Hole], fm: FreeMap): Free[F, Hole] =
-    freeTransCata[T, F, F, Hole, Hole](
-      br >> Free.roll(QC.inj(Map(Free.point[F, Hole](SrcHole), fm))))(
-      liftCo(rewrite.normalizeCoEnv[F]))
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -410,15 +404,10 @@ class Transform
       : PlannerError \/ Target = {
     val condError: PlannerError \/ JoinFunc = {
       // FIXME: This won’t work where we join a collection against itself
-      TJ.prj(values(2)._2.project).fold(
+      TJ.prj(QC.inj(reifyResult(values(2)._1, values(2)._2)).embed.transCata(rewrite.normalize).project).fold(
         (InternalError(s"non theta join condition found: ${values(2).shows}"): PlannerError).left[JoinFunc])(
         _.combine.right[PlannerError])
     }
-
-    // NB: This is a magic structure. Improve LP to not imply this structure.
-    val combine: JoinFunc = Free.roll(ConcatMaps(
-      Free.roll(MakeMap(StrLit[T, JoinSide]("left"), Free.point[MapFunc, JoinSide](LeftSide))),
-      Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc, JoinSide](RightSide)))))
 
     condError.map { cond =>
       val (commonSrc, lBranch, rBranch) = merge(values(0)._2, values(1)._2)
@@ -426,11 +415,12 @@ class Transform
       val Ann(leftBuckets, leftValue) = values(0)._1
       val Ann(rightBuckets, rightValue) = values(1)._1
 
-      // cond >>= {
-      //   case LeftSide => leftValue.map(κ(LeftSide))
-      //   case RightSide => rightValue.map(κ(RightSide))
-      // }
+      // NB: This is a magic structure. Improve LP to not imply this structure.
+      val combine: JoinFunc = Free.roll(ConcatMaps(
+        Free.roll(MakeMap(StrLit[T, JoinSide]("left"), leftValue.as(LeftSide))),
+        Free.roll(MakeMap(StrLit[T, JoinSide]("right"), rightValue.as(RightSide)))))
 
+      // FIXME: The provenances are not correct here
       (Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
         TJ.inj(ThetaJoin(
           commonSrc,
@@ -465,7 +455,7 @@ class Transform
 
   /** We carry around metadata with pointers to provenance and result value as
     * we build up QScript. At the point where a particular chain ends (E.g., the
-    * final result, or the `count` of a Take/Drop, we need to make sure we
+    * final result, or the `count` of a Subset, we need to make sure we
     * extract the result pointed to by the metadata.
     */
   def reifyResult[A](ann: Ann[T], src: A): QScriptCore[A] =
@@ -544,12 +534,12 @@ class Transform
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Take(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
+      (a1._1, QC.inj(Subset(src, lfree, Take, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
 
-      (a1._1, QC.inj(Drop(src, lfree, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
+      (a1._1, QC.inj(Subset(src, lfree, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)

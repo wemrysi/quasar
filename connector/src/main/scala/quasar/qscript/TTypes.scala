@@ -68,10 +68,11 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
   def QScriptCore[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[QScriptCore ~> G](fa =>
       QC inj (fa match {
-        case Union(src, lb, rb) => Union(src, applyToBranch(lb), applyToBranch(rb))
-        case Drop(src, lb, rb)  => Drop(src, applyToBranch(lb), applyToBranch(rb))
-        case Take(src, lb, rb)  => Take(src, applyToBranch(lb), applyToBranch(rb))
-        case _                  => fa
+        case Union(src, lb, rb) =>
+          Union(src, applyToBranch(lb), applyToBranch(rb))
+        case Subset(src, lb, sel, rb) =>
+          Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
+        case _ => fa
       })
     )
   )
@@ -221,8 +222,7 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
       case LeftShift(src, s, r)   => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, _))
       case Union(src, l, r)       => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
       case Filter(src, f)         => freeMFEq(f).map(Filter(src, _))
-      case Take(src, from, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Take(src, _, _))
-      case Drop(src, from, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Drop(src, _, _))
+      case Subset(src, from, sel, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Subset(src, _, sel, _))
       case Unreferenced()         => None
     })
   }
