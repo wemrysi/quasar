@@ -24,7 +24,9 @@ trait TableModule {
   type TableCompanion <: ygg.table.TableCompanion[Table]
 }
 
-trait TableModuleColumnar extends TableModule {
-  type Table <: ygg.table.ColumnarTable
-  type TableCompanion <: ygg.table.ColumnarTableCompanion[Table]
+object TableModule {
+  trait Columnar extends TableModule {
+    type Table <: ygg.table.ColumnarTable
+    type TableCompanion <: ygg.table.ColumnarTableCompanion[Table]
+  }
 }
