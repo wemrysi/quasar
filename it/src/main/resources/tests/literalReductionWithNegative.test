@@ -1,7 +1,8 @@
 {
     "name": "reduce a literal set with negatives",
-    "data": "zips.data",
-    "query": "select max((0, 1, -2, 5)) from zips",
+    "backends": { "marklogic": "skip" },
+    "data": "cars.data",
+    "query": "select max((0, 1, -2, 5)) from cars",
     "predicate": "equalsExactly",
     "expected": [{ "0": 5 }]
 }

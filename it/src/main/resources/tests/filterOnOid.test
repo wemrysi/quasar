@@ -2,7 +2,7 @@
     "name": "match on ObjectId",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "days.data",

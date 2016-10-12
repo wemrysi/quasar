@@ -1,0 +1,1 @@
+- Enable integration tests for MarkLogic

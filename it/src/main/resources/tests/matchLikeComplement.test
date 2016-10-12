@@ -2,7 +2,7 @@
     "name": "match like complement",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "zips.data",
