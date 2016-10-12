@@ -22,8 +22,6 @@ import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 
-import scala.Predef.$conforms
-
 import matryoshka._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
@@ -34,12 +32,13 @@ import simulacrum.typeclass
 
 // it would be nice to use the `NTComp` alias here, but it cannot compile
 trait NormalizableInstances {
+  import Normalizable._
+
   def normalizable[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] =
     new NormalizableT[T]
 
-  implicit def const[A] = new Normalizable[Const[A, ?]] {
-    def normalizeF = λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None)
-  }
+  implicit def const[A]: Normalizable[Const[A, ?]] =
+    make(λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None))
 
   implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
       : Normalizable[QScriptCore[T, ?]] =
@@ -57,13 +56,13 @@ trait NormalizableInstances {
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
-  implicit def coproduct[F[_]: Normalizable, G[_]: Normalizable] =
+  implicit def coproduct[F[_], G[_]]
+    (implicit F: Normalizable[F], G: Normalizable[G])
+      : Normalizable[Coproduct[F, G, ?]] =
     new Normalizable[Coproduct[F, G, ?]] {
       def normalizeF =
         λ[Coproduct[F, G, ?] ~> (Option ∘ Coproduct[F, G, ?])#λ](
-          _.run.bitraverse(
-            Normalizable[F].normalizeF(_),
-            Normalizable[G].normalizeF(_)) ∘ (Coproduct(_)))
+          _.run.bitraverse(F.normalizeF(_), G.normalizeF(_)) ∘ (Coproduct(_)))
   }
 }
 
@@ -132,19 +131,13 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
       }))
 
   def QScriptCore = {
-    // NB: all single-bucket reductions should reduce on `null`
-    def normalizeBucket(bucket: FreeMap): FreeMap = bucket.resume.fold({
-      case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
-      case _                    => bucket
-    }, κ(bucket))
-
     make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
       case Reduce(src, bucket, reducers, repair) => {
         val reducersOpt: List[Option[ReduceFunc[FreeMap]]] =
           reducers.map(_.traverse(freeMFEq[Hole](_)))
 
         val reducersNormOpt: Option[List[ReduceFunc[FreeMap]]] =
-          (!reducersOpt.map(_.toList).flatten.isEmpty).option(
+          reducersOpt.exists(_.nonEmpty).option(
             Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)))
 
         val bucketNormOpt: Option[FreeMap] = freeMFEq(bucket)
@@ -178,7 +171,7 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
           }
 
         val orderNormOpt: Option[List[(FreeMap, SortDir)]] =
-          (!orderOpt.map(_.toList).flatten.isEmpty).option(
+          orderOpt.exists(_.nonEmpty).option(
             Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)))
 
         makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
