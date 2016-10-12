@@ -20,9 +20,9 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 package object table {
-  type TransSpec1                 = trans.TransSpec1
-  type TransSpec[A <: SourceType] = trans.TransSpec[A]
-  type SourceType                 = trans.SourceType
+  type TransSpec1   = trans.TransSpec1
+  type TransSpec[A] = trans.TransSpec[A]
+  type SourceType   = trans.SourceType
 
   type NeedSlices = NeedStreamT[Slice]
   type NeedTable  = Need[Table]

@@ -98,9 +98,9 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   def checkSpecDataId(spec: TransSpec1, data: Seq[JValue]): Prop =
     checkSpecData(spec, data, data)
 
-  protected def defaultASD: ASD                                                         = sample(schema)
-  protected def select[A <: SourceType](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))
-  protected def select(name: String): TransSpec1                                        = select(Fn.source, name)
+  protected def defaultASD: ASD                                           = sample(schema)
+  protected def select[A](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))
+  protected def select(name: String): TransSpec1                          = select(Fn.source, name)
 }
 
 abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTestSupport {

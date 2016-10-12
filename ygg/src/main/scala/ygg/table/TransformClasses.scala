@@ -23,7 +23,7 @@ package ygg.table
 
 import ygg._, common._, json._
 
-trait TransformClasses[A <: trans.SourceType] {
+trait TransformClasses[A] {
   sealed trait TransSpec  extends AnyRef
   sealed trait ObjectSpec extends TransSpec
   sealed trait ArraySpec  extends TransSpec
