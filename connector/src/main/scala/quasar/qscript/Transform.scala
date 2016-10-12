@@ -549,10 +549,10 @@ class Transform
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoin3Result(AutoJoinBase(src, bucketsSrc), ordering, buckets, directions) =
+      val AutoJoin3Result(AutoJoinBase(src, bucketsSrc), dataset, keys, directions) =
         autojoin3(a1, a2, a3)
 
-      val bucketsList: List[FreeMap] = buckets.toCoEnv[T].project match {
+      val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
         case StaticArray(as) => as.map(_.fromCoEnv)
         case mf => List(mf.embed.fromCoEnv)
       }
@@ -575,12 +575,14 @@ class Transform
         }
       }
 
-      val lists: PlannerError \/ List[(FreeMap, SortDir)] =
-        directionsList.map { bucketsList.zip(_) }
-
-      lists.map(pairs =>
-        Target(Ann(bucketsSrc, HoleF[T]),
-          QC.inj(Sort(src, ordering, pairs)).embed))
+      directionsList.map(dirs =>
+        concatBuckets(bucketsSrc).fold(
+          Target(Ann(Nil, dataset),
+            QC.inj(Sort(src, NullLit(), keysList.zip(dirs))).embed)) {
+          case (newProvs, provAccess) =>
+            Target(Ann(provAccess.list.toList, dataset),
+              QC.inj(Sort(src, newProvs, keysList.zip(dirs))).embed)
+        })
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
