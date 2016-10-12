@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import scalaz._
+import scalaz._, Scalaz._
 import ygg._, common._, json._
 import trans._
 
@@ -64,7 +64,7 @@ trait Table {
   outer =>
 
   type NeedTable = Need[Table]
-  type Table >: this.type <: ygg.table.Table
+  type Table <: ygg.table.Table
 
   def companion: TableCompanion[Table]
 
@@ -161,6 +161,35 @@ trait Table {
   def toJson: Need[Stream[JValue]]
 }
 
+final case class LazyTable[T <: ygg.table.Table](underlying: Need[ygg.table.Table { type Table = T }]) extends Table {
+  lazy val table: ygg.table.Table { type Table = T } = underlying.value
+  type Table = table.Table
+
+  def companion: TableCompanion[Table]                                                                                                = table.companion
+  def slices: NeedSlices                                                                                                              = table.slices
+  def size: TableSize                                                                                                                 = table.size
+  def load(apiKey: APIKey, tpe: JType): NeedTable                                                                                     = underlying flatMap (_.load(apiKey, tpe))
+  def reduce[A: Monoid](reducer: CReducer[A]): Need[A]                                                                                = underlying flatMap (_.reduce[A](reducer))
+  def compact(spec: TransSpec1, definedness: Definedness): Table                                                                      = table.compact(spec, definedness)
+  def transform(spec: TransSpec1): Table                                                                                              = table.transform(spec)
+  def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table   = table.cogroup(leftKey, rightKey, that)(left, right, both)
+  def cross(that: Table)(spec: TransSpec2): Table                                                                                     = table.cross(that)(spec)
+  def force: NeedTable                                                                                                                = underlying flatMap (_.force)
+  def paged(limit: Int): Table                                                                                                        = table.paged(limit)
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = underlying flatMap (_.sort(sortKey, sortOrder))
+  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                                             = underlying flatMap (_.sortUnique(sortKey, order))
+  def distinct(spec: TransSpec1): Table                                                                                               = table.distinct(spec)
+  def concat(t2: Table): Table                                                                                                        = table.concat(t2)
+  def zip(t2: Table): NeedTable                                                                                                       = underlying flatMap (_.zip(t2))
+  def toArray[A](implicit tpe: CValueType[A]): Table                                                                                  = table.toArray[A](tpe)
+  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = underlying flatMap (_.groupByN(groupKeys, valueSpec, sortOrder, unique))
+  def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable                                                       = underlying flatMap (_.partitionMerge(partitionBy)(f))
+  def takeRange(startIndex: Long, numberToTake: Long): Table                                                                          = table.takeRange(startIndex, numberToTake)
+  def canonicalize(length: Int): Table                                                                                                = table.canonicalize(length)
+  def schemas: Need[Set[JType]]                                                                                                       = underlying flatMap (_.schemas)
+  def toJson: Need[Stream[JValue]]                                                                                                    = underlying flatMap (_.toJson)
+}
+
 trait NoLoadTable extends Table {
   def load(apiKey: APIKey, jtpe: JType): NeedTable = ???
 }
@@ -168,6 +197,8 @@ trait NoGroupTable extends Table {
   def groupByN(keys: scSeq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = Need(Nil)
 }
 trait NoSortTable extends Table {
+  type Table >: this.type <: ygg.table.Table
+
   def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
   def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
 }
