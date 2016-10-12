@@ -16,6 +16,7 @@
 
 package quasar
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._
@@ -71,7 +72,8 @@ object Optimizer {
     case _ => None
   }
 
-  def simplify(t: Fix[LogicalPlan]): Fix[LogicalPlan] = t.transCata(repeatedly(simplifyƒ))
+  def simplify[T[_[_]]: Recursive: Corecursive](t: T[LogicalPlan]): T[LogicalPlan] =
+    t.transCata[LogicalPlan](repeatedly(simplifyƒ[T]))
 
   val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {
     case FreeF(name) => Set(name)

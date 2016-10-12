@@ -16,6 +16,7 @@
 
 package quasar.server
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{TestConfig, Variables}
 import quasar.api.UriPathCodec

@@ -1,0 +1,1 @@
+- add `explain` command in the REPL, which plans a query without attempting to run it

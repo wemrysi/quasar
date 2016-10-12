@@ -19,7 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
 import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.Func.Input2
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -34,7 +33,6 @@ import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
-import quasar.std.DateLib.Extract
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, concurrent._
@@ -66,14 +64,9 @@ object queryfile {
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
-      val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.detail("XQuery", main.render))
-
-      def extractErr(partName: String, msg: String): FileSystemError =
-        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
-          LogicalPlan.InvokeF(Extract, Input2(partName, "<date/time>")), Some(msg)))
 
       val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -97,14 +90,12 @@ object queryfile {
                          // TODO: Change to include the QScript context when supported
                          LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
 
-                     case UnrecognizedDatePart(n) =>
-                       extractErr(n, mlerr.shows)
-
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
 
                      case UnsupportedDatePart(n) =>
-                       extractErr(n, mlerr.shows)
+                       FileSystemError.planningFailed(lp, QPlanner.UnsupportedFunction(
+                         n, "in planner".some))
                    })
         a       <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a

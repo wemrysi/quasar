@@ -73,7 +73,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.map" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -81,7 +81,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
         ))
 
-        def func: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("country"))
+        def func: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
         val map = quasar.qscript.Map(src, func)
 
         val state: SparkState[RDD[Data]] = alg(map)
@@ -100,7 +100,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.reduce" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -108,9 +108,9 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
         ))
 
-        def bucket: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("country"))
-        def reducers: List[ReduceFunc[FreeMap[Fix]]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
-        def repair: Free[MapFunc[Fix, ?], ReduceIndex] = Free.point(ReduceIndex(0))
+        def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+        def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
+        def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
         val reduce = Reduce(src, bucket, reducers, repair)
 
         val state: SparkState[RDD[Data]] = alg(reduce)
@@ -128,7 +128,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.filter" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -136,7 +136,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
         ))
 
-        def func: FreeMap[Fix] = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
+        def func: FreeMap = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
         val filter = quasar.qscript.Filter(src, func)
 
         val state: SparkState[RDD[Data]] = alg(filter)
@@ -156,7 +156,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.take" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -165,10 +165,10 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("US")))
         ))
 
-        def from: FreeQS[Fix] = Free.point(SrcHole)
-        def count: FreeQS[Fix] = constFreeQS(1)
+        def from: FreeQS = Free.point(SrcHole)
+        def count: FreeQS = constFreeQS(1)
 
-        val take = quasar.qscript.Take(src, from, count)
+        val take = quasar.qscript.Subset(src, from, Take, count)
 
         val state: SparkState[RDD[Data]] = alg(take)
         state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
@@ -187,7 +187,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.drop" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -196,10 +196,10 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("US")))
         ))
 
-        def from: FreeQS[Fix] = Free.point(SrcHole)
-        def count: FreeQS[Fix] = constFreeQS(3)
+        def from: FreeQS = Free.point(SrcHole)
+        def count: FreeQS = constFreeQS(3)
 
-        val drop = quasar.qscript.Drop(src, from, count)
+        val drop = quasar.qscript.Subset(src, from, Drop, count)
 
         val state: SparkState[RDD[Data]] = alg(drop)
         state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
@@ -218,7 +218,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.union" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -227,11 +227,11 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap() + ("age" -> Data.Int(14)) + ("country" -> Data.Str("UK")))
         ))
 
-        def func(country: String): FreeMap[Fix] =
+        def func(country: String): FreeMap =
           Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
-        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
 
         val union = quasar.qscript.Union(src, left, right)
 
@@ -251,15 +251,15 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
     "core.leftshift" in {
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, QScriptCore[Fix, ?], RDD[Data]] = qscore.plan(emptyFF)
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap(("age" -> Data.Int(24)),("countries" -> Data.Arr(List(Data.Str("Poland"), Data.Str("US")))))),
           Data.Obj(ListMap(("age" -> Data.Int(24)),("countries" -> Data.Arr(List(Data.Str("UK"))))))
         ))
 
-        def struct: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("countries"))
-        def repair: JoinFunc[Fix] = Free.point(RightSide)
+        def struct: FreeMap = ProjectFieldR(HoleF, StrLit("countries"))
+        def repair: JoinFunc = Free.point(RightSide)
 
         val leftShift = quasar.qscript.LeftShift(src, struct, repair)
 
@@ -281,7 +281,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "equiJoin.inner" in {
 
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+        val alg: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -290,13 +290,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
         ))
 
-        def func(country: String): FreeMap[Fix] =
+        def func(country: String): FreeMap =
           Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
-        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
-        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+        def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc = Free.roll(ConcatMaps(
           Free.roll(MakeMap(StrLit("left"), LeftSideF)),
           Free.roll(MakeMap(StrLit("right"), RightSideF))
         ))
@@ -321,7 +321,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "equiJoin.leftOuter" in {
 
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+        val alg: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -330,13 +330,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
         ))
 
-        def func(country: String): FreeMap[Fix] =
+        def func(country: String): FreeMap =
           Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
-        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
-        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+        def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc = Free.roll(ConcatMaps(
           Free.roll(MakeMap(StrLit("left"), LeftSideF)),
           Free.roll(MakeMap(StrLit("right"), RightSideF))
         ))
@@ -365,7 +365,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "equiJoin.rightOuter" in {
 
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+        val alg: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -374,13 +374,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
         ))
 
-        def func(country: String): FreeMap[Fix] =
+        def func(country: String): FreeMap =
           Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
-        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
-        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+        def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc = Free.roll(ConcatMaps(
           Free.roll(MakeMap(StrLit("left"), LeftSideF)),
           Free.roll(MakeMap(StrLit("right"), RightSideF))
         ))
@@ -409,7 +409,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     "equiJoin.fullOuter" in {
 
       newSc.map ( sc => {
-        val alg: AlgebraM[SparkState, EquiJoin[Fix, ?], RDD[Data]] = equi.plan(emptyFF)
+        val alg: AlgebraM[SparkState, EquiJoin, RDD[Data]] = equi.plan(emptyFF)
 
         val src: RDD[Data] = sc.parallelize(List(
           Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -419,13 +419,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           Data.Obj(ListMap(("age" -> Data.Int(14)), ("country" -> Data.Str("UK"))))
         ))
 
-        def func(country: String): FreeMap[Fix] =
+        def func(country: String): FreeMap =
           Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
-        def left: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
-        def right: FreeQS[Fix] = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
-        def key: FreeMap[Fix] = ProjectFieldR(HoleF, StrLit("age"))
-        def combine: JoinFunc[Fix] = Free.roll(ConcatMaps(
+        def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
+        def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
+        def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
+        def combine: JoinFunc = Free.roll(ConcatMaps(
           Free.roll(MakeMap(StrLit("left"), LeftSideF)),
           Free.roll(MakeMap(StrLit("right"), RightSideF))
         ))
@@ -457,7 +457,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
 
   }
 
-  private def constFreeQS(v: Int): FreeQS[Fix] =
+  private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
 
