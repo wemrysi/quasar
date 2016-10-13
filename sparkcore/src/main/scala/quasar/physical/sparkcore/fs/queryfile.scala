@@ -36,7 +36,11 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript[A] = QScriptShiftRead[Fix, A]
+  type SparkQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+  implicit val sparkQScriptToQSTotal
+      : Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
+    ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead, ?]])
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
@@ -67,7 +71,8 @@ object queryfile {
       val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       for {
-        qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp).map(shiftRead[Fix])
+        qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp).map(shiftRead[Fix](_).transCata(
+          SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], SparkQScript].simplifyJoin(idPrism.reverseGet)))
         _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", qs)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }

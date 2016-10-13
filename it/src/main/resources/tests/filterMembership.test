@@ -2,7 +2,7 @@
     "name": "filter on list membership",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "zips.data",

@@ -6,7 +6,8 @@
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending"
+        "couchbase":         "pending",
+        "marklogic":         "skip"
     },
     "data": "nullsWithMissing.data",
     "query": "select name,
