@@ -2,7 +2,7 @@
   "name": "cities with largest individual zip codes",
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "pending",
+    "marklogic":  "skip",
     "couchbase":  "pending"
   },
   "note": "This is tricky because the sort key does not appear in the result. The

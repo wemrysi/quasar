@@ -1,0 +1,2 @@
+- Organize the standard namespace.
+- Add combinators for deriving scalacheck generators.

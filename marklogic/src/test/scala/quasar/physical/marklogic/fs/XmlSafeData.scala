@@ -20,30 +20,24 @@ import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
 
-import org.scalacheck.{Arbitrary, Gen, Shrink}
 import scalaz._, Scalaz._
+import quasar.pkg.tests._
 
 /** Quasar Data that is known to be representable in XML. */
-final case class XmlSafeData(data: Data) extends scala.AnyVal
+final case class XmlSafeData(data: Data) extends AnyVal
 
 object XmlSafeData {
-  import Arbitrary.{arbitrary => arb}
+  implicit val arbitrary: Arbitrary[XmlSafeData] = genData(
+    genKey = Gen.nonEmptyListOf(Gen.alphaChar) ^^ (_.mkString),
+    genAtomicData = genAtomicData(
+      strSrc = genAlphaNumString,
+      intSrc = genInt ^^ (x => BigInt(x)),
+      decSrc = genDouble ^^ (x => BigDecimal(x)),
+      idSrc  = genAlphaNumString
+    )
+  ) ^^ apply
 
-  implicit val equal: Equal[XmlSafeData] =
-    Equal.equalBy(_.data)
-
-  implicit val show: Show[XmlSafeData] =
-    Show[Data].contramap(_.data)
-
-  implicit val arbitrary: Arbitrary[XmlSafeData] =
-    Arbitrary(genData(
-      objKeySrc = Gen.nonEmptyListOf(Gen.alphaChar) map (_.mkString   ),
-      strSrc    = Gen.listOf(Gen.alphaNumChar)      map (_.mkString   ),
-      intSrc    = arb[Int]                          map (BigInt(_)    ),
-      decSrc    = arb[Double]                       map (BigDecimal(_)),
-      idSrc     = Gen.listOf(Gen.alphaNumChar)      map (_.mkString   )
-    ) map (XmlSafeData(_)))
-
-  implicit val shrink: Shrink[XmlSafeData] =
-    Shrink.xmap[Data, XmlSafeData](XmlSafeData(_), _.data)
+  implicit val equal  = eqBy[XmlSafeData](_.data)
+  implicit val show   = showBy[XmlSafeData](_.data)
+  implicit val shrink = Shrink.xmap[Data, XmlSafeData](apply, _.data)
 }

@@ -109,7 +109,4 @@ object EquiJoin {
             }
         }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[EquiJoin[T, ?]] =
-    TTypes.normalizable[T].EquiJoin
 }

@@ -16,8 +16,7 @@
 
 package quasar.config
 
-import quasar.Predef.{String, StringContext, Some, None}
-
+import quasar.Predef._
 import monocle.Prism
 import scalaz.Show
 

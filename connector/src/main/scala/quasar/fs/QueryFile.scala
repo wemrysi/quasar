@@ -63,8 +63,8 @@ object QueryFile {
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
     lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
-      .cataM[PlannerError \/ ?, (Ann[T], T[QS])](newLP => transform.lpToQScript(newLP.map(_ ∘ (_.transCata(eval)))))
-      .map(qs => QC.inj((transform.reifyResult(qs._1, qs._2))).embed.transAna(eval))
+      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna(eval)))))
+      .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata(eval))
   }
 
   def simplifyAndNormalize

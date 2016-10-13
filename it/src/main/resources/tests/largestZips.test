@@ -2,7 +2,7 @@
     "name": "largest zips",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "pending"
     },
     "data": "zips.data",

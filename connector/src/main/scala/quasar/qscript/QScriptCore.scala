@@ -222,7 +222,7 @@ object QScriptCore {
         right: FreeMap[T],
         p1: QScriptCore[IT, ExternallyManaged],
         p2: QScriptCore[IT, ExternallyManaged]) = {
-        val norm = TTypes.normalizable[T]
+        val norm = Normalizable.normalizable[T]
 
         (p1, p2) match {
           case (Unreferenced(), Unreferenced()) =>
@@ -330,7 +330,4 @@ object QScriptCore {
         }
       }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[QScriptCore[T, ?]] =
-    TTypes.normalizable[T].QScriptCore
 }
