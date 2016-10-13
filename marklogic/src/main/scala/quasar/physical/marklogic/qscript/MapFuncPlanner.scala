@@ -31,7 +31,7 @@ import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
-import scalaz.EitherT
+import scalaz.{Apply, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -83,25 +83,25 @@ object MapFuncPlanner {
 
     // math
     case Negate(x)      => (-x).point[F]
-    case Add(x, y)      => (x + y).point[F]
-    case Multiply(x, y) => (x * y).point[F]
-    case Subtract(x, y) => (x - y).point[F]
-    case Divide(x, y)   => (x div y).point[F]
-    case Modulo(x, y)   => (x mod y).point[F]
+    case Add(x, y)      => binOp[F](x, y)(_ + _)
+    case Multiply(x, y) => binOp[F](x, y)(_ * _)
+    case Subtract(x, y) => binOp[F](x, y)(_ - _)
+    case Divide(x, y)   => binOp[F](x, y)(_ div _)
+    case Modulo(x, y)   => binOp[F](x, y)(_ mod _)
     case Power(b, e)    => math.pow(b, e).point[F]
 
     // relations
     case Not(x)              => fn.not(x).point[F]
-    case Eq(x, y)            => (x eq y).point[F]
-    case Neq(x, y)           => (x ne y).point[F]
-    case Lt(x, y)            => (x lt y).point[F]
-    case Lte(x, y)           => (x le y).point[F]
-    case Gt(x, y)            => (x gt y).point[F]
-    case Gte(x, y)           => (x ge y).point[F]
-    case And(x, y)           => (x and y).point[F]
-    case Or(x, y)            => (x or y).point[F]
+    case Eq(x, y)            => binOp[F](x, y)(_ eq _)
+    case Neq(x, y)           => binOp[F](x, y)(_ ne _)
+    case Lt(x, y)            => binOp[F](x, y)(_ lt _)
+    case Lte(x, y)           => binOp[F](x, y)(_ le _)
+    case Gt(x, y)            => binOp[F](x, y)(_ gt _)
+    case Gte(x, y)           => binOp[F](x, y)(_ ge _)
+    case And(x, y)           => binOp[F](x, y)(_ and _)
+    case Or(x, y)            => binOp[F](x, y)(_ or _)
     case Coalesce(x, y)      => qscript.coalesce[F] apply (x, y)
-    case Between(v1, v2, v3) => mkSeq_(mkSeq_(v2 le v1) and mkSeq_(v1 le v3)).point[F]
+    case Between(v1, v2, v3) => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
     case Cond(p, t, f)       => if_(p).then_(t).else_(f).point[F]
 
     // string
@@ -203,6 +203,14 @@ object MapFuncPlanner {
 
   // A string consisting only of digits.
   private val IntegralNumber = "^(\\d+)$".r
+
+  private def binOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
+    (freshVar[F] |@| freshVar[F])((vx, vy) =>
+      mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
+
+  private def ternOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
+    (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
+      mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
 
   private def whenValidQName[F[_]: MonadPlanErr, A](s: String)(f: QName => F[A]): F[A] =
     refineV[IsNCName](s).disjunction
