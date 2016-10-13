@@ -117,5 +117,6 @@ trait PackageAliases {
   val Ord     = scalaz.Order
   val Eq      = scalaz.Equal
 
-  type ToSelf[A] = A => A
+  type ToSelf[A]    = A => A
+  type MaybeSelf[A] = A =?> A
 }

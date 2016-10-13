@@ -64,8 +64,8 @@ object CF1 {
 }
 
 object CF1P {
-  def apply(name: String)(f: PartialFunction[Column, Column]): CF1 = apply(CFId(name))(f)
-  def apply(id: CFId)(f: PartialFunction[Column, Column]): CF1 = new CF1 {
+  def apply(name: String)(f: MaybeSelf[Column]): CF1 = apply(CFId(name))(f)
+  def apply(id: CFId)(f: MaybeSelf[Column]): CF1 = new CF1 {
     def apply(c: Column) = f.lift(c)
     val identity         = id
   }

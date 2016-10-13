@@ -517,9 +517,7 @@ package object json {
     /** Return a new JValue resulting from applying the given partial function <code>f</code>
       * to each element in JSON.
       */
-    def transform(f: PartialFunction[JValue, JValue]): JValue = mapUp { x =>
-      if (f.isDefinedAt(x)) f(x) else x
-    }
+    def transform(f: MaybeSelf[JValue]): JValue = mapUp (x => if (f isDefinedAt x) f(x) else x)
 
     /** Replaces the matched path values with the result of calling the
       * replacer function on the matches. If the path has no values, the

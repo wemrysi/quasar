@@ -39,109 +39,81 @@ package trans {
   final case object SourceLeft  extends Source2
   final case object SourceRight extends Source2
 
-  object root extends TransSpecBuilder(Leaf(Source)) {
-    def value = selectDynamic("value")
-    def key   = selectDynamic("key")
-  }
-  object rootLeft extends TransSpecBuilder(Leaf(SourceLeft)) {
-    def value = selectDynamic("value")
-    def key   = selectDynamic("key")
-  }
-  object rootRight extends TransSpecBuilder(Leaf(SourceRight)) {
-    def value = selectDynamic("value")
-    def key   = selectDynamic("key")
-  }
+  object root extends KVTransSpecBuilder(Leaf(Source))
+  object rootLeft extends KVTransSpecBuilder(Leaf(SourceLeft))
+  object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
 
+  class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
+    def value = select("value")
+    def key   = select("key")
+  }
   class TransSpecBuilder[A](val spec: TransSpec[A]) extends Dynamic {
     type This    = TransSpec[A]
     type Builder = TransSpecBuilder[A]
 
     protected def next[A](x: This): Builder = new TransSpecBuilder(x)
 
-    def deepMap(pf: PartialFunction[This, This]): Builder = next(TransSpec.deepMap(spec)(pf))
-    def deepMap1(fn: CF1): Builder                        = next(DeepMap1(spec, fn))
-    def map1(fn: CF1): Builder                            = next(Map1(spec, fn))
-    def isType(tp: JType): Builder                        = next(IsType(spec, tp))
-    def apply(index: Int): Builder                        = next(DerefArrayStatic(spec, CPathIndex(index)))
-    def delete(fields: CPathField*): Builder              = next(ObjectDelete(spec, fields.toSet))
-    def select(field: CPathField): Builder                = next(DerefObjectStatic(spec, field))
-    def select(name: String): Builder                     = select(CPathField(name))
-    def selectDynamic(name: String): Builder              = select(name)
+    def deepMap(pf: MaybeSelf[This]): Builder = next(TransSpec.deepMap(spec)(pf))
+    def deepMap1(fn: CF1): Builder            = next(DeepMap1(spec, fn))
+    def map1(fn: CF1): Builder                = next(Map1(spec, fn))
+    def isType(tp: JType): Builder            = next(IsType(spec, tp))
+    def apply(index: Int): Builder            = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def delete(fields: CPathField*): Builder  = next(ObjectDelete(spec, fields.toSet))
+    def select(field: CPathField): Builder    = next(DerefObjectStatic(spec, field))
+    def select(name: String): Builder         = select(CPathField(name))
+    def selectDynamic(name: String): Builder  = select(name)
   }
 
   sealed trait TransSpec[+A]  extends AnyRef
   sealed trait ObjectSpec[+A] extends TransSpec[A]
   sealed trait ArraySpec[+A]  extends TransSpec[A]
 
-  final case class Leaf[+A](source: A) extends TransSpec[A] //done
+  /** Done (according to the existing comments)
+   *
+   *  Scan: Adds a column to the output in the manner of scanLeft
+   *  Map2: apply a function to the cartesian product of the transformed left and right subsets of columns
+   *  InnerObjectConcat: Perform the specified transformation on the all sources, and then create a new set of columns containing all the resulting columns.
+   *  WrapObject: Take the output of the specified TransSpec and prefix all of the resulting selectors with the specified field.
+   *  Typed: Filter out all the source columns whose selector and CType are not specified by the supplied JType
+   *  TypedSubsumes: Filter out all the source columns whose selector and CType are not specified by the supplied JType. If the set of columns does not cover the JType specified, this will return the empty slice.
+   *  IsType: return a Boolean column. returns true for a given row when all of the columns specified by the supplied JType are defined
+   */
+  final case class DeepMap1[+A](source: TransSpec[A], f: CF1)                      extends TransSpec[A]
+  final case class DerefArrayDynamic[+A](left: TransSpec[A], right: TransSpec[A])  extends TransSpec[A]
+  final case class DerefArrayStatic[+A](source: TransSpec[A], element: CPathIndex) extends TransSpec[A]
+  final case class DerefObjectDynamic[+A](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
+  final case class DerefObjectStatic[+A](source: TransSpec[A], field: CPathField)  extends TransSpec[A]
+  final case class Equal[+A](left: TransSpec[A], right: TransSpec[A])              extends TransSpec[A]
+  final case class Filter[+A](source: TransSpec[A], predicate: TransSpec[A])       extends TransSpec[A]
+  final case class IsType[+A](source: TransSpec[A], tpe: JType)                    extends TransSpec[A]
+  final case class Leaf[+A](source: A)                                             extends TransSpec[A]
+  final case class Map1[+A](source: TransSpec[A], f: CF1)                          extends TransSpec[A]
+  final case class Map2[+A](left: TransSpec[A], right: TransSpec[A], f: CF2)       extends TransSpec[A]
+  final case class Scan[+A](source: TransSpec[A], scanner: Scanner)                extends TransSpec[A]
+  final case class TypedSubsumes[+A](source: TransSpec[A], tpe: JType)             extends TransSpec[A]
+  final case class Typed[+A](source: TransSpec[A], tpe: JType)                     extends TransSpec[A]
 
-  final case class Filter[+A](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A] //done
+  final case class InnerArrayConcat[+A](arrays: TransSpec[A]*)                     extends ArraySpec[A]
+  final case class OuterArrayConcat[+A](arrays: TransSpec[A]*)                     extends ArraySpec[A]
+  final case class WrapArray[+A](source: TransSpec[A])                             extends ArraySpec[A]
 
-  // Adds a column to the output in the manner of scanLeft
-  final case class Scan[+A](source: TransSpec[A], scanner: Scanner) extends TransSpec[A] //done
+  final case class InnerObjectConcat[+A](objects: TransSpec[A]*)                   extends ObjectSpec[A]
+  final case class OuterObjectConcat[+A](objects: TransSpec[A]*)                   extends ObjectSpec[A]
+  final case class WrapObject[+A](source: TransSpec[A], field: String)             extends ObjectSpec[A]
 
-  final case class Map1[+A](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
+  /** Not marked as done, but probably done. */
 
-  final case class DeepMap1[+A](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
-
-  // apply a function to the cartesian product of the transformed left and right subsets of columns
-  final case class Map2[+A](left: TransSpec[A], right: TransSpec[A], f: CF2) extends TransSpec[A] //done
-
-  // Perform the specified transformation on the all sources, and then create a new set of columns
-  // containing all the resulting columns.
-  final case class InnerObjectConcat[+A](objects: TransSpec[A]*) extends ObjectSpec[A] //done
-
-  final case class OuterObjectConcat[+A](objects: TransSpec[A]*) extends ObjectSpec[A] //done
-
-  final case class ObjectDelete[+A](source: TransSpec[A], fields: Set[CPathField]) extends TransSpec[A]
-
-  final case class InnerArrayConcat[+A](arrays: TransSpec[A]*) extends ArraySpec[A] //done
-
-  final case class OuterArrayConcat[+A](arrays: TransSpec[A]*) extends ArraySpec[A] //done
-
-  // Take the output of the specified TransSpec and prefix all of the resulting selectors with the
-  // specified field.
-  final case class WrapObject[+A](source: TransSpec[A], field: String) extends ObjectSpec[A] //done
-
-  final case class WrapObjectDynamic[+A](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
-
-  final case class WrapArray[+A](source: TransSpec[A]) extends ArraySpec[A] //done
-
-  final case class DerefObjectStatic[+A](source: TransSpec[A], field: CPathField) extends TransSpec[A] //done
-
-  final case class DerefMetadataStatic[+A](source: TransSpec[A], field: CPathMeta) extends TransSpec[A]
-
-  final case class DerefObjectDynamic[+A](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
-
-  final case class DerefArrayStatic[+A](source: TransSpec[A], element: CPathIndex) extends TransSpec[A] //done
-
-  final case class DerefArrayDynamic[+A](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
-
-  final case class ArraySwap[+A](source: TransSpec[A], index: Int) extends TransSpec[A]
-
-  // Filter out all the source columns whose selector and CType are not specified by the supplied JType
-  final case class Typed[+A](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
-
-  // Filter out all the source columns whose selector and CType are not specified by the supplied JType
-  // if the set of columns does not cover the JType specified, this will return the empty slice.
-  final case class TypedSubsumes[+A](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
-
-  // return a Boolean column
-  // returns true for a given row when all of the columns specified by the supplied JType are defined
-  final case class IsType[+A](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
-
-  final case class Equal[+A](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
-
-  final case class EqualLiteral[+A](left: TransSpec[A], right: CValue, invert: Boolean) extends TransSpec[A]
-
-  // target is the transspec that provides defineedness information. The resulting table will be defined
-  // and have the constant value wherever a row provided by the target transspec has at least one member
-  // that is not undefined
+  // The result table has constant value wherever a row in Target has at least one defined member.
   final case class ConstLiteral[+A](value: CValue, target: TransSpec[A]) extends TransSpec[A]
 
+  /** Not marked as done. */
+  final case class ArraySwap[+A](source: TransSpec[A], index: Int)                                             extends TransSpec[A]
+  final case class Cond[+A](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A])                       extends TransSpec[A]
+  final case class DerefMetadataStatic[+A](source: TransSpec[A], field: CPathMeta)                             extends TransSpec[A]
+  final case class EqualLiteral[+A](left: TransSpec[A], right: CValue, invert: Boolean)                        extends TransSpec[A]
   final case class FilterDefined[+A](source: TransSpec[A], definedFor: TransSpec[A], definedness: Definedness) extends TransSpec[A]
-
-  final case class Cond[+A](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
+  final case class ObjectDelete[+A](source: TransSpec[A], fields: Set[CPathField])                             extends TransSpec[A]
+  final case class WrapObjectDynamic[+A](left: TransSpec[A], right: TransSpec[A])                              extends TransSpec[A]
 
   object TransSpec {
     import CPath._
@@ -205,7 +177,7 @@ package trans {
       case Cond(pred, left, right)                        => Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
     }
 
-    def deepMap[A](spec: TransSpec[A])(f: PartialFunction[TransSpec[A], TransSpec[A]]): TransSpec[A] = spec match {
+    def deepMap[A](spec: TransSpec[A])(f: MaybeSelf[TransSpec[A]]): TransSpec[A] = spec match {
       case x if f isDefinedAt x => f(x)
 
       case x @ Leaf(source)                  => x

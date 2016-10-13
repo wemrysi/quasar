@@ -160,7 +160,7 @@ final object JField {
 
   implicit def liftTuple(x: JStringValue): JField = apply(x)
 
-  def liftCollect(f: PartialFunction[JField, JField]): PartialFunction[JValue, JValue] = {
+  def liftCollect(f: PartialFunction[JField, JField]): MaybeSelf[JValue] = {
     case JObject.Fields(fields) if fields exists f.isDefinedAt => JObject(fields collect f)
   }
 }

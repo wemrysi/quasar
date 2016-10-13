@@ -12,19 +12,8 @@ object Ygg {
   """.trim
 
   def yggImports = imports + "\n" + """
-    import ygg._, common._, json._, table._, trans._
+    import ygg._, common._, json._, table._, trans._, PlayTable._
     import quasar._, sql._, SemanticAnalysis._
-    import ygg.table.{ PlayTable => p }
-
-    def zips = PlayTable(new jFile("it/src/main/resources/tests/zips.data"))
-    def lp(q: String): Fix[LogicalPlan] = (
-      compile(q) map Optimizer.optimize flatMap (q =>
-        (LogicalPlan ensureCorrectTypes q).disjunction
-          leftMap (_.list.toList mkString ";")
-      )
-    ).fold(abort, x => x)
-    def zq = lp("select * from zips where state=\"CO\" limit 3")
-
   """.trim
 
   def jsonfileTestImports = imports + "\n" + """
