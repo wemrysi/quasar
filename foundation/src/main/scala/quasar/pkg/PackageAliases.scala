@@ -22,7 +22,6 @@ import java.lang.SuppressWarnings
 @SuppressWarnings(scala.Array("org.wartremover.warts.MutableDataStructures"))
 trait PackageAliases {
   // scala stdlib
-
   type ->[+A, +B]          = scala.Tuple2[A, B]
   type =?>[-A, +B]         = scala.PartialFunction[A, B]
   type Any                 = scala.Any
@@ -110,7 +109,8 @@ trait PackageAliases {
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
   type jPath                = java.nio.file.Path
 
-  // other outside libs
+  // scalaz aliases at present,
+  // but also a single place to change implementations
   type Cmp    = scalaz.Ordering
   type Eq[A]  = scalaz.Equal[A]
   type Ord[A] = scalaz.Order[A]

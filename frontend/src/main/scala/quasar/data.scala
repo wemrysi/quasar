@@ -108,6 +108,11 @@ object Data {
 
   val _int = Prism.partial[Data, BigInt] { case Data.Int(i) => i } (Data.Int(_))
 
+  object Obj {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
+    def apply(xs: (String -> Data)*): Obj = new Obj(ListMap(xs: _*))
+  }
+
   final case class Obj(value: ListMap[String, Data]) extends Data {
     def dataType = Type.Obj(value ∘ (Type.Const(_)), None)
 

@@ -17,7 +17,6 @@
 package ygg.tests
 
 import scala.Predef.{ $conforms, assert }
-import org.scalacheck.Shrink
 import ygg._, common._, table._
 import scala.math.Ordering
 import org.specs2.matcher.MatchersImplicits._

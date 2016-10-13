@@ -19,7 +19,6 @@ package ygg
 import jawn._
 import ygg.common._
 import scalaz._, Scalaz._
-import ygg.macros.Json._
 
 package object json {
   type JSchemaElem = ygg.json.JPath -> ygg.table.CType
@@ -33,10 +32,10 @@ package object json {
   val NoJPath = JPath()
   def undef: JValue = JUndefined
 
-  def toRecord(ids: Array[Long], jv: JValue): JValue = json"""{
-    "key" : $ids,
-    "value" : $jv
-  }"""
+  def toRecord(ids: Array[Long], jv: JValue): JValue = jobject(
+    "key"   -> jarray(ids map (x => JNum(x)): _*),
+    "value" -> jv
+  )
 
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
     type R = AsyncParse[A] -> AsyncParser[A]

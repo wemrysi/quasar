@@ -252,7 +252,7 @@ object QScriptCore {
             LeftShift(_, struct2, repair2)) =>
             val (repair, repL, repR) = concat(repair1, repair2)
 
-            val norm = TTypes.normalizable[T]
+            val norm = Normalizable.normalizable[T]
             val lFunc: FreeMap[IT] = norm.freeMF(struct1 >> left)
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
@@ -294,7 +294,4 @@ object QScriptCore {
           case (_, _) => None
         }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[QScriptCore[T, ?]] =
-    TTypes.normalizable[T].QScriptCore
 }

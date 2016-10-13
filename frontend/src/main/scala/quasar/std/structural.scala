@@ -418,7 +418,7 @@ trait StructuralLib extends Library {
     // Note: signature does not match VirtualFunc
     def apply[T[_[_]]: Corecursive](args: (T[LogicalPlan], T[LogicalPlan])*): LogicalPlan[T[LogicalPlan]] =
       args.toList match {
-        case Nil      => ConstantF(Data.Obj(ListMap()))
+        case Nil      => ConstantF(Data.Obj())
         case x :: xs  =>
           xs.foldLeft(MakeObject(x._1, x._2))((a, b) =>
             ObjectConcat(a.embed, MakeObject(b._1, b._2).embed))

@@ -21,8 +21,7 @@ import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
 import quasar.qscript.MapFunc
-import quasar.qscript.MapFuncs
-import MapFuncs._
+import quasar.qscript.MapFuncs, MapFuncs._
 
 import scalaz.{Free, Scalaz}, Scalaz._
 
