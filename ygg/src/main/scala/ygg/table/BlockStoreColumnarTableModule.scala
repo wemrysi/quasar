@@ -19,31 +19,7 @@ package ygg.table
 import scala.Predef.$conforms
 import scalaz._, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
-import org.mapdb._
 import JDBM._
-
-final case class JDBMState(prefix: String, fdb: Option[jFile -> DB], indices: IndexMap, insertCount: Long) {
-  def commit() = fdb foreach { _._2.commit() }
-
-  def closed(): JDBMState = fdb match {
-    case Some((f, db)) =>
-      db.close()
-      JDBMState(prefix, None, indices, insertCount)
-    case None => this
-  }
-
-  def opened(): (jFile, DB, JDBMState) = fdb match {
-    case Some((f, db)) => (f, db, this)
-    case None          =>
-      // Open a JDBM3 DB for use in sorting under a temp directory
-      val dbFile = new jFile(newScratchDir(), prefix)
-      val db     = DBMaker.fileDB(dbFile.getCanonicalPath).make()
-      (dbFile, db, JDBMState(prefix, Some((dbFile, db)), indices, insertCount))
-  }
-}
-object JDBMState {
-  def empty(prefix: String) = JDBMState(prefix, None, Map(), 0l)
-}
 
 final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
