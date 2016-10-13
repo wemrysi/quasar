@@ -34,10 +34,11 @@ import quasar.fs.mount.FileSystemDef._
 import quasar.fs.mount.ConnectionUri
 import quasar.contrib.pathy._
 
-import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
-import org.apache.hadoop.conf.Configuration;
 import java.net.URI
+import scala.sys
 
+import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
+import org.apache.hadoop.conf.Configuration
 import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
@@ -80,7 +81,7 @@ package object hdfs {
   final case class SparkHdfsFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
   private def fetchSparCoreJar: Task[String] = Task.delay {
-    sys.env("QUASAR_HOME/sparkcore.jar")
+    sys.env("QUASAR_HOME") + "/sparkcore.jar"
   }
 
   private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
