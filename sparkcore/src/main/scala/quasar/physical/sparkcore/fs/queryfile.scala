@@ -107,6 +107,7 @@ object queryfile {
     }
 
   // TODO unify explainPlan, executePlan & evaluatePlan
+  // This might be more complicated then it looks at first glance
   private def explainPlan[S[_]](input: Input, fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
