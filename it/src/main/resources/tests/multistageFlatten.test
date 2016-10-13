@@ -2,7 +2,7 @@
     "name": "multi-flatten with fields at various depths",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "nested_foo.data",

@@ -1,8 +1,8 @@
 {
     "name": "unshift aggregation",
     "backends": {
-        "marklogic":  "pending",
         "postgresql": "pending",
+        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "zips.data",

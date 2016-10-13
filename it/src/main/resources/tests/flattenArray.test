@@ -2,7 +2,7 @@
     "name": "flatten array",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "zips.data",

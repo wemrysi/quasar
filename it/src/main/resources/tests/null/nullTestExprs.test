@@ -2,7 +2,7 @@
     "name": "expressions with `= null` and `is null`",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "nulls.data",

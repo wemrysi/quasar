@@ -3,7 +3,7 @@
   "backends": {
     "mongodb_read_only": "pending",
     "postgresql":        "pending",
-    "marklogic":         "pending",
+    "marklogic":         "skip",
     "couchbase":         "skip"
   },
   "data": "olympics.data",

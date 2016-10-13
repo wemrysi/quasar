@@ -2,7 +2,7 @@
     "name": "unify flattened fields with multiple shape-preserving ops.",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
+        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "zips.data",
