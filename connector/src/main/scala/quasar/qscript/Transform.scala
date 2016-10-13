@@ -526,6 +526,13 @@ class Transform
         if func.effect ≟ Reduction =>
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
+    case LogicalPlan.InvokeFUnapply(set.Distinct, Sized(a1)) =>
+      invokeReduction1(
+        agg.Arbitrary,
+        Func.Input1((
+          Ann(prov.swapProvenances(a1._1.values :: a1._1.provenance), a1._1.values),
+          a1._2))).right
+
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
 
@@ -594,9 +601,36 @@ class Transform
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
+      val lbranch = Free.roll(FI.inject(QC.inj(reifyResult(a1._1, lfree))))
+      val rbranch = Free.roll(FI.inject(QC.inj(reifyResult(a2._1, rfree))))
 
-      (Ann(prov.unionProvenances(a1._1.provenance, a2._1.provenance), HoleF),
-        QC.inj(Union(src, lfree, rfree)).embed).right
+      // TODO: Need to align provenances, so each component is at the same
+      //       location on both sides
+      (concatBuckets(a1._1.provenance), concatBuckets(a2._1.provenance)) match {
+        case (None, None) =>
+          (Ann[T](Nil, HoleF), QC.inj(Union(src, lbranch, rbranch)).embed).right
+        case (None, Some((rBuck, rProvs))) =>
+          val (merged, rbacc, vacc) = concat(rBuck, HoleF[T])
+          (Ann(rProvs.map(_ >> rbacc).toList, vacc),
+            QC.inj(Union(src,
+              Free.roll(FI.inject(QC.inj(Map(lbranch, merged)))),
+              Free.roll(FI.inject(QC.inj(Map(rbranch, merged)))))).embed).right
+        case (Some((lBuck, lProvs)), None) =>
+          val (merged, lbacc, vacc) = concat(lBuck, HoleF[T])
+          (Ann(lProvs.map(_ >> lbacc).toList, vacc),
+            QC.inj(Union(src,
+              Free.roll(FI.inject(QC.inj(Map(lbranch, merged)))),
+              Free.roll(FI.inject(QC.inj(Map(rbranch, merged)))))).embed).right
+        case (Some((lBuck, lProvs)), Some((rBuck, rProvs))) =>
+          val (merged, lbacc, lvacc) = concat(lBuck, HoleF[T])
+          val (_, rbacc, rvacc) = concat(rBuck, HoleF[T])
+          (lbacc ≟ rbacc && lvacc ≟ rvacc).fold(
+            (Ann(lProvs.map(_ >> lbacc).toList, lvacc),
+              QC.inj(Union(src,
+                Free.roll(FI.inject(QC.inj(Map(lbranch, merged)))),
+                Free.roll(FI.inject(QC.inj(Map(rbranch, merged)))))).embed).right,
+            InternalError("unaligned union provenances").left)
+      }
 
     case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) =>
       val (src, lfree, rfree) = merge(a1._2, a2._2)
