@@ -24,6 +24,9 @@ object Dependencies {
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
+  private val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
+  private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
+
   def foundation = Seq(
     "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
@@ -57,31 +60,47 @@ object Dependencies {
     "com.github.scopt" %% "scopt" % "3.5.0",
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
+
+  def netty4Mongo =
+    if(quasar4Spark == "yes")
+      Seq.empty
+    else
+      Seq(
+        "io.netty"    % "netty-buffer"         % nettyVersion,
+        "io.netty"    % "netty-handler"        % nettyVersion
+      )
+
   def mongodb = Seq(
-    "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
-    "io.netty"    % "netty-buffer"         % nettyVersion,
-    "io.netty"    % "netty-handler"        % nettyVersion
-  )
+   "org.mongodb" % "mongodb-driver-async" %   "3.2.2"
+  ) ++ netty4Mongo
+
   val postgresql = Seq(
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
-  val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
-
   def buildSparkScope = if(buildSparkCore == "yes") "provided" else "compile"
 
-  def sparkcore = Seq(
-    "io.netty"          %  "netty-all"  % nettyVersion % buildSparkScope,
-    ("org.apache.spark" %% "spark-core" % "2.0.1") 
-      .exclude("commons-collections", "commons-collections")
-      .exclude("commons-beanutils", "commons-beanutils-core")
-      .exclude("commons-logging", "commons-logging")
-      .exclude("com.esotericsoftware.minlog", "minlog")
-      .exclude("org.spark-project.spark", "unused") 
-      .exclude("io.netty", "netty-all")
-      .exclude("io.netty", "netty") % buildSparkScope
-  )
+  val sparkDepCore = ("org.apache.spark" %% "spark-core" % "2.0.1")
+    .exclude("aopalliance", "aopalliance")
+    .exclude("javax.inject", "javax.inject")
+    .exclude("commons-collections", "commons-collections")
+    .exclude("commons-beanutils", "commons-beanutils-core")
+    .exclude("commons-logging", "commons-logging")
+    .exclude("commons-logging", "commons-logging")
+    .exclude("com.esotericsoftware.minlog", "minlog")
+    .exclude("org.spark-project.spark", "unused")
+
+  val sparkDep =
+    if(quasar4Spark == "yes")
+      sparkDepCore % buildSparkScope
+    else 
+      sparkDepCore
+        .exclude("io.netty", "netty-all")
+        .exclude("io.netty", "netty")
+        .excludeAll(ExclusionRule(organization = "javax.servlet")) % buildSparkScope
+  
+  def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
     "eu.timepit" %% "refined" %  refinedVersion
