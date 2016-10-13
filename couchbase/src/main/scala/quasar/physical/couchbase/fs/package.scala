@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
+import quasar.fs.mount._, FileSystemDef.DefErrT
 import quasar.physical.couchbase.common.Context
 
 import com.couchbase.client.java.CouchbaseCluster

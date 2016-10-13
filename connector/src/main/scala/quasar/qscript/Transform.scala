@@ -24,7 +24,7 @@ import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Planner._
-import quasar.Predef._
+import quasar.Predef.{ Eq => _, _ }
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._

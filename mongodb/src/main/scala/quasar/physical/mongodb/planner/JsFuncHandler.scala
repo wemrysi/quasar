@@ -21,7 +21,7 @@ import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
 import quasar.qscript.MapFunc
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncs, MapFuncs._
 
 import scalaz.{Free, Scalaz}, Scalaz._
 
@@ -51,7 +51,7 @@ object JsFuncHandler {
       case Modulo(a1, a2)   => BinOp(jscore.Mod, a1, a2)
       case Negate(a1)       => UnOp(jscore.Neg, a1)
 
-      case Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2)
+      case MapFuncs.Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2)
       case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2)
       case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2)
       case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2)

@@ -16,14 +16,12 @@
 
 package quasar.api.services
 
+import quasar.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
-import quasar.fp._
-import quasar.fp.ski._
-import quasar.fp.numeric._
+import quasar.fp._, ski._, numeric._
 import quasar.fs._
-import quasar.Predef._
 
 import java.nio.charset.StandardCharsets
 
