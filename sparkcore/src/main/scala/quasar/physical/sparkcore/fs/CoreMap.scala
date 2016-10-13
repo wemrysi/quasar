@@ -47,19 +47,19 @@ object CoreMap extends Serializable {
     }).right
 
     case Date(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseDate(v).getOrElse(Data.NA)
+      case Data.Str(v) => DateLib.parseDate(v).getOrElse(undefined)
       case _ => undefined
     }).right
     case Time(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseTime(v).getOrElse(Data.NA)
+      case Data.Str(v) => DateLib.parseTime(v).getOrElse(undefined)
       case _ => undefined
     }).right
     case Timestamp(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseTimestamp(v).getOrElse(Data.NA)
+      case Data.Str(v) => DateLib.parseTimestamp(v).getOrElse(undefined)
       case _ => undefined
     }).right
     case Interval(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseInterval(v).getOrElse(Data.NA)
+      case Data.Str(v) => DateLib.parseInterval(v).getOrElse(undefined)
       case _ => undefined
     }).right
     case TimeOfDay(f) => (f >>> {
@@ -222,7 +222,7 @@ object CoreMap extends Serializable {
     case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
-    case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
+    case Guard(f1, fPattern, f2,ff3) => ((x:Data) => f2(x)).right
     case _ => InternalError("not implemented").left
   }
 
