@@ -13,7 +13,18 @@ object Ygg {
 
   def yggImports = imports + "\n" + """
     import ygg._, common._, json._, table._, trans._
+    import quasar._, sql._, SemanticAnalysis._
     import ygg.table.{ PlayTable => p }
+
+    def zips = PlayTable(new jFile("it/src/main/resources/tests/zips.data"))
+    def lp(q: String): Fix[LogicalPlan] = (
+      compile(q) map Optimizer.optimize flatMap (q =>
+        (LogicalPlan ensureCorrectTypes q).disjunction
+          leftMap (_.list.toList mkString ";")
+      )
+    ).fold(abort, x => x)
+    def zq = lp("select * from zips where state=\"CO\" limit 3")
+
   """.trim
 
   def jsonfileTestImports = imports + "\n" + """
@@ -54,7 +65,7 @@ object Ygg {
   )
 
   def ygg(p: Project): Project = ( p
-    .dependsOn('foundation % BothScopes, 'macros1, 'ejson)
+    .dependsOn('connector % BothScopes, 'macros1)
     .settings(name := "quasar-ygg-internal")
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)
