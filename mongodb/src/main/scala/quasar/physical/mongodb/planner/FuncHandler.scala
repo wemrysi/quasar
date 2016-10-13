@@ -54,7 +54,7 @@ object FuncHandler {
           case Modulo(a1, a2)        => $mod(a1, a2)
           case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
 
-          case Eq(a1, a2)            => $eq(a1, a2)
+          case MapFuncs.Eq(a1, a2)   => $eq(a1, a2)
           case Neq(a1, a2)           => $neq(a1, a2)
           case Lt(a1, a2)            => $lt(a1, a2)
           case Lte(a1, a2)           => $lte(a1, a2)

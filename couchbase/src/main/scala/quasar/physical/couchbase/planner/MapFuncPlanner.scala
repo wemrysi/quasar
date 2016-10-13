@@ -28,7 +28,7 @@ import quasar.qscript, qscript._
 import quasar.std.StdLib.string._
 
 import matryoshka._, Recursive.ops._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 
 final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
   extends Planner[F, MapFunc[T, ?]] {

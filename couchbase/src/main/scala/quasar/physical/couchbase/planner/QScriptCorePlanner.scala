@@ -27,7 +27,7 @@ import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript.{Map => _, Read => _, _}
 
 import matryoshka.{Hole => _, _}
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 
 final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
   extends Planner[F, QScriptCore[T, ?]] {
