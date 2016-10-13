@@ -52,15 +52,15 @@ object queryfile {
 
   type SparkContextRead[A] = Read[SparkContext, A]
 
-  def chrooted[S[_]](input: Input, prefix: ADir)(implicit
+  def chrooted[S[_]](input: Input, fsType: FileSystemType, prefix: ADir)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] =
-    flatMapSNT(interpreter(input)) compose chroot.queryFile[QueryFile](prefix)
+    flatMapSNT(interpreter(input, fsType)) compose chroot.queryFile[QueryFile](prefix)
 
-  def interpreter[S[_]](input: Input)(implicit
+  def interpreter[S[_]](input: Input, fsType: FileSystemType)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
@@ -77,30 +77,26 @@ object queryfile {
       } yield qs
     }
 
+    def qsToProgram[T](
+      exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
+      lp: Fix[LogicalPlan]
+    ): Free[S, (PhaseResults, FileSystemError \/ T)] = {
+          val qs = toQScript(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
+          qs.run.run
+        }
+
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
-        case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          val qs = toQScript(lp) >>=
-          (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
-
-          qs.run.run
-        }
-        case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) => {
-          val qs = toQScript(lp) >>=
-          (qs => EitherT(WriterT(evaluatePlan(input, qs, lp).map(_.run.run))))
-
-          qs.run.run
-        }
+        case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) =>
+          qsToProgram(qs => executePlan(input, qs, out, lp), lp)
+        case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) =>
+          qsToProgram(qs => evaluatePlan(input, qs, lp), lp)
         case QueryFile.More(h) => more(h, input.readChunkSize())
         case QueryFile.Close(h) => close(h)
-        case QueryFile.Explain(lp: Fix[LogicalPlan]) => {
-          val qs = toQScript(lp) >>=
-          (qs => EitherT(WriterT(explainPlan(input, qs, lp).map(_.run.run))))
-
-          qs.run.run
-        }
+        case QueryFile.Explain(lp: Fix[LogicalPlan]) =>
+          qsToProgram(qs => explainPlan(input, fsType, qs, lp), lp)
       }
     }}
 
@@ -111,7 +107,7 @@ object queryfile {
     }
 
   // TODO unify explainPlan, executePlan & evaluatePlan
-  private def explainPlan[S[_]](input: Input, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
+  private def explainPlan[S[_]](input: Input, fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
@@ -125,7 +121,7 @@ object queryfile {
       injectFT.apply {
         sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(FileSystemType("spark"), "rdd explained"))))).map(EitherT(_))
+          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(fsType, "RDD Directed Acyclic Graph"))))).map(EitherT(_))
       }
     }.join
   }
