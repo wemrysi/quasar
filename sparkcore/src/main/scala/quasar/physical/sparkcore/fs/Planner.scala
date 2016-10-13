@@ -69,12 +69,17 @@ object Planner {
         (qs: Const[ShiftedRead, RDD[Data]]) => {
           StateT((sc: SparkContext) => {
             val filePath = qs.getConst.path
+            val idStatus = qs.getConst.idStatus
+
             EitherT(fromFile(sc, filePath).map { initRDD =>
               val rdd = initRDD.map { raw =>
                 DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
               }
-                (sc, rdd).right[PlannerError]
-
+              if(idStatus === IncludeId) {
+                (sc, rdd.zipWithIndex.map {
+                  case (d, idx) => Data.Arr(List(Data.Int(idx), d)) : Data
+                }).right[PlannerError]
+              } else (sc, rdd).right[PlannerError]
             })
           })
         }

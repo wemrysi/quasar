@@ -19,11 +19,9 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp._
-import quasar.fp.free._
-import quasar.fs._
-import quasar.fs.impl.ReadStream
-import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
+import quasar.fp._, free._
+import quasar.fs._, impl.ReadStream
+import quasar.fs.mount._, FileSystemDef.DefErrT
 
 import java.net.URI
 

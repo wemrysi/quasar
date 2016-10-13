@@ -108,6 +108,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               Free.roll(Undefined())))))))).some)
     }
 
+    "convert a basic order by" in {
+      val lp = fullCompileExp("select * from zips order by city")
+      val qs = convert(listContents.some, lp)
+      qs must equal(chain(RootR).some) // TODO incorrect expectation
+    }.pendingUntilFixed
+
     "convert a basic reduction" in {
       val lp = fullCompileExp("select sum(pop) from bar")
       val qs = convert(listContents.some, lp)

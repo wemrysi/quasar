@@ -24,7 +24,7 @@ import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Planner._
-import quasar.Predef._
+import quasar.Predef.{ Eq => _, _ }
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
@@ -549,38 +549,43 @@ class Transform
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoin3Result(AutoJoinBase(src, bucketsSrc), ordering, buckets, directions) =
-        autojoin3(a1, a2, a3)
+      val AutoJoinResult(AutoJoinBase(src, bucketsSrc), dataset, keys) =
+        autojoin(a1, a2)
 
-      val bucketsList: List[FreeMap] = buckets.toCoEnv[T].project match {
+      val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
         case StaticArray(as) => as.map(_.fromCoEnv)
-        case mf => List(mf.embed.fromCoEnv)
+        case mf              => List(mf.embed.fromCoEnv)
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
-        val orderStrs: PlannerError \/ List[String] =
-          directions.toCoEnv[T].project match {
-            case StaticArray(as) => {
-              as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
-            }
-            case StrLit(str) => List(str).right
-            case _ => InternalError("unsupported ordering function").left
-          }
+        val orderStrs: PlannerError \/ List[String] = {
+	  QC.prj(a3.value.project) match {
+	    case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
+	      mf.toCoEnv[T].project match {
+                case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
+                case StrLit(str)     => List(str).right
+                case _               => InternalError("unsupported ordering function").left
+	      }
+	    case None => InternalError("oops").left
+	  }
+	}
         orderStrs.flatMap {
           _.traverse {
-            case "ASC" => SortDir.Ascending.right
+            case "ASC"  => SortDir.Ascending.right
             case "DESC" => SortDir.Descending.right
-            case _ => InternalError("unsupported ordering direction").left
+            case _      => InternalError("unsupported ordering direction").left
           }
         }
       }
 
-      val lists: PlannerError \/ List[(FreeMap, SortDir)] =
-        directionsList.map { bucketsList.zip(_) }
-
-      lists.map(pairs =>
-        Target(Ann(bucketsSrc, HoleF[T]),
-          QC.inj(Sort(src, ordering, pairs)).embed))
+      directionsList.map(dirs =>
+        concatBuckets(bucketsSrc).fold(
+          Target(Ann(Nil, dataset),
+            QC.inj(Sort(src, NullLit(), keysList.zip(dirs))).embed)) {
+          case (newProvs, provAccess) =>
+            Target(Ann(provAccess.list.toList, dataset),
+              QC.inj(Sort(src, newProvs, keysList.zip(dirs))).embed)
+        })
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val join: AutoJoinResult = autojoin(a1, a2)
