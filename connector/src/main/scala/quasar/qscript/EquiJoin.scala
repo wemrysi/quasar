@@ -16,7 +16,8 @@
 
 package quasar.qscript
 
-import quasar.RenderTree
+import quasar.Predef._
+import quasar.{NonTerminal, Terminal, RenderTree}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -72,8 +73,26 @@ object EquiJoin {
       }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
-    RenderTree.delayFromShow
+  // TODO: use the RenderTree for FreeQS, which contains QScriptTotal, which
+  // contains ThetaJoin...
+  implicit def renderTree[T[_[_]]: ShowT](implicit
+    FM: RenderTree[FreeMap[T]],
+    JF: RenderTree[JoinFunc[T]]
+  ): Delay[RenderTree, EquiJoin[T, ?]] =
+    new Delay[RenderTree, EquiJoin[T, ?]] {
+      val nt = List("EquiJoin")
+      def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {
+          case EquiJoin(src, lBr, rBr, lKey, rKey, tpe, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              Terminal("LeftBranch" :: nt, lBr.shows.some),
+              Terminal("RightBranch" :: nt, rBr.shows.some),
+              lKey.render,
+              rKey.render,
+              tpe.render,
+              combine.render))
+        }
+      }
 
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {
