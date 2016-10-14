@@ -56,7 +56,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         val alg: AlgebraM[SparkState, Const[ShiftedRead, ?], RDD[Data]] = sr.plan(fromFile )
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
 
-        val state: SparkState[RDD[Data]] = alg(Const(ShiftedRead(afile, IncludeId)))
+        val state: SparkState[RDD[Data]] = alg(Const(ShiftedRead(afile, ExcludeId)))
         state.eval(sc).run.unsafePerformSync must beRightDisjunction.like{
           case rdd =>
             val results = rdd.collect
@@ -109,6 +109,34 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+        def reducers: List[ReduceFunc[FreeMap]] = List(Arbitrary(ProjectFieldR(HoleF, StrLit("country"))))
+        def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+        val reduce = Reduce(src, bucket, reducers, repair)
+
+        val state: SparkState[RDD[Data]] = alg(reduce)
+        state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+          case rdd =>
+            val results = rdd.collect
+            results.size must_== 2
+            results(1) must_== Data.Str("Poland")
+            results(0) must_== Data.Str("US")
+        }
+        sc.stop
+      }).run.unsafePerformSync
+      ok
+    }
+
+    "core.reduce.max" in {
+      newSc.map ( sc => {
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+
+        val src: RDD[Data] = sc.parallelize(List(
+          Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
+        ))
+
+        def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
         def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
         def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
         val reduce = Reduce(src, bucket, reducers, repair)
@@ -125,6 +153,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       }).run.unsafePerformSync
       ok
     }
+
 
     "core.filter" in {
       newSc.map ( sc => {
