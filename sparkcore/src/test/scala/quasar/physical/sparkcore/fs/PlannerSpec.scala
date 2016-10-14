@@ -228,7 +228,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def func(country: String): FreeMap =
-          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+          Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
         def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
@@ -291,7 +291,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def func(country: String): FreeMap =
-          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+          Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
         def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
@@ -331,7 +331,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def func(country: String): FreeMap =
-          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+          Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
         def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
@@ -375,7 +375,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def func(country: String): FreeMap =
-          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+          Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
         def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
@@ -420,7 +420,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ))
 
         def func(country: String): FreeMap =
-          Free.roll(Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+          Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
 
         def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
