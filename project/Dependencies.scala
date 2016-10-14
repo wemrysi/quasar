@@ -61,18 +61,13 @@ object Dependencies {
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
 
-  def netty4Mongo =
-    if(quasar4Spark == "yes")
-      Seq.empty
-    else
-      Seq(
-        "io.netty"    % "netty-buffer"         % nettyVersion,
-        "io.netty"    % "netty-handler"        % nettyVersion
-      )
+  def nettyDepType = if(quasar4Spark == "yes") "provided" else "compile"
 
   def mongodb = Seq(
-   "org.mongodb" % "mongodb-driver-async" %   "3.2.2"
-  ) ++ netty4Mongo
+    "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
+    "io.netty"    % "netty-buffer"         % nettyVersion % nettyDepType,
+    "io.netty"    % "netty-handler"        % nettyVersion % nettyDepType
+  )
 
   val postgresql = Seq(
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
