@@ -3,20 +3,19 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "couchbase":         "pending"
     },
     "data": "largeZips.data",
-    "query": "select city, loc[0] from largeZips",
+    "query": "select city, loc[0] as lat from largeZips",
     "predicate": "containsAtLeast",
-    "expected": [{ "city": "CUSHMAN",          "1":  -72.51565 },
-                 { "city": "CHICOPEE",         "1": -72.576142 },
-                 { "city": "HOLYOKE",          "1": -72.626193 },
-                 { "city": "FLORENCE",         "1": -72.654245 },
-                 { "city": "MONTGOMERY",       "1": -72.754318 },
-                 { "city": "WEST SPRINGFIELD", "1": -72.641109 },
-                 { "city": "SPRINGFIELD",      "1": -72.558432 },
-                 { "city": "SPRINGFIELD",      "1": -72.554349 },
-                 { "city": "PITTSFIELD",       "1": -73.247088 },
-                 { "city": "FITCHBURG",        "1": -71.803133 }]
+    "expected": [{ "city": "CUSHMAN",          "lat":  -72.51565 },
+                 { "city": "CHICOPEE",         "lat": -72.576142 },
+                 { "city": "HOLYOKE",          "lat": -72.626193 },
+                 { "city": "FLORENCE",         "lat": -72.654245 },
+                 { "city": "MONTGOMERY",       "lat": -72.754318 },
+                 { "city": "WEST SPRINGFIELD", "lat": -72.641109 },
+                 { "city": "SPRINGFIELD",      "lat": -72.558432 },
+                 { "city": "SPRINGFIELD",      "lat": -72.554349 },
+                 { "city": "PITTSFIELD",       "lat": -73.247088 },
+                 { "city": "FITCHBURG",        "lat": -71.803133 }]
 }
