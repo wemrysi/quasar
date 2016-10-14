@@ -108,6 +108,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     // TODO: This would benefit from better normalization around Sort (#1545)
+    // TODO: The provenance here is complicated (#1550), so the results are not
+    //       completely verifiable by hand.
     "convert a basic order by" in {
       val lp = fullCompileExp("select * from zips order by city")
       val qs = convert(listContents.some, lp)
@@ -514,6 +516,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed("verify includes proper provenance")
 
+    // TODO: The provenance here is complicated (#1550), so the results are not
+    //       completely verifiable by hand.
     "convert a filter" in {
       // "select * from foo where bar between 1 and 10"
       convert(
