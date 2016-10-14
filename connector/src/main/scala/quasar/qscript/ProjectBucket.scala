@@ -115,8 +115,4 @@ object ProjectBucket {
           case (_, _) => None
       }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]
-      : Normalizable[ProjectBucket[T, ?]] =
-    TTypes.normalizable[T].ProjectBucket
 }

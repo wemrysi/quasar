@@ -92,7 +92,7 @@ object MapFuncPlanner {
 
     // relations
     case Not(x)              => fn.not(x).point[F]
-    case Eq(x, y)            => binOp[F](x, y)(_ eq _)
+    case MapFuncs.Eq(x, y)   => binOp[F](x, y)(_ eq _)
     case Neq(x, y)           => binOp[F](x, y)(_ ne _)
     case Lt(x, y)            => binOp[F](x, y)(_ lt _)
     case Lte(x, y)           => binOp[F](x, y)(_ le _)

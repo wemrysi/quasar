@@ -1,0 +1,1 @@
+- Turn on QS optimization on sparkcore
