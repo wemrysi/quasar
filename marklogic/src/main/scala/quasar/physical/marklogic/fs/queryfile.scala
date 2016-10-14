@@ -65,6 +65,7 @@ object queryfile {
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
       val rewrite = new Rewrite[Fix]
+      val C = Coalesce[Fix, MLQScript, MLQScript]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.detail("XQuery", main.render))
@@ -85,7 +86,13 @@ object queryfile {
         shifted =  shiftRead[Fix](qs)
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
                      PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse)))
-        optmzed =  shifted.transCata(rewrite.optimize(reflNT))
+        optmzed =  shifted
+                     .transAna(
+                       repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
+                       repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
+                       repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
+                       repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
+                     .transCata(rewrite.optimize(reflNT))
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
                      PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse)))
         mod     <- plan(optmzed).leftMap(mlerr => mlerr match {
