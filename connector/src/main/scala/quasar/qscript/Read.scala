@@ -18,7 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.{Terminal, RenderTree}
+import quasar.RenderTree
 
 import matryoshka._
 import monocle.macros.Lenses
@@ -30,9 +30,8 @@ import scalaz._, Scalaz._
 @Lenses final case class Read(path: AbsFile[Sandboxed])
 
 object Read {
-  implicit def equal: Equal[Read] = Equal.equalBy(_.path)
-  implicit def show: Show[Read] =
-    Show.show(r => Cord("Read(") ++ posixCodec.printPath(r.path) ++ Cord(")"))
-  implicit def renderTree: RenderTree[Read] =
-    RenderTree.make(r => Terminal(List("Read"), posixCodec.printPath(r.path).some))
+  implicit val equal: Equal[Read] = Equal.equalBy(_.path)
+  implicit val renderTree: RenderTree[Read] =
+    RenderTree.simple(List("Read"), r => posixCodec.printPath(r.path).some)
+  implicit val show: Show[Read] = RenderTree.toShow
 }

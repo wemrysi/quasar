@@ -16,10 +16,9 @@
 
 package quasar.qscript
 
-import quasar.Predef._
-import quasar.{RenderTree, Terminal}
+import quasar.RenderTree
 
-import scalaz._, Scalaz._
+import scalaz._
 
 sealed trait JoinSide
 final case object LeftSide extends JoinSide
@@ -28,6 +27,5 @@ final case object RightSide extends JoinSide
 object JoinSide {
   implicit val equal: Equal[JoinSide] = Equal.equalRef
   implicit val show: Show[JoinSide] = Show.showFromToString
-  implicit val renderTree: RenderTree[JoinSide] =
-    RenderTree.make(t => Terminal(List(t.shows, "JoinSide"), None))
+  implicit val renderTree: RenderTree[JoinSide] = RenderTree.fromShowAsType("JoinSide")
 }

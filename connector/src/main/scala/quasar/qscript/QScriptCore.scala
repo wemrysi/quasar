@@ -39,18 +39,12 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 object ReduceIndex {
   val Empty = ReduceIndex(-1)
 
-  implicit def equal: Equal[ReduceIndex] =
+  implicit val equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
 
-  implicit def show: Show[ReduceIndex] =
-    Show.show {
-      case ReduceIndex(idx) =>
-        Cord("ReduceIndex(") ++ idx.show ++ Cord(")")
-    }
-
-  implicit def renderTree: RenderTree[ReduceIndex] = RenderTree.make {
-    case ReduceIndex(idx) => Terminal(List("ReduceIndex"), idx.shows.some)
-  }
+  implicit val renderTree: RenderTree[ReduceIndex] =
+    RenderTree.simple(List("ReduceIndex"), _.idx.shows.some)
+  implicit val show: Show[ReduceIndex] = RenderTree.toShow
 }
 
 /** Flattens nested structure, converting each value into a data set, which are
