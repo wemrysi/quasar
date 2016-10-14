@@ -22,7 +22,7 @@ import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.std._
-import quasar.qscript.MapFunc
+import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 import quasar.contrib.matryoshka._
 
 import matryoshka._, Recursive.ops._
@@ -33,6 +33,34 @@ import shapeless.Sized
 
 // TODO: pull out MapFunc translation as MapFuncStdLibSpec
 class CoreMapStdLibSpec extends StdLibSpec {
+  val TODO: Result \/ Unit = Skipped("TODO").left
+
+  /** Identify constructs that are expected not to be implemented. */
+  val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
+    case ExtractCentury(_) => TODO
+    case ExtractDayOfMonth(_) => TODO
+    case ExtractDecade(_) => TODO
+    case ExtractDayOfWeek(_) => TODO
+    case ExtractDayOfYear(_) => TODO
+    case ExtractEpoch(_) => TODO
+    case ExtractHour(_) => TODO
+    case ExtractIsoDayOfWeek(_) => TODO
+    case ExtractIsoYear(_) => TODO
+    case ExtractMicroseconds(_) => TODO
+    case ExtractMillennium(_) => TODO
+    case ExtractMilliseconds(_) => TODO
+    case ExtractMinute(_) => TODO
+    case ExtractMonth(_) => TODO
+    case ExtractQuarter(_) => TODO
+    case ExtractSecond(_) => TODO
+    case ExtractWeek(_) => TODO
+    case ExtractYear(_) => TODO
+
+    case Power(_, _) => Skipped("TODO: handle large value").left
+
+    case _ => ().right
+  }
+
 
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LogicalPlan], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
@@ -52,6 +80,10 @@ class CoreMapStdLibSpec extends StdLibSpec {
       case LogicalPlan.FreeF(sym) => Free.pure(args(sym))
     }
 
+  // TODO: figure out how to pass the args to shortCircuit tso they can be inspected
+  def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
+    freeCataM(fm)(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
+
   /** Compile/execute on this backend, and compare with the expected value. */
   // TODO: this signature might not work for other implementations.
   def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
@@ -67,7 +99,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
     def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) = {
       val mf = translate(prg(LogicalPlan.Free('arg)), κ(UnaryArg._1))
 
-      run(mf, κ(arg), expected)
+      check(mf, List(arg)) getOrElse
+        run(mf, κ(arg), expected)
     }
 
     def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) = {
@@ -76,7 +109,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
         case 'arg2 => BinaryArg._2
       })
 
-      run[BinaryArg](mf, _.fold(arg1, arg2), expected)
+      check(mf, List(arg1, arg2)) getOrElse
+       run[BinaryArg](mf, _.fold(arg1, arg2), expected)
     }
 
     def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) = {
@@ -86,7 +120,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
         case 'arg3 => TernaryArg._3
       })
 
-      run[TernaryArg](mf, _.fold(arg1, arg2, arg3), expected)
+      check(mf, List(arg1, arg2, arg3)) getOrElse
+       run[TernaryArg](mf, _.fold(arg1, arg2, arg3), expected)
     }
 
     def intDomain = arbitrary[BigInt]
