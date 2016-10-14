@@ -108,7 +108,7 @@ package object local {
   }
 
   private def fsInterpret(fsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-    corequeryfile.chrooted[Eff](queryfile.input, fsConf.prefix),
+    corequeryfile.chrooted[Eff](queryfile.input, FsType, fsConf.prefix),
     corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
     writefile.chrooted[Eff](fsConf.prefix),
     managefile.chrooted[Eff](fsConf.prefix))

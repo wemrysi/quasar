@@ -321,7 +321,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))).embed,
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed).embed).embed) must
       equal(chain(
-        RootR,
+        QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
@@ -344,7 +344,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed,
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))).embed).embed).embed).embed) must
       equal(chain(
-        RootR,
+        QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
@@ -366,8 +366,17 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("baz"))).embed,
                 structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("quux"))).embed).embed,
               structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("ducks"))).embed).embed).embed)) must
-      equal(chain(RootR).some) // TODO incorrect expectation
-    }.pendingUntilFixed
+      equal(chain(
+        RootR,
+        QC.inj(LeftShift((),
+          ProjectFieldR(ProjectFieldR(HoleF, StrLit("foo")), StrLit("bar")),
+          Free.roll(ConcatArrays[Fix, JoinFunc](
+            Free.roll(ConcatArrays[Fix, JoinFunc](
+              ProjectFieldR(RightSideF, StrLit("baz")),
+              ProjectFieldR(RightSideF, StrLit("quux")))),
+            ProjectFieldR(RightSideF, StrLit("ducks")))))),
+        QC.inj(LeftShift((), HoleF, RightSideF))).some)
+    }
 
     "convert a shift/unshift array" in {
       // "select [loc[_:] * 10 ...] from zips",
@@ -395,9 +404,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0))))))).some)
-    }.pendingUntilFixed
+    }.pendingUntilFixed("verify includes proper provenance")
 
-    "convert a filter" in { // takes 1 min 17 sec to run
+    "convert a filter" in {
       // "select * from foo where bar between 1 and 10"
       convert(
         listContents.some,
@@ -417,7 +426,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
             IntLit(10)))))).some)
-    }.pendingUntilFixed
+    }.pendingUntilFixed("need to normalize around filter")
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in {
@@ -457,5 +466,65 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         RootR,
         QC.inj(Map((), ProjectFieldR(HoleF, StrLit("foo"))))).some)
     }.pendingUntilFixed
+  }
+
+  "convert union" in {
+    val lp = fullCompileExp("select * from city union select * from person")
+    val qs = convert(listContents.some, lp)
+    qs must equal(chain(
+      QC.inj(Unreferenced[Fix, Fix[QS]]()),
+      QC.inj(Union((),
+        Free.roll(QCT.inj(LeftShift(
+          Free.roll(RT.inj(Const(Read(rootDir </> file("city"))))),
+          HoleF,
+          Free.roll(ConcatArrays(
+            // begin provenance
+            Free.roll(MakeArray(
+              Free.roll(MakeArray(
+                Free.roll(MakeMap(
+                  StrLit("n"),
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(
+                      Free.roll(MakeMap(
+                        StrLit("m"),
+                        Free.roll(ProjectIndex(
+                          Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                          IntLit(0))))))),
+                    Free.roll(Constant(
+                      ejson.CommonEJson(ejson.Arr(List(
+                        ejson.ExtEJson(ejson.Map(List((
+                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed,
+                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("city")).embed)))).embed))).embed)))))))))),
+            // end provenance
+            Free.roll(MakeArray(RightSideF))))))),
+        Free.roll(QCT.inj(LeftShift(
+          Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
+          HoleF,
+          Free.roll(ConcatArrays(
+            // begin provenance
+            Free.roll(MakeArray(
+              Free.roll(MakeArray(
+                Free.roll(MakeMap(
+                  StrLit("n"),
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(
+                      Free.roll(MakeMap(
+                        StrLit("m"),
+                        Free.roll(ProjectIndex(
+                          Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                          IntLit(0))))))),
+                    Free.roll(Constant(
+                      ejson.CommonEJson(ejson.Arr(List(
+                        ejson.ExtEJson(ejson.Map(List((
+                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed,
+                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("city")).embed)))).embed))).embed)))))))))),
+            // end provenance
+            Free.roll(MakeArray(RightSideF))))))))),
+      QC.inj(Reduce((),
+        Free.roll(ConcatArrays(
+          Free.roll(MakeArray(Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+          Free.roll(MakeArray(Free.roll(ProjectIndex(Free.roll(ProjectIndex(HoleF, IntLit(0))), IntLit(1))))))),
+        List(ReduceFuncs.Arbitrary[FreeMap](Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+        ReduceIndexF(0)))).some)
   }
 }

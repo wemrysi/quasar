@@ -118,7 +118,7 @@ package object hdfs {
     }
 
     interpretFileSystem(
-      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), sparkFsConf.prefix),
+      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),
       corereadfile.chrooted(readfile.input[Eff](hdfsPathStr, fileSystem), sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))
