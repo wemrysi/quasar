@@ -1,0 +1,5 @@
+- MarkLogic support for ExecutePlan
+  - Enable a handful of regression tests for MarkLogic
+  - Don't project array element children for ProjectIndex
+  - Fix ordering of ConcatMaps
+  - Reduce ambiguity in handling operations
