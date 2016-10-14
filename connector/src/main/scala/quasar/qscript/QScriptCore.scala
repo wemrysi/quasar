@@ -276,8 +276,15 @@ object QScriptCore {
         left: FreeMap[T],
         right: FreeMap[T],
         p1: QScriptCore[IT, ExternallyManaged],
-        p2: QScriptCore[IT, ExternallyManaged]) =
+        p2: QScriptCore[IT, ExternallyManaged]) = {
+        val norm = Normalizable.normalizable[T]
+
         (p1, p2) match {
+          case (Unreferenced(), Unreferenced()) =>
+            SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+              Unreferenced(),
+              HoleF,
+              HoleF).some
           case (Map(_, m1), Map(_, m2)) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(m1 >> left, m2 >> right)
@@ -307,7 +314,6 @@ object QScriptCore {
             LeftShift(_, struct2, repair2)) =>
             val (repair, repL, repR) = concat(repair1, repair2)
 
-            val norm = Normalizable.normalizable[T]
             val lFunc: FreeMap[IT] = norm.freeMF(struct1 >> left)
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
@@ -346,7 +352,37 @@ object QScriptCore {
                   case (_, _) => None
                 }
             }
+          case (Filter(s1, c1), Filter(_, c2)) =>
+            val lCond = norm.freeMF(c1 >> left)
+            val rCond = norm.freeMF(c2 >> right)
+            (lCond ≟ rCond).option(SrcMerge(Filter(s1, lCond), left, right))
+
+          case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
+            val lBucket = norm.freeMF(b1 >> left)
+            val rBucket = norm.freeMF(b2 >> right)
+            val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> left)))
+            val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> right)))
+            (lBucket ≟ rBucket && lOrder ≟ rOrder).option(
+                SrcMerge(Sort(s1, lBucket, lOrder), left, right))
+
+          case (Subset(s1, f1, o1, c1), Subset(_, f2, o2, c2)) =>
+            val from1 = rebaseBranch(f1, left)
+            val from2 = rebaseBranch(f2, right)
+            val count1 = rebaseBranch(c1, left)
+            val count2 = rebaseBranch(c2, right)
+            (from1 ≟ from2 && o1 ≟ o2 && count1 ≟ count2).option(
+              SrcMerge(Subset(s1, from1, o1, count1), HoleF, HoleF))
+
+          case (Union(s1, l1, r1), Union(_, l2, r2)) =>
+            val left1 = rebaseBranch(l1, left)
+            val left2 = rebaseBranch(l2, right)
+            val right1 = rebaseBranch(r1, left)
+            val right2 = rebaseBranch(r2, right)
+            (left1 ≟ left2 && right1 ≟ right2).option(
+              SrcMerge(Union(s1, left1, right1), HoleF, HoleF))
+
           case (_, _) => None
         }
+      }
     }
 }

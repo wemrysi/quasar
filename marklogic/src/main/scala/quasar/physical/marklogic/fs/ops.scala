@@ -89,7 +89,7 @@ object ops {
     val (errs, contents) = xmlData.separate
 
     for {
-      cs  <- chunkId ∘ (cid => contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) })
+      cs   <- chunkId ∘ (cid => contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) })
       exs  <- lift(SessionIO.insertContentCollectErrors(cs)).into[S]
     } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(errs.length) +: errs)
   }
@@ -236,14 +236,8 @@ object ops {
 
   ////
 
-  private def asDir(file: AFile): ADir =
-    fileParent(file) </> dir(fileName(file).value)
-
   private def chunkId[S[_]](implicit S: GenUUID :<: S): Free[S, String] =
     GenUUID.Ops[S].asks(id => toSequentialString(id) getOrElse toOpaqueString(id))
-
-  private def pathUri(path: APath): String =
-    posixCodec.printPath(path)
 
   private def deleteIfEmptyXqy(dirUri: XQuery): XQuery =
     if_ (fn.not(fn.exists(xdmp.directory(dirUri, "infinity".xs))))

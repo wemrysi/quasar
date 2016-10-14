@@ -132,6 +132,15 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
+  def concat4[T[_[_]]: Corecursive, A](
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+
   def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
     (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
     val rewrite = new Rewrite[T]
