@@ -78,7 +78,7 @@ package object hdfs {
 
   final case class SparkHdfsFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
-  private def fetchSparCoreJar: Task[String] = Task.delay {
+  private def fetchSparkCoreJar: Task[String] = Task.delay {
     sys.env("QUASAR_HOME") + "/sparkcore.jar"
   }
 
@@ -87,7 +87,7 @@ package object hdfs {
     S1: PhysErr :<: S
   ): Free[S, SparkHdfsFSDef[S]] = {
 
-    val genSc = fetchSparCoreJar.map { jar => 
+    val genSc = fetchSparkCoreJar.map { jar => 
       val sc = new SparkContext(sparkConf)
       sc.addJar(jar)
       sc
