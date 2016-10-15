@@ -867,7 +867,8 @@ object MongoDbQScriptPlanner {
           .transAna(
             repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
             repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
-            repeatedly(C.coalesceSR[MongoQScript](idPrism)))
+            repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
+            repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
           .transCata(rewrite.optimize(idPrism.reverseGet))
           .point[M])
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
