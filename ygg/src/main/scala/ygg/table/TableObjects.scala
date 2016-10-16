@@ -75,8 +75,6 @@ final case class GroupingAlignment(
   alignment: GroupingSpec.Alignment
 ) extends GroupingSpec
 
-final case class APIKey(value: String) extends AnyVal
-
 sealed trait TableSize {
   def maxSize: Long
   def +(other: TableSize): TableSize

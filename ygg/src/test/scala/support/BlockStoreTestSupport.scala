@@ -133,7 +133,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): NeedTable = {
+    def load(table: Table, tpe: JType): NeedTable = {
       for {
         paths       <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
@@ -826,7 +826,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
       loop(slices)
     }
 
-    def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
+    def load(tpe: JType) = Table.load(this, tpe)
 
     override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       val xform = transform(valueSpec)
@@ -852,7 +852,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable       = toExternalTable.sort(sortKey, sortOrder)
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = toExternalTable.sortUnique(sortKey, sortOrder)
 
-    def load(apiKey: APIKey, tpe: JType): NeedTable = Table.load(this, apiKey, tpe)
+    def load(tpe: JType): NeedTable = Table.load(this, tpe)
 
     override def force: NeedTable         = Need(this)
     override def paged(limit: Int): Table = this
@@ -868,7 +868,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
   class ExternalTable(slices: NeedSlices, size: TableSize) extends Table(slices, size) {
     import Table.{ Table => _, _ }
 
-    def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
+    def load(tpe: JType) = Table.load(this, tpe)
 
     def toInternalTable(limit0: Int): NeedEitherT[ExternalTable, InternalTable] = {
       val limit = limit0.toLong

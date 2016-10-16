@@ -300,7 +300,7 @@ trait ColumnarTableModule {
   trait NoLoadOrSortTable extends ygg.table.Table {
     self: outer.Table =>
 
-    def load(apiKey: APIKey, jtpe: JType): NeedTable                                                                      = ???
+    def load(jtpe: JType): NeedTable                                                                                      = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                 = Need[Table](this)
     def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                               = Need[Table](this)
     def groupByN(keys: scSeq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = Need(Nil)

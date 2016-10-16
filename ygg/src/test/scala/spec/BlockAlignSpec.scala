@@ -578,7 +578,7 @@ class BlockAlignSpec extends quasar.Qspec {
     val result: Need[Iterable[JValue]] = {
       import module.Table
       val t: Table      = Table constString Set("/test")
-      val loaded: Table = t.load(APIKey("dummyAPIKey"), Schema.mkType(cschema).get).value
+      val loaded: Table = t.load(Schema.mkType(cschema).get).value
       loaded.toJson
     }
 

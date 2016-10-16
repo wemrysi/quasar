@@ -20,6 +20,16 @@ import scalaz._
 import ygg._, common._, json._
 import trans._
 
+trait TableConstruct[T <: ygg.table.Table] {
+  def maxSliceSize: Int
+
+  def empty: T
+  def fromJValues(data: Seq[JValue]): T
+  def fromRValues(data: Seq[RValue]): T
+  def fromSlice(data: Slice): T
+  def fromSlices(data: Seq[Slice]): T
+}
+
 trait TableRep[T] {
   type Table = T with ygg.table.Table
   type Companion <: TableCompanion[Table]
@@ -70,7 +80,7 @@ trait Table {
     * For each distinct path in the table, load all columns identified by the specified
     * jtype and concatenate the resulting slices into a new table.
     */
-  def load(apiKey: APIKey, tpe: JType): NeedTable
+  def load(tpe: JType): NeedTable
 
   /**
     * Folds over the table to produce a single value (stored in a singleton table).
