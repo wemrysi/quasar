@@ -57,6 +57,9 @@ object FPlan {
 }
 
 object Queries {
+  def zipsFile = new jFile("it/src/main/resources/tests/zips.data")
+  def zips     = ygg.table.PlayTable(zipsFile)
+
   def fplans: Vector[FPlan] = Vector(
     """SELECT * FROM zips OFFSET 100 LIMIT 5""",
     """SELECT COUNT(*) as cnt, LENGTH(city) FROM zips""",

@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, json._, data._
+import ygg._, common._, json._
 import scalaz._, Scalaz._
 
 class PlayTable extends ColumnarTableModule {
@@ -65,28 +65,4 @@ class PlayTable extends ColumnarTableModule {
 object PlayTable extends PlayTable {
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
-
-  import matryoshka._
-  import quasar._, sql._, SemanticAnalysis._, RenderTree.ops._
-
-  def compile(query: String): String \/ Fix[LogicalPlan] =
-    for {
-      select <- fixParser.parse(Query(query)).leftMap(_.toString)
-      attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile(attr).leftMap(_.toString)
-    } yield cld
-
-  def lp(q: String): LP = (
-    compile(q) map Optimizer.optimize flatMap (q =>
-      (LogicalPlan ensureCorrectTypes q).disjunction
-        leftMap (_.list.toList mkString ";")
-    )
-  ).fold(abort, LP)
-
-  def zips = PlayTable(new jFile("it/src/main/resources/tests/zips.data"))
-  def zq   = lp("select * from zips where state=\"CO\" limit 3")
-
-  final case class LP(lp: Fix[LogicalPlan]) {
-    override def toString = lp.render.shows
-  }
 }
