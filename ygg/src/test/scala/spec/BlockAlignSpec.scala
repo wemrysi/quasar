@@ -87,7 +87,7 @@ class BlockAlignSpec extends quasar.Qspec {
     val expected = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 && i % 3 == 0 => v }
 
     val finalResults = for {
-      results     <- Table.align(fromJson(lstream), SourceKey.Single, fromJson(rstream), SourceKey.Single)
+      results     <- Need(Table.align(fromJson(lstream), SourceKey.Single, fromJson(rstream), SourceKey.Single))
       leftResult  <- results._1.toJson
       rightResult <- results._2.toJson
       leftResult2 <- results._1.toJson
@@ -166,7 +166,7 @@ class BlockAlignSpec extends quasar.Qspec {
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
       val (ljsondirect, rjsondirect) = (for {
-        aligned <- Table.align(ltable, alignOnL, rtable, alignOnR)
+        aligned <- Need(Table.align(ltable, alignOnL, rtable, alignOnR))
         ljson   <- aligned._1.toJson
         rjson   <- aligned._2.toJson
       } yield {
@@ -174,7 +174,7 @@ class BlockAlignSpec extends quasar.Qspec {
       }).copoint
 
       val (ljsonreversed, rjsonreversed) = (for {
-        aligned <- Table.align(rtable, alignOnR, ltable, alignOnL)
+        aligned <- Need(Table.align(rtable, alignOnR, ltable, alignOnL))
         ljson   <- aligned._1.toJson
         rjson   <- aligned._2.toJson
       } yield {

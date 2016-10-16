@@ -171,7 +171,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
 
     // def singleton(slice: Slice) = new SingletonTable(singleStreamT(slice))
 
-    override def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = {
+    override def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = {
       import aligns._
 
       // we need a custom row comparator that ignores the global ID introduced to prevent elimination of
@@ -505,7 +505,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport {
         reduceSlices(sourceR.slices),
         composeSliceTransform(addGlobalId(alignR)),
         initState,
-        initState)
+        initState).value
     }
 
     /**

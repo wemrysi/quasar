@@ -55,10 +55,10 @@ trait ColumnarTableModule {
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
-    def apply(slices: NeedSlices, size: TableSize): Table                                                  = fromSlices(slices, size)
-    def singleton(slice: Slice): Table                                                                     = fromSlices(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def fromJson(data: Seq[JValue]): Table                                                                 = outer fromJson data
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
+    def apply(slices: NeedSlices, size: TableSize): Table                                            = fromSlices(slices, size)
+    def singleton(slice: Slice): Table                                                               = fromSlices(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def fromJson(data: Seq[JValue]): Table                                                           = outer fromJson data
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = ???
 
     implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
 
