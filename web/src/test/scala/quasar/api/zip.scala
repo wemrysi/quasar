@@ -146,4 +146,14 @@ class ZipSpecs extends quasar.Qspec {
       bytes(z).unsafePerformSync must equal(bytes(z).unsafePerformSync)
     }.set(minTestsOk = 10) // This test is relatively slow
   }
+
+  "unzipFiles" should {
+    "recover any input" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
+      val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
+      val z = zipFiles(filesAndBytes.toList)
+
+      val exp = filesAndBytes.mapValues(_.runFoldMap(ι).unsafePerformSync)
+      unzipFiles(z).map(_.toMap).unsafePerformSync must_== exp
+    }.set(minTestsOk = 10) // This test is relatively slow
+  }
 }

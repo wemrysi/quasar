@@ -16,14 +16,17 @@
 
 package quasar.api
 
-import pathy.Path._
 import quasar.Predef._
+import quasar.fp.ski._
 
 import java.util.{zip => jzip}
 
+import pathy.Path._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 import scalaz.stream._
 import scodec.bits.{ByteVector}
+import scodec.interop.scalaz._
 
 object Zip {
   // First construct a single Process of Ops which can be performed in
@@ -104,5 +107,41 @@ object Zip {
         }
       case (_, None)       => Process.fail(new RuntimeException("unexpected state"))
     }
+  }
+
+  def unzipFiles(zippedBytes: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], ByteVector)]] = {
+    def entry(zis: jzip.ZipInputStream): OptionT[Task, (String, ByteVector)] =
+      for {
+        entry <- OptionT(Task.delay(Option(zis.getNextEntry())))
+        name  =  entry.getName
+        bytes <- contents(zis).liftM[OptionT]
+        _     <- Task.delay(zis.closeEntry()).liftM[OptionT]
+      } yield (name, bytes)
+
+    def contents(zis: jzip.ZipInputStream): Task[ByteVector] = {
+      def read(bufSize: Int)(is: jzip.ZipInputStream): OptionT[Task, ByteVector] =
+        OptionT(Task.delay {
+          val buf = new Array[Byte](bufSize)
+          val n = is.read(buf, 0, bufSize)
+          (n >= 0) option ByteVector.view(buf).take(n.toLong)
+        })
+
+      Process.unfoldEval(zis)(z => read(4*1024)(z).strengthR(z).run).runFoldMap(ι)
+    }
+
+    def entries(zis: jzip.ZipInputStream): Process[Task, (String, ByteVector)] =
+      Process.unfoldEval(zis)(z => entry(z).strengthR(z).run)
+
+    def toPath(name: String): Task[RelFile[Sandboxed]] =
+      posixCodec.parseRelFile(name).flatMap(sandbox(currentDir, _)).cata(
+        Task.now,
+        Task.fail(new RuntimeException("relative file path expected; found: $name")))
+
+    val is = io.toInputStream(zippedBytes)
+    for {
+      zis <- Task.delay(new jzip.ZipInputStream(is))
+      es  <- entries(zis).runLog
+      rez <- es.traverse { case (n: String, bs) => toPath(n).strengthR(bs) }
+    } yield rez.toList
   }
 }
