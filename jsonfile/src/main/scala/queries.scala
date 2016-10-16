@@ -24,11 +24,11 @@ import pathy.Path._
 import quasar.contrib.pathy._
 import scalaz._, Scalaz._
 
-final case class FPlan(lp: Fix[LogicalPlan]) {
+final case class FPlan(sql: String, lp: Fix[LogicalPlan]) {
   def universe                      = lp.universe
   def toTransSpec: Fix[LogicalPlan] = lp.cata[Fix[LogicalPlan]](x => Fix(x))
 
-  override def toString = lp.render.shows
+  override def toString = sql + "\n" + indent(2, lp.render.shows) + "\n"
 }
 
 object FPlan {
@@ -44,9 +44,10 @@ object FPlan {
       (LogicalPlan ensureCorrectTypes q).disjunction
         leftMap (_.list.toList mkString ";")
     )
-  ).fold(abort, FPlan(_))
+  ).fold(abort, FPlan(q, _))
 
   def fromFile(file: jFile): FPlan = FPlan(
+    file.slurpString,
     LogicalPlan.Read(
       sandboxCurrent(
         posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file.getPath).get

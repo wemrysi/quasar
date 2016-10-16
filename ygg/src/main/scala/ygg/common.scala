@@ -26,6 +26,8 @@ import java.math.MathContext.UNLIMITED
 package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases {
   private val InputStreamBufferSize = 8192
 
+  def indent(spaces: Int, s: String): String = s.lines map ("  " + _) mkString "\n"
+
   def slurpString(in: InputStream): String = new String(slurp(in), utf8Charset)
   def slurp(in: InputStream): Array[Byte]  = slurp(new BufferedInputStream(in))
 

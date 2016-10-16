@@ -18,7 +18,7 @@ package ygg.tests
 
 import scala.Predef.$conforms
 import scalaz._, Scalaz._
-import ygg._, common._, json._, table._
+import ygg._, common._, json._, data._, table._
 import scala.Predef.identity
 import org.specs2.matcher.MatchersImplicits._
 
@@ -59,13 +59,14 @@ class GrouperSpec extends quasar.Qspec {
   import trans._
   import constants._
 
+  private val idGen               = new AtomicIntIdSource(new GroupId(_))
+  private def newGroupId: GroupId = idGen.nextId()
+
   private def tic_a = CPathField("tic_a")
   private def tic_b = CPathField("tic_b")
 
   private def tic_aj = JPathField("tic_a")
   private def tic_bj = JPathField("tic_b")
-
-  implicit val fid = NaturalTransformation.refl[Need]
 
   private val eq12F1 = CF1P("testing::eq12F1") {
     case c: DoubleColumn =>

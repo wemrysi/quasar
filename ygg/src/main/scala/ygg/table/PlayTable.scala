@@ -20,9 +20,6 @@ import ygg._, common._, json._, data._
 import scalaz._, Scalaz._
 
 class PlayTable extends ColumnarTableModule {
-  private val idGen       = new AtomicIntIdSource(new GroupId(_))
-  def newGroupId: GroupId = idGen.nextId()
-
   type TableCompanion = ColumnarTableCompanion
 
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)

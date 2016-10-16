@@ -16,15 +16,10 @@
 
 package ygg.tests
 
-import ygg._, common._, data._, json._, table._
+import ygg._, common._,json._, table._
 import scalaz._, Scalaz._
 
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule {
-  self =>
-
-  private val idGen       = new AtomicIntIdSource(new GroupId(_))
-  def newGroupId: GroupId = idGen.nextId()
-
   private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {
     @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): (ArrayColumnMap, Int) = {
       from match {

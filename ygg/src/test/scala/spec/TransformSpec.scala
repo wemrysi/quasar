@@ -23,7 +23,6 @@ import scala.util.Random
 import scala.Predef.identity
 
 class TransformSpec extends TableQspec {
-  import CValueGenerators._
   import SampleData._
   import trans._
 
@@ -1266,7 +1265,7 @@ class TransformSpec extends TableQspec {
     val table                           = fromSample(sample)
     val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
     val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(Seq(_))
-    val schemas0                        = schemasSeq map inferSchema
+    val schemas0                        = schemasSeq map CValueGenerators.inferSchema
     val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
     val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
 
