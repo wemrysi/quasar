@@ -562,7 +562,7 @@ class Transform
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoin3Result(base, dataset, keys, directions) = autojoin3(a1, a2, a3)
+      val AutoJoinResult(base, dataset, keys) = autojoin(a1, a2)
 
       val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
         case StaticArray(as) => as.map(_.fromCoEnv)
@@ -571,15 +571,15 @@ class Transform
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] = {
-	  QC.prj(a3.value.project) match {
-	    case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
-	      mf.toCoEnv[T].project match {
+	  QC.prj(QC.inj(reifyResult(a3.ann, a3.value)).embed.transCata(rewrite.normalize).project) match {
+            case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
+              mf.toCoEnv[T].project match {
                 case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
                 case StrLit(str)     => List(str).right
                 case _               => InternalError("unsupported ordering function").left
-	      }
-	    case None => InternalError("oops").left
-	  }
+              }
+            case other => InternalError(s"Expected a constant, but received ${other.shows}").left
+          }
 	}
         orderStrs.flatMap {
           _.traverse {
