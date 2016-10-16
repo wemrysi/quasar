@@ -19,25 +19,7 @@ package ygg.tests
 import scalaz.{ Source => _, _ }, Scalaz._
 import ygg._, common._, json._, table._, trans._
 
-// TODO: mix in a trait rather than defining Table directly
-
-class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport {
-
-  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
-    def companion                                                                                                                   = Table
-    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                      = ???
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                = ???
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
-  }
-  trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: NeedSlices, size: TableSize)                                                         = new Table(slices, size)
-    def singleton(slice: Slice)                                                                            = new Table(singleStreamT(slice), ExactSize(1))
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
-  }
-
-  object Table extends TableCompanion
-
+class IndicesSpec extends TableQspec {
   def groupkey(s: String) = DerefObjectStatic(Leaf(Source), CPathField(s))
   def valuekey(s: String) = DerefObjectStatic(Leaf(Source), CPathField(s))
 

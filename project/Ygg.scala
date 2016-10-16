@@ -12,13 +12,13 @@ object Ygg {
   """.trim
 
   def yggImports = imports + "\n" + """
-    import ygg._, common._, json._, table._, trans._, PlayTable._
+    import ygg._, common._, json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
   """.trim
 
-  def jsonfileTestImports = imports + "\n" + """
-    import quasar.physical.jsonfile.fs._
-    import quasar.sql._, SqlQueries._, fixpoint._
+  def jsonfileImports = yggImports + "\n" + """
+    import quasar.physical.jsonfile.fs._, Queries._
+    import SqlQueries._
   """.trim
 
   def yggDropWarts = Seq(
@@ -60,12 +60,13 @@ object Ygg {
     .settings(libraryDependencies ++= Dependencies.ygg)
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
     .settings(initialCommands in (Compile, console) := yggImports)
+    .settings(scalacOptions in (Compile, console) --= Seq("-Ywarn-unused-code"))
   )
 
   def jsonfile(p: Project): Project = ( p
     .dependsOn('connector % BothScopes, 'ygg % BothScopes)
     .settings(name := "quasar-jsonfile-internal")
-    .settings(initialCommands in (Compile, console) := imports)
-    .settings(initialCommands in (Test, console) := jsonfileTestImports)
+    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+    .settings(initialCommands in (Compile, console) := jsonfileImports)
   )
 }

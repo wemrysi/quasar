@@ -20,7 +20,7 @@ import ygg._, common._, json._, table._
 import trans._
 import CPath._
 
-class ConcatSpec extends ColumnarTableQspec {
+class ConcatSpec extends TableQspec {
   "in concat" >> {
     "concat two tables" in testConcat
     "transform a CPathTree into a TransSpec" in testTreeToTransSpec

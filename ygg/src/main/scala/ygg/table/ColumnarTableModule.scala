@@ -26,11 +26,15 @@ final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
 }
 
-trait ColumnarTableModule extends TableModule {
+trait ColumnarTableModule {
   outer =>
 
   import trans._
 
+  def fromJson(data: Seq[JValue]): Table
+  def fromSlices(slices: NeedSlices, size: TableSize): Table
+
+  val Table: TableCompanion
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
 
@@ -50,10 +54,11 @@ trait ColumnarTableModule extends TableModule {
       (sortedGroupingSpec(left) |@| sortedGroupingSpec(right))(GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, _, _, alignment))
   }
 
-  trait ColumnarTableCompanion extends ygg.table.TableCompanion[outer.Table] {
-    def apply(slices: NeedSlices, size: TableSize): Table
-
-    def singleton(slice: Slice): Table
+  trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
+    def apply(slices: NeedSlices, size: TableSize): Table                                                  = fromSlices(slices, size)
+    def singleton(slice: Slice): Table                                                                     = fromSlices(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def fromJson(data: Seq[JValue]): Table                                                                 = outer fromJson data
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
 
     implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
 
@@ -292,12 +297,30 @@ trait ColumnarTableModule extends TableModule {
     }
   }
 
+  trait NoLoadOrSortTable extends ygg.table.Table {
+    self: outer.Table =>
+
+    def load(apiKey: APIKey, jtpe: JType): NeedTable                                                                      = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                 = Need[Table](this)
+    def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                               = Need[Table](this)
+    def groupByN(keys: scSeq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = Need(Nil)
+  }
+
   abstract class ColumnarTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
 
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
+    def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
+    def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
+
+    def slicesStream: Stream[Slice]  = slices.toStream.value
+    def jvalueStream: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
+    def columns: ColumnMap           = slicesStream.head.columns
+    def toVector: Vector[JValue]     = jvalueStream.toVector
+
+    def companion = Table
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]]                                                 = Sampling.sample[Table](self, sampleSize, specs)
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).

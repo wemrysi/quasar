@@ -19,7 +19,7 @@ package ygg.tests
 import scalaz._, Scalaz._
 import ygg._, common._
 
-class TakeRangeSpec extends ColumnarTableQspec {
+class TakeRangeSpec extends TableQspec {
   import SampleData._
 
   "in takeRange" >> {

@@ -19,7 +19,7 @@ package ygg.tests
 import ygg._, common._, table._, trans._
 import SampleData._
 
-class DistinctSpec extends ColumnarTableQspec {
+class DistinctSpec extends TableQspec {
   "in distinct" >> {
     "be the identity on tables with no duplicate rows"                            in testDistinctIdentity
     "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices

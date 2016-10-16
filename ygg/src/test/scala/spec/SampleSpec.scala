@@ -17,12 +17,10 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg._, common._, json._
+import ygg._, common._, json._, table._, trans._
 import org.specs2.matcher.TraversableMatchers._
 
-class SampleSpec extends ColumnarTableQspec {
-  import ygg.table.trans._
-
+class SampleSpec extends TableQspec {
   "in sample" >> {
      "sample from a dataset"                                in testSample
      "return no samples given empty sequence of transspecs" in testSampleEmpty

@@ -16,11 +16,12 @@
 
 package ygg.tests
 
-import scalaz._
-import scalaz.syntax.std.boolean._
 import ygg._, common._, data._, json._, table._
+import scalaz._, Scalaz._
 
-trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
+trait ColumnarTableModuleTestSupport extends ColumnarTableModule {
+  self =>
+
   private val idGen       = new AtomicIntIdSource(new GroupId(_))
   def newGroupId: GroupId = idGen.nextId()
 
@@ -59,4 +60,11 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
   def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table =
     fromJson0(values.toStream, maxSliceSize getOrElse yggConfig.maxSliceSize)
+
+  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
+  def fromJson(data: Seq[JValue]): Table                                   = fromJson(data, None)
+  def fromJson(data: Seq[JValue], maxBlockSize: Int): Table                = fromJson(data, Some(maxBlockSize))
+  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
 }

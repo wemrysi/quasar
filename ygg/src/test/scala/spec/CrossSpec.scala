@@ -19,7 +19,7 @@ package ygg.tests
 import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 
-class CrossSpec extends ColumnarTableQspec {
+class CrossSpec extends TableQspec {
   import SampleData._
   import trans._
 

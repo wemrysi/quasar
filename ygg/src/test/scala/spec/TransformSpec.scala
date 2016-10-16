@@ -18,11 +18,11 @@ package ygg.tests
 
 import scala.Predef.$conforms
 import scalaz._, Scalaz._
-import ygg._, common._, table._, json._
+import ygg._, common._, data._, table._, json._
 import scala.util.Random
 import scala.Predef.identity
 
-class TransformSpec extends ColumnarTableQspec {
+class TransformSpec extends TableQspec {
   import CValueGenerators._
   import SampleData._
   import trans._
@@ -1741,5 +1741,46 @@ class TransformSpec extends ColumnarTableQspec {
 
       unflatten(filtered)
     }
+  }
+
+  private def lookupScanner(namespace: List[String], name: String): Scanner = {
+    val lib = Map[String, Scanner](
+      "sum" -> new Scanner {
+        type A = BigDecimal
+        val init = BigDecimal(0)
+        def scan(a: BigDecimal, cols: ColumnMap, range: Range): A -> ColumnMap = {
+          val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
+          val prioritized = identityPath.map(_._2) filter {
+            case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
+            case _                                                => false
+          }
+
+          val mask = Bits.filteredRange(range.start, range.end) { i =>
+            prioritized exists { _ isDefinedAt i }
+          }
+
+          val (a2, arr) = mask.toList.foldLeft((a, new Array[BigDecimal](range.end))) {
+            case ((acc, arr), i) => {
+              val col = prioritized find { _ isDefinedAt i }
+
+              val acc2 = col map {
+                case lc: LongColumn   => acc + lc(i)
+                case dc: DoubleColumn => acc + dc(i)
+                case nc: NumColumn    => acc + nc(i)
+                case _                => abort("unreachable")
+              }
+
+              acc2 foreach { arr(i) = _ }
+
+              (acc2 getOrElse acc, arr)
+            }
+          }
+
+          (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
+        }
+      }
+    )
+
+    lib(name)
   }
 }

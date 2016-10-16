@@ -20,7 +20,7 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._
 import ygg.table.Render
 
-class RenderSpec extends ColumnarTableQspec {
+class RenderSpec extends TableQspec {
   import SampleData._
 
   "verify bijection from static JSON" in {

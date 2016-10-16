@@ -18,7 +18,7 @@ package ygg.tests
 
 import ygg._, common._
 
-class ToArraySpec extends ColumnarTableQspec {
+class ToArraySpec extends TableQspec {
   "in toArray" >> {
     "create a single column given two single columns" in testToArrayHomogeneous
     "create a single column given heterogeneous data" in testToArrayHeterogeneous

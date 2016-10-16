@@ -21,7 +21,7 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._
 import ygg.json.{ JType => J }
 
-class SchemasSpec extends ColumnarTableQspec {
+class SchemasSpec extends TableQspec {
   "in schemas" >> {
     "find a schema in single-schema table" in testSingleSchema
     "find a schema in homogeneous array table" in testHomogeneousArraySchema

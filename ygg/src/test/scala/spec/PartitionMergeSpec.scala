@@ -19,7 +19,7 @@ package ygg.tests
 import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 
-class PartitionMergeSpec extends ColumnarTableQspec {
+class PartitionMergeSpec extends TableQspec {
   import trans._
 
   "partitionMerge" should {

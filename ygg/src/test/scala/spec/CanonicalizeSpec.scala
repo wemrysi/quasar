@@ -19,7 +19,7 @@ package ygg.tests
 import ygg._, common._, table._
 import scalaz._, Scalaz._
 
-class CanonicalizeSpec extends ColumnarTableQspec {
+class CanonicalizeSpec extends TableQspec {
   import SampleData._
 
   "in canonicalize" >> {

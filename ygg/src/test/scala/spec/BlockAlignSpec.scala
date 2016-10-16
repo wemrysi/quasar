@@ -20,7 +20,6 @@ import scala.Predef.$conforms
 import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import SampleData._
-import CValueGenerators._
 
 /**
   * This provides an ordering on JValue that mimics how we'd order them as
@@ -80,7 +79,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlign(sample: SampleData) = {
-    import DummyModule.module._
+    import DummyModule._
     import trans.constants._
 
     val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
@@ -162,7 +161,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlignSymmetry(i: Int) = {
-    import DummyModule.module._
+    import DummyModule._
     import trans._
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
@@ -299,7 +298,6 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
-    import DummyModule.module
     val jvalueOrdering     = Ord[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 
@@ -325,7 +323,7 @@ class BlockAlignSpec extends quasar.Qspec {
     val cSortKeys = sortKeys map { CPath(_) }
 
     val resultM = for {
-      sorted <- module.fromSample(sample).sort(module.sortTransspec(cSortKeys: _*), sortOrder)
+      sorted <- DummyModule.fromSample(sample).sort(sortTransspec(cSortKeys: _*), sortOrder)
       json   <- sorted.toJson
     } yield (json, sorted)
 
@@ -555,35 +553,6 @@ class BlockAlignSpec extends quasar.Qspec {
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
 
-  private class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
-    val Some((idCount, schema)) = sampleData.schema
-    val actualSchema            = inferSchema(sampleData.data map { _ \ "value" })
-
-    val projections = List(actualSchema).map { subschema =>
-      val stream = sampleData.data flatMap { jv =>
-        val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
-          case (obj, (jpath, ctype)) => {
-            val vpath       = JPath(JPathField("value") :: jpath.nodes)
-            val valueAtPath = jv.get(vpath)
-
-            if (compliesWithSchema(valueAtPath, ctype)) {
-              obj.set(vpath, valueAtPath)
-            } else {
-              obj
-            }
-          }
-        }
-
-        if (back \ "value" == JUndefined)
-          None
-        else
-          Some(back)
-      }
-
-      Path("/test") -> Projection(stream)
-    } toMap
-  }
-
   private def testLoadDense(sample: SampleData) = {
     val module = new BlockStoreLoadTestModule(sample)
 
@@ -673,5 +642,20 @@ class BlockAlignSpec extends quasar.Qspec {
     )
 
     testLoadDense(sampleData)
+  }
+
+  private def sortTransspec(sortKeys: CPath*): TransSpec1 = {
+    import trans._
+    InnerObjectConcat(sortKeys.zipWithIndex.map {
+      case (sortKey, idx) =>
+        WrapObject(
+          sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
+            case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
+            case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
+            case x                              => abort(s"Unexpected arg $x")
+          },
+          "%09d".format(idx)
+        )
+    }: _*)
   }
 }

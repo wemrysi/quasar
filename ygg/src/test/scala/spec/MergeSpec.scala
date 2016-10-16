@@ -19,26 +19,7 @@ package ygg.tests
 import scalaz.{ Source => _, _ }, Scalaz._
 import ygg._, common._, table._, trans._
 
-class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport {
-
-  implicit val fid = NaturalTransformation.refl[Need]
-
-  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size)
-            with NoSortTable
-            with NoLoadTable
-            with NoGroupTable {
-
-      def companion = Table
-    }
-
-  trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: NeedSlices, size: TableSize)                                               = new Table(slices, size)
-    def singleton(slice: Slice)                                                                            = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
-  }
-
-  object Table extends TableCompanion
-
+class MergeSpec extends TableQspec {
   "merge" should {
     "avoid crosses in trivial cases" in {
       val foo = fromJson(jsonMany"""

@@ -63,19 +63,6 @@ object GroupId {
   implicit def apply(id: Int): GroupId = new GroupId(id)
 }
 
-trait ColumnarTableModuleConfig {
-  def maxSliceSize: Int
-
-  // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceSize / 4
-
-  // This is what we consider a "small" slice. This may affect points where
-  // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int
-
-  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
-}
-
 final case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
 class BitsetColumn(definedAt: BitSet) { this: Column =>
@@ -307,6 +294,3 @@ object ArraySetColumn {
     }
   }
 }
-
-/* help for ctags
-type ColumnSupport */

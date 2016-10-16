@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 import ygg.table._
 import ygg.data._
 
-class CompactSpec extends ColumnarTableQspec {
+class CompactSpec extends TableQspec {
   import SampleData._
   import trans._
 

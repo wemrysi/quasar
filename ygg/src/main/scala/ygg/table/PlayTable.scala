@@ -23,29 +23,13 @@ class PlayTable extends ColumnarTableModule {
   private val idGen       = new AtomicIntIdSource(new GroupId(_))
   def newGroupId: GroupId = idGen.nextId()
 
-  object Table extends TableCompanion
+  type TableCompanion = ColumnarTableCompanion
 
-  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadTable with NoSortTable with NoGroupTable {
-    def slicesStream: Stream[Slice]  = slices.toStream.value
-    def jvalueStream: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
-    def columns: ColumnMap           = slicesStream.head.columns
-    def toVector: Vector[JValue]     = jvalueStream.toVector
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
 
-    def companion = Table
-    // Deadlock
-    // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
-
-    private def colstr(kv: ColumnRef -> Column): String = {
-      val (ColumnRef(path, tpe), column) = kv
-      s"$path: $tpe => $column"
-    }
-
+  object Table extends ColumnarTableCompanion
+  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadOrSortTable {
     override def toString = jvalueStream mkString "\n"
-  }
-  trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: NeedSlices, size: TableSize): Table                                                  = new Table(slices, size)
-    def singleton(slice: Slice): Table                                                                     = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
   }
 
   private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {

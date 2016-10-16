@@ -17,19 +17,21 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg._, common._, data._, json._, table._
+import ygg._, common._, json._, table._
 import trans.DerefObjectStatic
 
-abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
+abstract class TableQspec extends quasar.Qspec with ColumnarTableModuleTestSupport {
   self =>
 
   import SampleData._
 
-  type ASD       = Arbitrary[SampleData]
-  type TTable    = Table { type Table = self.Table }
+  trait TableCompanion extends ColumnarTableCompanion
+  final object Table extends TableCompanion
+  final class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadOrSortTable
 
-  /* Oh cake, my cake, the crimes you make me commit */
-  private implicit def ttable(x: Table): TTable = x.asInstanceOf[TTable]
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
+
+  type ASD = Arbitrary[SampleData]
 
   trait CommuteTest[R, S] {
     def transformR(x: R): R
@@ -63,7 +65,7 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   case class TableTestFun(table: Table, fun: Table => Table, expected: Seq[JValue]) {
     def check(): MatchResult[Seq[JValue]] = (toJson(fun(table)).copoint: Seq[JValue]) must_=== expected
   }
-  case class TableTest(table: TTable, spec: TransSpec1, expected: Seq[JValue]) {
+  case class TableTest(table: Table, spec: TransSpec1, expected: Seq[JValue]) {
     def check(): MatchResult[Seq[JValue]] = toJsonSeq(table transform spec) must_=== expected
   }
   case class TableProp(f: SampleData => TableTest) {
@@ -100,77 +102,6 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   protected def defaultASD: ASD                                           = sample(schema)
   protected def select[A](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))
   protected def select(name: String): TransSpec1                          = select(Fn.source, name)
-}
-
-abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTestSupport {
-  outer =>
-
-  final object Table extends TableCompanion
-
-  final class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadTable with NoSortTable with NoGroupTable {
-    def companion = Table
-    // Deadlock
-    // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
-  }
-  trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: NeedSlices, size: TableSize): Table                                        = new Table(slices, size)
-    def singleton(slice: Slice): Table                                                                     = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
-  }
 
   def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
-}
-
-trait TableModuleTestSupport extends TableModule {
-  outer =>
-
-  def lookupScanner(namespace: List[String], name: String): Scanner = {
-    val lib = Map[String, Scanner](
-      "sum" -> new Scanner {
-        type A = BigDecimal
-        val init = BigDecimal(0)
-        def scan(a: BigDecimal, cols: ColumnMap, range: Range): A -> ColumnMap = {
-          val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
-          val prioritized = identityPath.map(_._2) filter {
-            case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
-            case _                                                => false
-          }
-
-          val mask = Bits.filteredRange(range.start, range.end) { i =>
-            prioritized exists { _ isDefinedAt i }
-          }
-
-          val (a2, arr) = mask.toList.foldLeft((a, new Array[BigDecimal](range.end))) {
-            case ((acc, arr), i) => {
-              val col = prioritized find { _ isDefinedAt i }
-
-              val acc2 = col map {
-                case lc: LongColumn   => acc + lc(i)
-                case dc: DoubleColumn => acc + dc(i)
-                case nc: NumColumn    => acc + nc(i)
-                case _                => abort("unreachable")
-              }
-
-              acc2 foreach { arr(i) = _ }
-
-              (acc2 getOrElse acc, arr)
-            }
-          }
-
-          (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
-        }
-      }
-    )
-
-    lib(name)
-  }
-
-  def fromJson(data: Seq[JValue], maxBlockSize: Option[Int]): Table
-
-  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
-  def fromJson(data: Seq[JValue]): Table                                   = fromJson(data, None)
-  def fromJson(data: Seq[JValue], maxBlockSize: Int): Table                = fromJson(data, Some(maxBlockSize))
-  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
 }

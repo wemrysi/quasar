@@ -724,7 +724,7 @@ object SliceTransform1 {
   }
 }
 
-protected sealed trait SliceTransform2[A] {
+sealed trait SliceTransform2[A] {
   import SliceTransform2._
 
   def initial: A

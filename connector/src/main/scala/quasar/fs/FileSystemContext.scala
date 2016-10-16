@@ -101,13 +101,13 @@ trait UnifiedFileSystemBuilder {
   def FsType: FileSystemType
   def apply[F[_]: Applicative] : UnifiedFileSystem[F]
 
-  def free[F[_]]: UnifiedFileSystem[Free[F, ?]]   = apply[Free[F, ?]]
-  def queryFile[F[_]]: QueryFile ~> Free[F, ?]    = free[F].queryFile
-  def readFile[F[_]]: ReadFile ~> Free[F, ?]      = free[F].readFile
-  def writeFile[F[_]]: WriteFile ~> Free[F, ?]    = free[F].writeFile
-  def manageFile[F[_]]: ManageFile ~> Free[F, ?]  = free[F].manageFile
-  def fileSystem[F[_]]: FileSystem ~> Free[F, ?]  = free[F].fileSystem
-  def definition[F[_]]: FileSystemDef[Free[F, ?]] = free[F].definition(FsType)
+  def freeFs[F[_]]: UnifiedFileSystem[Free[F, ?]] = apply[Free[F, ?]]
+  def queryFile[F[_]]: QueryFile ~> Free[F, ?]    = freeFs[F].queryFile
+  def readFile[F[_]]: ReadFile ~> Free[F, ?]      = freeFs[F].readFile
+  def writeFile[F[_]]: WriteFile ~> Free[F, ?]    = freeFs[F].writeFile
+  def manageFile[F[_]]: ManageFile ~> Free[F, ?]  = freeFs[F].manageFile
+  def fileSystem[F[_]]: FileSystem ~> Free[F, ?]  = freeFs[F].fileSystem
+  def definition[F[_]]: FileSystemDef[Free[F, ?]] = freeFs[F].definition(FsType)
 }
 
 /** Standardized aliases for filesystem implementations.

@@ -20,7 +20,7 @@ import scalaz._, Scalaz._, Ordering._, Either3._
 import ygg._, common._, json._, table._
 import scala.Predef.identity
 
-class CogroupSpec extends ColumnarTableQspec {
+class CogroupSpec extends TableQspec {
   import SampleData._
   import trans._, constants._
 
