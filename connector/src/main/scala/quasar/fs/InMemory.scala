@@ -46,7 +46,6 @@ object InMemory extends StatefulFileSystem {
   type S              = InMemState
   type InMemoryFs[A]  = F[A]
   type InMemStateR[A] = InMemState -> A
-  type PlanMap[+V]    = Map[FixPlan, V]
 
   /** Represents the current state of the InMemoryFilesystem
     * @param seq Represents the next available uid for a ReadHandle or WriteHandle

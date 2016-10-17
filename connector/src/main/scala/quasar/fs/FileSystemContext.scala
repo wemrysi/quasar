@@ -125,10 +125,15 @@ trait FileSystemIndependentTypes {
   type RHandle = ReadFile.ReadHandle
   type QHandle = QueryFile.ResultHandle
 
+  val WHandle = WriteFile.WriteHandle
+  val RHandle = ReadFile.ReadHandle
+  val QHandle = QueryFile.ResultHandle
+
   type FileMap[+V]  = Map[AFile, V]
   type QueryMap[+V] = Map[QHandle, V]
   type ReadMap[+V]  = Map[RHandle, V]
   type WriteMap[+V] = Map[WHandle, V]
+  type PlanMap[+V]  = Map[FixPlan, V]
 }
 object FileSystemIndependentTypes extends FileSystemIndependentTypes
 
