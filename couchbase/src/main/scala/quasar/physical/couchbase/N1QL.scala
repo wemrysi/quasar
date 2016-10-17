@@ -17,7 +17,6 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.NameGenerator
 
 import monocle.macros.Lenses
 import monocle.Prism
@@ -71,14 +70,13 @@ object N1QL {
   ): Select =
     Select(value, resultExprs, none, none, let.some, none, none, none, none)
 
-  def selectN1qlQueryString[F[_]: Monad: NameGenerator](sel: Select): F[String] =
+  def selectN1qlQueryString[F[_]: Monad](sel: Select): F[String] =
     for {
       ks      <- sel.keyspace.traverse {
                    case v: Select             => n1qlQueryString[F](v)
                    case PartialQueryString(v) => s"(select value $v)".point[F]
                    case Read(v)               => v.point[F]
                  }
-      tmpName <- planner.genName[F]
     } yield {
       val value = sel.value.fold("value ", "")
 
@@ -102,7 +100,7 @@ object N1QL {
       ")"
     }
 
-  def n1qlQueryString[F[_]: Monad: NameGenerator](n1ql: N1QL): F[String] =
+  def n1qlQueryString[F[_]: Monad](n1ql: N1QL): F[String] =
     n1ql match {
       case PartialQueryString(v) => v.point[F]
       case Read(v)               => v.point[F]
@@ -112,7 +110,7 @@ object N1QL {
   def outerN1qlFromString(n1ql: String): String =
     s"select value v from $n1ql as v"
 
-  def outerN1ql[F[_]: Monad: NameGenerator](n1ql: N1QL): F[String] =
+  def outerN1ql[F[_]: Monad](n1ql: N1QL): F[String] =
     n1qlQueryString[F](n1ql match {
       case PartialQueryString(v) => partialQueryString(s"(select value $v)")
       case v => v

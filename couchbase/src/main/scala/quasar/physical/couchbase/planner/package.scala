@@ -28,7 +28,7 @@ package object planner {
   def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
     MonadTell[F, PhaseResults].tell(pr)
 
-  def n1ql[F[_]: Monad: NameGenerator](n1ql: N1QL): F[String] =
+  def n1ql[F[_]: Monad](n1ql: N1QL): F[String] =
     N1QL.n1qlQueryString[F](n1ql)
 
   def genName[F[_]: Functor: NameGenerator]: F[String] =

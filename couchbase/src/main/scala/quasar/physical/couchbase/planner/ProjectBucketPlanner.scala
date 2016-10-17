@@ -18,14 +18,13 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.contrib.matryoshka.ShowT
-import quasar.NameGenerator
 import quasar.physical.couchbase._
 import quasar.qscript, qscript._
 
 import matryoshka._
 import scalaz._
 
-final class ProjectBucketPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+final class ProjectBucketPlanner[F[_]: Monad, T[_[_]]: Recursive: ShowT]
   extends Planner[F, ProjectBucket[T, ?]] {
 
   def plan: AlgebraM[M, ProjectBucket[T, ?], N1QL] = {

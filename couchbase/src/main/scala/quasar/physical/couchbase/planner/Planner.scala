@@ -46,11 +46,11 @@ object Planner {
     : Planner[F, Const[DeadEnd, ?]] =
     new ConstDeadEndPlanner[F]
 
-  implicit def constReadPlanner[F[_]: Monad: NameGenerator]
+  implicit def constReadPlanner[F[_]: Monad]
     : Planner[F, Const[Read, ?]] =
     new ConstReadPlanner[F]
 
-  implicit def constShiftedRead[F[_]: Monad: NameGenerator]
+  implicit def constShiftedRead[F[_]: Monad]
     : Planner[F, Const[ShiftedRead, ?]] =
     new ShiftedReadPlanner[F]
 
@@ -70,7 +70,7 @@ object Planner {
     : Planner[F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[F, T]
 
-  def reduceFuncPlanner[F[_]: Monad: NameGenerator]
+  def reduceFuncPlanner[F[_]: Monad]
     : Planner[F, ReduceFunc] =
     new ReduceFuncPlanner[F]
 
