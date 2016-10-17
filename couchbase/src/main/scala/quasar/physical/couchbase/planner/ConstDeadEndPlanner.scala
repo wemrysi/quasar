@@ -16,15 +16,15 @@
 
 package quasar.physical.couchbase.planner
 
+import quasar.Predef._
 import quasar.physical.couchbase._
 import quasar.qscript, qscript._
-import quasar.physical.couchbase.N1QL._
 
 import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
 final class ConstDeadEndPlanner[F[_]: Monad] extends Planner[F, Const[DeadEnd, ?]] {
   def plan: AlgebraM[M, Const[DeadEnd, ?], N1QL] = {
-    case Const(Root) => partialQueryString("Const(Root)").point[M]
+    case Const(Root) => ???
   }
 }
