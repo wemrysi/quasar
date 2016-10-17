@@ -30,7 +30,7 @@ final class ShiftedReadPlanner[F[_]: Monad] extends Planner[F, Const[ShiftedRead
     case Const(ShiftedRead(absFile, idStatus)) =>
       for {
         n    <- readPath[PR](absFile, idStatus)
-        nStr <- n1ql[M](n)
+        nStr =  n1ql(n)
         _    <- prtell[M](Vector(Detail(
                   "N1QL ShiftedRead",
                   s"""  absFile:  $absFile

@@ -36,7 +36,7 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Show
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, f, combine) =>
     for {
       tmpName <- genName[M]
-      sN1ql   <- n1ql[M](src)
+      sN1ql   =  n1ql(src)
       lbN1ql  <- freeCataM(lBranch)(interpretM(
                    κ(partialQueryString(tmpName).point[M]),
                    Planner[F, QScriptTotal[T, ?]].plan))

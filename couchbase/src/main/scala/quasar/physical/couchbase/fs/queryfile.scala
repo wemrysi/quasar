@@ -132,10 +132,7 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    (for {
-      n1ql    <- lpToN1ql(lp)
-      n1qlStr <- outerN1ql[Plan[S, ?]](n1ql)
-    } yield ExecutionPlan(FsType, n1qlStr)).run.run
+    (lpToN1ql(lp) ∘ (n1ql => ExecutionPlan(FsType, outerN1ql(n1ql)))).run.run
 
 
   def listContents[S[_]](
@@ -167,9 +164,10 @@ object queryfile {
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
-  ): Plan[S, Vector[JsonObject]] =
+  ): Plan[S, Vector[JsonObject]] = {
+    val n1qlStr = outerN1ql(n1ql)
+
     for {
-      n1qlStr <- outerN1ql[Plan[S, ?]](n1ql)
       _       <- prtell[Plan[S, ?]](Vector(Detail(
                    "N1QL Results",
                    s"""  n1ql: $n1qlStr""".stripMargin('|'))))
@@ -185,6 +183,7 @@ object queryfile {
                      .map(_.value)
                  )).into.liftP
     } yield r
+  }
 
   def lpToN1ql[S[_]](
     lp: Fix[LogicalPlan]

@@ -70,50 +70,51 @@ object N1QL {
   ): Select =
     Select(value, resultExprs, none, none, let.some, none, none, none, none)
 
-  def selectN1qlQueryString[F[_]: Monad](sel: Select): F[String] =
-    for {
-      ks      <- sel.keyspace.traverse {
-                   case v: Select             => n1qlQueryString[F](v)
-                   case PartialQueryString(v) => s"(select value $v)".point[F]
-                   case Read(v)               => v.point[F]
-                 }
-    } yield {
-      val value = sel.value.fold("value ", "")
-
-      val resultExprs = sel.resultExprs.intercalate(", ")
-
-      val ksAlias = sel.keyspaceAlias.cata(" as " + _, "")
-
-      val let = sel.let.map(_.map { case (k, v) => s"$k = $v" }.mkString(" let ", ", ", ""))
-
-      // TODO: Workaround for the moment. Lift "null" into a N1QL type?
-      val groupBy = sel.groupBy.flatMap(v => (v === "null").fold(None, v.some))
-
-      "("                                              |+|
-      s"select $value$resultExprs"                     |+|
-      ks         .map(k => s" from $k$ksAlias").orZero |+|
-      sel.filter .map(f => s" where $f"       ).orZero |+|
-      let                                      .orZero |+|
-      groupBy    .map(g => s" group by $g"    ).orZero |+|
-      sel.unnest .map(u => s" unnest $u"      ).orZero |+|
-      sel.orderBy.map(o => s" order by ($o)"  ).orZero |+|
-      ")"
+  def selectN1qlQueryString(sel: Select): String = {
+    val ks = sel.keyspace.map {
+      case v: Select             => n1qlQueryString(v)
+      case PartialQueryString(v) => s"(select value $v)"
+      case Read(v)               => v
     }
 
-  def n1qlQueryString[F[_]: Monad](n1ql: N1QL): F[String] =
+    val value = sel.value.fold("value ", "")
+
+    val resultExprs = sel.resultExprs.intercalate(", ")
+
+    val ksAlias = sel.keyspaceAlias.cata(" as " + _, "")
+
+    val let = sel.let.map(_.map { case (k, v) => s"$k = $v" }.mkString(" let ", ", ", ""))
+
+    // TODO: Workaround for the moment. Lift "null" into a N1QL type?
+    val groupBy = sel.groupBy.flatMap(v => (v === "null").fold(None, v.some))
+
+    "("                                              |+|
+    s"select $value$resultExprs"                     |+|
+    ks         .map(k => s" from $k$ksAlias").orZero |+|
+    sel.filter .map(f => s" where $f"       ).orZero |+|
+    let                                      .orZero |+|
+    groupBy    .map(g => s" group by $g"    ).orZero |+|
+    sel.unnest .map(u => s" unnest $u"      ).orZero |+|
+    sel.orderBy.map(o => s" order by ($o)"  ).orZero |+|
+    ")"
+  }
+
+  def n1qlQueryString(n1ql: N1QL): String =
     n1ql match {
-      case PartialQueryString(v) => v.point[F]
-      case Read(v)               => v.point[F]
-      case s: Select             => selectN1qlQueryString[F](s)
+      case PartialQueryString(v) => v
+      case Read(v)               => v
+      case s: Select             => selectN1qlQueryString(s)
     }
 
-  def outerN1ql[F[_]: Monad](n1ql: N1QL): F[String] =
-    n1qlQueryString[F](
+  def outerN1ql(n1ql: N1QL): String = {
+    val n1qlStr = n1qlQueryString(
       n1ql match {
         case PartialQueryString(v) => partialQueryString(s"(select value $v)")
         case v => v
-      }
-    ).map(n1qlStr => s"select value v from $n1qlStr as v")
+      })
+
+    s"select value v from $n1qlStr as v"
+  }
 
   implicit val show: Show[N1QL] = Show.showFromToString
 

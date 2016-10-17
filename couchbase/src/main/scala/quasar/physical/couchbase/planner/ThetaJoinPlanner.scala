@@ -44,7 +44,7 @@ final class ThetaJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Sho
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {
         tmpName <- genName[M]
-        sN1ql   <- n1ql[M](src)
+        sN1ql   =  n1ql(src)
         lbN1ql  <- freeCataM(lBranch)(interpretM(
                      κ(partialQueryString(tmpName).point[M]),
                      Planner[F, QScriptTotal[T, ?]].plan))

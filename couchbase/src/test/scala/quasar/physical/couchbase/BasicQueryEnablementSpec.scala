@@ -56,18 +56,18 @@ class BasicQueryEnablementSpec
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Eff](compileLogicalPlan(sql2), lc) >>= outerN1ql[Plan[Eff, ?]] _)
+    (lpLcToN1ql[Eff](compileLogicalPlan(sql2), lc) ∘ outerN1ql)
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
   def n1qlFromQS(qs: Fix[QS]): String =
-    EitherT(qs.cataM(Planner[Free[MonotonicSeq, ?], QS].plan).run.run.map(_._2))
-      .flatMap(q => EitherT.right(N1QL.outerN1ql[Free[MonotonicSeq, ?]](q)))
-      .fold(e => scala.sys.error(e.shows), ι)
+    (qs.cataM(Planner[Free[MonotonicSeq, ?], QS].plan) ∘ outerN1ql)
+      .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
+      .fold(e => scala.sys.error(e.shows), ι)
 
   def testSql2ToN1ql(sql2: String, n1ql: String): Fragment =
     sql2 in (n1qlFromSql2(sql2) must_= n1ql)

@@ -31,7 +31,7 @@ final class ConstReadPlanner[F[_]: Monad] extends Planner[F, Const[Read, ?]] {
     case Const(Read(path)) =>
       for {
         n    <- readPath[PR](path, ExcludeId)
-        nStr <- n1ql[M](n)
+        nStr =  n1ql(n)
         _    <- prtell[M](Vector(Detail(
                   "N1QL Read",
                   s"""  path: $path
