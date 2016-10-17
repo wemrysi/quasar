@@ -20,7 +20,7 @@ import scalaz._
 import ygg._, common._, json._
 import trans._
 
-trait TableConstruct[T <: ygg.table.Table] {
+trait TableConstructors[T <: ygg.table.Table] {
   def maxSliceSize: Int
 
   def empty: T

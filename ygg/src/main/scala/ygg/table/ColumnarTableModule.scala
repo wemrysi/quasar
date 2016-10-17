@@ -276,20 +276,11 @@ trait ColumnarTableModule {
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
       val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
 
-      def makeSlice(data: Stream[RValue]): (Slice, Stream[RValue]) = {
-        val (prefix, suffix) = data.splitAt(sliceSize)
-
-        (Slice.fromRValues(prefix), suffix)
-      }
+      def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
+        data splitAt sliceSize leftMap (Slice fromRValues _)
 
       Table(
-        StreamT.unfoldM(values) { events =>
-          Need {
-            (!events.isEmpty) option {
-              makeSlice(events.toStream)
-            }
-          }
-        },
+        StreamT.unfoldM(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
         ExactSize(values.length)
       )
     }

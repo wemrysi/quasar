@@ -16,24 +16,23 @@
 
 package ygg.table
 
-import ygg._, common._, json._
 import scalaz._, Scalaz._
+import ygg._, common._, json._
 
-class PlayTable extends ColumnarTableModule {
+class ColumnarTable extends ColumnarTableModule {
   type TableCompanion = ColumnarTableCompanion
 
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
+  def toJson(dataset: Table): Need[Stream[JValue]]           = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                   = toJson(table).copoint
 
   object Table extends ColumnarTableCompanion
   class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadOrSortTable {
     override def toString = jvalueStream mkString "\n"
   }
 
-  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 }
-
-object PlayTable extends PlayTable {
+object ColumnarTable extends ColumnarTable {
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
 }
