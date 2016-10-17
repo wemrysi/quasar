@@ -16,7 +16,10 @@
 
 package quasar.qscript
 
-import scalaz._
+import quasar.Predef._
+import quasar.{RenderTree, Terminal}
+
+import scalaz._, Scalaz._
 
 sealed abstract class JoinType
 final case object Inner extends JoinType
@@ -27,4 +30,6 @@ final case object RightOuter extends JoinType
 object JoinType {
   implicit val equal: Equal[JoinType] = Equal.equalRef
   implicit val show: Show[JoinType] = Show.showFromToString
+  implicit val renderTree: RenderTree[JoinType] =
+    RenderTree.make(t => Terminal(List(t.shows, "JoinType"), None))
 }

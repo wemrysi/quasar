@@ -246,10 +246,33 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lb, mf))),
                 sel,
                 rb).some
+            case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
+              case Map(doubleInner, mfInner) =>
+                Map(
+                  FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
+                  mf >> mfInner).some
+              case _ => None
+            }
+            case Sort(Embed(innerSrc), buckets, ordering) => FToOut.get(innerSrc) >>= QC.prj >>= {
+              case Map(doubleInner, mfInner) =>
+                Map(
+                  FToOut.reverseGet(QC.inj(Sort(
+                    doubleInner,
+                    buckets >> mfInner,
+                    ordering ∘ (_.leftMap(_ >> mfInner))))).embed,
+                  mf >> mfInner).some
+              case _ => None
+            }
             case _ => None
           })
         case LeftShift(Embed(src), struct, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
+            case LeftShift(innerSrc, innerStruct, innerRepair)
+                if !shiftRepair.element(LeftSide) && struct != HoleF =>
+              LeftShift(
+                FToOut.reverseGet(QC.inj(LeftShift(innerSrc, innerStruct, struct >> innerRepair))).embed,
+                HoleF,
+                shiftRepair).some
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
