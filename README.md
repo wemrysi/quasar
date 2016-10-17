@@ -177,6 +177,13 @@ To connect to Couchbase use the following `connectionUri` format:
 
 `couchbase://<host>[:<port>]?username=<username>&password=<password>`
 
+To connect to HDFS using Apache Spark use the following `connectionUri` format:
+
+`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+
+e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+
+
 #### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
@@ -195,6 +202,22 @@ For example, given the above MongoDB mount, an additional view could be defined 
 ```
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+#### Build Quasar for Apache Spark
+
+Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
+
+1. Assemble Quasar for Spark
+
+```sbt web/assembly -Dquasar4Spark=yes```
+
+2. Build sparkcore.jar
+
+```sbt sparkcore/assembly -DbuildSparkCore=yes```
+
+3. Set environment variable QUASAR_HOME
+
+QUASAR_HOME must point to a folder holding `sparkcore.jar`
 
 ## REPL Usage
 
