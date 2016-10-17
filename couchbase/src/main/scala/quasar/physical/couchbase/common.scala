@@ -17,6 +17,7 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
+import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect.Read
 import quasar.fp.free._
@@ -42,6 +43,8 @@ object common {
   final case class BucketCollection(bucket: String, collection: String)
 
   final case class DocIdType(id: String, tpe: String)
+
+  final case class Cursor(result: Vector[JsonObject])
 
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
@@ -113,4 +116,11 @@ object common {
         Task.delay(ctx.cluster.openBucket(name).right),
         Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
     ).into)
+
+  def resultsFromCursor(cursor: Cursor): FileSystemError \/ (Cursor, Vector[Data]) =
+    cursor.result.traverse(jObj =>
+      DataCodec.parse(jObj.toString)(DataCodec.Precise).leftMap(err =>
+        FileSystemError.readFailed(jObj.toString, err.shows))
+    ).strengthL(Cursor(Vector.empty))
+
 }
