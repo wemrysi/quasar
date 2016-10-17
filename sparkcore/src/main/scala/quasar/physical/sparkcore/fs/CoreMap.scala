@@ -72,13 +72,12 @@ object CoreMap extends Serializable {
     }).right
     case ExtractCentury(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear() / 100)
-      case Data.Date(v) => Data.Int(v.getYear() / 100)
+      case Data.Date(v) => Data.Int((v.getYear() / 100) + 1)
       case _ => undefined
     }).right
     case ExtractDayOfMonth(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfMonth())
       case Data.Date(v) => Data.Int(v.getDayOfMonth())
-      // TODO shouldn't we cover Data.Interval(Duration)?
       case _ => undefined
     }).right
     case ExtractDecade(f) => (f >>> {
@@ -87,8 +86,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractDayOfWeek(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfWeek().getValue())
-      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfWeek().getValue() % 7)
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue() % 7)
       case _ => undefined
     }).right
     case ExtractDayOfYear(f) => (f >>> {
@@ -98,6 +97,7 @@ object CoreMap extends Serializable {
     }).right
     case ExtractEpoch(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(v.toEpochMilli() / 1000)
+      case Data.Date(v) => Data.Int(v.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
       case _ => undefined
     }).right
     case ExtractHour(f) => (f >>> {
@@ -106,15 +106,10 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractIsoDayOfWeek(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()
       case _ => undefined
     }).right
     case ExtractIsoYear(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()
+
       case _ => undefined
     }).right
     case ExtractMicroseconds(f) => (f >>> {
@@ -122,35 +117,23 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractMillennium(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        // TODO check values
-        if(toDateTime(v).isAfter(ZonedDateTime.of(2000,12,31,23,59,59,99,ZoneOffset.UTC))) Data.Int(3)
-        else Data.Int(2)
-      case Data.Date(v) => if(v.isAfter(LocalDate.of(2000, 12, 31))) Data.Int(3) else Data.Int(2)
+
       case _ => undefined
     }).right
     case ExtractMilliseconds(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()      
+
       case _ => undefined
     }).right
     case ExtractMinute(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()
+
       case _ => undefined
     }).right
     case ExtractMonth(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()
+
       case _ => undefined
     }).right
     case ExtractQuarter(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
-      // case Data.Time(v) => Data.Int()
+
       case _ => undefined
     }).right
     case ExtractSecond(f) => (f >>> {
@@ -159,8 +142,7 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractWeek(f) => (f >>> {
-      // case Data.Timestamp(v) => Data.Int(toDateTime(v))
-      // case Data.Date(v) => Data.Int()
+
       case _ => undefined
     }).right
     case ExtractYear(f) => (f >>> {
