@@ -27,7 +27,7 @@ import quasar.fp.ski._
 
 import scala.math
 
-import org.threeten.bp.{Instant, ZoneOffset}
+import org.threeten.bp._
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -70,24 +70,104 @@ object CoreMap extends Serializable {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => undefined
     }).right
-    case ExtractCentury(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractDecade(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfYear(f) => InternalError("not implemented").left // TODO
-    case ExtractEpoch(f) => InternalError("not implemented").left // TODO
-    case ExtractHour(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoYear(f) => InternalError("not implemented").left // TODO
-    case ExtractMicroseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMillennium(f) => InternalError("not implemented").left // TODO
-    case ExtractMilliseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMinute(f) => InternalError("not implemented").left // TODO
-    case ExtractMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractQuarter(f) => InternalError("not implemented").left // TODO
-    case ExtractSecond(f) => InternalError("not implemented").left // TODO
-    case ExtractWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractYear(f) => InternalError("not implemented").left // TODO
+    case ExtractCentury(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getYear() / 100)
+      case Data.Date(v) => Data.Int(v.getYear() / 100)
+      case _ => undefined
+    }).right
+    case ExtractDayOfMonth(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getDayOfMonth())
+      case Data.Date(v) => Data.Int(v.getDayOfMonth())
+      // TODO shouldn't we cover Data.Interval(Duration)?
+      case _ => undefined
+    }).right
+    case ExtractDecade(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getYear() / 100)
+      case Data.Date(v) => Data.Int(v.getYear() / 100)
+      case _ => undefined
+    }).right
+    case ExtractDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getDayOfWeek().getValue())
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
+      case _ => undefined
+    }).right
+    case ExtractDayOfYear(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getDayOfYear())
+      case Data.Date(v) => Data.Int(v.getDayOfYear())
+      case _ => undefined
+    }).right
+    case ExtractEpoch(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(v.toEpochMilli() / 1000)
+      case _ => undefined
+    }).right
+    case ExtractHour(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getHour())
+      case Data.Time(v) => Data.Int(v.getHour())
+      case _ => undefined
+    }).right
+    case ExtractIsoDayOfWeek(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractIsoYear(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractMicroseconds(f) => (f >>> {
+
+      case _ => undefined
+    }).right
+    case ExtractMillennium(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        // TODO check values
+        if(toLocalDate(v).isAfter(ZonedDateTime.of(2000,12,31,23,59,59,99,ZoneOffset.UTC))) Data.Int(3)
+        else Data.Int(2)
+      case Data.Date(v) => if(v.isAfter(LocalDate.of(2000, 12, 31))) Data.Int(3) else Data.Int(2)
+      case _ => undefined
+    }).right
+    case ExtractMilliseconds(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()      
+      case _ => undefined
+    }).right
+    case ExtractMinute(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractMonth(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractQuarter(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      // case Data.Time(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractSecond(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getSecond())
+      case Data.Time(v) => Data.Int(v.getSecond())
+      case _ => undefined
+    }).right
+    case ExtractWeek(f) => (f >>> {
+      // case Data.Timestamp(v) => Data.Int(toLocalDate(v))
+      // case Data.Date(v) => Data.Int()
+      case _ => undefined
+    }).right
+    case ExtractYear(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toLocalDate(v).getYear())
+      case Data.Date(v) => Data.Int(v.getYear())
+      case _ => undefined
+    }).right
     case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
@@ -404,4 +484,5 @@ object CoreMap extends Serializable {
       case _ => undefined
     }
 
+  private def toLocalDate(v: Instant) = v.atZone(ZoneOffset.UTC)
 }
