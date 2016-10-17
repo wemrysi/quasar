@@ -31,7 +31,6 @@ trait ColumnarTableModule {
 
   import trans._
 
-  def fromJson(data: Seq[JValue]): Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
   val Table: TableCompanion
@@ -52,6 +51,28 @@ trait ColumnarTableModule {
       (table.asInstanceOf[Table]).sort(root.key) map (t => GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec))
     case GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment) =>
       (sortedGroupingSpec(left) |@| sortedGroupingSpec(right))(GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, _, _, alignment))
+  }
+
+  def fromJson(values: Seq[JValue]): Table = fromJson(values, None)
+  def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table = {
+    val sliceSize = maxSliceSize getOrElse yggConfig.maxSliceSize
+
+    def makeSlice(sampleData: Stream[JValue]): Slice -> Stream[JValue] = {
+      @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): ArrayColumnMap -> Int = from match {
+        case jv #:: xs => buildColArrays(xs, Slice.withIdsAndValues(jv, into, sliceIndex, sliceSize), sliceIndex + 1)
+        case _         => (into, sliceIndex)
+      }
+      val (prefix, suffix) = sampleData splitAt sliceSize
+      val (refs, size)     = buildColArrays(prefix.toStream, Map(), 0)
+      val slice            = Slice(size, refs)
+
+      slice -> suffix
+    }
+
+    fromSlices(
+      StreamT.unfoldM(values.toStream)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
+      ExactSize(values.length)
+    )
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {

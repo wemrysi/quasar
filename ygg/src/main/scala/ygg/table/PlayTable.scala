@@ -29,37 +29,8 @@ class PlayTable extends ColumnarTableModule {
     override def toString = jvalueStream mkString "\n"
   }
 
-  private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {
-    @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): (ArrayColumnMap, Int) = {
-      from match {
-        case jv #:: xs =>
-          val refs = Slice.withIdsAndValues(jv, into, sliceIndex, sliceSize)
-          buildColArrays(xs, refs, sliceIndex + 1)
-        case _ =>
-          (into, sliceIndex)
-      }
-    }
-
-    val (prefix, suffix) = sampleData.splitAt(sliceSize)
-    val (refs, size)     = buildColArrays(prefix.toStream, Map(), 0)
-    val slice            = Slice(size, refs)
-
-    slice -> suffix
-  }
-
-  // production-path code uses fromRValues, but all the tests use fromJson
-  // this will need to be changed when our tests support non-json such as CDate and CPeriod
-  def fromJson0(values: Stream[JValue], sliceSize: Int): Table = Table(
-    StreamT.unfoldM(values)(events => Need(events.nonEmpty option makeSlice(events.toStream, sliceSize))),
-    ExactSize(values.length)
-  )
-
-  def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table =
-    fromJson0(values.toStream, maxSliceSize getOrElse yggConfig.maxSliceSize)
-
-  def toJson(dataset: Table): Need[Stream[JValue]]          = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]                  = toJson(table).copoint
-  def fromJson(data: Seq[JValue]): Table                    = fromJson0(data.toStream, yggConfig.maxSliceSize)
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 }
 
 object PlayTable extends PlayTable {
