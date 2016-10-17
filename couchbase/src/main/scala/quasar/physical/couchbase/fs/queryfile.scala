@@ -70,7 +70,7 @@ object queryfile {
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ AFile)] =
     (for {
-      n1ql   <- lpToN1qlString(lp)
+      n1ql   <- lpToN1ql(lp)
       r      <- n1qlResults(n1ql)
       bktCol <- bucketCollectionFromPath(out).bimap(
                   e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
@@ -100,7 +100,7 @@ object queryfile {
     results: KeyValueStore.Ops[ResultHandle, Cursor, S]
   ): Free[S, (PhaseResults, FileSystemError \/ ResultHandle)] =
     (for {
-      n1ql <- lpToN1qlString(lp)
+      n1ql <- lpToN1ql(lp)
       r    <- n1qlResults(n1ql)
       i    <- MonotonicSeq.Ops[S].next.liftP
       h    =  ResultHandle(i)
@@ -132,7 +132,11 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    lpToN1qlString(lp).map(ExecutionPlan(FsType, _)).run.run
+    (for {
+      n1ql    <- lpToN1ql(lp)
+      n1qlStr <- outerN1ql[Plan[S, ?]](n1ql)
+    } yield ExecutionPlan(FsType, n1qlStr)).run.run
+
 
   def listContents[S[_]](
     dir: APath
@@ -159,51 +163,49 @@ object queryfile {
     } yield exists).exists(ι)
 
   def n1qlResults[S[_]](
-    n1ql: String
+    n1ql: N1QL
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
-  ): Plan[S, Vector[JsonObject]] = {
-    val n1qlQueryString = outerN1qlFromString(n1ql)
-
+  ): Plan[S, Vector[JsonObject]] =
     for {
-      _   <- prtell[Plan[S, ?]](Vector(Detail(
-               "N1QL Results",
-               s"""  n1ql: $n1qlQueryString""".stripMargin('|'))))
-      ctx <- context.ask.liftP
-      bkt <- lift(Task.delay(
-               ctx.cluster.openBucket()
-             )).into.liftP
-      r   <- lift(Task.delay(
-               bkt.query(n1qlQuery(n1qlQueryString))
-                 .allRows
-                 .asScala
-                 .toVector
-                 .map(_.value)
-             )).into.liftP
+      n1qlStr <- outerN1ql[Plan[S, ?]](n1ql)
+      _       <- prtell[Plan[S, ?]](Vector(Detail(
+                   "N1QL Results",
+                   s"""  n1ql: $n1qlStr""".stripMargin('|'))))
+      ctx     <- context.ask.liftP
+      bkt     <- lift(Task.delay(
+                   ctx.cluster.openBucket()
+                 )).into.liftP
+      r       <- lift(Task.delay(
+                   bkt.query(n1qlQuery(n1qlStr))
+                     .allRows
+                     .asScala
+                     .toVector
+                     .map(_.value)
+                 )).into.liftP
     } yield r
-  }
 
-  def lpToN1qlString[S[_]](
+  def lpToN1ql[S[_]](
     lp: Fix[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, String] = {
+  ): Plan[S, N1QL] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
-    lpLcToN1qlString(lp, lc)
+    lpLcToN1ql(lp, lc)
   }
 
-  def lpLcToN1qlString[S[_]](
+  def lpLcToN1ql[S[_]](
     lp: Fix[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, String] = {
+  ): Plan[S, N1QL] = {
     type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
 
     val tell = prtell[Plan[S, ?]] _
@@ -212,7 +214,7 @@ object queryfile {
       _    <- tell(Vector(Tree("lp", lp.render)))
       qs   <- convertToQScriptRead[
                 Fix,
-                FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?],
+                Plan[S, ?],
                 QScriptRead[Fix, ?]
               ](lc)(lp)
       _    <- tell(Vector(Tree("QS post convertToQScriptRead", qs.render)))
@@ -220,12 +222,9 @@ object queryfile {
                 SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
                   .simplifyJoin(idPrism.reverseGet))
       _    <- tell(Vector(Tree("QS post shiftRead", qs.render)))
-      plan <- shft.cataM(
+      n1ql <- shft.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))
-      n1ql <- N1QL.n1qlQueryString[
-                FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]
-              ](plan)
     } yield n1ql
   }
 

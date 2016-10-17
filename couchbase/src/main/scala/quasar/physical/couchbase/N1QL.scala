@@ -107,14 +107,13 @@ object N1QL {
       case s: Select             => selectN1qlQueryString[F](s)
     }
 
-  def outerN1qlFromString(n1ql: String): String =
-    s"select value v from $n1ql as v"
-
   def outerN1ql[F[_]: Monad](n1ql: N1QL): F[String] =
-    n1qlQueryString[F](n1ql match {
-      case PartialQueryString(v) => partialQueryString(s"(select value $v)")
-      case v => v
-    }).map(outerN1qlFromString)
+    n1qlQueryString[F](
+      n1ql match {
+        case PartialQueryString(v) => partialQueryString(s"(select value $v)")
+        case v => v
+      }
+    ).map(n1qlStr => s"select value v from $n1qlStr as v")
 
   implicit val show: Show[N1QL] = Show.showFromToString
 
