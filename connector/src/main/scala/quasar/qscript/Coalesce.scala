@@ -246,6 +246,23 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lb, mf))),
                 sel,
                 rb).some
+            case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
+              case Map(doubleInner, mfInner) =>
+                Map(
+                  FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
+                  mf >> mfInner).some
+              case _ => None
+            }
+            case Sort(Embed(innerSrc), buckets, ordering) => FToOut.get(innerSrc) >>= QC.prj >>= {
+              case Map(doubleInner, mfInner) =>
+                Map(
+                  FToOut.reverseGet(QC.inj(Sort(
+                    doubleInner,
+                    buckets >> mfInner,
+                    ordering ∘ (_.leftMap(_ >> mfInner))))).embed,
+                  mf >> mfInner).some
+              case _ => None
+            }
             case _ => None
           })
         case LeftShift(Embed(src), struct, shiftRepair) =>

@@ -69,6 +69,7 @@ object queryfile {
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
       val rewrite = new Rewrite[Fix]
+      val C = Coalesce[Fix, MLQScript, MLQScript]
 
       def logPhase(pr: PhaseResult): QPlan[Unit] =
         MonadTell[QPlan, PhaseResults].tell(Vector(pr))
@@ -85,7 +86,14 @@ object queryfile {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
         shifted =  shiftRead[Fix](qs)
         _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
-        optmzed =  shifted.transCata(rewrite.optimize(reflNT))
+        optmzed =  shifted
+                     .transAna(
+                       repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
+                       repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
+                       repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
+                       repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
+                     .transCata(rewrite.optimize(reflNT))
+
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>

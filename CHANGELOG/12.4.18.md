@@ -1,0 +1,1 @@
+- implement StdLibSpec for sparkcore
