@@ -24,6 +24,7 @@ import quasar.fp.ski._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._
+import quasar.qscript.SortDir._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -213,8 +214,27 @@ object Planner {
                 }
             }).map((sc, _)).point[Task])
           )
-        case Sort(src, bucket, order) =>
-          unimplemented("sort")
+        case Sort(src, bucket, orders) =>
+
+          implicit val ord = Data.ordering.toScalaOrdering
+          implicit val listOrd = Order[List[Data]].toScalaOrdering
+
+          val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
+            orders.traverse {
+              case (freemap, sdir) =>
+                freeCataM(freemap)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
+            }
+
+          val maybeBucket =
+            freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+          
+          EitherT((maybeBucket |@| maybeSortBys) {
+            case (bucket, sortBys) =>
+              val asc = sortBys(0)._2 === Ascending
+              val keys = bucket :: sortBys.map(_._1)
+              src.sortBy(d => keys.map(_(d)), asc)
+          }.point[Task]).liftM[SparkStateT]
+
         case Filter(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {

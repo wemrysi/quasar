@@ -195,6 +195,32 @@ object Data {
 
   final class Comparable private (val value: Data) extends scala.AnyVal
 
+  implicit val ordering = new Order[Data] {
+    def order(d1: Data, d2: Data): Ordering = (d1, d2) match {
+      case (Data.Null, Data. Null) => Ordering.EQ
+      case (Data.Str(a), Data.Str(b)) => Ordering.fromInt(a.compare(b))
+      case (Data.Bool(a), Data.Bool(b)) => Order[Boolean].order(a, b)
+      case (Data.Number(a), Data.Number(b)) => Order[BigDecimal].order(a, b)
+      // case (Data.Obj(a), Data.Obj(b)) => Order[ListMap[String, Data]].order(a, b)
+      // case (Data.Arr(a), Data.Arr(b)) => Order[List[Data]].order(a, b)
+      // case (Data.Set(a), Data.Set(b)) => Order[List[Data]].order(a, b)
+      case (Data.Timestamp(a), Data.Timestamp(b)) => Ordering.fromInt(a.compareTo(b))
+      case (Data.Date(a), Data.Date(b)) => Ordering.fromInt(a.compareTo(b))
+      case (Data.Time(a), Data.Time(b)) => Ordering.fromInt(a.compareTo(b))
+      case _ => Ordering.EQ
+    }
+  }
+
+  // implicit val listOrdering = new scala.math.Ordering[List[Data]] {
+    // def compare(ld1: List[Data], ld2: List[Data]): Int = (ld1, ld2) match {
+      // case (e1::t1, e2::t2) if(ordering.compare(e1, e2) == 0) => listOrdering.compare(t1, t2)
+      // case (Nil, Nil) => 0
+      // case (l, Nil) => ???
+      // case (Nil, l) => ???
+      // case (e1::t1, e2::t2) => ordering.compare(e1, e2)
+    // }
+  // }
+
   object Comparable {
     def apply(data: Data): Option[Comparable] =
       some(data)
