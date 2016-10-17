@@ -3,17 +3,16 @@
 
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "pending"
     },
 
     "data": ["cars.data", "zips.data"],
 
-    "query": "select (zips := select * from cars; select * from zips) from zips",
+    "query": "select (zips := select * from cars; select * from zips) as value from zips",
 
     "predicate": "containsExactly",
 
-    "expected": [{ "0": { "_id": "1", "name": "RangeRover-Evoque" } },
-                 { "0": { "_id": "2", "name": "Honda-civic" } },
-                 { "0": { "_id": "3", "name": "BMW-X5" } }]
+    "expected": [{ "value": { "_id": "1", "name": "RangeRover-Evoque" } },
+                 { "value": { "_id": "2", "name": "Honda-civic" } },
+                 { "value": { "_id": "3", "name": "BMW-X5" } }]
 }

@@ -258,6 +258,7 @@ object CoreMap extends Serializable {
     }).right
     case ConcatArrays(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
+      case (Data.Str(s1), Data.Str(s2)) => Data.Str(s1 ++ s2)
       case _ => undefined
     }).right
     case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
@@ -344,7 +345,7 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a / b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(b))
-    case (Data.Int(a), Data.Int(b)) => Data.Int(a / b)
+    case (Data.Int(a), Data.Int(b)) => Data.Dec(BigDecimal(a) / BigDecimal(b))
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
@@ -432,19 +433,19 @@ object CoreMap extends Serializable {
 
   private def between(d1: Data, d2: Data, d3: Data): Data = (d1, d2, d3) match {
     case (Data.Int(a), Data.Int(b), Data.Int(c)) =>
-      Data.Bool(a <= b && b <= c)
+      Data.Bool(b <= a && a <= c)
     case (Data.Dec(a), Data.Dec(b), Data.Dec(c)) =>
-      Data.Bool(a <= b && b <= c)
+      Data.Bool(b <= a && a <= c)
     case (Data.Interval(a), Data.Interval(b), Data.Interval(c)) =>
-      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Str(a), Data.Str(b), Data.Str(c)) =>
-      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b), Data.Timestamp(c)) =>
-      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Date(a), Data.Date(b), Data.Date(c)) =>
-      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Time(a), Data.Time(b), Data.Time(c)) =>
-      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => (a,b,c) match {
       case (false, false, true) => Data.Bool(true)
       case (false, true, true) => Data.Bool(true)
@@ -480,7 +481,7 @@ object CoreMap extends Serializable {
   private def substring(dStr: Data, dFrom: Data, dCount: Data): Data =
     (dStr, dFrom, dCount) match {
       case (Data.Str(str), Data.Int(from), Data.Int(count)) =>
-        \/.fromTryCatchNonFatal(Data.Str(str.substring(from.toInt, count.toInt))).fold(κ(Data.NA), ι)
+        \/.fromTryCatchNonFatal(Data.Str(StringLib.safeSubstring(str, from.toInt, count.toInt))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
 

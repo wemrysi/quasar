@@ -378,6 +378,7 @@ lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
+  .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
     wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
