@@ -21,11 +21,12 @@ import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
-import quasar.fs._, FileSystemError.pathErr, PathError.pathNotFound
+import quasar.fs._
 import quasar.fs.impl._
 import quasar.physical.marklogic.xcc._
 
 import scalaz._, Scalaz._
+import scalaz.stream.Process
 
 object readfile {
 
@@ -47,11 +48,10 @@ object readfile {
 
     readFromProcess { (file, readOpts) =>
       lift(ContentSourceIO.runSessionIO(ops.exists(file)) map { doesExist =>
-        if (doesExist)
-          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt))
-            .right[FileSystemError]
-        else
-          pathErr(pathNotFound(file)).left[ReadStream[ContentSourceIO]]
+        doesExist.fold(
+          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt)),
+          (Process.empty: ReadStream[ContentSourceIO])
+        ).right[FileSystemError]
       }).into[S]
     }
   }

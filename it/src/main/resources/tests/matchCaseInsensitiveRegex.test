@@ -2,8 +2,8 @@
     "name": "match on case-insensitive string",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select * from zips where city ~* \"^bOu\"",

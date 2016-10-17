@@ -63,8 +63,8 @@ object QueryFile {
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
     lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
-      .cataM[PlannerError \/ ?, (Ann[T], T[QS])](newLP => transform.lpToQScript(newLP.map(_ ∘ (_.transCata(eval)))))
-      .map(qs => QC.inj(quasar.qscript.Map(qs._2, qs._1.values)).embed.transCata(eval))
+      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna(eval)))))
+      .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata(eval))
   }
 
   def simplifyAndNormalize
@@ -79,14 +79,14 @@ object QueryFile {
       TJ:    ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     // TODO: This would be `transHylo` if there were such a thing.
     _.transAna(SP.simplifyProjection)
       // TODO: Rather than explicitly applying multiple times, we should apply
       //       repeatedly until unchanged.
-      .transCata(optimize.applyAll)
-      .transCata(optimize.applyAll)
+      .transAna(rewrite.normalize)
+      .transAna(rewrite.normalize)
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -116,10 +116,10 @@ object QueryFile {
       RT:     Delay[RenderTree, QS])
       : EitherT[Writer[PhaseResults, ?], FileSystemError, T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
@@ -145,7 +145,7 @@ object QueryFile {
       RT:       Delay[RenderTree, QS])
       : M[T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     type InterimQS[A] =
       (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
@@ -160,10 +160,10 @@ object QueryFile {
     val qs =
       merr.map(
         merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).fold(
+          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
             perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
             merr.point(_)))(
-          optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
+          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
         simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>

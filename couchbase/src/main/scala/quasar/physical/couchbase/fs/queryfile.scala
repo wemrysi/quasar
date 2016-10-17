@@ -17,17 +17,21 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
+import quasar.{Data, LogicalPlan, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
-import quasar.effect.{Read, MonotonicSeq}
-import quasar.fp._, free._
-import quasar.fp.ski._
+import quasar.contrib.matryoshka._
+import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
+import quasar.fp._, eitherT._, free._, ski._
 import quasar.fs._
-import quasar.physical.couchbase.common._
-import quasar.qscript._
+import quasar.PhaseResult.{Detail, Tree}
+import quasar.physical.couchbase._, common._, N1QL._, planner._
+import quasar.qscript.{Read => _, _}
+import quasar.RenderTree.ops._
 
 import scala.collection.JavaConverters._
 
-import matryoshka._
+import com.couchbase.client.java.document.json.JsonObject
+import matryoshka._, FunctorT.ops._, Recursive.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -35,19 +39,192 @@ import scalaz.concurrent.Task
 object queryfile {
   import QueryFile._
 
+  type Plan[S[_], A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+
+  implicit class LiftP[F[_]: Monad, A](p: F[A]) {
+    val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
+  // TODO: Streaming
   def interpret[S[_]](
     implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
+    S2: KeyValueStore[ResultHandle, Cursor, ?] :<: S,
     S3: Task :<: S
   ): QueryFile ~> Free[S, ?] = λ[QueryFile ~> Free[S, ?]] {
-    case ExecutePlan(lp, out) => ???
-    case EvaluatePlan(lp)     => ???
-    case More(h)              => ???
-    case Close(h)             => ???
-    case Explain(lp)          => ???
+    case ExecutePlan(lp, out) => executePlan(lp, out)
+    case EvaluatePlan(lp)     => evaluatePlan(lp)
+    case More(h)              => more(h)
+    case Close(h)             => close(h)
+    case Explain(lp)          => explain(lp)
     case ListContents(dir)    => listContents(dir)
     case FileExists(file)     => fileExists(file)
+  }
+
+  def executePlan[S[_]](
+    lp: Fix[LogicalPlan], out: AFile
+  )(implicit
+    S0: Read[Context, ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: Task :<: S
+  ): Free[S, (PhaseResults, FileSystemError \/ AFile)] =
+    (for {
+      n1ql   <- lpToN1ql(lp)
+      r      <- n1qlResults(n1ql)
+      bktCol <- bucketCollectionFromPath(out).bimap(
+                  e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
+                  _.point[Free[S, ?]].liftP
+                ).merge
+      objs   =  r.map(d =>
+                  JsonObject
+                    .create()
+                    .put("type", bktCol.collection)
+                    .put("value", d)
+                )
+      ctx    <- Read.Ops[Context, S].ask.liftP
+      bkt    <- lift(Task.delay(
+                  ctx.cluster.openBucket(bktCol.bucket)
+                )).into.liftP
+      _      <- lift(
+                  insert(bkt, objs)
+                ).into.liftP
+    } yield out).run.run
+
+  def evaluatePlan[S[_]](
+    lp: Fix[LogicalPlan]
+  )(implicit
+    S0: Read[Context, ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: Task :<: S,
+    results: KeyValueStore.Ops[ResultHandle, Cursor, S]
+  ): Free[S, (PhaseResults, FileSystemError \/ ResultHandle)] =
+    (for {
+      n1ql <- lpToN1ql(lp)
+      r    <- n1qlResults(n1ql)
+      i    <- MonotonicSeq.Ops[S].next.liftP
+      h    =  ResultHandle(i)
+      _    <- results.put(h, Cursor(r)).liftP
+    } yield h).run.run
+
+  def more[S[_]](
+    handle: ResultHandle
+  )(implicit
+    results: KeyValueStore.Ops[ResultHandle, Cursor, S]
+  ): Free[S, FileSystemError \/ Vector[Data]] =
+    (for {
+      h <- results.get(handle).toRight(FileSystemError.unknownResultHandle(handle))
+      r <- EitherT(resultsFromCursor(h).point[Free[S, ?]])
+      _ <- results.put(handle, r._1).liftM[FileSystemErrT]
+    } yield r._2).run
+
+  def close[S[_]](
+    handle: ResultHandle
+  )(implicit
+    results: KeyValueStore.Ops[ResultHandle, Cursor, S]
+  ): Free[S, Unit] =
+    results.delete(handle)
+
+  def explain[S[_]](
+    lp: Fix[LogicalPlan]
+  )(implicit
+    S0: Read[Context, ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: Task :<: S
+  ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
+    (lpToN1ql(lp) ∘ (n1ql => ExecutionPlan(FsType, outerN1ql(n1ql)))).run.run
+
+
+  def listContents[S[_]](
+    dir: APath
+  )(implicit
+    S0: Task :<: S,
+    context: Read.Ops[Context, S]
+  ): Free[S, FileSystemError \/ Set[PathSegment]] =
+    if (dir === rootDir)
+      listRootContents(dir)
+    else
+      listNonRootContents(dir)
+
+  def fileExists[S[_]](
+    file: AFile
+  )(implicit
+    S0: Task :<: S,
+    context: Read.Ops[Context, S]
+  ): Free[S, Boolean] =
+    (for {
+      ctx    <- context.ask.liftM[FileSystemErrT]
+      bktCol <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
+      bkt    <- EitherT(getBucket(bktCol.bucket))
+      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+    } yield exists).exists(ι)
+
+  def n1qlResults[S[_]](
+    n1ql: N1QL
+  )(implicit
+    S0: Task :<: S,
+    context: Read.Ops[Context, S]
+  ): Plan[S, Vector[JsonObject]] = {
+    val n1qlStr = outerN1ql(n1ql)
+
+    for {
+      _       <- prtell[Plan[S, ?]](Vector(Detail(
+                   "N1QL Results",
+                   s"""  n1ql: $n1qlStr""".stripMargin('|'))))
+      ctx     <- context.ask.liftP
+      bkt     <- lift(Task.delay(
+                   ctx.cluster.openBucket()
+                 )).into.liftP
+      r       <- lift(Task.delay(
+                   bkt.query(n1qlQuery(n1qlStr))
+                     .allRows
+                     .asScala
+                     .toVector
+                     .map(_.value)
+                 )).into.liftP
+    } yield r
+  }
+
+  def lpToN1ql[S[_]](
+    lp: Fix[LogicalPlan]
+  )(implicit
+    S0: Read[Context, ?] :<: S,
+    S1: MonotonicSeq :<: S,
+    S2: Task :<: S
+  ): Plan[S, N1QL] = {
+    val lc: DiscoverPath.ListContents[Plan[S, ?]] =
+      (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
+
+    lpLcToN1ql(lp, lc)
+  }
+
+  def lpLcToN1ql[S[_]](
+    lp: Fix[LogicalPlan],
+    lc: DiscoverPath.ListContents[Plan[S, ?]]
+  )(implicit
+    S1: MonotonicSeq :<: S,
+    S2: Task :<: S
+  ): Plan[S, N1QL] = {
+    type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+    val tell = prtell[Plan[S, ?]] _
+
+    for {
+      _    <- tell(Vector(Tree("lp", lp.render)))
+      qs   <- convertToQScriptRead[
+                Fix,
+                Plan[S, ?],
+                QScriptRead[Fix, ?]
+              ](lc)(lp)
+      _    <- tell(Vector(Tree("QS post convertToQScriptRead", qs.render)))
+      shft =  shiftRead(qs).transCata(
+                SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
+                  .simplifyJoin(idPrism.reverseGet))
+      _    <- tell(Vector(Tree("QS post shiftRead", qs.render)))
+      n1ql <- shft.cataM(
+                Planner[Free[S, ?], CBQScript].plan
+              ).leftMap(FileSystemError.planningFailed(lp, _))
+    } yield n1ql
   }
 
   def listRootContents[S[_]](
@@ -85,29 +262,5 @@ object queryfile {
                   else ().right
                 ).point[Free[S, ?]])
     } yield pathSegmentsFromPrefixDocIds(bktCol.collection, docIds)).run
-
-  def listContents[S[_]](
-    dir: APath
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    if (dir === rootDir)
-      listRootContents(dir)
-    else
-      listNonRootContents(dir)
-
-  def fileExists[S[_]](
-    file: AFile
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, Boolean] =
-    (for {
-      ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
-    } yield exists).exists(ι)
 
 }

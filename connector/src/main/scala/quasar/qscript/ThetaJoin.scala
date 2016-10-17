@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -76,22 +76,46 @@ object ThetaJoin {
       }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
-    RenderTree.delayFromShow
+  // TODO: use the RenderTree for FreeQS, which contains QScriptTotal, which
+  // contains ThetaJoin...
+  implicit def renderTree[T[_[_]]: ShowT](implicit
+    JF: RenderTree[JoinFunc[T]]
+  ): Delay[RenderTree, ThetaJoin[T, ?]] =
+    new Delay[RenderTree, ThetaJoin[T, ?]] {
+      val nt = List("ThetaJoin")
+      def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {
+          case ThetaJoin(src, lBr, rBr, on, f, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              Terminal("LeftBranch" :: nt, lBr.shows.some),
+              Terminal("RightBranch" :: nt, rBr.shows.some),
+              on.render,
+              f.render,
+              combine.render))
+        }
+      }
 
-  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, ?]] =
+  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+      : Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
-      // TODO: merge two joins with different combine funcs
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: ThetaJoin[IT, ExternallyManaged],
         p2: ThetaJoin[IT, ExternallyManaged]) =
-        None
-    }
+        (p1, p2) match {
+          case (ThetaJoin(s1, l1, r1, o1, f1, c1), ThetaJoin(_, l2, r2, o2, f2, c2)) =>
+            val left1 = rebaseBranch(l1, left)
+            val right1 = rebaseBranch(r1, left)
+            val left2 = rebaseBranch(l2, right)
+            val right2 = rebaseBranch(r2, right)
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[ThetaJoin[T, ?]] =
-    TTypes.normalizable[T].ThetaJoin
+            (left1 ≟ left2 && right1 ≟ right2 && o1 ≟ o2 && f1 ≟ f2).option {
+              val (merged, left, right) = concat(c1, c2)
+              SrcMerge(ThetaJoin(s1, left1, right1, o1, f1, merged), left, right)
+            }
+        }
+    }
 }

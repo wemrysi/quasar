@@ -38,6 +38,22 @@ object qscript {
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
+  // qscript:as-date($item as item()) as xs:date?
+  def asDate[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("as-date").qn[F] map { fname =>
+      declare(fname)(
+        $("item") as SequenceType("item()")
+      ).as(SequenceType("xs:date?")) { item =>
+        if_(isCastable(item, SequenceType("xs:date")))
+        .then_ { xs.date(item) }
+        .else_ {
+          if_(isCastable(item, SequenceType("xs:dateTime")))
+          .then_ { xs.date(xs.dateTime(item)) }
+          .else_ { emptySeq }
+        }
+      }
+    }
+
   // qscript:as-map-key($item as item()) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>
@@ -120,6 +136,20 @@ object qscript {
       }
     }
 
+  // qscript:element-left-shift($elt as element()) as item()*
+  def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
+    (qs.name("element-left-shift").qn[F] |@| ejson.arrayEltN.qn |@| ejson.isArray) { (fname, aelt, isArr) =>
+      declare(fname)(
+        $("elt") as SequenceType("element()")
+      ).as(SequenceType("item()*")) { elt: XQuery =>
+        isArr(elt) map { eltIsArray =>
+          if_ (eltIsArray)
+          .then_ { elt `/` child(aelt) `/` child.node() }
+          .else_ { elt `/` child.node() }
+        }
+      }
+    }.join
+
   // qscript:identity($x as item()*) as item()*
   def identity[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("identity").qn[F] map { fname =>
@@ -136,20 +166,20 @@ object qscript {
         val (c, a, y) = ("$c", "$a", "$y")
         incAvgState[F].apply(c.xqy, y.xqy) map { nextSt =>
           let_(
-            c -> (map.get(st, "cnt".xqy) + 1.xqy),
-            a -> map.get(st, "avg".xqy),
+            c -> (map.get(st, "cnt".xs) + 1.xqy),
+            a -> map.get(st, "avg".xs),
             y -> (a.xqy + mkSeq_(mkSeq_(x - a.xqy) div c.xqy)))
           .return_(nextSt)
         }
       }
     }
 
-  // qscript:inc-avg-state($cntavg as map:map, $x as item()*) as map:map
+  // qscript:inc-avg-state($cnt as xs:integer, $avg as xs:double) as map:map
   def incAvgState[F[_]: PrologW]: F[FunctionDecl2] =
     qs.name("inc-avg-state").qn[F] map { fname =>
       declare(fname)(
         $("cnt") as SequenceType("xs:integer"),
-        $("avg") as SequenceType("xs:decimal")
+        $("avg") as SequenceType("xs:double")
       ).as(SequenceType("map:map")) { (cnt, avg) =>
         map.new_(IList(
           map.entry("cnt".xs, cnt),
@@ -172,16 +202,6 @@ object qscript {
       }
     }
 
-  // qscript:node-left-shift($node as node()*) as item()*
-  def nodeLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.name("node-left-shift").qn[F] map { fname =>
-      declare(fname)(
-        $("node") as SequenceType("node()*")
-      ).as(SequenceType("item()*")) { n =>
-        n `/` child.node() `/` child.node()
-      }
-    }
-
   // qscript:project-field($src as element(), $field as xs:QName) as item()*
   def projectField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.name("project-field").qn[F] map { fname =>
@@ -189,10 +209,7 @@ object qscript {
         $("src")   as SequenceType("element()"),
         $("field") as SequenceType("xs:QName")
       ).as(SequenceType.Top) { (src: XQuery, field: XQuery) =>
-        val n = "$n"
-        for_    (n -> (src `/` child.element()))
-        .where_ (fn.nodeName(n.xqy) eq field)
-        .return_(n.xqy `/` child.node())
+        fn.filter(func("$n")(fn.nodeName("$n".xqy) eq field), src `/` child.element())
       }
     }
 
@@ -236,12 +253,12 @@ object qscript {
       }
     }.join
 
-  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:decimal
+  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:double
   def secondsSinceEpoch[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("seconds-since-epoch").qn[F] map { fname =>
       declare(fname)(
         $("dt") as SequenceType("xs:dateTime")
-      ).as(SequenceType("xs:decimal")) { dt =>
+      ).as(SequenceType("xs:double")) { dt =>
         mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
       }
     }
@@ -283,7 +300,7 @@ object qscript {
       }
     }
 
-  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:decimal
+  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:integer
   def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("timezone-offset-seconds").qn[F] map { fname =>
       declare(fname)(
@@ -322,10 +339,10 @@ object qscript {
         val n = "$name"
 
         for {
-          kelt    <- ejson.mkArrayElt[F] apply n.xqy
-          velt    <- ejson.mkArrayElt[F] apply (c.xqy `/` child.node())
+          kelt    <- ejson.mkArrayElt[F](n.xqy)
+          velt    <- ejson.mkArrayElt[F](c.xqy)
           kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
-          kvEnt   <- ejson.mkObjectEntry[F] apply (n.xqy, kvArr)
+          kvEnt   <- ejson.renameOrWrap[F] apply (n.xqy, kvArr)
           entries =  for_ (c -> elt `/` child.element())
                      .let_(n -> fn.nodeName(c.xqy))
                      .return_(kvEnt)

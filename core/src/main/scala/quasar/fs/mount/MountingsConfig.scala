@@ -16,11 +16,9 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{Map, String, ArrowAssoc}
+import quasar.Predef._
 import quasar.fp.ski._
 import quasar.contrib.pathy.APath
-
-import scala.AnyVal
 
 import argonaut._, Argonaut._, DecodeResultScalaz._
 import monocle.Iso

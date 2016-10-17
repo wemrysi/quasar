@@ -2,8 +2,8 @@
     "name": "LIKE with constant-foldable pattern",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "variables": { "substr": "\"ULDER\"" },

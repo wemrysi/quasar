@@ -3,20 +3,19 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "largeZips.data",
-    "query": "select city, state, loc || [ pop ] from largeZips",
+    "query": "select city, state, loc || [ pop ] as lp from largeZips",
     "predicate": "containsAtLeast",
-    "expected": [{ "city": "CUSHMAN",            "state": "MA", "2": [ -72.51565, 42.377017, 36963] },
-                 { "city": "CHICOPEE",           "state": "MA", "2": [-72.576142, 42.176443, 31495] },
-                 { "city": "HOLYOKE",            "state": "MA", "2": [-72.626193, 42.202007, 43704] },
-                 { "city": "FLORENCE",           "state": "MA", "2": [-72.654245, 42.324662, 27939] },
-                 { "city": "MONTGOMERY",         "state": "MA", "2": [-72.754318, 42.129484, 40117] },
-                 { "city": "WEST SPRINGFIELD",   "state": "MA", "2": [-72.641109, 42.115066, 27537] },
-                 { "city": "SPRINGFIELD",        "state": "MA", "2": [-72.558432, 42.085314, 25519] },
-                 { "city": "SPRINGFIELD",        "state": "MA", "2": [-72.554349, 42.114455, 32635] },
-                 { "city": "PITTSFIELD",         "state": "MA", "2": [-73.247088, 42.453086, 50655] },
-                 { "city": "FITCHBURG",          "state": "MA", "2": [-71.803133, 42.579563, 41194] }]
+    "expected": [{ "city": "CUSHMAN",            "state": "MA", "lp": [ -72.51565, 42.377017, 36963] },
+                 { "city": "CHICOPEE",           "state": "MA", "lp": [-72.576142, 42.176443, 31495] },
+                 { "city": "HOLYOKE",            "state": "MA", "lp": [-72.626193, 42.202007, 43704] },
+                 { "city": "FLORENCE",           "state": "MA", "lp": [-72.654245, 42.324662, 27939] },
+                 { "city": "MONTGOMERY",         "state": "MA", "lp": [-72.754318, 42.129484, 40117] },
+                 { "city": "WEST SPRINGFIELD",   "state": "MA", "lp": [-72.641109, 42.115066, 27537] },
+                 { "city": "SPRINGFIELD",        "state": "MA", "lp": [-72.558432, 42.085314, 25519] },
+                 { "city": "SPRINGFIELD",        "state": "MA", "lp": [-72.554349, 42.114455, 32635] },
+                 { "city": "PITTSFIELD",         "state": "MA", "lp": [-73.247088, 42.453086, 50655] },
+                 { "city": "FITCHBURG",          "state": "MA", "lp": [-71.803133, 42.579563, 41194] }]
 }

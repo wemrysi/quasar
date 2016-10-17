@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar.fs._
 import quasar.fs.QueryFile.ResultHandle
-import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+import quasar.fs.mount._, FileSystemDef._
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
@@ -28,16 +28,15 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fp.TaskRef
 import quasar.fp.free._
-import quasar.fs.mount.FileSystemDef._
 import quasar.EnvironmentError
-import quasar.fs.mount.FileSystemDef._
 import quasar.fs.mount.ConnectionUri
 import quasar.contrib.pathy._
 
-import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
-import org.apache.hadoop.conf.Configuration;
 import java.net.URI
+import scala.sys
 
+import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
+import org.apache.hadoop.conf.Configuration
 import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
@@ -66,7 +65,7 @@ package object hdfs {
     def forge(master: String, hdfsUriStr: String, rootPath: String): DefinitionError \/ SparkFSConf =
       posixCodec.parseAbsDir(rootPath)
         .map { prefix =>
-        SparkFSConf(new SparkConf().setMaster(master), hdfsUriStr, sandboxAbs(prefix))
+        SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar"), hdfsUriStr, sandboxAbs(prefix))
       }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
 
     uri.value.split('|').toList match {
@@ -79,13 +78,19 @@ package object hdfs {
 
   final case class SparkHdfsFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
+  private def fetchSparkCoreJar: Task[String] = Task.delay {
+    sys.env("QUASAR_HOME") + "/sparkcore.jar"
+  }
+
   private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): Free[S, SparkHdfsFSDef[S]] = {
 
-    val genSc = Task.delay {
-      new SparkContext(sparkConf.setAppName("quasar"))
+    val genSc = fetchSparkCoreJar.map { jar => 
+      val sc = new SparkContext(sparkConf)
+      sc.addJar(jar)
+      sc
     }
 
     lift((TaskRef(0L) |@|
@@ -120,7 +125,7 @@ package object hdfs {
     }
 
     interpretFileSystem(
-      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), sparkFsConf.prefix),
+      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),
       corereadfile.chrooted(readfile.input[Eff](hdfsPathStr, fileSystem), sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))

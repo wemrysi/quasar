@@ -16,6 +16,7 @@
 
 package quasar.javascript
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{Terminal, RenderTree}
 

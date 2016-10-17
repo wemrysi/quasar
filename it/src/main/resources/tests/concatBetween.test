@@ -2,8 +2,8 @@
     "name": "concat BETWEEN with other fields",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select city, pop, pop between 1000 and 10000 from zips",

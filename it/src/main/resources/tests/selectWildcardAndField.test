@@ -2,8 +2,8 @@
     "name": "select wildcard and field",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "largeZips.data",
     "query": "select *, pop/1000 as popInK from largeZips",

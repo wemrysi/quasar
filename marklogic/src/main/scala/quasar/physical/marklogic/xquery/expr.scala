@@ -54,6 +54,9 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
+  def isCastable(x: XQuery, tpe: SequenceType): XQuery =
+    XQuery(s"$x castable as $tpe")
+
   def some(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
     QuantifiedExpr(Quantifier.Some, NonEmptyList(ts, tss: _*))
 
