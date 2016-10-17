@@ -1,0 +1,2 @@
+- Add sparkcore.jar - a fatjar for spark calculations
+- Automate build process of quasar for spark

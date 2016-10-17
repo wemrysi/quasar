@@ -18,7 +18,6 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{Data, LogicalPlan => LP, Type}
-import quasar.ejson, ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
@@ -108,11 +107,131 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               Free.roll(Undefined())))))))).some)
     }
 
+    // TODO: This would benefit from better normalization around Sort (#1545)
+    // TODO: The provenance here is complicated (#1550), so the results are not
+    //       completely verifiable by hand.
     "convert a basic order by" in {
       val lp = fullCompileExp("select * from zips order by city")
       val qs = convert(listContents.some, lp)
-      qs must equal(chain(RootR).some) // TODO incorrect expectation
-    }.pendingUntilFixed
+      qs must equal(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          Free.roll(ZipMapKeys(HoleF)),
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              // {{{ provenance
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(
+                    Free.roll(MakeMap(
+                      StrLit("n"),
+                      Free.roll(ConcatArrays(
+                        Free.roll(MakeArray(
+                          Free.roll(MakeMap(
+                            StrLit("j"),
+                            Free.roll(ConcatArrays(
+                              Free.roll(MakeArray(
+                                prov.join(
+                                  prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0)))),
+                                  prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0))))))),
+                              Free.roll(Constant(ejsonNullArr)))))))),
+                        Free.roll(Constant(ejsonArr(
+                          ejsonJoin(
+                            ejsonJoin(
+                              ejsonProjectField(ejsonStr("zips")),
+                              ejsonProjectField(ejsonStr("zips"))),
+                            ejsonNull)))))))))))),
+                Free.roll(MakeArray(
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(
+                      Free.roll(MakeMap(
+                        StrLit("j"),
+                        Free.roll(ConcatArrays(
+                          Free.roll(MakeArray(
+                            Free.roll(MakeMap(
+                              StrLit("n"),
+                              Free.roll(ConcatArrays(
+                                Free.roll(MakeArray(
+                                  Free.roll(MakeMap(
+                                    StrLit("j"),
+                                    Free.roll(ConcatArrays(
+                                      Free.roll(MakeArray(
+                                        prov.join(
+                                          prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0)))),
+                                          prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0))))))),
+                                      Free.roll(Constant(ejsonNullArr)))))))),
+                                Free.roll(Constant(ejsonArr(
+                                  ejsonJoin(
+                                    ejsonJoin(
+                                      ejsonProjectField(ejsonStr("zips")),
+                                      ejsonProjectField(ejsonStr("zips"))),
+                                    ejsonNull)))))))))),
+                          Free.roll(Constant(ejsonNullArr)))))))),
+                    Free.roll(MakeArray(
+                      Free.roll(MakeMap(
+                        StrLit("j"),
+                        Free.roll(ConcatArrays(
+                          Free.roll(MakeArray(
+                            Free.roll(ProjectIndex(
+                              Free.roll(MakeArray(
+                                Free.roll(MakeMap(
+                                  StrLit("n"),
+                                  Free.roll(ConcatArrays(
+                                    Free.roll(MakeArray(
+                                      Free.roll(MakeMap(
+                                        StrLit("j"),
+                                        Free.roll(ConcatArrays(
+                                          Free.roll(MakeArray(
+                                            prov.join(
+                                              prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0)))),
+                                              prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0))))))),
+                                          Free.roll(Constant(ejsonNullArr)))))))),
+                                    Free.roll(Constant(ejsonArr(
+                                      ejsonJoin(
+                                        ejsonJoin(
+                                          ejsonProjectField(ejsonStr("zips")),
+                                          ejsonProjectField(ejsonStr("zips"))),
+                                      ejsonNull)))))))))),
+                              IntLit(1))))),
+                          Free.roll(Constant(ejsonNullArr)))))))))))))),
+              // }}}
+              Free.roll(MakeArray(
+                Free.roll(Guard(
+                  Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                  Type.Obj(scala.Predef.Map(), Type.Top.some),
+                  Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                  Free.roll(Undefined()))))))),
+            Free.roll(MakeArray(
+              Free.roll(MakeArray(
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                    Type.Obj(scala.Predef.Map(), Type.Top.some),
+                    Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                    Free.roll(Undefined()))),
+                  StrLit("city")))))))))),
+        QC.inj(Sort((),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(
+              prov.join(
+                Free.roll(ProjectIndex(
+                  Free.roll(ProjectIndex(HoleF, IntLit(0))),
+                  IntLit(0))),
+                Free.roll(ProjectIndex(
+                  Free.roll(ProjectIndex(HoleF, IntLit(1))),
+                  IntLit(0)))))),
+            Free.roll(MakeArray(
+              prov.join(
+                Free.roll(ProjectIndex(
+                  Free.roll(ProjectIndex(HoleF, IntLit(0))),
+                  IntLit(1))),
+                Free.roll(ProjectIndex(
+                  Free.roll(ProjectIndex(HoleF, IntLit(1))),
+                  IntLit(1)))))))),
+          List((Free.roll(ProjectIndex(HoleF, IntLit(3))), SortDir.Ascending)))),
+        QC.inj(Map((),
+          Free.roll(ProjectIndex(HoleF, IntLit(2)))))).some)
+    }
 
     "convert a basic reduction" in {
       val lp = fullCompileExp("select sum(pop) from bar")
@@ -304,9 +423,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         UnreferencedR,
         QC.inj(LeftShift(
           (),
-          Free.roll(Constant(
-            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7))))))),
+          Free.roll(Constant(ejsonArr(ejsonInt(7)))),
           Free.point(RightSide)))).some)
     }
 
@@ -324,10 +441,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
-          Free.roll(Constant(
-            EJson.fromCommon[Fix].apply(ejson.Arr(List(
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8))))))),
+          Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8)))),
           Free.point(RightSide)))).some)
     }
 
@@ -347,11 +461,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
-          Free.roll(Constant(
-            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8)),
-              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](9))))))),
+          Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8), ejsonInt(9)))),
           Free.point(RightSide)))).some)
     }
 
@@ -406,6 +516,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed("verify includes proper provenance")
 
+    // TODO: The provenance here is complicated (#1550), so the results are not
+    //       completely verifiable by hand.
     "convert a filter" in {
       // "select * from foo where bar between 1 and 10"
       convert(
@@ -419,14 +531,56 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         ReadR(rootDir </> file("bar")),
         QC.inj(LeftShift((),
-          HoleF,
-          Free.point(RightSide))),
-        QC.inj(Filter((),
-          Free.roll(Between(
-            ProjectFieldR(HoleF, StrLit("baz")),
-            IntLit(1),
-            IntLit(10)))))).some)
-    }.pendingUntilFixed("need to normalize around filter")
+          Free.roll(ZipMapKeys(HoleF)),
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              // {{{ provenance
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(
+                      prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0)))))),
+                    Free.roll(Constant(ejsonArr(
+                      ejsonProjectField(ejsonStr("bar"))))))))),
+                Free.roll(MakeArray(
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(
+                      Free.roll(MakeMap(
+                        StrLit("j"),
+                        Free.roll(ConcatArrays(
+                          Free.roll(MakeArray(
+                            Free.roll(MakeMap(
+                              StrLit("j"),
+                              Free.roll(ConcatArrays(
+                                Free.roll(MakeArray(
+                                  Free.roll(MakeMap(
+                                    StrLit("j"),
+                                    Free.roll(ConcatArrays(
+                                      Free.roll(MakeArray(
+                                        prov.shiftMap(Free.roll(ProjectIndex(RightSideF, IntLit(0)))))),
+                                      Free.roll(Constant(ejsonNullArr)))))))),
+                                Free.roll(Constant(ejsonNullArr)))))))),
+                          Free.roll(Constant(ejsonNullArr)))))))),
+                    Free.roll(Constant(ejsonArr(
+                      ejsonJoin(
+                        ejsonJoin(
+                          ejsonJoin(
+                            ejsonProjectField(ejsonStr("bar")),
+                            ejsonNull),
+                          ejsonNull),
+                        ejsonNull)))))))))),
+              // }}}
+              Free.roll(MakeArray(Free.roll(ProjectIndex(RightSideF, IntLit(1))))))),
+            Free.roll(MakeArray(
+              Free.roll(Between(
+                ProjectFieldR(
+                  Free.roll(ProjectIndex(RightSideF, IntLit(1))),
+                  StrLit("baz")),
+                IntLit(1),
+                IntLit(10))))))))),
+        QC.inj(Filter((), Free.roll(ProjectIndex(HoleF, IntLit(3))))),
+        QC.inj(Map((), Free.roll(ProjectIndex(HoleF, IntLit(2)))))).some)
+    }
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in {
@@ -478,47 +632,37 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(RT.inj(Const(Read(rootDir </> file("city"))))),
           HoleF,
           Free.roll(ConcatArrays(
-            // begin provenance
+            // {{{ provenance
             Free.roll(MakeArray(
               Free.roll(MakeArray(
                 Free.roll(MakeMap(
                   StrLit("n"),
                   Free.roll(ConcatArrays(
                     Free.roll(MakeArray(
-                      Free.roll(MakeMap(
-                        StrLit("m"),
+                      prov.shiftMap(
                         Free.roll(ProjectIndex(
                           Free.roll(ProjectIndex(RightSideF, IntLit(1))),
-                          IntLit(0))))))),
-                    Free.roll(Constant(
-                      ejson.CommonEJson(ejson.Arr(List(
-                        ejson.ExtEJson(ejson.Map(List((
-                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed,
-                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("city")).embed)))).embed))).embed)))))))))),
-            // end provenance
+                          IntLit(0)))))),
+                    Free.roll(Constant(ejsonArr(ejsonProjectField(ejsonStr("city"))))))))))))),
+            // }}}
             Free.roll(MakeArray(RightSideF))))))),
         Free.roll(QCT.inj(LeftShift(
           Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
           HoleF,
           Free.roll(ConcatArrays(
-            // begin provenance
+            // {{{ provenance
             Free.roll(MakeArray(
               Free.roll(MakeArray(
                 Free.roll(MakeMap(
                   StrLit("n"),
                   Free.roll(ConcatArrays(
                     Free.roll(MakeArray(
-                      Free.roll(MakeMap(
-                        StrLit("m"),
+                      prov.shiftMap(
                         Free.roll(ProjectIndex(
                           Free.roll(ProjectIndex(RightSideF, IntLit(1))),
-                          IntLit(0))))))),
-                    Free.roll(Constant(
-                      ejson.CommonEJson(ejson.Arr(List(
-                        ejson.ExtEJson(ejson.Map(List((
-                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed,
-                          ejson.CommonEJson(ejson.Str[Fix[EJson]]("city")).embed)))).embed))).embed)))))))))),
-            // end provenance
+                          IntLit(0)))))),
+                    Free.roll(Constant(ejsonArr(ejsonProjectField(ejsonStr("city"))))))))))))),
+            // }}}
             Free.roll(MakeArray(RightSideF))))))))),
       QC.inj(Reduce((),
         Free.roll(ConcatArrays(
