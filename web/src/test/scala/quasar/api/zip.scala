@@ -153,7 +153,7 @@ class ZipSpecs extends quasar.Qspec {
       val z = zipFiles(filesAndBytes.toList)
 
       val exp = filesAndBytes.mapValues(_.runFoldMap(ι).unsafePerformSync)
-      unzipFiles(z).map(_.toMap).unsafePerformSync must_== exp
+      unzipFiles(z).map(_.toMap).run.unsafePerformSync must beRightDisjunction(exp)
     }.set(minTestsOk = 10) // This test is relatively slow
   }
 }

@@ -109,7 +109,7 @@ object Zip {
     }
   }
 
-  def unzipFiles(zippedBytes: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], ByteVector)]] = {
+  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, List[(RelFile[Sandboxed], ByteVector)]] = {
     def entry(zis: jzip.ZipInputStream): OptionT[Task, (String, ByteVector)] =
       for {
         entry <- OptionT(Task.delay(Option(zis.getNextEntry())))
@@ -138,10 +138,13 @@ object Zip {
         Task.fail(new RuntimeException("relative file path expected; found: $name")))
 
     val is = io.toInputStream(zippedBytes)
-    for {
+    EitherT((for {
       zis <- Task.delay(new jzip.ZipInputStream(is))
       es  <- entries(zis).runLog
       rez <- es.traverse { case (n: String, bs) => toPath(n).strengthR(bs) }
-    } yield rez.toList
+    } yield rez.toList).attempt.map(_.leftMap {
+      case x: jzip.ZipException => s"zip decoding error: $x"
+      case x => s"$x"
+    }))
   }
 }

@@ -44,6 +44,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
+import scodec.bits.ByteVector
 
 import quasar.api.MessageFormatGen._
 
@@ -456,6 +457,30 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val response = request.flatMap(service(_)).unsafePerformSync
             response.status must_== Status.InternalServerError
             response.as[String].unsafePerformSync must contain("anything but 4")
+        }
+      }
+    }
+    "PUT" >> {
+      "download and re-upload directory" >> prop { (baseDir: ADir, rFile: RFile, content: Vector[Data]) =>
+        content.nonEmpty ==> {
+          val contentMap = Map((baseDir </> rFile) -> content)
+
+        // NB: only Precise format preserves all possible Data
+          val mt = jsonPreciseLine.mediaType
+
+          val request1 = Request(uri = pathUri(baseDir), headers = Headers(Accept(mt)))
+          val (service1, _) = serviceRef(InMemState.fromFiles(contentMap))
+          val responseBody = service1(request1).flatMap(_.as[ByteVector]).unsafePerformSync
+
+          val request2 = Request(uri = pathUri(baseDir), method = Method.PUT)
+                          .withBody(responseBody).unsafePerformSync
+                          .withContentType(`Content-Type`(mt).some)
+          val (service2, ref2) = serviceRef(InMemState.empty)
+          val response2 = service2(request2).unsafePerformSync
+
+          response2.status must_== Status.Ok
+          response2.as[String].unsafePerformSync must_== ""
+          ref2.unsafePerformSync.contents must_== contentMap
         }
       }
     }
