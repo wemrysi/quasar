@@ -38,6 +38,22 @@ object qscript {
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
+  // qscript:as-date($item as item()) as xs:date?
+  def asDate[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("as-date").qn[F] map { fname =>
+      declare(fname)(
+        $("item") as SequenceType("item()")
+      ).as(SequenceType("xs:date?")) { item =>
+        if_(isCastable(item, SequenceType("xs:date")))
+        .then_ { xs.date(item) }
+        .else_ {
+          if_(isCastable(item, SequenceType("xs:dateTime")))
+          .then_ { xs.date(xs.dateTime(item)) }
+          .else_ { emptySeq }
+        }
+      }
+    }
+
   // qscript:as-map-key($item as item()) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>

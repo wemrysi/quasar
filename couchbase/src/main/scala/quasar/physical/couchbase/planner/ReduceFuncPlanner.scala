@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.NameGenerator
 import quasar.PhaseResult.Detail
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._
@@ -27,34 +26,35 @@ import quasar.qscript, qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class ReduceFuncPlanner[F[_]: Monad: NameGenerator] extends Planner[F, ReduceFunc] {
+final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
   import ReduceFuncs._
 
   def plan: AlgebraM[M, ReduceFunc, N1QL] = {
     case Arbitrary(a)     =>
       ???
     case Avg(a)           =>
-      n1ql[M](a).map(nq => partialQueryString(s"avg($nq)"))
+      partialQueryString(s"avg(${n1ql(a)})").point[M]
     case Count(a)         =>
-      n1ql[M](a).map(nq => partialQueryString(s"count($nq)"))
+      partialQueryString(s"count(${n1ql(a)})").point[M]
     case Max(a)           =>
-      n1ql[M](a).map(nq => partialQueryString(s"max($nq)"))
+      partialQueryString(s"max(${n1ql(a)})").point[M]
     case Min(a)           =>
-      n1ql[M](a).map(nq => partialQueryString(s"min($nq)"))
+      partialQueryString(s"min(${n1ql(a)})").point[M]
     case Sum(a)           =>
-      n1ql[M](a).map(nq => partialQueryString(s"sum($nq)"))
+      partialQueryString(s"sum(${n1ql(a)})").point[M]
     case UnshiftArray(a)  =>
-      n1ql[M](a).map(nq => partialQueryString(s"array_agg($nq)"))
+      partialQueryString(s"array_agg(${n1ql(a)})").point[M]
     case UnshiftMap(k, v) =>
-      for {
-        kN1ql   <- n1ql[M](k)
-        vN1ql   <- n1ql[M](v)
-        n1qlStr = s"object_add({}, $kN1ql, $vN1ql)"
-        _       <- prtell[M](Vector(Detail(
-                     "N1QL UnshiftMap",
-                     s"""  k:    $kN1ql
-                        |  v:    $vN1ql
-                        |  n1ql: $n1qlStr""".stripMargin('|'))))
-      } yield partialQueryString(n1qlStr)
+      val kN1ql   = n1ql(k)
+      val vN1ql   = n1ql(v)
+      val n1qlStr = s"object_add({}, $kN1ql, $vN1ql)"
+      prtell[M](Vector(Detail(
+        "N1QL UnshiftMap",
+        s"""  k:    $kN1ql
+           |  v:    $vN1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
   }
 }

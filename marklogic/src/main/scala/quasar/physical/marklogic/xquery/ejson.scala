@@ -60,14 +60,14 @@ object ejson {
       }
     }.join
 
-  // ejson:array-element-at($arr as element(), $idx as xs:integer) as item()*
+  // ejson:array-element-at($arr as element(), $idx as xs:integer) as element(ejson:array-element)?
   def arrayElementAt[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-element-at").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
       declare(fname)(
         $("arr") as SequenceType("element()"),
         $("idx") as SequenceType("xs:integer")
-      ).as(SequenceType.Top) { (arr: XQuery, idx: XQuery) =>
-        arr `/` child(aelt)(idx) `/` child.node()
+      ).as(SequenceType(s"element($aelt)?")) { (arr: XQuery, idx: XQuery) =>
+        arr `/` child(aelt)(idx)
       }
     }
 
@@ -188,7 +188,7 @@ object ejson {
             ys    -> fn.filter(func(e) {
                        every(n1 -> fn.nodeName(e.xqy), n2 -> names.xqy) satisfies (n1.xqy ne n2.xqy)
                      }, obj1 `/` child.element()))
-          .return_(mkSeq_(xs.xqy, ys.xqy))
+          .return_(mkSeq_(ys.xqy, xs.xqy))
         }
       }
     }.join

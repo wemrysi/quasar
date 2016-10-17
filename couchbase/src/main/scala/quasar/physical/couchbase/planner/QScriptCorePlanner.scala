@@ -36,11 +36,11 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
     case qscript.Map(src, f) =>
       for {
         tmpName  <- genName[M]
-        srcN1ql  <- n1ql[M](src)
+        srcN1ql  =  n1ql(src)
         ff       <- freeCataM(f)(interpretM(
                       κ(partialQueryString(tmpName).point[M]),
                       mapFuncPlanner[F, T].plan))
-        ffN1ql   <- n1ql[M](ff)
+        ffN1ql   =  n1ql(ff)
         rN1ql    =  src match {
                       case _: Select | _: Read =>
                         select(
@@ -54,7 +54,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                           resultExprs = ffN1ql.wrapNel,
                           let         = Map(tmpName -> srcN1ql))
                     }
-        rN1qlStr <- n1ql[M](rN1ql)
+        rN1qlStr =  n1ql(rN1ql)
         _        <- prtell[M](Vector(Detail(
                      "N1QL Map",
                        s"""  src: $src
@@ -69,7 +69,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         s        <- freeCataM(struct)(interpretM(
                       κ(partialQueryString(tmpName1).point[M]),
                       mapFuncPlanner[F, T].plan))
-        sN1ql    <- n1ql[M](s)
+        sN1ql    =  n1ql(s)
         r        <- freeCataM(repair)(interpretM(
                       {
                         case LeftSide  =>
@@ -85,7 +85,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                           ).n1ql.point[M]
                       },
                       mapFuncPlanner[F, T].plan))
-        rN1ql    <- n1ql[M](r)
+        rN1ql    =  n1ql(r)
         _        <- prtell[M](Vector(Detail(
                       "N1QL LeftShift",
                       s"""  src: $src
@@ -109,15 +109,15 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                      ).flatMap(reduceFuncPlanner[F].plan)
                    )
         rep     <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[F, T].plan))
-        repN1ql <- n1ql[M](rep)
-        bN1ql   <- n1ql[M](b)
+        repN1ql =  n1ql(rep)
+        bN1ql   =  n1ql(b)
         s       =  select(
                      value         = true,
                      resultExprs   = repN1ql.wrapNel,
                      keyspace      = src,
                      keyspaceAlias = tmpName) |>
                      groupBy.set(bN1ql.some)
-        sN1ql   <- n1ql[M](s)
+        sN1ql   =  n1ql(s)
         _       <- prtell[M](Vector(Detail(
                      "N1QL Reduce",
                      s"""  src:      $src
@@ -146,10 +146,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                        ord     <- freeCataM(or)(interpretM(
                                     κ(partialQueryString(tmpName).point[M]),
                                     mapFuncPlanner[F, T].plan))
-                       ordN1ql <- n1ql[M](ord)
+                       ordN1ql =  n1ql(ord)
                      } yield s"($or) $dir"
                    }.map(_.mkString(", "))
-        bN1ql   <- n1ql[M](b)
+        bN1ql   =  n1ql(b)
         s       =  select(
                      value         = false,
                      resultExprs   = "*".wrapNel,
@@ -168,11 +168,11 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
 
     case qscript.Filter(src, f) =>
       for {
-        sN1ql    <- n1ql[M](src)
         fN1ql    <- freeCataM(f)(interpretM(
                       κ(src.point[M]),
                       mapFuncPlanner[F, T].plan))
-        fN1qlStr <- n1ql[M](fN1ql)
+        sN1ql    =  n1ql(src)
+        fN1qlStr =  n1ql(fN1ql)
         _        <- prtell[M](Vector(Detail(
                       "N1QL Filter",
                       s"""  src:  $sN1ql
@@ -189,9 +189,9 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         rb        <- freeCataM(rBranch)(interpretM(
                        κ(partialQueryString(tmpNameRB).point[M]),
                        Planner[F, QScriptTotal[T, ?]].plan))
-        srcN1ql   <- n1ql[M](src)
-        lbN1ql    <- n1ql[M](lb)
-        rbN1ql    <- n1ql[M](rb)
+        srcN1ql   =  n1ql(src)
+        lbN1ql    =  n1ql(lb)
+        rbN1ql    =  n1ql(rb)
         n1qlStr   =  s"($srcN1ql).($lbN1ql) union ($srcN1ql).($rbN1ql)"
         _         <- prtell[M](Vector(Detail(
                        "N1QL Union",
@@ -224,9 +224,9 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
       c        <- freeCataM(takeOrDrop.merge)(interpretM(
                     κ(partialQueryString(tmpName1).point[M]),
                     Planner[F, QScriptTotal[T, ?]].plan))
-      sN1ql    <- n1ql[M](src)
-      fN1ql    <- n1ql[M](f)
-      cN1ql    <- n1ql[M](c)
+      sN1ql    =  n1ql(src)
+      fN1ql    =  n1ql(f)
+      cN1ql    =  n1ql(c)
       ks       =  select(
                     value         = true,
                     resultExprs   = fN1ql.wrapNel,
@@ -245,7 +245,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                     keyspace      = slc,
                     keyspaceAlias = tmpName4)           |>
                 unnest.set(s"$tmpName4 $tmpName5".some)
-      selN1ql <- n1ql[M](sel)
+      selN1ql =  n1ql(sel)
       _       <- prtell[M](Vector(Detail(
                    s"""N1QL ${takeOrDrop.bimap(κ("Take"), κ("Drop")).merge}""",
                    s"""  src:   $sN1ql

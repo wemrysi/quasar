@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.NameGenerator
 import quasar.PhaseResult.Detail
 import quasar.physical.couchbase._, common._
 import quasar.qscript, qscript._
@@ -26,12 +25,12 @@ import quasar.qscript, qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class ShiftedReadPlanner[F[_]: Monad: NameGenerator] extends Planner[F, Const[ShiftedRead, ?]] {
+final class ShiftedReadPlanner[F[_]: Monad] extends Planner[F, Const[ShiftedRead, ?]] {
   val plan: AlgebraM[M, Const[ShiftedRead, ?], N1QL] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       for {
         n    <- readPath[PR](absFile, idStatus)
-        nStr <- n1ql[M](n)
+        nStr =  n1ql(n)
         _    <- prtell[M](Vector(Detail(
                   "N1QL ShiftedRead",
                   s"""  absFile:  $absFile

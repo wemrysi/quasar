@@ -28,8 +28,8 @@ package object planner {
   def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
     MonadTell[F, PhaseResults].tell(pr)
 
-  def n1ql[F[_]: Monad: NameGenerator](n1ql: N1QL): F[String] =
-    N1QL.n1qlQueryString[F](n1ql)
+  def n1ql(n1ql: N1QL): String =
+    N1QL.n1qlQueryString(n1ql)
 
   def genName[F[_]: Functor: NameGenerator]: F[String] =
     NameGenerator[F].prefixedName("_")

@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.NameGenerator
 import quasar.PhaseResult.Detail
 import quasar.physical.couchbase._, common._
 import quasar.qscript, qscript._
@@ -26,13 +25,13 @@ import quasar.qscript, qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class ConstReadPlanner[F[_]: Monad: NameGenerator] extends Planner[F, Const[Read, ?]] {
+final class ConstReadPlanner[F[_]: Monad] extends Planner[F, Const[Read, ?]] {
 
   def plan: AlgebraM[M, Const[Read, ?], N1QL] = {
     case Const(Read(path)) =>
       for {
         n    <- readPath[PR](path, ExcludeId)
-        nStr <- n1ql[M](n)
+        nStr =  n1ql(n)
         _    <- prtell[M](Vector(Detail(
                   "N1QL Read",
                   s"""  path: $path
