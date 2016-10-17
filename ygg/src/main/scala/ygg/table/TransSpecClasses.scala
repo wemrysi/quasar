@@ -27,8 +27,9 @@ package object trans {
     def outer_++(x: TransSpec[A], xs: TransSpec[A]*): OuterObjectConcat[A] = OuterObjectConcat(spec +: x +: xs: _*)
   }
 
-  implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]       = new TransSpecBuilder(x)
-  implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
+  implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
+  implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
+  implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
 }
 
 package trans {
@@ -53,15 +54,20 @@ package trans {
 
     protected def next[A](x: This): Builder = new TransSpecBuilder(x)
 
-    def deepMap(pf: MaybeSelf[This]): Builder = next(TransSpec.deepMap(spec)(pf))
-    def deepMap1(fn: CF1): Builder            = next(DeepMap1(spec, fn))
-    def map1(fn: CF1): Builder                = next(Map1(spec, fn))
-    def isType(tp: JType): Builder            = next(IsType(spec, tp))
-    def apply(index: Int): Builder            = next(DerefArrayStatic(spec, CPathIndex(index)))
-    def delete(fields: CPathField*): Builder  = next(ObjectDelete(spec, fields.toSet))
-    def select(field: CPathField): Builder    = next(DerefObjectStatic(spec, field))
-    def select(name: String): Builder         = select(CPathField(name))
-    def selectDynamic(name: String): Builder  = select(name)
+    def apply(index: Int): Builder             = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def deepMap(pf: MaybeSelf[This]): Builder  = next(TransSpec.deepMap(spec)(pf))
+    def deepMap1(fn: CF1): Builder             = next(DeepMap1(spec, fn))
+    def deepEquals(that: This): Builder        = next(Equal(spec, that))
+    def isEqual(that: CValue): Builder         = next(EqualLiteral(spec, right = that, invert = false))
+    def delete(fields: CPathField*): Builder   = next(ObjectDelete(spec, fields.toSet))
+    def filter(p: This): Builder               = next(Filter(spec, p))
+    def isType(tp: JType): Builder             = next(IsType(spec, tp))
+    def map1(fn: CF1): Builder                 = next(Map1(spec, fn))
+    def select(field: CPathField): Builder     = next(DerefObjectStatic(spec, field))
+    def select(name: String): Builder          = select(CPathField(name))
+    def selectDynamic(name: String): Builder   = select(name)
+    def wrapArrayValue(): Builder              = next(WrapArray(spec))
+    def wrapObjectField(name: String): Builder = next(WrapObject(spec, name))
   }
 
   sealed trait TransSpec[+A]  extends AnyRef
@@ -119,19 +125,16 @@ package trans {
     import CPath._
 
     def concatChildren[A](tree: CPathTree[Int], leaf: TransSpec[A]): TransSpec[A] = {
-      def createSpecs(trees: Seq[CPathTree[Int]]): Seq[TransSpec[A]] = trees map { child =>
-        (child match {
-          case node @ RootNode(seq)                  => concatChildren(node, leaf)
-          case node @ FieldNode(CPathField(name), _) => trans.WrapObject(concatChildren(node, leaf), name)
-          case node @ IndexNode(CPathIndex(_), _)    => trans.WrapArray(concatChildren(node, leaf)) //assuming that indices received in order
-          case LeafNode(idx)                         => leaf(idx)
-        }): TransSpec[A]
+      def createSpec(tree: CPathTree[Int]): TransSpec[A] = tree match {
+        case node @ RootNode(seq)                  => concatChildren(node, leaf)
+        case node @ FieldNode(CPathField(name), _) => concatChildren(node, leaf) wrapObjectField name
+        case node @ IndexNode(CPathIndex(_), _)    => concatChildren(node, leaf).wrapArrayValue() //assuming that indices received in order
+        case LeafNode(idx)                         => leaf(idx)
       }
-
       val initialSpecs = tree match {
-        case RootNode(children)     => createSpecs(children)
-        case FieldNode(_, children) => createSpecs(children)
-        case IndexNode(_, children) => createSpecs(children)
+        case RootNode(children)     => children map createSpec
+        case FieldNode(_, children) => children map createSpec
+        case IndexNode(_, children) => children map createSpec
         case LeafNode(_)            => Seq()
       }
 

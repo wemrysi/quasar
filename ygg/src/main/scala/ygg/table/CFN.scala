@@ -107,7 +107,7 @@ object CF2P {
   }
 }
 
-class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])
+final case class CSchema(columnRefs: Set[ColumnRef], columns: JType => Set[Column])
 
 trait CReducer[A] {
   def reduce(schema: CSchema, range: Range): A

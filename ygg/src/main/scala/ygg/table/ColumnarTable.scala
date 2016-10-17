@@ -36,3 +36,15 @@ object ColumnarTable extends ColumnarTable {
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
 }
+
+
+abstract class BlockTable extends BlockTableModule {
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
+}
+object BlockTable extends BlockTable {
+  def projections = Map[Path, Projection]()
+
+  def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
+  def apply(file: jFile): Table  = apply(file.slurpString)
+}

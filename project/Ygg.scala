@@ -14,6 +14,7 @@ object Ygg {
   def yggImports = imports + "\n" + """
     import ygg._, common._, json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
+    import ygg.macros.Json._
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """
