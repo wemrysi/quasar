@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
 import matryoshka._
@@ -83,6 +83,8 @@ trait StringLib extends Library {
     "^" + escape(pattern.toList).mkString + "$"
   }
 
+  // TODO: This is here (rather than converted to `Search` in `sql.compile`)
+  //       until we can constant-fold as we compile.
   val Like = TernaryFunc(
     Mapping,
     "(like)",
@@ -346,17 +348,6 @@ trait StringLib extends Library {
           DateLib.Interval.tpe(Func.Input1(x)))
           .map(Func.Input1(_))
     })
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Length :: Lower :: Upper ::
-    Boolean :: Integer :: Decimal ::
-    Null :: ToString :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Concat :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] =
-    Like :: Search :: Substring :: Nil
 }
 
 object StringLib extends StringLib

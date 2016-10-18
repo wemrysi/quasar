@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, GenericFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar.{Data, Func, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
@@ -193,17 +193,6 @@ trait DateLib extends Library {
       case Sized(Type.Int) => Type.Timestamp
     },
     basicUntyper)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    ExtractCentury :: ExtractDayOfMonth :: ExtractDecade :: ExtractDayOfWeek ::
-    ExtractDayOfYear :: ExtractEpoch :: ExtractHour :: ExtractIsoDayOfWeek ::
-    ExtractIsoYear :: ExtractMicroseconds :: ExtractMillennium ::
-    ExtractMilliseconds :: ExtractMinute :: ExtractMonth :: ExtractQuarter ::
-    ExtractSecond :: ExtractWeek :: ExtractYear ::
-    Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object DateLib extends DateLib

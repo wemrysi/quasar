@@ -398,19 +398,6 @@ trait StructuralLib extends Library {
           x => success(Func.Input1(x)))
     })
 
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    MakeArray :: FlattenMap :: FlattenArray ::
-    FlattenMapKeys :: FlattenArrayIndices ::
-    ShiftMap :: ShiftArray :: ShiftMapKeys ::
-    ShiftArrayIndices :: UnshiftArray :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    MakeObject :: ObjectConcat :: ArrayConcat ::
-    ConcatOp :: ObjectProject :: ArrayProject ::
-    DeleteField :: UnshiftMap :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
-
   // TODO: fix types and add the VirtualFuncs to the list of functions
 
   // val MakeObjectN = new VirtualFunc {

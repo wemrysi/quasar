@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}
@@ -86,7 +86,6 @@ trait MathLib extends Library {
   /** Adds two numeric values, promoting to decimal if either operand is
     * decimal.
     */
-
   val Add = BinaryFunc(
     Mapping,
     "(+)",
@@ -286,13 +285,6 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))
     }) ||| numericWidening,
     biReflexiveUnapply)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] = Negate :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Add :: Multiply :: Subtract :: Divide :: Modulo :: Power :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object MathLib extends MathLib

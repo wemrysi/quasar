@@ -16,8 +16,7 @@
 
 package quasar.std
 
-import quasar.Predef._
-import quasar.{Data, Type, Func, BinaryFunc, GenericFunc, Mapping, SemanticError}, SemanticError._
+import quasar.{Data, Type, Func, BinaryFunc, Mapping, SemanticError}, SemanticError._
 
 import scalaz._, NonEmptyList.nels, Validation.{success, failure}
 import shapeless._
@@ -41,10 +40,6 @@ trait ArrayLib extends Library {
         success(Type.Int)
     },
     basicUntyper)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] = Nil
-  def binaryFunctions: List[GenericFunc[nat._2]] = ArrayLength :: Nil
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object ArrayLib extends ArrayLib

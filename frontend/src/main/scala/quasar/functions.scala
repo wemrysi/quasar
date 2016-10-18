@@ -88,7 +88,7 @@ final case class TernaryFunc(
     applyGeneric(Func.Input3[A](a1, a2, a3))
 }
 
-abstract class GenericFunc[N <: Nat] {
+sealed abstract class GenericFunc[N <: Nat] {
   def effect: DimensionalEffect
   def name: String
   def help: String
@@ -113,9 +113,10 @@ abstract class GenericFunc[N <: Nat] {
 }
 
 trait FuncInstances {
-  implicit val FuncRenderTree: RenderTree[GenericFunc[_]] = new RenderTree[GenericFunc[_]] {
-    def render(func: GenericFunc[_]) = Terminal("Func" :: Nil, Some(func.name))
-  }
+  implicit val FuncRenderTree: RenderTree[GenericFunc[_]] =
+    new RenderTree[GenericFunc[_]] {
+      def render(func: GenericFunc[_]) = Terminal("Func" :: Nil, Some(func.name))
+    }
 }
 
 object Func extends FuncInstances {

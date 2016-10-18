@@ -16,7 +16,6 @@
 
 package quasar.std
 
-import quasar.Predef._
 import quasar._
 
 import scalaz._
@@ -48,10 +47,6 @@ trait IdentityLib extends Library {
       case Sized(Type.Str)                  => Type.Id
     },
     basicUntyper)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] = Squash :: ToId :: Nil
-  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object IdentityLib extends IdentityLib

@@ -151,12 +151,6 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Count :: Sum :: Min :: Max :: Avg :: Arbitrary :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] = Nil
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
-
   ////
 
   private val errSetF = Functor[SemanticError \/ ?].compose[List]

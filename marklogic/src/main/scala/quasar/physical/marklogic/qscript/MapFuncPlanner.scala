@@ -100,7 +100,6 @@ object MapFuncPlanner {
     case Gte(x, y)           => binOp[F](x, y)(_ ge _)
     case And(x, y)           => binOp[F](x, y)(_ and _)
     case Or(x, y)            => binOp[F](x, y)(_ or _)
-    case Coalesce(x, y)      => qscript.coalesce[F] apply (x, y)
     case Between(v1, v2, v3) => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
     case Cond(p, t, f)       => if_(p).then_(t).else_(f).point[F]
 

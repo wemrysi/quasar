@@ -342,16 +342,6 @@ trait SetLib extends Library {
       case Sized(const, _) => const
     },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Distinct :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Take :: Drop :: Range :: Filter :: GroupBy :: DistinctBy ::
-    Union :: Intersect :: Except :: In :: Within :: Constantly :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] =
-    OrderBy :: InnerJoin :: LeftOuterJoin :: RightOuterJoin :: FullOuterJoin :: Nil
 }
 
 object SetLib extends SetLib

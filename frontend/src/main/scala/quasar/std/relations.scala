@@ -240,40 +240,6 @@ trait RelationsLib extends Library {
     },
     untyper[nat._3](t => success(Func.Input3(Type.Bool, t, t))))
 
-  val Coalesce = BinaryFunc(
-    Mapping, 
-    "coalesce",
-    "Returns the first of its arguments that isn't null.",
-    Type.Bottom,
-    Func.Input2(Type.Top, Type.Top),
-    new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
-        orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.Null)), Embed(second))) => second.some
-          case InvokeF(_, Sized(Embed(first), Embed(ConstantF(Data.Null))))  => first.some
-          case _                                                            => None
-        }
-    },
-    partialTyper[nat._2] {
-      case Sized(Type.Null, v2) => v2
-      case Sized(Type.Const(Data.Null), v2) => v2
-      case Sized(Type.Const(v1), _ ) => Type.Const(v1)
-      case Sized(v1, Type.Null) => v1
-      case Sized(v1, Type.Const(Data.Null)) => v1
-      case Sized(v1, v2) => Type.lub(v1, v2)
-    },
-    untyper[nat._2] {
-      case Type.Null => success(Func.Input2(Type.Null, Type.Null))
-      case t         => success(Func.Input2(t ⨿ Type.Null, Type.Top))
-    })
-
-  def unaryFunctions: List[GenericFunc[nat._1]] = Not :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: IfUndefined :: And :: Or :: Coalesce :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Between :: Cond :: Nil
-
   def flip(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
     case Eq  => Some(Eq)
     case Neq => Some(Neq)
