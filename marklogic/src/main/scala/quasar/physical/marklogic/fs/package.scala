@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.effect.{KeyValueStore, MonotonicSeq, uuid}
 import quasar.fp._, free._
 import quasar.fs._, impl.ReadStream
 import quasar.fs.mount._, FileSystemDef.DefErrT

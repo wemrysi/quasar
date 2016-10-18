@@ -18,7 +18,7 @@ package quasar.physical.couchbase.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy._
-import quasar.{Data, DataCodec}
+import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp.free._
 import quasar.fs._
@@ -27,16 +27,11 @@ import quasar.physical.couchbase.common._
 
 import scala.collection.JavaConverters._
 
-import com.couchbase.client.java.document.json.JsonObject
 import eu.timepit.refined.api.RefType.ops._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
-
-  implicit val codec = DataCodec.Precise
-
-  final case class Cursor(result: Vector[JsonObject])
 
   def interpret[S[_]](
     implicit
@@ -47,7 +42,7 @@ object readfile {
   ): ReadFile ~> Free[S, ?] =
     impl.read[S, Cursor](open, read, close)
 
-  // TODO: stream results
+  // TODO: Streaming
   def open[S[_]](
     file: AFile, readOpts: ReadOpts
   )(implicit
@@ -59,15 +54,15 @@ object readfile {
       bktCol  <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
       bkt     <- EitherT(getBucket(bktCol.bucket))
       limit   =  readOpts.limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
-      qStr    =  s"""SELECT d.* FROM `${bktCol.bucket}` d
+      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
       qResult <- lift(Task.delay(
                    bkt.query(n1qlQuery(qStr))
-                     .rows
+                     .allRows
                      .asScala
                      .toVector
-                     .map(_.value.getObject("value"))
+                     .map(_.value)
                  )).into.liftM[FileSystemErrT]
     } yield Cursor(qResult)).run
 
@@ -76,12 +71,7 @@ object readfile {
   )(implicit
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
-    lift(Task.delay(
-      cursor.result.traverse(jObj =>
-        DataCodec.parse(jObj.toString).leftMap(err =>
-          FileSystemError.readFailed(jObj.toString, err.shows))
-      ).strengthL(Cursor(Vector.empty))
-    )).into
+    resultsFromCursor(cursor).point[Free[S, ?]]
 
   def close[S[_]](
     cursor: Cursor

@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "delete from zips where pop < 100000",

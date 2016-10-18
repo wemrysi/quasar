@@ -115,6 +115,7 @@ object LogicalPlan {
           }
         }
     }
+
   implicit val EqualFLogicalPlan: EqualF[LogicalPlan] =
     new EqualF[LogicalPlan] {
       def equal[A: Equal](v1: LogicalPlan[A], v2: LogicalPlan[A]): Boolean =
@@ -350,7 +351,7 @@ object LogicalPlan {
       emitName(freshName("check").map(name =>
         ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), Free(name))))
     }
-    else lift((SemanticError.genericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term")).wrapNel.left)
+    else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
   }
 
   private def appConst(constraints: ConstrainedPlan, fallback: Fix[LogicalPlan]) =

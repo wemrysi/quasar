@@ -5,7 +5,7 @@
       "mongodb_read_only": "pending",
       "postgresql":        "pending",
       "marklogic":         "skip",
-      "couchbase":         "pending"
+      "couchbase":         "skip"
   },
 
   "data": "largeZips.data",

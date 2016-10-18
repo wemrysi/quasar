@@ -168,7 +168,8 @@ abstract class QueryRegressionTest[S[_]](
 
     exp.predicate(
       exp.rows.toVector,
-      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun))
+      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
+      exp.fieldOrder)
   }
 
   /** Parse and execute the given query, returning a stream of results. */

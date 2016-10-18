@@ -18,10 +18,11 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._
-import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
+import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
-import quasar.physical.couchbase.common.Context
+import quasar.physical.couchbase.common.{Context, Cursor}
 
 import com.couchbase.client.java.CouchbaseCluster
 import org.http4s.Uri
@@ -35,14 +36,16 @@ package object fs {
   val FsType = FileSystemType("couchbase")
 
   type Eff[A] = (
-    Task                                           :\:
-    Read[Context, ?]                               :\:
-    MonotonicSeq                                   :\:
-    KeyValueStore[ReadHandle,  readfile.Cursor, ?] :/:
-    KeyValueStore[WriteHandle, writefile.State, ?]
+    Task                                             :\:
+    Read[Context, ?]                                 :\:
+    MonotonicSeq                                     :\:
+    GenUUID                                          :\:
+    KeyValueStore[ReadHandle,   Cursor,  ?]          :\:
+    KeyValueStore[WriteHandle,  writefile.State,  ?] :/:
+    KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  // TODO: move away from Task failures
+  // TODO: Move away from Task failures
 
   def clusterManager(cluster: CouchbaseCluster, username: String, password: String): Task[Context] =
     Task.delay(
@@ -71,18 +74,22 @@ package object fs {
       } yield (cluster, manager)
 
     def taskInterp: Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
-      (clusterMngr                                      |@|
-       TaskRef(Map.empty[ReadHandle,  readfile.Cursor]) |@|
-       TaskRef(Map.empty[WriteHandle, writefile.State]) |@|
-       TaskRef(0L)
-      )((cm, kvR, kvW, i) =>
+      (clusterMngr                                       |@|
+       TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
+       TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
+       TaskRef(Map.empty[ResultHandle, Cursor])          |@|
+       TaskRef(0L)                                       |@|
+       GenUUID.type1
+     )((cm, kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
           reflNT[Task]                          :+:
           Read.constant[Task, Context](cm._2)   :+:
           MonotonicSeq.fromTaskRef(i)           :+:
+          genUUID                               :+:
           KeyValueStore.impl.fromTaskRef(kvR)   :+:
-          KeyValueStore.impl.fromTaskRef(kvW))),
+          KeyValueStore.impl.fromTaskRef(kvW)   :+:
+          KeyValueStore.impl.fromTaskRef(kvQ))),
         lift(Task.delay(cm._1.disconnect()).void).into
       ))
 
