@@ -238,6 +238,7 @@ lazy val ejson = project
 lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) --= Seq(
     Wart.AsInstanceOf,

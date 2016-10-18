@@ -17,6 +17,7 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
+import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect.Read
 import quasar.fp.free._
@@ -27,10 +28,8 @@ import scala.collection.JavaConverters._
 import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.cluster.ClusterManager
 import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.query.{Insert, N1qlParams, N1qlQuery}
+import com.couchbase.client.java.query.{N1qlParams, N1qlQuery}
 import com.couchbase.client.java.query.consistency.ScanConsistency
-import com.couchbase.client.java.query.dsl.Expression
-import com.couchbase.client.java.query.dsl.functions.MetaFunctions.uuid
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -42,6 +41,8 @@ object common {
   final case class BucketCollection(bucket: String, collection: String)
 
   final case class DocIdType(id: String, tpe: String)
+
+  final case class Cursor(result: Vector[JsonObject])
 
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
@@ -71,20 +72,6 @@ object common {
       .exists(_.value.getBoolean("v").booleanValue === true)
   }
 
-  def insert(bucket: Bucket, objects: Vector[JsonObject]): Task[Unit] =
-    objects match {
-      case Vector(h, t @ _*) =>
-        Task.delay(bucket.query(N1qlQuery.simple(
-          t.foldLeft(
-            Insert.insertInto(Expression.i(bucket.name)).values(uuid(), h)
-          ){
-            case (a, d) => a.values(uuid(), d)
-          }
-        ))).void
-      case Vector() =>
-        Task.now(())
-    }
-
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
     paths.collect {
       case h :: Nil => FileName(h).right
@@ -113,4 +100,11 @@ object common {
         Task.delay(ctx.cluster.openBucket(name).right),
         Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
     ).into)
+
+  def resultsFromCursor(cursor: Cursor): FileSystemError \/ (Cursor, Vector[Data]) =
+    cursor.result.traverse(jObj =>
+      DataCodec.parse(jObj.toString)(DataCodec.Precise).leftMap(err =>
+        FileSystemError.readFailed(jObj.toString, err.shows))
+    ).strengthL(Cursor(Vector.empty))
+
 }

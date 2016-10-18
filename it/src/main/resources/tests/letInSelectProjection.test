@@ -3,7 +3,7 @@
 
     "backends": {
         "postgresql": "pending",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
 
     "data": ["cars.data", "zips.data"],

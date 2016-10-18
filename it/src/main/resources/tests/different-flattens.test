@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

@@ -19,6 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.qscript.{provenance => prov}
 
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
@@ -228,7 +229,7 @@ package object qscript {
 package qscript {
   final case class SrcMerge[A, B](src: A, left: B, right: B)
 
-  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+  @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 
   object Ann {
     implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
@@ -241,10 +242,15 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: EqualT, F[_]: EqualF]: Equal[Target[T, F]] =
+    implicit def equal[T[_[_]]: EqualT, F[_]](implicit F: Delay[Equal, F])
+        : Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
 
-    implicit def show[T[_[_]]: ShowT, F[_]: ShowF]: Show[Target[T, F]] =
-      Show.show(target => Cord("Target(") ++ target.ann.show ++ Cord(", ") ++ target.value.show ++ Cord(")"))
+    implicit def show[T[_[_]]: ShowT, F[_]](implicit F: Delay[Show, F])
+        : Show[Target[T, F]] =
+      Show.show(target =>
+        Cord("Target(") ++
+          target.ann.shows ++ Cord(", ") ++
+          target.value.shows ++ Cord(")"))
   }
 }

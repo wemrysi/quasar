@@ -19,11 +19,11 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
+import quasar.effect.uuid._
 import quasar.fp.free.lift
 import quasar.fs._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data.encodeXml
-import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._

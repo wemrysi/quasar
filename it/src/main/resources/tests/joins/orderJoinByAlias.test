@@ -3,8 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending",
-        "marklogic":         "skip"
+        "marklogic":         "skip",
+        "couchbase":         "skip"
     },
     "data": "../largeZips.data",
     "query": "select z1._id as zip, z2.pop / 1000 as popK from `../largeZips` as z1 inner join `../largeZips` as z2 on z1._id = z2._id order by popK desc",

@@ -3,8 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "couchbase":         "pending",
-        "marklogic":         "skip"
+        "marklogic":         "skip",
+        "couchbase":         "skip"
     },
     "data": "nulls.data",
     "query": "select null(name), to_string(val) from nulls where name = \"null\"",
