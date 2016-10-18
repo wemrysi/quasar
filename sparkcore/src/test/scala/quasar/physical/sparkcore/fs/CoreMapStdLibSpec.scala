@@ -38,9 +38,6 @@ class CoreMapStdLibSpec extends StdLibSpec {
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
     case ExtractIsoYear(_) => TODO
-    case ExtractMillennium(_) => TODO
-    case ExtractQuarter(_) => TODO
-    case ExtractWeek(_) => TODO
     case Power(_, _) => Skipped("TODO: handle large value").left
     case _ => ().right
   }

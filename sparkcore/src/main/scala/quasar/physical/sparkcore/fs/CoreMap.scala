@@ -103,7 +103,6 @@ object CoreMap extends Serializable {
     case ExtractHour(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(toDateTime(v).getHour())
       case Data.Time(v) => Data.Int(v.getHour())
-      // TODO should we really?
       case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
@@ -128,7 +127,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractMillennium(f) => (f >>> {
-
+      case Data.Timestamp(v) => Data.Int(((toDateTime(v).getYear() - 1) / 1000) + 1)
+      case Data.Date(v) => Data.Int(((v.getYear() - 1) / 1000) + 1)
       case _ => undefined
     }).right
     case ExtractMilliseconds(f) => (f >>> {
@@ -146,7 +146,6 @@ object CoreMap extends Serializable {
     case ExtractMinute(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(toDateTime(v).getMinute())
       case Data.Time(v) => Data.Int(v.getMinute())
-      // TODO should we really?
       case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
@@ -156,6 +155,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractQuarter(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(((toDateTime(v).getMonth().getValue - 1) / 3) + 1)
+      case Data.Date(v) => Data.Int(((v.getMonth().getValue - 1) / 3) + 1)
       case _ => undefined
     }).right
     case ExtractSecond(f) => (f >>> {
@@ -171,6 +172,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractWeek(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfYear() / 7)
+      case Data.Date(v) => Data.Int(v.getDayOfYear() / 7)
       case _ => undefined
     }).right
     case ExtractYear(f) => (f >>> {
