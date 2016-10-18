@@ -16,8 +16,8 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
 import quasar.contrib.matryoshka.ShowT
+import quasar.fp.ski.κ
 import quasar.physical.couchbase._
 import quasar.qscript, qscript._
 
@@ -27,8 +27,5 @@ import scalaz._
 final class ProjectBucketPlanner[F[_]: Monad, T[_[_]]: Recursive: ShowT]
   extends Planner[F, ProjectBucket[T, ?]] {
 
-  def plan: AlgebraM[M, ProjectBucket[T, ?], N1QL] = {
-    case BucketField(src, value, name)  => ???
-    case BucketIndex(src, value, index) => ???
-  }
+  def plan: AlgebraM[M, ProjectBucket[T, ?], N1QL] = κ(unreachable)
 }

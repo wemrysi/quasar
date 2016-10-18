@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import quasar.fp.ski.κ
 import quasar.physical.couchbase._
 import quasar.qscript, qscript._
 
@@ -24,7 +24,5 @@ import matryoshka._
 import scalaz._
 
 final class ConstDeadEndPlanner[F[_]: Monad] extends Planner[F, Const[DeadEnd, ?]] {
-  def plan: AlgebraM[M, Const[DeadEnd, ?], N1QL] = {
-    case Const(Root) => ???
-  }
+  def plan: AlgebraM[M, Const[DeadEnd, ?], N1QL] = κ(unreachable)
 }
