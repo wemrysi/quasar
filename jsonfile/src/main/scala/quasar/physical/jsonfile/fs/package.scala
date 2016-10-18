@@ -29,7 +29,10 @@ import quasar.contrib.pathy._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import FileSystemIndependentTypes._
+import ManageFile.MoveSemantics
+
 import ygg.table.Table
+import ygg.json.JValue
 // import matryoshka._
 // import Recursive.ops._
 
@@ -55,121 +58,155 @@ import ygg.table.Table
 // fcc UnsupportedJoinCondition(cond: Fix[LogicalPlan])
 // fcc UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String])
 
-package object fs {
+package object fs extends fs.FilesystemEffect {
   val FsType = FileSystemType("jsonfile")
+
+  type FH = Table
+  type RH = Table
+  type WH = Unit
+  type QH = JValue
 
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)
   implicit def showRHandle: Show[RHandle] = Show shows (r => "ReadHandle(%s, %s)".format(r.file.show, r.id))
   implicit def showWHandle: Show[WHandle] = Show shows (r => "WriteHandle(%s, %s)".format(r.file.show, r.id))
 
-  def kvEmpty[K, V] = KeyValueStore.impl.empty[K, V]
-
-  type KVFiles[A] = KeyValueStore[AFile, Table, A]
-  type KVRead[A]  = KeyValueStore[RHandle, Table, A]
-
-  type JsonFs[A] = (
-        Task
-    :\: KVFiles
-    :\: KVRead
-    :/: MonotonicSeq
-  )#M[A]
-
-  def jsonFs(uri: ConnectionUri): AsTask[JsonFs] = (
-        kvEmpty[AFile, Table]
-    |@| kvEmpty[RHandle, Table]
-    |@| MonotonicSeq.fromZero
-  )(reflNT[Task] :+: _ :+: _ :+: _)
-
-  type AsTask[M[X]] = Task[M ~> Task]
-
-  def fileSystem[S[_]](implicit
-    T: Task :<: S,
-    KVF: KVFiles :<: S,
-    KVR: KVRead :<: S,
-    MS: MonotonicSeq :<: S
-  ): FileSystem ~> Free[S, ?] = interpretFileSystem(queryFile[S], readFile[S], writeFile[S], manageFile[S])
-
-  def definition[S[_]](implicit S0: Task :<: S): FileSystemDef[Free[S, ?]] = FileSystemDef fromPF {
-    case FsCfg(FsType, uri) =>
-      val defnTask: Task[DefinitionResult[Free[S, ?]]] = jsonFs(uri) map (run =>
-        DefinitionResult(
-          mapSNT(injectNT[Task, S] compose run) compose fileSystem,
-          ().point[Free[S, ?]]
-        )
-      )
-
-      lift(defnTask).into[S].liftM[DefErrT]
-  }
-
-  def tmpName(n: Long): String                  = s"__quasar.jsonfile_$n"
+  def tmpName(n: Long): String                  = s"__quasar.ygg$n"
   def unknownPath(p: APath): FileSystemError    = pathErr(PathError pathNotFound p)
   def unknownPlan(lp: FixPlan): FileSystemError = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
   def makeDirList(names: PathSegment*): DirList = names.toSet
 
-  def nextUid[S[_]](implicit MS: MonotonicSeq :<: S) = MonotonicSeq.Ops[S].next
-
-  implicit class KVSOps[K, V, S[_]](val kvs: KeyValueStore[K, V, ?] :<: S) {
-    implicit def kvs_ = kvs
-
-    val Ops = KeyValueStore.Ops[K, V, S]
-
-    def keys             = Ops.keys
-    def contains(key: K) = Ops contains key
-    def delete(key: K)   = Ops delete key
-  }
-
-  def listFiles[S[_]](implicit KVF: KVFiles :<: S)              = KeyValueStore.Ops[AFile, Table, S].keys
-  def containsFile[S[_]](f: AFile)(implicit KVF: KVFiles :<: S) = KeyValueStore.Ops[AFile, Table, S].contains(f)
-
-  def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFiles :<: S): QueryFileSystem[Free[S, ?]] = new QueryFileSystem[Free[S, ?]] with STypes[S] {
-    def closeQ(rh: QHandle): FSUnit                   = ()
-    def evaluate(lp: FixPlan): FPLR[QHandle]          = (phaseResults(lp) |@| nextUid)((ph, uid) => ph -> \/-(QHandle(uid)))
-    def execute(lp: FixPlan, out: AFile): FPLR[AFile] = phaseResults(lp) tuple \/-(out)
-    def explain(lp: FixPlan): FPLR[ExecutionPlan]     = phaseResults(lp) tuple ExecutionPlan(FsType, "...")
-
-    private def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
-
-    def exists(file: AFile): FSBool    = KVF contains file
-    def list(dir: ADir): FLR[DirList]  = listFiles[S] map (_ flatMap pathName) map (xs => makeDirList(xs: _*).right)
-    def more(rh: QHandle): FLR[Chunks] = Vector()
+  def tracing[A: Show, B](msg: String, value: A)(expr: B): B = {
+    println(msg + ": " + value.show)
+    expr
   }
 
   def trace[A: Show](msg: String)(value: A): A = { println(msg + ": " + value.show) ; value }
 
-  def readFile[S[_]](implicit MS: MonotonicSeq :<: S): ReadFileSystem[Free[S, ?]] = new ReadFileSystem[Free[S, ?]] with STypes[S] {
-    def openForRead(file: AFile, offset: Natural, limit: Option[Positive]): FLR[RHandle] = nextUid map (uid => trace("openForRead")(RHandle(file, uid)).right)
-    def read(fh: RHandle): FLR[Chunks]                                                   = Vector()
-    def closeR(fh: RHandle): FSUnit                                                      = ()
-  }
-
-  def writeFile[S[_]](implicit MS: MonotonicSeq :<: S): WriteFileSystem[Free[S, ?]] = new WriteFileSystem[Free[S, ?]] with STypes[S] {
-    def openForWrite(file: AFile): FLR[WHandle]        = nextUid map (uid => trace("openForWrite")(WHandle(file, uid)).right)
-    def write(fh: WHandle, chunks: Chunks): FS[Errors] = Vector()
-    def closeW(fh: WHandle): FSUnit                    = ()
-  }
-
-  def manageFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFiles :<: S): ManageFileSystem[Free[S, ?]] = new ManageFileSystem[Free[S, ?]] with STypes[S] {
-    def createTempFile(near: APath): FLR[AFile] =
-      MonotonicSeq.Ops[S].next map { i =>
-        val name = file(tmpName(i))
-        refineType(near).fold(
-          _ </> name,
-          f => fileParent(f) </> name
-        ).right
-      }
-
-    def deletePath(path: APath): FLR[Unit]                                    = refineType(path).fold(x => (), x => ignore(KVF delete trace("deletePath")(x)))
-    def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]    = ()
-    def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit] = ()
-  }
+  def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> Free[S, ?] = new FsAlgebras[S].queryFile
+  def readFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): ReadFile ~> Free[S, ?]    = new FsAlgebras[S].readFile
+  def writeFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]): WriteFile ~> Free[S, ?] = new FsAlgebras[S].writeFile
+  def manageFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]): ManageFile ~> Free[S, ?]                = new FsAlgebras[S].manageFile
 }
 
 package fs {
+  class FsAlgebras[S[_]] extends STypes[S] {
+    implicit class KVSOps[K, V](val kvs: KVInject[K, V, S]) {
+      implicit private def kvs_ = kvs
+      private def Ops = KeyValueStore.Ops[K, V, S]
+
+      def keys             = Ops.keys
+      def contains(key: K) = Ops contains key
+      def delete(key: K)   = Ops delete key
+    }
+
+    def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
+    def nextLong(implicit MS: MonotonicSeq :<: S)   = MonotonicSeq.Ops[S].next
+
+    def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]    = ()
+    def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit] = ()
+
+    def createTempFile(near: APath, uid: Long): LR[AFile] = {
+      val name = file(tmpName(uid))
+      refineType(near).fold(
+        _ </> name,
+        f => fileParent(f) </> name
+      ).right
+    }
+
+    def manageFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]) = λ[ManageFile ~> FS] {
+      case ManageFile.Move(scenario, semantics) => scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
+      case ManageFile.Delete(path)              => refineType(path).fold(_ => Unimplemented, KVF delete _ map (_ => ().right))
+      case ManageFile.TempFile(path)            => tracing("tempFile", path)(nextLong map (uid => createTempFile(path, uid)))
+    }
+    def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
+      case WriteFile.Open(file)        => nextLong map (uid => trace("openForWrite")(WHandle(file, uid)).right)
+      case WriteFile.Write(fh, chunks) => tracing("write", fh)(Vector())
+      case WriteFile.Close(fh)         => tracing("write.close", fh)(KVW delete fh)
+    }
+    def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = λ[ReadFile ~> FS] {
+      case ReadFile.Open(file, offset, limit) => nextLong map (uid => trace("openForRead")(RHandle(file, uid)).right)
+      case ReadFile.Read(fh)                  => tracing("read", fh)(Vector())
+      case ReadFile.Close(fh)                 => tracing("read.close", fh)(KVR delete fh)
+    }
+    def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
+      case QueryFile.ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
+      case QueryFile.EvaluatePlan(lp)     => (phaseResults(lp) |@| nextLong)((ph, uid) => ph -> \/-(QHandle(uid)))
+      case QueryFile.Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
+      case QueryFile.More(rh)             => tracing("more", rh)(Vector())
+      case QueryFile.ListContents(dir)    => tracing("list", dir)(KVF.keys map (_ flatMap pathName) map (xs => makeDirList(xs: _*).right))
+      case QueryFile.Close(fh)            => tracing("query.close", fh)(KVQ delete fh)
+      case QueryFile.FileExists(file)     => tracing("exists", file)(KVF contains file)
+    }
+  }
+
   trait STypes[S[_]] extends EitherTContextLeft[Free[S, ?], FileSystemError] {
     implicit protected val applicative: Applicative[FS] = scalaz.Free.freeMonad[S]
 
     type FS[A]  = Free[S, A]
     type FSUnit = FS[Unit]
     type FSBool = FS[Boolean]
+  }
+
+  trait FilesystemEffect {
+    val FsType: FileSystemType
+
+    type FH // file map values
+    type RH // read handle map values
+    type WH // write handle map values
+    type QH // query handle map values
+
+    type KVFile[S[_]]  = KVInject[AFile, FH, S]
+    type KVRead[S[_]]  = KVInject[RHandle, RH, S]
+    type KVWrite[S[_]] = KVInject[WHandle, WH, S]
+    type KVQuery[S[_]] = KVInject[QHandle, QH, S]
+
+    type AsTask[M[X]]         = Task[M ~> Task]
+    type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
+
+    def kvEmpty[K, V] : AsTask[KeyValueStore[K, V, ?]]   = KeyValueStore.impl.empty[K, V]
+    def kvOps[K, V, S[_]](implicit z: KVInject[K, V, S]) = KeyValueStore.Ops[K, V, S]
+
+    def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> Free[S, ?]
+    def readFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): ReadFile ~> Free[S, ?]
+    def writeFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]): WriteFile ~> Free[S, ?]
+    def manageFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]): ManageFile ~> Free[S, ?]
+
+    type Eff[A] = (
+          Task
+      :\: KeyValueStore[AFile, FH, ?]
+      :\: KeyValueStore[RHandle, RH, ?]
+      :\: KeyValueStore[WHandle, WH, ?]
+      :\: KeyValueStore[QHandle, QH, ?]
+      :/: MonotonicSeq
+    )#M[A]
+
+    def initialEffect(uri: ConnectionUri): AsTask[Eff] = (
+          (Task delay reflNT[Task])
+      |@| kvEmpty[AFile, FH]
+      |@| kvEmpty[RHandle, RH]
+      |@| kvEmpty[WHandle, WH]
+      |@| kvEmpty[QHandle, QH]
+      |@| MonotonicSeq.fromZero
+    )(_ :+: _ :+: _ :+: _ :+: _ :+: _)
+
+    def fileSystem[S[_]](implicit
+      TS: Task :<: S,
+      KVF: KVFile[S],
+      KVR: KVRead[S],
+      KVW: KVWrite[S],
+      KVQ: KVQuery[S],
+      MS: MonotonicSeq :<: S
+    ): FileSystem ~> Free[S, ?] = interpretFileSystem(queryFile[S], readFile[S], writeFile[S], manageFile[S])
+
+    def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] = FileSystemDef fromPF {
+      case FsCfg(FsType, uri) =>
+        val defnTask: Task[DefinitionResult[Free[S, ?]]] = initialEffect(uri) map (run =>
+          DefinitionResult(
+            mapSNT(injectNT[Task, S] compose run) compose fileSystem,
+            ().point[Free[S, ?]]
+          )
+        )
+        lift(defnTask).into[S].liftM[DefErrT]
+    }
   }
 }
