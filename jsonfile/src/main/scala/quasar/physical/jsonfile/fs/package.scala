@@ -16,7 +16,7 @@
 
 package quasar.physical.jsonfile
 
-import quasar.{ PhaseResult, PhaseResults }
+import quasar.{ Data, PhaseResult, PhaseResults }
 import quasar.Predef._
 import quasar.fp._, free._, numeric._
 import quasar.fs._
@@ -73,6 +73,7 @@ package object fs extends fs.FilesystemEffect {
     def contains(key: K)      = Ops contains key
     def delete(key: K)        = Ops delete key
     def put(key: K, value: V) = Ops.put(key, value)
+    def get(key: K)           = Ops get key
   }
 
   type FH = Table
@@ -81,6 +82,8 @@ package object fs extends fs.FilesystemEffect {
   type QH = JValue
 
   def emptyFile(): FH = ColumnarTable.empty
+
+  def read[S[_]](value: RH): Vector[Data] = Vector()
 
   def create[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]) = {
     val wh = WHandle(file, uid)
@@ -142,7 +145,7 @@ package fs {
     }
     def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = λ[ReadFile ~> FS] {
       case ReadFile.Open(file, offset, limit) => tracing("Read.Open", file)(nextLong map (uid => RHandle(file, uid).right))
-      case ReadFile.Read(fh)                  => tracing("Read", fh)(Vector())
+      case ReadFile.Read(fh)                  => tracing("Read", fh)((KVR get fh).fold(rv => read(rv), unknownReadHandle(fh).left))
       case ReadFile.Close(fh)                 => tracing("Read.Close", fh)(KVR delete fh)
     }
     def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
