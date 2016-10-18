@@ -37,26 +37,13 @@ class CoreMapStdLibSpec extends StdLibSpec {
 
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
-    case ExtractCentury(_) => TODO
-    case ExtractDecade(_) => TODO
-    case ExtractHour(_) => TODO
-    case ExtractIsoDayOfWeek(_) => TODO
     case ExtractIsoYear(_) => TODO
-    case ExtractMicroseconds(_) => TODO
     case ExtractMillennium(_) => TODO
-    case ExtractMilliseconds(_) => TODO
-    case ExtractMinute(_) => TODO
-    case ExtractMonth(_) => TODO
     case ExtractQuarter(_) => TODO
-    case ExtractSecond(_) => TODO
     case ExtractWeek(_) => TODO
-    case ExtractYear(_) => TODO
-
     case Power(_, _) => Skipped("TODO: handle large value").left
-
     case _ => ().right
   }
-
 
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LogicalPlan], args: Symbol => A): Free[MapFunc[Fix, ?], A] =

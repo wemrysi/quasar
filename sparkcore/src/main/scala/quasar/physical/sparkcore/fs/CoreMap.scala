@@ -71,8 +71,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractCentury(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear() / 100)
-      case Data.Date(v) => Data.Int((v.getYear() / 100) + 1)
+      case Data.Timestamp(v) => century(toDateTime(v).getYear())
+      case Data.Date(v) => century(v.getYear())
       case _ => undefined
     }).right
     case ExtractDayOfMonth(f) => (f >>> {
@@ -81,8 +81,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractDecade(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear() / 100)
-      case Data.Date(v) => Data.Int(v.getYear() / 100)
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear() / 10)
+      case Data.Date(v) => Data.Int(v.getYear() / 10)
       case _ => undefined
     }).right
     case ExtractDayOfWeek(f) => (f >>> {
@@ -103,17 +103,28 @@ object CoreMap extends Serializable {
     case ExtractHour(f) => (f >>> {
       case Data.Timestamp(v) => Data.Int(toDateTime(v).getHour())
       case Data.Time(v) => Data.Int(v.getHour())
+      // TODO should we really?
+      case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
     case ExtractIsoDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfWeek().getValue())
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
       case _ => undefined
     }).right
     case ExtractIsoYear(f) => (f >>> {
-
       case _ => undefined
     }).right
     case ExtractMicroseconds(f) => (f >>> {
-
+      case Data.Timestamp(v) =>
+        val sec = toDateTime(v).getSecond() * 1000000
+        val milli = toDateTime(v).getNano() / 1000
+        Data.Int(sec + milli)
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000000
+        val milli = v.getNano() / 1000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
       case _ => undefined
     }).right
     case ExtractMillennium(f) => (f >>> {
@@ -121,28 +132,45 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractMilliseconds(f) => (f >>> {
-
+      case Data.Timestamp(v) =>
+        val sec = toDateTime(v).getSecond() * 1000
+        val milli = toDateTime(v).getNano() / 1000000
+        Data.Int(sec + milli)
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000
+        val milli = v.getNano() / 1000000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
       case _ => undefined
     }).right
     case ExtractMinute(f) => (f >>> {
-
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getMinute())
+      case Data.Time(v) => Data.Int(v.getMinute())
+      // TODO should we really?
+      case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
     case ExtractMonth(f) => (f >>> {
-
+      case Data.Timestamp(v) => Data.Int(toDateTime(v).getMonth().getValue())
+      case Data.Date(v) => Data.Int(v.getMonth().getValue())
       case _ => undefined
     }).right
     case ExtractQuarter(f) => (f >>> {
-
       case _ => undefined
     }).right
     case ExtractSecond(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getSecond())
-      case Data.Time(v) => Data.Int(v.getSecond())
+      case Data.Timestamp(v) =>
+        val sec = toDateTime(v).getSecond()
+        val milli = toDateTime(v).getNano() / 1000
+        Data.Dec(BigDecimal(s"$sec.$milli"))
+      case Data.Time(v) =>
+        val sec = v.getSecond()
+        val milli = v.getNano() / 1000
+        Data.Dec(BigDecimal(s"$sec.$milli"))
+      case Data.Date(_) => Data.Dec(0)
       case _ => undefined
     }).right
     case ExtractWeek(f) => (f >>> {
-
       case _ => undefined
     }).right
     case ExtractYear(f) => (f >>> {
@@ -452,6 +480,8 @@ object CoreMap extends Serializable {
     case Data.Id(s) => Data.Str(s)
     case _ => undefined
   }
+
+  private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {
