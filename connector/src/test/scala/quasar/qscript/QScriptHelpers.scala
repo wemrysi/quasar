@@ -66,10 +66,14 @@ trait QScriptHelpers extends TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(ProjectField(src, field))
 
+  def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ProjectIndex(src, field))
+
   def lpRead(path: String): Fix[LP] =
     LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
-  val prov = new Provenance[Fix]
+  val prov = new provenance.ProvenanceT[Fix]
 
   /** A helper when writing examples that allows them to be written in order of
     * execution.
