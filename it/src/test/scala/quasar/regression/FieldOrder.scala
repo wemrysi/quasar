@@ -16,13 +16,8 @@
 
 package quasar.regression
 
-import quasar.Predef._
+sealed trait FieldOrder
 
-import argonaut._, Json._
+final case object FieldOrderPreserved extends FieldOrder
 
-case class ExpectedResult(
-  rows:          List[Json],
-  predicate:     Predicate,
-  ignoredFields: List[JsonField],
-  fieldOrder:    FieldOrder
-)
+final case object FieldOrderIgnored extends FieldOrder

@@ -28,7 +28,8 @@ import scalaz.stream._
 sealed trait Predicate {
   def apply[F[_]: Catchable: Monad](
     expected: Vector[Json],
-    actual: Process[F, Json]
+    actual: Process[F, Json],
+    fieldOrder: FieldOrder
   ): F[Result]
 }
 
@@ -60,7 +61,8 @@ object Predicate {
   final case object ContainsAtLeast extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected: Vector[Json],
-      actual: Process[F, Json]
+      actual: Process[F, Json],
+      fieldOrder: FieldOrder
     ): F[Result] =
       actual.scan((expected.toSet, Set.empty[Json])) {
         case ((expected, wrongOrder), e) =>
@@ -77,7 +79,8 @@ object Predicate {
         .map {
           case Some((exp, wrongOrder)) =>
             (exp aka "unmatched expected values" must beEmpty) and
-            (wrongOrder aka "matched but field order differs" must beEmpty): Result
+            (wrongOrder aka "matched but field order differs" must beEmpty)
+              .unless(fieldOrder === FieldOrderIgnored): Result
           case None =>
             failure
         }
@@ -87,7 +90,8 @@ object Predicate {
   final case object ContainsExactly extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected: Vector[Json],
-      actual: Process[F, Json]
+      actual: Process[F, Json],
+      fieldOrder: FieldOrder
     ): F[Result] =
       actual.scan((expected.toSet, Set.empty[Json], None: Option[Json])) {
         case ((expected, wrongOrder, extra), e) =>
@@ -104,7 +108,8 @@ object Predicate {
         .map {
           case Some((exp, wrongOrder, extra)) =>
             (extra aka "unexpected value" must beNone) and
-            (wrongOrder aka "matched but field order differs" must beEmpty) and
+            (wrongOrder aka "matched but field order differs" must beEmpty)
+              .unless(fieldOrder === FieldOrderIgnored) and
             (exp aka "unmatched expected values" must beEmpty): Result
           case None =>
             failure
@@ -115,7 +120,8 @@ object Predicate {
   final case object EqualsExactly extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
-      actual0: Process[F, Json]
+      actual0: Process[F, Json],
+      fieldOrder: FieldOrder
     ): F[Result] = {
       val actual   = actual0.map(Some(_))
       val expected = Process.emitAll(expected0).map(Some(_))
@@ -135,7 +141,8 @@ object Predicate {
   final case object EqualsInitial extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
-      actual0: Process[F, Json]
+      actual0: Process[F, Json],
+      fieldOrder: FieldOrder
     ): F[Result] = {
       val actual   = actual0.map(Some(_))
       val expected = Process.emitAll(expected0).map(Some(_))
@@ -154,7 +161,8 @@ object Predicate {
   final case object DoesNotContain extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected0: Vector[Json],
-      actual: Process[F, Json]
+      actual: Process[F, Json],
+      fieldOrder: FieldOrder
     ): F[Result] = {
       val expected = expected0.toSet
 
