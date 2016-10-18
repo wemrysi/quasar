@@ -1,0 +1,1 @@
+- Utilize bulk operations for Couchbase insertion

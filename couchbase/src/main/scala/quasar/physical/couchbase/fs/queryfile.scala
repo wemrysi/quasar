@@ -21,6 +21,7 @@ import quasar.{Data, LogicalPlan, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
+import quasar.effect.uuid.GenUUID
 import quasar.fp._, eitherT._, free._, ski._
 import quasar.fs._
 import quasar.PhaseResult.{Detail, Tree}
@@ -30,9 +31,11 @@ import quasar.RenderTree.ops._
 
 import scala.collection.JavaConverters._
 
+import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import pathy.Path._
+import rx.lang.scala._, JavaConverters._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -51,7 +54,8 @@ object queryfile {
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: KeyValueStore[ResultHandle, Cursor, ?] :<: S,
-    S3: Task :<: S
+    S3: GenUUID :<: S,
+    S4: Task :<: S
   ): QueryFile ~> Free[S, ?] = λ[QueryFile ~> Free[S, ?]] {
     case ExecutePlan(lp, out) => executePlan(lp, out)
     case EvaluatePlan(lp)     => evaluatePlan(lp)
@@ -67,7 +71,8 @@ object queryfile {
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S2: Task :<: S
+    S2: GenUUID :<: S,
+    S3: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ AFile)] =
     (for {
       n1ql   <- lpToN1ql(lp)
@@ -76,19 +81,26 @@ object queryfile {
                   e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
                   _.point[Free[S, ?]].liftP
                 ).merge
-      objs   =  r.map(d =>
-                  JsonObject
-                    .create()
-                    .put("type", bktCol.collection)
-                    .put("value", d)
-                )
+      docs   <- r.traverse(d => GenUUID.Ops[S].asks(uuid =>
+                  JsonDocument.create(
+                    uuid.toString,
+                    JsonObject
+                      .create()
+                      .put("type", bktCol.collection)
+                      .put("value", d))
+                )).liftP
       ctx    <- Read.Ops[Context, S].ask.liftP
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftP
-      _      <- lift(
-                  insert(bkt, objs)
-                ).into.liftP
+
+      _    <- lift(Task.delay(
+                Observable
+                  .from(docs)
+                  .flatMap(bkt.async.insert(_).asScala)
+                  .toBlocking
+                  .last
+              )).into.liftP
     } yield out).run.run
 
   def evaluatePlan[S[_]](

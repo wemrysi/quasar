@@ -18,6 +18,7 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
@@ -38,6 +39,7 @@ package object fs {
     Task                                             :\:
     Read[Context, ?]                                 :\:
     MonotonicSeq                                     :\:
+    GenUUID                                          :\:
     KeyValueStore[ReadHandle,   Cursor,  ?]          :\:
     KeyValueStore[WriteHandle,  writefile.State,  ?] :/:
     KeyValueStore[ResultHandle, Cursor, ?]
@@ -76,13 +78,15 @@ package object fs {
        TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
        TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
        TaskRef(Map.empty[ResultHandle, Cursor])          |@|
-       TaskRef(0L)
-      )((cm, kvR, kvW, kvQ, i) =>
+       TaskRef(0L)                                       |@|
+       GenUUID.type1
+     )((cm, kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
           reflNT[Task]                          :+:
           Read.constant[Task, Context](cm._2)   :+:
           MonotonicSeq.fromTaskRef(i)           :+:
+          genUUID                               :+:
           KeyValueStore.impl.fromTaskRef(kvR)   :+:
           KeyValueStore.impl.fromTaskRef(kvW)   :+:
           KeyValueStore.impl.fromTaskRef(kvQ))),
