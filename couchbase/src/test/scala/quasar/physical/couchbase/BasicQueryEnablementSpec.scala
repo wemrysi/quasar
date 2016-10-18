@@ -203,6 +203,24 @@ class BasicQueryEnablementSpec
       n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value loc from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
     }
 
+    "convert a Eq filter" in {
+      // "select * from foo where bar 1"
+      val qs =
+        chain(
+          ReadR(rootDir </> file("foo")),
+          QC.inj(LeftShift((),
+            HoleF,
+            Free.point(RightSide))),
+          QC.inj(Filter((),
+            Free.roll(MapFuncs.Eq(
+              ProjectFieldR(HoleF, StrLit("bar")),
+              StrLit("baz"))))))
+
+      val n1ql = n1qlFromQS(qs)
+
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+    }
+
     "convert a filter" in {
       // "select * from foo where bar between 1 and 10"
       val qs =
