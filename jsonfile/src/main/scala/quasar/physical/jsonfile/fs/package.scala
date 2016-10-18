@@ -31,7 +31,7 @@ import scalaz.concurrent.Task
 import FileSystemIndependentTypes._
 import ManageFile.MoveSemantics
 
-import ygg.table.Table
+import ygg.table._
 import ygg.json.JValue
 // import matryoshka._
 // import Recursive.ops._
@@ -61,16 +61,34 @@ import ygg.json.JValue
 package object fs extends fs.FilesystemEffect {
   val FsType = FileSystemType("jsonfile")
 
-  lazy val isTracing = scala.sys.props contains "ygg.trace"
+  val tracingProp: Option[String] = scala.sys.props get "ygg.trace" map (".*(" + _ + ").*")
 
-  val tracingProp = scala.sys.props get "ygg.trace" map (_.r)
+  def isTracing(label: String): Boolean = tracingProp exists (label matches _)
 
-  def isTracing(label: String): Boolean = tracingProp exists (label matches _.toString)
+  implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) {
+    implicit private def kvs_ = kvs
+    private def Ops = KeyValueStore.Ops[K, V, S]
+
+    def keys                  = Ops.keys
+    def contains(key: K)      = Ops contains key
+    def delete(key: K)        = Ops delete key
+    def put(key: K, value: V) = Ops.put(key, value)
+  }
 
   type FH = Table
   type RH = Table
-  type WH = Unit
+  type WH = Long
   type QH = JValue
+
+  def emptyFile(): FH = ColumnarTable.empty
+
+  def create[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]) = {
+    val wh = WHandle(file, uid)
+    for {
+      _ <- KVF.put(file, emptyFile())
+      _ <- KVW.put(wh, 0)
+    } yield wh
+  }
 
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)
   implicit def showRHandle: Show[RHandle] = Show shows (r => "ReadHandle(%s, %s)".format(r.file.show, r.id))
@@ -98,15 +116,6 @@ package object fs extends fs.FilesystemEffect {
 
 package fs {
   class FsAlgebras[S[_]] extends STypes[S] {
-    implicit class KVSOps[K, V](val kvs: KVInject[K, V, S]) {
-      implicit private def kvs_ = kvs
-      private def Ops = KeyValueStore.Ops[K, V, S]
-
-      def keys             = Ops.keys
-      def contains(key: K) = Ops contains key
-      def delete(key: K)   = Ops delete key
-    }
-
     def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
     def nextLong(implicit MS: MonotonicSeq :<: S)   = MonotonicSeq.Ops[S].next
 
@@ -127,7 +136,7 @@ package fs {
       case ManageFile.TempFile(path)            => tracing("TempFile", path)(nextLong map (uid => createTempFile(path, uid)))
     }
     def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
-      case WriteFile.Open(file)        => tracing("Write.Open", file)(nextLong map (uid => WHandle(file, uid).right))
+      case WriteFile.Open(file)        => tracing("Write.Open", file)(nextLong flatMap (uid => create[S](file, uid) map (wh => wh.right)))
       case WriteFile.Write(fh, chunks) => tracing("Write", fh)(Vector())
       case WriteFile.Close(fh)         => tracing("Write.Close", fh)(KVW delete fh)
     }
@@ -142,7 +151,7 @@ package fs {
       case QueryFile.Explain(lp)          => tracing("Explain", lp)(phaseResults(lp) tuple ExecutionPlan(FsType, "..."))
       case QueryFile.More(rh)             => tracing("More", rh)(Vector())
       case QueryFile.ListContents(dir)    => tracing("List", dir)(KVF.keys map (_ flatMap pathName) map (xs => makeDirList(xs: _*).right))
-      case QueryFile.Close(fh)            => tracing("Query.close", fh)(KVQ delete fh)
+      case QueryFile.Close(fh)            => tracing("Query.Close", fh)(KVQ delete fh)
       case QueryFile.FileExists(file)     => tracing("Exists", file)(KVF contains file)
     }
   }
@@ -163,6 +172,8 @@ package fs {
     type WH // write handle map values
     type QH // query handle map values
 
+    def emptyFile(): FH
+
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
     type KVRead[S[_]]  = KVInject[RHandle, RH, S]
     type KVWrite[S[_]] = KVInject[WHandle, WH, S]
@@ -173,6 +184,7 @@ package fs {
 
     def kvEmpty[K, V] : AsTask[KeyValueStore[K, V, ?]]   = KeyValueStore.impl.empty[K, V]
     def kvOps[K, V, S[_]](implicit z: KVInject[K, V, S]) = KeyValueStore.Ops[K, V, S]
+
 
     def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> Free[S, ?]
     def readFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): ReadFile ~> Free[S, ?]

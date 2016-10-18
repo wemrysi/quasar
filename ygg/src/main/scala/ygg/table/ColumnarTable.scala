@@ -33,6 +33,7 @@ class ColumnarTable extends ColumnarTableModule {
 
 }
 object ColumnarTable extends ColumnarTable {
+  def empty: Table               = fromSlices(emptyStreamT(), ExactSize(0))
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
 }
