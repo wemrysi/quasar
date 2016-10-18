@@ -88,8 +88,8 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         rN1ql    =  n1ql(r)
         _        <- prtell[M](Vector(Detail(
                       "N1QL LeftShift",
-                      s"""  src: $src
-                         |  struct: $sN1ql
+                      s"""  src:    ${n1ql(src)}
+                         |  struct: ${n1ql(s)}
                          |  repair: $rN1ql
                          |  n1ql:   $rN1ql""".stripMargin('|'))))
 

@@ -221,7 +221,25 @@ class BasicQueryEnablementSpec
       n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
     }
 
-    "convert a filter" in {
+    "convert a Eq filter with a projection" in {
+      // select bar from foo where bar = 1
+      val qs =
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
+            ProjectFieldR(HoleF, StrLit("bar")),
+            Free.point(RightSide))),
+          QCT.inj(Filter((),
+            Free.roll(MapFuncs.Eq(
+              ProjectFieldR(HoleF, StrLit("bar")),
+              StrLit("baz"))))))
+
+      val n1ql = n1qlFromQS(qs)
+
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+    }
+
+    "convert a Between filter" in {
       // select * from foo where bar between 1 and 10
       val qs =
         chain[Fix, QST](
@@ -237,7 +255,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      todo
+      n1ql must_= "select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where _2.bar >= 1 and _2.bar <= 10) as v"
     }
   }
 

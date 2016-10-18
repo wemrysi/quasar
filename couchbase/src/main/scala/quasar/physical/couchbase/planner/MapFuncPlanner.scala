@@ -135,25 +135,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Or(a1, a2)          =>
       partialQueryString(s"(${n1ql(a1)} or ${n1ql(a2)})").point[M]
     case Between(a1, a2, a3) =>
-      for {
-        t      <- genName[M]
-        a1N1ql =  n1ql(a1)
-        a2N1ql =  n1ql(a2)
-        a3N1ql =  n1ql(a3)
-        s      =  select(
-                    value         = true,
-                    resultExprs   = t.wrapNel,
-                    keyspace      = a1,
-                    keyspaceAlias = t) |>
-                  filter.set(s"$t between $a2N1ql and $a3N1ql".some)
-        sN1ql  =  n1ql(s)
-        _      <- prtell[M](Vector(Detail(
-                    "N1QL Between",
-                    s"""  a1:   $a1N1ql
-                       |  a2:   $a2N1ql
-                       |  a3:   $a3N1ql
-                       |  n1ql: $sN1ql""".stripMargin('|'))))
-      } yield s
+      val a1N1ql =  n1ql(a1)
+      val a2N1ql =  n1ql(a2)
+      val a3N1ql =  n1ql(a3)
+      val b      =  s"$a1N1ql >= $a2N1ql and $a1N1ql <= $a3N1ql"
+      prtell[M](Vector(Detail(
+        "N1QL Between",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  a3:   $a3N1ql
+           |  n1ql: $b""".stripMargin('|')
+      ))).as(partialQueryString(b))
     case Cond(cond, then_, else_) =>
       partialQueryString(s"""
         (case
