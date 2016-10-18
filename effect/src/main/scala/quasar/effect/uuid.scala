@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.effect
 
 import quasar.Predef._
-import quasar.effect.Read
 
 import java.util.UUID
 

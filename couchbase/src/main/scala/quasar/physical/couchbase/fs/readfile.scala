@@ -59,7 +59,7 @@ object readfile {
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
       qResult <- lift(Task.delay(
                    bkt.query(n1qlQuery(qStr))
-                     .rows
+                     .allRows
                      .asScala
                      .toVector
                      .map(_.value)
