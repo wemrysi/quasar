@@ -120,7 +120,7 @@ class BasicQueryEnablementSpec
   "QScript to N1QL" should {
 
     "convert a squashed read" in {
-      // "select * from foo"
+      // select * from foo
       val qs =
         chain(
            ReadR(rootDir </> file("foo")),
@@ -134,7 +134,7 @@ class BasicQueryEnablementSpec
     }
 
     "convert a simple projection" in {
-      // "select zed from foo"
+      // select zed from foo
       val qs =
         chain(
           ReadR(rootDir </> file("foo")),
@@ -148,7 +148,7 @@ class BasicQueryEnablementSpec
     }
 
     "read followed by a map" in {
-      // "select (a + b) from foo"
+      // select (a + b) from foo
       val qs =
         chain(
           ReadR(rootDir </> file("foo")),
@@ -164,7 +164,7 @@ class BasicQueryEnablementSpec
     }
 
     "convert a basic reduction wrapped in an object" in {
-      // "select sum(height) from person"
+      // select sum(height) from person
       val qs =
         chain(
           ReadR(rootDir </> file("person")),
@@ -185,7 +185,7 @@ class BasicQueryEnablementSpec
     }
 
     "convert a flatten array" in {
-      // "select loc[:*] from zips",
+      // select loc[:*] from zips
       val qs =
         chain(
           ReadR(rootDir </> file("zips")),
@@ -203,8 +203,26 @@ class BasicQueryEnablementSpec
       n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value loc from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
     }
 
+    "convert a Eq filter" in {
+      // select * from foo where bar = "baz"
+      val qs =
+        chain(
+          ReadR(rootDir </> file("foo")),
+          QC.inj(LeftShift((),
+            HoleF,
+            Free.point(RightSide))),
+          QC.inj(Filter((),
+            Free.roll(MapFuncs.Eq(
+              ProjectFieldR(HoleF, StrLit("bar")),
+              StrLit("baz"))))))
+
+      val n1ql = n1qlFromQS(qs)
+
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+    }
+
     "convert a filter" in {
-      // "select * from foo where bar between 1 and 10"
+      // select * from foo where bar between 1 and 10
       val qs =
         chain(
           ReadR(rootDir </> file("foo")),
