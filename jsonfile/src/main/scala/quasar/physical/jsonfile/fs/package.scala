@@ -66,14 +66,16 @@ package object fs extends fs.FilesystemEffect {
   def isTracing(label: String): Boolean = tracingProp exists (label matches _)
 
   implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) {
+    type FS[A] = Free[S, A]
+
     implicit private def kvs_ = kvs
     private def Ops = KeyValueStore.Ops[K, V, S]
 
-    def keys                  = Ops.keys
-    def contains(key: K)      = Ops contains key
-    def delete(key: K)        = Ops delete key
-    def put(key: K, value: V) = Ops.put(key, value)
-    def get(key: K)           = Ops get key
+    def keys: FS[Vector[K]]             = Ops.keys
+    def contains(key: K): FS[Boolean]   = Ops contains key
+    def delete(key: K): FS[Unit]        = Ops delete key
+    def put(key: K, value: V): FS[Unit] = Ops.put(key, value)
+    def get(key: K): OptionT[FS, V]     = Ops get key
   }
 
   type FH = Table
@@ -83,9 +85,10 @@ package object fs extends fs.FilesystemEffect {
 
   def emptyFile(): FH = ColumnarTable.empty
 
-  def read[S[_]](value: RH): Vector[Data] = Vector()
+  def read[S[_]](h: RH): Vector[Data]                                  = Vector()
+  def write[S[_]](h: WH, chunk: Vector[Data]): Vector[FileSystemError] = Vector()
 
-  def create[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]) = {
+  def create[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]): Free[S, WHandle] = {
     val wh = WHandle(file, uid)
     for {
       _ <- KVF.put(file, emptyFile())
@@ -140,12 +143,12 @@ package fs {
     }
     def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
       case WriteFile.Open(file)        => tracing("Write.Open", file)(nextLong flatMap (uid => create[S](file, uid) map (wh => wh.right)))
-      case WriteFile.Write(fh, chunks) => tracing("Write", fh)(Vector())
+      case WriteFile.Write(fh, chunks) => tracing("Write", fh)(KVW get fh fold (wv => write(wv, chunks), Vector(unknownWriteHandle(fh))))
       case WriteFile.Close(fh)         => tracing("Write.Close", fh)(KVW delete fh)
     }
     def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = λ[ReadFile ~> FS] {
       case ReadFile.Open(file, offset, limit) => tracing("Read.Open", file)(nextLong map (uid => RHandle(file, uid).right))
-      case ReadFile.Read(fh)                  => tracing("Read", fh)((KVR get fh).fold(rv => read(rv), unknownReadHandle(fh).left))
+      case ReadFile.Read(fh)                  => tracing("Read", fh)(KVR get fh fold (rv => read(rv), unknownReadHandle(fh).left))
       case ReadFile.Close(fh)                 => tracing("Read.Close", fh)(KVR delete fh)
     }
     def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
