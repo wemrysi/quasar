@@ -230,7 +230,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     keyword("in") ~ default_expr ^^ { case _ ~ a => In(_, a).embed }
 
   private def LIKE(l: T[Sql], r: T[Sql], esc: Option[T[Sql]]) =
-    invokeFunction("(like)",
+    invokeFunction("like",
       List(l, r, esc.getOrElse(stringLiteral[T[Sql]]("\\").embed))).embed
 
   def like_suffix: Parser[T[Sql] => T[Sql]] =

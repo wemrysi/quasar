@@ -34,8 +34,6 @@ import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 trait Compiler[F[_]] {
   import identity._
-  import set._
-  import structural._
   import JoinDir._
 
   // HELPERS
@@ -57,7 +55,7 @@ trait Compiler[F[_]] {
     def ++(that: TableContext): TableContext =
       TableContext(
         None,
-        () => Fix(ObjectConcat(this.full(), that.full())),
+        () => Fix(structural.ObjectConcat(this.full(), that.full())),
         this.subtables ++ that.subtables)
   }
 
@@ -224,28 +222,7 @@ trait Compiler[F[_]] {
       "to_timestamp"            -> date.ToTimestamp,
       "SQUASH"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
-      "(+)"                     -> math.Add,
-      "(*)"                     -> math.Multiply,
-      "(^)"                     -> math.Power,
-      "(-)"                     -> math.Subtract,
-      "(/)"                     -> math.Divide,
-      "-"                       -> math.Negate,
-      "(%)"                     -> math.Modulo,
-      "(=)"                     -> relations.Eq,
-      "(<>)"                    -> relations.Neq,
-      "(<)"                     -> relations.Lt,
-      "(<=)"                    -> relations.Lte,
-      "(>)"                     -> relations.Gt,
-      "(>=)"                    -> relations.Gte,
       "BETWEEN"                 -> relations.Between,
-      "(??)"                    -> relations.IfUndefined,
-      "(AND)"                   -> relations.And,
-      "(OR)"                    -> relations.Or,
-      "NOT"                     -> relations.Not,
-      "(IF_THEN_ELSE)"          -> relations.Cond,
-      "(LIMIT)"                 -> set.Take,
-      "(OFFSET)"                -> set.Drop,
-      "(..)"                    -> set.Range,
       "ORDER BY"                -> set.OrderBy,
       "WHERE"                   -> set.Filter,
       "INNER JOIN"              -> set.InnerJoin,
@@ -253,16 +230,11 @@ trait Compiler[F[_]] {
       "RIGHT OUTER JOIN"        -> set.RightOuterJoin,
       "FULL OUTER JOIN"         -> set.FullOuterJoin,
       "GROUP BY"                -> set.GroupBy,
-      "DISTINCT"                -> set.Distinct,
       "DISTINCT BY"             -> set.DistinctBy,
-      "(UNION ALL)"             -> set.Union,
-      "(INTERSECT ALL)"         -> set.Intersect,
-      "(EXCEPT)"                -> set.Except,
-      "(in)"                    -> set.In,
       "within"                  -> set.Within,
       "CONSTANTLY"              -> set.Constantly,
       "concat"                  -> string.Concat,
-      "(like)"                  -> string.Like,
+      "like"                    -> string.Like,
       "search"                  -> string.Search,
       "length"                  -> string.Length,
       "lower"                   -> string.Lower,
@@ -277,51 +249,11 @@ trait Compiler[F[_]] {
       "MAKE_ARRAY"              -> structural.MakeArray,
       "OBJECT_CONCAT"           -> structural.ObjectConcat,
       "ARRAY_CONCAT"            -> structural.ArrayConcat,
-      "(||)"                    -> structural.ConcatOp,
-      "({})"                    -> structural.ObjectProject,
-      "([])"                    -> structural.ArrayProject,
       "DELETE_FIELD"            -> structural.DeleteField,
       "FLATTEN_MAP"             -> structural.FlattenMap,
       "FLATTEN_ARRAY"           -> structural.FlattenArray,
-      "{*:}"                    -> structural.FlattenMapKeys,
-      "[*:]"                    -> structural.FlattenArrayIndices,
       "SHIFT_MAP"               -> structural.ShiftMap,
-      "SHIFT_ARRAY"             -> structural.ShiftArray,
-      "{_:}"                    -> structural.ShiftMapKeys,
-      "[_:]"                    -> structural.ShiftArrayIndices,
-      "({...})"                 -> structural.UnshiftMap,
-      "[...]"                   -> structural.UnshiftArray)
-
-    def findUnaryFunction(name: String): CompilerM[GenericFunc[nat._1]] =
-      functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
-        fail(FunctionNotFound(name)))(
-        _._2 match {
-          case func @ UnaryFunc(_, _, _, _, _, _, _) => emit(func)
-          case func => fail(WrongArgumentCount(name, func.arity, 1))
-        })
-
-    def findBinaryFunction(name: String): CompilerM[GenericFunc[nat._2]] =
-      functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
-        fail(FunctionNotFound(name)))(
-        _._2 match {
-          case func @ BinaryFunc(_, _, _, _, _, _, _) => emit(func)
-          case func => fail(WrongArgumentCount(name, func.arity, 2))
-        })
-
-    def findTernaryFunction(name: String): CompilerM[GenericFunc[nat._3]] =
-      functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
-        fail(FunctionNotFound(name)))(
-        _._2 match {
-          case func @ TernaryFunc(_, _, _, _, _, _, _) => emit(func)
-          case func => fail(WrongArgumentCount(name, func.arity, 3))
-        })
-
-    def findNaryFunction(name: String, length: Int): CompilerM[Fix[LP]] =
-      functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
-        fail(FunctionNotFound(name)))(
-        _._2 match {
-          case func => fail(WrongArgumentCount(name, func.arity, length))
-        })
+      "SHIFT_ARRAY"             -> structural.ShiftArray)
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LP])(f: Case[CoExpr] => CompilerM[(Fix[LP], Fix[LP])]) =
       cases.traverse(f).map(_.foldRight(default) {
@@ -332,7 +264,7 @@ trait Compiler[F[_]] {
         Fix[LP] = relations match {
       case _: NamedRelation[_]             => term
       case JoinRelation(left, right, _, _) =>
-        Fix(ObjectConcat(
+        Fix(structural.ObjectConcat(
           flattenJoins(Left.projectFrom(term), left),
           flattenJoins(Right.projectFrom(term), right)))
     }
@@ -409,11 +341,11 @@ trait Compiler[F[_]] {
         Fix[LP] = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(MakeObject(LP.Constant(Data.Str(name)), value))
+          Fix(structural.MakeObject(LP.Constant(Data.Str(name)), value))
         case (None, value) => value
       }
 
-      fields.reduceOption((a,b) => Fix(ObjectConcat(a, b)))
+      fields.reduceOption((a,b) => Fix(structural.ObjectConcat(a, b)))
         .getOrElse(LP.Constant(Data.Obj()))
     }
 
@@ -445,10 +377,10 @@ trait Compiler[F[_]] {
                 compile0(clause).map(c =>
                   LP.Invoke(
                     tpe match {
-                      case LeftJoin             => LeftOuterJoin
-                      case quasar.sql.InnerJoin => InnerJoin
-                      case RightJoin            => RightOuterJoin
-                      case FullJoin             => FullOuterJoin
+                      case LeftJoin             => set.LeftOuterJoin
+                      case quasar.sql.InnerJoin => set.InnerJoin
+                      case RightJoin            => set.RightOuterJoin
+                      case FullJoin             => set.FullOuterJoin
                     },
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
               LP.Let(leftName, left0,
@@ -497,19 +429,19 @@ trait Compiler[F[_]] {
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
-                    (CompilerState.rootTableReq ⊛ compile0(filter)) ((set, filt) =>
-                      Fix(Filter(set, filt))))
+                    (CompilerState.rootTableReq ⊛ compile0(filter))(
+                      set.Filter(_, _).embed))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
                       (CompilerState.rootTableReq ⊛
                         groupBy.keys.traverse(compile0)) ((src, keys) =>
-                        Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
+                        Fix(set.GroupBy(src, Fix(structural.MakeArrayN(keys: _*))))))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
-                        (CompilerState.rootTableReq ⊛ compile0(having)) ((set, filt) =>
-                          Fix(Filter(set, filt))))
+                        (CompilerState.rootTableReq ⊛ compile0(having))(
+                          set.Filter(_, _).embed))
 
                       stepBuilder(having) {
                         val squashed = select.map(set => Fix(Squash(set)))
@@ -518,19 +450,19 @@ trait Compiler[F[_]] {
                           val sort = orderBy.map(orderBy =>
                             (CompilerState.rootTableReq ⊛
                               CompilerState.addFields(names.foldMap(_.toList))(orderBy.keys.traverse { case (_, key) => compile0(key) }))((t, keys) =>
-                              Fix(OrderBy(
+                              Fix(set.OrderBy(
                                 t,
-                                Fix(MakeArrayN(keys: _*)),
-                                Fix(MakeArrayN(orderBy.keys.map { case (order, _) => LP.Constant(Data.Str(order.shows)) }: _*))))))
+                                Fix(structural.MakeArrayN(keys: _*)),
+                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => LP.Constant(Data.Str(order.shows)) }: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
                               case SelectDistinct =>
                                 CompilerState.rootTableReq.map(t =>
                                   if (syntheticNames.nonEmpty)
-                                    Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(DeleteField(acc, LP.Constant(Data.Str(field)))))))
-                                  else Fix(Distinct(t))).some
+                                    Fix(set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
+                                      Fix(structural.DeleteField(acc, LP.Constant(Data.Str(field)))))))
+                                  else Fix(set.Distinct(t))).some
                               case _ => None
                             }
 
@@ -538,7 +470,7 @@ trait Compiler[F[_]] {
                               val pruned =
                                 CompilerState.rootTableReq.map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
-                                    Fix(DeleteField(acc,
+                                    Fix(structural.DeleteField(acc,
                                       LP.Constant(Data.Str(field))))))
 
                               pruned
@@ -559,14 +491,14 @@ trait Compiler[F[_]] {
 
       case SetLiteral(values0) =>
         values0.traverse(compile0).map(vs =>
-          ShiftArray(MakeArrayN(vs: _*).embed).embed)
+          structural.ShiftArray(structural.MakeArrayN(vs: _*).embed).embed)
 
       case ArrayLiteral(exprs) =>
-        exprs.traverse(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
+        exprs.traverse(compile0).map(elems => Fix(structural.MakeArrayN(elems: _*)))
 
       case MapLiteral(exprs) =>
         exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>
-          Fix(MakeObjectN(elems: _*)))
+          Fix(structural.MakeObjectN(elems: _*)))
 
       case Splice(expr) =>
         expr.fold(
@@ -574,23 +506,72 @@ trait Compiler[F[_]] {
           compile0)
 
       case Binop(left, right, op) =>
-        findBinaryFunction(op.name).flatMap(compileFunction[nat._2](_, Func.Input2(left, right)))
+        ((op match {
+          case IfUndefined   => relations.IfUndefined.left
+          case Range         => set.Range.left
+          case Or            => relations.Or.left
+          case And           => relations.And.left
+          case Eq            => relations.Eq.left
+          case Neq           => relations.Neq.left
+          case Ge            => relations.Gte.left
+          case Gt            => relations.Gt.left
+          case Le            => relations.Lte.left
+          case Lt            => relations.Lt.left
+          case Concat        => structural.ConcatOp.left
+          case Plus          => math.Add.left
+          case Minus         => math.Subtract.left
+          case Mult          => math.Multiply.left
+          case Div           => math.Divide.left
+          case Mod           => math.Modulo.left
+          case Pow           => math.Power.left
+          case In            => set.In.left
+          case FieldDeref    => structural.ObjectProject.left
+          case IndexDeref    => structural.ArrayProject.left
+          case Limit         => set.Take.left
+          case Offset        => set.Drop.left
+          case UnshiftMap    => structural.UnshiftMap.left
+          case Except        => set.Except.left
+          case UnionAll      => set.Union.left
+          case IntersectAll  => set.Intersect.left
+          // TODO: These two cases are eliminated by `normalizeƒ` and would be
+          //       better represented in a Coproduct.
+          case f @ Union     => fail(FunctionNotFound(f.name)).right
+          case f @ Intersect => fail(FunctionNotFound(f.name)).right
+        }): GenericFunc[nat._2] \/ CompilerM[Fix[LP]])
+          .valueOr(compileFunction[nat._2](_, Func.Input2(left, right)))
 
       case Unop(expr, op) =>
-        findUnaryFunction(op.name).flatMap(compileFunction[nat._1](_, Func.Input1(expr)))
+        ((op match {
+          case Not                 => relations.Not.left
+          case f @ Exists          => fail(FunctionNotFound(f.name)).right
+          // TODO: NOP, but should we ensure we have a Num or Interval here?
+          case Positive            => compile0(expr).right
+          case Negative            => math.Negate.left
+          case Distinct            => set.Distinct.left
+          case FlattenMapKeys      => structural.FlattenMapKeys.left
+          case FlattenMapValues    => structural.FlattenMap.left
+          case ShiftMapKeys        => structural.ShiftMapKeys.left
+          case ShiftMapValues      => structural.ShiftMap.left
+          case FlattenArrayIndices => structural.FlattenArrayIndices.left
+          case FlattenArrayValues  => structural.FlattenArray.left
+          case ShiftArrayIndices   => structural.ShiftArrayIndices.left
+          case ShiftArrayValues    => structural.ShiftArray.left
+          case UnshiftArray        => structural.UnshiftArray.left
+        }): GenericFunc[nat._1] \/ CompilerM[Fix[LP]])
+          .valueOr(compileFunction[nat._1](_, Func.Input1(expr)))
 
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
-              Fix(ObjectProject(obj, LP.Constant(Data.Str(name)))))
+              Fix(structural.ObjectProject(obj, LP.Constant(Data.Str(name)))))
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq(rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(ObjectProject(table, LP.Constant(Data.Str(name)))))
+              else Fix(structural.ObjectProject(table, LP.Constant(Data.Str(name)))))
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
@@ -626,7 +607,13 @@ trait Compiler[F[_]] {
         }
 
       case InvokeFunction(name, List(a1)) =>
-        findUnaryFunction(name).flatMap(compileFunction[nat._1](_, Func.Input1(a1)))
+        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name)))(
+          _._2 match {
+            case func @ UnaryFunc(_, _, _, _, _, _, _) =>
+              compileFunction[nat._1](func, Func.Input1(a1))
+            case func => fail(WrongArgumentCount(name, func.arity, 1))
+          })
 
       case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
@@ -637,14 +624,29 @@ trait Compiler[F[_]] {
               relations.Eq(LP.Free(name), LP.Constant(Data.Null)).embed,
               c2,
               LP.Free(name)).embed)),
-          findBinaryFunction(name) >>=
-            (compileFunction[nat._2](_, Func.Input2(a1, a2))))
+          functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
+            fail(FunctionNotFound(name)))(
+            _._2 match {
+              case func @ BinaryFunc(_, _, _, _, _, _, _) =>
+                compileFunction[nat._2](func, Func.Input2(a1, a2))
+              case func => fail(WrongArgumentCount(name, func.arity, 2))
+            }))
 
       case InvokeFunction(name, List(a1, a2, a3)) =>
-        findTernaryFunction(name) >>=
-          (compileFunction[nat._3](_, Func.Input3(a1, a2, a3)))
+        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name)))(
+          _._2 match {
+            case func @ TernaryFunc(_, _, _, _, _, _, _) =>
+              compileFunction[nat._3](func, Func.Input3(a1, a2, a3))
+            case func => fail(WrongArgumentCount(name, func.arity, 3))
+          })
 
-      case InvokeFunction(name, args) => findNaryFunction(name, args.length)
+      case InvokeFunction(name, args) =>
+        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name)))(
+          _._2 match {
+            case func => fail(WrongArgumentCount(name, func.arity, args.length))
+          })
 
       case Match(expr, cases, default0) =>
         for {

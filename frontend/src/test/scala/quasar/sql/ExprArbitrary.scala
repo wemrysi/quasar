@@ -125,7 +125,7 @@ trait ExprArbitrary {
       2 -> (Gen.oneOf("sum", "count", "avg", "length", "make_array") ⊛ exprGen(depth))(
         (fn, arg) => InvokeFunctionR(fn, List(arg))),
       1 -> exprGen(depth) ∘
-        (arg => InvokeFunctionR("(like)", List(arg, StringLiteralR("B%"), StringLiteralR("")))),
+        (arg => InvokeFunctionR("like", List(arg, StringLiteralR("B%"), StringLiteralR("")))),
       1 -> (exprGen(depth) ⊛ casesGen(depth) ⊛ Gen.option(exprGen(depth)))(
         MatchR(_, _, _)),
       1 -> (casesGen(depth) ⊛ Gen.option(exprGen(depth)))(SwitchR(_, _))
