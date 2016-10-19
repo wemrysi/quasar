@@ -1,0 +1,1 @@
+- Couchbase: Utilize Failure effect in FileSystemDef interpreter

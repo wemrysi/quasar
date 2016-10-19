@@ -45,15 +45,7 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  // TODO: Move away from Task failures
-
-  def clusterManager(cluster: CouchbaseCluster, username: String, password: String): Task[Context] =
-    Task.delay(
-      Option(cluster.clusterManager(username, password)).cata(
-        Task.now(_),
-        Task.fail(new RuntimeException(
-          "Unable to obtain a ClusterManager with provided credentials.")))
-    ).join.map(Context(cluster, _))
+  def physErr(msg: String): PhysicalError = unhandledFSError(new RuntimeException(msg))
 
   def interp[S[_]](
       connectionUri: ConnectionUri
@@ -62,38 +54,51 @@ package object fs {
       failure: Failure.Ops[PhysicalError, S]
     ): Free[S, (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
-    val clusterMngr =
+    val cbCtx: EitherT[Task, PhysicalError, Context] =
       for {
-        uri     <- Task.fromDisjunction(Uri.fromString(connectionUri.value))
-        cluster =  CouchbaseCluster.fromConnectionString(uri.renderString)
-        user    <- Task.fromMaybe(uri.params.get("username").toMaybe)(
-                     new RuntimeException("No username in ConnectionUri"))
-        pass    <- Task.fromMaybe(uri.params.get("password").toMaybe)(
-                     new RuntimeException("No password in ConnectionUri"))
-        manager <- clusterManager(cluster, user, pass)
-      } yield (cluster, manager)
+        uri     <- EitherT.fromDisjunction[Task](
+                     Uri.fromString(connectionUri.value).leftMap(e => physErr(e.message))
+                   )
+        cluster <- EitherT(Task.delay(
+                     CouchbaseCluster.fromConnectionString(uri.renderString).right
+                   ).handle { case e: Exception => unhandledFSError(e).left })
+        user    <- EitherT.fromDisjunction[Task](
+                     uri.params.get("username") \/> physErr("No username in ConnectionUri")
+                   )
+        pass    <- EitherT.fromDisjunction[Task](
+                     uri.params.get("password") \/> physErr("No password in ConnectionUri")
+                   )
+        ctx     <- EitherT(Task.delay(
+                     Option(cluster.clusterManager(user, pass)) \/>
+                       physErr("Unable to obtain a ClusterManager with provided credentials.")
+                   )).map(Context(cluster, _))
+      } yield ctx
 
-    def taskInterp: Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
-      (clusterMngr                                       |@|
-       TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
+    def taskInterp(
+      ctx: Context
+    ): Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
+      (TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
        TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
        TaskRef(Map.empty[ResultHandle, Cursor])          |@|
        TaskRef(0L)                                       |@|
        GenUUID.type1
-     )((cm, kvR, kvW, kvQ, i, genUUID) =>
+     )((kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
           reflNT[Task]                          :+:
-          Read.constant[Task, Context](cm._2)   :+:
+          Read.constant[Task, Context](ctx)     :+:
           MonotonicSeq.fromTaskRef(i)           :+:
           genUUID                               :+:
           KeyValueStore.impl.fromTaskRef(kvR)   :+:
           KeyValueStore.impl.fromTaskRef(kvW)   :+:
           KeyValueStore.impl.fromTaskRef(kvQ))),
-        lift(Task.delay(cm._1.disconnect()).void).into
+        lift(Task.delay(ctx.cluster.disconnect()).void).into
       ))
 
-    lift(taskInterp).into
+    lift(cbCtx.run).into >>= (_.fold(
+      failure.fail,
+      ctx => lift(taskInterp(ctx)).into
+    ))
   }
 
   def definition[S[_]](implicit
