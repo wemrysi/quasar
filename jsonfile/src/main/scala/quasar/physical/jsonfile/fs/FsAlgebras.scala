@@ -36,21 +36,44 @@ class FsAlgebras[S[_]] extends STypes[S] {
   def emptyData(): Chunks                  = Vector()
   def ignoreRes[A](x: FS[A]): FS[LR[Unit]] = x map (_ => ().right)
 
+  def filesInDir(dir: ADir)(implicit KVF: KVFile[S]): FS[Vector[AFile]] =
+    KVF.keys map (_ filter (f => parentDir(f) === Some(dir)))
+
   def existsError[A](path: APath): FLR[A]         = point(-\/(pathErr(pathExists(path))))
   def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
   def nextLong(implicit MS: MonotonicSeq :<: S)   = MonotonicSeq.Ops[S].next
 
-  def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]    = ()
-  def deleteDir(x: ADir)(implicit KVF: KVFile[S]): FLR[Unit]                = ()
-  def deleteFile(x: AFile)(implicit KVF: KVFile[S]): FLR[Unit]              = KVF delete x map (_ fold (().right, unknownPath(x).left))
+  def deleteDir(x: ADir)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(x) flatMap {
+    case Seq() => unknownPath(x)
+    case fs    => ignoreRes(fs traverse (KVF delete _))
+  }
+  def deleteFile(x: AFile)(implicit KVF: KVFile[S]): FLR[Unit] = KVF delete x map (_ fold (().right, unknownPath(x).left))
 
   def newWHandle(file: AFile)(implicit MS: MonotonicSeq :<: S): FS[WHandle] = nextLong map (uid => WHandle(file, uid))
 
-  def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics)(implicit KVF: KVFile[S]): FLR[Unit] = semantics match {
-    case Overwrite     => KVF.move(src, dst) map (_ fold (().right, unknownPath(src).left))
-    case FailIfExists  => KVF contains dst flatMap (_ fold (existsError(dst), ignoreRes(KVF.move(src, dst))))
-    case FailIfMissing => KVF contains dst flatMap (_ fold (ignoreRes(KVF.move(src, dst)), unknownPath(dst)))
+  def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(src) flatMap {
+    case Seq() => unknownPath(src)
+    case fs    =>
+      def move0 = ignoreRes(fs traverse (f => KVF.move(f, dst </> file1(fileName(f)))))
+      semantics match {
+        case Overwrite     => move0
+        case FailIfExists  => filesInDir(dst) flatMap (xs => xs.nonEmpty.fold(pathErr(pathExists(dst)), move0))
+        case FailIfMissing => filesInDir(dst) flatMap (xs => xs.isEmpty.fold(unknownPath(dst), move0))
+      }
   }
+
+  def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics)(implicit KVF: KVFile[S]): FLR[Unit] = {
+    KVF contains src flatMap {
+      case false => unknownPath(src)
+      case _     =>
+        KVF contains dst flatMap {
+          case true if semantics == FailIfExists   => pathErr(pathExists(dst))
+          case false if semantics == FailIfMissing => unknownPath(dst)
+          case _                                   => ignoreRes(KVF.move(src, dst))
+        }
+    }
+  }
+
   def openForRead(file: AFile, offset: Int, limit: Int)(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): FLR[RHandle] = {
     KVF get file flatMap {
       case Some(data) => nextLong flatMap (uid => RHandle(file, uid) |> (h => KVR.put(h, ReadPos(data, offset, limit)) map (_ => h.right)))
