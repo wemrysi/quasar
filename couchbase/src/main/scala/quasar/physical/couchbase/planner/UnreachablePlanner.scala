@@ -18,11 +18,12 @@ package quasar.physical.couchbase.planner
 
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._
-import quasar.qscript, qscript._
+import quasar.Planner.InternalError
 
 import matryoshka._
-import scalaz._
+import scalaz._, Scalaz._
 
-final class ConstDeadEndPlanner[F[_]: Monad] extends Planner[F, Const[DeadEnd, ?]] {
-  def plan: AlgebraM[M, Const[DeadEnd, ?], N1QL] = κ(unreachable)
+final class UnreachablePlanner[F[_]: Applicative, QS[_]] extends Planner[F, QS] {
+  def plan: AlgebraM[M, QS, N1QL] =
+    κ(EitherT.fromDisjunction(InternalError("unreachable").left))
 }

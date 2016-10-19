@@ -18,16 +18,12 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.{NameGenerator, PlannerErrT, PhaseResults, PhaseResultT}
-import quasar.Planner.InternalError
 
-import scalaz._, Scalaz._
+import scalaz._
 
 package object planner {
 
   type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
-
-  def unreachable[F[_]: Applicative]: CBPhaseLog[F, N1QL] =
-    EitherT.fromDisjunction(InternalError("unreachable").left)
 
   def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
     MonadTell[F, PhaseResults].tell(pr)

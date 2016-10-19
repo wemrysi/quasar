@@ -29,6 +29,13 @@ import quasar.qscript, qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
+// Join document by field that is not a primary key?
+// ╰─ http://stackoverflow.com/a/39264955/343274
+// ╰─ https://forums.couchbase.com/t/n1ql-joins-on-document-fields/8418/3
+
+// When falling back to Map/Reduce can quickly arrive at "error (reduction too large)"
+// ╰─ https://github.com/couchbase/couchstore/search?utf8=%E2%9C%93&q=MAX_REDUCTION_SIZE
+
 final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
   extends Planner[F, EquiJoin[T, ?]] {
 
