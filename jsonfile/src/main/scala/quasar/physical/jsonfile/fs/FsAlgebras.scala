@@ -72,9 +72,10 @@ class FsAlgebras[S[_]] extends STypes[S] {
     case Seq() => unknownPath(x)
     case fs    => ignoreRes(fs traverse (KVF delete _))
   }
-  def deleteFile(x: AFile)(implicit KVF: KVFile[S]): FLR[Unit] = KVF delete x map (_ fold (().right, unknownPath(x).left))
-
-  def newWHandle(file: AFile)(implicit MS: MonotonicSeq :<: S): FS[WHandle] = nextLong map (uid => WHandle(file, uid))
+  def deleteFile(x: AFile)(implicit KVF: KVFile[S]): FLR[Unit] = KVF contains x flatMap {
+    case false => unknownPath(x)
+    case true  => ignoreRes(KVF.delete(x))
+  }
 
   def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(src) flatMap {
     case Seq() => unknownPath(src)
@@ -99,12 +100,6 @@ class FsAlgebras[S[_]] extends STypes[S] {
     }
   }
 
-  def openForRead(file: AFile, offset: Int, limit: Int)(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): FLR[RHandle] = {
-    KVF get file flatMap {
-      case Some(data) => nextLong flatMap (uid => RHandle(file, uid) |> (h => KVR.put(h, ReadPos(data, offset, limit)) map (_ => h.right)))
-      case _          => point(unknownPath(file).left)
-    }
-  }
   def createTempFile(near: APath, uid: Long)(implicit KVF: KVFile[S]): FS[LR[AFile]] = {
     val name  = file(tmpName(uid))
     val rfile = refineType(near).fold(_ </> name, f => fileParent(f) </> name)
@@ -165,11 +160,22 @@ class FsAlgebras[S[_]] extends STypes[S] {
           } yield ()
       })
   }
-  def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = λ[ReadFile ~> FS] {
-    case ReadFile.Open(file, offset, None)        => openForRead(file, offset.get.toInt, defaultChunkSize)
-    case ReadFile.Open(file, offset, Some(limit)) => openForRead(file, offset.get.toInt, limit.get.toInt)
-    case ReadFile.Read(fh)                        => read(fh)
-    case ReadFile.Close(fh)                       => for (_ <- KVR delete fh) yield ()
+  def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = {
+    def openForRead(file: AFile, offset: Int, limit: Option[Int]): FLR[RHandle] = KVF get file flatMap {
+      case None       => unknownPath(file)
+      case Some(data) =>
+        for {
+          uid <- nextLong
+          h = RHandle(file, uid)
+          _ <- KVR.put(h, ReadPos(data, offset, limit getOrElse data.length))
+        } yield h
+    }
+
+    λ[ReadFile ~> FS] {
+      case ReadFile.Open(file, offset, limit) => openForRead(file, offset.get.toInt, limit map (_.get.toInt))
+      case ReadFile.Read(fh)                  => read(fh)
+      case ReadFile.Close(fh)                 => for (_ <- KVR delete fh) yield ()
+    }
   }
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
     case QueryFile.ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
