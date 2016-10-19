@@ -36,6 +36,8 @@ class FsAlgebras[S[_]] extends STypes[S] {
 
   def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]    = ()
   def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit] = ()
+  def deleteDir(x: ADir)(implicit KVF: KVFile[S]): FLR[Unit]                = ()
+  def deleteFile(x: AFile)(implicit KVF: KVFile[S]): FLR[Unit]              = KVF delete x map (_ fold (().right, unknownPath(x).left))
 
   def createFile[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]): Free[S, WHandle] = {
     val wh = WHandle(file, uid)
@@ -54,18 +56,18 @@ class FsAlgebras[S[_]] extends STypes[S] {
 
   def manageFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]) = λ[ManageFile ~> FS] {
     case ManageFile.Move(scenario, semantics) => scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
-    case ManageFile.Delete(path)              => refineType(path).fold(_ => Unimplemented, KVF delete _ map (_ => ().right))
+    case ManageFile.Delete(path)              => refineType(path).fold(deleteDir, deleteFile)
     case ManageFile.TempFile(path)            => nextLong flatMap (uid => createTempFile(path, uid))
   }
   def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
     case WriteFile.Open(file)        => nextLong flatMap (uid => create[S](file, uid) map (wh => wh.right))
     case WriteFile.Write(fh, chunks) => KVW get fh fold (wv => write(wv, chunks), Vector(unknownWriteHandle(fh)))
-    case WriteFile.Close(fh)         => KVW delete fh
+    case WriteFile.Close(fh)         => for (_ <- KVW delete fh) yield ()
   }
   def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = λ[ReadFile ~> FS] {
     case ReadFile.Open(file, offset, limit) => nextLong map (uid => RHandle(file, uid).right)
     case ReadFile.Read(fh)                  => KVR get fh fold (rv => read(rv), unknownReadHandle(fh).left)
-    case ReadFile.Close(fh)                 => KVR delete fh
+    case ReadFile.Close(fh)                 => for (_ <- KVR delete fh) yield ()
   }
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
     case QueryFile.ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
@@ -73,7 +75,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
     case QueryFile.Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
     case QueryFile.More(rh)             => Vector()
     case QueryFile.ListContents(dir)    => KVF.keys map (_ flatMap pathName) map (xs => makeDirList(xs: _*).right)
-    case QueryFile.Close(fh)            => KVQ delete fh
+    case QueryFile.Close(fh)            => for (_ <- KVQ delete fh) yield ()
     case QueryFile.FileExists(file)     => KVF contains file
   }
 }

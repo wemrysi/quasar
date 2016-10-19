@@ -76,7 +76,7 @@ package object fs extends fs.FilesystemEffect {
 
     def keys: FS[Vector[K]]             = Ops.keys
     def contains(key: K): FS[Boolean]   = Ops contains key
-    def delete(key: K): FS[Unit]        = Ops delete key
+    def delete(key: K): FS[Boolean]     = for (exists <- contains(key) ; _ <- Ops delete key) yield exists
     def put(key: K, value: V): FS[Unit] = Ops.put(key, value)
     def get(key: K): OptionT[FS, V]     = Ops get key
   }
