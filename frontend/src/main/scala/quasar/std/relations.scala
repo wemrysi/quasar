@@ -27,7 +27,6 @@ import shapeless._
 trait RelationsLib extends Library {
   val Eq = BinaryFunc(
     Mapping,
-    "(=)",
     "Determines if two values are equal",
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
@@ -46,7 +45,6 @@ trait RelationsLib extends Library {
 
   val Neq = BinaryFunc(
     Mapping,
-    "(<>)",
     "Determines if two values are not equal",
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
@@ -65,7 +63,6 @@ trait RelationsLib extends Library {
 
   val Lt = BinaryFunc(
     Mapping,
-    "(<)",
     "Determines if one value is less than another value of the same type",
     Type.Bool,
     Func.Input2(Type.Comparable, Type.Comparable),
@@ -82,7 +79,6 @@ trait RelationsLib extends Library {
 
   val Lte = BinaryFunc(
     Mapping,
-    "(<=)",
     "Determines if one value is less than or equal to another value of the same type",
     Type.Bool,
     Func.Input2(Type.Comparable, Type.Comparable),
@@ -99,7 +95,6 @@ trait RelationsLib extends Library {
 
   val Gt = BinaryFunc(
     Mapping,
-    "(>)",
     "Determines if one value is greater than another value of the same type",
     Type.Bool,
     Func.Input2(Type.Comparable, Type.Comparable),
@@ -116,7 +111,6 @@ trait RelationsLib extends Library {
 
   val Gte = BinaryFunc(
     Mapping,
-    "(>=)",
     "Determines if one value is greater than or equal to another value of the same type",
     Type.Bool,
     Func.Input2(Type.Comparable, Type.Comparable),
@@ -133,7 +127,6 @@ trait RelationsLib extends Library {
 
   val Between = TernaryFunc(
     Mapping,
-    "(BETWEEN)",
     "Determines if a value is between two other values of the same type, inclusive",
     Type.Bool,
     Func.Input3(Type.Comparable, Type.Comparable, Type.Comparable),
@@ -147,7 +140,6 @@ trait RelationsLib extends Library {
 
   val IfUndefined = BinaryFunc(
     Mapping,
-    "(??)",
     "This is the only way to recognize an undefined value. If the first argument is undefined, return the second argument, otherwise, return the first.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -160,7 +152,6 @@ trait RelationsLib extends Library {
 
   val And = BinaryFunc(
     Mapping,
-    "(AND)",
     "Performs a logical AND of two boolean values",
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
@@ -184,7 +175,6 @@ trait RelationsLib extends Library {
 
   val Or = BinaryFunc(
     Mapping,
-    "(OR)",
     "Performs a logical OR of two boolean values",
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
@@ -208,7 +198,6 @@ trait RelationsLib extends Library {
 
   val Not = UnaryFunc(
     Mapping,
-    "NOT",
     "Performs a logical negation of a boolean value",
     Type.Bool,
     Func.Input1(Type.Bool),
@@ -221,7 +210,6 @@ trait RelationsLib extends Library {
 
   val Cond = TernaryFunc(
     Mapping,
-    "(IF_THEN_ELSE)",
     "Chooses between one of two cases based on the value of a boolean expression",
     Type.Bottom,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
@@ -230,7 +218,7 @@ trait RelationsLib extends Library {
         orig match {
           case InvokeF(_, Sized(Embed(ConstantF(Data.True)),  Embed(c), _)) => c.some
           case InvokeF(_, Sized(Embed(ConstantF(Data.False)), _, Embed(a))) => a.some
-          case _                                                           => None
+          case _                                                            => None
         }
     },
     partialTyper[nat._3] {

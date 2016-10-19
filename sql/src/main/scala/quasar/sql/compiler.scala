@@ -222,7 +222,6 @@ trait Compiler[F[_]] {
       "interval"                -> date.Interval,
       "time_of_day"             -> date.TimeOfDay,
       "to_timestamp"            -> date.ToTimestamp,
-      "date"                    -> date.Date,
       "SQUASH"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
       "(+)"                     -> math.Add,
@@ -238,7 +237,7 @@ trait Compiler[F[_]] {
       "(<=)"                    -> relations.Lte,
       "(>)"                     -> relations.Gt,
       "(>=)"                    -> relations.Gte,
-      "(BETWEEN)"               -> relations.Between,
+      "BETWEEN"                 -> relations.Between,
       "(??)"                    -> relations.IfUndefined,
       "(AND)"                   -> relations.And,
       "(OR)"                    -> relations.Or,
@@ -297,7 +296,7 @@ trait Compiler[F[_]] {
       functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._1]]](
         fail(FunctionNotFound(name)))(
         _._2 match {
-          case func @ UnaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func @ UnaryFunc(_, _, _, _, _, _, _) => emit(func)
           case func => fail(WrongArgumentCount(name, func.arity, 1))
         })
 
@@ -305,7 +304,7 @@ trait Compiler[F[_]] {
       functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._2]]](
         fail(FunctionNotFound(name)))(
         _._2 match {
-          case func @ BinaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func @ BinaryFunc(_, _, _, _, _, _, _) => emit(func)
           case func => fail(WrongArgumentCount(name, func.arity, 2))
         })
 
@@ -313,7 +312,7 @@ trait Compiler[F[_]] {
       functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[GenericFunc[nat._3]]](
         fail(FunctionNotFound(name)))(
         _._2 match {
-          case func @ TernaryFunc(_, _, _, _, _, _, _, _) => emit(func)
+          case func @ TernaryFunc(_, _, _, _, _, _, _) => emit(func)
           case func => fail(WrongArgumentCount(name, func.arity, 3))
         })
 
@@ -724,7 +723,7 @@ object Compiler {
       def strip(v: Cofree[LP, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
           InvokeF[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
 
         case _ =>

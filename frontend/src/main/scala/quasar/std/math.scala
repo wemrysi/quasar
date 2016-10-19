@@ -88,7 +88,6 @@ trait MathLib extends Library {
     */
   val Add = BinaryFunc(
     Mapping,
-    "(+)",
     "Adds two numeric or temporal values",
     MathAbs,
     Func.Input2(MathAbs, MathRel),
@@ -123,7 +122,6 @@ trait MathLib extends Library {
    */
   val Multiply = BinaryFunc(
     Mapping,
-    "(*)",
     "Multiplies two numeric values or one interval and one numeric value",
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
@@ -151,7 +149,6 @@ trait MathLib extends Library {
 
   val Power = BinaryFunc(
     Mapping,
-    "(^)",
     "Raises the first argument to the power of the second",
     Type.Numeric,
     Func.Input2(Type.Numeric, Type.Numeric),
@@ -177,7 +174,6 @@ trait MathLib extends Library {
     */
   val Subtract = BinaryFunc(
     Mapping,
-    "(-)",
     "Subtracts two numeric or temporal values",
     MathAbs,
     Func.Input2(MathAbs, MathAbs),
@@ -217,7 +213,6 @@ trait MathLib extends Library {
    */
   val Divide = BinaryFunc(
     Mapping,
-    "(/)",
     "Divides one numeric or interval value by another (non-zero) numeric value",
     MathRel,
     Func.Input2(MathAbs, MathRel),
@@ -253,7 +248,6 @@ trait MathLib extends Library {
    */
   val Negate = UnaryFunc(
     Mapping,
-    "-",
     "Reverses the sign of a numeric or interval value",
     MathRel,
     Func.Input1(MathRel),
@@ -272,7 +266,6 @@ trait MathLib extends Library {
 
   val Modulo = BinaryFunc(
     Mapping,
-    "(%)",
     "Finds the remainder of one number divided by another",
     MathRel,
     Func.Input2(MathRel, Type.Numeric),

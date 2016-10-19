@@ -27,7 +27,6 @@ trait IdentityLib extends Library {
 
   val Squash = UnaryFunc(
     Squashing,
-    "SQUASH",
     "Squashes all dimensional information",
     Top,
     Func.Input1(Top),
@@ -37,7 +36,6 @@ trait IdentityLib extends Library {
 
   val ToId = UnaryFunc(
     Mapping,
-    "oid",
     "Converts a string to a (backend-specific) object identifier.",
     Type.Id,
     Func.Input1(Type.Str),

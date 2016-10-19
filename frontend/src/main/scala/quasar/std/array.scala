@@ -24,7 +24,6 @@ import shapeless._
 trait ArrayLib extends Library {
   val ArrayLength = BinaryFunc(
     Mapping,
-    "array_length",
     "Gets the length of a given dimension of an array.",
     Type.Int,
     Func.Input2(Type.AnyArray, Type.Int),

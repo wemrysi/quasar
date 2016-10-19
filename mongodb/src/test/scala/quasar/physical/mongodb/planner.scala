@@ -328,8 +328,6 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $project(
            reshape("0" ->
-             // TODO: Would be nice to identify this pattern and use $ifNull,
-             //       since MongoDB has it.
              $cond(
                $eq($field("bar"), $literal(Bson.Null)),
                $field("baz"),
@@ -3675,7 +3673,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR(StdLib.string.Search.name, List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
+    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
