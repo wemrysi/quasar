@@ -30,8 +30,8 @@ import scalaz._, Scalaz.{ ToIdOps => _, _ }
 import scalaz.concurrent.Task
 import FileSystemIndependentTypes._
 
-import ygg.table._
-import ygg.json.JValue
+// import ygg.table._
+// import ygg.json.JValue
 // import matryoshka._
 // import Recursive.ops._
 
@@ -79,27 +79,14 @@ package object fs extends fs.FilesystemEffect {
     def contains(key: K): FS[Boolean]     = Ops contains key
     def delete(key: K): FS[Boolean]       = for (exists <- contains(key) ; _ <- Ops delete key) yield exists
     def put(key: K, value: V): FS[Unit]   = Ops.put(key, value)
-    def get(key: K): OptionT[FS, V]       = Ops get key
+    def get(key: K): FS[Option[V]]        = (Ops get key).run
     def move(src: K, dst: K): FS[Boolean] = for (exists <- contains(src) ; _ <- Ops.move(src, dst)) yield exists
   }
 
-  type FH = Table
-  type RH = Table
-  type WH = Long
-  type QH = JValue
-
-  def emptyFile(): FH = ColumnarTable.empty
-
-  def read[S[_]](h: RH): Vector[Data]                                  = Vector()
-  def write[S[_]](h: WH, chunk: Vector[Data]): Vector[FileSystemError] = Vector()
-
-  def create[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]): Free[S, WHandle] = {
-    val wh = WHandle(file, uid)
-    for {
-      _ <- KVF.put(file, emptyFile())
-      _ <- KVW.put(wh, 0)
-    } yield wh
-  }
+  type FH = Vector[Data]
+  type RH = ReadPos
+  type WH = Vector[Data]
+  type QH = Vector[Data]
 
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)
   implicit def showRHandle: Show[RHandle] = Show shows (r => "ReadHandle(%s, %s)".format(r.file.show, r.id))
@@ -118,6 +105,8 @@ package object fs extends fs.FilesystemEffect {
 }
 
 package fs {
+  final case class ReadPos(data: Chunks, offset: Int, limit: Int)
+
   trait STypes[S[_]] extends EitherTContextLeft[Free[S, ?], FileSystemError] {
     implicit protected val applicative: Applicative[FS] = scalaz.Free.freeMonad[S]
 
@@ -133,8 +122,6 @@ package fs {
     type RH // read handle map values
     type WH // write handle map values
     type QH // query handle map values
-
-    def emptyFile(): FH
 
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
     type KVRead[S[_]]  = KVInject[RHandle, RH, S]
