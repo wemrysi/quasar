@@ -34,7 +34,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
   private def defaultChunkSize: Int = 10
 
   def emptyData(): Chunks                  = Vector()
-  def ignoreRes[A](x: FS[A]): FS[LR[Unit]] = x map (_ => ().right)
+  def ignoreRes[A](x: FS[A]): FLR[Unit] = x map (_ => ().right)
 
   implicit class ADirOps2(dir: ADir) {
     def /(name: DirName): ADir = dir </> dir1(name)
@@ -50,6 +50,8 @@ class FsAlgebras[S[_]] extends STypes[S] {
     def name: Option[PathSegment]    = refineType(path).fold(x => dirName(x) map (_.left), x => Some(fileName(x)))
     def nameIfFile: Option[FileName] = name flatMap (_.toOption)
     def nameIfDir: Option[DirName]   = name flatMap (_.swap.toOption)
+
+    def parentOrSelf: ADir = refineType(path).fold(x => x, fileParent _)
   }
 
   def ls(dir: ADir)(implicit KVF: KVFile[S]): FLR[DirList] = KVF.keys map (fs =>
@@ -100,65 +102,51 @@ class FsAlgebras[S[_]] extends STypes[S] {
     }
   }
 
-  def createTempFile(near: APath, uid: Long)(implicit KVF: KVFile[S]): FS[LR[AFile]] = {
-    val name  = file(tmpName(uid))
-    val rfile = refineType(near).fold(_ </> name, f => fileParent(f) </> name)
-
-    KVF.put(rfile, emptyData()) map (_ => rfile)
-  }
-
-  def read(fh: RHandle)(implicit KVF: KVFile[S], KVR: KVRead[S]): FLR[Chunks] = KVR get fh flatMap {
-    case Some(ReadPos(data, offset, limit)) =>
-      val chunks = data drop offset take limit
-      val newPos = ReadPos(data, offset + chunks.length, limit - chunks.length)
-      for {
-        _ <- KVR.put(fh, newPos)
-      } yield chunks.right
-    case _ =>
-      unknownReadHandle(fh)
-  }
-  def write(fh: WHandle, chunk: Chunks)(implicit KVW: KVWrite[S]): FS[Errors] = KVW get fh flatMap {
-    case Some(WritePos(file, data, offset)) =>
-      val newPos = WritePos(file, (data take offset) ++ chunk ++ (data drop offset), offset + chunk.length)
-      for {
-        _ <- KVW.put(fh, newPos)
-      } yield Vector()
-    case _                            =>
-      Vector(unknownWriteHandle(fh))
-  }
-
   def manageFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]) = λ[ManageFile ~> FS] {
     case ManageFile.Move(DirToDir(src, dst), semantics)   => moveDir(src, dst, semantics)
-    case ManageFile.Move(FileToFile(src, dst), semantics) => moveFile(src, dst, semantics)
-    case ManageFile.Delete(path)                          => refineType(path).fold(deleteDir, deleteFile)
-    case ManageFile.TempFile(path)                        => nextLong flatMap (uid => createTempFile(path, uid))
-  }
-  def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
-    case WriteFile.Write(fh, chunks) => write(fh, chunks)
-    case WriteFile.Open(file)        =>
-      KVF get file flatMap {
-        case Some(data) =>
-          for {
-            uid <- nextLong
-            h = WHandle(file, uid)
-            _ <- KVW.put(h, WritePos(file, data, data.length))
-          } yield h
-        case None       =>
-          for {
-            uid <- nextLong
-            h = WHandle(file, uid)
-            _ <- KVF.put(file, emptyData())
-            _ <- KVW.put(h, WritePos(file, emptyData(), 0))
-          } yield h
+    case ManageFile.Move(FileToFile(src, dst), semantics) =>
+      KVF contains src flatMap {
+        case false => unknownPath(src)
+        case _     =>
+          KVF contains dst flatMap {
+            case true if semantics == FailIfExists   => pathErr(pathExists(dst))
+            case false if semantics == FailIfMissing => unknownPath(dst)
+            case _                                   => ignoreRes(KVF.move(src, dst))
+          }
       }
-    case WriteFile.Close(fh)         =>
-      KVW get fh flatMap (_.fold[FSUnit](()) {
-        case WritePos(file, data, pos) =>
-          for {
-            _ <- KVF.put(file, data)
-            _ <- KVW.delete(fh)
-          } yield ()
-      })
+
+    case ManageFile.Delete(path)                          => refineType(path).fold(deleteDir, deleteFile)
+    case ManageFile.TempFile(path)                        =>
+      for {
+        uid <- nextLong
+        file = path.parentOrSelf / tmpName(uid)
+        _   <- KVF.put(file, emptyData())
+      } yield file
+  }
+
+  def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
+    case WriteFile.Write(fh, chunks) =>
+      KVW get fh flatMap {
+        case None                      => Vector(unknownWriteHandle(fh))
+        case Some(WritePos(file, offset)) =>
+          KVF get file flatMap {
+            case None       => Vector(unknownPath(file))
+            case Some(data) =>
+              for {
+                _ <- KVF.put(file, (data take offset) ++ chunks ++ (data drop offset))
+                _ <- KVW.put(fh, WritePos(file, offset + chunks.length))
+              } yield Vector()
+          }
+      }
+    case WriteFile.Open(file)        =>
+      for {
+        uid <- nextLong
+        h = WHandle(file, uid)
+        _ <- KVF.put(file, emptyData())
+        _ <- KVW.put(h, WritePos(file, 0))
+      } yield h
+
+    case WriteFile.Close(fh) => (KVW delete fh).void
   }
   def readFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]) = {
     def openForRead(file: AFile, offset: Int, limit: Option[Int]): FLR[RHandle] = KVF get file flatMap {
@@ -167,24 +155,36 @@ class FsAlgebras[S[_]] extends STypes[S] {
         for {
           uid <- nextLong
           h = RHandle(file, uid)
-          _ <- KVR.put(h, ReadPos(data, offset, limit getOrElse data.length))
+          _ <- KVR.put(h, ReadPos(file, offset, limit getOrElse data.length))
         } yield h
     }
 
     λ[ReadFile ~> FS] {
       case ReadFile.Open(file, offset, limit) => openForRead(file, offset.get.toInt, limit map (_.get.toInt))
-      case ReadFile.Read(fh)                  => read(fh)
-      case ReadFile.Close(fh)                 => for (_ <- KVR delete fh) yield ()
+      case ReadFile.Close(fh)                 => (KVR delete fh).void
+      case ReadFile.Read(fh)                  =>
+        KVR get fh flatMap {
+          case None                               => unknownReadHandle(fh)
+          case Some(ReadPos(file, offset, limit)) =>
+            // NB: no data
+            KVF get file flatMap {
+              case None       => Vector() // unknownPath(file)
+              case Some(data) =>
+                val chunks = data drop offset take limit
+                val newPos = ReadPos(file, offset + chunks.length, limit - chunks.length)
+                for (_ <- KVR.put(fh, newPos)) yield chunks
+            }
+        }
     }
   }
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
     case QueryFile.ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
     case QueryFile.EvaluatePlan(lp)     => (phaseResults(lp) |@| nextLong)((ph, uid) => ph -> \/-(QHandle(uid)))
     case QueryFile.Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
-    case QueryFile.More(rh)             => Vector()
     case QueryFile.ListContents(dir)    => ls(dir)
-    case QueryFile.Close(fh)            => for (_ <- KVQ delete fh) yield ()
     case QueryFile.FileExists(file)     => KVF contains file
+    case QueryFile.More(qh)             => Vector()
+    case QueryFile.Close(fh)            => (KVQ delete fh).void
   }
 
   def boundFs(implicit

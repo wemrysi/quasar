@@ -95,8 +95,8 @@ package object fs extends fs.FilesystemEffect {
 }
 
 package fs {
-  final case class ReadPos(data: Chunks, offset: Int, limit: Int)
-  final case class WritePos(file: AFile, data: Chunks, offset: Int)
+  final case class ReadPos(file: AFile, offset: Int, limit: Int)
+  final case class WritePos(file: AFile, offset: Int)
 
   trait STypes[S[_]] extends EitherTContextLeft[Free[S, ?], FileSystemError] {
     implicit protected val applicative: Applicative[FS] = scalaz.Free.freeMonad[S]
