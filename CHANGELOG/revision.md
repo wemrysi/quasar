@@ -1,1 +1,1 @@
-- Couchbase: Utilize Failure effect in FileSystemDef interpreter
+- Couchbase: Utilize DefinitionError in FileSystemDef interpreter
