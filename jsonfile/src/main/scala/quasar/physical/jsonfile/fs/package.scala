@@ -96,6 +96,7 @@ package object fs extends fs.FilesystemEffect {
 
 package fs {
   final case class ReadPos(data: Chunks, offset: Int, limit: Int)
+  final case class WritePos(data: Chunks, offset: Int)
 
   trait STypes[S[_]] extends EitherTContextLeft[Free[S, ?], FileSystemError] {
     implicit protected val applicative: Applicative[FS] = scalaz.Free.freeMonad[S]
@@ -108,10 +109,10 @@ package fs {
   trait FilesystemEffect {
     val FsType: FileSystemType
 
-    type FH = Vector[Data] // file map values
-    type RH = ReadPos      // read handle map values
-    type WH = Vector[Data] // write handle map values
-    type QH = Vector[Data] // query handle map values
+    type FH = Chunks    // file map values
+    type RH = ReadPos   // read handle map values
+    type WH = WritePos  // write handle map values
+    type QH = Chunks    // query handle map values
 
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
     type KVRead[S[_]]  = KVInject[RHandle, RH, S]

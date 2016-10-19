@@ -60,7 +60,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
     val wh = WHandle(file, uid)
     for {
       _ <- KVF.put(file, emptyData())
-      _ <- KVW.put(wh, emptyData())
+      _ <- KVW.put(wh, WritePos(emptyData(), 0))
     } yield wh
   }
   def createTempFile(near: APath, uid: Long)(implicit KVF: KVFile[S]): FS[LR[AFile]] = {
@@ -70,13 +70,24 @@ class FsAlgebras[S[_]] extends STypes[S] {
     KVF.put(rfile, emptyData()) map (_ => rfile)
   }
 
-  def read(fh: RHandle)(implicit KVF: KVFile[S], KVR: KVRead[S]): FLR[Chunks] = KVR get fh map {
-    case Some(ReadPos(data, offset, limit)) => (data drop offset take limit).right
-    case _                                  => unknownReadHandle(fh).left
+  def read(fh: RHandle)(implicit KVF: KVFile[S], KVR: KVRead[S]): FLR[Chunks] = KVR get fh flatMap {
+    case Some(ReadPos(data, offset, limit)) =>
+      val chunks = data drop offset take limit
+      val newPos = ReadPos(data, offset + chunks.length, limit - chunks.length)
+      for {
+        _ <- KVR.put(fh, newPos)
+      } yield chunks.right
+    case _ =>
+      unknownReadHandle(fh)
   }
   def write(fh: WHandle, chunk: Chunks)(implicit KVW: KVWrite[S]): FS[Errors] = KVW get fh flatMap {
-    case Some(data) => KVW.put(fh, data ++ chunk) map (_ => Vector())
-    case _          => Vector(unknownWriteHandle(fh))
+    case Some(WritePos(data, offset)) =>
+      val newPos = WritePos((data take offset) ++ chunk ++ (data drop offset), offset + chunk.length)
+      for {
+        _ <- KVW.put(fh, newPos)
+      } yield Vector()
+    case _                            =>
+      Vector(unknownWriteHandle(fh))
   }
 
   def manageFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]) = λ[ManageFile ~> FS] {
