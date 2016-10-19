@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp.free.lift
 import quasar.fs._, FileSystemError._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.physical.marklogic.uuid.GenUUID
+import quasar.effect.uuid.GenUUID
 import quasar.physical.marklogic.xcc.SessionIO
 
 import scalaz._, Scalaz._

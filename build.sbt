@@ -240,6 +240,7 @@ lazy val ejson = project
 lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) --= Seq(
     Wart.AsInstanceOf,
@@ -378,6 +379,7 @@ lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
+  .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
     wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))

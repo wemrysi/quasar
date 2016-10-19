@@ -3,20 +3,19 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "largeZips.data",
-    "query": "select [ city, pop ] from largeZips",
+    "query": "select [ city, pop ] as cp from largeZips",
     "predicate": "containsAtLeast",
-    "expected": [{ "0": ["CUSHMAN",          36963] },
-                 { "0": ["CHICOPEE",         31495] },
-                 { "0": ["HOLYOKE",          43704] },
-                 { "0": ["FLORENCE",         27939] },
-                 { "0": ["MONTGOMERY",       40117] },
-                 { "0": ["WEST SPRINGFIELD", 27537] },
-                 { "0": ["SPRINGFIELD",      25519] },
-                 { "0": ["SPRINGFIELD",      32635] },
-                 { "0": ["PITTSFIELD",       50655] },
-                 { "0": ["FITCHBURG",        41194] }]
+    "expected": [{ "cp": ["CUSHMAN",          36963] },
+                 { "cp": ["CHICOPEE",         31495] },
+                 { "cp": ["HOLYOKE",          43704] },
+                 { "cp": ["FLORENCE",         27939] },
+                 { "cp": ["MONTGOMERY",       40117] },
+                 { "cp": ["WEST SPRINGFIELD", 27537] },
+                 { "cp": ["SPRINGFIELD",      25519] },
+                 { "cp": ["SPRINGFIELD",      32635] },
+                 { "cp": ["PITTSFIELD",       50655] },
+                 { "cp": ["FITCHBURG",        41194] }]
 }

@@ -63,7 +63,7 @@ object QueryFile {
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
     lp.transCata[LogicalPlan](orOriginal(Optimizer.elideLets[T]))
-      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transCata(eval)))))
+      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna(eval)))))
       .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata(eval))
   }
 
@@ -85,8 +85,8 @@ object QueryFile {
     _.transAna(SP.simplifyProjection)
       // TODO: Rather than explicitly applying multiple times, we should apply
       //       repeatedly until unchanged.
-      .transCata(rewrite.normalize)
-      .transCata(rewrite.normalize)
+      .transAna(rewrite.normalize)
+      .transAna(rewrite.normalize)
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -123,9 +123,7 @@ object QueryFile {
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
-      qs.fold(
-        κ(Vector()),
-        a => Vector(PhaseResult.tree("QScript", a.cata(transform.linearize).reverse))),
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.tree("QScript", a))),
       qs))
   }
 
@@ -167,9 +165,7 @@ object QueryFile {
         simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>
-      mtell.writer(
-        Vector(PhaseResult.tree("QScript", qs.cata(transform.linearize).reverse)),
-        qs)
+      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
     }
   }
 

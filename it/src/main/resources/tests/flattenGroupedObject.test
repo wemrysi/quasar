@@ -4,7 +4,7 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",

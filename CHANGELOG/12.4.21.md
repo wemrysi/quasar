@@ -1,0 +1,5 @@
+- simplify runtime provenance representation
+- improve QScript PhaseResult output (improves #1550)
+- handle constant join conditions (fixes #1559)
+- fixes autojoin condition
+- improve typechecker error message

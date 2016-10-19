@@ -173,6 +173,10 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
+To connect to Couchbase use the following `connectionUri` format:
+
+`couchbase://<host>[:<port>]?username=<username>&password=<password>`
+
 #### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.

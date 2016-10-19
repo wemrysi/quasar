@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "pending"
+        "couchbase":  "skip"
     },
     "description": "expression with `is not null` should be true whenever the same filter is satisfied",
     "data": "nulls.data",
