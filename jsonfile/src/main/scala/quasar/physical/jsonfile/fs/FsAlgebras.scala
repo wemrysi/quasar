@@ -26,26 +26,36 @@ import quasar.contrib.pathy._
 import scalaz._
 import Scalaz.{ ToIdOps => _, _ }
 import FileSystemIndependentTypes._
+import ygg.table._
 
 class FsAlgebras[S[_]] extends STypes[S] {
+  def emptyFile(): Table = ColumnarTable.empty
+
   def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
   def nextLong(implicit MS: MonotonicSeq :<: S)   = MonotonicSeq.Ops[S].next
 
   def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]    = ()
   def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit] = ()
 
-  def createTempFile(near: APath, uid: Long): LR[AFile] = {
+  def createFile[S[_]](file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]): Free[S, WHandle] = {
+    val wh = WHandle(file, uid)
+    for {
+      _ <- KVF.put(file, emptyFile())
+      _ <- KVW.put(wh, 0)
+    } yield wh
+  }
+
+  def createTempFile(near: APath, uid: Long)(implicit KVF: KVFile[S]): Free[S, LR[AFile]] = {
     val name = file(tmpName(uid))
-    refineType(near).fold(
-      _ </> name,
-      f => fileParent(f) </> name
-    ).right
+    val fil  = refineType(near).fold(_ </> name, f => fileParent(f) </> name)
+
+    for (_ <- KVF.put(fil, emptyFile())) yield fil
   }
 
   def manageFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]) = λ[ManageFile ~> FS] {
     case ManageFile.Move(scenario, semantics) => scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
     case ManageFile.Delete(path)              => refineType(path).fold(_ => Unimplemented, KVF delete _ map (_ => ().right))
-    case ManageFile.TempFile(path)            => nextLong map (uid => createTempFile(path, uid))
+    case ManageFile.TempFile(path)            => nextLong flatMap (uid => createTempFile(path, uid))
   }
   def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
     case WriteFile.Open(file)        => nextLong flatMap (uid => create[S](file, uid) map (wh => wh.right))
