@@ -62,8 +62,8 @@ class BasicQueryEnablementSpec
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
-  def n1qlFromQS(qs: Fix[QS]): String =
-    (qs.cataM(Planner[Free[MonotonicSeq, ?], QS].plan) ∘ outerN1ql)
+  def n1qlFromQS(qs: Fix[QST]): String =
+    (qs.cataM(Planner[Free[MonotonicSeq, ?], QST].plan) ∘ outerN1ql)
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
@@ -122,9 +122,9 @@ class BasicQueryEnablementSpec
     "convert a squashed read" in {
       // select * from foo
       val qs =
-        chain(
-           ReadR(rootDir </> file("foo")),
-           QC.inj(LeftShift((),
+        chain[Fix, QST](
+           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+           QCT.inj(LeftShift((),
              HoleF,
              Free.point(RightSide))))
 
@@ -136,9 +136,9 @@ class BasicQueryEnablementSpec
     "convert a simple projection" in {
       // select zed from foo
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
             HoleF,
             ProjectFieldR(Free.point(RightSide), StrLit("zed")))))
 
@@ -150,9 +150,9 @@ class BasicQueryEnablementSpec
     "read followed by a map" in {
       // select (a + b) from foo
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(qscript.Map(
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(qscript.Map(
             (),
             Free.roll(Add(
               ProjectFieldR(HoleF, StrLit("a")),
@@ -166,14 +166,14 @@ class BasicQueryEnablementSpec
     "convert a basic reduction wrapped in an object" in {
       // select sum(height) from person
       val qs =
-        chain(
-          ReadR(rootDir </> file("person")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("person"), ExcludeId))),
+          QCT.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("person")),
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("height")))),
-          QC.inj(Reduce(
+          QCT.inj(Reduce(
             (),
             NullLit(), // reduce on a constant bucket, which is normalized to Null
             List(ReduceFuncs.Sum[FreeMap](HoleF)),
@@ -187,14 +187,14 @@ class BasicQueryEnablementSpec
     "convert a flatten array" in {
       // select loc[:*] from zips
       val qs =
-        chain(
-          ReadR(rootDir </> file("zips")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
+          QCT.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("zips")),
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("loc")))),
-          QC.inj(LeftShift((),
+          QCT.inj(LeftShift((),
             HoleF,
             Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))))
 
@@ -206,12 +206,12 @@ class BasicQueryEnablementSpec
     "convert a Eq filter" in {
       // select * from foo where bar = "baz"
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
             HoleF,
             Free.point(RightSide))),
-          QC.inj(Filter((),
+          QCT.inj(Filter((),
             Free.roll(MapFuncs.Eq(
               ProjectFieldR(HoleF, StrLit("bar")),
               StrLit("baz"))))))
@@ -224,12 +224,12 @@ class BasicQueryEnablementSpec
     "convert a filter" in {
       // select * from foo where bar between 1 and 10
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
             HoleF,
             Free.point(RightSide))),
-          QC.inj(Filter((),
+          QCT.inj(Filter((),
             Free.roll(Between(
               ProjectFieldR(HoleF, StrLit("bar")),
               IntLit(1),
