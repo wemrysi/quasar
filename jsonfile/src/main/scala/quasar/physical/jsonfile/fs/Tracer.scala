@@ -65,6 +65,12 @@ class Tracer[S[_]](
     case x @ ManageFile.TempFile(path)            => tracing("TempFile", path)(M(x))
   }
 }
+object Tracer {
+  val tracingProp: Option[String] = scala.sys.props get "ygg.trace" map (".*(" + _ + ").*")
+
+  def maybe[S[_]](bfs: BoundFilesystem[S]): FileSystem ~> Free[S, ?] =
+    tracingProp.fold(bfs.fileSystem)(re => bfs trace (_ matches re))
+}
 
 final case class BoundFilesystem[S[_]](
   Q: QueryFile ~> Free[S, ?],

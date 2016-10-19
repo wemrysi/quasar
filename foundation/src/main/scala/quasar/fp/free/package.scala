@@ -31,10 +31,10 @@ package object free {
   def foldMapNT[F[_], G[_]: Monad](f: F ~> G)    = λ[Free[F, ?] ~> G](_ foldMap f)
 
   /** `Inject#inj` as a natural transformation. */
-  def injectNT[F[_], G[_]](implicit I: F :<: G) = λ[F ~> G](I inj _)
+  def injectNT[F[_], G[_]](implicit I: F :<: G): F ~> G = I
 
   /** Convenience transformation to inject into a coproduct and lift into Free. */
-  def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] = liftFT[S] compose injectNT[F, S]
+  def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] = liftFT[S] compose S
 
   /** `Free#liftF` as a natural transformation */
   def liftFT[S[_]] = λ[S ~> Free[S, ?]](Free liftF _)

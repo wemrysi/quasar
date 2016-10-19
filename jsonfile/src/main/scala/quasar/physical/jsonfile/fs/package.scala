@@ -58,16 +58,21 @@ import FileSystemIndependentTypes._
 // fcc UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String])
 
 package object fs extends fs.FilesystemEffect {
-  val MoveSemantics  = ManageFile.MoveSemantics
-  type FixPlan       = matryoshka.Fix[LogicalPlan]
-  type MoveSemantics = ManageFile.MoveSemantics
-  type Task[A]       = scalaz.concurrent.Task[A]
-
   val FsType = FileSystemType("jsonfile")
 
-  val tracingProp: Option[String] = scala.sys.props get "ygg.trace" map (".*(" + _ + ").*")
+  type AsTask[F[X]]         = Task[F ~> Task]
+  type FixPlan              = matryoshka.Fix[LogicalPlan]
+  type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
+  type MoveSemantics        = ManageFile.MoveSemantics
+  type Task[A]              = scalaz.concurrent.Task[A]
+  val MoveSemantics         = ManageFile.MoveSemantics
 
-  def isTracing(label: String): Boolean = tracingProp exists (label matches _)
+  def kvEmpty[K, V] : AsTask[KeyValueStore[K, V, ?]]   = KeyValueStore.impl.empty[K, V]
+  def kvOps[K, V, S[_]](implicit z: KVInject[K, V, S]) = KeyValueStore.Ops[K, V, S]
+  def makeDirList(names: PathSegment*): DirList        = names.toSet
+  def tmpName(n: Long): String                         = s"__quasar.ygg$n"
+  def unknownPath(p: APath): FileSystemError           = pathErr(PathError pathNotFound p)
+  def unknownPlan(lp: FixPlan): FileSystemError        = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
 
   implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) {
     type FS[A] = Free[S, A]
@@ -83,25 +88,10 @@ package object fs extends fs.FilesystemEffect {
     def move(src: K, dst: K): FS[Boolean] = for (exists <- contains(src) ; _ <- Ops.move(src, dst)) yield exists
   }
 
-  type FH = Vector[Data]
-  type RH = ReadPos
-  type WH = Vector[Data]
-  type QH = Vector[Data]
-
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)
   implicit def showRHandle: Show[RHandle] = Show shows (r => "ReadHandle(%s, %s)".format(r.file.show, r.id))
   implicit def showWHandle: Show[WHandle] = Show shows (r => "WriteHandle(%s, %s)".format(r.file.show, r.id))
   implicit def showFixPlan: Show[FixPlan] = Show shows (lp => FPlan("", lp).toString)
-
-  def tmpName(n: Long): String                  = s"__quasar.ygg$n"
-  def unknownPath(p: APath): FileSystemError    = pathErr(PathError pathNotFound p)
-  def unknownPlan(lp: FixPlan): FileSystemError = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
-  def makeDirList(names: PathSegment*): DirList = names.toSet
-
-  def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> Free[S, ?] = new FsAlgebras[S].queryFile
-  def readFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): ReadFile ~> Free[S, ?]    = new FsAlgebras[S].readFile
-  def writeFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]): WriteFile ~> Free[S, ?] = new FsAlgebras[S].writeFile
-  def manageFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]): ManageFile ~> Free[S, ?]                = new FsAlgebras[S].manageFile
 }
 
 package fs {
@@ -118,26 +108,15 @@ package fs {
   trait FilesystemEffect {
     val FsType: FileSystemType
 
-    type FH // file map values
-    type RH // read handle map values
-    type WH // write handle map values
-    type QH // query handle map values
+    type FH = Vector[Data] // file map values
+    type RH = ReadPos      // read handle map values
+    type WH = Vector[Data] // write handle map values
+    type QH = Vector[Data] // query handle map values
 
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
     type KVRead[S[_]]  = KVInject[RHandle, RH, S]
     type KVWrite[S[_]] = KVInject[WHandle, WH, S]
     type KVQuery[S[_]] = KVInject[QHandle, QH, S]
-
-    type AsTask[M[X]]         = Task[M ~> Task]
-    type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
-
-    def kvEmpty[K, V] : AsTask[KeyValueStore[K, V, ?]]   = KeyValueStore.impl.empty[K, V]
-    def kvOps[K, V, S[_]](implicit z: KVInject[K, V, S]) = KeyValueStore.Ops[K, V, S]
-
-    def queryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> Free[S, ?]
-    def readFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVR: KVRead[S]): ReadFile ~> Free[S, ?]
-    def writeFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]): WriteFile ~> Free[S, ?]
-    def manageFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S]): ManageFile ~> Free[S, ?]
 
     type Eff[A] = (
           Task
@@ -148,7 +127,7 @@ package fs {
       :/: MonotonicSeq
     )#M[A]
 
-    def initialEffect(uri: ConnectionUri): AsTask[Eff] = (
+    def initialEff(uri: ConnectionUri): AsTask[Eff] = (
           (Task delay reflNT[Task])
       |@| kvEmpty[AFile, FH]
       |@| kvEmpty[RHandle, RH]
@@ -164,20 +143,17 @@ package fs {
       KVW: KVWrite[S],
       KVQ: KVQuery[S],
       MS: MonotonicSeq :<: S
-    ): FileSystem ~> Free[S, ?] = {
-      val bfs = BoundFilesystem[S](queryFile[S], readFile[S], writeFile[S], manageFile[S])
-      tracingProp.fold(bfs.fileSystem)(re => bfs trace (_ matches re))
-    }
+    ): FileSystem ~> Free[S, ?] = Tracer maybe new FsAlgebras[S].boundFs
 
-    def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] = FileSystemDef fromPF {
-      case FsCfg(FsType, uri) =>
-        val defnTask: Task[DefinitionResult[Free[S, ?]]] = initialEffect(uri) map (run =>
-          DefinitionResult(
-            mapSNT(injectNT[Task, S] compose run) compose fileSystem,
-            ().point[Free[S, ?]]
-          )
-        )
-        lift(defnTask).into[S].liftM[DefErrT]
-    }
+    def optUri(cfg: FsCfg): Option[ConnectionUri] = Some(cfg) collect { case FsCfg(FsType, uri) => uri }
+
+    def runFilesystem[S[_]](run: Eff ~> Task, onClose: => Unit)(implicit TS: Task :<: S, PE: PhysErr :<: S): DefinitionResult[Free[S, ?]] =
+      DefinitionResult(
+        run   = mapSNT(TS compose run) compose fileSystem,
+        close = lift(Task delay onClose).into[S]
+      )
+
+    def definition[S[_]](implicit TS: Task :<: S, PE: PhysErr :<: S): FileSystemDef[Free[S, ?]] =
+      FileSystemDef(cfg => optUri(cfg) map (uri => lift(initialEff(uri) map (run => runFilesystem(run, ()))).into[S].liftM[DefErrT]))
   }
 }

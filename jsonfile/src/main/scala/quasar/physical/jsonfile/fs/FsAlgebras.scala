@@ -31,8 +31,8 @@ import MoveSemantics._
 
 class FsAlgebras[S[_]] extends STypes[S] {
   private def defaultChunkSize: Int = 10
-  def emptyData(): Chunks = Vector()
 
+  def emptyData(): Chunks                  = Vector()
   def ignoreRes[A](x: FS[A]): FS[LR[Unit]] = x map (_ => ().right)
 
   def existsError[A](path: APath): FLR[A]         = point(-\/(pathErr(pathExists(path))))
@@ -104,4 +104,13 @@ class FsAlgebras[S[_]] extends STypes[S] {
     case QueryFile.Close(fh)            => for (_ <- KVQ delete fh) yield ()
     case QueryFile.FileExists(file)     => KVF contains file
   }
+
+  def boundFs(implicit
+    TS: Task :<: S,
+    KVF: KVFile[S],
+    KVR: KVRead[S],
+    KVW: KVWrite[S],
+    KVQ: KVQuery[S],
+    MS: MonotonicSeq :<: S
+  ): BoundFilesystem[S] = BoundFilesystem(queryFile, readFile, writeFile, manageFile)
 }
