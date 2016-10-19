@@ -17,8 +17,9 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
+import quasar.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
@@ -45,34 +46,38 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  def physErr(msg: String): PhysicalError = unhandledFSError(new RuntimeException(msg))
-
   def interp[S[_]](
       connectionUri: ConnectionUri
     )(implicit
-      S0: Task :<: S,
-      failure: Failure.Ops[PhysicalError, S]
-    ): Free[S, (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
+      S0: Task :<: S
+    ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
-    val cbCtx: EitherT[Task, PhysicalError, Context] =
+    def liftDT[A](v: String \/ A): DefErrT[Task, A] =
+      EitherT.fromDisjunction[Task](v.leftMap(_.wrapNel.left[EnvironmentError]))
+
+    val cbCtx: DefErrT[Task, Context] =
       for {
-        uri     <- EitherT.fromDisjunction[Task](
-                     Uri.fromString(connectionUri.value).leftMap(e => physErr(e.message))
+        uri     <- liftDT(
+                     Uri.fromString(connectionUri.value).leftMap(_.message)
                    )
         cluster <- EitherT(Task.delay(
                      CouchbaseCluster.fromConnectionString(uri.renderString).right
-                   ).handle { case e: Exception => unhandledFSError(e).left })
-        user    <- EitherT.fromDisjunction[Task](
-                     uri.params.get("username") \/> physErr("No username in ConnectionUri")
+                   ).handle {
+                     case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
+                   })
+        user    <- liftDT(
+                     uri.params.get("username") \/> "No username in ConnectionUri"
                    )
-        pass    <- EitherT.fromDisjunction[Task](
-                     uri.params.get("password") \/> physErr("No password in ConnectionUri")
+        pass    <- liftDT(
+                     uri.params.get("password") \/> "No password in ConnectionUri"
                    )
-        ctx     <- EitherT(Task.delay(
+        cm      <- EitherT(Task.delay(
                      Option(cluster.clusterManager(user, pass)) \/>
-                       physErr("Unable to obtain a ClusterManager with provided credentials.")
-                   )).map(Context(cluster, _))
-      } yield ctx
+                       invalidCredentials(
+                         "Unable to obtain a ClusterManager with provided credentials."
+                       ).right[NonEmptyList[String]]
+                   ))
+      } yield Context(cluster, cm)
 
     def taskInterp(
       ctx: Context
@@ -95,10 +100,7 @@ package object fs {
         lift(Task.delay(ctx.cluster.disconnect()).void).into
       ))
 
-    lift(cbCtx.run).into >>= (_.fold(
-      failure.fail,
-      ctx => lift(taskInterp(ctx)).into
-    ))
+    EitherT(lift(cbCtx.run >>= (_.traverse(taskInterp))).into)
   }
 
   def definition[S[_]](implicit
@@ -115,6 +117,6 @@ package object fs {
               writefile.interpret,
               managefile.interpret),
             close)
-        }.liftM[DefErrT]
+        }
     }
 }
