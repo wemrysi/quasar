@@ -36,8 +36,33 @@ class FsAlgebras[S[_]] extends STypes[S] {
   def emptyData(): Chunks                  = Vector()
   def ignoreRes[A](x: FS[A]): FS[LR[Unit]] = x map (_ => ().right)
 
+  implicit class ADirOps2(dir: ADir) {
+    def /(name: DirName): ADir = dir </> dir1(name)
+  }
+  implicit class ADirOps1(dir: ADir) {
+    def /(name: FileName): AFile = dir </> file1(name)
+  }
+  implicit class ADirOps(dir: ADir) {
+    def /(name: String): AFile      = dir / FileName(name)
+    def /(name: PathSegment): APath = name.fold(dir / _, dir / _)
+  }
+  implicit class APathOps(path: APath) {
+    def name: Option[PathSegment]    = refineType(path).fold(x => dirName(x) map (_.left), x => Some(fileName(x)))
+    def nameIfFile: Option[FileName] = name flatMap (_.toOption)
+    def nameIfDir: Option[DirName]   = name flatMap (_.swap.toOption)
+  }
+
+  def ls(dir: ADir)(implicit KVF: KVFile[S]): FLR[DirList] = KVF.keys map (fs =>
+    fs.map(_ relativeTo dir).unite.toNel
+      .map(_ foldMap (f => firstSegmentName(f).toSet))
+      .toRightDisjunction(unknownPath(dir))
+  )
+
   def filesInDir(dir: ADir)(implicit KVF: KVFile[S]): FS[Vector[AFile]] =
-    KVF.keys map (_ filter (f => parentDir(f) === Some(dir)))
+    ls(dir) flatMap {
+      case -\/(_)     => Vector()
+      case \/-(names) => names.toVector map (dir / _) flatMap (x => maybeFile(x))
+    }
 
   def existsError[A](path: APath): FLR[A]         = point(-\/(pathErr(pathExists(path))))
   def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
@@ -54,7 +79,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
   def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(src) flatMap {
     case Seq() => unknownPath(src)
     case fs    =>
-      def move0 = ignoreRes(fs traverse (f => KVF.move(f, dst </> file1(fileName(f)))))
+      def move0 = ignoreRes(fs traverse (f => KVF.move(f, dst / fileName(f))))
       semantics match {
         case Overwrite     => move0
         case FailIfExists  => filesInDir(dst) flatMap (xs => xs.nonEmpty.fold(pathErr(pathExists(dst)), move0))
@@ -79,13 +104,6 @@ class FsAlgebras[S[_]] extends STypes[S] {
       case Some(data) => nextLong flatMap (uid => RHandle(file, uid) |> (h => KVR.put(h, ReadPos(data, offset, limit)) map (_ => h.right)))
       case _          => point(unknownPath(file).left)
     }
-  }
-  def createFile(file: AFile, uid: Long)(implicit KVF: KVFile[S], KVW: KVWrite[S]): FLR[WHandle] = {
-    val wh = WHandle(file, uid)
-    for {
-      _ <- KVF.put(file, emptyData())
-      _ <- KVW.put(wh, WritePos(file, emptyData(), 0))
-    } yield wh
   }
   def createTempFile(near: APath, uid: Long)(implicit KVF: KVFile[S]): FS[LR[AFile]] = {
     val name  = file(tmpName(uid))
@@ -121,8 +139,23 @@ class FsAlgebras[S[_]] extends STypes[S] {
     case ManageFile.TempFile(path)                        => nextLong flatMap (uid => createTempFile(path, uid))
   }
   def writeFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVW: KVWrite[S]) = λ[WriteFile ~> FS] {
-    case WriteFile.Open(file)        => nextLong flatMap (uid => createFile(file, uid))
     case WriteFile.Write(fh, chunks) => write(fh, chunks)
+    case WriteFile.Open(file)        =>
+      KVF get file flatMap {
+        case Some(data) =>
+          for {
+            uid <- nextLong
+            h = WHandle(file, uid)
+            _ <- KVW.put(h, WritePos(file, data, data.length))
+          } yield h
+        case None       =>
+          for {
+            uid <- nextLong
+            h = WHandle(file, uid)
+            _ <- KVF.put(file, emptyData())
+            _ <- KVW.put(h, WritePos(file, emptyData(), 0))
+          } yield h
+      }
     case WriteFile.Close(fh)         =>
       KVW get fh flatMap (_.fold[FSUnit](()) {
         case WritePos(file, data, pos) =>
@@ -143,7 +176,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
     case QueryFile.EvaluatePlan(lp)     => (phaseResults(lp) |@| nextLong)((ph, uid) => ph -> \/-(QHandle(uid)))
     case QueryFile.Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
     case QueryFile.More(rh)             => Vector()
-    case QueryFile.ListContents(dir)    => KVF.keys map (_ flatMap pathName) map (xs => makeDirList(xs: _*).right)
+    case QueryFile.ListContents(dir)    => ls(dir)
     case QueryFile.Close(fh)            => for (_ <- KVQ delete fh) yield ()
     case QueryFile.FileExists(file)     => KVF contains file
   }
