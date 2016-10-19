@@ -58,6 +58,7 @@ import ygg.json.JValue
 // fcc UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String])
 
 package object fs extends fs.FilesystemEffect {
+  val MoveSemantics  = ManageFile.MoveSemantics
   type FixPlan       = matryoshka.Fix[LogicalPlan]
   type MoveSemantics = ManageFile.MoveSemantics
   type Task[A]       = scalaz.concurrent.Task[A]
@@ -74,11 +75,12 @@ package object fs extends fs.FilesystemEffect {
     implicit private def kvs_ = kvs
     private def Ops = KeyValueStore.Ops[K, V, S]
 
-    def keys: FS[Vector[K]]             = Ops.keys
-    def contains(key: K): FS[Boolean]   = Ops contains key
-    def delete(key: K): FS[Boolean]     = for (exists <- contains(key) ; _ <- Ops delete key) yield exists
-    def put(key: K, value: V): FS[Unit] = Ops.put(key, value)
-    def get(key: K): OptionT[FS, V]     = Ops get key
+    def keys: FS[Vector[K]]               = Ops.keys
+    def contains(key: K): FS[Boolean]     = Ops contains key
+    def delete(key: K): FS[Boolean]       = for (exists <- contains(key) ; _ <- Ops delete key) yield exists
+    def put(key: K, value: V): FS[Unit]   = Ops.put(key, value)
+    def get(key: K): OptionT[FS, V]       = Ops get key
+    def move(src: K, dst: K): FS[Boolean] = for (exists <- contains(src) ; _ <- Ops.move(src, dst)) yield exists
   }
 
   type FH = Table
