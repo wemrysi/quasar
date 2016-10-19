@@ -62,8 +62,8 @@ class BasicQueryEnablementSpec
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
-  def n1qlFromQS(qs: Fix[QS]): String =
-    (qs.cataM(Planner[Free[MonotonicSeq, ?], QS].plan) ∘ outerN1ql)
+  def n1qlFromQS(qs: Fix[QST]): String =
+    (qs.cataM(Planner[Free[MonotonicSeq, ?], QST].plan) ∘ outerN1ql)
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
@@ -120,11 +120,11 @@ class BasicQueryEnablementSpec
   "QScript to N1QL" should {
 
     "convert a squashed read" in {
-      // "select * from foo"
+      // select * from foo
       val qs =
-        chain(
-           ReadR(rootDir </> file("foo")),
-           QC.inj(LeftShift((),
+        chain[Fix, QST](
+           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+           QCT.inj(LeftShift((),
              HoleF,
              Free.point(RightSide))))
 
@@ -134,11 +134,11 @@ class BasicQueryEnablementSpec
     }
 
     "convert a simple projection" in {
-      // "select zed from foo"
+      // select zed from foo
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
             HoleF,
             ProjectFieldR(Free.point(RightSide), StrLit("zed")))))
 
@@ -148,11 +148,11 @@ class BasicQueryEnablementSpec
     }
 
     "read followed by a map" in {
-      // "select (a + b) from foo"
+      // select (a + b) from foo
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(qscript.Map(
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(qscript.Map(
             (),
             Free.roll(Add(
               ProjectFieldR(HoleF, StrLit("a")),
@@ -164,16 +164,16 @@ class BasicQueryEnablementSpec
     }
 
     "convert a basic reduction wrapped in an object" in {
-      // "select sum(height) from person"
+      // select sum(height) from person
       val qs =
-        chain(
-          ReadR(rootDir </> file("person")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("person"), ExcludeId))),
+          QCT.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("person")),
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("height")))),
-          QC.inj(Reduce(
+          QCT.inj(Reduce(
             (),
             NullLit(), // reduce on a constant bucket, which is normalized to Null
             List(ReduceFuncs.Sum[FreeMap](HoleF)),
@@ -185,16 +185,16 @@ class BasicQueryEnablementSpec
     }
 
     "convert a flatten array" in {
-      // "select loc[:*] from zips",
+      // select loc[:*] from zips
       val qs =
-        chain(
-          ReadR(rootDir </> file("zips")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
+          QCT.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("zips")),
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("loc")))),
-          QC.inj(LeftShift((),
+          QCT.inj(LeftShift((),
             HoleF,
             Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))))
 
@@ -203,15 +203,33 @@ class BasicQueryEnablementSpec
       n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value loc from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
     }
 
-    "convert a filter" in {
-      // "select * from foo where bar between 1 and 10"
+    "convert a Eq filter" in {
+      // select * from foo where bar = "baz"
       val qs =
-        chain(
-          ReadR(rootDir </> file("foo")),
-          QC.inj(LeftShift((),
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
             HoleF,
             Free.point(RightSide))),
-          QC.inj(Filter((),
+          QCT.inj(Filter((),
+            Free.roll(MapFuncs.Eq(
+              ProjectFieldR(HoleF, StrLit("bar")),
+              StrLit("baz"))))))
+
+      val n1ql = n1qlFromQS(qs)
+
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+    }
+
+    "convert a filter" in {
+      // select * from foo where bar between 1 and 10
+      val qs =
+        chain[Fix, QST](
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
+            HoleF,
+            Free.point(RightSide))),
+          QCT.inj(Filter((),
             Free.roll(Between(
               ProjectFieldR(HoleF, StrLit("bar")),
               IntLit(1),
