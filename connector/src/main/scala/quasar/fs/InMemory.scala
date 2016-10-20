@@ -168,10 +168,16 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
     phaseResults(lp) tuple planMapL.st.map(executionPlan(lp, _))
 
   def openForRead(f: AFile, off: Natural, lim: Option[Positive]): FLR[ReadHandle] =
-    for {
-      h <- nextSeq ∘ (ReadHandle(f, _))
-      _ <- readingL(h) := Reading(f, off, lim, 0).some
-    } yield h.right
+    fileL(f).st flatMap {
+      case Some(_) =>
+        for {
+          h <- nextSeq ∘ (ReadHandle(f, _))
+          _ <- readingL(h) := Reading(f, off, lim, 0).some
+        } yield h.right
+
+      case None =>
+        unknownPath(f)
+    }
 
   def read(h: ReadHandle): FLR[Chunks] =
     readingL(h) flatMap {
@@ -179,7 +185,7 @@ sealed class InMemoryFsImpl extends UnifiedFileSystem[InMemoryFs] {
       case Some(r @ Reading(f, _, _, _)) =>
         fileL(f).st flatMap {
           case Some(xs) => doRead(h, r, xs)
-          case _        => Vector() /** non-existent file returns empty content now */
+          case _        => unknownPath(f)
         }
     }
 

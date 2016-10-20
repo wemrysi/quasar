@@ -194,7 +194,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_.filterNot
         val p  = write.save(f1, oneDoc.toProcess).drain ++ manage.delete(f1).liftM[Process]
 
         (execT(run, p).runOption must beNone) and
-        (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data]))
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathErr(pathNotFound(f1))))
       }
 
       "deleting a file with siblings in directory leaves siblings untouched" >> {
@@ -206,8 +206,8 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_.filterNot
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.delete(f1).liftM[Process]
 
-        (execT(run, p).runOption must beNone)                                       and
-        (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
+        (execT(run, p).runOption must beNone) and
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathErr(pathNotFound(f1)))) and
         (runLogT(run, read.scanAll(f2)).runEither must beRight(anotherDoc))
       }
 
@@ -220,9 +220,9 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_.filterNot
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.delete(d).liftM[Process]
 
-        (execT(run, p).runOption must beNone)                                       and
-        (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
-        (runLogT(run, read.scanAll(f2)).runEither must beRight(Vector.empty[Data])) and
+        (execT(run, p).runOption must beNone) and
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathErr(pathNotFound(f1)))) and
+        (runLogT(run, read.scanAll(f2)).runEither must beLeft(pathErr(pathNotFound(f2)))) and
         (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d))))
       }
 
