@@ -55,8 +55,10 @@ package object fs {
       S0: Task :<: S
     ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
-    def liftDT[A](v: String \/ A): DefErrT[Task, A] =
-      EitherT.fromDisjunction[Task](v.leftMap(_.wrapNel.left[EnvironmentError]))
+    final case class ConnUriParams(user: String, pass: String)
+
+    def liftDT[A](v: NonEmptyList[String] \/ A): DefErrT[Task, A] =
+      EitherT.fromDisjunction[Task](v.leftMap(_.left[EnvironmentError]))
 
     // TODO: retrieve from connectionUri params
     val env = DefaultCouchbaseEnvironment
@@ -67,21 +69,19 @@ package object fs {
     val cbCtx: DefErrT[Task, Context] =
       for {
         uri     <- liftDT(
-                     Uri.fromString(connectionUri.value).leftMap(_.message)
+                     Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
                    )
         cluster <- EitherT(Task.delay(
                      CouchbaseCluster.fromConnectionString(env, uri.renderString).right
                    ).handle {
                      case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
                    })
-        user    <- liftDT(
-                     uri.params.get("username") \/> "No username in ConnectionUri"
-                   )
-        pass    <- liftDT(
-                     uri.params.get("password") \/> "No password in ConnectionUri"
-                   )
+        params  <- liftDT((
+                     uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
+                     uri.params.get("password").toSuccessNel("No password in ConnectionUri")
+                   )(ConnUriParams).disjunction)
         cm      <- EitherT(Task.delay(
-                     Option(cluster.clusterManager(user, pass)) \/>
+                     Option(cluster.clusterManager(params.user, params.pass)) \/>
                        invalidCredentials(
                          "Unable to obtain a ClusterManager with provided credentials."
                        ).right[NonEmptyList[String]]
