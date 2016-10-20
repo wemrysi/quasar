@@ -186,12 +186,12 @@ trait Compiler[F[_]] {
       CompilerM[Fix[LP]] = {
 
     val functionMapping = Map[String, GenericFunc[_]](
-      "COUNT"                   -> agg.Count,
-      "SUM"                     -> agg.Sum,
-      "MIN"                     -> agg.Min,
-      "MAX"                     -> agg.Max,
-      "AVG"                     -> agg.Avg,
-      "ARBITRARY"               -> agg.Arbitrary,
+      "count"                   -> agg.Count,
+      "sum"                     -> agg.Sum,
+      "min"                     -> agg.Min,
+      "max"                     -> agg.Max,
+      "avg"                     -> agg.Avg,
+      "arbitrary"               -> agg.Arbitrary,
       "array_length"            -> array.ArrayLength,
       "extract_century"         -> date.ExtractCentury,
       "extract_day_of_month"    -> date.ExtractDayOfMonth,
@@ -220,13 +220,13 @@ trait Compiler[F[_]] {
       "interval"                -> date.Interval,
       "time_of_day"             -> date.TimeOfDay,
       "to_timestamp"            -> date.ToTimestamp,
-      "SQUASH"                  -> identity.Squash,
+      "squash"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
-      "BETWEEN"                 -> relations.Between,
-      "WHERE"                   -> set.Filter,
-      "DISTINCT"                -> set.Distinct,
+      "between"                 -> relations.Between,
+      "where"                   -> set.Filter,
+      "distinct"                -> set.Distinct,
       "within"                  -> set.Within,
-      "CONSTANTLY"              -> set.Constantly,
+      "constantly"              -> set.Constantly,
       "concat"                  -> string.Concat,
       "like"                    -> string.Like,
       "search"                  -> string.Search,
@@ -239,11 +239,15 @@ trait Compiler[F[_]] {
       "decimal"                 -> string.Decimal,
       "null"                    -> string.Null,
       "to_string"               -> string.ToString,
-      "MAKE_OBJECT"             -> structural.MakeObject,
-      "MAKE_ARRAY"              -> structural.MakeArray,
-      "OBJECT_CONCAT"           -> structural.ObjectConcat,
-      "ARRAY_CONCAT"            -> structural.ArrayConcat,
-      "DELETE_FIELD"            -> structural.DeleteField)
+      "make_object"             -> structural.MakeObject,
+      "make_array"              -> structural.MakeArray,
+      "object_concat"           -> structural.ObjectConcat,
+      "array_concat"            -> structural.ArrayConcat,
+      "delete_field"            -> structural.DeleteField,
+      "flatten_map"             -> structural.FlattenMap,
+      "flatten_array"           -> structural.FlattenArray,
+      "shift_map"               -> structural.ShiftMap,
+      "shift_array"             -> structural.ShiftArray)
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LP])(f: Case[CoExpr] => CompilerM[(Fix[LP], Fix[LP])]) =
       cases.traverse(f).map(_.foldRight(default) {
@@ -597,13 +601,12 @@ trait Compiler[F[_]] {
         }
 
       case InvokeFunction(name, List(a1)) =>
-        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
-          fail(FunctionNotFound(name)))(
-          _._2 match {
-            case func @ UnaryFunc(_, _, _, _, _, _, _) =>
-              compileFunction[nat._1](func, Func.Input1(a1))
-            case func => fail(WrongArgumentCount(name, func.arity, 1))
-          })
+        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name))) {
+          case func @ UnaryFunc(_, _, _, _, _, _, _) =>
+            compileFunction[nat._1](func, Func.Input1(a1))
+          case func => fail(WrongArgumentCount(name, func.arity, 1))
+        }
 
       case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
@@ -614,29 +617,25 @@ trait Compiler[F[_]] {
               relations.Eq(LP.Free(name), LP.Constant(Data.Null)).embed,
               c2,
               LP.Free(name)).embed)),
-          functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
-            fail(FunctionNotFound(name)))(
-            _._2 match {
-              case func @ BinaryFunc(_, _, _, _, _, _, _) =>
-                compileFunction[nat._2](func, Func.Input2(a1, a2))
-              case func => fail(WrongArgumentCount(name, func.arity, 2))
-            }))
+          functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+            fail(FunctionNotFound(name))) {
+            case func @ BinaryFunc(_, _, _, _, _, _, _) =>
+              compileFunction[nat._2](func, Func.Input2(a1, a2))
+            case func => fail(WrongArgumentCount(name, func.arity, 2))
+          })
 
       case InvokeFunction(name, List(a1, a2, a3)) =>
-        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
-          fail(FunctionNotFound(name)))(
-          _._2 match {
-            case func @ TernaryFunc(_, _, _, _, _, _, _) =>
-              compileFunction[nat._3](func, Func.Input3(a1, a2, a3))
-            case func => fail(WrongArgumentCount(name, func.arity, 3))
-          })
+        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name))) {
+          case func @ TernaryFunc(_, _, _, _, _, _, _) =>
+            compileFunction[nat._3](func, Func.Input3(a1, a2, a3))
+          case func => fail(WrongArgumentCount(name, func.arity, 3))
+        }
 
       case InvokeFunction(name, args) =>
-        functionMapping.find(_._1.toLowerCase === name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name)))(
-          _._2 match {
-            case func => fail(WrongArgumentCount(name, func.arity, args.length))
-          })
+          func => fail(WrongArgumentCount(name, func.arity, args.length)))
 
       case Match(expr, cases, default0) =>
         for {
