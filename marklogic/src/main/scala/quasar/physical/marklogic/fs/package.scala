@@ -95,10 +95,7 @@ package object fs {
       contentSource.flatMapF { cs =>
         val runCSIO = ContentSourceIO.runNT(cs)
         val runSIO  = runCSIO compose ContentSourceIO.runSessionIO
-        val runML   = reflNT[Task] :+: runSIO   :+:
-                      runCSIO      :+: genUUID  :+:
-                      seq          :+: rhandles :+:
-                      whandles     :+: qhandles
+        val runML   = reflNT[Task] :+: runSIO :+: runCSIO :+: genUUID :+: seq :+: rhandles :+: whandles :+: qhandles
         val sdown   = Task.delay(cs.getConnectionProvider.shutdown(null))
 
         // NB: An innocuous operation used to test the connection.
