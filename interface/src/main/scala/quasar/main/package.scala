@@ -25,6 +25,7 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 
+import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
@@ -47,7 +48,7 @@ package object main {
     quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff],
     quasar.physical.mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff],
     quasar.physical.postgresql.fs.definition[PhysFsEff],
-    quasar.physical.marklogic.fs.definition[PhysFsEff],
+    quasar.physical.marklogic.fs.definition[PhysFsEff](10000L),
     quasar.physical.sparkcore.fs.local.definition[PhysFsEff],
     quasar.physical.sparkcore.fs.hdfs.definition[PhysFsEff],
     quasar.physical.couchbase.fs.definition[PhysFsEff]

@@ -21,13 +21,13 @@ import quasar.Data
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq, uuid}
 import quasar.fp._, free._
+import quasar.fp.numeric.Positive
 import quasar.fs._, impl.ReadStream
 import quasar.fs.mount._, FileSystemDef.DefErrT
 
 import java.net.URI
 
 import com.marklogic.xcc._
-import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -54,8 +54,10 @@ package object fs {
 
   val FsType = FileSystemType("marklogic")
 
+  /** @param readChunkSize the size of a single chunk when streaming records from MarkLogic */
   def definition[S[_]](
-    implicit
+    readChunkSize: Positive
+  )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] =
@@ -64,8 +66,8 @@ package object fs {
         lift(runMarkLogicFs(uri).map { case (run, shutdown) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
-              queryfile.interpret[MarkLogicFs](10000L),
-              readfile.interpret[MarkLogicFs](10000L),
+              queryfile.interpret[MarkLogicFs](readChunkSize),
+              readfile.interpret[MarkLogicFs](readChunkSize),
               writefile.interpret[MarkLogicFs],
               managefile.interpret[MarkLogicFs]),
             lift(shutdown).into[S])
@@ -75,7 +77,6 @@ package object fs {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def runMarkLogicFs(connectionUri: ConnectionUri): Task[(MarkLogicFs ~> Task, Task[Unit])] = {
     val uri = new URI(connectionUri.value)
-
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                       |@|
