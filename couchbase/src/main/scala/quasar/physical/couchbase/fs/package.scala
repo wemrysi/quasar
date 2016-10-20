@@ -25,7 +25,10 @@ import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.Result
 import quasar.fs.mount._, FileSystemDef.DefErrT
 import quasar.physical.couchbase.common.{Context, Cursor}
 
+import java.util.concurrent.TimeUnit.SECONDS
+
 import com.couchbase.client.java.CouchbaseCluster
+import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
 import org.http4s.Uri
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -55,13 +58,19 @@ package object fs {
     def liftDT[A](v: String \/ A): DefErrT[Task, A] =
       EitherT.fromDisjunction[Task](v.leftMap(_.wrapNel.left[EnvironmentError]))
 
+    // TODO: retrieve from connectionUri params
+    val env = DefaultCouchbaseEnvironment
+      .builder()
+      .queryTimeout(SECONDS.toMillis(150))
+      .build()
+
     val cbCtx: DefErrT[Task, Context] =
       for {
         uri     <- liftDT(
                      Uri.fromString(connectionUri.value).leftMap(_.message)
                    )
         cluster <- EitherT(Task.delay(
-                     CouchbaseCluster.fromConnectionString(uri.renderString).right
+                     CouchbaseCluster.fromConnectionString(env, uri.renderString).right
                    ).handle {
                      case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
                    })
