@@ -24,7 +24,10 @@ import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.Result
 import quasar.fs.mount._, FileSystemDef.DefErrT
 import quasar.physical.couchbase.common.{Context, Cursor}
 
+import java.util.concurrent.TimeUnit.SECONDS
+
 import com.couchbase.client.java.CouchbaseCluster
+import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
 import org.http4s.Uri
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -62,10 +65,16 @@ package object fs {
       failure: Failure.Ops[PhysicalError, S]
     ): Free[S, (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
+    // TODO: retrieve from connectionUri params
+    val env = DefaultCouchbaseEnvironment
+      .builder()
+      .queryTimeout(SECONDS.toMillis(150))
+      .build()
+
     val clusterMngr =
       for {
         uri     <- Task.fromDisjunction(Uri.fromString(connectionUri.value))
-        cluster =  CouchbaseCluster.fromConnectionString(uri.renderString)
+        cluster =  CouchbaseCluster.fromConnectionString(env, uri.renderString)
         user    <- Task.fromMaybe(uri.params.get("username").toMaybe)(
                      new RuntimeException("No username in ConnectionUri"))
         pass    <- Task.fromMaybe(uri.params.get("password").toMaybe)(

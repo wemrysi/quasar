@@ -27,6 +27,7 @@ import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
 import matryoshka._, Recursive.ops._
+import org.threeten.bp.format.DateTimeFormatter
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
@@ -56,7 +57,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massage(expected: Data): Data = expected match {
-      case Data.Time(time) => Data.Str(time.toString)
+      case Data.Time(time) => Data.Str(time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))
       case _               => expected
     }
 
