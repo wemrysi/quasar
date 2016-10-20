@@ -25,6 +25,8 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 
+import scala.util.control.NonFatal
+
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -221,6 +223,15 @@ package object main {
   object PhysFsEff {
     def inject[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): PhysFsEff ~> S =
       S0 :+: S1
+
+    /** Replace non-fatal failed `Task`s with a PhysicalError. */
+    def reifyNonFatalErrors[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): S ~> Free[S, ?] = {
+      val handle = λ[Task ~> Free[S, ?]](t => Free.roll(S0(t map (_.point[Free[S, ?]]) handle {
+        case NonFatal(ex: Exception) => Failure.Ops[PhysicalError, S].fail(unhandledFSError(ex))
+      })))
+
+      transformIn(handle, liftFT[S])
+    }
   }
 
 
@@ -229,7 +240,8 @@ package object main {
   /** Provides the mount handlers to update the hierarchical
     * filesystem whenever a mount is added or removed.
     */
-  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](physicalFileSystems)
+  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
+    physicalFileSystems translate flatMapSNT(PhysFsEff.reifyNonFatalErrors[PhysFsEff]))
   import mountHandler.HierarchicalFsRef
 
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]

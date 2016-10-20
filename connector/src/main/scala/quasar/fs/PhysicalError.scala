@@ -36,7 +36,7 @@ sealed abstract class PhysicalError {
 @Lenses final case class UnhandledFSError(cause: Exception)
     extends PhysicalError
 
-object PhysicalError {
+object PhysicalError extends PhysicalErrorPrisms {
   implicit val show: Show[PhysicalError] = Show.shows(_.cause.getMessage)
 }
 
