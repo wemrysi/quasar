@@ -336,13 +336,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
   def paren_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
 
   def function_expr: Parser[T[Sql]] =
-    ident ~ paren_list ^^ {
-      // TODO: `is_null` is deprecated, but leaving this here until we figure
-      //       out how to message deprecation to users.
-      case a ~ List(x) if a.toLowerCase ≟ "is_null" =>
-        Eq(x, nullLiteral[T[Sql]]().embed).embed
-      case a ~ xs => invokeFunction(a, xs).embed
-    }
+    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(a, xs).embed }
 
   def primary_expr: Parser[T[Sql]] =
     case_expr |

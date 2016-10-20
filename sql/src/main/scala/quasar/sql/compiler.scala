@@ -223,14 +223,8 @@ trait Compiler[F[_]] {
       "SQUASH"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
       "BETWEEN"                 -> relations.Between,
-      "ORDER BY"                -> set.OrderBy,
       "WHERE"                   -> set.Filter,
-      "INNER JOIN"              -> set.InnerJoin,
-      "LEFT OUTER JOIN"         -> set.LeftOuterJoin,
-      "RIGHT OUTER JOIN"        -> set.RightOuterJoin,
-      "FULL OUTER JOIN"         -> set.FullOuterJoin,
-      "GROUP BY"                -> set.GroupBy,
-      "DISTINCT BY"             -> set.DistinctBy,
+      "DISTINCT"                -> set.Distinct,
       "within"                  -> set.Within,
       "CONSTANTLY"              -> set.Constantly,
       "concat"                  -> string.Concat,
@@ -249,11 +243,7 @@ trait Compiler[F[_]] {
       "MAKE_ARRAY"              -> structural.MakeArray,
       "OBJECT_CONCAT"           -> structural.ObjectConcat,
       "ARRAY_CONCAT"            -> structural.ArrayConcat,
-      "DELETE_FIELD"            -> structural.DeleteField,
-      "FLATTEN_MAP"             -> structural.FlattenMap,
-      "FLATTEN_ARRAY"           -> structural.FlattenArray,
-      "SHIFT_MAP"               -> structural.ShiftMap,
-      "SHIFT_ARRAY"             -> structural.ShiftArray)
+      "DELETE_FIELD"            -> structural.DeleteField)
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LP])(f: Case[CoExpr] => CompilerM[(Fix[LP], Fix[LP])]) =
       cases.traverse(f).map(_.foldRight(default) {

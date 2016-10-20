@@ -1,2 +1,0 @@
-- extract SQL->LP mapping from StdLib
-- restrict `Coalesce` to SQL²
