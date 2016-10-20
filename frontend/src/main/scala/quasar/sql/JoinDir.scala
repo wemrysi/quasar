@@ -16,25 +16,28 @@
 
 package quasar.sql
 
-import quasar.{Data, LogicalPlan}
+import quasar.{Data, LogicalPlan => LP}
+import quasar.Predef.String
 import quasar.std.StdLib._
 
 import matryoshka.Fix
 
 sealed trait JoinDir {
-  def projectFrom(t: Fix[LogicalPlan]): Fix[LogicalPlan]
+  import structural.ObjectProject
+
+  val name: String
+
+  lazy val data: Data = Data.Str(name)
+  lazy val const: Fix[LP] = LP.Constant(data)
+  def projectFrom(lp: Fix[LP]): Fix[LP] = Fix(ObjectProject(lp, const))
 }
 
 object JoinDir {
-  import structural._
-
   final case object Left extends JoinDir {
-    def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("left"))))
+    val name: String = "left"
   }
 
   final case object Right extends JoinDir {
-    def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("right"))))
+    val name: String = "right"
   }
 }

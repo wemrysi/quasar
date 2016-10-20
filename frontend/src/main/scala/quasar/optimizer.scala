@@ -108,7 +108,7 @@ object Optimizer {
     case InvokeFUnapply(Drop, Sized(src, _)) => src._2
     case InvokeFUnapply(Filter, Sized(src, _)) => src._2
     case InvokeFUnapply(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _) =>
-      Some(List(Constant(Data.Str("left")), Constant(Data.Str("right"))))
+      Some(List(JoinDir.Left.const, JoinDir.Right.const))
     case InvokeFUnapply(GroupBy, Sized(src, _)) => src._2
     case InvokeFUnapply(Distinct, Sized(src, _)) => src._2
     case InvokeFUnapply(DistinctBy, Sized(src, _)) => src._2

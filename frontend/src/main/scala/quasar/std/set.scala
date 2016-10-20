@@ -19,6 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.sql.JoinDir
 import quasar._, LogicalPlan._
 
 import scala.collection.immutable.NumericRange
@@ -144,10 +145,10 @@ trait SetLib extends Library {
       case Sized(_, _, Type.Const(Data.Bool(false))) => Type.Const(Data.Set(Nil))
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map("left" -> s1, "right" -> s2), None)
+      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val LeftOuterJoin = TernaryFunc(
@@ -159,13 +160,13 @@ trait SetLib extends Library {
     noSimplification,
     partialTyper[nat._3] {
       case Sized(s1, _, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map("left" -> s1, "right" -> Type.Null), None)
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> Type.Null), None)
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map("left" -> s1, "right" -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val RightOuterJoin = TernaryFunc(
@@ -177,12 +178,12 @@ trait SetLib extends Library {
     noSimplification,
     partialTyper[nat._3] {
       case Sized(_, s2, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map("left" -> Type.Null, "right" -> s2), None)
+        Type.Obj(Map(JoinDir.Left.name -> Type.Null, JoinDir.Right.name -> s2), None)
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> s2), None)
+      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val FullOuterJoin = TernaryFunc(
@@ -196,10 +197,10 @@ trait SetLib extends Library {
       case Sized(Type.Const(Data.Set(Nil)), Type.Const(Data.Set(Nil)), _) =>
         Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val GroupBy = BinaryFunc(
