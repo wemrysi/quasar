@@ -60,6 +60,11 @@ object MongoDbPlanner {
   type OutputM[A] = PlannerError \/ A
 
   type PartialJs = Partial[JsFn, JsFn]
+  implicit def partialJsRenderTree: RenderTree[PartialJs] = RenderTree.make {
+    case (f, ifs) => NonTerminal(List("PartialJs"), None,
+      f(List.range(0, ifs.length).map(x => JsFn(JsFn.defaultName, jscore.Ident(jscore.Name(s"_$x"))))).render ::
+      ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
+  }
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -248,6 +253,11 @@ object MongoDbPlanner {
   }
 
   type PartialSelector = Partial[BsonField, Selector]
+  implicit def partialSelRenderTree(implicit S: RenderTree[Selector]): RenderTree[PartialSelector] = RenderTree.make {
+    case (f, ifs) => NonTerminal(List("PartialSelector"), None,
+      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x))).render ::
+      ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
+  }
 
   /**
    * The selector phase tries to turn expressions into MongoDB selectors -- i.e.
