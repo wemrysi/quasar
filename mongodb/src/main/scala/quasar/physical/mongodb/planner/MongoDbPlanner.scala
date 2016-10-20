@@ -478,7 +478,7 @@ object MongoDbPlanner {
     (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
     (implicit
       ev0: WorkflowOpCoreF :<: F,
-      ev1: Show[WorkflowBuilder[F]],
+      ev1: RenderTree[WorkflowBuilder[F]],
       ev2: ExprOpCoreF :<: EX,
       inj: EX :<: ExprOp,
       WB: WorkflowBuilder.Ops[F])
@@ -541,7 +541,7 @@ object MongoDbPlanner {
       val HasLiteral: Ann => OutputM[Bson] = ann => HasWorkflow(ann).flatMap { p =>
         asLiteral(p) match {
           case Some(value) => \/-(value)
-          case _           => -\/(FuncApply(func.name, "literal", p.shows))
+          case _           => -\/(FuncApply(func.name, "literal", p.render.shows))
         }
       }
 

@@ -485,7 +485,7 @@ object WorkflowBuilder {
 
   private def toCollectionBuilder[F[_]: Coalesce]
     (wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : M[CollectionBuilderF[F]] =
     wb.unFix match {
       case cb @ CollectionBuilderF(_, _, _) => emit(cb)
@@ -730,7 +730,7 @@ object WorkflowBuilder {
     }
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
 
@@ -755,7 +755,7 @@ object WorkflowBuilder {
   }
 
   def build[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[Fix[F]] =
     toCollectionBuilder(wb).map {
       case CollectionBuilderF(graph, base, struct) =>
@@ -771,7 +771,7 @@ object WorkflowBuilder {
   }
 
   private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : Option[M[(WorkflowBuilder[F], List[Fix[ExprOp]])]] =
     builders match {
       case Nil             => None
@@ -793,7 +793,7 @@ object WorkflowBuilder {
     }
 
   private def foldBuilders[F[_]: Coalesce](src: WorkflowBuilder[F], others: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[(WorkflowBuilder[F], Base, List[Base])] =
     others.foldLeftM[M, (WorkflowBuilder[F], Base, List[Base])](
       (src, Root(), Nil)) {
@@ -917,7 +917,7 @@ object WorkflowBuilder {
   private def findSort[F[_]: Coalesce]
     (src: WorkflowBuilder[F])
     (distincting: WorkflowBuilder[F] => M[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[WorkflowBuilder[F]] = {
     @tailrec
     def loop(wb: WorkflowBuilder[F]): M[WorkflowBuilder[F]] =
@@ -945,7 +945,7 @@ object WorkflowBuilder {
   }
 
   private def merge[F[_]: Coalesce](left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
-    (implicit I: WorkflowOpCoreF :<: F, ev0: Show[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
+    (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
     : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
     def delegate =
       merge(right, left).map { case (r, l, merged) => (l, r, merged) }
@@ -1136,7 +1136,7 @@ object WorkflowBuilder {
       case (_, ArrayBuilderF(_, _)) => delegate
 
       case _ =>
-        fail(InternalError("failed to merge:\n" + left.show + "\n" + right.show))
+        fail(InternalError("failed to merge:\n" + left.render.show + "\n" + right.render.show))
     }
   }
 
@@ -1164,21 +1164,21 @@ object WorkflowBuilder {
     def expr1
       (wb: WorkflowBuilder[F])
       (f: Fix[ExprOp] => Fix[ExprOp])
-      (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]])
+      (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb)) { case List(e) => f(e) }
 
     def expr2
       (wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
       (f: (Fix[ExprOp], Fix[ExprOp]) => Fix[ExprOp])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb1, wb2)) { case List(e1, e2) => f(e1, e2) }
 
     def expr
       (wbs: List[WorkflowBuilder[F]])
       (f: List[Fix[ExprOp]] => Fix[ExprOp])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1190,7 +1190,7 @@ object WorkflowBuilder {
       ExprBuilder(wb, -\/(js))
 
     def jsExpr(wbs: List[WorkflowBuilder[F]], f: List[JsCore] => JsCore)
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1342,7 +1342,7 @@ object WorkflowBuilder {
         })
 
     def distinct(src: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findKeys(src).fold(
         lift(deleteField(src, "_id")).flatMap(del => distinctBy(del, List(del))))(
@@ -1365,13 +1365,13 @@ object WorkflowBuilder {
         })
 
     def distinctBy(src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findSort(src)(s => reduce(groupBy(s, keys))($first(_)).point[M])
 
     // TODO: handle concating value, expr, or collection with group (#439)
     def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine): M[WorkflowBuilder[F]] = {
         def delegate = impl(wb2, wb1, combine.flip)
@@ -1606,7 +1606,7 @@ object WorkflowBuilder {
 
           case _ => fail(UnsupportedFunction(
             structural.ObjectConcat.name,
-            Some("unrecognized shapes:\n" + wb1.show + "\n" + wb2.show)))
+            Some("unrecognized shapes:\n" + wb1.render.show + "\n" + wb2.render.show)))
         }
       }
 
@@ -1614,7 +1614,7 @@ object WorkflowBuilder {
     }
 
     def arrayConcat(left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine):
           M[WorkflowBuilder[F]] = {
@@ -1734,7 +1734,7 @@ object WorkflowBuilder {
 
     def unionAll
       (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
         : M[WorkflowBuilder[F]] =
       (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
         CollectionBuilder(
@@ -1749,7 +1749,7 @@ object WorkflowBuilder {
 
     def union
       (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
         : M[WorkflowBuilder[F]] =
       (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
         CollectionBuilder(
@@ -1834,15 +1834,4 @@ object WorkflowBuilder {
             render(src) :: structure.map(RC.render))
       }
     }
-
-  // TODO: Perhaps remove this, and explicitly `render` in the places that
-  //       depend on it.
-  implicit def WorkflowBuilderShow[F[_]: Coalesce]
-    (implicit
-      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
-      RC: RenderTree[Contents[Expr]],
-      RF: RenderTree[Fix[F]],
-      ev: WorkflowOpCoreF :<: F)
-      : Show[WorkflowBuilder[F]] =
-    Show.show(_.render.show)
 }
