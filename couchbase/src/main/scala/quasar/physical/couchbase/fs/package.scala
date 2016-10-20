@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit.SECONDS
 
 import com.couchbase.client.java.CouchbaseCluster
 import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
+import com.couchbase.client.java.error.InvalidPasswordException
 import org.http4s.Uri
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -80,12 +81,17 @@ package object fs {
                      uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
                      uri.params.get("password").toSuccessNel("No password in ConnectionUri")
                    )(ConnUriParams).disjunction)
-        cm      <- EitherT(Task.delay(
-                     Option(cluster.clusterManager(params.user, params.pass)) \/>
-                       invalidCredentials(
-                         "Unable to obtain a ClusterManager with provided credentials."
-                       ).right[NonEmptyList[String]]
-                   ))
+        cm      =  cluster.clusterManager(params.user, params.pass)
+        _       <- EitherT(Task.delay(
+                     // verify credentials via call to info
+                     cm.info
+                   ).as(
+                     ().right
+                   ).handle { case ex: InvalidPasswordException =>
+                     invalidCredentials(
+                       "Unable to obtain a ClusterManager with provided credentials."
+                     ).right[NonEmptyList[String]].left
+                   })
       } yield Context(cluster, cm)
 
     def taskInterp(
