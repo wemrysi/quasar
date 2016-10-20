@@ -61,7 +61,7 @@ class FsAlgebras[S[_]] extends STypes[S] {
   )
 
   def filesInDir(dir: ADir)(implicit KVF: KVFile[S]): FS[Vector[AFile]] =
-    ls(dir) flatMap {
+    ls(dir) >>= {
       case -\/(_)     => Vector()
       case \/-(names) => names.toVector map (dir / _) flatMap (x => maybeFile(x))
     }
@@ -85,8 +85,8 @@ class FsAlgebras[S[_]] extends STypes[S] {
       def move0 = ignoreRes(fs traverse (f => KVF.move(f, dst / fileName(f))))
       semantics match {
         case Overwrite     => move0
-        case FailIfExists  => filesInDir(dst) flatMap (xs => xs.nonEmpty.fold(pathErr(pathExists(dst)), move0))
-        case FailIfMissing => filesInDir(dst) flatMap (xs => xs.isEmpty.fold(unknownPath(dst), move0))
+        case FailIfExists  => filesInDir(dst) >>= (_.nonEmpty.fold(pathErr(pathExists(dst)), move0))
+        case FailIfMissing => filesInDir(dst) >>= (_.isEmpty.fold(unknownPath(dst), move0))
       }
   }
 
