@@ -177,6 +177,10 @@ To connect to Couchbase use the following `connectionUri` format:
 
 `couchbase://<host>[:<port>]?username=<username>&password=<password>`
 
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+
+`xcc://<username>:<password>@<host>:<port>/<database>`
+
 #### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
