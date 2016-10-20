@@ -39,7 +39,7 @@ package object xquery {
   type PrologW[F[_]] = MonadTell[F, Prologs]
 
   sealed abstract class SortDirection {
-    override def toString = this match {
+    def asOrderModifier: String = this match {
       case SortDirection.Ascending  => "ascending"
       case SortDirection.Descending => "descending"
     }
