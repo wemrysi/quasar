@@ -108,6 +108,7 @@ trait PackageAliases {
   type jFile                = java.io.File
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
   type jPath                = java.nio.file.Path
+  type jUri                 = java.net.URI
 
   // scalaz aliases at present,
   // but also a single place to change implementations
