@@ -2,7 +2,6 @@
   "name": "distinct of one field",
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "skip",
     "couchbase":  "skip"
   },
   "data": "olympics.data",
