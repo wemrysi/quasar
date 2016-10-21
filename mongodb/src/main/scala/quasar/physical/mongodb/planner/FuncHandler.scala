@@ -117,10 +117,12 @@ object FuncHandler {
           case ExtractMinute(a1) => $minute(a1)
           case ExtractMonth(a1) => $month(a1)
           case ExtractQuarter(a1) =>
-            // FIXME
-            trunc($add(
-              $divide($dayOfYear(a1), $literal(Bson.Int32(92))),
-              $literal(Bson.Int32(1))))
+            trunc(
+              $add(
+                $divide(
+                  $subtract($month(a1), $literal(Bson.Int32(1))),
+                  $literal(Bson.Int32(3))),
+                $literal(Bson.Int32(1))))
           case ExtractSecond(a1) =>
             $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
           case ExtractWeek(a1) => $week(a1)
