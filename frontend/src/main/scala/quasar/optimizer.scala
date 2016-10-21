@@ -48,7 +48,7 @@ object Optimizer {
     case x => x.map(_._2)
   }
 
-  def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
+  private def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
       LogicalPlan[T[LogicalPlan]] => Option[LogicalPlan[T[LogicalPlan]]] = {
     case inv @ InvokeF(func, _) => func.simplify(inv)
     case LetF(ident, form, in) => form.project match {
@@ -63,6 +63,13 @@ object Optimizer {
     case _ => None
   }
 
+  def simplifyRepeatedly[T[_[_]]: Recursive: Corecursive]:
+      LogicalPlan[T[LogicalPlan]] => LogicalPlan[T[LogicalPlan]] =
+    repeatedly(simplifyƒ[T])
+
+  def simplify[T[_[_]]: Recursive: Corecursive](t: T[LogicalPlan]): T[LogicalPlan] =
+    t.transCata[LogicalPlan](simplifyRepeatedly[T])
+
   /** Like `simplifyƒ`, but eliminates _all_ `Let` (and any bound `Free`) nodes.
     */
   def elideLets[T[_[_]]: Recursive: FunctorT]:
@@ -72,10 +79,7 @@ object Optimizer {
     case _ => None
   }
 
-  def simplify[T[_[_]]: Recursive: Corecursive](t: T[LogicalPlan]): T[LogicalPlan] =
-    t.transCata[LogicalPlan](repeatedly(simplifyƒ[T]))
-
-  val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {
+  private val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {
     case FreeF(name) => Set(name)
     case x           => x.fold
   }
@@ -92,7 +96,7 @@ object Optimizer {
     loop(prefix)
   }
 
-  val shapeƒ: GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, Option[List[Fix[LogicalPlan]]]] = {
+  private val shapeƒ: GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, Option[List[Fix[LogicalPlan]]]] = {
     case LetF(_, _, body) => body._2
     case ConstantF(Data.Obj(map)) =>
       Some(map.keys.map(n => Constant(Data.Str(n))).toList)
@@ -116,7 +120,7 @@ object Optimizer {
     case _ => None
   }
 
-  def preserveFree0[A](x: (Fix[LogicalPlan], A))(f: A => Fix[LogicalPlan]):
+  private def preserveFree0[A](x: (Fix[LogicalPlan], A))(f: A => Fix[LogicalPlan]):
       Fix[LogicalPlan] = x._1.unFix match {
     case FreeF(_) => x._1
     case _        => f(x._2)
@@ -150,7 +154,7 @@ object Optimizer {
   }
 
   def preferProjections(t: Fix[LogicalPlan]): Fix[LogicalPlan] =
-    boundPara(t)(preferProjectionsƒ)._1.transCata(repeatedly(simplifyƒ))
+    simplify(boundPara(t)(preferProjectionsƒ)._1)
 
   val elideTypeCheckƒ: Algebra[LogicalPlan, Fix[LogicalPlan]] = {
     case LetF(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
@@ -220,7 +224,7 @@ object Optimizer {
     * The input plan must have been simplified already so that the structure
     * is in a canonical form for inspection.
     */
-  val rewriteCrossJoinsƒ: LogicalPlan[(Fix[LogicalPlan], Fix[LogicalPlan])] => State[NameGen, Fix[LogicalPlan]] = { node =>
+  private val rewriteCrossJoinsƒ: LogicalPlan[(Fix[LogicalPlan], Fix[LogicalPlan])] => State[NameGen, Fix[LogicalPlan]] = { node =>
     import quasar.fp._
 
     def preserveFree(x: (Fix[LogicalPlan], Fix[LogicalPlan])) = preserveFree0(x)(ι)
@@ -307,7 +311,7 @@ object Optimizer {
   val optimize: Fix[LogicalPlan] => Fix[LogicalPlan] =
     NonEmptyList[Fix[LogicalPlan] => Fix[LogicalPlan]](
       // Eliminate extraneous constants, etc.:
-      _.transCata(repeatedly(simplifyƒ)),
+      simplify[Fix],
 
       // NB: must precede normalizeLets to eliminate possibility of shadowing:
       normalizeTempNames,
@@ -319,7 +323,7 @@ object Optimizer {
       boundParaS(_)(rewriteCrossJoinsƒ).evalZero,
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
-      _.transCata(repeatedly(simplifyƒ)),
+      simplify[Fix],
 
       // Final pass to normalize the resulting plans for better matching in tests:
       normalizeLets,
