@@ -144,7 +144,7 @@ object qscript {
       ).as(SequenceType("item()*")) { elt: XQuery =>
         isArr(elt) map { eltIsArray =>
           if_ (eltIsArray)
-          .then_ { elt `/` child(aelt) `/` child.node() }
+          .then_ { elt `/` child(aelt)  }
           .else_ { elt `/` child.node() }
         }
       }
