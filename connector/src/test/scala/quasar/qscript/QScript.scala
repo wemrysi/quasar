@@ -110,7 +110,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(ZipMapKeys(HoleF)),
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
-              // FIXME: Why so many projections – there should only be one
+              // FIXME: #1622
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
                   ProjectIndexR(
@@ -458,7 +458,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.roll(ConcatArrays(
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))),
-                // FIXME: This line is wrong.
+                // FIXME: #1622
                 Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
               Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
             Free.roll(MakeArray(
@@ -555,5 +555,60 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         ProjectIndexR(HoleF, IntLit(1)),
         List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
         ReduceIndexF(0)))).some)
+  }
+
+  "convert distinct by" in {
+    val lp = fullCompileExp("select distinct(city) from zips order by pop")
+    val qs = convert(listContents.some, lp)
+    qs must equal(chain(
+      ReadR(rootDir </> file("zips")),
+      QC.inj(LeftShift((),
+        Free.roll(ZipMapKeys(HoleF)),
+        Free.roll(ConcatArrays(
+          Free.roll(ConcatArrays(
+            // FIXME: #1622
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(
+                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))),
+              Free.roll(MakeArray(
+                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
+            Free.roll(MakeArray(
+              Free.roll(ConcatMaps(
+                Free.roll(MakeMap(
+                  StrLit("city"),
+                  ProjectFieldR(
+                    Free.roll(Guard(
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Type.Obj(ScalaMap(),Some(Type.Top)),
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Free.roll(Undefined()))),
+                    StrLit("city")))),
+                Free.roll(MakeMap(
+                  StrLit("__sd__0"),
+                  ProjectFieldR(
+                    Free.roll(Guard(
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Type.Obj(ScalaMap(),Some(Type.Top)),
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Free.roll(Undefined()))),
+                    StrLit("pop")))))))))),
+          Free.roll(MakeArray(
+            Free.roll(MakeArray(
+              ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Free.roll(Undefined()))),
+                StrLit("pop")))))))))),
+      QC.inj(Sort((),
+        Free.roll(ConcatArrays(
+          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
+          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
+        List(ProjectIndexR(HoleF, IntLit(3)) -> SortDir.Ascending))),
+      QC.inj(Reduce((),
+        Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))),
+        List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),
+        Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0")))))).some)
   }
 }
