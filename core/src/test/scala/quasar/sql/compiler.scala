@@ -351,12 +351,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select coalesce(bar, baz) from foo",
         Let('__tmp0, read("foo"),
-          Squash(
-            makeObj(
-              "0" ->
-                Coalesce[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("baz"))))))))
+          Let('__tmp1, ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
+            Squash(
+              makeObj(
+                "0" ->
+                  Cond[FLP](
+                    Eq[FLP](Free('__tmp1), Constant(Data.Null)),
+                    ObjectProject(Free('__tmp0), Constant(Data.Str("baz"))),
+                    Free('__tmp1)))))))
     }
 
     "compile date field extraction" in {

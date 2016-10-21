@@ -97,16 +97,16 @@ object LogicalPlan {
           def render(v: LogicalPlan[A]) = v match {
             // NB: a couple of special cases for readability
             case ConstantF(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
-            case InvokeFUnapply(structural.ObjectProject, Sized(expr, name)) =>
+            case InvokeFUnapply(func @ structural.ObjectProject, Sized(expr, name)) =>
               (ra.render(expr), ra.render(name)) match {
                 case (RenderedTree(_, Some(x), Nil), RenderedTree(_, Some(n), Nil)) =>
-                  Terminal("ObjectProject" :: nodeType, Some(x + "[" + n + "]"))
-                case (x, n) => NonTerminal("Invoke" :: nodeType, Some(ObjectProject.name), x :: n :: Nil)
+                  Terminal("ObjectProject" :: nodeType, Some(x + "{" + n + "}"))
+                case (x, n) => NonTerminal("Invoke" :: nodeType, Some(func.shows), x :: n :: Nil)
               }
 
             case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
             case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
-            case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.name), args.unsized.map(ra.render))
+            case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.shows), args.unsized.map(ra.render))
             case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case LetF(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
             case TypecheckF(expr, typ, cont, fallback) =>
@@ -148,9 +148,7 @@ object LogicalPlan {
 
   final case class InvokeF[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N]) extends LogicalPlan[A] {
     override def toString = {
-      val funcName = if (func.name(0).isLetter) func.name.split('_').map(_.toLowerCase.capitalize).mkString
-                      else "\"" + func.name + "\""
-      funcName + "(" + values.mkString(", ") + ")"
+      func.shows + "(" + values.mkString(", ") + ")"
     }
     override def equals(that: scala.Any): Boolean = that match {
       case that @ InvokeF(_, _) =>
@@ -259,18 +257,18 @@ object LogicalPlan {
       case LetF(b, Fix(LetF(a, x1, x2)), x3) => LetF(a, x1, Let(b, x2, x3)).some
 
       // TODO generalize the following three `GenericFunc` cases
-      case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) => a1 match {
+      case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) => a1 match {
         case Fix(LetF(a, x1, x2)) => LetF(a, x1, Invoke[nat._1](func, Func.Input1(x2))).some
         case _ => None
       }
 
-      case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) => (a1, a2) match {
+      case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) => (a1, a2) match {
         case (Fix(LetF(a, x1, x2)), a2) => LetF(a, x1, Invoke[nat._2](func, Func.Input2(x2, a2))).some
         case (a1, Fix(LetF(a, x1, x2))) => LetF(a, x1, Invoke[nat._2](func, Func.Input2(a1, x2))).some
         case _ => None
       }
 
-      case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
+      case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
         case (Fix(LetF(a, x1, x2)), a2, a3) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
         case (a1, Fix(LetF(a, x1, x2)), a3) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(a1, x2, a3))).some
         case (a1, a2, Fix(LetF(a, x1, x2))) => LetF(a, x1, Invoke[nat._3](func, Func.Input3(a1, a2, x2))).some
@@ -420,11 +418,11 @@ object LogicalPlan {
           consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))))
           plan  <- unifyOrCheck(inf, types, Invoke[nat._1](structural.FlattenMap, consts))
         } yield plan
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) =>
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
           handleGenericInvoke(inf, InvokeF(func, Func.Input1(a1)))
-        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) =>
+        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) =>
           handleGenericInvoke(inf, InvokeF(func, Func.Input2(a1, a2)))
-        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
+        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           handleGenericInvoke(inf, InvokeF(func, Func.Input3(a1, a2, a3)))
         case TypecheckF(expr, typ, cont, fallback) =>
           unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))

@@ -327,7 +327,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" -> $ifNull($field("bar"), $field("baz"))),
+           reshape("0" ->
+             $cond(
+               $eq($field("bar"), $literal(Bson.Null)),
+               $field("baz"),
+               $field("bar"))),
            IgnoreId)))
     }
 
@@ -3669,7 +3673,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR(StdLib.string.Like.name, List(x, sql.StringLiteralR("BOULDER%"), sql.StringLiteralR(""))),
+    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)

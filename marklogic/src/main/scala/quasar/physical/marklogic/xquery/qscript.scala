@@ -74,19 +74,6 @@ object qscript {
       }
     }
 
-  // qscript:coalesce($x as item()*, $y as item()*) as item()*
-  def coalesce[F[_]: PrologW]: F[FunctionDecl2] =
-    qs.name("coalesce").qn[F] flatMap { fname =>
-      declare(fname)(
-        $("x") as SequenceType.Top,
-        $("y") as SequenceType.Top
-      ).as(SequenceType.Top) { (x: XQuery, y: XQuery) =>
-        ejson.isNull[F].apply(x) map { xIsNull =>
-          if_ (xIsNull) then_ y else_ x
-        }
-      }
-    }
-
   // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
   def combineN[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("combine-n").qn[F] map { fname =>

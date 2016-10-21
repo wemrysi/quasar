@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}
@@ -86,10 +86,8 @@ trait MathLib extends Library {
   /** Adds two numeric values, promoting to decimal if either operand is
     * decimal.
     */
-
   val Add = BinaryFunc(
     Mapping,
-    "(+)",
     "Adds two numeric or temporal values",
     MathAbs,
     Func.Input2(MathAbs, MathRel),
@@ -124,7 +122,6 @@ trait MathLib extends Library {
    */
   val Multiply = BinaryFunc(
     Mapping,
-    "(*)",
     "Multiplies two numeric values or one interval and one numeric value",
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
@@ -152,7 +149,6 @@ trait MathLib extends Library {
 
   val Power = BinaryFunc(
     Mapping,
-    "(^)",
     "Raises the first argument to the power of the second",
     Type.Numeric,
     Func.Input2(Type.Numeric, Type.Numeric),
@@ -178,7 +174,6 @@ trait MathLib extends Library {
     */
   val Subtract = BinaryFunc(
     Mapping,
-    "(-)",
     "Subtracts two numeric or temporal values",
     MathAbs,
     Func.Input2(MathAbs, MathAbs),
@@ -218,7 +213,6 @@ trait MathLib extends Library {
    */
   val Divide = BinaryFunc(
     Mapping,
-    "(/)",
     "Divides one numeric or interval value by another (non-zero) numeric value",
     MathRel,
     Func.Input2(MathAbs, MathRel),
@@ -254,7 +248,6 @@ trait MathLib extends Library {
    */
   val Negate = UnaryFunc(
     Mapping,
-    "-",
     "Reverses the sign of a numeric or interval value",
     MathRel,
     Func.Input1(MathRel),
@@ -273,7 +266,6 @@ trait MathLib extends Library {
 
   val Modulo = BinaryFunc(
     Mapping,
-    "(%)",
     "Finds the remainder of one number divided by another",
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
@@ -286,13 +278,6 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))
     }) ||| numericWidening,
     biReflexiveUnapply)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] = Negate :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Add :: Multiply :: Subtract :: Divide :: Modulo :: Power :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object MathLib extends MathLib

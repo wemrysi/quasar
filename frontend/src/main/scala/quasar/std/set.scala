@@ -30,7 +30,6 @@ import shapeless.{Data => _, _}
 trait SetLib extends Library {
   val Take: BinaryFunc = BinaryFunc(
     Sifting,
-    "(LIMIT)",
     "Takes the first N elements from a set",
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
@@ -54,7 +53,6 @@ trait SetLib extends Library {
 
   val Drop: BinaryFunc = BinaryFunc(
     Sifting,
-    "(OFFSET)",
     "Drops the first N elements from a set",
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
@@ -78,7 +76,6 @@ trait SetLib extends Library {
 
   val Range = BinaryFunc(
     Expansion,
-    "(..)",
     "Creates a set of values in the range from `a` to `b`, inclusive.",
     Type.Int,
     Func.Input2(Type.Int, Type.Int),
@@ -95,7 +92,6 @@ trait SetLib extends Library {
   // TODO second param is an Array, third param is Array[String]
   val OrderBy = TernaryFunc(
     Sifting,
-    "ORDER BY",
     "Orders a set by the natural ordering of a projection on the set",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Top),
@@ -107,7 +103,6 @@ trait SetLib extends Library {
 
   val Filter = BinaryFunc(
     Sifting,
-    "WHERE",
     "Filters a set to include only elements where a projection is true",
     Type.Top,
     Func.Input2(Type.Top, Type.Bool),
@@ -135,7 +130,6 @@ trait SetLib extends Library {
 
   val InnerJoin = TernaryFunc(
     Transformation,
-    "INNER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -152,7 +146,6 @@ trait SetLib extends Library {
 
   val LeftOuterJoin = TernaryFunc(
     Transformation,
-    "LEFT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the left set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -170,7 +163,6 @@ trait SetLib extends Library {
 
   val RightOuterJoin = TernaryFunc(
     Transformation,
-    "RIGHT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the right set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -187,7 +179,6 @@ trait SetLib extends Library {
 
   val FullOuterJoin = TernaryFunc(
     Transformation,
-    "FULL OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from either set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -204,7 +195,6 @@ trait SetLib extends Library {
 
   val GroupBy = BinaryFunc(
     Transformation,
-    "GROUP BY",
     "Groups a projection of a set by another projection",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -216,7 +206,6 @@ trait SetLib extends Library {
 
   val Distinct = UnaryFunc(
     Sifting,
-    "DISTINCT",
     "Discards all but the first instance of each unique value",
     Type.Top,
     Func.Input1(Type.Top),
@@ -228,7 +217,6 @@ trait SetLib extends Library {
 
   val DistinctBy = BinaryFunc(
     Sifting,
-    "DISTINCT BY",
     "Discards all but the first instance of the first argument, based on uniqueness of the second argument",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -240,7 +228,6 @@ trait SetLib extends Library {
 
   val Union = BinaryFunc(
     Transformation,
-    "(UNION ALL)",
     "Creates a new set with all the elements of each input set, keeping duplicates.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -254,7 +241,6 @@ trait SetLib extends Library {
 
   val Intersect = BinaryFunc(
     Transformation,
-    "(INTERSECT ALL)",
     "Creates a new set with only the elements that exist in both input sets, keeping duplicates.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -266,7 +252,6 @@ trait SetLib extends Library {
 
   val Except = BinaryFunc(
     Transformation,
-    "(EXCEPT)",
     "Removes the elements of the second set from the first set.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -288,7 +273,6 @@ trait SetLib extends Library {
   //       on Cofree.
   val In = BinaryFunc(
     Sifting,
-    "(in)",
     "Determines whether a value is in a given set.",
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
@@ -316,7 +300,6 @@ trait SetLib extends Library {
 
   val Within = BinaryFunc(
     Mapping,
-    "within",
     "Determines whether a value is in a given array.",
     Type.Bool,
     Func.Input2(Type.Top, Type.AnyArray),
@@ -332,7 +315,7 @@ trait SetLib extends Library {
 
   val Constantly = BinaryFunc(
     Transformation,
-    "CONSTANTLY", "Always return the same value",
+    "Always return the same value",
     Type.Bottom,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
@@ -342,16 +325,6 @@ trait SetLib extends Library {
       case Sized(const, _) => const
     },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Distinct :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Take :: Drop :: Range :: Filter :: GroupBy :: DistinctBy ::
-    Union :: Intersect :: Except :: In :: Within :: Constantly :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] =
-    OrderBy :: InnerJoin :: LeftOuterJoin :: RightOuterJoin :: FullOuterJoin :: Nil
 }
 
 object SetLib extends SetLib
