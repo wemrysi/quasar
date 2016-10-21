@@ -104,7 +104,7 @@ object expr {
 
       val orderClause = {
         val specs = orderSpecs map {
-          case (xqy, mod) => s"$xqy $mod"
+          case (xqy, sortDir) => s"$xqy ${sortDir.asOrderModifier}"
         } intercalate ", "
 
         val orderKeyword = orderIsStable.fold("stable order", "order")

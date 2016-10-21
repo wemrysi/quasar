@@ -168,16 +168,23 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
 
     case qscript.Filter(src, f) =>
       for {
+        tmpName  <- genName[M]
         fN1ql    <- freeCataM(f)(interpretM(
-                      κ(src.point[M]),
+                      κ(partialQueryString(tmpName).point[M]),
                       mapFuncPlanner[F, T].plan))
-        sN1ql    =  n1ql(src)
         fN1qlStr =  n1ql(fN1ql)
+        sel      =  select(
+                      value         = true,
+                      resultExprs   = tmpName.wrapNel,
+                      keyspace      = src,
+                      keyspaceAlias = tmpName) |>
+                    filter.set(fN1qlStr.some)
         _        <- prtell[M](Vector(Detail(
                       "N1QL Filter",
-                      s"""  src:  $sN1ql
-                         |  n1ql: $fN1qlStr""".stripMargin('|'))))
-      } yield fN1ql
+                      s"""  src:  ${n1ql(src)}
+                         |  f:    $fN1qlStr
+                         |  n1ql: ${n1ql(sel)}""".stripMargin('|'))))
+      } yield sel
 
     case Union(src, lBranch, rBranch) =>
       for {
