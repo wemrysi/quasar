@@ -22,22 +22,15 @@ import quasar.std.StdLib._
 
 import matryoshka.Fix
 
-sealed trait JoinDir {
+sealed abstract class JoinDir(val name: String) {
   import structural.ObjectProject
 
-  val name: String
-
-  lazy val data: Data = Data.Str(name)
-  lazy val const: Fix[LP] = LP.Constant(data)
+  val data: Data = Data.Str(name)
+  val const: Fix[LP] = LP.Constant(data)
   def projectFrom(lp: Fix[LP]): Fix[LP] = Fix(ObjectProject(lp, const))
 }
 
 object JoinDir {
-  final case object Left extends JoinDir {
-    val name: String = "left"
-  }
-
-  final case object Right extends JoinDir {
-    val name: String = "right"
-  }
+  final case object Left extends JoinDir("left")
+  final case object Right extends JoinDir("right")
 }
