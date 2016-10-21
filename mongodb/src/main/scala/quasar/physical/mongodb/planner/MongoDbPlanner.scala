@@ -785,11 +785,14 @@ object MongoDbPlanner {
           κ(NonRepresentableData(data)),
           WB.pure))
       case InvokeF(func, args) =>
-        val v = invoke(func, args) <+>
-          lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
+        val wb: Output = invoke(func, args)
+        val js: Output = lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
             lift(pjs._2.traverse(_(Cofree(UnsupportedPlan(node, None).left, node.map(_.map(_._2)))))).flatMap(args =>
               WB.jsExpr(args, x => pjs._1(x.map(JsFn.const))(jscore.Ident(JsFn.defaultName)))))
-        State(s => v.run(s).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
+        /** Like `\/.orElse`, but always uses the error from the first arg. */
+        def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
+          v1.swapped(_.flatMap(e => v2.toOption <\/ e))
+        State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
       case LetF(_, _, in) => state(in.head._2)
