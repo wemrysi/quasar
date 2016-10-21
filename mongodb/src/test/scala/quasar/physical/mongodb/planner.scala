@@ -26,7 +26,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
-import quasar.sql.{fixpoint => sql, JoinDir, _}
+import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
 import scala.Either
