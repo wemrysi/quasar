@@ -127,11 +127,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
+              ObjectProject(Free('__tmp0), JoinDir.Left.const),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("right"))),
+                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
                     Constant(Data.Str("address"))))))))
     }
 
@@ -144,13 +144,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             ObjectConcat[FLP](
               ObjectProject[FLP](
                 ObjectProject[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
+                  ObjectProject(Free('__tmp0), JoinDir.Left.const),
                   Constant(Data.Str("bar"))),
                 Constant(Data.Str("baz"))),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("right"))),
+                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
                     Constant(Data.Str("address"))))))))
     }
 
@@ -571,8 +571,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           InnerJoin(read("person"), read("car"), Constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
-              ObjectProject(Free('__tmp0), Constant(Data.Str("right")))))))
+              ObjectProject(Free('__tmp0), JoinDir.Left.const),
+              ObjectProject(Free('__tmp0), JoinDir.Right.const)))))
     }
 
     "compile two term multiplication from two tables" in {
@@ -585,10 +585,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               "0" ->
                 Multiply[FLP](
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("left"))),
+                    ObjectProject(Free('__tmp0), JoinDir.Left.const),
                     Constant(Data.Str("age"))),
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("right"))),
+                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
                     Constant(Data.Str("modelYear"))))))))
     }
 
@@ -1113,11 +1113,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), Constant(Data.Str("left"))),
+                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
                       Constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), Constant(Data.Str("right"))),
+                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
                       Constant(Data.Str("address")))))))))
     }
 
@@ -1178,10 +1178,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     Fix(Squash(
                        makeObj(
                          "name" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
+                           ObjectProject(Free('__tmp4), JoinDir.Left.const),
                            Constant(Data.Str("name"))),
                          "address" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), Constant(Data.Str("right"))),
+                           ObjectProject(Free('__tmp4), JoinDir.Right.const),
                            Constant(Data.Str("address"))))))))))))
     }
 
@@ -1215,10 +1215,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   Fix(Squash(
                     makeObj(
                       "name" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
+                        ObjectProject(Free('__tmp4), JoinDir.Left.const),
                         Constant(Data.Str("name"))),
                       "address" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), Constant(Data.Str("right"))),
+                        ObjectProject(Free('__tmp4), JoinDir.Right.const),
                         Constant(Data.Str("address"))))))))))))
     }
 
@@ -1237,11 +1237,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), Constant(Data.Str("left"))),
+                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
                       Constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), Constant(Data.Str("right"))),
+                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
                       Constant(Data.Str("address")))))))))
     }
 
@@ -1269,21 +1269,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                         Constant(Data.Str("bar_id"))),
                       ObjectProject[FLP](
                         ObjectProject(Free('__tmp2),
-                          Constant(Data.Str("right"))),
+                          JoinDir.Right.const),
                         Constant(Data.Str("id"))))),
                   Squash(
                     makeObj(
                       "name" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
-                            Constant(Data.Str("left"))),
+                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            JoinDir.Left.const),
                           Constant(Data.Str("name"))),
                       "address" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
-                            Constant(Data.Str("right"))),
+                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            JoinDir.Right.const),
                           Constant(Data.Str("address")))))))))))
     }
 

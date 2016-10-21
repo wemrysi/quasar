@@ -24,6 +24,7 @@ import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Planner._
 import quasar.Predef.{ Eq => _, _ }
+import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
@@ -397,8 +398,8 @@ class Transform
 
       // NB: This is a magic structure. Improve LP to not imply this structure.
       val combine: JoinFunc = Free.roll(ConcatMaps(
-        Free.roll(MakeMap(StrLit[T, JoinSide]("left"), leftValue.as(LeftSide))),
-        Free.roll(MakeMap(StrLit[T, JoinSide]("right"), rightValue.as(RightSide)))))
+        Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
+        Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
 
       // FIXME: The provenances are not correct here
       Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
