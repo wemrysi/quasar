@@ -200,21 +200,24 @@ object Data {
 
   final class Comparable private (val value: Data) extends scala.AnyVal
 
-  implicit def ordering[A <: Data]: Order[A] = Ord order {
-    case a -> b if a == b             => Ordering.EQ
-    case Str(a) -> Str(b)             => a cmp b
-    case Bool(a) -> Bool(b)           => a cmp b
-    case Number(a) -> Number(b)       => a cmp b
-    case Obj(a) -> Obj(b)             => a.toList cmp b.toList
-    case Arr(a) -> Arr(b)             => a cmp b
-    case Set(a) -> Set(b)             => a cmp b
-    case Timestamp(a) -> Timestamp(b) => Ordering fromInt (a compareTo b)
-    case Date(a) -> Date(b)           => Ordering fromInt (a compareTo b)
-    case Time(a) -> Time(b)           => Ordering fromInt (a compareTo b)
-    case Interval(a) -> Interval(b)   => Ordering fromInt (a compareTo b)
-    case Binary(a) -> Binary(b)       => a.toArray.toList cmp b.toArray.toList
-    case Id(a) -> Id(b)               => a cmp b
-    case a -> b                       => a.getClass.## cmp b.getClass.##
+  implicit def ordering[A <: Data]: Order[A] = new Order[A] with Serializable {
+
+    def order(d1: A, d2: A) = (d1, d2) match {
+      case a -> b if a == b             => Ordering.EQ
+      case Str(a) -> Str(b)             => a cmp b
+      case Bool(a) -> Bool(b)           => a cmp b
+      case Number(a) -> Number(b)       => a cmp b
+      case Obj(a) -> Obj(b)             => a.toList cmp b.toList
+      case Arr(a) -> Arr(b)             => a cmp b
+      case Set(a) -> Set(b)             => a cmp b
+      case Timestamp(a) -> Timestamp(b) => Ordering fromInt (a compareTo b)
+      case Date(a) -> Date(b)           => Ordering fromInt (a compareTo b)
+      case Time(a) -> Time(b)           => Ordering fromInt (a compareTo b)
+      case Interval(a) -> Interval(b)   => Ordering fromInt (a compareTo b)
+      case Binary(a) -> Binary(b)       => a.toArray.toList cmp b.toArray.toList
+      case Id(a) -> Id(b)               => a cmp b
+      case a -> b                       => a.getClass.## cmp b.getClass.##
+    }
   }
 
   object Comparable {

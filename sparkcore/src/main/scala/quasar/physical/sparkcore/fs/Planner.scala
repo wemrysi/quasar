@@ -26,6 +26,8 @@ import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._
 import quasar.qscript.SortDir._
 
+import scala.math.{Ordering => SOrdering}
+
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
@@ -216,8 +218,21 @@ object Planner {
           )
         case Sort(src, bucket, orders) =>
 
-          implicit val ord = Data.ordering.toScalaOrdering
-          implicit val listOrd = Order[List[Data]].toScalaOrdering
+          implicit val ord: SOrdering[Data] = new SOrdering[Data] {
+            def compare(x: Data, y: Data) = Data.ordering.order(x, y).toInt
+          }
+          
+          implicit val listOrd = new SOrdering[List[Data]] {
+            def compare(l1: List[Data], l2: List[Data]) = (l1, l2) match {
+              case (Nil, Nil)     => 0
+              case (Nil, _::_)    => -1
+              case (_::_, Nil)    => 1
+              case (a::as, b::bs) => ord.compare(a, b) match {
+                case 0 => compare(as, bs)
+                case x  => x
+              }
+            }
+          }
 
           val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
             orders.traverse {
