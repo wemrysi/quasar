@@ -17,8 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{NonTerminal, Terminal, RenderTree}, RenderTree.ops._
+import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
+import quasar.ejson.EJson
 import quasar.fp._
 
 import matryoshka._
@@ -172,6 +173,8 @@ object QScriptCore {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
+      val f1: Show[JoinFunc[T]] = implicitly
+
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++
@@ -206,14 +209,8 @@ object QScriptCore {
         }
     }
 
-  // TODO: use the RenderTree for FreeQS, which contains QScriptTotal, which
-  // contains QScriptCore...
-  implicit def renderTree[T[_[_]]: ShowT](implicit
-      // FQ:  RenderTree[FreeQS[T]],
-      FM:  RenderTree[FreeMap[T]],
-      JF:  RenderTree[JoinFunc[T]],
-      RF:  RenderTree[ReduceFunc[FreeMap[T]]],
-      FMR: RenderTree[FreeMapA[T, ReduceIndex]])
+  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
+  implicit def renderTree[T[_[_]]: RenderTreeT](implicit ev: Show[T[EJson]])
       : Delay[RenderTree, QScriptCore[T, ?]] =
     new Delay[RenderTree, QScriptCore[T, ?]] {
       def apply[A](RA: RenderTree[A]): RenderTree[QScriptCore[T, A]] =
@@ -227,7 +224,7 @@ object QScriptCore {
             v match {
               case Map(src, f) =>
                 NonTerminal("Map" :: nt, None,
-                  RA.render(src) :: FM.render(f) :: Nil)
+                  RA.render(src) :: f.render :: Nil)
               case LeftShift(src, struct, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::
@@ -238,7 +235,7 @@ object QScriptCore {
                 NonTerminal("Reduce" :: nt, None,
                   RA.render(src) ::
                     nested("Bucket", bucket) ::
-                    NonTerminal("Reducers" :: nt, None, reducers.map(RF.render(_))) ::
+                    NonTerminal("Reducers" :: nt, None, reducers.map(_.render)) ::
                     nested("Repair", repair) ::
                     Nil)
               case Sort(src, bucket, order) =>
@@ -250,8 +247,8 @@ object QScriptCore {
               case Union(src, lBranch, rBranch) =>
                 NonTerminal("Union" :: nt, None, List(
                   RA.render(src),
-                  Terminal("LeftBranch" :: nt, lBranch.shows.some),
-                  Terminal("RightBranch" :: nt, rBranch.shows.some)))
+                  nested("LeftBranch", lBranch),
+                  nested("RightBranch", rBranch)))
               case Filter(src, func) =>
                 NonTerminal("Filter" :: nt, None, List(
                   RA.render(src),
@@ -259,8 +256,8 @@ object QScriptCore {
               case Subset(src, from, sel, count) =>
                 NonTerminal("Subset" :: nt, sel.shows.some, List(
                   RA.render(src),
-                  Terminal("From" :: nt, from.shows.some),
-                  Terminal("Count" :: nt, count.shows.some)))
+                  nested("From", from),
+                  nested("Count", count)))
               case Unreferenced()             =>
                 Terminal("Unreferenced" :: nt, None)
             }

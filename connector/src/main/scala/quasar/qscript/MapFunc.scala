@@ -566,6 +566,7 @@ object MapFunc {
       }
     }
 
+  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
   implicit def renderTree[T[_[_]]](implicit ev0: Show[T[EJson]], ev1: RenderTree[Type]): Delay[RenderTree, MapFunc[T, ?]] =
     new Delay[RenderTree, MapFunc[T, ?]] {
       val nt = "MapFunc" :: Nil

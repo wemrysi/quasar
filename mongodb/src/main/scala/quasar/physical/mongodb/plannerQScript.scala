@@ -812,7 +812,7 @@ object MongoDbQScriptPlanner {
 
   type GenT[X[_], A]  = StateT[X, NameGen, A]
 
-  def plan0[T[_[_]]: Recursive: Corecursive: EqualT: ShowT,
+  def plan0[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse](
     joinHandler: JoinHandler[WF, WorkflowBuilder.M],
@@ -884,7 +884,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
+  def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT](
     logical: T[LogicalPlan], queryContext: fs.QueryContext):
       EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
