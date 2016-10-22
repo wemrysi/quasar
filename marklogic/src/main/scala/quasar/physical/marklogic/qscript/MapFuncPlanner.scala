@@ -67,7 +67,6 @@ object MapFuncPlanner {
     case ExtractEpoch(time)           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
     case ExtractHour(time)            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
     case ExtractIsoDayOfWeek(time)    => qscript.asDate[F].apply(time) map (xdmp.weekdayFromDate)
-    case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedDatePart("isoyear"))
     case ExtractMicroseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
     case ExtractMillennium(time)      => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
     case ExtractMilliseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
@@ -100,7 +99,6 @@ object MapFuncPlanner {
     case Gte(x, y)           => binOp[F](x, y)(_ ge _)
     case And(x, y)           => binOp[F](x, y)(_ and _)
     case Or(x, y)            => binOp[F](x, y)(_ or _)
-    case Coalesce(x, y)      => qscript.coalesce[F] apply (x, y)
     case Between(v1, v2, v3) => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
     case Cond(p, t, f)       => if_(p).then_(t).else_(f).point[F]
 

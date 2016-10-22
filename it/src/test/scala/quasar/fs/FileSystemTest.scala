@@ -30,6 +30,7 @@ import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
 
+import eu.timepit.refined.auto._
 import monocle.Optional
 import monocle.function.Index
 import monocle.std.vector._
@@ -128,8 +129,8 @@ object FileSystemTest {
     fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)        orElse
     fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)   orElse
     fsTestConfig(sparkcore.fs.hdfs.FsType, sparkcore.fs.hdfs.definition)     orElse
-    fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition)         orElse
     fsTestConfig(jsonfile.fs.FsType,        jsonfile.fs.definition)          orElse
+    fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition(10000L)) orElse
     fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)
   }
 

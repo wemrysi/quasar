@@ -134,7 +134,6 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       partialQueryString(s"(${n1ql(a1)} and ${n1ql(a2)})").point[M]
     case Or(a1, a2)          =>
       partialQueryString(s"(${n1ql(a1)} or ${n1ql(a2)})").point[M]
-    case Coalesce(a1, a2)    => ???
     case Between(a1, a2, a3) =>
       for {
         t      <- genName[M]

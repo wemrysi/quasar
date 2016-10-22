@@ -1043,17 +1043,6 @@ abstract class StdLibSpec extends Qspec {
           ternary(Cond(_, _, _).embed, Data.Bool(false), x, y, y)
         }
       }
-
-      "Coalesce" >> {
-        "null" >> prop { (x: Data) =>
-          binary(Coalesce(_, _).embed, Data.Null, x, x)
-        }
-
-        "non-null" >> prop { (x: Data, y: Data) =>
-          x != Data.Null ==>
-            binary(Coalesce(_, _).embed, x, y, x)
-        }
-      }
     }
   }
 }

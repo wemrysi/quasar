@@ -17,8 +17,9 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
+import quasar.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit.SECONDS
 
 import com.couchbase.client.java.CouchbaseCluster
 import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
+import com.couchbase.client.java.error.InvalidPasswordException
 import org.http4s.Uri
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -48,22 +50,16 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  // TODO: Move away from Task failures
-
-  def clusterManager(cluster: CouchbaseCluster, username: String, password: String): Task[Context] =
-    Task.delay(
-      Option(cluster.clusterManager(username, password)).cata(
-        Task.now(_),
-        Task.fail(new RuntimeException(
-          "Unable to obtain a ClusterManager with provided credentials.")))
-    ).join.map(Context(cluster, _))
-
   def interp[S[_]](
       connectionUri: ConnectionUri
     )(implicit
-      S0: Task :<: S,
-      failure: Failure.Ops[PhysicalError, S]
-    ): Free[S, (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
+      S0: Task :<: S
+    ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
+
+    final case class ConnUriParams(user: String, pass: String)
+
+    def liftDT[A](v: NonEmptyList[String] \/ A): DefErrT[Task, A] =
+      EitherT.fromDisjunction[Task](v.leftMap(_.left[EnvironmentError]))
 
     // TODO: retrieve from connectionUri params
     val env = DefaultCouchbaseEnvironment
@@ -71,38 +67,55 @@ package object fs {
       .queryTimeout(SECONDS.toMillis(150))
       .build()
 
-    val clusterMngr =
+    val cbCtx: DefErrT[Task, Context] =
       for {
-        uri     <- Task.fromDisjunction(Uri.fromString(connectionUri.value))
-        cluster =  CouchbaseCluster.fromConnectionString(env, uri.renderString)
-        user    <- Task.fromMaybe(uri.params.get("username").toMaybe)(
-                     new RuntimeException("No username in ConnectionUri"))
-        pass    <- Task.fromMaybe(uri.params.get("password").toMaybe)(
-                     new RuntimeException("No password in ConnectionUri"))
-        manager <- clusterManager(cluster, user, pass)
-      } yield (cluster, manager)
+        uri     <- liftDT(
+                     Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
+                   )
+        cluster <- EitherT(Task.delay(
+                     CouchbaseCluster.fromConnectionString(env, uri.renderString).right
+                   ).handle {
+                     case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
+                   })
+        params  <- liftDT((
+                     uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
+                     uri.params.get("password").toSuccessNel("No password in ConnectionUri")
+                   )(ConnUriParams).disjunction)
+        cm      =  cluster.clusterManager(params.user, params.pass)
+        _       <- EitherT(Task.delay(
+                     // verify credentials via call to info
+                     cm.info
+                   ).as(
+                     ().right
+                   ).handle { case ex: InvalidPasswordException =>
+                     invalidCredentials(
+                       "Unable to obtain a ClusterManager with provided credentials."
+                     ).right[NonEmptyList[String]].left
+                   })
+      } yield Context(cluster, cm)
 
-    def taskInterp: Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
-      (clusterMngr                                       |@|
-       TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
+    def taskInterp(
+      ctx: Context
+    ): Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
+      (TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
        TaskRef(Map.empty[WriteHandle,  writefile.State]) |@|
        TaskRef(Map.empty[ResultHandle, Cursor])          |@|
        TaskRef(0L)                                       |@|
        GenUUID.type1
-     )((cm, kvR, kvW, kvQ, i, genUUID) =>
+     )((kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
           reflNT[Task]                          :+:
-          Read.constant[Task, Context](cm._2)   :+:
+          Read.constant[Task, Context](ctx)     :+:
           MonotonicSeq.fromTaskRef(i)           :+:
           genUUID                               :+:
           KeyValueStore.impl.fromTaskRef(kvR)   :+:
           KeyValueStore.impl.fromTaskRef(kvW)   :+:
           KeyValueStore.impl.fromTaskRef(kvQ))),
-        lift(Task.delay(cm._1.disconnect()).void).into
+        lift(Task.delay(ctx.cluster.disconnect()).void).into
       ))
 
-    lift(taskInterp).into
+    EitherT(lift(cbCtx.run >>= (_.traverse(taskInterp))).into)
   }
 
   def definition[S[_]](implicit
@@ -119,6 +132,6 @@ package object fs {
               writefile.interpret,
               managefile.interpret),
             close)
-        }.liftM[DefErrT]
+        }
     }
 }

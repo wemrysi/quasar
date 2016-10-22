@@ -207,7 +207,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           InternalServerError withReason "Unsupported function.",
           err.message,
-          "functionName" := fn)
+          "functionName" := fn.shows)
       case PlanPathError(e) =>
         e.toApiError
       case UnsupportedJoinCondition(cond) =>
@@ -225,7 +225,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           BadRequest withReason "Illegal function argument.",
           err.message,
-          "functionName" := fn,
+          "functionName" := fn.shows,
           "expectedArg"  := exp,
           "actualArg"    := act)
       case ObjectIdFormatError(oid) =>
@@ -331,7 +331,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           BadRequest withReason "Malformed date/time string.",
           err.message,
-          "functionName" := fn.name,
+          "functionName" := fn.shows,
           "input"        := str)
       case other =>
         fromMsg_(

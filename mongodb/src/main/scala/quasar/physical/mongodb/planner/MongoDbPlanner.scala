@@ -105,7 +105,7 @@ object MongoDbPlanner {
       val HasStr: Output => OutputM[String] = _.flatMap {
         _._1(Nil)(ident("_")) match {
           case Literal(Js.Str(str)) => str.right
-          case x => FuncApply(func.name, "JS string", x.render.shows).left
+          case x => FuncApply(func, "JS string", x.render.shows).left
         }
       }
 
@@ -161,13 +161,13 @@ object MongoDbPlanner {
         // doesn't make sense here.
         case (ArrayConcat, _) => None
 
-        case (func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
+        case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           JsFuncHandler(mf).map(exp => Arity1(exp.eval))
-        case (func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
+        case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           JsFuncHandler(mf).map(exp => Arity2(exp.eval))
-        case (func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
+        case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           JsFuncHandler(mf).map(exp => Arity3(exp.eval))
         case _ => None
@@ -203,7 +203,7 @@ object MongoDbPlanner {
         }
         case MakeArray => Arity1(x => Arr(List(x)))
 
-        case _ => -\/(UnsupportedFunction(func.name, "in JS planner".some))
+        case _ => -\/(UnsupportedFunction(func, "in JS planner".some))
       })
     }
 
@@ -417,7 +417,7 @@ object MongoDbPlanner {
 
         case (Constantly, Sized(const, _)) => const._2
 
-        case _ => -\/(UnsupportedFunction(func.name, "in Selector planner".some))
+        case _ => -\/(UnsupportedFunction(func, "in Selector planner".some))
       }
     }
 
@@ -541,19 +541,19 @@ object MongoDbPlanner {
       val HasLiteral: Ann => OutputM[Bson] = ann => HasWorkflow(ann).flatMap { p =>
         asLiteral(p) match {
           case Some(value) => \/-(value)
-          case _           => -\/(FuncApply(func.name, "literal", p.shows))
+          case _           => -\/(FuncApply(func, "literal", p.shows))
         }
       }
 
       val HasInt: Ann => OutputM[Long] = HasLiteral(_).flatMap {
         case Bson.Int32(v) => \/-(v.toLong)
         case Bson.Int64(v) => \/-(v)
-        case x => -\/(FuncApply(func.name, "64-bit integer", x.shows))
+        case x => -\/(FuncApply(func, "64-bit integer", x.shows))
       }
 
       val HasText: Ann => OutputM[String] = HasLiteral(_).flatMap {
         case Bson.Text(v) => \/-(v)
-        case x => -\/(FuncApply(func.name, "text", x.shows))
+        case x => -\/(FuncApply(func, "text", x.shows))
       }
 
       def Arity1[A](f: Ann => OutputM[A]): OutputM[A] = args match {
@@ -607,14 +607,14 @@ object MongoDbPlanner {
         // doesn't make sense here.
         case (ArrayConcat, _) => None
 
-        case (func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
+        case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
             funcHandler.run(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = FunctorT[Free[?[_], UnaryArg]].transCata(f)(inj)
             WB.expr1(wb1)(exp.eval)
           }
-        case (func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
+        case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
@@ -622,7 +622,7 @@ object MongoDbPlanner {
             val exp: Binary[ExprOp] = FunctorT[Free[?[_], BinaryArg]].transCata(f)(inj)
             WB.expr2(wb1, wb2)(exp.eval)
           }
-        case (func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
+        case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
           val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
@@ -704,7 +704,7 @@ object MongoDbPlanner {
         case ArrayLength =>
           lift(Arity2(HasWorkflow, HasInt)).flatMap {
             case (p, 1)   => mapExpr(p)($size(_))
-            case (_, dim) => fail(FuncApply(func.name, "lower array dimension", dim.toString))
+            case (_, dim) => fail(FuncApply(func, "lower array dimension", dim.toString))
           }
 
         // TODO: If we had the type available, this could be more efficient in
@@ -737,7 +737,7 @@ object MongoDbPlanner {
         case DistinctBy   =>
           lift(Arity2(HasWorkflow, HasKeys)).flatMap((WB.distinctBy(_, _)).tupled)
 
-        case _ => fail(UnsupportedFunction(func.name, "in workflow planner".some))
+        case _ => fail(UnsupportedFunction(func, "in workflow planner".some))
       })
     }
 
@@ -873,7 +873,7 @@ object MongoDbPlanner {
           Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
         case InvokeFUnapply(Not, Sized(t1)) =>
           Func.Input1(t1).traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
-        case x @ InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
+        case x @ InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
             \/-(Invoke(func, Func.Input2(left, right)))
           else if (containsTableRefs(left, rt, right, lt))

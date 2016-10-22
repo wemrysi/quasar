@@ -365,7 +365,6 @@ object MapFunc {
         case IfUndefined(a1, a2) => (f(a1) ⊛ f(a2))(IfUndefined(_, _))
         case And(a1, a2) => (f(a1) ⊛ f(a2))(And(_, _))
         case Or(a1, a2) => (f(a1) ⊛ f(a2))(Or(_, _))
-        case Coalesce(a1, a2) => (f(a1) ⊛ f(a2))(Coalesce(_, _))
         case Within(a1, a2) => (f(a1) ⊛ f(a2))(Within(_, _))
         case MakeMap(a1, a2) => (f(a1) ⊛ f(a2))(MakeMap(_, _))
         case ConcatMaps(a1, a2) => (f(a1) ⊛ f(a2))(ConcatMaps(_, _))
@@ -451,7 +450,6 @@ object MapFunc {
         case (IfUndefined(a1, a2), IfUndefined(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (And(a1, a2), And(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Or(a1, a2), Or(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (Coalesce(a1, a2), Coalesce(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Within(a1, a2), Within(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (MakeMap(a1, a2), MakeMap(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatMaps(a1, a2), ConcatMaps(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -544,7 +542,6 @@ object MapFunc {
           case IfUndefined(a1, a2) => shz("IfUndefined", a1, a2)
           case And(a1, a2) => shz("And", a1, a2)
           case Or(a1, a2) => shz("Or", a1, a2)
-          case Coalesce(a1, a2) => shz("Coalesce", a1, a2)
           case Within(a1, a2) => shz("Within", a1, a2)
           case MakeMap(a1, a2) => shz("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => shz("ConcatMaps", a1, a2)
@@ -644,7 +641,6 @@ object MapFunc {
           case IfUndefined(a1, a2) => nAry("IfUndefined", a1, a2)
           case And(a1, a2) => nAry("And", a1, a2)
           case Or(a1, a2) => nAry("Or", a1, a2)
-          case Coalesce(a1, a2) => nAry("Coalesce", a1, a2)
           case Within(a1, a2) => nAry("Within", a1, a2)
           case MakeMap(a1, a2) => nAry("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => nAry("ConcatMaps", a1, a2)
@@ -728,7 +724,6 @@ object MapFunc {
       case relations.IfUndefined => IfUndefined(_, _)
       case relations.And => And(_, _)
       case relations.Or => Or(_, _)
-      case relations.Coalesce => Coalesce(_, _)
       case set.Within => Within(_, _)
       case structural.MakeObject => MakeMap(_, _)
       case structural.ObjectConcat => ConcatMaps(_, _)
@@ -820,7 +815,6 @@ object MapFuncs {
   @Lenses final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Cond[T[_[_]], A](cond: A, then_ : A, else_ : A) extends Ternary[T, A] {
     def a1 = cond
