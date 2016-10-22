@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.PhaseResult.Detail
+import quasar.common.PhaseResult.detail
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._
 import quasar.qscript, qscript._
@@ -48,7 +48,7 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
       val kN1ql   = n1ql(k)
       val vN1ql   = n1ql(v)
       val n1qlStr = s"object_add({}, $kN1ql, $vN1ql)"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL UnshiftMap",
         s"""  k:    $kN1ql
            |  v:    $vN1ql

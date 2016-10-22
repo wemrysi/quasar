@@ -196,17 +196,15 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-        ejson, js,  // NB: need to get dependencies to look like:
-//         \  /
-          frontend, //   frontend, connector,
-//           |            /    \  /     \
-    effect, sql,    //  sql,  core,    marklogic, mongodb, ...
-//     \     |             \    |     /
-        connector,  //      interface,
-//      / / | \ \
-                    marklogicValidation,
-//    /  /  |  \  \    /
-  core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
+      ejson, js,                         // NB: need to get dependencies to look like:
+//       \  /
+        common,                          //   frontend, connector,
+//        |                                    /    \  /     \
+    frontend, effect,                    //  sql,  core,    marklogic, mongodb, ...
+//   |    \   |                                 \    |     /
+    sql, connector, marklogicValidation, //      interface,
+//   |  /   | | \ \      |
+    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
 //        /  \
@@ -253,11 +251,26 @@ lazy val js = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Quasar components shared by both frontend and connector. */
+lazy val common = project
+  .settings(name := "quasar-common-internal")
+  // TODO: The dependency on `js` is because `Data` encapsulates its `toJs`,
+  //       which should be extracted.
+  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(
-    frontend % BothScopes,
-    connector % BothScopes)
+  .dependsOn(frontend % BothScopes, connector % BothScopes, sql)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -274,7 +287,7 @@ lazy val core = project
 //       be elsewhere.
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
-  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -302,11 +315,10 @@ lazy val sql = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    ejson % BothScopes,
-    effect % BothScopes,
-    js % BothScopes,
+    common   % BothScopes,
+    effect   % BothScopes,
     frontend % BothScopes,
-    sql % BothScopes)
+    sql      % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -349,7 +361,10 @@ lazy val marklogicValidation = project.in(file("marklogic-validation"))
 
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
-  .dependsOn(connector % BothScopes, js % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    js        % BothScopes,
+    core      % "test->compile")
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.mongodb,

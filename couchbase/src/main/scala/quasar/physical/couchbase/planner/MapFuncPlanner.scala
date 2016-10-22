@@ -17,13 +17,13 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._, ski.κ
 import quasar.NameGenerator
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._
-import quasar.physical.couchbase.N1QL._, Select._
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
+import quasar.common.PhaseResult.Detail
+import quasar.contrib.matryoshka._
+import quasar.fp._, eitherT._
+import quasar.fp.ski.κ
+import quasar.physical.couchbase._, N1QL._, Select._
 import quasar.qscript, qscript._
 import quasar.std.StdLib.string._
 

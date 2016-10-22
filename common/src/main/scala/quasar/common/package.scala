@@ -14,26 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.physical.couchbase
+package quasar
 
 import quasar.Predef._
-import quasar.NameGenerator
-import quasar.common.{PhaseResults, PhaseResultT}
-import quasar.connector.PlannerErrT
 
 import scalaz._
 
-package object planner {
-
-  type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
-
-  def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
-    MonadTell[F, PhaseResults].tell(pr)
-
-  def n1ql(n1ql: N1QL): String =
-    N1QL.n1qlQueryString(n1ql)
-
-  def genName[F[_]: Functor: NameGenerator]: F[String] =
-    NameGenerator[F].prefixedName("_")
-
+package object common {
+  type PhaseResults = Vector[PhaseResult]
+  type PhaseResultW[A] = Writer[PhaseResults, A]
+  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
 }

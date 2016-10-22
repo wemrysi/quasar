@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp.liftMT
 import quasar.fs._

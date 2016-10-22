@@ -14,26 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.physical.couchbase
+package quasar
 
-import quasar.Predef._
-import quasar.NameGenerator
-import quasar.common.{PhaseResults, PhaseResultT}
-import quasar.connector.PlannerErrT
+import quasar.common.PhaseResultW
+import quasar.effect.Failure
+import quasar.frontend.SemanticErrsT
 
 import scalaz._
 
-package object planner {
+package object connector {
+  type CompileM[A] = SemanticErrsT[PhaseResultW, A]
 
-  type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
+  type EnvErr[A] = Failure[EnvironmentError, A]
+  type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
 
-  def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
-    MonadTell[F, PhaseResults].tell(pr)
-
-  def n1ql(n1ql: N1QL): String =
-    N1QL.n1qlQueryString(n1ql)
-
-  def genName[F[_]: Functor: NameGenerator]: F[String] =
-    NameGenerator[F].prefixedName("_")
-
+  type PlannerErrT[F[_], A] = EitherT[F, Planner.PlannerError, A]
 }
