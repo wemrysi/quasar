@@ -48,7 +48,6 @@ object DimensionalEffect {
 
 final case class UnaryFunc(
     val effect: DimensionalEffect,
-    val name: String,
     val help: String,
     val codomain: Func.Codomain,
     val domain: Func.Domain[nat._1],
@@ -62,7 +61,6 @@ final case class UnaryFunc(
 
 final case class BinaryFunc(
     val effect: DimensionalEffect,
-    val name: String,
     val help: String,
     val codomain: Func.Codomain,
     val domain: Func.Domain[nat._2],
@@ -76,7 +74,6 @@ final case class BinaryFunc(
 
 final case class TernaryFunc(
     val effect: DimensionalEffect,
-    val name: String,
     val help: String,
     val codomain: Func.Codomain,
     val domain: Func.Domain[nat._3],
@@ -88,9 +85,8 @@ final case class TernaryFunc(
     applyGeneric(Func.Input3[A](a1, a2, a3))
 }
 
-abstract class GenericFunc[N <: Nat] {
+sealed abstract class GenericFunc[N <: Nat] {
   def effect: DimensionalEffect
-  def name: String
   def help: String
   def codomain: Func.Codomain
   def domain: Func.Domain[N]
@@ -108,17 +104,127 @@ abstract class GenericFunc[N <: Nat] {
     typer0(args)
 
   final def arity: Int = domain.length
-
-  override def toString: String = name
 }
 
-trait FuncInstances {
-  implicit val FuncRenderTree: RenderTree[GenericFunc[_]] = new RenderTree[GenericFunc[_]] {
-    def render(func: GenericFunc[_]) = Terminal("Func" :: Nil, Some(func.name))
+trait GenericFuncInstances {
+  implicit def show[N <: Nat]: Show[GenericFunc[N]] = {
+    import std.StdLib._
+
+    Show.shows {
+      case agg.Count                      => "Count"
+      case agg.Sum                        => "Sum"
+      case agg.Min                        => "Min"
+      case agg.Max                        => "Max"
+      case agg.Avg                        => "Avg"
+      case agg.Arbitrary                  => "Arbitrary"
+      case array.ArrayLength              => "ArrayLength"
+      case date.ExtractCentury            => "ExtractCentury"
+      case date.ExtractDayOfMonth         => "ExtractDayOfMonth"
+      case date.ExtractDecade             => "ExtractDecade"
+      case date.ExtractDayOfWeek          => "ExtractDayOfWeek"
+      case date.ExtractDayOfYear          => "ExtractDayOfYear"
+      case date.ExtractEpoch              => "ExtractEpoch"
+      case date.ExtractHour               => "ExtractHour"
+      case date.ExtractIsoDayOfWeek       => "ExtractIsoDayOfWeek"
+      case date.ExtractIsoYear            => "ExtractIsoYear"
+      case date.ExtractMicroseconds       => "ExtractMicroseconds"
+      case date.ExtractMillennium         => "ExtractMillennium"
+      case date.ExtractMilliseconds       => "ExtractMilliseconds"
+      case date.ExtractMinute             => "ExtractMinute"
+      case date.ExtractMonth              => "ExtractMonth"
+      case date.ExtractQuarter            => "ExtractQuarter"
+      case date.ExtractSecond             => "ExtractSecond"
+      case date.ExtractTimezone           => "ExtractTimezone"
+      case date.ExtractTimezoneHour       => "ExtractTimezoneHour"
+      case date.ExtractTimezoneMinute     => "ExtractTimezoneMinute"
+      case date.ExtractWeek               => "ExtractWeek"
+      case date.ExtractYear               => "ExtractYear"
+      case date.Date                      => "Date"
+      case date.Time                      => "Time"
+      case date.Timestamp                 => "Timestamp"
+      case date.Interval                  => "Interval"
+      case date.TimeOfDay                 => "TimeOfDay"
+      case date.ToTimestamp               => "ToTimestamp"
+      case identity.Squash                => "Squash"
+      case identity.ToId                  => "ToId"
+      case math.Add                       => "Add"
+      case math.Multiply                  => "Multiply"
+      case math.Power                     => "Power"
+      case math.Subtract                  => "Subtract"
+      case math.Divide                    => "Divide"
+      case math.Negate                    => "Negate"
+      case math.Modulo                    => "Modulo"
+      case relations.Eq                   => "Eq"
+      case relations.Neq                  => "Neq"
+      case relations.Lt                   => "Lt"
+      case relations.Lte                  => "Lte"
+      case relations.Gt                   => "Gt"
+      case relations.Gte                  => "Gte"
+      case relations.Between              => "Between"
+      case relations.IfUndefined          => "IfUndefined"
+      case relations.And                  => "And"
+      case relations.Or                   => "Or"
+      case relations.Not                  => "Not"
+      case relations.Cond                 => "Cond"
+      case set.Take                       => "Take"
+      case set.Drop                       => "Drop"
+      case set.Range                      => "Range"
+      case set.OrderBy                    => "OrderBy"
+      case set.Filter                     => "Filter"
+      case set.InnerJoin                  => "InnerJoin"
+      case set.LeftOuterJoin              => "LeftOuterJoin"
+      case set.RightOuterJoin             => "RightOuterJoin"
+      case set.FullOuterJoin              => "FullOuterJoin"
+      case set.GroupBy                    => "GroupBy"
+      case set.Distinct                   => "Distinct"
+      case set.DistinctBy                 => "DistinctBy"
+      case set.Union                      => "Union"
+      case set.Intersect                  => "Intersect"
+      case set.Except                     => "Except"
+      case set.In                         => "In"
+      case set.Within                     => "Within"
+      case set.Constantly                 => "Constantly"
+      case string.Concat                  => "Concat"
+      case string.Like                    => "Like"
+      case string.Search                  => "Search"
+      case string.Length                  => "Length"
+      case string.Lower                   => "Lower"
+      case string.Upper                   => "Upper"
+      case string.Substring               => "Substring"
+      case string.Boolean                 => "Boolean"
+      case string.Integer                 => "Integer"
+      case string.Decimal                 => "Decimal"
+      case string.Null                    => "Null"
+      case string.ToString                => "ToString"
+      case structural.MakeObject          => "MakeObject"
+      case structural.MakeArray           => "MakeArray"
+      case structural.ObjectConcat        => "ObjectConcat"
+      case structural.ArrayConcat         => "ArrayConcat"
+      case structural.ConcatOp            => "ConcatOp"
+      case structural.ObjectProject       => "ObjectProject"
+      case structural.ArrayProject        => "ArrayProject"
+      case structural.DeleteField         => "DeleteField"
+      case structural.FlattenMap          => "FlattenMap"
+      case structural.FlattenArray        => "FlattenArray"
+      case structural.FlattenMapKeys      => "FlattenMapKeys"
+      case structural.FlattenArrayIndices => "FlattenArrayIndices"
+      case structural.ShiftMap            => "ShiftMap"
+      case structural.ShiftArray          => "ShiftArray"
+      case structural.ShiftMapKeys        => "ShiftMapKeys"
+      case structural.ShiftArrayIndices   => "ShiftArrayIndices"
+      case structural.UnshiftMap          => "UnshiftMap"
+      case structural.UnshiftArray        => "UnshiftArray"
+      case f                              => "unknown function: " + f.help
+    }
   }
+
+  implicit def renderTree[N <: Nat]: RenderTree[GenericFunc[N]] =
+    RenderTree.fromShow("Func")
 }
 
-object Func extends FuncInstances {
+object GenericFunc extends GenericFuncInstances
+
+object Func {
   /** This handles rewrites that constant-folding (handled by the typers) can’t.
     * I.e., any rewrite where either the result or one of the relevant arguments
     * is a non-Constant expression. It _could_ cover all the rewrites, but

@@ -498,7 +498,7 @@ object WorkflowBuilder {
             fields.traverse(f => (DocField(name) \\ f.toDocVar).deref).fold(
               scala.sys.error("prefixed ${name}, but still no field"))(
               op.lift(_).fold(
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
+                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
                 op =>
                 (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \/-($$ROOT))))) {
                   case (
@@ -523,7 +523,7 @@ object WorkflowBuilder {
               CollectionBuilderF(_, _, srcStruct),
               CollectionBuilderF(graph, base0, bothStruct)) =>
               op.lift(fields.map(f => base0.toDocVar.deref.map(_ \ f).getOrElse(f))).fold[M[CollectionBuilderF[F]]](
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
+                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
                 { op =>
                   val g = chain(graph, op)
                   if (srcStruct ≟ bothStruct)
@@ -1242,19 +1242,19 @@ object WorkflowBuilder {
           projectField(src, name).map(ShapePreservingBuilder(_, inputs, op))
         case ValueBuilderF(Bson.Doc(fields)) =>
           fields.get(name).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("value does not contain a field ‘" + name + "’."))))(
             x => \/-(ValueBuilder(x)))
         case ValueBuilderF(_) =>
-          -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value is not a document.")))
+          -\/(UnsupportedFunction(structural.ObjectProject, Some("value is not a document.")))
         case GroupBuilderF(wb0, key, Expr(\/-($var(dv)))) =>
           projectField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($var(dv)))))
         case GroupBuilderF(wb0, key, Doc(doc)) =>
           doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("group does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("group does not contain a field ‘" + name + "’."))))(
             x => \/-(GroupBuilder(wb0, key, Expr(x))))
         case DocBuilderF(wb, doc) =>
           doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("document does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("document does not contain a field ‘" + name + "’."))))(
             expr => \/-(ExprBuilder(wb, expr)))
         case ExprBuilderF(wb0,  -\/(js1)) =>
           \/-(ExprBuilder(wb0,
@@ -1271,22 +1271,22 @@ object WorkflowBuilder {
             \/-(ValueBuilder(elems(index)))
           else
             -\/(UnsupportedFunction(
-              structural.ArrayProject.name,
+              structural.ArrayProject,
               Some("value does not contain index ‘" + index + "’.")))
         case ArrayBuilderF(wb0, elems) =>
           if (index < elems.length) // UGH!
             \/-(ExprBuilder(wb0, elems(index)))
           else
             -\/(UnsupportedFunction(
-              structural.ArrayProject.name,
+              structural.ArrayProject,
               Some("array does not contain index ‘" + index + "’.")))
         case ValueBuilderF(_) =>
           -\/(UnsupportedFunction(
-            structural.ArrayProject.name,
+            structural.ArrayProject,
             Some("value is not an array.")))
         case DocBuilderF(_, _) =>
           -\/(UnsupportedFunction(
-            structural.ArrayProject.name,
+            structural.ArrayProject,
             Some("value is not an array.")))
         case _ =>
           jsExpr1(wb, JsFn(jsBase,
@@ -1301,7 +1301,7 @@ object WorkflowBuilder {
           \/-(ValueBuilder(Bson.Doc(fields - name)))
         case ValueBuilderF(_) =>
           -\/(UnsupportedFunction(
-            structural.DeleteField.name,
+            structural.DeleteField,
             Some("value is not a document.")))
         case GroupBuilderF(wb0, key, Expr(\/-($$ROOT))) =>
           deleteField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($$ROOT))))
@@ -1605,7 +1605,7 @@ object WorkflowBuilder {
           case (GroupBuilderF(_, _, _), DocBuilderF(Fix(ArraySpliceBuilderF(_, _)), _)) => delegate
 
           case _ => fail(UnsupportedFunction(
-            structural.ObjectConcat.name,
+            structural.ObjectConcat,
             Some("unrecognized shapes:\n" + wb1.render.show + "\n" + wb2.render.show)))
         }
       }
@@ -1724,7 +1724,7 @@ object WorkflowBuilder {
 
           case _ =>
             fail(UnsupportedFunction(
-              structural.ArrayConcat.name,
+              structural.ArrayConcat,
               Some("values are not both arrays")))
         }
       }

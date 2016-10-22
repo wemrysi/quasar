@@ -47,7 +47,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
       Skipped("Infinity is not translated properly?").left
 
     case (relations.Cond, _)     => Skipped("TODO").left
-    case (relations.Coalesce, _) => Skipped("TODO").left
 
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left

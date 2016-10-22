@@ -28,6 +28,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import WorkflowBuilder._
+import quasar.sql.JoinDir
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
@@ -45,8 +46,8 @@ object JoinHandler {
   // FIXME: these have to match the names used in the logical plan. Should
   //        change this to ensure left0/right0 are `Free` and pull the names
   //        from those.
-  val LeftName: BsonField.Name = BsonField.Name("left")
-  val RightName: BsonField.Name = BsonField.Name("right")
+  val LeftName: BsonField.Name = BsonField.Name(JoinDir.Left.name)
+  val RightName: BsonField.Name = BsonField.Name(JoinDir.Right.name)
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.

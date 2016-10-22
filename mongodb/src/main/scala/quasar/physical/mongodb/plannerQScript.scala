@@ -760,12 +760,12 @@ object MongoDbQScriptPlanner {
   // TODO: Need `Delay[Show, WorkflowBuilder]`
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def HasLiteral[WF[_]]: WorkflowBuilder[WF] => OutputM[Bson] =
-    wb => asLiteral(wb) \/> FuncApply("", "literal", wb.toString)
+    wb => asLiteral(wb) \/> NonRepresentableEJson(wb.toString)
 
   def HasInt[WF[_]]: WorkflowBuilder[WF] => OutputM[Long] = HasLiteral(_) >>= {
     case Bson.Int32(v) => \/-(v.toLong)
     case Bson.Int64(v) => \/-(v)
-    case x => -\/(FuncApply("", "64-bit integer", x.shows))
+    case x             => -\/(NonRepresentableEJson(x.shows))
   }
 
   // This is maybe worth putting in Matryoshka?
