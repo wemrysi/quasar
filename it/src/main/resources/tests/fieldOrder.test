@@ -7,18 +7,13 @@
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "couchbase":         "skip"
     },
 
     "data": "zips.data",
 
-    "query": "select count(*)/1000, 0 from zips limit 5",
+    "query": "select count(*)/1000 as kcount, 0 as zero from zips limit 5",
 
     "predicate": "equalsExactly",
-    "expected": [{ "0": 29.353, "1": 0 },
-                 { "0": 29.353, "1": 0 },
-                 { "0": 29.353, "1": 0 },
-                 { "0": 29.353, "1": 0 },
-                 { "0": 29.353, "1": 0 }]
+    "expected": [{ "kcount": 29.353, "zero": 0 }]
 }

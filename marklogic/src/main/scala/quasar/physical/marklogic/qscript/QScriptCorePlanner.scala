@@ -127,7 +127,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case Min(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Sum(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F](fm, _))
-    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.seqToArray_[F](_)))
+    case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.singletonArray[F].apply(_)))
     case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F](kfm, x).tuple(mapFuncXQuery[T, F](vfm, x)).flatMap {
                                    case (k, v) => ejson.singletonObject[F].apply(k, v)
                                  })

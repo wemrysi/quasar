@@ -9,5 +9,6 @@
     "data": "cities.data",
     "query": "select distinct * from cities where city = \"BOSTON\"",
     "predicate": "equalsExactly",
+    "NB": "This will only ever pass for MongoDB as other backends will consider the '_id' field.",
     "expected": [{ "value": { "city": "BOSTON" } }]
 }
