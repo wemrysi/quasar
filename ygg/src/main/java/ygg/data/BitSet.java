@@ -441,7 +441,7 @@ public class BitSet {
     }
 
     // Optimization.
-    public boolean equals(Object obj) {
+    public boolean equals(java.lang.Object obj) {
         if (!(obj instanceof BitSet))
             return super.equals(obj);
         BitSet that = (BitSet) obj;
