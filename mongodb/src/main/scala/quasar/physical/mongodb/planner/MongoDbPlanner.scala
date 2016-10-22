@@ -599,6 +599,9 @@ object MongoDbPlanner {
         }
       }
 
+      def createOp[A](f: Free[EX, A]): Free[ExprOp, A] =
+        FunctorT[Free[?[_], A]].transCata[EX, ExprOp](f)(inj)
+
       ((func, args) match {
         // NB: this one is missing from MapFunc.
         case (ToId, _) => None
@@ -611,7 +614,7 @@ object MongoDbPlanner {
           val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
             funcHandler.run(mf)) { (wb1, f) =>
-            val exp: Unary[ExprOp] = FunctorT[Free[?[_], UnaryArg]].transCata(f)(inj)
+            val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
@@ -619,7 +622,7 @@ object MongoDbPlanner {
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             funcHandler.run(mf)) { (wb1, wb2, f) =>
-            val exp: Binary[ExprOp] = FunctorT[Free[?[_], BinaryArg]].transCata(f)(inj)
+            val exp: Binary[ExprOp] = createOp[BinaryArg](f)
             WB.expr2(wb1, wb2)(exp.eval)
           }
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
@@ -628,7 +631,7 @@ object MongoDbPlanner {
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|
             funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
-            val exp: Ternary[ExprOp] = FunctorT[Free[?[_], TernaryArg]].transCata(f)(inj)
+            val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
               case List(_1, _2, _3) => exp.eval[Fix](_1, _2, _3)
             }
