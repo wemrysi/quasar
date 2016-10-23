@@ -30,7 +30,7 @@ import ManageFile.MoveSemantics._
 import ManageFile.MoveScenario._
 // import ygg.table._
 
-class FsAlgebras[S[_]] extends STypes[S] {
+class FsAlgebras[S[_]] extends STypes[S] with YggQueryFile[S] {
   private def defaultChunkSize: Int = 10
 
   def emptyData(): Chunks                  = Vector()
@@ -66,9 +66,8 @@ class FsAlgebras[S[_]] extends STypes[S] {
       case \/-(names) => names.toVector map (dir / _) flatMap (x => maybeFile(x))
     }
 
-  def existsError[A](path: APath): FLR[A]         = point(-\/(pathErr(pathExists(path))))
-  def phaseResults(lp: FixPlan): FS[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", "<no description>"))
-  def nextLong(implicit MS: MonotonicSeq :<: S)   = MonotonicSeq.Ops[S].next
+  def existsError[A](path: APath): FLR[A]       = point(-\/(pathErr(pathExists(path))))
+  def nextLong(implicit MS: MonotonicSeq :<: S) = MonotonicSeq.Ops[S].next
 
   def deleteDir(x: ADir)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(x) flatMap {
     case Seq() => unknownPath(x)
@@ -176,15 +175,6 @@ class FsAlgebras[S[_]] extends STypes[S] {
             }
         }
     }
-  }
-  def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) = λ[QueryFile ~> FS] {
-    case QueryFile.ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
-    case QueryFile.EvaluatePlan(lp)     => (phaseResults(lp) |@| nextLong)((ph, uid) => ph -> \/-(QHandle(uid)))
-    case QueryFile.Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
-    case QueryFile.ListContents(dir)    => ls(dir)
-    case QueryFile.FileExists(file)     => KVF contains file
-    case QueryFile.More(qh)             => Vector()
-    case QueryFile.Close(fh)            => (KVQ delete fh).void
   }
 
   def boundFs(implicit
