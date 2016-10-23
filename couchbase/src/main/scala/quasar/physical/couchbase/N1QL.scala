@@ -95,7 +95,7 @@ object N1QL {
     let                                      .orZero |+|
     groupBy    .map(g => s" group by $g"    ).orZero |+|
     sel.unnest .map(u => s" unnest $u"      ).orZero |+|
-    sel.orderBy.map(o => s" order by ($o)"  ).orZero |+|
+    sel.orderBy.map(o => s" order by $o"    ).orZero |+|
     ")"
   }
 

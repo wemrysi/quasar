@@ -57,7 +57,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         rN1qlStr =  n1ql(rN1ql)
         _        <- prtell[M](Vector(Detail(
                      "N1QL Map",
-                       s"""  src: $src
+                       s"""  src: ${n1ql(src)}
                           |  f:   $ffN1ql
                           |  n1ql: $rN1qlStr""".stripMargin('|'))))
       } yield rN1ql
@@ -69,7 +69,6 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         s        <- freeCataM(struct)(interpretM(
                       κ(partialQueryString(tmpName1).point[M]),
                       mapFuncPlanner[F, T].plan))
-        sN1ql    =  n1ql(s)
         r        <- freeCataM(repair)(interpretM(
                       {
                         case LeftSide  =>
@@ -129,8 +128,6 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
       } yield s
 
     case qscript.Sort(src, bucket, order) =>
-      // TODO: Incorrect? Unable to test due to "unsupported ordering function" error from convertToQScript #1411.
-
       for {
         tmpName <- genName[M]
         b       <- freeCataM(bucket)(interpretM(
@@ -141,28 +138,25 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                        case SortDir.Ascending  => "ASC"
                        case SortDir.Descending => "DESC"
                      }
-                     // TODO: Overly nested
-                     for {
-                       ord     <- freeCataM(or)(interpretM(
-                                    κ(partialQueryString(tmpName).point[M]),
-                                    mapFuncPlanner[F, T].plan))
-                       ordN1ql =  n1ql(ord)
-                     } yield s"($or) $dir"
+                     freeCataM(or)(interpretM(
+                       κ(partialQueryString(tmpName).point[M]),
+                       mapFuncPlanner[F, T].plan
+                     )) ∘ (ord => s"${n1ql(ord)} $dir")
                    }.map(_.mkString(", "))
         bN1ql   =  n1ql(b)
         s       =  select(
-                     value         = false,
-                     resultExprs   = "*".wrapNel,
+                     value         = true,
+                     resultExprs   = tmpName.wrapNel,
                      keyspace      = src,
                      keyspaceAlias = tmpName)     |>
                    groupBy.set(bN1ql.some) >>>
                    orderBy.set(o.some)
         _       <- prtell[M](Vector(Detail(
                      "N1QL Sort",
-                     s"""  src:    $src
-                        |  bucket: $b
+                     s"""  src:    ${n1ql(src)}
+                        |  bucket: $bN1ql
                         |  order:  $o
-                        |  n1ql:   $s""".stripMargin('|'))))
+                        |  n1ql:   ${n1ql(s)}""".stripMargin('|'))))
 
       } yield s
 
