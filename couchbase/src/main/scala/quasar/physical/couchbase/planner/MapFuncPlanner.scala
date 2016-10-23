@@ -219,7 +219,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, "${n1ql(a1)}", ${n1ql(a2)})""").point[M]
+      partialQueryString(s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})""").point[M]
     case ConcatArrays(a1, a2)                     =>
       partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
     case ConcatMaps(a1, a2)                       =>
@@ -235,7 +235,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       )
     case ProjectField(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1.$a2N1ql"
+      val n1qlStr = s"$a1.[$a2N1ql]"
       prtell[M](Vector(Detail(
         "N1QL ProjectField(PartialQueryString(_), _)",
         s"""  a1:   $a1
@@ -251,7 +251,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         a2N1ql   =  n1ql(a2)
         s        =  select(
                       value         = true,
-                      resultExprs   = a2N1ql.wrapNel,
+                      resultExprs   = s"$tempName.[$a2N1ql]".wrapNel,
                       keyspace      = a1,
                       keyspaceAlias = tempName)
         sN1ql    =  n1ql(s)

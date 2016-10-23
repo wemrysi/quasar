@@ -82,7 +82,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample`",
-      """select value v from (select value object_add({}, "name", _0.name) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
+      """select value v from (select value object_add({}, "name", _0.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
 
     testSql2ToN1qlPending(
       "select name, type from `beer-sample`",
@@ -90,19 +90,19 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value object_add({}, "name", _5.name) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value object_add({}, "name", _5.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
     testSql2ToN1ql(
       "select name from `beer-sample` limit 1",
-      """select value v from (select value _4 from (select value _2[0:_1[0]] from (select value (select value object_add({}, "name", _5.name) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[0:_1[0]] from (select value (select value object_add({}, "name", _5.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
     testSql2ToN1qlPending(
       "select name from `beer-sample` order by name",
       pending("#1545"))
 
-    testSql2ToN1qlPending(
-      """select name from `beer-sample` where name = "Brasserie de Silly"""",
-      todo)
+    testSql2ToN1ql(
+      """select address from `beer-sample` where name = "Brasserie de Silly"""",
+      """select value v from (select value object_add({}, "address", array_concat(array_concat(array_concat([array_concat([_1[0]], [_1[1]])[0]], [array_concat([_1[0]], [_1[1]])[0][0][0]]), [array_concat([_1[0]], [_1[1]])[1]]), [(array_concat([_1[0]], [_1[1]])[1].["name"] = "Brasserie de Silly")])[2].["address"]) from (select value _0 from (select value [meta(v).id, ifmissing(v.`value`, v)] from `beer-sample` v) as _0 where array_concat(array_concat(array_concat([array_concat([_0[0]], [_0[1]])[0]], [array_concat([_0[0]], [_0[1]])[0][0][0]]), [array_concat([_0[0]], [_0[1]])[1]]), [(array_concat([_0[0]], [_0[1]])[1].["name"] = "Brasserie de Silly")])[3]) as _1) as v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
@@ -110,11 +110,11 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select count(name) from `beer-sample`",
-      """select value v from (select value object_add({}, "0", count(_0.name)) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
+      """select value v from (select value object_add({}, "0", count(_0.["name"])) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
 
     testSql2ToN1ql(
       "select geo.lat + geo.lon from `beer-sample`",
-      """select value v from (select value object_add({}, "0", (_0.geo.lat + _0.geo.lon)) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
+      """select value v from (select value object_add({}, "0", (_0.["geo"].["lat"] + _0.["geo"].["lon"])) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
   }
 
   "QScript to N1QL" should {
@@ -144,7 +144,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= "select value v from (select value zed from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2) as v"
+      n1ql must_= """select value v from (select value _2.["zed"] from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2) as v"""
     }
 
     "read followed by a map" in {
@@ -160,7 +160,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= "select value v from (select value (_0.a + _0.b) from (select value ifmissing(v.`value`, v) from `foo` v) as _0) as v"
+      n1ql must_= """select value v from (select value (_0.["a"] + _0.["b"]) from (select value ifmissing(v.`value`, v) from `foo` v) as _0) as v"""
     }
 
     "convert a basic reduction wrapped in an object" in {
@@ -181,7 +181,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= """select value v from (select value object_add({}, "0", sum(_3)) from (select value height from (select value _0 from (select value ifmissing(v.`value`, v) from `person` v) as _1 unnest _1 as _0) as _2) as _3) as v"""
+      n1ql must_= """select value v from (select value object_add({}, "0", sum(_3)) from (select value _2.["height"] from (select value _0 from (select value ifmissing(v.`value`, v) from `person` v) as _1 unnest _1 as _0) as _2) as _3) as v"""
     }
 
     "convert a flatten array" in {
@@ -200,7 +200,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value loc from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
+      n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value _2.["loc"] from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
     }
 
     "convert a Eq filter" in {
@@ -218,7 +218,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.["bar"] = "baz")) as v"""
     }
 
     "convert a Eq filter with a projection" in {
@@ -236,7 +236,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.bar = baz)) as v"""
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.["bar"] = "baz")) as v"""
     }
 
     "convert a Between filter" in {
@@ -255,7 +255,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= "select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where _2.bar >= 1 and _2.bar <= 10) as v"
+      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where _2.["bar"] >= 1 and _2.["bar"] <= 10) as v"""
     }
 
     "convert a basic order by" in {
@@ -269,7 +269,7 @@ class BasicQueryEnablementSpec
 
           val n1ql = n1qlFromQS(qs)
 
-          n1ql must_= "select value v from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _0 order by _0.city ASC) as v"
+          n1ql must_= """select value v from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _0 order by _0.["city"] ASC) as v"""
       }
   }
 
