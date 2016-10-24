@@ -1,12 +1,12 @@
 {
     "name": "concat BETWEEN with other fields",
     "backends": {
-        "postgresql": "pending",
-        "couchbase":  "skip"
+        "postgresql": "pending"
     },
-    "data": "zips.data",
-    "query": "select city, pop, pop between 1000 and 10000 as midsized from zips",
+    "data": "smallZips.data",
+    "query": "select city, pop, pop between 1000 and 10000 as midsized from smallZips",
     "predicate": "containsAtLeast",
+    "ignoreFieldOrder": true,
     "expected": [{ "city": "AGAWAM",       "pop": 15338, "midsized": false },
                  { "city": "CUSHMAN",      "pop": 36963, "midsized": false },
                  { "city": "BARRE",        "pop": 4546,  "midsized": true  },
