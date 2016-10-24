@@ -82,19 +82,19 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample`",
-      """select value v from (select value object_add({}, "name", _0.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
+      """select value v from (select value {"name": _0.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
 
-    testSql2ToN1qlPending(
+    testSql2ToN1ql(
       "select name, type from `beer-sample`",
-      pending("ConcatMaps implementation"))
+      """select value v from (select value {"name": _0.["name"], "type": _0.["type"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value object_add({}, "name", _5.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
     testSql2ToN1ql(
       "select name from `beer-sample` limit 1",
-      """select value v from (select value _4 from (select value _2[0:_1[0]] from (select value (select value object_add({}, "name", _5.["name"]) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[0:_1[0]] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
     testSql2ToN1qlPending(
       "select name from `beer-sample` order by name",
@@ -102,7 +102,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       """select address from `beer-sample` where name = "Brasserie de Silly"""",
-      """select value v from (select value object_add({}, "address", array_concat(array_concat(array_concat([array_concat([_1[0]], [_1[1]])[0]], [array_concat([_1[0]], [_1[1]])[0][0][0]]), [array_concat([_1[0]], [_1[1]])[1]]), [(array_concat([_1[0]], [_1[1]])[1].["name"] = "Brasserie de Silly")])[2].["address"]) from (select value _0 from (select value [meta(v).id, ifmissing(v.`value`, v)] from `beer-sample` v) as _0 where array_concat(array_concat(array_concat([array_concat([_0[0]], [_0[1]])[0]], [array_concat([_0[0]], [_0[1]])[0][0][0]]), [array_concat([_0[0]], [_0[1]])[1]]), [(array_concat([_0[0]], [_0[1]])[1].["name"] = "Brasserie de Silly")])[3]) as _1) as v""")
+      """select value v from (select value {"address": array_concat(array_concat(array_concat([array_concat([_1[0]], [_1[1]])[0]], [array_concat([_1[0]], [_1[1]])[0][0][0]]), [array_concat([_1[0]], [_1[1]])[1]]), [(array_concat([_1[0]], [_1[1]])[1].["name"] = "Brasserie de Silly")])[2].["address"]} from (select value _0 from (select value [meta(v).id, ifmissing(v.`value`, v)] from `beer-sample` v) as _0 where array_concat(array_concat(array_concat([array_concat([_0[0]], [_0[1]])[0]], [array_concat([_0[0]], [_0[1]])[0][0][0]]), [array_concat([_0[0]], [_0[1]])[1]]), [(array_concat([_0[0]], [_0[1]])[1].["name"] = "Brasserie de Silly")])[3]) as _1) as v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
@@ -114,7 +114,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select geo.lat + geo.lon from `beer-sample`",
-      """select value v from (select value object_add({}, "0", (_0.["geo"].["lat"] + _0.["geo"].["lon"])) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
+      """select value v from (select value {"0": (_0.["geo"].["lat"] + _0.["geo"].["lon"])} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
   }
 
   "QScript to N1QL" should {
@@ -163,13 +163,13 @@ class BasicQueryEnablementSpec
       n1ql must_= """select value v from (select value (_0.["a"] + _0.["b"]) from (select value ifmissing(v.`value`, v) from `foo` v) as _0) as v"""
     }
 
-    "convert a basic reduction wrapped in an object" in {
+    "convert a basic reduction" in {
       // select sum(height) from person
       val qs =
         chain[Fix, QST](
           SRT.inj(Const(ShiftedRead(rootDir </> file("person"), ExcludeId))),
           QCT.inj(LeftShift((),
-            ProjectFieldR(HoleF, StrLit("person")),
+            HoleF,
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("height")))),
@@ -190,7 +190,7 @@ class BasicQueryEnablementSpec
         chain[Fix, QST](
           SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
           QCT.inj(LeftShift((),
-            ProjectFieldR(HoleF, StrLit("zips")),
+            HoleF,
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("loc")))),
@@ -210,24 +210,6 @@ class BasicQueryEnablementSpec
           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
           QCT.inj(LeftShift((),
             HoleF,
-            Free.point(RightSide))),
-          QCT.inj(Filter((),
-            Free.roll(MapFuncs.Eq(
-              ProjectFieldR(HoleF, StrLit("bar")),
-              StrLit("baz"))))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.["bar"] = "baz")) as v"""
-    }
-
-    "convert a Eq filter with a projection" in {
-      // select bar from foo where bar = 1
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            ProjectFieldR(HoleF, StrLit("bar")),
             Free.point(RightSide))),
           QCT.inj(Filter((),
             Free.roll(MapFuncs.Eq(
