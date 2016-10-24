@@ -518,6 +518,9 @@ class Transform
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.Distinct, Sized(a1)) =>
+      // TODO: This currently duplicates a _portion_ of the bucket in the
+      //       reducer list, we could perhaps avoid doing that, or normalize it
+      //       away later.
       invokeReduction1(
         agg.Arbitrary,
         Func.Input1(
@@ -526,6 +529,17 @@ class Transform
               prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance),
               a1.ann.values),
             a1.value))).right
+
+    case LogicalPlan.InvokeFUnapply(set.DistinctBy, Sized(a1, a2)) =>
+      val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
+      invokeReduction1(
+        agg.Arbitrary,
+        Func.Input1(
+          Target(
+            Ann(
+              prov.swapProvenances(provenance.Value(rval) :: base.buckets),
+              lval),
+            base.src))).right
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
