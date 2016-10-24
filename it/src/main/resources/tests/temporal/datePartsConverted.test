@@ -10,13 +10,13 @@
 
   "data": "../slamengine_commits.data",
 
-  "nb": "`doy`, `week`, and `quarter` are missing because we currently have
-         no JS implementation.",
+  "nb": "`doy` and `week` are missing because we currently have no JS implementation.",
   "query": "select
               date_part(\"millennium\", timestamp(commit.committer.date)) as millennium,
               date_part(\"century\", timestamp(commit.committer.date)) as century,
               date_part(\"decade\", timestamp(commit.committer.date)) as decade,
               date_part(\"year\", timestamp(commit.committer.date)) as year,
+              date_part(\"quarter\", timestamp(commit.committer.date)) as quarter,
               date_part(\"month\", timestamp(commit.committer.date)) as month,
               date_part(\"day\", timestamp(commit.committer.date)) as dayOfMonth,
               date_part(\"dow\", timestamp(commit.committer.date)) as dayOfWeek,
@@ -34,7 +34,7 @@
   "expected": [
     {
     "millennium": 3.0, "century": 21.0, "decade": 201.0, "year": 2015.0,
-    "month": 1.0, "dayOfMonth": 29.0, "dayOfWeek": 4.0, "dayOfWeek (ISO)": 4.0,
+    "quarter": 1.0, "month": 1.0, "dayOfMonth": 29.0, "dayOfWeek": 4.0, "dayOfWeek (ISO)": 4.0,
     "hour": 15.0, "minute": 52.0, "second": 37.0, "millis": 37000.0, "micros": 3.7e7,
     "id": "33031"
     }
