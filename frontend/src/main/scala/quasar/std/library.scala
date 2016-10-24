@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.contrib.shapeless._
 import quasar.fp.ski._
-import quasar.{Func, GenericFunc, LogicalPlan, Type, SemanticError}
+import quasar.{Func, LogicalPlan, Type, SemanticError}
 
 import matryoshka._
 import scalaz._, Validation.{success, failure}
@@ -99,12 +99,4 @@ trait Library {
       self(args) ||| that(args)
     }
   }
-
-  // TODO exhaustiveness checking for each arity
-  def unaryFunctions: List[GenericFunc[nat._1]]
-  def binaryFunctions: List[GenericFunc[nat._2]]
-  def ternaryFunctions: List[GenericFunc[nat._3]]
-
-  def functions =
-    (unaryFunctions: List[GenericFunc[_]]) ++ binaryFunctions ++ ternaryFunctions
 }

@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, LogicalPlan => LP, Type}
 import quasar.fp._
 import quasar.qscript.MapFuncs._
-import quasar.sql.CompilerHelpers
+import quasar.sql.{CompilerHelpers, JoinDir}
 import quasar.std.StdLib, StdLib._
 
 import scala.collection.immutable.{Map => ScalaMap}
@@ -481,8 +481,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))).embed,
           identity.Squash(
             structural.ObjectConcat(
-              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))).embed,
-              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))).embed).embed).embed)) must
+              JoinDir.Left.projectFrom(LP.Free('__tmp0)),
+              JoinDir.Right.projectFrom(LP.Free('__tmp0))).embed).embed)) must
       equal(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
@@ -518,11 +518,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             makeObj(
               "name" ->
                 structural.ObjectProject(
-                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("left"))).embed,
+                  JoinDir.Left.projectFrom(LP.Free('__tmp2)),
                   LP.Constant(Data.Str("name"))),
               "address" ->
                 structural.ObjectProject(
-                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))).embed,
+                  JoinDir.Right.projectFrom(LP.Free('__tmp2)),
                   LP.Constant(Data.Str("address")))))))
       convert(None, lp) must
       equal(chain(

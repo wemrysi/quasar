@@ -37,43 +37,42 @@ class CoreMapStdLibSpec extends StdLibSpec {
 
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
-    case ExtractCentury(_) => TODO
-    case ExtractDayOfMonth(_) => TODO
-    case ExtractDecade(_) => TODO
-    case ExtractDayOfWeek(_) => TODO
-    case ExtractDayOfYear(_) => TODO
-    case ExtractEpoch(_) => TODO
-    case ExtractHour(_) => TODO
+    case ExtractCentury(_)      => TODO
+    case ExtractDayOfMonth(_)   => TODO
+    case ExtractDecade(_)       => TODO
+    case ExtractDayOfWeek(_)    => TODO
+    case ExtractDayOfYear(_)    => TODO
+    case ExtractEpoch(_)        => TODO
+    case ExtractHour(_)         => TODO
     case ExtractIsoDayOfWeek(_) => TODO
-    case ExtractIsoYear(_) => TODO
+    case ExtractIsoYear(_)      => TODO
     case ExtractMicroseconds(_) => TODO
-    case ExtractMillennium(_) => TODO
+    case ExtractMillennium(_)   => TODO
     case ExtractMilliseconds(_) => TODO
-    case ExtractMinute(_) => TODO
-    case ExtractMonth(_) => TODO
-    case ExtractQuarter(_) => TODO
-    case ExtractSecond(_) => TODO
-    case ExtractWeek(_) => TODO
-    case ExtractYear(_) => TODO
+    case ExtractMinute(_)       => TODO
+    case ExtractMonth(_)        => TODO
+    case ExtractQuarter(_)      => TODO
+    case ExtractSecond(_)       => TODO
+    case ExtractWeek(_)         => TODO
+    case ExtractYear(_)         => TODO
 
-    case Power(_, _) => Skipped("TODO: handle large value").left
+    case Power(_, _)            => Skipped("TODO: handle large value").left
 
-    case _ => ().right
+    case _                      => ().right
   }
-
 
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LogicalPlan], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
-      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateUnaryMapping(func)(a1))
 
-      case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
+      case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
 
-      case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
+      case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 

@@ -108,7 +108,7 @@ object Optimizer {
     case InvokeFUnapply(Drop, Sized(src, _)) => src._2
     case InvokeFUnapply(Filter, Sized(src, _)) => src._2
     case InvokeFUnapply(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _) =>
-      Some(List(Constant(Data.Str("left")), Constant(Data.Str("right"))))
+      Some(List(JoinDir.Left.const, JoinDir.Right.const))
     case InvokeFUnapply(GroupBy, Sized(src, _)) => src._2
     case InvokeFUnapply(Distinct, Sized(src, _)) => src._2
     case InvokeFUnapply(DistinctBy, Sized(src, _)) => src._2
@@ -241,13 +241,13 @@ object Optimizer {
         case InvokeFUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
           EquiCond((l, r) => Fix(relations.Eq(rc(r), lc(l))))
 
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(t1)) =>
+        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
           Func.Input1(t1).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
 
-        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(t1, t2)) =>
+        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
           Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
 
-        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
+        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
           Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LogicalPlan]].map(ts => Fix(InvokeF(func, ts)))
 
         case t => NeitherCond(Fix(t.map(_._1)))
