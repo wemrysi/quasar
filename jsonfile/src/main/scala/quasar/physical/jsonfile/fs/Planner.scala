@@ -22,21 +22,17 @@ import quasar.qscript._
 import matryoshka._
 import quasar.contrib.matryoshka._
 import scalaz._
-import Planner._
 
 trait Planner[F[_], QS[_]] {
-  /** QS[Rep] => PlannerErrT[PhaseResultT[F, ?], Rep] */
-  def plan: AlgebraM[PlannerT[F, ?], QS, Rep]
+  /** QS[QRep] => PlannerErrT[PhaseResultT[F, ?], QRep] */
+  def plan: AlgebraM[Planner.PlannerT[F, ?], QS, QRep]
 }
 
 object Planner {
-  /** The query representation, e.g. in marklogic it's XQuery */
-  type Rep
-
   type PlannerT[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
 
-  def apply[F[_], QS[_]](implicit z: Planner[F, QS]): Planner[F, QS]    = z
-  def make[F[_], QS[_]](f: QS[Rep] => PlannerT[F, Rep]): Planner[F, QS] = new Planner[F, QS] { val plan = f }
+  def apply[F[_], QS[_]](implicit z: Planner[F, QS]): Planner[F, QS]      = z
+  def make[F[_], QS[_]](f: QS[QRep] => PlannerT[F, QRep]): Planner[F, QS] = new Planner[F, QS] { val plan = f }
 
   implicit def qScriptCore[F[_]: Applicative, T[_[_]]: Recursive: ShowT]: Planner[F, QScriptCore[T, ?]] = ???
   implicit def constDeadEnd[F[_]: Applicative]: Planner[F, Const[DeadEnd, ?]]                           = ???

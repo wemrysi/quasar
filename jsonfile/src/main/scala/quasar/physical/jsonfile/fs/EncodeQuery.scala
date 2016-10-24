@@ -17,18 +17,17 @@
 package quasar.physical.jsonfile.fs
 
 import quasar._, Predef._
-import Planner.Rep
 import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
 trait EncodeQuery[M[_], F[_]] {
-  def encodeQuery: AlgebraM[M, F, Rep]
+  def encodeQuery: AlgebraM[M, F, QRep]
 }
 
 object EncodeQuery {
   def apply[M[_], F[_]](implicit z: EncodeQuery[M, F]): EncodeQuery[M, F] = z
 
-  def make[M[_], F[_]](f: F[Rep] => M[Rep]): EncodeQuery[M, F] = new EncodeQuery[M, F] { val encodeQuery = f }
+  def make[M[_], F[_]](f: F[QRep] => M[QRep]): EncodeQuery[M, F] = new EncodeQuery[M, F] { val encodeQuery = f }
 
   implicit def coproductEncodeQuery[M[_], F[_], G[_]](implicit F: EncodeQuery[M, F], G: EncodeQuery[M, G]): EncodeQuery[M, Coproduct[F, G, ?]] =
     make(_.run.fold(F.encodeQuery, G.encodeQuery))

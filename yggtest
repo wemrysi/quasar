@@ -3,4 +3,5 @@
 
 [[ -n "$TRACE" ]] && TRACE="-Dygg.trace=$TRACE"
 
-./yggsbt -no-colors $TRACE ~"it/testOnly -- quasar.ResultFileQueryRegressionSpec -- ex \"$*\"" | uniq
+./yggsbt -no-colors $TRACE ~"it/testOnly -- quasar.ResultFileQueryRegressionSpec -- ex \"$*\"" | gstdbuf --output=L uniq | \
+  gstdbuf --output=L ag -vw '(Resolving|Resolved|Fetching|Fetched)'

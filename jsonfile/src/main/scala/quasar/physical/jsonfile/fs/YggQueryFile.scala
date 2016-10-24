@@ -22,7 +22,6 @@ import quasar.fs._, FileSystemError._
 import quasar.effect._
 import scalaz._, Scalaz._
 import quasar.{ qscript => q }
-import Planner.Rep
 import matryoshka._, Recursive.ops._
 import QueryFile._
 import LogicalPlan._
@@ -34,7 +33,7 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
   private def TODO[A] : FLR[A]                           = Unimplemented
 
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS = {
-    def lpResultƒ: AlgebraM[FLR, LogicalPlan, Rep] = {
+    def lpResultƒ: AlgebraM[FLR, LogicalPlan, QRep] = {
       case ReadF(path)                           => TODO
       case ConstantF(data)                       => TODO
       case InvokeF(func, values)                 => TODO
@@ -46,7 +45,7 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
     def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = TODO
 
     /** See marklogic's QScriptCorePlanner.scala for a very clean example */
-    def qscriptCore: AlgebraM[FPLR, QScriptCore, Rep] = {
+    def qscriptCore: AlgebraM[FPLR, QScriptCore, QRep] = {
       case q.Map(src, f)                           => phaseTodo(TODO)
       case q.LeftShift(src, struct, repair)        => phaseTodo(TODO)
       case q.Reduce(src, bucket, reducers, repair) => phaseTodo(TODO)

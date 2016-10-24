@@ -61,6 +61,9 @@ import matryoshka._
 package object fs extends fs.FilesystemEffect {
   val FsType = FileSystemType("jsonfile")
 
+  /** The query representation, e.g. in marklogic it's XQuery */
+  type QRep = ygg.json.JValue
+
   type AsTask[F[X]]         = Task[F ~> Task]
   type FixPlan              = matryoshka.Fix[LogicalPlan]
   type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
