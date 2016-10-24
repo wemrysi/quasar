@@ -63,8 +63,7 @@ object MapFuncPlanner {
     case ExtractCentury(time)         => fn.ceiling(fn.yearFromDateTime(xs.dateTime(time)) div 100.xqy).point[F]
     case ExtractDayOfMonth(time)      => fn.dayFromDateTime(xs.dateTime(time)).point[F]
     case ExtractDecade(time)          => fn.floor(fn.yearFromDateTime(xs.dateTime(time)) div 10.xqy).point[F]
-    case ExtractDayOfWeek(time)       => qscript.asDate[F].apply(time) map (d =>
-                                           mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
+    case ExtractDayOfWeek(time)       => qscript.asDate[F].apply(time) map (d => mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
     case ExtractDayOfYear(time)       => qscript.asDate[F].apply(time) map (xdmp.yeardayFromDate)
     case ExtractEpoch(time)           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
     case ExtractHour(time)            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
@@ -104,6 +103,9 @@ object MapFuncPlanner {
     case Or(x, y)                     => binOp[F](x, y)(_ or _)
     case Between(v1, v2, v3)          => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
     case Cond(p, t, f)                => if_(p).then_(t).else_(f).point[F]
+
+    // set
+    case Within(x, arr)               => qscript.elementLeftShift[F].apply(arr) map (xs => fn.exists(fn.indexOf(xs, x)))
 
     // string
     case Lower(s)                     => fn.lowerCase(s).point[F]
