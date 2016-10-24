@@ -23,4 +23,7 @@ before_cache:
 env:
   matrix:
   - QUASAR_CODECOV=true SBT_TARGET="; project ygg ; coverage ; test ; coverageReport"
-  - QUASAR_CODECOV=false SBT_TARGET="ygg/test"
+  - QUASAR_CODECOV=false SBT_TARGET="; project it ; testOnly $(echo quasar.fs.{Read,Write,Query,Manage}FilesSpec)"
+
+  global:
+  - QUASAR_JSONFILE='{"jsonfile":{"connectionUri":"."}}'
