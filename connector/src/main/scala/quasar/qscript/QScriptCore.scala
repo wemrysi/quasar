@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.fp._
 
 import matryoshka._
@@ -209,8 +208,7 @@ object QScriptCore {
         }
     }
 
-  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
-  implicit def renderTree[T[_[_]]: RenderTreeT](implicit ev: Show[T[EJson]])
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
       : Delay[RenderTree, QScriptCore[T, ?]] =
     new Delay[RenderTree, QScriptCore[T, ?]] {
       def apply[A](RA: RenderTree[A]): RenderTree[QScriptCore[T, A]] =

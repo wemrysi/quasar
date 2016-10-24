@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.fp._
 
 import matryoshka._
@@ -77,9 +76,7 @@ object ThetaJoin {
       }
     }
 
-  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
-  implicit def renderTree[T[_[_]]: RenderTreeT](implicit ev: Show[T[EJson]])
-      : Delay[RenderTree, ThetaJoin[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
     new Delay[RenderTree, ThetaJoin[T, ?]] {
       val nt = List("ThetaJoin")
       def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {

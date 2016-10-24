@@ -17,9 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{NonTerminal, RenderTree}, RenderTree.ops._
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.fp._
 
 import matryoshka._
@@ -74,9 +73,7 @@ object EquiJoin {
       }
     }
 
-  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
-  implicit def renderTree[T[_[_]]: quasar.RenderTreeT](implicit ev: Show[T[EJson]])
-      : Delay[RenderTree, EquiJoin[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
     new Delay[RenderTree, EquiJoin[T, ?]] {
       val nt = List("EquiJoin")
       def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {

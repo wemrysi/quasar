@@ -17,9 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{NonTerminal, RenderTree}, RenderTree.ops._
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.fp._
 
 import matryoshka._
@@ -90,9 +89,7 @@ object ProjectBucket {
         }
     }
 
-  // TODO: implement Delay[RenderTree, EJson] and remove the oddball Show
-  implicit def renderTree[T[_[_]]: quasar.RenderTreeT](implicit ev: Show[T[EJson]])
-      : Delay[RenderTree, ProjectBucket[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ProjectBucket[T, ?]] =
     new Delay[RenderTree, ProjectBucket[T, ?]] {
       def apply[A](RA: RenderTree[A]): RenderTree[ProjectBucket[T, A]] = RenderTree.make {
         case BucketField(src, value, name) =>
