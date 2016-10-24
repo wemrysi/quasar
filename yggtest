@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#
+
+[[ -n "$TRACE" ]] && TRACE="-Dygg.trace=$TRACE"
+
+./yggsbt -no-colors $TRACE ~"it/testOnly -- quasar.ResultFileQueryRegressionSpec -- ex \"$*\"" | uniq

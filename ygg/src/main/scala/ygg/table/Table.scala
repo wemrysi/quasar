@@ -19,6 +19,7 @@ package ygg.table
 import scalaz._
 import ygg._, common._, json._
 import trans._
+import quasar.Data
 
 trait TableConstructors[T <: ygg.table.Table] {
   def maxSliceSize: Int
@@ -59,6 +60,11 @@ trait TableCompanion[T <: ygg.table.Table] {
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table]
   def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+}
+
+object Table {
+  def fromFile(file: jFile): Table = ???
+  def fromData(data: Data): Table  = ???
 }
 
 trait Table {
@@ -160,4 +166,7 @@ trait Table {
 
   // for debugging only!!
   def toJson: Need[Stream[JValue]]
+
+  // import quasar.Data._
+  def toData: Vector[Data] = toJson.value.toVector map (x => jawn.Parser.parseUnsafe[Data](x.toString))
 }

@@ -40,10 +40,9 @@ object FPlan {
     } yield cld
 
   def fromString(q: String): FPlan = (
-    compile(q) map Optimizer.optimize flatMap (q =>
-      (LogicalPlan ensureCorrectTypes q).disjunction
-        leftMap (_.list.toList mkString ";")
-    )
+    compile(q)
+      map     Optimizer.optimize
+      flatMap (x => (LogicalPlan ensureCorrectTypes x).disjunction leftMap (_.list.toList mkString ";"))
   ).fold(abort, FPlan(q, _))
 
   def fromFile(file: jFile): FPlan = FPlan(

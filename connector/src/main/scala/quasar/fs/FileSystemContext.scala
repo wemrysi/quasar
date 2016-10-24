@@ -46,8 +46,8 @@ object FileSystemContext {
   abstract class Impl[F[_]](implicit F: Applicative[F]) extends FileSystemContext[F] {
     implicit protected val applicative = F
   }
-  trait Free[F0[_]] extends FileSystemContext[scalaz.Free[F0, ?]] {
-    implicit protected val applicative: Applicative[F] = scalaz.Free.freeMonad[F0]
+  trait Free[F0[_]] extends FileSystemContext[scalaz.Free[F0, ?]] with MonadicContext[scalaz.Free[F0, ?]] {
+    implicit protected val applicative: Monad[F] = scalaz.Free.freeMonad[F0]
   }
 }
 

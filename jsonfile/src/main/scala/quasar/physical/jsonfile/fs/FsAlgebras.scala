@@ -16,8 +16,7 @@
 
 package quasar.physical.jsonfile.fs
 
-import quasar._
-import quasar.Predef._
+import quasar._, Predef._
 import quasar.fs._, PathError._
 import quasar.fs.FileSystemError._
 import quasar.effect._
@@ -25,12 +24,10 @@ import pathy.Path._
 import quasar.contrib.pathy._
 import scalaz._
 import Scalaz.{ ToIdOps => _, _ }
-import FileSystemIndependentTypes._
 import ManageFile.MoveSemantics._
 import ManageFile.MoveScenario._
-// import ygg.table._
 
-class FsAlgebras[S[_]] extends STypes[S] with YggQueryFile[S] {
+class FsAlgebras[S[_]] extends STypes[S] {
   private def defaultChunkSize: Int = 10
 
   def emptyData(): Chunks                  = Vector()
@@ -53,12 +50,6 @@ class FsAlgebras[S[_]] extends STypes[S] with YggQueryFile[S] {
 
     def parentOrSelf: ADir = refineType(path).fold(x => x, fileParent _)
   }
-
-  def ls(dir: ADir)(implicit KVF: KVFile[S]): FLR[DirList] = KVF.keys map (fs =>
-    fs.map(_ relativeTo dir).unite.toNel
-      .map(_ foldMap (f => firstSegmentName(f).toSet))
-      .toRightDisjunction(unknownPath(dir))
-  )
 
   def filesInDir(dir: ADir)(implicit KVF: KVFile[S]): FS[Vector[AFile]] =
     ls(dir) >>= {
@@ -176,6 +167,9 @@ class FsAlgebras[S[_]] extends STypes[S] with YggQueryFile[S] {
         }
     }
   }
+
+  def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS =
+    new YggQueryFile[S].queryFile
 
   def boundFs(implicit
     TS: Task :<: S,

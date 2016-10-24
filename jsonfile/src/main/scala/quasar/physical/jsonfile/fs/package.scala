@@ -24,15 +24,16 @@ import quasar.fs.mount._, FileSystemDef._
 import quasar.effect._
 import quasar.fs.FileSystemError._
 import quasar.Planner.UnsupportedPlan
-import pathy.Path._
+import quasar.qscript._
+import pathy.Path, Path._
 import quasar.contrib.pathy._
 import scalaz._, Scalaz.{ ToIdOps => _, _ }
 import scalaz.concurrent.Task
 import FileSystemIndependentTypes._
+import matryoshka._
 
 // import ygg.table._
 // import ygg.json.JValue
-// import matryoshka._
 // import Recursive.ops._
 
 // XXX tests which pass too easily:
@@ -74,6 +75,11 @@ package object fs extends fs.FilesystemEffect {
   def unknownPath(p: APath): FileSystemError           = pathErr(PathError pathNotFound p)
   def unknownPlan(lp: FixPlan): FileSystemError        = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
 
+  implicit class PathyRFPathOps(val path: Path[Any, Any, Sandboxed]) {
+    def toAbsolute: APath = mkAbsolute(rootDir, path)
+    def toJavaFile: jFile = new jFile(posixCodec unsafePrintPath path)
+  }
+
   implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) {
     type FS[A] = Free[S, A]
 
@@ -98,12 +104,16 @@ package fs {
   final case class ReadPos(file: AFile, offset: Int, limit: Int)
   final case class WritePos(file: AFile, offset: Int)
 
-  trait STypes[S[_]] extends EitherTContextLeft[Free[S, ?], FileSystemError] {
-    implicit protected val applicative: Applicative[FS] = scalaz.Free.freeMonad[S]
-
+  trait STypes[S[_]] extends FileSystemContext.Free[S] with TTypes[Fix] {
     type FS[A]  = Free[S, A]
     type FSUnit = FS[Unit]
     type FSBool = FS[Boolean]
+
+    def ls(dir: ADir)(implicit KVF: KVFile[S]): FLR[DirList] = KVF.keys map (fs =>
+      fs.map(_ relativeTo dir).unite.toNel
+        .map(_ foldMap (f => firstSegmentName(f).toSet))
+        .toRightDisjunction(unknownPath(dir))
+    )
   }
 
   trait FilesystemEffect {

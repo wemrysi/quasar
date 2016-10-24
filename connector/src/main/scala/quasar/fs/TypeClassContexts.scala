@@ -39,6 +39,9 @@ trait ApplicativeContext[F[_]] {
   protected implicit def applicative: Applicative[F]
   protected implicit def point[A](x: A): F[A] = applicative point x
 }
+trait MonadicContext[F[_]] extends ApplicativeContext[F] {
+  protected implicit def applicative: Monad[F]
+}
 trait EitherTypes[F[X], L] {
   type LR[A]  = L \/ A
   type ER[A]  = EitherT[F, L, A]

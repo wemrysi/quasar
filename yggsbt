@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+
+run () { echo >&2 "$@" && "$@"; }
+
+export QUASAR_JSONFILE='{"jsonfile":{"connectionUri":"."}}'
+run ./sbt "$@"
