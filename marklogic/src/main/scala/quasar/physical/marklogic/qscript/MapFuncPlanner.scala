@@ -28,13 +28,13 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.std.StdLib
 
 import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
 import scalaz.{Apply, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
-import scalaz.syntax.show._
 import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
@@ -68,6 +68,7 @@ object MapFuncPlanner {
     case ExtractEpoch(time)           => qscript.secondsSinceEpoch[F] apply (xs.dateTime(time))
     case ExtractHour(time)            => fn.hoursFromDateTime(xs.dateTime(time)).point[F]
     case ExtractIsoDayOfWeek(time)    => qscript.asDate[F].apply(time) map (xdmp.weekdayFromDate)
+    case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedFunction(StdLib.date.ExtractIsoYear))
     case ExtractMicroseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000000.xqy).point[F]
     case ExtractMillennium(time)      => mkSeq_(mkSeq_(fn.yearFromDateTime(xs.dateTime(time)) mod 1000.xqy) + 1.xqy).point[F]
     case ExtractMilliseconds(time)    => mkSeq_(fn.secondsFromDateTime(xs.dateTime(time)) * 1000.xqy).point[F]
@@ -120,8 +121,7 @@ object MapFuncPlanner {
     case Substring(s, loc, len)       => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
-    case MakeArray(x) =>
-      ejson.singletonArray[F] apply x
+    case MakeArray(x)                 => ejson.singletonArray[F] apply x
 
     case MakeMap(k, v) =>
       def withLitKey(s: String): F[XQuery] =
@@ -139,14 +139,9 @@ object MapFuncPlanner {
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
-    case ConcatArrays(x, y) =>
-      ejson.arrayConcat[F] apply (x, y)
-
-    case ConcatMaps(x, y) =>
-      ejson.objectConcat[F] apply (x, y)
-
-    case ProjectIndex(arr, idx) =>
-      ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
+    case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
+    case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
+    case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
     case ProjectField(src, field) =>
       def projectLit(s: String): F[XQuery] =
@@ -197,8 +192,6 @@ object MapFuncPlanner {
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
     case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
-
-    case mapFunc                      => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
 
   ////

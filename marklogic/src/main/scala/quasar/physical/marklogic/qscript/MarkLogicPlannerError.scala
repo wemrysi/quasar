@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.GenericFunc
 import quasar.ejson.EJson
 import quasar.fp.coproductShow
 import quasar.physical.marklogic.ErrorMessages
@@ -27,12 +28,14 @@ import scalaz._
 import scalaz.std.string._
 import scalaz.syntax.foldable._
 import scalaz.syntax.show._
+import shapeless.Nat
 
 sealed abstract class MarkLogicPlannerError
 
 object MarkLogicPlannerError {
   final case class InvalidQName(strLit: String) extends MarkLogicPlannerError
   final case class UnrepresentableEJson(ejson: Fix[EJson], msgs: ErrorMessages) extends MarkLogicPlannerError
+  final case class UnsupportedFunction(func: GenericFunc[_ <: Nat]) extends MarkLogicPlannerError
 
   val invalidQName = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidQName(s) => s
@@ -42,6 +45,10 @@ object MarkLogicPlannerError {
     case UnrepresentableEJson(ejs, msgs) => (ejs, msgs)
   } (UnrepresentableEJson.tupled)
 
+  val unsupportedFunction = Prism.partial[MarkLogicPlannerError, GenericFunc[_ <: Nat]] {
+    case UnsupportedFunction(func) => func
+  } (UnsupportedFunction)
+
   implicit val show: Show[MarkLogicPlannerError] =
     Show.shows {
       case InvalidQName(s) =>
@@ -49,6 +56,9 @@ object MarkLogicPlannerError {
 
       case UnrepresentableEJson(ejs, msgs) =>
         s"'${ejs.shows}' does not have an XQuery representation: ${msgs.intercalate(", ")}"
+
+      case UnsupportedFunction(f) =>
+        s"'${f.shows}' is not supported."
     }
 }
 
