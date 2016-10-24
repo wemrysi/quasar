@@ -38,7 +38,7 @@ import scalaz.syntax.show._
 import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
-  import expr.{if_, let_}, axes._
+  import expr.{emptySeq, if_, let_}, axes._
 
   def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
@@ -47,7 +47,9 @@ object MapFuncPlanner {
         msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
         _.point[F]))
 
-    case Length(arrOrstr) => qscript.length[F] apply arrOrstr
+    case Undefined()                  => emptySeq.point[F]
+
+    case Length(arrOrstr)             => qscript.length[F] apply arrOrstr
 
     // time
     case Date(s)                      => qscript.asDate[F] apply s
@@ -81,38 +83,39 @@ object MapFuncPlanner {
     case ExtractYear(time)            => fn.yearFromDateTime(xs.dateTime(time)).point[F]
 
     // math
-    case Negate(x)      => (-x).point[F]
-    case Add(x, y)      => binOp[F](x, y)(_ + _)
-    case Multiply(x, y) => binOp[F](x, y)(_ * _)
-    case Subtract(x, y) => binOp[F](x, y)(_ - _)
-    case Divide(x, y)   => binOp[F](x, y)(_ div _)
-    case Modulo(x, y)   => binOp[F](x, y)(_ mod _)
-    case Power(b, e)    => math.pow(b, e).point[F]
+    case Negate(x)                    => (-x).point[F]
+    case Add(x, y)                    => binOp[F](x, y)(_ + _)
+    case Multiply(x, y)               => binOp[F](x, y)(_ * _)
+    case Subtract(x, y)               => binOp[F](x, y)(_ - _)
+    case Divide(x, y)                 => binOp[F](x, y)(_ div _)
+    case Modulo(x, y)                 => binOp[F](x, y)(_ mod _)
+    case Power(b, e)                  => math.pow(b, e).point[F]
 
     // relations
-    case Not(x)              => fn.not(x).point[F]
-    case MapFuncs.Eq(x, y)   => binOp[F](x, y)(_ eq _)
-    case Neq(x, y)           => binOp[F](x, y)(_ ne _)
-    case Lt(x, y)            => binOp[F](x, y)(_ lt _)
-    case Lte(x, y)           => binOp[F](x, y)(_ le _)
-    case Gt(x, y)            => binOp[F](x, y)(_ gt _)
-    case Gte(x, y)           => binOp[F](x, y)(_ ge _)
-    case And(x, y)           => binOp[F](x, y)(_ and _)
-    case Or(x, y)            => binOp[F](x, y)(_ or _)
-    case Between(v1, v2, v3) => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
-    case Cond(p, t, f)       => if_(p).then_(t).else_(f).point[F]
+    case Not(x)                       => fn.not(x).point[F]
+    case MapFuncs.Eq(x, y)            => binOp[F](x, y)(_ eq _)
+    case Neq(x, y)                    => binOp[F](x, y)(_ ne _)
+    case Lt(x, y)                     => binOp[F](x, y)(_ lt _)
+    case Lte(x, y)                    => binOp[F](x, y)(_ le _)
+    case Gt(x, y)                     => binOp[F](x, y)(_ gt _)
+    case Gte(x, y)                    => binOp[F](x, y)(_ ge _)
+    case IfUndefined(x, alternate)    => if_(fn.empty(x)).then_(alternate).else_(x).point[F]
+    case And(x, y)                    => binOp[F](x, y)(_ and _)
+    case Or(x, y)                     => binOp[F](x, y)(_ or _)
+    case Between(v1, v2, v3)          => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
+    case Cond(p, t, f)                => if_(p).then_(t).else_(f).point[F]
 
     // string
-    case Lower(s)               => fn.lowerCase(s).point[F]
-    case Upper(s)               => fn.upperCase(s).point[F]
-    case Bool(s)                => xs.boolean(s).point[F]
-    case Integer(s)             => xs.integer(s).point[F]
-    case Decimal(s)             => xs.decimal(s).point[F]
-    case Null(s)                => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
-                                     (n, e) => if_ (s eq "null".xs) then_ n else_ e)
-    case ToString(x)            => fn.string(x).point[F]
-    case Search(in, ptn, ci)    => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
-    case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len)).point[F]
+    case Lower(s)                     => fn.lowerCase(s).point[F]
+    case Upper(s)                     => fn.upperCase(s).point[F]
+    case Bool(s)                      => xs.boolean(s).point[F]
+    case Integer(s)                   => xs.integer(s).point[F]
+    case Decimal(s)                   => xs.decimal(s).point[F]
+    case Null(s)                      => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
+                                           (n, e) => if_ (s eq "null".xs) then_ n else_ e)
+    case ToString(x)                  => fn.string(x).point[F]
+    case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
+    case Substring(s, loc, len)       => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
     case MakeArray(x) =>
@@ -184,17 +187,16 @@ object MapFuncPlanner {
       }
 
     // other
-    case DupMapKeys(m)       => qscript.elementDupKeys[F]    apply m
-    case DupArrayIndices(a)  => ejson.arrayDupIndices[F]     apply a
-    case ZipMapKeys(m)       => qscript.zipMapElementKeys[F] apply m
-    case ZipArrayIndices(a)  => ejson.arrayZipIndices[F]     apply a
-    case Range(x, y)         => (x to y).point[F]
+    case DupMapKeys(m)                => qscript.elementDupKeys[F]    apply m
+    case DupArrayIndices(a)           => ejson.arrayDupIndices[F]     apply a
+    case ZipMapKeys(m)                => qscript.zipMapElementKeys[F] apply m
+    case ZipArrayIndices(a)           => ejson.arrayZipIndices[F]     apply a
+    case Range(x, y)                  => (x to y).point[F]
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
-    case Guard(_, _, cont, _) =>
-      s"(: GUARD CONT :)$cont".xqy.point[F]
+    case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
 
-    case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
+    case mapFunc                      => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
 
   ////
