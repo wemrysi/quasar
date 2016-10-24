@@ -50,22 +50,32 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 object MapFunc {
   import MapFuncs._
 
+  type CoMF[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
+
+  type TCoMF[T[_[_]], A] = T[CoMF[T, A, ?]]
+  type CoMFR[T[_[_]], A] = CoMF[T, A, TCoMF[T, A]]
+
+  private def makeCoMF[T[_[_]], A, B](mf: A \/ MapFunc[T, B]): CoMF[T, A, B] =
+    CoEnv[A, MapFunc[T, ?], B](mf)
+
+  private def makeCoMFR[T[_[_]], A](mf: A \/ MapFunc[T, TCoMF[T, A]]): CoMFR[T, A] =
+    makeCoMF[T, A, TCoMF[T, A]](mf)
+
   /** Returns a List that maps element-by-element to a MapFunc array. If we
     * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMFR[T, A]):
+        Option[List[TCoMF[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
-          as.foldRightM[Option, List[T[CoEnv[A, MapFunc[T, ?], ?]]]](
+          as.foldRightM[Option, List[TCoMF[T, A]]](
             Nil)(
             (mf, acc) => (mf.project.run.toOption >>=
               {
                 case MakeArray(value) => (value :: acc).some
                 case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed) ++ acc).some
+                  (values.map(v => makeCoMFR[T, A](Constant(v).right).embed) ++ acc).some
                 case _ => None
               }))
         case _ => None
@@ -73,18 +83,17 @@ object MapFunc {
   }
 
   object StaticMap {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[(T[EJson], T[CoEnv[A, MapFunc[T, ?], ?]])]] =
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMFR[T, A]):
+        Option[List[(T[EJson], TCoMF[T, A])]] =
       mf match {
         case ConcatMapsN(as) =>
-          as.foldRightM[Option, List[(T[EJson], T[CoEnv[A, MapFunc[T, ?], ?]])]](
+          as.foldRightM[Option, List[(T[EJson], TCoMF[T, A])]](
             Nil)(
             (mf, acc) => (mf.project.run.toOption >>=
               {
                 case MakeMap(Embed(CoEnv(\/-(Constant(k)))), v) => ((k, v) :: acc).some
                 case Constant(Embed(ejson.Extension(ejson.Map(kvs)))) =>
-                  (kvs.map(_.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed)) ++ acc).some
+                  (kvs.map(_.map(v => makeCoMFR[T, A](Constant(v).right).embed)) ++ acc).some
                 case _ => None
               }))
         case _ => None
@@ -96,19 +105,18 @@ object MapFunc {
     * possible, and punt otherwise.
     */
   object StaticArrayPrefix {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMFR[T, A]):
+        Option[List[TCoMF[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
-          as.foldRightM[List[T[CoEnv[A, MapFunc[T, ?], ?]]] \/ ?, List[T[CoEnv[A, MapFunc[T, ?], ?]]]](
+          as.foldRightM[List[TCoMF[T, A]] \/ ?, List[TCoMF[T, A]]](
             Nil)(
             (mf, acc) => mf.project.run.fold(
               κ(acc.left),
               _ match {
                 case MakeArray(value) => (value :: acc).right
                 case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed) ++ acc).right
+                  (values.map(v => makeCoMFR[T, A](Constant(v).right).embed) ++ acc).right
                 case _ => acc.left
               })).merge.some
         case _ => None
@@ -128,18 +136,16 @@ object MapFunc {
         FreeMapA[T, A] =
       apply(args.map(_.toCoEnv[T])).embed.fromCoEnv
 
-    def apply[T[_[_]]: Recursive: Corecursive, A]
-      (args: List[T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]] = {
+    def apply[T[_[_]]: Recursive: Corecursive, A](args: List[TCoMF[T, A]]):
+        CoMFR[T, A] = {
       args.toList match {
-        case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]((ConcatArrays(a, b): MapFunc[T, T[CoEnv[A, MapFunc[T, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case h :: t => t.foldLeft(h)((a, b) => makeCoMFR[T, A]((ConcatArrays(a, b): MapFunc[T, TCoMF[T, A]]).right).embed).project
+        case Nil    => makeCoMFR[T, A](\/-(Constant[T, TCoMF[T, A]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
       }
     }
 
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMFR[T, A]):
+        Option[List[TCoMF[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -153,22 +159,18 @@ object MapFunc {
 
   }
 
-  type CoMF[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
-  type CoMFR[T[_[_]], A] = CoMF[T, A, T[CoMF[T, A, ?]]]
-
   // TODO subtyping is preventing embeding of MapFuncs
   object ConcatMapsN {
-    def apply[T[_[_]]: Recursive: Corecursive, A](args: List[T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]] = {
+    def apply[T[_[_]]: Recursive: Corecursive, A](args: List[TCoMF[T, A]]):
+        CoMFR[T, A] = {
       args.toList match {
-        case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]((ConcatMaps(a, b): MapFunc[T, T[CoEnv[A, MapFunc[T, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case h :: t => t.foldLeft(h)((a, b) => makeCoMFR[T, A]((ConcatMaps(a, b): MapFunc[T, TCoMF[T, A]]).right).embed).project
+        case Nil    => makeCoMFR[T, A](\/-(Constant[T, TCoMF[T, A]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
       }
     }
 
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMFR[T, A]):
+        Option[List[TCoMF[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -233,7 +235,7 @@ object MapFunc {
   def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]
       : CoMFR[T, A] => CoMFR[T, A] =
     repeatedly(rewrite[T, A]) ⋘
-      orOriginal(foldConstant[T, A].apply(_) ∘ (const => CoEnv(Constant(const).right)))
+      orOriginal(foldConstant[T, A].apply(_) ∘ (const => makeCoMFR[T, A](Constant(const).right)))
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
@@ -244,8 +246,8 @@ object MapFunc {
       κ(None),
       {
         case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
-          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
-            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(
+          makeCoMFR[T, A](
+            Constant[T, TCoMF[T, A]](EJson.fromCommon[T].apply(
               ejson.Bool[T[EJson]](v1 ≟ v2))).right).some
 
         case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
@@ -262,32 +264,32 @@ object MapFunc {
             case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
-              }.map(p => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](p._2).right)).get
+              }.map(p => makeCoMFR[T, A](Constant[T, TCoMF[T, A]](p._2).right)).get
           }
 
         // elide Nil array on the left
         case ConcatArrays(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
+            makeCoMFR[T, A](rhs.right[A]).some
 
         // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
+            makeCoMFR[T, A](lhs.right[A]).some
 
         // elide Nil map on the left
         case ConcatMaps(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
+            makeCoMFR[T, A](rhs.right[A]).some
 
         // elide Nil map on the right
         case ConcatMaps(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
+            makeCoMFR[T, A](lhs.right[A]).some
 
         case _ => None
       })
@@ -929,7 +931,7 @@ object MapFuncs {
     // TODO[matryoshka]: Once we handle directly recursive types, this
     //                   overloading can go away.
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
+    def unapply[T[_[_]]: Recursive, A, B](mf: MapFunc.CoMF[T, A, B]):
         Option[String] =
       mf.run.fold({
         _ => None
