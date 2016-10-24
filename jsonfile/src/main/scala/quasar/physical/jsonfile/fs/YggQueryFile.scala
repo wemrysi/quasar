@@ -23,33 +23,17 @@ import quasar.effect._
 import scalaz._, Scalaz._
 import quasar.{ qscript => q }
 import Planner.Rep
-// import ygg.table._
 import matryoshka._, Recursive.ops._
-// import pathy.Path._
-// import quasar.contrib.pathy._
+import QueryFile._
+import LogicalPlan._
+// import pathy._, Path._, quasar.contrib.pathy._
 
 class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypes[S] {
+  private def phaseResults(msg: String): F[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", msg))
+  private def phaseTodo[A](x: FLR[A]): FPLR[A]           = phaseResults("<jsonfile>") tuple x
+  private def TODO[A] : FLR[A]                           = Unimplemented
 
-  import QueryFile._
-
-  private def phaseResults(msg: String): PhaseResults = Vector(PhaseResult.Detail("jsonfile", msg))
-  private def pr(): PhaseResults                      = phaseResults("<jsonfile>")
-  private def TODO[A] : FLR[A]                        = Unimplemented
-  private def TODO_P[A] : FPLR[A]                     = pr().point[F] tuple TODO[A]
-
-  def queryFile = λ[QueryFile ~> FS] {
-    case Explain(lp)          => TODO_P
-    case ExecutePlan(lp, out) => TODO_P
-    case EvaluatePlan(lp)     => evaluatePlan(lp) map ((x: LR[QHandle]) => pr() -> x)
-    case ListContents(dir)    => ls(dir)
-    case FileExists(file)     => KVF contains file
-    case More(qh)             => Vector()
-    case Close(fh)            => (KVQ delete fh).void
-  }
-
-  def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = {
-    import LogicalPlan._
-
+  def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS = {
     def lpResultƒ: AlgebraM[FLR, LogicalPlan, Rep] = {
       case ReadF(path)                           => TODO
       case ConstantF(data)                       => TODO
@@ -59,20 +43,30 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
       case TypecheckF(expr, typ, cont, fallback) => TODO
     }
 
-    TODO
-  }
+    def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = TODO
 
-  /** See marklogic's QScriptCorePlanner.scala for a very clean example */
-  def qscriptCore: AlgebraM[FPLR, QScriptCore, Rep] = {
-    case q.Map(src, f)                           => TODO_P
-    case q.LeftShift(src, struct, repair)        => TODO_P
-    case q.Reduce(src, bucket, reducers, repair) => TODO_P
-    case q.Sort(src, bucket, order)              => TODO_P
-    case q.Filter(src, f)                        => TODO_P
-    case q.Union(src, lBranch, rBranch)          => TODO_P
-    case q.Subset(src, from, q.Drop, count)      => TODO_P
-    case q.Subset(src, from, q.Take, count)      => TODO_P
-    case q.Subset(src, from, q.Sample, count)    => TODO_P
-    case q.Unreferenced()                        => TODO_P
+    /** See marklogic's QScriptCorePlanner.scala for a very clean example */
+    def qscriptCore: AlgebraM[FPLR, QScriptCore, Rep] = {
+      case q.Map(src, f)                           => phaseTodo(TODO)
+      case q.LeftShift(src, struct, repair)        => phaseTodo(TODO)
+      case q.Reduce(src, bucket, reducers, repair) => phaseTodo(TODO)
+      case q.Sort(src, bucket, order)              => phaseTodo(TODO)
+      case q.Filter(src, f)                        => phaseTodo(TODO)
+      case q.Union(src, lBranch, rBranch)          => phaseTodo(TODO)
+      case q.Subset(src, from, q.Drop, count)      => phaseTodo(TODO)
+      case q.Subset(src, from, q.Take, count)      => phaseTodo(TODO)
+      case q.Subset(src, from, q.Sample, count)    => phaseTodo(TODO)
+      case q.Unreferenced()                        => phaseTodo(TODO)
+    }
+
+    λ[QueryFile ~> FS] {
+      case Explain(lp)          => phaseTodo(TODO)
+      case ExecutePlan(lp, out) => phaseTodo(TODO)
+      case EvaluatePlan(lp)     => phaseResults("<jsonfile>") tuple evaluatePlan(lp)
+      case ListContents(dir)    => ls(dir)
+      case FileExists(file)     => KVF contains file
+      case More(qh)             => Vector()
+      case Close(fh)            => (KVQ delete fh).void
+    }
   }
 }
