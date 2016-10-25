@@ -7,7 +7,7 @@
 
     "data": ["cars.data", "smallZips.data"],
 
-    "query": "select (zips := select * from cars; select * from zips) as value from smallZips",
+    "query": "select (smallZips := select * from cars; select * from smallZips) as value from smallZips",
 
     "predicate": "containsExactly",
 
