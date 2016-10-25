@@ -26,7 +26,7 @@ import matryoshka._, Recursive.ops._
 import QueryFile._
 import LogicalPlan._
 import quasar.qscript._
-import quasar.contrib.matryoshka.ShowT
+// import quasar.contrib.matryoshka.ShowT
 
 class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypesFree[S, Fix] {
   private def phaseResults(msg: String): F[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", msg))
@@ -58,10 +58,10 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
   }
 }
 
-class QScriptCorePlanner[F[_]: Applicative, T[_[_]]: Recursive : ShowT] extends Planner[F, QScriptCore[T, ?]] with TTypes[T] {
+class QScriptCorePlanner[F[_]: Applicative, T[_[_]]] extends Planner[F, QScriptCore[T, ?]] {
   private def TODO: F[QRep] = ???
 
-  def plan: AlgebraM[F, QScriptCore, QRep] = {
+  def plan: AlgebraM[F, QScriptCore[T, ?], Table] = {
     case q.Map(src, f)                           => TODO
     case q.LeftShift(src, struct, repair)        => TODO
     case q.Reduce(src, bucket, reducers, repair) => TODO

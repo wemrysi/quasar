@@ -19,17 +19,37 @@ package ygg.table
 import scalaz._
 import ygg._, common._, json._
 import trans._
-import quasar.Data
+import quasar._
 import quasar.ejson.EJson
 
 object Table {
-  def fromData(data: Data): Table                         = ???
+  implicit val codec = DataCodec.Precise
+
   def fromEJson[A](json: EJson[A])(f: A => JValue): Table = ???
 
-  def fromFile(file: jFile): Table       = fromJson((JParser parseManyFromFile file).orThrow)
-  def fromString(json: String): Table    = fromJson(Seq(JParser parseUnsafe json))
-  def fromJValues(json: JValue*): Table  = fromJson(json.toVector)
-  def fromJson(json: Seq[JValue]): Table = BlockTable fromJson json
+  def dataToJValue(d: Data): JValue = d match {
+    case Data.NA => JUndefined
+    case _       =>
+      DataCodec render d match {
+        case -\/(e)  => throw new RuntimeException(e.toString)
+        case \/-(jv) =>
+          (JParser parseFromString jv).disjunction match {
+            case -\/(t) => throw t
+            case \/-(r) => r
+          }
+      }
+  }
+
+  def fromData(data: Vector[Data]): Table = {
+    val res = fromJson(data map dataToJValue)
+    println("DATA: " + data)
+    println("TABLE: " + res.toJValues.mkString("\n"))
+    res
+  }
+  def fromFile(file: jFile): Table        = fromJson((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): Table     = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): Table   = fromJson(json.toVector)
+  def fromJson(json: Seq[JValue]): Table  = BlockTable fromJson json
 }
 
 trait TableConstructors[T <: ygg.table.Table] {
@@ -81,8 +101,6 @@ trait TableCompanion[T <: ygg.table.Table] {
 }
 
 trait Table {
-  outer =>
-
   type NeedTable = Need[Table]
   type Table <: ygg.table.Table
 

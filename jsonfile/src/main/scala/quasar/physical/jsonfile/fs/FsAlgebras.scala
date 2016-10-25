@@ -58,7 +58,6 @@ class FsAlgebras[S[_]] extends STypesFree[S, Fix] {
     }
 
   def existsError[A](path: APath): FLR[A]       = point(-\/(pathErr(pathExists(path))))
-  def nextLong(implicit MS: MonotonicSeq :<: S) = MonotonicSeq.Ops[S].next
 
   def deleteDir(x: ADir)(implicit KVF: KVFile[S]): FLR[Unit] = filesInDir(x) flatMap {
     case Seq() => unknownPath(x)

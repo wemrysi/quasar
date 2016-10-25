@@ -32,6 +32,8 @@ package object table {
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
 
+  implicit def convertTableCompanion(x: Table.type): ColumnarTable.Table.type = ColumnarTable.Table
+
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =
     StreamT.unfoldM[Need, Slice, A](start)(f)
 

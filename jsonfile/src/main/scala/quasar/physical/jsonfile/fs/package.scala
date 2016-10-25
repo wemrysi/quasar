@@ -70,6 +70,7 @@ package object fs extends fs.FilesystemEffect {
   type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
   type MoveSemantics        = ManageFile.MoveSemantics
   type Task[A]              = scalaz.concurrent.Task[A]
+  type Table                = ygg.table.Table
 
   val MoveSemantics = ManageFile.MoveSemantics
   val Unimplemented = quasar.fs.FileSystemError.Unimplemented
@@ -119,6 +120,8 @@ package fs {
     type FSUnit = FS[Unit]
     type FSPred = FS[Boolean]
 
+    def nextLong(implicit MS: MonotonicSeq :<: S) = MonotonicSeq.Ops[S].next
+
     type QPlan[A] = FileSystemErrT[PhaseResultT[FS, ?], A]
     def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
       lift(fa).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
@@ -148,7 +151,7 @@ package fs {
      *    Couchbase: N1QL
      *        Spark: RDD[Data]
      */
-    type QRep = Chunks
+    type QRep = ygg.table.Table
 
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
     type KVRead[S[_]]  = KVInject[RHandle, RCursor, S]
