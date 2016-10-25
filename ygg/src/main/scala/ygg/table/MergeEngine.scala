@@ -149,7 +149,7 @@ class MergeEngine {
       }
     }
 
-    StreamT.unfoldM[Need, Slice, Stream[CellState]](cellStates) { cellStates =>
+    unfoldStream(cellStates) { cellStates =>
       val cells: Vec[Cell] = cellStates.map(_.toCell).toVector //(breakOut)
 
       // TODO: We should not recompute all of the row comparators every time,

@@ -82,14 +82,14 @@ trait ColumnarTableModule {
     }
 
     fromSlices(
-      StreamT.unfoldM(values.toStream)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
+      unfoldStream(values.toStream)(evts => Need(evts.nonEmpty option makeSlice(evts))),
       ExactSize(values.length)
     )
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
     def apply(slices: NeedSlices, size: TableSize): Table                                            = fromSlices(slices, size)
-    def singleton(slice: Slice): Table                                                               = fromSlices(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def singleton(slice: Slice): Table                                                               = fromSlices(singleStreamT(slice), ExactSize(1))
     def fromJson(data: Seq[JValue]): Table                                                           = outer fromJson data
     def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = ???
 
@@ -258,7 +258,7 @@ trait ColumnarTableModule {
         // TODO: this can probably be done as one step, but for now
         // it's probably fine.
         val tables: StreamT[Need, Table] = StreamT.unfoldM(groupKeys.toList) {
-          case k :: ks => evaluateGroupKey(k).map(t => Some((t, ks)))
+          case k :: ks => evaluateGroupKey(k).map(t => some(t -> ks))
           case Nil     => Need(None)
         }
 
@@ -292,7 +292,7 @@ trait ColumnarTableModule {
         data splitAt sliceSize leftMap (Slice fromRValues _)
 
       Table(
-        StreamT.unfoldM(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
+        unfoldStream(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
         ExactSize(values.length)
       )
     }
@@ -957,9 +957,10 @@ trait ColumnarTableModule {
           }
         } yield back
 
-        Table(StreamT.wrapEffect(initialState map { state =>
-          StreamT.unfoldM[Need, Slice, CogroupState](state getOrElse CogroupDone)(step)
-        }), UnknownSize)
+        Table(
+          StreamT.wrapEffect(initialState map (state => unfoldStream(state getOrElse CogroupDone)(step))),
+          UnknownSize
+        )
       }
 
       cogroup0(
@@ -1045,7 +1046,7 @@ trait ColumnarTableModule {
             }
           }
 
-          StreamT.unfoldM(CrossState(a0, 0, right))(step _)
+          unfoldStream(CrossState(a0, 0, right))(step)
         }
 
         def crossRightSingle(left: NeedSlices, rhead: Slice)(a0: A): NeedSlices = {
@@ -1526,7 +1527,7 @@ trait BlockTableModule extends ColumnarTableModule {
         totalLength = projections.map(_.length).sum
       } yield {
         def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
-          StreamT.unfoldM[Need, Slice, Option[proj.Key]](None) { key =>
+          unfoldStream(none[proj.Key]) { key =>
             proj.getBlockAfter(key, constraints).map { b =>
               b.map {
                 case BlockProjectionData(_, maxKey, slice) =>

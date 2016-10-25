@@ -32,6 +32,9 @@ package object table {
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
 
+  def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =
+    StreamT.unfoldM[Need, Slice, A](start)(f)
+
   def columnMap(xs: ColumnKV*): EagerColumnMap             = EagerColumnMap(xs.toVector)
   def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap = LazyColumnMap(() => expr.toVector)
 
