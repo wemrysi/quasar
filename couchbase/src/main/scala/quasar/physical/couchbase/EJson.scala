@@ -30,7 +30,7 @@ object EJson {
     case ejson.Arr(v)  => v.mkString("[", ", ", "]")
     case ejson.Null()  => "null"
     case ejson.Bool(v) => v.shows
-    case ejson.Str(v)  => v
+    case ejson.Str(v)  => s""""$v""""
     case ejson.Dec(v)  => v.shows
   }
 

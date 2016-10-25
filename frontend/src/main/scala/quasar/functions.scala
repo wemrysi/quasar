@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.{LogicalPlan => LP}
 
 import matryoshka._
 import scalaz._
@@ -55,7 +56,7 @@ final case class UnaryFunc(
     val typer0: Func.Typer[nat._1],
     val untyper0: Func.Untyper[nat._1]) extends GenericFunc[nat._1] {
 
-  def apply[A](a1: A): LogicalPlan[A] =
+  def apply[A](a1: A): LP[A] =
     applyGeneric(Func.Input1[A](a1))
 }
 
@@ -68,7 +69,7 @@ final case class BinaryFunc(
     val typer0: Func.Typer[nat._2],
     val untyper0: Func.Untyper[nat._2]) extends GenericFunc[nat._2] {
 
-  def apply[A](a1: A, a2: A): LogicalPlan[A] =
+  def apply[A](a1: A, a2: A): LP[A] =
     applyGeneric(Func.Input2[A](a1, a2))
 }
 
@@ -81,7 +82,7 @@ final case class TernaryFunc(
     val typer0: Func.Typer[nat._3],
     val untyper0: Func.Untyper[nat._3]) extends GenericFunc[nat._3] {
 
-  def apply[A](a1: A, a2: A, a3: A): LogicalPlan[A] =
+  def apply[A](a1: A, a2: A, a3: A): LP[A] =
     applyGeneric(Func.Input3[A](a1, a2, a3))
 }
 
@@ -94,8 +95,8 @@ sealed abstract class GenericFunc[N <: Nat] {
   def typer0: Func.Typer[N]
   def untyper0: Func.Untyper[N]
 
-  def applyGeneric[A](args: Func.Input[A, N]): LogicalPlan[A] =
-    LogicalPlan.InvokeF[A, N](this, args)
+  def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
+    LP.InvokeF[A, N](this, args)
 
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
     untyper0((domain, codomain), tpe)
@@ -232,8 +233,8 @@ object Func {
     * typer.
     */
   trait Simplifier {
-    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]):
-        Option[LogicalPlan[T[LogicalPlan]]]
+    def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]):
+        Option[LP[T[LP]]]
   }
 
   type Input[A, N <: Nat] = Sized[List[A], N]

@@ -19,6 +19,7 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._, ski.κ
+import quasar.ejson
 import quasar.NameGenerator
 import quasar.PhaseResult.Detail
 import quasar.physical.couchbase._
@@ -26,20 +27,40 @@ import quasar.physical.couchbase.N1QL._, Select._
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript.{Map => _, Read => _, _}
 
-import matryoshka.{Hole => _, _}
+import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz._, Scalaz.{ToIdOps => _, _}
 
-final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
   extends Planner[F, QScriptCore[T, ?]] {
+
+  def processFreeMapDefault(f: FreeMap[T], tmpName: String): M[N1QL] =
+    freeCataM(f)(interpretM(
+      κ(partialQueryString(tmpName).point[M]),
+      mapFuncPlanner[F, T].plan))
+
+  def processFreeMap(f: FreeMap[T], tmpName: String): M[N1QL] =
+    f.toCoEnv[T].project match {
+      case MapFunc.StaticMap(elems) =>
+        elems.traverse(_.bitraverse(
+          {
+            case Embed(ejson.Common(ejson.Str(key))) => key.point[M]
+            case key => ???
+          },
+          v => processFreeMapDefault(v.fromCoEnv, tmpName)
+        )) ∘ (m =>
+          partialQueryString(m.map { case (k, v) => s""""$k": ${n1ql(v)}""" }.mkString("{", ", ", "}"))
+        )
+      case _ =>
+        processFreeMapDefault(f, tmpName)
+    }
+
 
   val plan: AlgebraM[M, QScriptCore[T, ?], N1QL] = {
     case qscript.Map(src, f) =>
       for {
         tmpName  <- genName[M]
         srcN1ql  =  n1ql(src)
-        ff       <- freeCataM(f)(interpretM(
-                      κ(partialQueryString(tmpName).point[M]),
-                      mapFuncPlanner[F, T].plan))
+        ff       <- processFreeMap(f, tmpName)
         ffN1ql   =  n1ql(ff)
         rN1ql    =  src match {
                       case _: Select | _: Read =>
@@ -57,7 +78,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         rN1qlStr =  n1ql(rN1ql)
         _        <- prtell[M](Vector(Detail(
                      "N1QL Map",
-                       s"""  src: $src
+                       s"""  src: ${n1ql(src)}
                           |  f:   $ffN1ql
                           |  n1ql: $rN1qlStr""".stripMargin('|'))))
       } yield rN1ql
@@ -78,7 +99,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
                           (
                             select(
                               value         = true,
-                              resultExprs   = tmpName1.wrapNel,
+                              resultExprs   = sN1ql.wrapNel,
                               keyspace      = src,
                               keyspaceAlias = tmpName2) |>
                             unnest.set(s"$tmpName2 as $tmpName1".some)
@@ -88,7 +109,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         rN1ql    =  n1ql(r)
         _        <- prtell[M](Vector(Detail(
                       "N1QL LeftShift",
-                      s"""  src: $src
+                      s"""  src:    ${n1ql(src)}
                          |  struct: $sN1ql
                          |  repair: $rN1ql
                          |  n1ql:   $rN1ql""".stripMargin('|'))))
@@ -98,14 +119,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
     case qscript.Reduce(src, bucket, reducers, repair) =>
       for {
         tmpName <- genName[M]
-        b       <- freeCataM(bucket)(interpretM(
-                     κ(partialQueryString(tmpName).point[M]),
-                     mapFuncPlanner[F, T].plan))
+        b       <- processFreeMap(bucket, tmpName)
         red     =  reducers.map(
-                     _.traverse(red =>
-                       freeCataM(red)(interpretM(
-                         κ(partialQueryString(tmpName).point[M]),
-                         mapFuncPlanner[F, T].plan))
+                     _.traverse(
+                       red => processFreeMap(red, tmpName)
                      ).flatMap(reduceFuncPlanner[F].plan)
                    )
         rep     <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[F, T].plan))
@@ -120,58 +137,45 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: S
         sN1ql   =  n1ql(s)
         _       <- prtell[M](Vector(Detail(
                      "N1QL Reduce",
-                     s"""  src:      $src
-                        |  bucket:   $b
+                     s"""  src:      ${n1ql(src)}
+                        |  bucket:   $bN1ql
                         |  reducers: $red
                         |  repair:   $repN1ql
-                        |  bucket:   $bN1ql
                         |  n1ql:     $sN1ql""".stripMargin('|'))))
       } yield s
 
     case qscript.Sort(src, bucket, order) =>
-      // TODO: Incorrect? Unable to test due to "unsupported ordering function" error from convertToQScript #1411.
-
       for {
         tmpName <- genName[M]
-        b       <- freeCataM(bucket)(interpretM(
-                     κ(partialQueryString(tmpName).point[M]),
-                     mapFuncPlanner[F, T].plan))
+        b       <- processFreeMap(bucket, tmpName)
         o       <- order.traverse { case (or, d) =>
                      val dir = d match {
                        case SortDir.Ascending  => "ASC"
                        case SortDir.Descending => "DESC"
                      }
-                     // TODO: Overly nested
-                     for {
-                       ord     <- freeCataM(or)(interpretM(
-                                    κ(partialQueryString(tmpName).point[M]),
-                                    mapFuncPlanner[F, T].plan))
-                       ordN1ql =  n1ql(ord)
-                     } yield s"($or) $dir"
+                     processFreeMap(or, tmpName) ∘ (ord => s"${n1ql(ord)} $dir")
                    }.map(_.mkString(", "))
         bN1ql   =  n1ql(b)
         s       =  select(
-                     value         = false,
-                     resultExprs   = "*".wrapNel,
+                     value         = true,
+                     resultExprs   = tmpName.wrapNel,
                      keyspace      = src,
                      keyspaceAlias = tmpName)     |>
                    groupBy.set(bN1ql.some) >>>
                    orderBy.set(o.some)
         _       <- prtell[M](Vector(Detail(
                      "N1QL Sort",
-                     s"""  src:    $src
-                        |  bucket: $b
+                     s"""  src:    ${n1ql(src)}
+                        |  bucket: $bN1ql
                         |  order:  $o
-                        |  n1ql:   $s""".stripMargin('|'))))
+                        |  n1ql:   ${n1ql(s)}""".stripMargin('|'))))
 
       } yield s
 
     case qscript.Filter(src, f) =>
       for {
         tmpName  <- genName[M]
-        fN1ql    <- freeCataM(f)(interpretM(
-                      κ(partialQueryString(tmpName).point[M]),
-                      mapFuncPlanner[F, T].plan))
+        fN1ql    <- processFreeMap(f, tmpName)
         fN1qlStr =  n1ql(fN1ql)
         sel      =  select(
                       value         = true,
