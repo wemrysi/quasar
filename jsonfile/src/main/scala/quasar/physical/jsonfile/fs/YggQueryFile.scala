@@ -27,13 +27,10 @@ import QueryFile._
 import LogicalPlan._
 import quasar.qscript._
 import quasar.contrib.matryoshka.ShowT
-// import pathy._, Path._, quasar.contrib.pathy._
 
 class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypesFree[S, Fix] {
-  private def phaseResults(lp: FixPlan): F[PhaseResults]        = phaseResults(FPlan("", lp).toString)
-  private def phaseResults(msg: String): F[PhaseResults]        = Vector(PhaseResult.Detail("jsonfile", msg))
-  private def phaseTodo[A](x: FLR[A]): F[PhaseResults -> LR[A]] = phaseResults("<jsonfile>") tuple x
-  private def TODO[A]: FLR[A]                                   = ???
+  private def phaseResults(msg: String): F[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", msg))
+  private def TODO[A]: FLR[A]                            = Unimplemented
 
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS = {
     def lpResultƒ: AlgebraM[FLR, LogicalPlan, QRep] = {
@@ -45,12 +42,14 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
       case TypecheckF(expr, typ, cont, fallback) => TODO
     }
 
-    def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = TODO
+    def executePlan(lp: FixPlan, out: AFile): FLR[AFile] = TODO
+    def evaluatePlan(lp: FixPlan): FLR[QHandle]          = TODO
+    def explainPlan(lp: FixPlan): FLR[ExecutionPlan]     = ExecutionPlan(FsType, lp.to_s)
 
     λ[QueryFile ~> FS] {
-      case Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
-      case ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
-      case EvaluatePlan(lp)     => phaseResults("<jsonfile>") tuple evaluatePlan(lp)
+      case Explain(lp)          => phaseResults(lp.to_s) tuple explainPlan(lp)
+      case EvaluatePlan(lp)     => phaseResults(lp.to_s) tuple evaluatePlan(lp)
+      case ExecutePlan(lp, out) => phaseResults(lp.to_s) tuple executePlan(lp, out)
       case ListContents(dir)    => ls(dir)
       case FileExists(file)     => KVF contains file
       case More(qh)             => Vector()

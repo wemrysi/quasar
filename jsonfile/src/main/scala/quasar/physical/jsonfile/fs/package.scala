@@ -61,16 +61,18 @@ import matryoshka._
 package object fs extends fs.FilesystemEffect {
   val FsType = FileSystemType("jsonfile")
 
-  /** The query representation, e.g. in marklogic it's XQuery */
-  type QRep = ygg.json.JValue
-
+  type AFile                = quasar.contrib.pathy.AFile
+  type ADir                 = quasar.contrib.pathy.ADir
+  type APath                = quasar.contrib.pathy.APath
   type Fix[F[_]]            = matryoshka.Fix[F]
   type AsTask[F[X]]         = Task[F ~> Task]
   type FixPlan              = matryoshka.Fix[LogicalPlan]
   type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
   type MoveSemantics        = ManageFile.MoveSemantics
   type Task[A]              = scalaz.concurrent.Task[A]
-  val MoveSemantics         = ManageFile.MoveSemantics
+
+  val MoveSemantics = ManageFile.MoveSemantics
+  val Unimplemented = quasar.fs.FileSystemError.Unimplemented
 
   def kvEmpty[K, V] : AsTask[KeyValueStore[K, V, ?]]   = KeyValueStore.impl.empty[K, V]
   def kvOps[K, V, S[_]](implicit z: KVInject[K, V, S]) = KeyValueStore.Ops[K, V, S]
@@ -78,6 +80,10 @@ package object fs extends fs.FilesystemEffect {
   def tmpName(n: Long): String                         = s"__quasar.ygg$n"
   def unknownPath(p: APath): FileSystemError           = pathErr(PathError pathNotFound p)
   def unknownPlan(lp: FixPlan): FileSystemError        = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
+
+  implicit class FixPlanOps(val self: FixPlan) {
+    def to_s: String = FPlan("", self).toString
+  }
 
   implicit class PathyRFPathOps(val path: Path[Any, Any, Sandboxed]) {
     def toAbsolute: APath = mkAbsolute(rootDir, path)
@@ -128,30 +134,42 @@ package fs {
     val FsType: FileSystemType
 
     type FH = Chunks    // file map values
-    type RH = ReadPos   // read handle map values
     type WH = WritePos  // write handle map values
-    type QH = Chunks    // query handle map values
+
+    /** The read cursor type.
+     *    Marklogic: ReadStream[ContentSourceIO]
+     *    Couchbase: Cursor( Vector[JsonObject] )
+     *        Spark: SparkCursor( Option[RDD[Data->Long]]->Int )
+     */
+    type RCursor = ReadPos
+
+    /** The query representation type.
+     *    Marklogic: XQuery
+     *    Couchbase: N1QL
+     *        Spark: RDD[Data]
+     */
+    type QRep = Chunks
 
     type KVFile[S[_]]  = KVInject[AFile, FH, S]
-    type KVRead[S[_]]  = KVInject[RHandle, RH, S]
+    type KVRead[S[_]]  = KVInject[RHandle, RCursor, S]
     type KVWrite[S[_]] = KVInject[WHandle, WH, S]
-    type KVQuery[S[_]] = KVInject[QHandle, QH, S]
+    type KVQuery[S[_]] = KVInject[QHandle, QRep, S]
 
     type Eff[A] = (
           Task
       :\: KeyValueStore[AFile, FH, ?]
-      :\: KeyValueStore[RHandle, RH, ?]
+      :\: KeyValueStore[RHandle, RCursor, ?]
       :\: KeyValueStore[WHandle, WH, ?]
-      :\: KeyValueStore[QHandle, QH, ?]
+      :\: KeyValueStore[QHandle, QRep, ?]
       :/: MonotonicSeq
     )#M[A]
 
     def initialEff(uri: ConnectionUri): AsTask[Eff] = (
           (Task delay reflNT[Task])
       |@| kvEmpty[AFile, FH]
-      |@| kvEmpty[RHandle, RH]
+      |@| kvEmpty[RHandle, RCursor]
       |@| kvEmpty[WHandle, WH]
-      |@| kvEmpty[QHandle, QH]
+      |@| kvEmpty[QHandle, QRep]
       |@| MonotonicSeq.fromZero
     )(_ :+: _ :+: _ :+: _ :+: _ :+: _)
 
