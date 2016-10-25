@@ -30,6 +30,7 @@ import quasar.contrib.matryoshka.ShowT
 // import pathy._, Path._, quasar.contrib.pathy._
 
 class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypesFree[S, Fix] {
+  private def phaseResults(lp: FixPlan): F[PhaseResults]        = phaseResults(FPlan("", lp).toString)
   private def phaseResults(msg: String): F[PhaseResults]        = Vector(PhaseResult.Detail("jsonfile", msg))
   private def phaseTodo[A](x: FLR[A]): F[PhaseResults -> LR[A]] = phaseResults("<jsonfile>") tuple x
   private def TODO[A]: FLR[A]                                   = ???
@@ -47,8 +48,8 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
     def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = TODO
 
     λ[QueryFile ~> FS] {
-      case Explain(lp)          => phaseTodo(TODO)
-      case ExecutePlan(lp, out) => phaseTodo(TODO)
+      case Explain(lp)          => phaseResults(lp) tuple ExecutionPlan(FsType, "...")
+      case ExecutePlan(lp, out) => phaseResults(lp) tuple \/-(out)
       case EvaluatePlan(lp)     => phaseResults("<jsonfile>") tuple evaluatePlan(lp)
       case ListContents(dir)    => ls(dir)
       case FileExists(file)     => KVF contains file
