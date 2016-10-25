@@ -80,6 +80,7 @@ package object fs extends fs.FilesystemEffect {
   def tmpName(n: Long): String                         = s"__quasar.ygg$n"
   def unknownPath(p: APath): FileSystemError           = pathErr(PathError pathNotFound p)
   def unknownPlan(lp: FixPlan): FileSystemError        = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
+  def cond[A](p: Boolean, ifp: => A, elsep: => A): A   = if (p) ifp else elsep
 
   implicit class FixPlanOps(val self: FixPlan) {
     def to_s: String = FPlan("", self).toString
@@ -90,18 +91,17 @@ package object fs extends fs.FilesystemEffect {
     def toJavaFile: jFile = new jFile(posixCodec unsafePrintPath path)
   }
 
-  implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) {
-    type FS[A] = Free[S, A]
-
-    implicit private def kvs_ = kvs
-    private def Ops = KeyValueStore.Ops[K, V, S]
+  implicit class KVSOps[K, V, S[_]](val kvs: KVInject[K, V, S]) extends STypesFree[S, Fix] {
+    private def Ops = KeyValueStore.Ops[K, V, S](kvs)
+    private def maybe(condition: FSPred, action: FSUnit): FSPred = condition flatMap (p => cond[FSUnit](p, action, ()) map (_ => p))
 
     def keys: FS[Vector[K]]               = Ops.keys
-    def contains(key: K): FS[Boolean]     = Ops contains key
-    def delete(key: K): FS[Boolean]       = for (exists <- contains(key) ; _ <- Ops delete key) yield exists
-    def put(key: K, value: V): FS[Unit]   = Ops.put(key, value)
+    def contains(key: K): FSPred          = Ops contains key
+    def put(key: K, value: V): FSUnit     = Ops.put(key, value)
     def get(key: K): FS[Option[V]]        = (Ops get key).run
-    def move(src: K, dst: K): FS[Boolean] = for (exists <- contains(src) ; _ <- Ops.move(src, dst)) yield exists
+    def delete(key: K): FSPred            = maybe(contains(key), Ops delete key)
+    def move(src: K, dst: K): FSPred      = maybe(contains(src), Ops.move(src, dst))
+    def modify(key: K, f: V => V): FSUnit = Ops.modify(key, f)
   }
 
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)
@@ -117,7 +117,7 @@ package fs {
   trait STypesFree[S[_], T[_[_]]] extends FileSystemContext.Free[S] with TTypes[T] {
     type FS[A]  = Free[S, A]
     type FSUnit = FS[Unit]
-    type FSBool = FS[Boolean]
+    type FSPred = FS[Boolean]
 
     type QPlan[A] = FileSystemErrT[PhaseResultT[FS, ?], A]
     def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
