@@ -79,12 +79,6 @@ trait Table {
   def size: TableSize
 
   /**
-    * For each distinct path in the table, load all columns identified by the specified
-    * jtype and concatenate the resulting slices into a new table.
-    */
-  def load(tpe: JType): NeedTable
-
-  /**
     * Folds over the table to produce a single value (stored in a singleton table).
     */
   def reduce[A: Monoid](reducer: CReducer[A]): Need[A]

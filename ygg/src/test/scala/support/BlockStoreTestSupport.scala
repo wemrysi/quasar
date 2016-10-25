@@ -19,14 +19,13 @@ package ygg.tests
 import scala.Predef.$conforms
 import ygg._, common._, json._, table._
 
-object DummyModule extends BlockStoreTestModule {
-  val projections = Map[Path, Projection]()
-}
+object DummyModule extends BlockStoreTestModule
+
 class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
   val Some((idCount, schema)) = sampleData.schema
   val actualSchema            = CValueGenerators.inferSchema(sampleData.data map { _ \ "value" })
 
-  val projections = List(actualSchema).map { subschema =>
+  override val projections = List(actualSchema).map { subschema =>
     val stream = sampleData.data flatMap { jv =>
       val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
         case (obj, (jpath, ctype)) => {

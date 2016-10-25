@@ -43,7 +43,53 @@ final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_]
 trait ColumnarTableModule {
   outer =>
 
+  def projections: Map[Path, Projection] = Map[Path, Projection]()
+
   def fromSlices(slices: NeedSlices, size: TableSize): Table
+
+
+  object Projection {
+    def apply(path: Path): Need[Option[Projection]] = Need(projections get path)
+  }
+  case class Projection(val data: Stream[JValue]) extends ProjectionLike {
+    type Key = JArray
+
+    private val slices      = Table.fromJson(data).slices.toStream.copoint
+    val length: Long        = data.length.toLong
+    val xyz: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
+
+    def structure = Need(xyz)
+
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
+      @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
+        blocks.filterNot(_.isEmpty) match {
+          case x #:: xs => if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
+          case _        => None
+        }
+      }
+
+      val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
+
+      slice map { s =>
+        val s0 = Slice(s.size, {
+          colSelection.map { reqCols =>
+            s.columns.filter {
+              case (ref @ ColumnRef(jpath, ctype), _) =>
+                jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
+                  (CPathField("value") \ ref.selector) == jpath && ref.ctype == ctype
+                }
+            }
+          }.getOrElse(s.columns)
+        })
+
+        BlockProjectionData[JArray](
+          s0.toJson(0).getOrElse(JUndefined) \ "key" asArray,
+          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" asArray,
+          s0)
+      }
+    }
+  }
+
 
   val Table: TableCompanion
   type Table <: ColumnarTable
@@ -82,6 +128,37 @@ trait ColumnarTableModule {
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
+    def load(table: Table, tpe: JType): NeedTable = {
+      for {
+        paths       <- pathsM(table)
+        projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
+        totalLength = projections.map(_.length).sum
+      } yield {
+        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
+          unfoldStream(none[proj.Key]) { key =>
+            proj.getBlockAfter(key, constraints).map { b =>
+              b.map {
+                case BlockProjectionData(_, maxKey, slice) =>
+                  (slice, Some(maxKey))
+              }
+            }
+          }
+        }
+
+        val stream = projections.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
+          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
+          val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
+            Some(Schema.flatten(tpe, struct.toVector).toSet)
+          }
+
+          acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
+        }
+
+        Table(stream, ExactSize(totalLength))
+      }
+    }
+
+
     def apply(slices: NeedSlices, size: TableSize): Table                                            = fromSlices(slices, size)
     def singleton(slice: Slice): Table                                                               = fromSlices(singleStreamT(slice), ExactSize(1))
     def fromJson(data: Seq[JValue]): Table                                                           = outer fromJson data
@@ -319,6 +396,12 @@ trait ColumnarTableModule {
     self: Table =>
 
     type Table = outer.Table
+
+    /**
+      * For each distinct path in the table, load all columns identified by the specified
+      * jtype and concatenate the resulting slices into a new table.
+      */
+    def load(tpe: JType): NeedTable = companion.load(this, tpe)
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
     def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
@@ -1441,8 +1524,6 @@ trait ColumnarTableModule {
 trait BlockTableModule extends ColumnarTableModule {
   outer =>
 
-  def projections: Map[Path, Projection]
-
   def fromSlices(slices: NeedSlices, size: TableSize): Table = {
     size match {
       case ExactSize(1) => new SingletonTable(slices)
@@ -1463,79 +1544,7 @@ trait BlockTableModule extends ColumnarTableModule {
     case _                                 => false
   }
 
-  object Projection {
-    def apply(path: Path): Need[Option[Projection]] = Need(projections get path)
-  }
-  case class Projection(val data: Stream[JValue]) extends ProjectionLike {
-    type Key = JArray
-
-    private val slices      = Table.fromJson(data).slices.toStream.copoint
-    val length: Long        = data.length.toLong
-    val xyz: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
-
-    def structure = Need(xyz)
-
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
-      @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
-        blocks.filterNot(_.isEmpty) match {
-          case x #:: xs => if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
-          case _        => None
-        }
-      }
-
-      val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
-
-      slice map { s =>
-        val s0 = Slice(s.size, {
-          colSelection.map { reqCols =>
-            s.columns.filter {
-              case (ref @ ColumnRef(jpath, ctype), _) =>
-                jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
-                  (CPathField("value") \ ref.selector) == jpath && ref.ctype == ctype
-                }
-            }
-          }.getOrElse(s.columns)
-        })
-
-        BlockProjectionData[JArray](
-          s0.toJson(0).getOrElse(JUndefined) \ "key" asArray,
-          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" asArray,
-          s0)
-      }
-    }
-  }
-
   trait TableCompanion extends ColumnarTableCompanion {
-    def load(table: Table, tpe: JType): NeedTable = {
-      for {
-        paths       <- pathsM(table)
-        projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
-        totalLength = projections.map(_.length).sum
-      } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
-          unfoldStream(none[proj.Key]) { key =>
-            proj.getBlockAfter(key, constraints).map { b =>
-              b.map {
-                case BlockProjectionData(_, maxKey, slice) =>
-                  (slice, Some(maxKey))
-              }
-            }
-          }
-        }
-
-        val stream = projections.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
-          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toVector).toSet)
-          }
-
-          acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
-        }
-
-        Table(stream, ExactSize(totalLength))
-      }
-    }
-
     lazy val sortMergeEngine = new MergeEngine
 
     def addGlobalId(spec: TransSpec1) = {
@@ -2213,8 +2222,6 @@ trait BlockTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def load(tpe: JType) = Table.load(this, tpe)
-
     def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
@@ -2238,8 +2245,6 @@ trait BlockTableModule extends ColumnarTableModule {
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable       = toExternalTable.sort(sortKey, sortOrder)
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = toExternalTable.sortUnique(sortKey, sortOrder)
 
-    def load(tpe: JType): NeedTable = Table.load(this, tpe)
-
     override def force: NeedTable         = Need(this)
     override def paged(limit: Int): Table = this
 
@@ -2253,8 +2258,6 @@ trait BlockTableModule extends ColumnarTableModule {
 
   class ExternalTable(slices: NeedSlices, size: TableSize) extends Table(slices, size) {
     import Table.{ Table => _, _ }
-
-    def load(tpe: JType) = Table.load(this, tpe)
 
     def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
       val limit = limit0.toLong

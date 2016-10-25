@@ -30,7 +30,6 @@ class ColumnarTable extends ColumnarTableModule {
   class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
     /** XXX FIXME */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
-    def load(tpe: JType): NeedTable                                       = ???
 
     override def toString = jvalueStream mkString "\n"
   }
@@ -46,8 +45,6 @@ abstract class BlockTable extends BlockTableModule {
   def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 }
 object BlockTable extends BlockTable {
-  def projections = Map[Path, Projection]()
-
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
 }
