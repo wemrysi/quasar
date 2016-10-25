@@ -20,18 +20,30 @@ import scalaz._
 import ygg._, common._, json._
 import trans._
 import quasar.Data
+import quasar.ejson.EJson
 
 object Table {
-  def fromFile(file: jFile): Table = ???
-  def fromData(data: Data): Table  = ???
-  def fromJson(json: Seq[JValue]): Table = BlockTable fromJson json
+  def fromData(data: Data): Table                         = ???
+  def fromEJson[A](json: EJson[A])(f: A => JValue): Table = ???
+
+  def fromFile(file: jFile): Table        = fromJValues(JParser parseFromFile file)
+  def fromJsonString(json: String): Table = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): Table   = fromJson(json.toVector)
+  def fromJson(json: Seq[JValue]): Table  = BlockTable fromJson json
 }
 
 trait TableConstructors[T <: ygg.table.Table] {
+  type JsonRep
+  type Seq[A]
+
   def maxSliceSize: Int
 
   def empty: T
-  def fromJValues(data: Seq[JValue]): T
+  def fromData(data: Data): T
+  def fromEJson[A](json: EJson[A])(f: A => JsonRep): T
+  def fromFile(file: jFile): T
+  def fromJson(json: String): T
+  def fromJValues(data: Seq[JsonRep]): T
   def fromRValues(data: Seq[RValue]): T
   def fromSlice(data: Slice): T
   def fromSlices(data: Seq[Slice]): T

@@ -31,6 +31,7 @@ object AsyncParser {
 object JParser {
   def parseFromUri(uri: jUri): JValue                               = parseFromStream(uri.toURL.openStream)
   def parseFromPath(path: String): JValue                           = parseFromPath(java.nio.file.Paths get path)
+  def parseFromFile(file: jFile): JValue                            = parseUnsafe(file.slurpString)
   def parseFromPath(path: jPath): JValue                            = parseUnsafe(path.slurpString)
   def parseFromStream(in: InputStream): JValue                      = parseUnsafe(slurpString(in))
   def parseFromResource[A: CTag](name: String): JValue              = parseUnsafe(slurpString(jResource[A](name)))
