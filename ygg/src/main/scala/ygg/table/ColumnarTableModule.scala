@@ -88,24 +88,12 @@ trait ColumnarTableModule {
       val projs = paths.toList flatMap projections.get
       val totalLength = projs.map(_.length).sum
 
-      def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
-        unfoldStream(none[proj.Key]) { key =>
-          proj.getBlockAfter(key, constraints).map { b =>
-            b.map {
-              case BlockProjectionData(_, maxKey, slice) =>
-                (slice, Some(maxKey))
-            }
-          }
-        }
-      }
-
       val stream = projs.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
         // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
         val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
           Some(Schema.flatten(tpe, struct.toVector).toSet)
         }
-
-        acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
+        acc ++ StreamT.wrapEffect(constraints map proj.getBlockStream)
       }
 
       Table(stream, ExactSize(totalLength))
