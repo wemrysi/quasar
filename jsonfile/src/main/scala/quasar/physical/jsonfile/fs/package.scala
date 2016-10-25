@@ -64,6 +64,7 @@ package object fs extends fs.FilesystemEffect {
   /** The query representation, e.g. in marklogic it's XQuery */
   type QRep = ygg.json.JValue
 
+  type Fix[F[_]]            = matryoshka.Fix[F]
   type AsTask[F[X]]         = Task[F ~> Task]
   type FixPlan              = matryoshka.Fix[LogicalPlan]
   type KVInject[K, V, S[_]] = KeyValueStore[K, V, ?] :<: S
@@ -107,10 +108,14 @@ package fs {
   final case class ReadPos(file: AFile, offset: Int, limit: Int)
   final case class WritePos(file: AFile, offset: Int)
 
-  trait STypes[S[_]] extends FileSystemContext.Free[S] with TTypes[Fix] {
+  trait STypesFree[S[_], T[_[_]]] extends FileSystemContext.Free[S] with TTypes[T] {
     type FS[A]  = Free[S, A]
     type FSUnit = FS[Unit]
     type FSBool = FS[Boolean]
+
+    type QPlan[A] = FileSystemErrT[PhaseResultT[FS, ?], A]
+    def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
+      lift(fa).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
     def ls(dir: ADir)(implicit KVF: KVFile[S]): FLR[DirList] = KVF.keys map (fs =>
       fs.map(_ relativeTo dir).unite.toNel

@@ -17,24 +17,21 @@
 package quasar.physical.jsonfile.fs
 
 import scala.Predef.???
-import quasar._
 import quasar.qscript._
 import matryoshka._
 import quasar.contrib.matryoshka._
 import scalaz._
 
 trait Planner[F[_], QS[_]] {
-  /** QS[QRep] => PlannerErrT[PhaseResultT[F, ?], QRep] */
-  def plan: AlgebraM[Planner.PlannerT[F, ?], QS, QRep]
+  /** QS[QRep] => F[QRep] */
+  def plan: AlgebraM[F, QS, QRep]
 }
 
 object Planner {
-  type PlannerT[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
+  def apply[F[_], QS[_]](implicit z: Planner[F, QS]): Planner[F, QS] = z
+  def make[F[_], QS[_]](f: QS[QRep] => F[QRep]): Planner[F, QS]      = new Planner[F, QS] { val plan = f }
 
-  def apply[F[_], QS[_]](implicit z: Planner[F, QS]): Planner[F, QS]      = z
-  def make[F[_], QS[_]](f: QS[QRep] => PlannerT[F, QRep]): Planner[F, QS] = new Planner[F, QS] { val plan = f }
-
-  implicit def qScriptCore[F[_]: Applicative, T[_[_]]: Recursive: ShowT]: Planner[F, QScriptCore[T, ?]] = ???
+  implicit def qScriptCore[F[_]: Applicative, T[_[_]]: Recursive: ShowT]: Planner[F, QScriptCore[T, ?]] = new QScriptCorePlanner[F, T]
   implicit def constDeadEnd[F[_]: Applicative]: Planner[F, Const[DeadEnd, ?]]                           = ???
   implicit def constRead[F[_]: Applicative]: Planner[F, Const[Read, ?]]                                 = ???
   implicit def constShiftedRead[F[_]: Applicative]: Planner[F, Const[ShiftedRead, ?]]                   = ???

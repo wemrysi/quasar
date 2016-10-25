@@ -18,19 +18,21 @@ package quasar.physical.jsonfile.fs
 
 import quasar._
 import quasar.Predef._
-import quasar.fs._, FileSystemError._
+import quasar.fs._
 import quasar.effect._
 import scalaz._, Scalaz._
 import quasar.{ qscript => q }
 import matryoshka._, Recursive.ops._
 import QueryFile._
 import LogicalPlan._
+import quasar.qscript._
+import quasar.contrib.matryoshka.ShowT
 // import pathy._, Path._, quasar.contrib.pathy._
 
-class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypes[S] {
-  private def phaseResults(msg: String): F[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", msg))
-  private def phaseTodo[A](x: FLR[A]): FPLR[A]           = phaseResults("<jsonfile>") tuple x
-  private def TODO[A] : FLR[A]                           = Unimplemented
+class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypesFree[S, Fix] {
+  private def phaseResults(msg: String): F[PhaseResults]        = Vector(PhaseResult.Detail("jsonfile", msg))
+  private def phaseTodo[A](x: FLR[A]): F[PhaseResults -> LR[A]] = phaseResults("<jsonfile>") tuple x
+  private def TODO[A]: FLR[A]                                   = ???
 
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS = {
     def lpResultƒ: AlgebraM[FLR, LogicalPlan, QRep] = {
@@ -44,20 +46,6 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
 
     def evaluatePlan(lp: Fix[LogicalPlan]): FLR[QHandle] = TODO
 
-    /** See marklogic's QScriptCorePlanner.scala for a very clean example */
-    def qscriptCore: AlgebraM[FPLR, QScriptCore, QRep] = {
-      case q.Map(src, f)                           => phaseTodo(TODO)
-      case q.LeftShift(src, struct, repair)        => phaseTodo(TODO)
-      case q.Reduce(src, bucket, reducers, repair) => phaseTodo(TODO)
-      case q.Sort(src, bucket, order)              => phaseTodo(TODO)
-      case q.Filter(src, f)                        => phaseTodo(TODO)
-      case q.Union(src, lBranch, rBranch)          => phaseTodo(TODO)
-      case q.Subset(src, from, q.Drop, count)      => phaseTodo(TODO)
-      case q.Subset(src, from, q.Take, count)      => phaseTodo(TODO)
-      case q.Subset(src, from, q.Sample, count)    => phaseTodo(TODO)
-      case q.Unreferenced()                        => phaseTodo(TODO)
-    }
-
     λ[QueryFile ~> FS] {
       case Explain(lp)          => phaseTodo(TODO)
       case ExecutePlan(lp, out) => phaseTodo(TODO)
@@ -67,5 +55,22 @@ class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: K
       case More(qh)             => Vector()
       case Close(fh)            => (KVQ delete fh).void
     }
+  }
+}
+
+class QScriptCorePlanner[F[_]: Applicative, T[_[_]]: Recursive : ShowT] extends Planner[F, QScriptCore[T, ?]] with TTypes[T] {
+  private def TODO: F[QRep] = ???
+
+  def plan: AlgebraM[F, QScriptCore, QRep] = {
+    case q.Map(src, f)                           => TODO
+    case q.LeftShift(src, struct, repair)        => TODO
+    case q.Reduce(src, bucket, reducers, repair) => TODO
+    case q.Sort(src, bucket, order)              => TODO
+    case q.Filter(src, f)                        => TODO
+    case q.Union(src, lBranch, rBranch)          => TODO
+    case q.Subset(src, from, q.Drop, count)      => TODO
+    case q.Subset(src, from, q.Take, count)      => TODO
+    case q.Subset(src, from, q.Sample, count)    => TODO
+    case q.Unreferenced()                        => TODO
   }
 }

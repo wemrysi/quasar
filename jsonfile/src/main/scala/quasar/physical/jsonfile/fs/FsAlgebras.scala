@@ -27,7 +27,7 @@ import Scalaz.{ ToIdOps => _, _ }
 import ManageFile.MoveSemantics._
 import ManageFile.MoveScenario._
 
-class FsAlgebras[S[_]] extends STypes[S] {
+class FsAlgebras[S[_]] extends STypesFree[S, Fix] {
   private def defaultChunkSize: Int = 10
 
   def emptyData(): Chunks                  = Vector()
