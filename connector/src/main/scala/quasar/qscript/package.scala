@@ -118,12 +118,19 @@ package object qscript {
               IntLit[T, Hole](p._2))))).some
     }
 
-  def concat[T[_[_]]: Corecursive, A](
+  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    // NB: Might be better to do this later, after some normalization, part of
+    //     array compaction, but this helps us avoid some autojoins.
+    (norm.freeMF(l) ≟ norm.freeMF(r)).fold(
+      (norm.freeMF(l), HoleF[T], HoleF[T]),
+      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+  }
 
   def concat3[T[_[_]]: Corecursive, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):

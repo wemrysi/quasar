@@ -363,7 +363,7 @@ object QScriptCore {
             val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> left)))
             val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> right)))
             (lBucket ≟ rBucket && lOrder ≟ rOrder).option(
-                SrcMerge(Sort(s1, lBucket, lOrder), left, right))
+              SrcMerge(Sort(s1, lBucket, lOrder), left, right))
 
           case (Subset(s1, f1, o1, c1), Subset(_, f2, o2, c2)) =>
             val from1 = rebaseBranch(f1, left)
