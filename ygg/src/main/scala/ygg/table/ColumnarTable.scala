@@ -27,17 +27,19 @@ class ColumnarTable extends ColumnarTableModule {
   def toJsonSeq(table: Table): Seq[JValue]                   = toJson(table).copoint
 
   object Table extends ColumnarTableCompanion
-  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadOrSortTable {
+  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+    /** XXX FIXME */
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
+    def load(tpe: JType): NeedTable                                       = ???
+
     override def toString = jvalueStream mkString "\n"
   }
-
 }
 object ColumnarTable extends ColumnarTable {
   def empty: Table               = fromSlices(emptyStreamT(), ExactSize(0))
   def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
   def apply(file: jFile): Table  = apply(file.slurpString)
 }
-
 
 abstract class BlockTable extends BlockTableModule {
   def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)

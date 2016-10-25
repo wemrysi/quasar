@@ -73,10 +73,6 @@ trait Table {
   type NeedTable = Need[Table]
   type Table <: ygg.table.Table
 
-  def companion: TableCompanion[Table]
-
-  def slices: NeedSlices
-
   /**
     * Return an indication of table size, if known
     */
@@ -125,48 +121,18 @@ trait Table {
     */
   def force: NeedTable
 
-  def paged(limit: Int): Table
-
-  /**
-    * Sorts the KV table by ascending or descending order of a transformation
-    * applied to the rows.
-    *
-    * @param sortKey The transspec to use to obtain the values to sort on
-    * @param sortOrder Whether to sort ascending or descending
-    * @param unique If true, the same key values will sort into a single row, otherwise
-    * we assign a unique row ID as part of the key so that multiple equal values are
-    * preserved
-    */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
-  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable
-  def distinct(spec: TransSpec1): Table
-  def concat(t2: Table): Table
-  def zip(t2: Table): NeedTable
-  def toArray[A](implicit tpe: CValueType[A]): Table
-
-  /**
-    * Sorts the KV table by ascending or descending order based on a seq of transformations
-    * applied to the rows.
-    *
-    * @param groupKeys The transspecs to use to obtain the values to sort on
-    * @param valueSpec The transspec to use to obtain the non-sorting values
-    * @param sortOrder Whether to sort ascending or descending
-    * @param unique If true, the same key values will sort into a single row, otherwise
-    * we assign a unique row ID as part of the key so that multiple equal values are
-    * preserved
-    */
-  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
-  def takeRange(startIndex: Long, numberToTake: Long): Table
   def canonicalize(length: Int): Table
+  def companion: TableCompanion[Table]
+  def concat(t2: Table): Table
+  def distinct(spec: TransSpec1): Table
+  def paged(limit: Int): Table
+  def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
   def schemas: Need[Set[JType]]
-
-  // def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
-  // def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
-
-  // for debugging only!!
+  def slices: NeedSlices
+  def takeRange(startIndex: Long, numberToTake: Long): Table
+  def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: Need[Stream[JValue]]
+  def zip(t2: Table): NeedTable
 
-  // import quasar.Data._
   def toData: Vector[Data] = toJson.value.toVector map (x => jawn.Parser.parseUnsafe[Data](x.toString))
 }

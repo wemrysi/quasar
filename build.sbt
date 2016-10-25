@@ -71,12 +71,12 @@ lazy val buildSettings = Seq(
   //   • AsInstanceOf   – puffnfresh/wartremover#266
   //   • NoNeedForMonad – puffnfresh/wartremover#268
   //   • others         – simply need to be reviewed & fixed
-  wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-    Wart.Any,                   // - see puffnfresh/wartremover#263
-    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
-    Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
-    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing),              // - see puffnfresh/wartremover#263
+  // wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
+  //   Wart.Any,                   // - see puffnfresh/wartremover#263
+  //   Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
+  //   Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
+  //   Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
+  //   Wart.Nothing),              // - see puffnfresh/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.

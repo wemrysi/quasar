@@ -19,7 +19,6 @@ package ygg.table
 import ygg._, common._
 
 object yggConfig {
-  def hashJoins         = true
   def sortBufferSize    = 1000
   def maxSliceSize: Int = 10
 

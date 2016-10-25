@@ -58,12 +58,6 @@ trait ColumnarTableModule {
     case x: GroupingSource                       => Vector(x)
     case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
   }
-  def sortedGroupingSpec(gs: GroupingSpec): Need[GroupingSpec] = gs match {
-    case GroupingSource(table, idTrans, targetTrans, groupId, groupKeySpec) =>
-      (table.asInstanceOf[Table]).sort(root.key) map (t => GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec))
-    case GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment) =>
-      (sortedGroupingSpec(left) |@| sortedGroupingSpec(right))(GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, _, _, alignment))
-  }
 
   def fromJson(values: Seq[JValue]): Table = fromJson(values, None)
   def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table = {
@@ -321,22 +315,15 @@ trait ColumnarTableModule {
     }
   }
 
-  trait NoLoadOrSortTable extends ygg.table.Table {
-    self: outer.Table =>
-
-    def load(jtpe: JType): NeedTable                                                                                      = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                 = Need[Table](this)
-    def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                               = Need[Table](this)
-    def groupByN(keys: scSeq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = Need(Nil)
-  }
-
   abstract class ColumnarTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
 
-    def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
     def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
+
+    def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
 
     def slicesStream: Stream[Slice]  = slices.toStream.value
     def jvalueStream: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
@@ -1159,11 +1146,10 @@ trait ColumnarTableModule {
           } yield back
         )
 
-        val slices0 = StreamT.wrapEffect(this.sort(spec) map { sorted =>
-          stream((id.initial, filter.initial), sorted.slices)
-        })
-
-        Table(slices0, EstimateSize(0L, size.maxSize))
+        Table(
+          StreamT.wrapEffect(sort(spec) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
+          EstimateSize(0L, size.maxSize)
+        )
       }
 
       distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
@@ -1937,9 +1923,11 @@ trait BlockTableModule extends ColumnarTableModule {
 
       valueTrans.advance(slice) flatMap {
         case (valueTrans0, vslice) => {
-          val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
-          val dataRowFormat           = RowFormat.forValues(vColumnRefs)
-          val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
+          val kvs               = vslice.columns.toList.sortBy(_._1)
+          val vColumnRefs       = kvs map (_._1)
+          val vColumns          = kvs map (_._2)
+          val dataRowFormat     = RowFormat.forValues(vColumnRefs)
+          val dataColumnEncoder = dataRowFormat.ColumnEncoder(vColumns)
 
           def storeTransformed(jdbmState: JDBMState,
                                transforms: List[SliceTransform1[_] -> String],
@@ -1949,11 +1937,9 @@ trait BlockTableModule extends ColumnarTableModule {
                 case (nextKeyTransform, kslice) =>
                   def thing = (nextKeyTransform -> streamId) :: updatedTransforms
 
-                  kslice.columns.toList.sortBy(_._1).unzip match {
-                    case (refs, _) if refs.isEmpty =>
-                      Need(jdbmState -> thing)
-                    case (refs, _) =>
-                      writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
+                  kslice.columns.toList.sortBy(_._1) match {
+                    case Seq() => Need(jdbmState -> thing)
+                    case _     => writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
                   }
               }
 
@@ -1970,9 +1956,12 @@ trait BlockTableModule extends ColumnarTableModule {
     }
 
     protected def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) = {
-      val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
-      val dataRowFormat           = RowFormat.forValues(vColumnRefs)
-      val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
+      val kvs         = vslice.columns.toList.sortBy(_._1)
+      val vColumnRefs = kvs map (_._1)
+      val vColumns    = kvs map (_._2)
+
+      val dataRowFormat     = RowFormat.forValues(vColumnRefs)
+      val dataColumnEncoder = dataRowFormat.ColumnEncoder(vColumns)
 
       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, indexNamePrefix, jdbmState)
     }
@@ -2150,24 +2139,44 @@ trait BlockTableModule extends ColumnarTableModule {
       val left1  = left0.compact(leftKeySpec)
       val right1 = right0.compact(rightKeySpec)
 
-      if (yggConfig.hashJoins) {
-        (left1.toInternalTable(), right1.toInternalTable()) match {
-          case (\/-(left), \/-(right)) =>
-            orderHint match {
-              case Some(JoinOrder.LeftOrder)  => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-              case Some(JoinOrder.RightOrder) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-              case _                          => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-            }
+      (left1.toInternalTable(), right1.toInternalTable()) match {
+        case (\/-(left), \/-(right)) =>
+          orderHint match {
+            case Some(JoinOrder.LeftOrder)  => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+            case Some(JoinOrder.RightOrder) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
+            case _                          => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+          }
 
-          case (\/-(left), -\/(right)) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-          case (-\/(left), \/-(right)) => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-          case (-\/(left), -\/(right)) => super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
-        }
-      } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
+        case (\/-(left), -\/(right)) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
+        case (-\/(left), \/-(right)) => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+        case (-\/(left), -\/(right)) => super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
+      }
     }
   }
 
   abstract class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+    /**
+      * Sorts the KV table by ascending or descending order of a transformation
+      * applied to the rows.
+      *
+      * @param sortKey The transspec to use to obtain the values to sort on
+      * @param sortOrder Whether to sort ascending or descending
+      */
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
+
+    /**
+      * Sorts the KV table by ascending or descending order based on a seq of transformations
+      * applied to the rows.
+      *
+      * @param groupKeys The transspecs to use to obtain the values to sort on
+      * @param valueSpec The transspec to use to obtain the non-sorting values
+      * @param sortOrder Whether to sort ascending or descending
+      * @param unique If true, the same key values will sort into a single row, otherwise
+      * we assign a unique row ID as part of the key so that multiple equal values are
+      * preserved
+      */
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
+
     /**
       * Converts a table to an internal table, if possible. If the table is
       * already an `InternalTable` or a `SingletonTable`, then the conversion
@@ -2176,6 +2185,7 @@ trait BlockTableModule extends ColumnarTableModule {
       * otherwise it will stay an `ExternalTable`.
       */
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable
+
     def toInternalTable(): ExternalTable \/ InternalTable = toInternalTable(yggConfig.maxSliceSize)
 
     /**
@@ -2205,7 +2215,7 @@ trait BlockTableModule extends ColumnarTableModule {
 
     def load(tpe: JType) = Table.load(this, tpe)
 
-    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
