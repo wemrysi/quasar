@@ -216,7 +216,7 @@ object MongoDbPlanner {
       case c @ ConstantF(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
-      case LP.LetF(_, _, body) => body
+      case LP.Let(_, _, body) => body
       case x @ TypecheckF(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
@@ -441,7 +441,7 @@ object MongoDbPlanner {
     node match {
       case ConstantF(_)   => \/-(default)
       case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
-      case LetF(_, _, in) => in._2
+      case Let(_, _, in) => in._2
       case TypecheckF(_, typ, cont, _) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
@@ -798,7 +798,7 @@ object MongoDbPlanner {
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
-      case LetF(_, _, in) => state(in.head._2)
+      case Let(_, _, in) => state(in.head._2)
       case TypecheckF(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
@@ -898,8 +898,8 @@ object MongoDbPlanner {
               f => \/-(Invoke[nat._2](f, Func.Input2(right, left))))
           else -\/(UnsupportedJoinCondition(Fix(x)))
 
-        case LetF(name, form, in) =>
-          alignCondition(lt, rt)(in).map(Let(name, form, _))
+        case Let(name, form, in) =>
+          alignCondition(lt, rt)(in).map(body => Fix(Let(name, form, body)))
 
         case x => \/-(Fix(x))
       }
@@ -919,12 +919,12 @@ object MongoDbPlanner {
     */
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
-    case x @ LetF(n, r @ Fix(ReadF(_)),
+    case x @ Let(n, r @ Fix(ReadF(_)),
       Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
-          \/-(Let(n, r, cont))
+          \/-(Fix(Let(n, r, cont)))
         case Type.Obj(_, _) =>
           \/-(Fix(x))
         case _ =>

@@ -465,7 +465,7 @@ class Transform
     case LogicalPlan.FreeF(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[Target[F]]
 
-    case LogicalPlan.LetF(name, form, body) =>
+    case LogicalPlan.Let(name, form, body) =>
       (Planner.InternalError("un-elided Let"): PlannerError).left[Target[F]]
 
     case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>

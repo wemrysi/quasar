@@ -38,7 +38,7 @@ object Optimizer {
 
   private def countUsageƒ(target: Symbol): Algebra[LP, Int] = {
     case FreeF(symbol) if symbol == target => 1
-    case LetF(ident, form, _) if ident == target => form
+    case Let(ident, form, _) if ident == target => form
     case x => x.fold
   }
 
@@ -46,15 +46,15 @@ object Optimizer {
       LP[(T[LP], T[LP])] => LP[T[LP]] =
   {
     case FreeF(symbol) if symbol == target => repl
-    case LetF(ident, form, body) if ident == target =>
-      LetF(ident, form._2, body._1)
+    case Let(ident, form, body) if ident == target =>
+      Let(ident, form._2, body._1)
     case x => x.map(_._2)
   }
 
   private def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
       LP[T[LP]] => Option[LP[T[LP]]] = {
     case inv @ InvokeF(func, _) => func.simplify(inv)
-    case LetF(ident, form, in) => form.project match {
+    case Let(ident, form, in) => form.project match {
       case ConstantF(_)
          | FreeF(_) => in.transPara(inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
@@ -77,7 +77,7 @@ object Optimizer {
     */
   def elideLets[T[_[_]]: Recursive: FunctorT]:
       LP[T[LP]] => Option[LP[T[LP]]] = {
-    case LetF(ident, form, in) =>
+    case Let(ident, form, in) =>
       in.transPara(inlineƒ(ident, form.project)).project.some
     case _ => None
   }
@@ -100,7 +100,7 @@ object Optimizer {
   }
 
   private val shapeƒ: GAlgebra[(Fix[LP], ?), LP, Option[List[Fix[LP]]]] = {
-    case LetF(_, _, body) => body._2
+    case Let(_, _, body) => body._2
     case ConstantF(Data.Obj(map)) =>
       Some(map.keys.map(n => Constant(Data.Str(n))).toList)
     case InvokeFUnapply(DeleteField, Sized(src, field)) =>
@@ -147,9 +147,9 @@ object Optimizer {
           Invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field)))) {
           fields =>
             val name = uniqueName("src", fields)
-              Let(name, preserveFree(src),
+              Fix(Let(name, preserveFree(src),
                 Fix(MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> Invoke(ObjectProject, Func.Input2(Free(name), f))): _*)))
+                  f -> Invoke(ObjectProject, Func.Input2(Free(name), f))): _*))))
         }
       case lp => Fix(lp.map(preserveFree))
     },
@@ -160,9 +160,9 @@ object Optimizer {
     simplify(boundPara(t)(preferProjectionsƒ)._1)
 
   val elideTypeCheckƒ: Algebra[LP, Fix[LP]] = {
-    case LetF(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
+    case Let(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
         if n == nf =>
-      Let(n, b, cont)
+      Fix(Let(n, b, cont))
     case x => Fix(x)
   }
 
@@ -281,16 +281,16 @@ object Optimizer {
       } yield {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
-          Let(lName, lSrc,
-            Let(lFName, Fix(Filter(Free(lName), assembleCond(lefts.map(_.run0(Free(lName)))))),
-              Let(rName, rSrc,
-                Let(rFName, Fix(Filter(Free(rName), assembleCond(rights.map(_.run0(Free(rName)))))),
-                  Let(jName,
+          Fix(Let(lName, lSrc,
+            Fix(Let(lFName, Fix(Filter(Free(lName), assembleCond(lefts.map(_.run0(Free(lName)))))),
+              Fix(Let(rName, rSrc,
+                Fix(Let(rFName, Fix(Filter(Free(rName), assembleCond(rights.map(_.run0(Free(rName)))))),
+                  Fix(Let(jName,
                     Fix(InnerJoin(Free(lFName), Free(rFName),
                       assembleCond(equis.map(_.run(Free(lFName), Free(rFName)))))),
                     Fix(Filter(Free(jName), assembleCond(
                       others.map(_.run0(JoinDir.Left.projectFrom(Free(jName)), JoinDir.Right.projectFrom(Free(jName)))) ++
-                      neithers.map(_.run0))))))))))
+                      neithers.map(_.run0)))))))))))))))
       }
     }
 

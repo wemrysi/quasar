@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.LogicalPlan._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.set._, StdLib.structural._
 
@@ -28,34 +29,34 @@ import scalaz.{Free => _, _}, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
-class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
+class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers with LogicalPlanHelpers {
   "simplify" should {
 
     "inline trivial binding" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"), Free('tmp0))) must
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"), Free('tmp0))) must
         beTree(read("foo"))
     }
 
     "not inline binding that's used twice" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"),
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
         makeObj(
           "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
           "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))) must
         beTree(
-          Let('tmp0, read("foo"),
+          fixLet('tmp0, read("foo"),
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
               "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz"))))))
     }
 
     "completely inline stupid lets" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"), Let('tmp1, Free('tmp0), Free('tmp1)))) must
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"), fixLet('tmp1, Free('tmp0), Free('tmp1)))) must
         beTree(read("foo"))
     }
 
     "inline correct value for shadowed binding" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"),
-        Let('tmp0, read("bar"),
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
+        fixLet('tmp0, read("bar"),
           makeObj(
             "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))))))) must
         beTree(
@@ -64,9 +65,9 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     }
 
     "inline a binding used once, then shadowed once" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"),
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
         ObjectProject(Free('tmp0),
-          Let('tmp0, read("bar"),
+          fixLet('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))))))) must
         beTree(
@@ -77,27 +78,27 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     }
 
     "inline a binding used once, then shadowed twice" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("foo"),
+      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
         ObjectProject(Free('tmp0),
-          Let('tmp0, read("bar"),
+          fixLet('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
               "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))))) must
         beTree(
           Invoke(ObjectProject, Func.Input2(
             read("foo"),
-            Let('tmp0, read("bar"),
+            fixLet('tmp0, read("bar"),
               makeObj(
                 "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
                 "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz"))))))))
     }
 
     "partially inline a more interesting case" in {
-      Optimizer.simplify[Fix](Let('tmp0, read("person"),
-        Let('tmp1,
+      Optimizer.simplify[Fix](fixLet('tmp0, read("person"),
+        fixLet('tmp1,
           makeObj(
             "name" -> ObjectProject(Free('tmp0), Constant(Data.Str("name")))),
-          Let('tmp2,
+          fixLet('tmp2,
             OrderBy[FLP](
               Free('tmp1),
               MakeArray[FLP](
@@ -105,7 +106,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               Constant(Data.Str("foobar"))),
             Free('tmp2))))) must
         beTree(
-          Let('tmp1,
+          fixLet('tmp1,
             makeObj(
               "name" ->
                 ObjectProject(read("person"), Constant(Data.Str("name")))),
@@ -129,14 +130,14 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
     "convert a delete after a projection" in {
       Optimizer.preferProjections(
-        Let('meh, Read(file("zips")),
+        fixLet('meh, Read(file("zips")),
           DeleteField[FLP](
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
               "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
             Constant(Data.Str("pop"))))) must
       beTree(
-        Let('meh, Read(file("zips")),
+        fixLet('meh, Read(file("zips")),
           makeObj(
             "city" ->
               ObjectProject(
@@ -150,8 +151,8 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
     "convert a delete when the shape is hidden by a Free" in {
       Optimizer.preferProjections(
-        Let('meh, Read(file("zips")),
-          Let('meh2,
+        fixLet('meh, Read(file("zips")),
+          fixLet('meh2,
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
               "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),
@@ -160,8 +161,8 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "cleaned" ->
                 DeleteField(Free('meh2), Constant(Data.Str("pop"))))))) must
       beTree(
-        Let('meh, Read(file("zips")),
-          Let('meh2,
+        fixLet('meh, Read(file("zips")),
+          fixLet('meh2,
             makeObj(
               "city" -> ObjectProject(Free('meh), Constant(Data.Str("city"))),
               "pop"  -> ObjectProject(Free('meh), Constant(Data.Str("pop")))),

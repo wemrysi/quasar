@@ -17,12 +17,13 @@
 package quasar.sql
 
 import quasar.Predef._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.Data
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
 import matryoshka.Fix
 
-class CompilerSpec extends quasar.Qspec with CompilerHelpers {
+class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
   //     need to do a better job of handling this.
   import quasar.LogicalPlan._
@@ -123,7 +124,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile qualified select * with additional fields" in {
       testLogicalPlanCompile(
         "select foo.*, bar.address from foo, bar",
-        Let('__tmp0,
+        fixLet('__tmp0,
           InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
@@ -138,7 +139,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile deeply-nested qualified select *" in {
       testLogicalPlanCompile(
         "select foo.bar.baz.*, bar.address from foo, bar",
-        Let('__tmp0,
+        fixLet('__tmp0,
           InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
@@ -317,7 +318,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile two term addition from one table" in {
       testLogicalPlanCompile(
         "select foo + bar from baz",
-        Let('__tmp0, read("baz"),
+        fixLet('__tmp0, read("baz"),
           Squash(
             makeObj(
               "0" ->
@@ -338,7 +339,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile modulo" in {
       testLogicalPlanCompile(
         "select foo % baz from bar",
-        Let('__tmp0, read("bar"),
+        fixLet('__tmp0, read("bar"),
           Squash(
             makeObj(
               "0" ->
@@ -350,8 +351,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile coalesce" in {
       testLogicalPlanCompile(
         "select coalesce(bar, baz) from foo",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1, ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
             Squash(
               makeObj(
                 "0" ->
@@ -374,7 +375,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile conditional" in {
       testLogicalPlanCompile(
         "select case when pop < 10000 then city else loc end from zips",
-        Let('__tmp0, read("zips"),
+        fixLet('__tmp0, read("zips"),
           Squash(makeObj(
             "0" ->
               Cond[FLP](
@@ -423,7 +424,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile concat" in {
       testLogicalPlanCompile(
         "select concat(foo, concat(\" \", bar)) from baz",
-        Let('__tmp0, read("baz"),
+        fixLet('__tmp0, read("baz"),
           Squash(
             makeObj(
               "0" ->
@@ -447,7 +448,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile between" in {
       testLogicalPlanCompile(
         "select * from foo where bar between 1 and 10",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
               Free('__tmp0),
@@ -460,7 +461,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile not between" in {
       testLogicalPlanCompile(
         "select * from foo where bar not between 1 and 10",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
               Free('__tmp0),
@@ -474,7 +475,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile like" in {
       testLogicalPlanCompile(
         "select bar from foo where bar like \"a%\"",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
@@ -491,7 +492,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile like with escape char" in {
       testLogicalPlanCompile(
         "select bar from foo where bar like \"a=%\" escape \"=\"",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
@@ -508,7 +509,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile not like" in {
       testLogicalPlanCompile(
         "select bar from foo where bar not like \"a%\"",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash(makeObj("bar" -> ObjectProject[FLP](Filter[FLP](
             Free('__tmp0),
             Not[FLP](
@@ -522,7 +523,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile ~" in {
       testLogicalPlanCompile(
         "select bar from foo where bar ~ \"a.$\"",
-        Let('__tmp0, read("foo"),
+        fixLet('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
@@ -567,7 +568,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile cross select *" in {
       testLogicalPlanCompile(
         "select * from person, car",
-        Let('__tmp0,
+        fixLet('__tmp0,
           InnerJoin(read("person"), read("car"), Constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
@@ -578,7 +579,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile two term multiplication from two tables" in {
       testLogicalPlanCompile(
         "select person.age * car.modelYear from person, car",
-        Let('__tmp0,
+        fixLet('__tmp0,
           InnerJoin(read("person"), read("car"), Constant(Data.Bool(true))),
           Squash(
             makeObj(
@@ -606,7 +607,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple where" in {
       testLogicalPlanCompile(
         "select name from person where age > 18",
-        Let('__tmp0, read("person"),
+        fixLet('__tmp0, read("person"),
           Squash(
             makeObj(
               "name" ->
@@ -622,7 +623,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple group by" in {
       testLogicalPlanCompile(
         "select count(*) from person group by name",
-        Let('__tmp0, read("person"),
+        fixLet('__tmp0, read("person"),
           Squash(
             makeObj(
               "0" ->
@@ -637,8 +638,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile group by with projected keys" in {
       testLogicalPlanCompile(
         "select lower(name), person.gender, avg(age) from person group by lower(person.name), gender",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("person"),
+          fixLet('__tmp1,
             GroupBy[FLP](
               Free('__tmp0),
               MakeArrayN[Fix](
@@ -666,7 +667,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile group by with perverse aggregated expression" in {
       testLogicalPlanCompile(
         "select count(name) from person group by name",
-        Let('__tmp0, read("person"),
+        fixLet('__tmp0, read("person"),
           Squash(
             makeObj(
               "0" ->
@@ -692,7 +693,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     val setA =
-      Let('__tmp0, read("zips"),
+      fixLet('__tmp0, read("zips"),
         Squash(makeObj(
           "loc" -> ObjectProject(Free('__tmp0), Constant(Data.Str("loc"))),
           "pop" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))))
@@ -806,7 +807,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
       testLogicalPlanCompile(
         "select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
-        Let('__tmp0, read("slamengine_commits"),
+        fixLet('__tmp0, read("slamengine_commits"),
           Squash(makeObj("0" ->
             UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
@@ -816,7 +817,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
       testLogicalPlanCompile(
         "select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
-        Let('__tmp0, read("slamengine_commits"),
+        fixLet('__tmp0, read("slamengine_commits"),
           Squash(makeObj("0" ->
             UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
@@ -857,8 +858,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by" in {
       testLogicalPlanCompile(
         "select name from person order by height",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("person"),
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("name"))),
@@ -876,14 +877,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
         "select name from person where gender = \"male\" order by name, height",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("person"),
+          fixLet('__tmp1,
             Filter[FLP](
               Free('__tmp0),
               Eq[FLP](
                 ObjectProject(Free('__tmp0), Constant(Data.Str("gender"))),
                 Constant(Data.Str("male")))),
-            Let('__tmp2,
+            fixLet('__tmp2,
               Squash(
                 makeObj(
                   "name"    -> ObjectProject(Free('__tmp1), Constant(Data.Str("name"))),
@@ -903,7 +904,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by with wildcard" in {
       testLogicalPlanCompile(
         "select * from person order by height",
-        Let('__tmp0, Squash(read("person")),
+        fixLet('__tmp0, Squash(read("person")),
           OrderBy[FLP](
             Free('__tmp0),
             MakeArrayN[Fix](
@@ -915,7 +916,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by with ascending and descending" in {
       testLogicalPlanCompile(
         "select * from person order by height desc, name",
-        Let('__tmp0, Squash(read("person")),
+        fixLet('__tmp0, Squash(read("person")),
           OrderBy[FLP](
             Free('__tmp0),
             MakeArrayN[Fix](
@@ -929,8 +930,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by with expression" in {
       testLogicalPlanCompile(
         "select * from person order by height*2.54",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("person"),
+          fixLet('__tmp1,
             Squash[FLP](
               ObjectConcat(
                 Free('__tmp0),
@@ -951,7 +952,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile order by with alias" in {
       testLogicalPlanCompile(
         "select firstName as name from person order by name",
-        Let('__tmp0,
+        fixLet('__tmp0,
           Squash(
             makeObj(
               "name" -> ObjectProject(read("person"), Constant(Data.Str("firstName"))))),
@@ -964,8 +965,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple order by with expression in synthetic field" in {
       testLogicalPlanCompile(
         "select name from person order by height*2.54",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("person"),
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("name"))),
@@ -986,8 +987,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile order by with nested projection" in {
       testLogicalPlanCompile(
         "select bar from foo order by foo.bar.baz.quux/3",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "bar" -> ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
@@ -1053,20 +1054,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           " order by cm" +
           " offset 10" +
           " limit 5",
-        Let('__tmp0, read("person"), // from person
-          Let('__tmp1,    // where height > 60
+        fixLet('__tmp0, read("person"), // from person
+          fixLet('__tmp1,    // where height > 60
             Filter[FLP](
               Free('__tmp0),
               Gt[FLP](
                 ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
                 Constant(Data.Int(60)))),
-            Let('__tmp2,    // group by gender, height
+            fixLet('__tmp2,    // group by gender, height
               GroupBy[FLP](
                 Free('__tmp1),
                 MakeArrayN[Fix](
                   ObjectProject(Free('__tmp1), Constant(Data.Str("gender"))),
                   ObjectProject(Free('__tmp1), Constant(Data.Str("height"))))),
-              Let('__tmp3,
+              fixLet('__tmp3,
                 Squash(    // select height*2.54 as cm
                   makeObj(
                     "cm" ->
@@ -1102,9 +1103,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple inner equi-join" in {
       testLogicalPlanCompile(
         "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1, read("bar"),
+            fixLet('__tmp2,
               InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
                 relations.Eq[FLP](
                   ObjectProject(Free('__tmp0), Constant(Data.Str("id"))),
@@ -1156,21 +1157,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // val equiv = "select foo.name, bar.address from (select * from foo where x < 10) foo join (select * from bar where y = 20) bar on foo.id = bar.foo_id"
 
       testLogicalPlanCompile(query,
-        Let('__tmp0, read("foo"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1,
              Fix(Filter(
                Free('__tmp0),
                Fix(Lt(
                  ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
                  Constant(Data.Int(10)))))),
-             Let('__tmp2, read("bar"),
-               Let('__tmp3,
+             fixLet('__tmp2, read("bar"),
+               fixLet('__tmp3,
                  Fix(Filter(
                    Free('__tmp2),
                    Fix(Eq(
                      ObjectProject(Free('__tmp2), Constant(Data.Str("y"))),
                      Constant(Data.Int(20)))))),
-                  Let('__tmp4,
+                  fixLet('__tmp4,
                     Fix(InnerJoin(Free('__tmp1), Free('__tmp3),
                       Fix(Eq(
                         ObjectProject(Free('__tmp1), Constant(Data.Str("id"))),
@@ -1193,21 +1194,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // because both require optimization)
 
       testLogicalPlanCompile(query,
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1, read("bar"),
+            fixLet('__tmp2,
               Fix(Filter(
                 Free('__tmp0),
                 Fix(Lt(
                   ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
                   Constant(Data.Int(10)))))),
-              Let('__tmp3,
+              fixLet('__tmp3,
                 Fix(Filter(
                   Free('__tmp1),
                   Fix(Eq(
                     ObjectProject(Free('__tmp1), Constant(Data.Str("y"))),
                     Constant(Data.Int(20)))))),
-                Let('__tmp4,
+                fixLet('__tmp4,
                   Fix(InnerJoin(Free('__tmp2), Free('__tmp3),
                     Fix(Eq(
                       ObjectProject(Free('__tmp2), Constant(Data.Str("id"))),
@@ -1226,9 +1227,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select foo.name, bar.address " +
           "from foo left join bar on foo.id < bar.foo_id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1, read("bar"),
+            fixLet('__tmp2,
               LeftOuterJoin[FLP](Free('__tmp0), Free('__tmp1),
                 relations.Lt[FLP](
                   ObjectProject(Free('__tmp0), Constant(Data.Str("id"))),
@@ -1250,9 +1251,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select foo.name, bar.address " +
           "from foo join bar on foo.id = bar.foo_id " +
           "join baz on baz.bar_id = bar.id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
+        fixLet('__tmp0, read("foo"),
+          fixLet('__tmp1, read("bar"),
+            fixLet('__tmp2,
               InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
                 relations.Eq[FLP](
                   ObjectProject(
@@ -1261,8 +1262,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   ObjectProject(
                     Free('__tmp1),
                     Constant(Data.Str("foo_id"))))),
-              Let('__tmp3, read("baz"),
-                Let('__tmp4,
+              fixLet('__tmp3, read("baz"),
+                fixLet('__tmp4,
                   InnerJoin[FLP](Free('__tmp2), Free('__tmp3),
                     relations.Eq[FLP](
                       ObjectProject(Free('__tmp3),
@@ -1296,8 +1297,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple sub-select" in {
       testLogicalPlanCompile(
         "select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) as temp",
-        Let('__tmp0, read("zips"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("zips"),
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
@@ -1311,8 +1312,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile sub-select with same un-qualified names" in {
       testLogicalPlanCompile(
         "select city, pop from (select city, pop from zips) as temp",
-        Let('__tmp0, read("zips"),
-          Let('__tmp1,
+        fixLet('__tmp0, read("zips"),
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "city" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
@@ -1335,7 +1336,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple distinct ordered" in {
       testLogicalPlanCompile(
         "select distinct city from zips order by city",
-        Let('__tmp0,
+        fixLet('__tmp0,
           Squash(
             makeObj(
               "city" ->
@@ -1352,14 +1353,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile distinct with unrelated order by" in {
       testLogicalPlanCompile(
         "select distinct city from zips order by pop desc",
-        Let('__tmp0,
+        fixLet('__tmp0,
           read("zips"),
-          Let('__tmp1,
+          fixLet('__tmp1,
             Squash(
               makeObj(
                 "city" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
                 "__sd__0" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))),
-            Let('__tmp2,
+            fixLet('__tmp2,
               OrderBy[FLP](
                 Free('__tmp1),
                 MakeArrayN[Fix](
@@ -1383,7 +1384,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple distinct with two named projections" in {
       testLogicalPlanCompile(
         "select distinct city as CTY, state as ST from zips",
-        Let('__tmp0, read("zips"),
+        fixLet('__tmp0, read("zips"),
           Distinct[FLP](
             Squash(
               makeObj(
@@ -1422,7 +1423,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "translate free variable" in {
       testLogicalPlanCompile("select name from zips where age < :age",
-        Let('__tmp0, read("zips"),
+        fixLet('__tmp0, read("zips"),
           Squash(
             makeObj(
               "name" ->
@@ -1451,14 +1452,14 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "insert ARBITRARY" in {
       val lp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        fixLet('tmp0, read("zips"),
+          fixLet('tmp1,
             GroupBy[FLP](
               Free('tmp0),
               MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
             ObjectProject(Free('tmp1), Constant(Data.Str("city")))))
       val exp =
-        Let('tmp0, read("zips"),
+        fixLet('tmp0, read("zips"),
           Arbitrary[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
@@ -1470,17 +1471,17 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "insert ARBITRARY with intervening filter" in {
       val lp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        fixLet('tmp0, read("zips"),
+          fixLet('tmp1,
             GroupBy[FLP](
               Free('tmp0),
               MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
-            Let('tmp2,
+            fixLet('tmp2,
               Filter[FLP](Free('tmp1), Gt[FLP](Count(Free('tmp1)), Constant(Data.Int(10)))),
               ObjectProject(Free('tmp2), Constant(Data.Str("city"))))))
       val exp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        fixLet('tmp0, read("zips"),
+          fixLet('tmp1,
             GroupBy[FLP](
               Free('tmp0),
               MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
@@ -1496,7 +1497,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "not insert redundant Reduction" in {
       val lp =
-        Let('tmp0, read("zips"),
+        fixLet('tmp0, read("zips"),
           Count[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
@@ -1509,9 +1510,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "insert ARBITRARY with multiple keys and mixed projections" in {
       val lp =
-        Let('tmp0,
+        fixLet('tmp0,
           read("zips"),
-          Let('tmp1,
+          fixLet('tmp1,
             GroupBy[FLP](
               Free('tmp0),
               MakeArrayN[Fix](
@@ -1523,9 +1524,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               "loc"  -> ObjectProject(Free('tmp1), Constant(Data.Str("loc"))),
               "2"    -> Sum[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("pop")))))))
       val exp =
-        Let('tmp0,
+        fixLet('tmp0,
           read("zips"),
-          Let('tmp1,
+          fixLet('tmp1,
             GroupBy[FLP](
               Free('tmp0),
               MakeArrayN[Fix](

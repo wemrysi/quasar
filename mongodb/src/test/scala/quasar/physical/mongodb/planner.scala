@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
@@ -41,7 +42,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
+class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers with LogicalPlanHelpers {
   import StdLib.{set => s, _}
   import structural._
   import LogicalPlan._
@@ -3760,11 +3761,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "plan simple OrderBy" in {
       val lp =
-        LogicalPlan.Let(
+        fixLet(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
+          fixLet(
             'tmp1, makeObj("bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
-            LogicalPlan.Let('tmp2,
+            fixLet('tmp2,
               s.OrderBy[FLP](
                 Free('tmp1),
                 MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
@@ -3781,7 +3782,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "plan OrderBy with expression" in {
       val lp =
-        LogicalPlan.Let(
+        fixLet(
           'tmp0, read("db/foo"),
           s.OrderBy[FLP](
             Free('tmp0),
@@ -3805,9 +3806,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "plan OrderBy with expression and earlier pipeline op" in {
       val lp =
-        LogicalPlan.Let(
+        fixLet(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
+          fixLet(
             'tmp1,
             s.Filter[FLP](
               Free('tmp0),
@@ -3828,9 +3829,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
     "plan OrderBy with expression (and extra project)" in {
       val lp =
-        LogicalPlan.Let(
+        fixLet(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
+          fixLet(
             'tmp9,
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
@@ -3966,9 +3967,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       // because type-checks are inserted into the inner and outer queries separately.
 
       val lp =
-        LogicalPlan.Let(
+        fixLet(
           'tmp0,
-          LogicalPlan.Let(
+          fixLet(
             'check0,
             identity.Squash(read("db/zips")),
             LogicalPlan.Typecheck(
@@ -3985,7 +3986,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     Free('tmp0),
                     string.Search[FLP](
                       FlattenArray[FLP](
-                        LogicalPlan.Let(
+                        fixLet(
                           'check1,
                           ObjectProject(Free('tmp0), Constant(Data.Str("loc"))),
                           LogicalPlan.Typecheck(

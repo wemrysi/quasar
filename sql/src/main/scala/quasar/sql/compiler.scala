@@ -308,7 +308,7 @@ trait Compiler[F[_]] {
             case r                               => BindingContext(Map())
           }
           next2    <- CompilerState.contextual(bc, tableContext(LP.Free(stepName), relations))(next)
-        } yield LP.Let(stepName, current, next2)
+        } yield Fix(LP.Let(stepName, current, next2))
       }.getOrElse(next)
     }
 
@@ -377,8 +377,8 @@ trait Compiler[F[_]] {
                       case FullJoin             => set.FullOuterJoin
                     },
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
-              LP.Let(leftName, left0,
-                LP.Let(rightName, right0, join)))
+              Fix(LP.Let(leftName, left0,
+                Fix(LP.Let(rightName, right0, join)))))
             }).join
       }
 
@@ -610,13 +610,13 @@ trait Compiler[F[_]] {
 
       case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
-          LP.Let(name, c1,
+          Fix(LP.Let(name, c1,
             relations.Cond(
               // TODO: Ideally this would use `is null`, but that doesn’t makes it
               //       this far (but it should).
               relations.Eq(LP.Free(name), LP.Constant(Data.Null)).embed,
               c2,
-              LP.Free(name)).embed)),
+              LP.Free(name)).embed))),
           functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
