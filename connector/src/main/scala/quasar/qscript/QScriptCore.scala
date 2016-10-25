@@ -295,13 +295,13 @@ object QScriptCore {
           case (
             Reduce(_, bucket1, func1, rep1),
             Reduce(_, bucket2, func2, rep2)) =>
-            val mapL = bucket1 >> left
-            val mapR = bucket2 >> right
+            val mapL = norm.freeMF(bucket1 >> left)
+            val mapR = norm.freeMF(bucket2 >> right)
 
             (mapL ≟ mapR).option {
-              val funcL = func1.map(_.map(_ >> left))
-              val funcR = func1.map(_.map(_ >> right))
-              val (newRep, lrep, rrep) = concat(rep1, rep2.map(_.incr(func1.length)))
+              val funcL = func1 ∘ (_ ∘ (_ >> left))
+              val funcR = func2 ∘ (_ ∘ (_ >> right))
+              val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
 
               SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
                 Reduce(Extern, mapL, funcL ++ funcR, newRep),
