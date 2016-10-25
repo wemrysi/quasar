@@ -568,7 +568,9 @@ object MapFunc {
       }
     }
 
-  implicit def renderTree[T[_[_]]](implicit ev0: Show[T[EJson]], ev1: RenderTree[Type]): Delay[RenderTree, MapFunc[T, ?]] =
+  // TODO: replace this with some kind of pretty-printing based on a syntax for
+  // MapFunc + EJson.
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFunc[T, ?]] =
     new Delay[RenderTree, MapFunc[T, ?]] {
       val nt = "MapFunc" :: Nil
 
@@ -579,7 +581,7 @@ object MapFunc {
 
         RenderTree.make {
           // nullary
-          case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)  // TODO: use RenderTree[T[EJson]]?
+          case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)
           case Undefined() => Terminal("Undefined" :: nt, None)
           case Now() => Terminal("Now" :: nt, None)
 
