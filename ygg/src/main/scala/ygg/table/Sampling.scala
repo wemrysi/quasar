@@ -88,7 +88,7 @@ object Sampling {
       }
     }
 
-    val transforms = specs map { SliceTransform.composeSliceTransform }
+    val transforms = specs map composeSliceTransform
     val states     = transforms map (transform => SampleState(None, 0, transform))
     build(states.toList, table.slices)
   }

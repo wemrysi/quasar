@@ -24,11 +24,12 @@ final case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 final case class Projection(data: Stream[JValue]) {
   type Key = JArray
 
-  private val slices      = Table.fromJson(data).slices.toStream.copoint
-  val length: Long        = data.length.toLong
-  val xyz: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
+  private val slices            = Table.fromJson(data).slices.toStream.copoint
+  val length: Long              = data.length.toLong
+  val structure: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
 
-  def structure = Need(xyz)
+  def getBlockStreamForType(tpe: JType): NeedSlices =
+    getBlockStream(Some(Schema.flatten(tpe, structure.toVector).toSet))
 
   def getBlockStream(columns: Option[Set[ColumnRef]]): NeedSlices = unfoldStream(none[Key])(key =>
     getBlockAfter(key, columns) map (

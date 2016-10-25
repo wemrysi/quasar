@@ -85,21 +85,21 @@ trait ColumnarTableModule {
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
-    def load(table: Table, tpe: JType): NeedTable = pathsM(table) map { paths =>
-      val projs = paths.toList flatMap projections.get
-      val totalLength = projs.map(_.length).sum
-
-      val stream = projs.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
-        // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-        val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-          Some(Schema.flatten(tpe, struct.toVector).toSet)
+    def load(table: Table, tpe: JType): NeedTable = {
+      val reduced = table reduce new CReducer[Set[Path]] {
+        def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
+          case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
+          case _            => Set()
         }
-        acc ++ StreamT.wrapEffect(constraints map proj.getBlockStream)
       }
-
-      Table(stream, ExactSize(totalLength))
+      reduced map { paths =>
+        val projs = paths.toList flatMap projections.get
+        Table(
+          projs foldMap (_ getBlockStreamForType tpe),
+          ExactSize(projs.foldMap(_.length)(Monoid[Long]))
+        )
+      }
     }
-
 
     def apply(slices: NeedSlices, size: TableSize): Table                                            = fromSlices(slices, size)
     def singleton(slice: Slice): Table                                                               = fromSlices(singleStreamT(slice), ExactSize(1))
@@ -128,29 +128,6 @@ trait ColumnarTableModule {
     def constNull: Table                          = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
     def constEmptyObject: Table                   = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
     def constEmptyArray: Table                    = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
-
-    def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
-      def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
-        for {
-          head <- slices.uncons
-
-          back <- {
-            head map {
-              case (s, sx) => {
-                sliceTransform.f(state, s) map {
-                  case (nextState, s0) =>
-                    StreamT.Yield(s0, stream(nextState, sx))
-                }
-              }
-            } getOrElse {
-              Need(StreamT.Done)
-            }
-          }
-        } yield back
-      )
-
-      stream(sliceTransform.initial, slices)
-    }
 
     /**
       * Merge controls the iteration over the table of group key values.
@@ -281,23 +258,6 @@ trait ColumnarTableModule {
 
     /// Utility Methods ///
 
-    /**
-      * Reduce the specified table to obtain the in-memory set of strings representing the vfs paths
-      * to be loaded.
-      */
-    protected def pathsM(table: Table) = {
-      table reduce {
-        new CReducer[Set[Path]] {
-          def reduce(schema: CSchema, range: Range): Set[Path] = {
-            schema.columns(JTextT) flatMap {
-              case s: StrColumn => range.filter(s.isDefinedAt).map(i => Path(s(i)))
-              case _            => Set()
-            }
-          }
-        }
-      }
-    }
-
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
       val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
 
@@ -373,14 +333,37 @@ trait ColumnarTableModule {
       )
     }
 
+    private def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
+      def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
+        for {
+          head <- slices.uncons
+
+          back <- {
+            head map {
+              case (s, sx) => {
+                sliceTransform.f(state, s) map {
+                  case (nextState, s0) =>
+                    StreamT.Yield(s0, stream(nextState, sx))
+                }
+              }
+            } getOrElse {
+              Need(StreamT.Done)
+            }
+          }
+        } yield back
+      )
+
+      stream(sliceTransform.initial, slices)
+    }
+
     def compact(spec: TransSpec1, definedness: Definedness): Table = {
-      val specTransform = SliceTransform.composeSliceTransform(spec)
+      val specTransform = composeSliceTransform(spec)
       val compactTransform = {
-        SliceTransform.composeSliceTransform(Leaf(Source)).zip(specTransform) { (s1, s2) =>
+        composeSliceTransform(Leaf(Source)).zip(specTransform) { (s1, s2) =>
           s1.compact(s2, definedness)
         }
       }
-      Table(Table.transformStream(compactTransform, slices), size).normalize
+      Table(transformStream(compactTransform, slices), size).normalize
     }
 
     /**
@@ -388,9 +371,8 @@ trait ColumnarTableModule {
       * If the key transform is not identity, the resulting table will have
       * unknown sort order.
       */
-    def transform(spec: TransSpec1): Table = {
-      Table(Table.transformStream(composeSliceTransform(spec), slices), this.size)
-    }
+    def transform(spec: TransSpec1): Table =
+      Table(transformStream(composeSliceTransform(spec), slices), this.size)
 
     def force: NeedTable = {
       def loop(slices: NeedSlices, acc: List[Slice], size: Long): Need[List[Slice] -> Long] = slices.uncons flatMap {
