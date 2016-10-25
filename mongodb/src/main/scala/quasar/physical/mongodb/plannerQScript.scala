@@ -482,7 +482,7 @@ object MongoDbQScriptPlanner {
       joinHandler: JoinHandler[WF, WorkflowBuilder.M],
       funcHandler: FuncHandler[IT, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp):
         AlgebraM[StateT[OutputM, NameGen, ?], F, WorkflowBuilder[WF]]
@@ -507,7 +507,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    WB: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           qs => Collection
@@ -534,7 +534,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    WB: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
@@ -587,7 +587,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           qs =>
@@ -617,7 +617,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           _.run.fold(F.plan(joinHandler, funcHandler), G.plan(joinHandler, funcHandler))
@@ -634,7 +634,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           κ(shouldNotBeReached)
@@ -647,7 +647,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           κ(shouldNotBeReached)
@@ -660,7 +660,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           κ(shouldNotBeReached)
@@ -673,7 +673,7 @@ object MongoDbQScriptPlanner {
           joinHandler: JoinHandler[WF, WorkflowBuilder.M],
           funcHandler: FuncHandler[T, EX])(
           implicit ev0: WorkflowOpCoreF :<: WF,
-                   ev1: Show[WorkflowBuilder[WF]],
+                   ev1: RenderTree[WorkflowBuilder[WF]],
                    ev2: WorkflowBuilder.Ops[WF],
                    ev3: EX :<: ExprOp) =
           κ(shouldNotBeReached)
@@ -750,7 +750,7 @@ object MongoDbQScriptPlanner {
     src: WorkflowBuilder[WF])(
     implicit F: Planner.Aux[T, QScriptTotal[T, ?]],
              ev0: WorkflowOpCoreF :<: WF,
-             ev1: Show[WorkflowBuilder[WF]],
+             ev1: RenderTree[WorkflowBuilder[WF]],
              ev2: WorkflowBuilder.Ops[WF],
              ev3: EX :<: ExprOp):
       StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
