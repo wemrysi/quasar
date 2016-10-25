@@ -21,6 +21,7 @@ import quasar._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.std._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 import quasar.contrib.matryoshka._
@@ -32,7 +33,7 @@ import scalaz._, Scalaz._
 import shapeless.Sized
 
 // TODO: pull out MapFunc translation as MapFuncStdLibSpec
-class CoreMapStdLibSpec extends StdLibSpec {
+class CoreMapStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   val TODO: Result \/ Unit = Skipped("TODO").left
 
   /** Identify constructs that are expected not to be implemented. */
@@ -76,7 +77,7 @@ class CoreMapStdLibSpec extends StdLibSpec {
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 
-      case LogicalPlan.FreeF(sym) => Free.pure(args(sym))
+      case LogicalPlan.Free(sym) => Free.pure(args(sym))
     }
 
   // TODO: figure out how to pass the args to shortCircuit tso they can be inspected
@@ -96,14 +97,14 @@ class CoreMapStdLibSpec extends StdLibSpec {
       failure
 
     def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) = {
-      val mf = translate(prg(LogicalPlan.Free('arg)), κ(UnaryArg._1))
+      val mf = translate(prg(fixFree('arg)), κ(UnaryArg._1))
 
       check(mf, List(arg)) getOrElse
         run(mf, κ(arg), expected)
     }
 
     def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) = {
-      val mf = translate[BinaryArg](prg(LogicalPlan.Free('arg1), LogicalPlan.Free('arg2)), {
+      val mf = translate[BinaryArg](prg(fixFree('arg1), fixFree('arg2)), {
         case 'arg1 => BinaryArg._1
         case 'arg2 => BinaryArg._2
       })
@@ -113,7 +114,7 @@ class CoreMapStdLibSpec extends StdLibSpec {
     }
 
     def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) = {
-      val mf = translate[TernaryArg](prg(LogicalPlan.Free('arg1), LogicalPlan.Free('arg2), LogicalPlan.Free('arg3)), {
+      val mf = translate[TernaryArg](prg(fixFree('arg1), fixFree('arg2), fixFree('arg3)), {
         case 'arg1 => TernaryArg._1
         case 'arg2 => TernaryArg._2
         case 'arg3 => TernaryArg._3

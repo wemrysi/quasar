@@ -49,7 +49,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
 
   type HEff0[A] = Coproduct[MountedResultH, MountedFs, A]
   type HEff[A]  = Coproduct[MonotonicSeq, HEff0, A]
-  type HEffM[A] = Free[HEff, A]
+  type HEffM[A] = scalaz.Free[HEff, A]
 
   type RHandles = Map[ResultHandle, (ADir, ResultHandle)]
 

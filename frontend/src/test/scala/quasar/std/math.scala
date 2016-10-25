@@ -74,13 +74,13 @@ class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
     }
 
     "simplify add with zero" in {
-      Add.simplify(Add(fixConstant(Int(0)), Free('x))) should
-        beSome(FreeF[Fix[LogicalPlan]]('x))
+      Add.simplify(Add(fixConstant(Int(0)), fixFree('x))) should
+        beSome(Free[Fix[LogicalPlan]]('x))
     }
 
     "simplify add with Dec zero" in {
-      Add.simplify(Add(Free('x), fixConstant(Dec(0.0)))) should
-        beSome(FreeF[Fix[LogicalPlan]]('x))
+      Add.simplify(Add(fixFree('x), fixConstant(Dec(0.0)))) should
+        beSome(Free[Fix[LogicalPlan]]('x))
     }
 
     "eliminate multiply by dec zero (on the right)" >> prop { (c : Const) =>
@@ -171,8 +171,8 @@ class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
     }
 
     "simplify expression raised to 1st power" in {
-      Power.simplify(Power(Free('x), fixConstant(Int(1)))) should
-        beSome(FreeF[Fix[LogicalPlan]]('x))
+      Power.simplify(Power(fixFree('x), fixConstant(Int(1)))) should
+        beSome(Free[Fix[LogicalPlan]]('x))
     }
 
     "fold a complex expression (10-4)/3 + (5*8)" in {

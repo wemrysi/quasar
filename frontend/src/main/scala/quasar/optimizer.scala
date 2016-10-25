@@ -37,7 +37,7 @@ object Optimizer {
   import structural._
 
   private def countUsageƒ(target: Symbol): Algebra[LP, Int] = {
-    case FreeF(symbol) if symbol == target => 1
+    case Free(symbol) if symbol == target => 1
     case Let(ident, form, _) if ident == target => form
     case x => x.fold
   }
@@ -45,7 +45,7 @@ object Optimizer {
   private def inlineƒ[T[_[_]], A](target: Symbol, repl: LP[T[LP]]):
       LP[(T[LP], T[LP])] => LP[T[LP]] =
   {
-    case FreeF(symbol) if symbol == target => repl
+    case Free(symbol) if symbol == target => repl
     case Let(ident, form, body) if ident == target =>
       Let(ident, form._2, body._1)
     case x => x.map(_._2)
@@ -56,7 +56,7 @@ object Optimizer {
     case inv @ InvokeF(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
       case Constant(_)
-         | FreeF(_) => in.transPara(inlineƒ(ident, form.project)).project.some
+         | Free(_) => in.transPara(inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
         case 0 => in.project.some
         case 1 => in.transPara(inlineƒ(ident, form.project)).project.some
@@ -83,7 +83,7 @@ object Optimizer {
   }
 
   private val namesƒ: Algebra[LP, Set[Symbol]] = {
-    case FreeF(name) => Set(name)
+    case Free(name) => Set(name)
     case x           => x.fold
   }
 
@@ -125,7 +125,7 @@ object Optimizer {
 
   private def preserveFree0[A](x: (Fix[LP], A))(f: A => Fix[LP]):
       Fix[LP] = x._1.unFix match {
-    case FreeF(_) => x._1
+    case Free(_) => x._1
     case _        => f(x._2)
   }
 
@@ -149,7 +149,7 @@ object Optimizer {
             val name = uniqueName("src", fields)
               Fix(Let(name, preserveFree(src),
                 Fix(MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> Invoke(ObjectProject, Func.Input2(Free(name), f))): _*))))
+                  f -> Invoke(ObjectProject, Func.Input2(Fix(Free(name)), f))): _*))))
         }
       case lp => Fix(lp.map(preserveFree))
     },
@@ -160,7 +160,7 @@ object Optimizer {
     simplify(boundPara(t)(preferProjectionsƒ)._1)
 
   val elideTypeCheckƒ: Algebra[LP, Fix[LP]] = {
-    case Let(n, b, Fix(Typecheck(Fix(FreeF(nf)), _, cont, _)))
+    case Let(n, b, Fix(Typecheck(Fix(Free(nf)), _, cont, _)))
         if n == nf =>
       Fix(Let(n, b, cont))
     case x => Fix(x)
@@ -282,14 +282,14 @@ object Optimizer {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
           Fix(Let(lName, lSrc,
-            Fix(Let(lFName, Fix(Filter(Free(lName), assembleCond(lefts.map(_.run0(Free(lName)))))),
+            Fix(Let(lFName, Fix(Filter(Fix(Free(lName)), assembleCond(lefts.map(_.run0(Fix(Free(lName))))))),
               Fix(Let(rName, rSrc,
-                Fix(Let(rFName, Fix(Filter(Free(rName), assembleCond(rights.map(_.run0(Free(rName)))))),
+                Fix(Let(rFName, Fix(Filter(Fix(Free(rName)), assembleCond(rights.map(_.run0(Fix(Free(rName))))))),
                   Fix(Let(jName,
-                    Fix(InnerJoin(Free(lFName), Free(rFName),
-                      assembleCond(equis.map(_.run(Free(lFName), Free(rFName)))))),
-                    Fix(Filter(Free(jName), assembleCond(
-                      others.map(_.run0(JoinDir.Left.projectFrom(Free(jName)), JoinDir.Right.projectFrom(Free(jName)))) ++
+                    Fix(InnerJoin(Fix(Free(lFName)), Fix(Free(rFName)),
+                      assembleCond(equis.map(_.run(Fix(Free(lFName)), Fix(Free(rFName))))))),
+                    Fix(Filter(Fix(Free(jName)), assembleCond(
+                      others.map(_.run0(JoinDir.Left.projectFrom(Fix(Free(jName))), JoinDir.Right.projectFrom(Fix(Free(jName))))) ++
                       neithers.map(_.run0)))))))))))))))
       }
     }

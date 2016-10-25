@@ -30,4 +30,7 @@ trait LogicalPlanHelpers {
 
   def fixTypecheck(expr: Fix[LP], typ: Type, cont: Fix[LP], fallback: Fix[LP]): Fix[LP] =
     Fix[LP](LP.Typecheck(expr, typ, cont, fallback))
+
+  def fixFree(name: Symbol): Fix[LP] =
+    Fix[LP](LP.Free(name))
 }

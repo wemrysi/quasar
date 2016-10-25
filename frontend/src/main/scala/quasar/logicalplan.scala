@@ -48,7 +48,7 @@ object LogicalPlan {
           case ReadF(coll)           => G.point(ReadF(coll))
           case Constant(data)       => G.point(Constant(data))
           case InvokeF(func, values) => values.traverse(f).map(InvokeF(func, _))
-          case FreeF(v)              => G.point(FreeF(v))
+          case Free(v)              => G.point(Free(v))
           case Let(ident, form, in) => (f(form) ⊛ f(in))(Let(ident, _, _))
           case Typecheck(expr, typ, cont, fallback) =>
             (f(expr) ⊛ f(cont) ⊛ f(fallback))(Typecheck(_, typ, _, _))
@@ -59,7 +59,7 @@ object LogicalPlan {
           case ReadF(coll)           => ReadF(coll)
           case Constant(data)       => Constant(data)
           case InvokeF(func, values) => InvokeF(func, values.map(f))
-          case FreeF(v)              => FreeF(v)
+          case Free(v)              => Free(v)
           case Let(ident, form, in) => Let(ident, f(form), f(in))
           case Typecheck(expr, typ, cont, fallback) =>
             Typecheck(f(expr), typ, f(cont), f(fallback))
@@ -70,7 +70,7 @@ object LogicalPlan {
           case ReadF(_)              => B.zero
           case Constant(_)          => B.zero
           case InvokeF(_, values)    => values.foldMap(f)
-          case FreeF(_)              => B.zero
+          case Free(_)              => B.zero
           case Let(_, form, in)     => f(form) ⊹ f(in)
           case Typecheck(expr, _, cont, fallback) =>
             f(expr) ⊹ f(cont) ⊹ f(fallback)
@@ -81,7 +81,7 @@ object LogicalPlan {
           case ReadF(_)              => z
           case Constant(_)          => z
           case InvokeF(_, values)    => values.foldRight(z)(f)
-          case FreeF(_)              => z
+          case Free(_)              => z
           case Let(ident, form, in) => f(form, f(in, z))
           case Typecheck(expr, _, cont, fallback) =>
             f(expr, f(cont, f(fallback, z)))
@@ -107,7 +107,7 @@ object LogicalPlan {
             case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
             case Constant(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.shows), args.unsized.map(ra.render))
-            case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
+            case Free(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case Let(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
             case Typecheck(expr, typ, cont, fallback) =>
               NonTerminal("Typecheck" :: nodeType, Some(typ.shows),
@@ -123,7 +123,7 @@ object LogicalPlan {
           case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (Constant(d1), Constant(d2)) => d1 ≟ d2
           case (InvokeFUnapply(f1, v1), InvokeFUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
-          case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
+          case (Free(n1), Free(n2)) => n1 ≟ n2
           case (Let(ident1, form1, in1), Let(ident2, form2, in2)) =>
             ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
           case (Typecheck(expr1, typ1, cont1, fb1), Typecheck(expr2, typ2, cont2, fb2)) =>
@@ -162,11 +162,7 @@ object LogicalPlan {
       Fix[LogicalPlan](InvokeF(func, values))
   }
 
-  final case class FreeF[A](name: Symbol) extends LogicalPlan[A]
-  object Free {
-    def apply(name: Symbol): Fix[LogicalPlan] =
-      Fix[LogicalPlan](FreeF(name))
-  }
+  final case class Free[A](name: Symbol) extends LogicalPlan[A]
 
   final case class Let[A](let: Symbol, form: A, in: A) extends LogicalPlan[A]
 
@@ -194,7 +190,7 @@ object LogicalPlan {
 
       def subst[T[_[_]]: Recursive, A](t: LogicalPlan[T[LogicalPlan]], b: G[A]): Option[A] =
         t match {
-          case FreeF(symbol) => b.get(symbol)
+          case Free(symbol) => b.get(symbol)
           case _             => None
         }
     }
@@ -213,9 +209,9 @@ object LogicalPlan {
           Let(sym1,
             (bound, expr),
             (bound + (sym -> sym1), body)))
-      case FreeF(sym) =>
+      case Free(sym) =>
         val v: LogicalPlan[(Map[Symbol, Symbol], Fix[LogicalPlan])] =
-          FreeF(bound.get(sym).getOrElse(sym))
+          Free(bound.get(sym).getOrElse(sym))
         v.point[M]
       case t =>
         t.strengthL(bound).point[M]
@@ -297,12 +293,12 @@ object LogicalPlan {
         }
       } yield InvokeF(func, args0)
 
-      case FreeF(n) => success(FreeF[Typed[LogicalPlan]](n))
+      case Free(n) => success(Free[Typed[LogicalPlan]](n))
 
       case Let(n, form, in) =>
         inferTypes(typ, in).flatMap { in0 =>
           val fTyp = in0.collect {
-            case Cofree(typ0, FreeF(n0)) if n0 == n => typ0
+            case Cofree(typ0, Free(n0)) if n0 == n => typ0
           }.concatenate(Type.TypeGlbMonoid)
           inferTypes(fTyp, form).map(Let[Typed[LogicalPlan]](n, _, in0))
         }
@@ -333,7 +329,7 @@ object LogicalPlan {
       }))
     else if (poss.contains(inf)) {
       emitName(freshName("check").map(name =>
-        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), Free(name))))
+        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), Fix(Free(name)))))
     }
     else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
   }
@@ -342,7 +338,7 @@ object LogicalPlan {
       Fix[LogicalPlan] =
     constraints.constraints.foldLeft(constraints.plan)((acc, con) =>
       Fix(Let(con.name, con.term,
-        Fix(Typecheck(Free(con.name), con.inferred, acc, fallback)))))
+        Fix(Typecheck(Fix(Free(con.name)), con.inferred, acc, fallback)))))
 
   /** This inserts a constraint on a node that might not strictly require a type
     * check. It protects operations (EG, array flattening) that need a certain
@@ -353,7 +349,7 @@ object LogicalPlan {
       (consts match {
         case Nil =>
           freshName("check").map(name =>
-            ConstrainedPlan(typ, List(NamedConstraint(name, typ, term)), Free(name)))
+            ConstrainedPlan(typ, List(NamedConstraint(name, typ, term)), Fix(Free(name))))
         case _   => constraints.point[State[NameGen, ?]]
       }).map(appConst(_, fallback))
   }
@@ -416,7 +412,7 @@ object LogicalPlan {
         case Let(name, value, in) =>
           unifyOrCheck(inf, in.inferred, Fix(Let(name, appConst(value, Fix(Constant(Data.NA))), appConst(in, Fix(Constant(Data.NA))))))
         // TODO: Get the possible type from the Let
-        case FreeF(v) => emit(ConstrainedPlan(inf, Nil, Free(v)))
+        case Free(v) => emit(ConstrainedPlan(inf, Nil, Fix(Free(v))))
       }
   }
 
@@ -471,7 +467,7 @@ object LogicalPlan {
       } yield Cofree((b, a), co)
 
       t.unFix match {
-        case FreeF(name)            => bind.get(name).fold(default)(_.point[M])
+        case Free(name)            => bind.get(name).fold(default)(_.point[M])
         case Let(name, form, body) => for {
           form1 <- loop(form, bind)
           rez   <- loop(body, bind + (name -> form1))

@@ -78,7 +78,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
       } yield rez
 
     def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
-      prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
+      prg((0 until args.length).toList.map(idx => fixFree(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
     final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](

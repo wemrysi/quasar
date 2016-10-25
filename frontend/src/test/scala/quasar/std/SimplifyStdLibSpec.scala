@@ -66,7 +66,7 @@ class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   }
 
   def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
-    prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
+    prg((0 until args.length).toList.map(idx => fixFree(Symbol("arg" + idx))))
       .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
   def run(lp: Fix[LogicalPlan], expected: Data): Result =

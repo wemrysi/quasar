@@ -302,12 +302,12 @@ trait Compiler[F[_]] {
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, name)        => BindingContext(Map(name -> LP.Free(stepName)))
-            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> LP.Free(stepName)))
-            case id @ IdentRelationAST(_, _) => BindingContext(Map(id.aliasName -> LP.Free(stepName)))
+            case ExprRelationAST(_, name)        => BindingContext(Map(name -> Fix(LP.Free(stepName))))
+            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> Fix(LP.Free(stepName))))
+            case id @ IdentRelationAST(_, _) => BindingContext(Map(id.aliasName -> Fix(LP.Free(stepName))))
             case r                               => BindingContext(Map())
           }
-          next2    <- CompilerState.contextual(bc, tableContext(LP.Free(stepName), relations))(next)
+          next2    <- CompilerState.contextual(bc, tableContext(Fix(LP.Free(stepName)), relations))(next)
         } yield Fix(LP.Let(stepName, current, next2))
       }.getOrElse(next)
     }
@@ -360,8 +360,8 @@ trait Compiler[F[_]] {
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
-            val leftFree = LP.Free(leftName)
-            val rightFree = LP.Free(rightName)
+            val leftFree: Fix[LP] = Fix(LP.Free[Fix[LP]](leftName))
+            val rightFree: Fix[LP] = Fix(LP.Free[Fix[LP]](rightName))
 
             (compileRelation(left) ⊛
               compileRelation(right) ⊛
@@ -614,9 +614,9 @@ trait Compiler[F[_]] {
             relations.Cond(
               // TODO: Ideally this would use `is null`, but that doesn’t makes it
               //       this far (but it should).
-              relations.Eq(LP.Free(name), Fix(LP.Constant[Fix[LP]](Data.Null))).embed,
+              relations.Eq(Fix(LP.Free[Fix[LP]](name)), Fix(LP.Constant[Fix[LP]](Data.Null))).embed,
               c2,
-              LP.Free(name)).embed))),
+              Fix(LP.Free[Fix[LP]](name))).embed))),
           functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
@@ -660,7 +660,7 @@ trait Compiler[F[_]] {
       case StringLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Str(value))))
       case BoolLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Bool(value))))
       case NullLiteral() => emit(Fix(LP.Constant[Fix[LP]](Data.Null)))
-      case Vari(name) => emit(LP.Free(Symbol(name)))
+      case Vari(name) => emit(Fix(LP.Free[Fix[LP]](Symbol(name))))
     }
   }
 

@@ -378,9 +378,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           structural.ShiftArray(
             structural.ArrayConcat(
               structural.ArrayConcat(
-                structural.ObjectProject(LP.Free('x), fixConstant(Data.Str("baz"))).embed,
-                structural.ObjectProject(LP.Free('x), fixConstant(Data.Str("quux"))).embed).embed,
-              structural.ObjectProject(LP.Free('x), fixConstant(Data.Str("ducks"))).embed).embed).embed)) must
+                structural.ObjectProject(fixFree('x), fixConstant(Data.Str("baz"))).embed,
+                structural.ObjectProject(fixFree('x), fixConstant(Data.Str("quux"))).embed).embed,
+              structural.ObjectProject(fixFree('x), fixConstant(Data.Str("ducks"))).embed).embed).embed)) must
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -482,8 +482,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), fixConstant(Data.Bool(true))).embed,
           identity.Squash(
             structural.ObjectConcat(
-              JoinDir.Left.projectFrom(LP.Free('__tmp0)),
-              JoinDir.Right.projectFrom(LP.Free('__tmp0))).embed).embed)) must
+              JoinDir.Left.projectFrom(fixFree('__tmp0)),
+              JoinDir.Right.projectFrom(fixFree('__tmp0))).embed).embed)) must
       equal(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
@@ -512,18 +512,18 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val lp = Fix(LP.Let('__tmp0, lpRead("/foo"),
         Fix(LP.Let('__tmp1, lpRead("/bar"),
           Fix(LP.Let('__tmp2,
-            StdLib.set.InnerJoin(LP.Free('__tmp0), LP.Free('__tmp1),
+            StdLib.set.InnerJoin(fixFree('__tmp0), fixFree('__tmp1),
               relations.Eq(
-                structural.ObjectProject(LP.Free('__tmp0), fixConstant(Data.Str("id"))).embed,
-                structural.ObjectProject(LP.Free('__tmp1), fixConstant(Data.Str("foo_id"))).embed).embed).embed,
+                structural.ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("id"))).embed,
+                structural.ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("foo_id"))).embed).embed).embed,
             makeObj(
               "name" ->
                 structural.ObjectProject(
-                  JoinDir.Left.projectFrom(LP.Free('__tmp2)),
+                  JoinDir.Left.projectFrom(fixFree('__tmp2)),
                   fixConstant(Data.Str("name"))),
               "address" ->
                 structural.ObjectProject(
-                  JoinDir.Right.projectFrom(LP.Free('__tmp2)),
+                  JoinDir.Right.projectFrom(fixFree('__tmp2)),
                   fixConstant(Data.Str("address"))))))))))
       convert(None, lp) must
       equal(chain(

@@ -3764,13 +3764,13 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         fixLet(
           'tmp0, read("db/foo"),
           fixLet(
-            'tmp1, makeObj("bar" -> ObjectProject(Free('tmp0), fixConstant(Data.Str("bar")))),
+            'tmp1, makeObj("bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar")))),
             fixLet('tmp2,
               s.OrderBy[FLP](
-                Free('tmp1),
-                MakeArrayN[Fix](ObjectProject(Free('tmp1), fixConstant(Data.Str("bar")))),
+                fixFree('tmp1),
+                MakeArrayN[Fix](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("bar")))),
                 MakeArrayN(fixConstant(Data.Str("ASC")))),
-              Free('tmp2))))
+              fixFree('tmp2))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3785,9 +3785,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         fixLet(
           'tmp0, read("db/foo"),
           s.OrderBy[FLP](
-            Free('tmp0),
+            fixFree('tmp0),
             MakeArrayN[Fix](math.Divide[FLP](
-              ObjectProject(Free('tmp0), fixConstant(Data.Str("bar"))),
+              ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
               fixConstant(Data.Dec(10.0)))),
             MakeArrayN(fixConstant(Data.Str("ASC")))))
 
@@ -3811,13 +3811,13 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           fixLet(
             'tmp1,
             s.Filter[FLP](
-              Free('tmp0),
+              fixFree('tmp0),
               relations.Eq[FLP](
-                ObjectProject(Free('tmp0), fixConstant(Data.Str("baz"))),
+                ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz"))),
                 fixConstant(Data.Int(0)))),
             s.OrderBy[FLP](
-              Free('tmp1),
-              MakeArrayN[Fix](ObjectProject(Free('tmp1), fixConstant(Data.Str("bar")))),
+              fixFree('tmp1),
+              MakeArrayN[Fix](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("bar")))),
               MakeArrayN(fixConstant(Data.Str("ASC"))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
@@ -3834,11 +3834,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           fixLet(
             'tmp9,
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), fixConstant(Data.Str("bar")))),
+              "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar")))),
             s.OrderBy[FLP](
-              Free('tmp9),
+              fixFree('tmp9),
               MakeArrayN[Fix](math.Divide[FLP](
-                ObjectProject(Free('tmp9), fixConstant(Data.Str("bar"))),
+                ObjectProject(fixFree('tmp9), fixConstant(Data.Str("bar"))),
                 fixConstant(Data.Dec(10.0)))),
               MakeArrayN(fixConstant(Data.Str("ASC"))))))
 
@@ -3878,88 +3878,88 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     "leave well enough alone" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
+          Func.Input3(fixFree('left), fixFree('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
-                ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
+                ObjectProject(fixFree('left), fixConstant(Data.Str("foo"))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("bar")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
+                ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("zab")))))))) must
       beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
+        Fix(s.InnerJoin[FLP](fixFree('left), fixFree('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
+              ObjectProject(fixFree('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
+              ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "swap a reversed condition" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
+          Func.Input3(fixFree('left), fixFree('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
-                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("bar"))),
+                ObjectProject(fixFree('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
+                ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("zab")))))))) must
       beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
+        Fix(s.InnerJoin[FLP](fixFree('left), fixFree('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
+              ObjectProject(fixFree('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
+              ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "swap multiple reversed conditions" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
+          Func.Input3(fixFree('left), fixFree('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
-                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("bar"))),
+                ObjectProject(fixFree('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('right), fixConstant(Data.Str("zab"))),
-                ObjectProject(Free('left), fixConstant(Data.Str("baz")))))))) must
+                ObjectProject(fixFree('right), fixConstant(Data.Str("zab"))),
+                ObjectProject(fixFree('left), fixConstant(Data.Str("baz")))))))) must
       beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
+        Fix(s.InnerJoin[FLP](fixFree('left), fixFree('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
+              ObjectProject(fixFree('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
+              ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(fixFree('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "fail with “mixed” conditions" in {
       MongoDbPlanner.alignJoinsƒ(
         InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
+          Func.Input3(fixFree('left), fixFree('right),
             relations.And[FLP](
               relations.Eq[FLP](
                 math.Add[FLP](
-                  ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
-                  ObjectProject(Free('left), fixConstant(Data.Str("baz")))),
-                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
+                  ObjectProject(fixFree('right), fixConstant(Data.Str("bar"))),
+                  ObjectProject(fixFree('left), fixConstant(Data.Str("baz")))),
+                ObjectProject(fixFree('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
-                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
+                ObjectProject(fixFree('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(fixFree('right), fixConstant(Data.Str("zab")))))))) must
       beLeftDisjunction(UnsupportedJoinCondition(
         relations.Eq[FLP](
           math.Add[FLP](
-            ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
-            ObjectProject(Free('left), fixConstant(Data.Str("baz")))),
-          ObjectProject(Free('left), fixConstant(Data.Str("foo"))))))
+            ObjectProject(fixFree('right), fixConstant(Data.Str("bar"))),
+            ObjectProject(fixFree('left), fixConstant(Data.Str("baz")))),
+          ObjectProject(fixFree('left), fixConstant(Data.Str("foo"))))))
     }
 
     "plan with extra squash and flattening" in {
@@ -3973,9 +3973,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             'check0,
             identity.Squash(read("db/zips")),
             LogicalPlan.Typecheck(
-              Free('check0),
+              fixFree('check0),
               Type.Obj(Map(), Some(Type.Top)),
-              Free('check0),
+              fixFree('check0),
               fixConstant(Data.NA))),
           s.Distinct[FLP](
             identity.Squash[FLP](
@@ -3983,16 +3983,16 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 "city" ->
                 ObjectProject[FLP](
                   s.Filter[FLP](
-                    Free('tmp0),
+                    fixFree('tmp0),
                     string.Search[FLP](
                       FlattenArray[FLP](
                         fixLet(
                           'check1,
-                          ObjectProject(Free('tmp0), fixConstant(Data.Str("loc"))),
+                          ObjectProject(fixFree('tmp0), fixConstant(Data.Str("loc"))),
                           LogicalPlan.Typecheck(
-                            Free('check1),
+                            fixFree('check1),
                             Type.FlexArr(0, None, Type.Str),
-                            Free('check1),
+                            fixFree('check1),
                             fixConstant(Data.Arr(List(Data.NA)))))),
                       fixConstant(Data.Str("^.*MONT.*$")),
                       fixConstant(Data.Bool(false)))),

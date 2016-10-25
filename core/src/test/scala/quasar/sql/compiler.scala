@@ -128,11 +128,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           InnerJoin(read("foo"), read("bar"), fixConstant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), JoinDir.Left.const),
+              ObjectProject(fixFree('__tmp0), JoinDir.Left.const),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(fixFree('__tmp0), JoinDir.Right.const),
                     fixConstant(Data.Str("address"))))))))
     }
 
@@ -145,13 +145,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             ObjectConcat[FLP](
               ObjectProject[FLP](
                 ObjectProject[FLP](
-                  ObjectProject(Free('__tmp0), JoinDir.Left.const),
+                  ObjectProject(fixFree('__tmp0), JoinDir.Left.const),
                   fixConstant(Data.Str("bar"))),
                 fixConstant(Data.Str("baz"))),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(fixFree('__tmp0), JoinDir.Right.const),
                     fixConstant(Data.Str("address"))))))))
     }
 
@@ -323,8 +323,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             makeObj(
               "0" ->
                 Add[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("foo"))),
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))))))))
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("foo"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))))))))
     }
 
     "compile negate" in {
@@ -344,22 +344,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             makeObj(
               "0" ->
                 Modulo[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("foo"))),
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("baz"))))))))
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("foo"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("baz"))))))))
     }
 
     "compile coalesce" in {
       testLogicalPlanCompile(
         "select coalesce(bar, baz) from foo",
         fixLet('__tmp0, read("foo"),
-          fixLet('__tmp1, ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+          fixLet('__tmp1, ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
             Squash(
               makeObj(
                 "0" ->
                   Cond[FLP](
-                    Eq[FLP](Free('__tmp1), fixConstant(Data.Null)),
-                    ObjectProject(Free('__tmp0), fixConstant(Data.Str("baz"))),
-                    Free('__tmp1)))))))
+                    Eq[FLP](fixFree('__tmp1), fixConstant(Data.Null)),
+                    ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("baz"))),
+                    fixFree('__tmp1)))))))
     }
 
     "compile date field extraction" in {
@@ -380,10 +380,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             "0" ->
               Cond[FLP](
                 Lt[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("pop"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("pop"))),
                   fixConstant(Data.Int(10000))),
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("city"))),
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("loc"))))))))
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city"))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("loc"))))))))
     }
 
     "compile conditional (match) without else" in {
@@ -429,10 +429,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             makeObj(
               "0" ->
                 Concat[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("foo"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("foo"))),
                   Concat[FLP](
                     fixConstant(Data.Str(" ")),
-                    ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar")))))))))
+                    ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar")))))))))
     }
 
     "filter on constant false" in {
@@ -451,9 +451,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               Between[FLP](
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                 fixConstant(Data.Int(1)),
                 fixConstant(Data.Int(10)))))))
     }
@@ -464,10 +464,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               Not[FLP](
                 Between[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                   fixConstant(Data.Int(1)),
                   fixConstant(Data.Int(10))))))))
     }
@@ -481,9 +481,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                      ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                       fixConstant(Data.Str("^a.*$")),
                       fixConstant(Data.Bool(false)))),
                   fixConstant(Data.Str("bar")))))))
@@ -498,9 +498,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                      ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                       fixConstant(Data.Str("^a%$")),
                       fixConstant(Data.Bool(false)))),
                   fixConstant(Data.Str("bar")))))))
@@ -511,10 +511,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         "select bar from foo where bar not like \"a%\"",
         fixLet('__tmp0, read("foo"),
           Squash(makeObj("bar" -> ObjectProject[FLP](Filter[FLP](
-            Free('__tmp0),
+            fixFree('__tmp0),
             Not[FLP](
               Search[FLP](
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                 fixConstant(Data.Str("^a.*$")),
                 fixConstant(Data.Bool(false))))),
             fixConstant(Data.Str("bar")))))))
@@ -529,9 +529,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                      ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                       fixConstant(Data.Str("a.$")),
                       fixConstant(Data.Bool(false)))),
                   fixConstant(Data.Str("bar")))))))
@@ -572,8 +572,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           InnerJoin(read("person"), read("car"), fixConstant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), JoinDir.Left.const),
-              ObjectProject(Free('__tmp0), JoinDir.Right.const)))))
+              ObjectProject(fixFree('__tmp0), JoinDir.Left.const),
+              ObjectProject(fixFree('__tmp0), JoinDir.Right.const)))))
     }
 
     "compile two term multiplication from two tables" in {
@@ -586,10 +586,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "0" ->
                 Multiply[FLP](
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Left.const),
+                    ObjectProject(fixFree('__tmp0), JoinDir.Left.const),
                     fixConstant(Data.Str("age"))),
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
+                    ObjectProject(fixFree('__tmp0), JoinDir.Right.const),
                     fixConstant(Data.Str("modelYear"))))))))
     }
 
@@ -613,9 +613,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "name" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     Gt[FLP](
-                      ObjectProject(Free('__tmp0), fixConstant(Data.Str("age"))),
+                      ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("age"))),
                       fixConstant(Data.Int(18)))),
                   fixConstant(Data.Str("name")))))))
     }
@@ -629,9 +629,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "0" ->
                 Count[FLP](
                   GroupBy[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     MakeArrayN[Fix](ObjectProject(
-                      Free('__tmp0),
+                      fixFree('__tmp0),
                       fixConstant(Data.Str("name"))))))))))
     }
 
@@ -641,27 +641,27 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("person"),
           fixLet('__tmp1,
             GroupBy[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               MakeArrayN[Fix](
                 Lower[FLP](
                   ObjectProject(
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     fixConstant(Data.Str("name")))),
                 ObjectProject(
-                  Free('__tmp0),
+                  fixFree('__tmp0),
                   fixConstant(Data.Str("gender"))))),
             Squash(
               makeObj(
                 "0" ->
                   Arbitrary[FLP](
                     Lower[FLP](
-                      ObjectProject(Free('__tmp1), fixConstant(Data.Str("name"))))),
+                      ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("name"))))),
                 "gender" ->
                   Arbitrary[FLP](
-                    ObjectProject(Free('__tmp1), fixConstant(Data.Str("gender")))),
+                    ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("gender")))),
                 "2" ->
                   Avg[FLP](
-                    ObjectProject(Free('__tmp1), fixConstant(Data.Str("age")))))))))
+                    ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("age")))))))))
     }
 
     "compile group by with perverse aggregated expression" in {
@@ -674,9 +674,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
                 Count[FLP](
                   ObjectProject[FLP](
                     GroupBy[FLP](
-                      Free('__tmp0),
+                      fixFree('__tmp0),
                       MakeArrayN[Fix](ObjectProject(
-                        Free('__tmp0),
+                        fixFree('__tmp0),
                         fixConstant(Data.Str("name"))))),
                     fixConstant(Data.Str("name"))))))))
     }
@@ -695,8 +695,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
     val setA =
       fixLet('__tmp0, read("zips"),
         Squash(makeObj(
-          "loc" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("loc"))),
-          "pop" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("pop"))))))
+          "loc" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("loc"))),
+          "pop" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("pop"))))))
     val setB =
       Squash(makeObj(
         "city" -> ObjectProject(read("zips"), fixConstant(Data.Str("city")))))
@@ -803,7 +803,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
     }
 
     "compile map shift / unshift" in {
-      val inner = ShiftMap[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), fixConstant(Data.Str("commit"))), fixConstant(Data.Str("author"))))
+      val inner = ShiftMap[FLP](ObjectProject[FLP](ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("commit"))), fixConstant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         "select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
@@ -813,7 +813,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
     }
 
     "compile map shift / unshift keys" in {
-      val inner = ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), fixConstant(Data.Str("commit"))), fixConstant(Data.Str("author"))))
+      val inner = ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("commit"))), fixConstant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         "select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
@@ -862,13 +862,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("name"))),
-                "__sd__0" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("height"))))),
+                "name" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("name"))),
+                "__sd__0" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height"))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("__sd__0")))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("__sd__0")))),
                 MakeArrayN(
                   fixConstant(Data.Str("ASC")))),
               fixConstant(Data.Str("__sd__0"))))))
@@ -880,21 +880,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("person"),
           fixLet('__tmp1,
             Filter[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               Eq[FLP](
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("gender"))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("gender"))),
                 fixConstant(Data.Str("male")))),
             fixLet('__tmp2,
               Squash(
                 makeObj(
-                  "name"    -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("name"))),
-                  "__sd__0" -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("height"))))),
+                  "name"    -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("name"))),
+                  "__sd__0" -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("height"))))),
               DeleteField[FLP](
                 OrderBy[FLP](
-                  Free('__tmp2),
+                  fixFree('__tmp2),
                   MakeArrayN[Fix](
-                    ObjectProject(Free('__tmp2), fixConstant(Data.Str("name"))),
-                    ObjectProject(Free('__tmp2), fixConstant(Data.Str("__sd__0")))),
+                    ObjectProject(fixFree('__tmp2), fixConstant(Data.Str("name"))),
+                    ObjectProject(fixFree('__tmp2), fixConstant(Data.Str("__sd__0")))),
                   MakeArrayN(
                     fixConstant(Data.Str("ASC")),
                     fixConstant(Data.Str("ASC")))),
@@ -906,9 +906,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         "select * from person order by height",
         fixLet('__tmp0, Squash(read("person")),
           OrderBy[FLP](
-            Free('__tmp0),
+            fixFree('__tmp0),
             MakeArrayN[Fix](
-              ObjectProject(Free('__tmp0), fixConstant(Data.Str("height")))),
+              ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height")))),
             MakeArrayN(
               fixConstant(Data.Str("ASC"))))))
     }
@@ -918,10 +918,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         "select * from person order by height desc, name",
         fixLet('__tmp0, Squash(read("person")),
           OrderBy[FLP](
-            Free('__tmp0),
+            fixFree('__tmp0),
             MakeArrayN[Fix](
-              ObjectProject(Free('__tmp0), fixConstant(Data.Str("height"))),
-              ObjectProject(Free('__tmp0), fixConstant(Data.Str("name")))),
+              ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height"))),
+              ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("name")))),
             MakeArrayN(
               fixConstant(Data.Str("DESC")),
               fixConstant(Data.Str("ASC"))))))
@@ -934,16 +934,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash[FLP](
               ObjectConcat(
-                Free('__tmp0),
+                fixFree('__tmp0),
                 makeObj(
                   "__sd__0" -> Multiply[FLP](
-                    ObjectProject(Free('__tmp0), fixConstant(Data.Str("height"))),
+                    ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height"))),
                     fixConstant(Data.Dec(2.54)))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("__sd__0")))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("__sd__0")))),
                 MakeArrayN(
                   fixConstant(Data.Str("ASC")))),
               fixConstant(Data.Str("__sd__0"))))))
@@ -957,8 +957,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
             makeObj(
               "name" -> ObjectProject(read("person"), fixConstant(Data.Str("firstName"))))),
           OrderBy[FLP](
-            Free('__tmp0),
-            MakeArrayN[Fix](ObjectProject(Free('__tmp0), fixConstant(Data.Str("name")))),
+            fixFree('__tmp0),
+            MakeArrayN[Fix](ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("name")))),
             MakeArrayN(fixConstant(Data.Str("ASC"))))))
     }
 
@@ -969,16 +969,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("name"))),
+                "name" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("name"))),
                 "__sd__0" ->
                   Multiply[FLP](
-                    ObjectProject(Free('__tmp0), fixConstant(Data.Str("height"))),
+                    ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height"))),
                     fixConstant(Data.Dec(2.54))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("__sd__0")))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("__sd__0")))),
                 MakeArrayN(
                   fixConstant(Data.Str("ASC")))),
               fixConstant(Data.Str("__sd__0"))))))
@@ -991,20 +991,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "bar" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("bar"))),
+                "bar" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("bar"))),
                 "__sd__0" -> Divide[FLP](
                   ObjectProject[FLP](
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp0),
+                      ObjectProject(fixFree('__tmp0),
                         fixConstant(Data.Str("bar"))),
                       fixConstant(Data.Str("baz"))),
                     fixConstant(Data.Str("quux"))),
                   fixConstant(Data.Int(3))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("__sd__0")))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("__sd__0")))),
                 MakeArrayN(
                   fixConstant(Data.Str("ASC")))),
               fixConstant(Data.Str("__sd__0"))))))
@@ -1057,16 +1057,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("person"), // from person
           fixLet('__tmp1,    // where height > 60
             Filter[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               Gt[FLP](
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("height"))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("height"))),
                 fixConstant(Data.Int(60)))),
             fixLet('__tmp2,    // group by gender, height
               GroupBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("gender"))),
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("height"))))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("gender"))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("height"))))),
               fixLet('__tmp3,
                 Squash(    // select height*2.54 as cm
                   makeObj(
@@ -1075,16 +1075,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
                         Arbitrary[FLP](
                           ObjectProject[FLP](
                             Filter[FLP](  // having count(*) > 10
-                              Free('__tmp2),
-                              Gt[FLP](Count(Free('__tmp2)), fixConstant(Data.Int(10)))),
+                              fixFree('__tmp2),
+                              Gt[FLP](Count(fixFree('__tmp2)), fixConstant(Data.Int(10)))),
                             fixConstant(Data.Str("height")))),
                         fixConstant(Data.Dec(2.54))))),
                 Take[FLP](
                   Drop[FLP](
                     OrderBy[FLP](  // order by cm
-                      Free('__tmp3),
+                      fixFree('__tmp3),
                       MakeArrayN[Fix](
-                        ObjectProject(Free('__tmp3), fixConstant(Data.Str("cm")))),
+                        ObjectProject(fixFree('__tmp3), fixConstant(Data.Str("cm")))),
                       MakeArrayN(
                         fixConstant(Data.Str("ASC")))),
                   fixConstant(Data.Int(10))), // offset 10
@@ -1106,19 +1106,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           fixLet('__tmp1, read("bar"),
             fixLet('__tmp2,
-              InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
+              InnerJoin[FLP](fixFree('__tmp0), fixFree('__tmp1),
                 relations.Eq[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("id"))),
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("foo_id"))))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("id"))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("foo_id"))))),
               Squash(
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
+                      ObjectProject(fixFree('__tmp2), JoinDir.Left.const),
                       fixConstant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
+                      ObjectProject(fixFree('__tmp2), JoinDir.Right.const),
                       fixConstant(Data.Str("address")))))))))
     }
 
@@ -1160,29 +1160,29 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           fixLet('__tmp1,
              Fix(Filter(
-               Free('__tmp0),
+               fixFree('__tmp0),
                Fix(Lt(
-                 ObjectProject(Free('__tmp0), fixConstant(Data.Str("x"))),
+                 ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x"))),
                  fixConstant(Data.Int(10)))))),
              fixLet('__tmp2, read("bar"),
                fixLet('__tmp3,
                  Fix(Filter(
-                   Free('__tmp2),
+                   fixFree('__tmp2),
                    Fix(Eq(
-                     ObjectProject(Free('__tmp2), fixConstant(Data.Str("y"))),
+                     ObjectProject(fixFree('__tmp2), fixConstant(Data.Str("y"))),
                      fixConstant(Data.Int(20)))))),
                   fixLet('__tmp4,
-                    Fix(InnerJoin(Free('__tmp1), Free('__tmp3),
+                    Fix(InnerJoin(fixFree('__tmp1), fixFree('__tmp3),
                       Fix(Eq(
-                        ObjectProject(Free('__tmp1), fixConstant(Data.Str("id"))),
-                        ObjectProject(Free('__tmp3), fixConstant(Data.Str("foo_id"))))))),
+                        ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("id"))),
+                        ObjectProject(fixFree('__tmp3), fixConstant(Data.Str("foo_id"))))))),
                     Fix(Squash(
                        makeObj(
                          "name" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                           ObjectProject(fixFree('__tmp4), JoinDir.Left.const),
                            fixConstant(Data.Str("name"))),
                          "address" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), JoinDir.Right.const),
+                           ObjectProject(fixFree('__tmp4), JoinDir.Right.const),
                            fixConstant(Data.Str("address"))))))))))))
     }
 
@@ -1198,28 +1198,28 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1, read("bar"),
             fixLet('__tmp2,
               Fix(Filter(
-                Free('__tmp0),
+                fixFree('__tmp0),
                 Fix(Lt(
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("x"))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x"))),
                   fixConstant(Data.Int(10)))))),
               fixLet('__tmp3,
                 Fix(Filter(
-                  Free('__tmp1),
+                  fixFree('__tmp1),
                   Fix(Eq(
-                    ObjectProject(Free('__tmp1), fixConstant(Data.Str("y"))),
+                    ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("y"))),
                     fixConstant(Data.Int(20)))))),
                 fixLet('__tmp4,
-                  Fix(InnerJoin(Free('__tmp2), Free('__tmp3),
+                  Fix(InnerJoin(fixFree('__tmp2), fixFree('__tmp3),
                     Fix(Eq(
-                      ObjectProject(Free('__tmp2), fixConstant(Data.Str("id"))),
-                      ObjectProject(Free('__tmp3), fixConstant(Data.Str("foo_id"))))))),
+                      ObjectProject(fixFree('__tmp2), fixConstant(Data.Str("id"))),
+                      ObjectProject(fixFree('__tmp3), fixConstant(Data.Str("foo_id"))))))),
                   Fix(Squash(
                     makeObj(
                       "name" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                        ObjectProject(fixFree('__tmp4), JoinDir.Left.const),
                         fixConstant(Data.Str("name"))),
                       "address" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), JoinDir.Right.const),
+                        ObjectProject(fixFree('__tmp4), JoinDir.Right.const),
                         fixConstant(Data.Str("address"))))))))))))
     }
 
@@ -1230,19 +1230,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           fixLet('__tmp1, read("bar"),
             fixLet('__tmp2,
-              LeftOuterJoin[FLP](Free('__tmp0), Free('__tmp1),
+              LeftOuterJoin[FLP](fixFree('__tmp0), fixFree('__tmp1),
                 relations.Lt[FLP](
-                  ObjectProject(Free('__tmp0), fixConstant(Data.Str("id"))),
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("foo_id"))))),
+                  ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("id"))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("foo_id"))))),
               Squash(
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
+                      ObjectProject(fixFree('__tmp2), JoinDir.Left.const),
                       fixConstant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
+                      ObjectProject(fixFree('__tmp2), JoinDir.Right.const),
                       fixConstant(Data.Str("address")))))))))
     }
 
@@ -1254,22 +1254,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('__tmp0, read("foo"),
           fixLet('__tmp1, read("bar"),
             fixLet('__tmp2,
-              InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
+              InnerJoin[FLP](fixFree('__tmp0), fixFree('__tmp1),
                 relations.Eq[FLP](
                   ObjectProject(
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     fixConstant(Data.Str("id"))),
                   ObjectProject(
-                    Free('__tmp1),
+                    fixFree('__tmp1),
                     fixConstant(Data.Str("foo_id"))))),
               fixLet('__tmp3, read("baz"),
                 fixLet('__tmp4,
-                  InnerJoin[FLP](Free('__tmp2), Free('__tmp3),
+                  InnerJoin[FLP](fixFree('__tmp2), fixFree('__tmp3),
                     relations.Eq[FLP](
-                      ObjectProject(Free('__tmp3),
+                      ObjectProject(fixFree('__tmp3),
                         fixConstant(Data.Str("bar_id"))),
                       ObjectProject[FLP](
-                        ObjectProject(Free('__tmp2),
+                        ObjectProject(fixFree('__tmp2),
                           JoinDir.Right.const),
                         fixConstant(Data.Str("id"))))),
                   Squash(
@@ -1277,13 +1277,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
                       "name" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            ObjectProject(fixFree('__tmp4), JoinDir.Left.const),
                             JoinDir.Left.const),
                           fixConstant(Data.Str("name"))),
                       "address" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            ObjectProject(fixFree('__tmp4), JoinDir.Left.const),
                             JoinDir.Right.const),
                           fixConstant(Data.Str("address")))))))))))
     }
@@ -1301,12 +1301,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("city"))),
-                "size" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("pop"))))),
+                "name" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city"))),
+                "size" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("pop"))))),
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("name"))),
-                "size" -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("size"))))))))
+                "name" -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("name"))),
+                "size" -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("size"))))))))
     }
 
     "compile sub-select with same un-qualified names" in {
@@ -1316,12 +1316,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("city"))),
-                "pop" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("pop"))))),
+                "city" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city"))),
+                "pop" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("pop"))))),
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("city"))),
-                "pop" -> ObjectProject(Free('__tmp1), fixConstant(Data.Str("pop"))))))))
+                "city" -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("city"))),
+                "pop" -> ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("pop"))))))))
     }
 
     "compile simple distinct" in {
@@ -1343,9 +1343,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
                 ObjectProject(read("zips"), fixConstant(Data.Str("city"))))),
           Distinct[FLP](
             OrderBy[FLP](
-              Free('__tmp0),
+              fixFree('__tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('__tmp0), fixConstant(Data.Str("city")))),
+                ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city")))),
               MakeArrayN(
                 fixConstant(Data.Str("ASC")))))))
     }
@@ -1358,18 +1358,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           fixLet('__tmp1,
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("city"))),
-                "__sd__0" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("pop"))))),
+                "city" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city"))),
+                "__sd__0" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("pop"))))),
             fixLet('__tmp2,
               OrderBy[FLP](
-                Free('__tmp1),
+                fixFree('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), fixConstant(Data.Str("__sd__0")))),
+                  ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("__sd__0")))),
                 MakeArrayN(
                   fixConstant(Data.Str("DESC")))),
               DeleteField[FLP](
-                DistinctBy[FLP](Free('__tmp2),
-                  DeleteField(Free('__tmp2), fixConstant(Data.Str("__sd__0")))),
+                DistinctBy[FLP](fixFree('__tmp2),
+                  DeleteField(fixFree('__tmp2), fixConstant(Data.Str("__sd__0")))),
                 fixConstant(Data.Str("__sd__0")))))))
     }
 
@@ -1388,8 +1388,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           Distinct[FLP](
             Squash(
               makeObj(
-                "CTY" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("city"))),
-                "ST" -> ObjectProject(Free('__tmp0), fixConstant(Data.Str("state"))))))))
+                "CTY" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("city"))),
+                "ST" -> ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("state"))))))))
     }
 
     "compile count distinct with two exprs" in {
@@ -1429,10 +1429,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
               "name" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    fixFree('__tmp0),
                     Lt[FLP](
-                      ObjectProject(Free('__tmp0), fixConstant(Data.Str("age"))),
-                      Free('age))),
+                      ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("age"))),
+                      fixFree('age))),
                   fixConstant(Data.Str("name")))))))
     }
   }
@@ -1455,16 +1455,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('tmp0, read("zips"),
           fixLet('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))))),
-            ObjectProject(Free('tmp1), fixConstant(Data.Str("city")))))
+              fixFree('tmp0),
+              MakeArrayN[Fix](ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))))),
+            ObjectProject(fixFree('tmp1), fixConstant(Data.Str("city")))))
       val exp =
         fixLet('tmp0, read("zips"),
           Arbitrary[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
-                Free('tmp0),
-                MakeArrayN[Fix](ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))))), fixConstant(Data.Str("city")))))
+                fixFree('tmp0),
+                MakeArrayN[Fix](ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))))), fixConstant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
@@ -1474,22 +1474,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
         fixLet('tmp0, read("zips"),
           fixLet('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))))),
+              fixFree('tmp0),
+              MakeArrayN[Fix](ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))))),
             fixLet('tmp2,
-              Filter[FLP](Free('tmp1), Gt[FLP](Count(Free('tmp1)), fixConstant(Data.Int(10)))),
-              ObjectProject(Free('tmp2), fixConstant(Data.Str("city"))))))
+              Filter[FLP](fixFree('tmp1), Gt[FLP](Count(fixFree('tmp1)), fixConstant(Data.Int(10)))),
+              ObjectProject(fixFree('tmp2), fixConstant(Data.Str("city"))))))
       val exp =
         fixLet('tmp0, read("zips"),
           fixLet('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))))),
+              fixFree('tmp0),
+              MakeArrayN[Fix](ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))))),
             Arbitrary[FLP](
               ObjectProject[FLP](
                 Filter[FLP](
-                  Free('tmp1),
-                  Gt[FLP](Count(Free('tmp1)), fixConstant(Data.Int(10)))),
+                  fixFree('tmp1),
+                  Gt[FLP](Count(fixFree('tmp1)), fixConstant(Data.Int(10)))),
                 fixConstant(Data.Str("city"))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
@@ -1501,8 +1501,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           Count[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
-                Free('tmp0),
-                MakeArrayN[Fix](ObjectProject(Free('tmp0),
+                fixFree('tmp0),
+                MakeArrayN[Fix](ObjectProject(fixFree('tmp0),
                   fixConstant(Data.Str("city"))))), fixConstant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(lp)
@@ -1514,29 +1514,29 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers with LogicalPlanHel
           read("zips"),
           fixLet('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
+              fixFree('tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))),
-                ObjectProject(Free('tmp0), fixConstant(Data.Str("state"))))),
+                ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))),
+                ObjectProject(fixFree('tmp0), fixConstant(Data.Str("state"))))),
             makeObj(
-              "city" -> ObjectProject(Free('tmp1), fixConstant(Data.Str("city"))),
-              "1"    -> Count[FLP](ObjectProject(Free('tmp1), fixConstant(Data.Str("state")))),
-              "loc"  -> ObjectProject(Free('tmp1), fixConstant(Data.Str("loc"))),
-              "2"    -> Sum[FLP](ObjectProject(Free('tmp1), fixConstant(Data.Str("pop")))))))
+              "city" -> ObjectProject(fixFree('tmp1), fixConstant(Data.Str("city"))),
+              "1"    -> Count[FLP](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("state")))),
+              "loc"  -> ObjectProject(fixFree('tmp1), fixConstant(Data.Str("loc"))),
+              "2"    -> Sum[FLP](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("pop")))))))
       val exp =
         fixLet('tmp0,
           read("zips"),
           fixLet('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
+              fixFree('tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('tmp0), fixConstant(Data.Str("city"))),
-                ObjectProject(Free('tmp0), fixConstant(Data.Str("state"))))),
+                ObjectProject(fixFree('tmp0), fixConstant(Data.Str("city"))),
+                ObjectProject(fixFree('tmp0), fixConstant(Data.Str("state"))))),
             makeObj(
-              "city" -> Arbitrary[FLP](ObjectProject(Free('tmp1), fixConstant(Data.Str("city")))),
-              "1"    -> Count[FLP](ObjectProject(Free('tmp1), fixConstant(Data.Str("state")))),
-              "loc"  -> ObjectProject(Free('tmp1), fixConstant(Data.Str("loc"))),
-              "2"    -> Sum[FLP](ObjectProject(Free('tmp1), fixConstant(Data.Str("pop")))))))
+              "city" -> Arbitrary[FLP](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("city")))),
+              "1"    -> Count[FLP](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("state")))),
+              "loc"  -> ObjectProject(fixFree('tmp1), fixConstant(Data.Str("loc"))),
+              "2"    -> Sum[FLP](ObjectProject(fixFree('tmp1), fixConstant(Data.Str("pop")))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }

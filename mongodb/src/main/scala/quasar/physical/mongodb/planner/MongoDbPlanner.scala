@@ -215,7 +215,7 @@ object MongoDbPlanner {
     {
       case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case InvokeF(f, a)    => invoke(f, a)
-      case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
+      case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LP.Let(_, _, body) => body
       case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -609,8 +609,8 @@ object MongoDbPlanner {
         }
       }
 
-      def createOp[A](f: Free[EX, A]): Free[ExprOp, A] =
-        FunctorT[Free[?[_], A]].transCata[EX, ExprOp](f)(inj)
+      def createOp[A](f: scalaz.Free[EX, A]): scalaz.Free[ExprOp, A] =
+        FunctorT[scalaz.Free[?[_], A]].transCata[EX, ExprOp](f)(inj)
 
       ((func, args) match {
         // NB: this one is missing from MapFunc.
@@ -796,7 +796,7 @@ object MongoDbPlanner {
         def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
-      case FreeF(name) =>
+      case Free(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
       case Let(_, _, in) => state(in.head._2)
       case Typecheck(exp, typ, cont, fallback) =>
@@ -920,7 +920,7 @@ object MongoDbPlanner {
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
     case x @ Let(n, r @ Fix(ReadF(_)),
-      Fix(Typecheck(Fix(FreeF(nf)), typ, cont, _)))
+      Fix(Typecheck(Fix(Free(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>

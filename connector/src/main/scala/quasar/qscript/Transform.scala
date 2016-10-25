@@ -462,7 +462,7 @@ class Transform
           Ann(Nil, Free.roll[MapFunc, Hole](mf)),
           QC.inj(Unreferenced[T, T[F]]()).embed))
 
-    case LogicalPlan.FreeF(name) =>
+    case LogicalPlan.Free(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[Target[F]]
 
     case LogicalPlan.Let(name, form, body) =>

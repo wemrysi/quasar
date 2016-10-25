@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import quasar.Predef._
 
-import quasar._, LogicalPlan._
+import quasar._, LogicalPlan.{Free => _, _}
 import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._, eitherT._
