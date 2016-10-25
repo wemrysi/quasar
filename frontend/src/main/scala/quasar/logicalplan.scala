@@ -50,8 +50,8 @@ object LogicalPlan {
           case InvokeF(func, values) => values.traverse(f).map(InvokeF(func, _))
           case FreeF(v)              => G.point(FreeF(v))
           case Let(ident, form, in) => (f(form) ⊛ f(in))(Let(ident, _, _))
-          case TypecheckF(expr, typ, cont, fallback) =>
-            (f(expr) ⊛ f(cont) ⊛ f(fallback))(TypecheckF(_, typ, _, _))
+          case Typecheck(expr, typ, cont, fallback) =>
+            (f(expr) ⊛ f(cont) ⊛ f(fallback))(Typecheck(_, typ, _, _))
         }
 
       override def map[A, B](v: LogicalPlan[A])(f: A => B): LogicalPlan[B] =
@@ -61,8 +61,8 @@ object LogicalPlan {
           case InvokeF(func, values) => InvokeF(func, values.map(f))
           case FreeF(v)              => FreeF(v)
           case Let(ident, form, in) => Let(ident, f(form), f(in))
-          case TypecheckF(expr, typ, cont, fallback) =>
-            TypecheckF(f(expr), typ, f(cont), f(fallback))
+          case Typecheck(expr, typ, cont, fallback) =>
+            Typecheck(f(expr), typ, f(cont), f(fallback))
         }
 
       override def foldMap[A, B](fa: LogicalPlan[A])(f: A => B)(implicit B: Monoid[B]): B =
@@ -72,7 +72,7 @@ object LogicalPlan {
           case InvokeF(_, values)    => values.foldMap(f)
           case FreeF(_)              => B.zero
           case Let(_, form, in)     => f(form) ⊹ f(in)
-          case TypecheckF(expr, _, cont, fallback) =>
+          case Typecheck(expr, _, cont, fallback) =>
             f(expr) ⊹ f(cont) ⊹ f(fallback)
         }
 
@@ -83,7 +83,7 @@ object LogicalPlan {
           case InvokeF(_, values)    => values.foldRight(z)(f)
           case FreeF(_)              => z
           case Let(ident, form, in) => f(form, f(in, z))
-          case TypecheckF(expr, _, cont, fallback) =>
+          case Typecheck(expr, _, cont, fallback) =>
             f(expr, f(cont, f(fallback, z)))
         }
     }
@@ -109,7 +109,7 @@ object LogicalPlan {
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.shows), args.unsized.map(ra.render))
             case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case Let(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
-            case TypecheckF(expr, typ, cont, fallback) =>
+            case Typecheck(expr, typ, cont, fallback) =>
               NonTerminal("Typecheck" :: nodeType, Some(typ.shows),
                 List(ra.render(expr), ra.render(cont), ra.render(fallback)))
           }
@@ -126,7 +126,7 @@ object LogicalPlan {
           case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
           case (Let(ident1, form1, in1), Let(ident2, form2, in2)) =>
             ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
-          case (TypecheckF(expr1, typ1, cont1, fb1), TypecheckF(expr2, typ2, cont2, fb2)) =>
+          case (Typecheck(expr1, typ1, cont1, fb1), Typecheck(expr2, typ2, cont2, fb2)) =>
             expr1 ≟ expr2 && typ1 ≟ typ2 && cont1 ≟ cont2 && fb1 ≟ fb2
           case _ => false
         }
@@ -174,13 +174,7 @@ object LogicalPlan {
   //     should only exist in BlackShield – the checker will annotate nodes
   //     where runtime checks are necessary, then they will be added during
   //     compilation to BlackShield.
-  final case class TypecheckF[A](expr: A, typ: Type, cont: A, fallback: A)
-      extends LogicalPlan[A]
-  object Typecheck {
-    def apply(expr: Fix[LogicalPlan], typ: Type, cont: Fix[LogicalPlan], fallback: Fix[LogicalPlan]):
-        Fix[LogicalPlan] =
-      Fix[LogicalPlan](TypecheckF(expr, typ, cont, fallback))
-  }
+  final case class Typecheck[A](expr: A, typ: Type, cont: A, fallback: A) extends LogicalPlan[A]
 
   implicit val LogicalPlanUnzip: Unzip[LogicalPlan] = new Unzip[LogicalPlan] {
     def unzip[A, B](f: LogicalPlan[(A, B)]) = (f.map(_._1), f.map(_._2))
@@ -267,12 +261,12 @@ object LogicalPlan {
         case _ => None
       }
 
-      case TypecheckF(Fix(Let(a, x1, x2)), typ, cont, fallback) =>
-        Let(a, x1, Fix(TypecheckF(x2, typ, cont, fallback))).some
-      case TypecheckF(expr, typ, Fix(Let(a, x1, x2)), fallback) =>
-        Let(a, x1, Fix(TypecheckF(expr, typ, x2, fallback))).some
-      case TypecheckF(expr, typ, cont, Fix(Let(a, x1, x2))) =>
-        Let(a, x1, Fix(TypecheckF(expr, typ, cont, x2))).some
+      case Typecheck(Fix(Let(a, x1, x2)), typ, cont, fallback) =>
+        Let(a, x1, Fix(Typecheck(x2, typ, cont, fallback))).some
+      case Typecheck(expr, typ, Fix(Let(a, x1, x2)), fallback) =>
+        Let(a, x1, Fix(Typecheck(expr, typ, x2, fallback))).some
+      case Typecheck(expr, typ, cont, Fix(Let(a, x1, x2))) =>
+        Let(a, x1, Fix(Typecheck(expr, typ, cont, x2))).some
 
       case t => None
   }
@@ -313,9 +307,9 @@ object LogicalPlan {
           inferTypes(fTyp, form).map(Let[Typed[LogicalPlan]](n, _, in0))
         }
 
-      case TypecheckF(expr, t, cont, fallback) =>
+      case Typecheck(expr, t, cont, fallback) =>
         (inferTypes(t, expr) ⊛ inferTypes(typ, cont) ⊛ inferTypes(typ, fallback))(
-          TypecheckF[Typed[LogicalPlan]](_, t, _, _))
+          Typecheck[Typed[LogicalPlan]](_, t, _, _))
 
     }).map(Cofree(typ, _))
   }
@@ -348,7 +342,7 @@ object LogicalPlan {
       Fix[LogicalPlan] =
     constraints.constraints.foldLeft(constraints.plan)((acc, con) =>
       Fix(Let(con.name, con.term,
-        Typecheck(Free(con.name), con.inferred, acc, fallback))))
+        Fix(Typecheck(Free(con.name), con.inferred, acc, fallback)))))
 
   /** This inserts a constraint on a node that might not strictly require a type
     * check. It protects operations (EG, array flattening) that need a certain
@@ -417,8 +411,8 @@ object LogicalPlan {
           handleGenericInvoke(inf, InvokeF(func, Func.Input2(a1, a2)))
         case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           handleGenericInvoke(inf, InvokeF(func, Func.Input3(a1, a2, a3)))
-        case TypecheckF(expr, typ, cont, fallback) =>
-          unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))
+        case Typecheck(expr, typ, cont, fallback) =>
+          unifyOrCheck(inf, Type.glb(cont.inferred, typ), Fix(Typecheck(expr.plan, typ, cont.plan, fallback.plan)))
         case Let(name, value, in) =>
           unifyOrCheck(inf, in.inferred, Fix(Let(name, appConst(value, Fix(Constant(Data.NA))), appConst(in, Fix(Constant(Data.NA))))))
         // TODO: Get the possible type from the Let

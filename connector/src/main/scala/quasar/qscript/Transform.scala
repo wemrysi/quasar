@@ -468,7 +468,7 @@ class Transform
     case LogicalPlan.Let(name, form, body) =>
       (Planner.InternalError("un-elided Let"): PlannerError).left[Target[F]]
 
-    case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
+    case LogicalPlan.Typecheck(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))

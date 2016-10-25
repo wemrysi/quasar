@@ -217,7 +217,7 @@ object MongoDbPlanner {
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LP.Let(_, _, body) => body
-      case x @ TypecheckF(expr, typ, cont, fallback) =>
+      case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
             case Type.Null             => isNull
@@ -442,7 +442,7 @@ object MongoDbPlanner {
       case Constant(_)   => \/-(default)
       case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
       case Let(_, _, in) => in._2
-      case TypecheckF(_, typ, cont, _) =>
+      case Typecheck(_, typ, cont, _) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -602,7 +602,7 @@ object MongoDbPlanner {
             })
 
         (ann.tail, f) match {
-          case (TypecheckF(_, _, _, _), There(1, _)) => !isSimpleRef
+          case (Typecheck(_, _, _, _), There(1, _)) => !isSimpleRef
           case (InvokeFUnapply(Cond, _), There(x, _))
               if x == 1 || x == 2                    => !isSimpleRef
           case _                                     => false
@@ -799,7 +799,7 @@ object MongoDbPlanner {
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
       case Let(_, _, in) => state(in.head._2)
-      case TypecheckF(exp, typ, cont, fallback) =>
+      case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
@@ -881,8 +881,8 @@ object MongoDbPlanner {
     def alignCondition(lt: Fix[LP], rt: Fix[LP]):
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
-        case TypecheckF(expr, typ, cont, fb) =>
-          alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _, fb))
+        case Typecheck(expr, typ, cont, fb) =>
+          alignCondition(lt, rt)(cont).map(cont => Fix(Typecheck(expr, typ, cont, fb)))
         case InvokeFUnapply(And, Sized(t1, t2)) =>
           Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(And, _))
         case InvokeFUnapply(Or, Sized(t1, t2)) =>
@@ -920,7 +920,7 @@ object MongoDbPlanner {
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
     case x @ Let(n, r @ Fix(ReadF(_)),
-      Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
+      Fix(Typecheck(Fix(FreeF(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>

@@ -160,7 +160,7 @@ object Optimizer {
     simplify(boundPara(t)(preferProjectionsƒ)._1)
 
   val elideTypeCheckƒ: Algebra[LP, Fix[LP]] = {
-    case Let(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
+    case Let(n, b, Fix(Typecheck(Fix(FreeF(nf)), _, cont, _)))
         if n == nf =>
       Fix(Let(n, b, cont))
     case x => Fix(x)

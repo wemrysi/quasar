@@ -17,7 +17,7 @@
 package quasar.frontend
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, Data}
+import quasar.{LogicalPlan => LP, _}
 
 import matryoshka._
 
@@ -27,4 +27,7 @@ trait LogicalPlanHelpers {
 
   def fixConstant(data: Data): Fix[LP] =
     Fix[LP](LP.Constant(data))
+
+  def fixTypecheck(expr: Fix[LP], typ: Type, cont: Fix[LP], fallback: Fix[LP]): Fix[LP] =
+    Fix[LP](LP.Typecheck(expr, typ, cont, fallback))
 }
