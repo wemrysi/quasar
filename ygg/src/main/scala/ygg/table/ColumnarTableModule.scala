@@ -1537,7 +1537,7 @@ trait BlockTableModule extends ColumnarTableModule {
           }
         }
 
-        val stream = projections.foldLeft(StreamT.empty[Need, Slice]) { (acc, proj) =>
+        val stream = projections.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
           val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
             Some(Schema.flatten(tpe, struct.toVector).toSet)
@@ -2151,27 +2151,17 @@ trait BlockTableModule extends ColumnarTableModule {
       val right1 = right0.compact(rightKeySpec)
 
       if (yggConfig.hashJoins) {
-        (left1.toInternalTable().toEither |@| right1.toInternalTable().toEither).tupled flatMap {
-          case (Right(left), Right(right)) =>
+        (left1.toInternalTable(), right1.toInternalTable()) match {
+          case (\/-(left), \/-(right)) =>
             orderHint match {
-              case Some(JoinOrder.LeftOrder) =>
-                hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-              case Some(JoinOrder.RightOrder) =>
-                hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-              case _ =>
-                hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+              case Some(JoinOrder.LeftOrder)  => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+              case Some(JoinOrder.RightOrder) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
+              case _                          => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
             }
 
-          case (Right(left), Left(right)) =>
-            hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-
-          case (Left(left), Right(right)) =>
-            hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-
-          case (leftE, rightE) =>
-            val idT: Table => Table = x => x
-            val (left, right)       = (leftE.fold(idT, idT), rightE.fold(idT, idT))
-            super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
+          case (\/-(left), -\/(right)) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
+          case (-\/(left), \/-(right)) => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
+          case (-\/(left), -\/(right)) => super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
         }
       } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
@@ -2185,8 +2175,8 @@ trait BlockTableModule extends ColumnarTableModule {
       * less than `limit` rows, it will be converted to an `InternalTable`,
       * otherwise it will stay an `ExternalTable`.
       */
-    def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable]
-    def toInternalTable(): NeedEitherT[ExternalTable, InternalTable] = toInternalTable(yggConfig.maxSliceSize)
+    def toInternalTable(limit: Int): ExternalTable \/ InternalTable
+    def toInternalTable(): ExternalTable \/ InternalTable = toInternalTable(yggConfig.maxSliceSize)
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.
@@ -2200,8 +2190,8 @@ trait BlockTableModule extends ColumnarTableModule {
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
     def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
 
-    def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
-      EitherT[Need, ExternalTable, InternalTable](slices.toStream map (slices1 => \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))))
+    def toInternalTable(limit: Int): ExternalTable \/ InternalTable =
+      slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
 
     def toRValue: Need[RValue] = {
       def loop(stream: NeedSlices): Need[RValue] = stream.uncons flatMap {
@@ -2230,8 +2220,7 @@ trait BlockTableModule extends ColumnarTableModule {
     * allowed more optimizations when doing things like joins.
     */
   class InternalTable(val slice: Slice) extends Table(singleStreamT(slice), ExactSize(slice.size)) {
-    def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
-      EitherT[Need, ExternalTable, InternalTable](Need(\/-(this)))
+    def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
     def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
@@ -2257,7 +2246,7 @@ trait BlockTableModule extends ColumnarTableModule {
 
     def load(tpe: JType) = Table.load(this, tpe)
 
-    def toInternalTable(limit0: Int): NeedEitherT[ExternalTable, InternalTable] = {
+    def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
       val limit = limit0.toLong
 
       def acc(slices: NeedSlices, buffer: List[Slice], size: Long): Need[ExternalTable \/ InternalTable] = {
@@ -2280,7 +2269,7 @@ trait BlockTableModule extends ColumnarTableModule {
         }
       }
 
-      EitherT(acc(slices, Nil, 0L))
+      acc(slices, Nil, 0L).value
     }
 
     /**
