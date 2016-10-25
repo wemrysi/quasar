@@ -47,50 +47,6 @@ trait ColumnarTableModule {
 
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
-
-  object Projection {
-    def apply(path: Path): Need[Option[Projection]] = Need(projections get path)
-  }
-  case class Projection(val data: Stream[JValue]) extends ProjectionLike {
-    type Key = JArray
-
-    private val slices      = Table.fromJson(data).slices.toStream.copoint
-    val length: Long        = data.length.toLong
-    val xyz: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
-
-    def structure = Need(xyz)
-
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
-      @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
-        blocks.filterNot(_.isEmpty) match {
-          case x #:: xs => if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
-          case _        => None
-        }
-      }
-
-      val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
-
-      slice map { s =>
-        val s0 = Slice(s.size, {
-          colSelection.map { reqCols =>
-            s.columns.filter {
-              case (ref @ ColumnRef(jpath, ctype), _) =>
-                jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
-                  (CPathField("value") \ ref.selector) == jpath && ref.ctype == ctype
-                }
-            }
-          }.getOrElse(s.columns)
-        })
-
-        BlockProjectionData[JArray](
-          s0.toJson(0).getOrElse(JUndefined) \ "key" asArray,
-          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" asArray,
-          s0)
-      }
-    }
-  }
-
-
   val Table: TableCompanion
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
@@ -128,34 +84,31 @@ trait ColumnarTableModule {
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
-    def load(table: Table, tpe: JType): NeedTable = {
-      for {
-        paths       <- pathsM(table)
-        projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
-        totalLength = projections.map(_.length).sum
-      } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
-          unfoldStream(none[proj.Key]) { key =>
-            proj.getBlockAfter(key, constraints).map { b =>
-              b.map {
-                case BlockProjectionData(_, maxKey, slice) =>
-                  (slice, Some(maxKey))
-              }
+    def load(table: Table, tpe: JType): NeedTable = pathsM(table) map { paths =>
+      val projs = paths.toList flatMap projections.get
+      val totalLength = projs.map(_.length).sum
+
+      def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
+        unfoldStream(none[proj.Key]) { key =>
+          proj.getBlockAfter(key, constraints).map { b =>
+            b.map {
+              case BlockProjectionData(_, maxKey, slice) =>
+                (slice, Some(maxKey))
             }
           }
         }
+      }
 
-        val stream = projections.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
-          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toVector).toSet)
-          }
-
-          acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
+      val stream = projs.foldLeft(emptyStreamT[Slice]()) { (acc, proj) =>
+        // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
+        val constraints: Need[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
+          Some(Schema.flatten(tpe, struct.toVector).toSet)
         }
 
-        Table(stream, ExactSize(totalLength))
+        acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
       }
+
+      Table(stream, ExactSize(totalLength))
     }
 
 

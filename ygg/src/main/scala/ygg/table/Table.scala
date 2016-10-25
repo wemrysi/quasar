@@ -24,6 +24,7 @@ import quasar.Data
 object Table {
   def fromFile(file: jFile): Table = ???
   def fromData(data: Data): Table  = ???
+  def fromJson(json: Seq[JValue]): Table = BlockTable fromJson json
 }
 
 trait TableConstructors[T <: ygg.table.Table] {
