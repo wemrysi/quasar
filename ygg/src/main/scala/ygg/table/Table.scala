@@ -26,10 +26,10 @@ object Table {
   def fromData(data: Data): Table                         = ???
   def fromEJson[A](json: EJson[A])(f: A => JValue): Table = ???
 
-  def fromFile(file: jFile): Table        = fromJValues(JParser parseFromFile file)
-  def fromJsonString(json: String): Table = fromJson(Seq(JParser parseUnsafe json))
-  def fromJValues(json: JValue*): Table   = fromJson(json.toVector)
-  def fromJson(json: Seq[JValue]): Table  = BlockTable fromJson json
+  def fromFile(file: jFile): Table       = fromJson((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): Table    = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): Table  = fromJson(json.toVector)
+  def fromJson(json: Seq[JValue]): Table = BlockTable fromJson json
 }
 
 trait TableConstructors[T <: ygg.table.Table] {
@@ -138,8 +138,8 @@ trait Table {
   def slices: NeedSlices
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
+  def toData: Stream[Data]
+  def toJValues: Stream[JValue]
   def toJson: Need[Stream[JValue]]
   def zip(t2: Table): NeedTable
-
-  def toData: Vector[Data] = toJson.value.toVector map (x => jawn.Parser.parseUnsafe[Data](x.toString))
 }

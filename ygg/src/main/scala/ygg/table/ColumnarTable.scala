@@ -30,8 +30,6 @@ class ColumnarTable extends ColumnarTableModule {
   class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
     /** XXX FIXME */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
-
-    override def toString = jvalueStream mkString "\n"
   }
 }
 object ColumnarTable extends ColumnarTable {

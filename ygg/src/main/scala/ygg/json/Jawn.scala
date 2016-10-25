@@ -38,6 +38,8 @@ object JParser {
   def parseUnsafe(str: String): JValue                              = Parser.parseUnsafe[JValue](str)
   def parseFromString(str: String): Result[JValue]                  = fromTryCatchNonFatal( parseUnsafe(str) )
   def parseFromByteBuffer(buf: ByteBuffer): Result[JValue]          = Parser.parseFromByteBuffer[JValue](buf)
+
+  def parseManyFromFile(file: jFile): Result[Vec[JValue]]           = parseManyFromString(file.slurpString)
   def parseManyFromString(str: String): Result[Vec[JValue]]         = AsyncParser.stream absorb str mapRight (_.toVector)
   def parseManyFromByteBuffer(buf: ByteBuffer): Result[Vec[JValue]] = AsyncParser.stream absorb buf mapRight (_.toVector)
 }

@@ -73,6 +73,10 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
 
   object decimal extends DecimalConstructors(UNLIMITED)
 
+  implicit class ThrowValidationOps[A](private val self: Validation[Throwable, A]) {
+    def orThrow: A = self.fold(throw _, x => x)
+  }
+
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
     def slurpString(): String     = new String(slurpBytes, utf8Charset)

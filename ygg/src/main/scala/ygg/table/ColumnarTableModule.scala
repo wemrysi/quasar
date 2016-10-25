@@ -22,6 +22,7 @@ import ygg._, common._, data._, json._, trans._
 import ygg.cf.{ Remap, Empty }
 import scala.math.{ min, max }
 import JDBM._
+import quasar.Data
 
 final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
@@ -349,10 +350,11 @@ trait ColumnarTableModule {
 
     def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
 
-    def slicesStream: Stream[Slice]  = slices.toStream.value
-    def jvalueStream: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
-    def columns: ColumnMap           = slicesStream.head.columns
-    def toVector: Vector[JValue]     = jvalueStream.toVector
+    def slicesStream: Stream[Slice] = slices.toStream.value
+    def columns: ColumnMap          = slicesStream.head.columns
+    def toVector: Vector[JValue]    = toJValues.toVector
+    def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
+    def toData: Stream[Data]        = toJValues map (x => jawn.Parser.parseUnsafe[Data](x.toString))
 
     def companion                                                         = Table
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
@@ -2105,6 +2107,9 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   abstract class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+    override def toString = s"Table(_, $size)"
+    def toJsonString: String = toJValues mkString "\n"
+
     /**
       * Sorts the KV table by ascending or descending order of a transformation
       * applied to the rows.
