@@ -17,11 +17,14 @@
 package quasar.frontend
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
+import quasar.{LogicalPlan => LP, Data}
 
 import matryoshka._
 
 trait LogicalPlanHelpers {
   def fixLet(let: Symbol, form: Fix[LP], in: Fix[LP]): Fix[LP] =
     Fix[LP](LP.Let(let, form, in))
+
+  def fixConstant(data: Data): Fix[LP] =
+    Fix[LP](LP.Constant(data))
 }

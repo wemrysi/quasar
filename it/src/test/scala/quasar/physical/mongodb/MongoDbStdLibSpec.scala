@@ -21,6 +21,7 @@ import quasar._, Planner.PlannerError
 import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.fs.DataCursor
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
@@ -39,7 +40,7 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-abstract class MongoDbStdLibSpec extends StdLibSpec {
+abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
@@ -109,7 +110,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
                 (0 until args.length).toList.map(idx =>
                   Fix(StructuralLib.ObjectProject(
                     LogicalPlan.Read(coll.asFile),
-                    LogicalPlan.Constant(Data.Str("arg" + idx))))))
+                    fixConstant(Data.Str("arg" + idx))))))
           t  <- compile(qm, coll, lp).point[Task].unattempt
           (wf, resultField) = t
 

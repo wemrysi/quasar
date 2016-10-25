@@ -46,7 +46,7 @@ object LogicalPlan {
           G[LogicalPlan[B]] =
         fa match {
           case ReadF(coll)           => G.point(ReadF(coll))
-          case ConstantF(data)       => G.point(ConstantF(data))
+          case Constant(data)       => G.point(Constant(data))
           case InvokeF(func, values) => values.traverse(f).map(InvokeF(func, _))
           case FreeF(v)              => G.point(FreeF(v))
           case Let(ident, form, in) => (f(form) ⊛ f(in))(Let(ident, _, _))
@@ -57,7 +57,7 @@ object LogicalPlan {
       override def map[A, B](v: LogicalPlan[A])(f: A => B): LogicalPlan[B] =
         v match {
           case ReadF(coll)           => ReadF(coll)
-          case ConstantF(data)       => ConstantF(data)
+          case Constant(data)       => Constant(data)
           case InvokeF(func, values) => InvokeF(func, values.map(f))
           case FreeF(v)              => FreeF(v)
           case Let(ident, form, in) => Let(ident, f(form), f(in))
@@ -68,7 +68,7 @@ object LogicalPlan {
       override def foldMap[A, B](fa: LogicalPlan[A])(f: A => B)(implicit B: Monoid[B]): B =
         fa match {
           case ReadF(_)              => B.zero
-          case ConstantF(_)          => B.zero
+          case Constant(_)          => B.zero
           case InvokeF(_, values)    => values.foldMap(f)
           case FreeF(_)              => B.zero
           case Let(_, form, in)     => f(form) ⊹ f(in)
@@ -79,7 +79,7 @@ object LogicalPlan {
       override def foldRight[A, B](fa: LogicalPlan[A], z: => B)(f: (A, => B) => B): B =
         fa match {
           case ReadF(_)              => z
-          case ConstantF(_)          => z
+          case Constant(_)          => z
           case InvokeF(_, values)    => values.foldRight(z)(f)
           case FreeF(_)              => z
           case Let(ident, form, in) => f(form, f(in, z))
@@ -96,7 +96,7 @@ object LogicalPlan {
 
           def render(v: LogicalPlan[A]) = v match {
             // NB: a couple of special cases for readability
-            case ConstantF(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
+            case Constant(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
             case InvokeFUnapply(func @ structural.ObjectProject, Sized(expr, name)) =>
               (ra.render(expr), ra.render(name)) match {
                 case (RenderedTree(_, Some(x), Nil), RenderedTree(_, Some(n), Nil)) =>
@@ -105,7 +105,7 @@ object LogicalPlan {
               }
 
             case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
-            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
+            case Constant(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.shows), args.unsized.map(ra.render))
             case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case Let(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
@@ -121,7 +121,7 @@ object LogicalPlan {
       def equal[A: Equal](v1: LogicalPlan[A], v2: LogicalPlan[A]): Boolean =
         (v1, v2) match {
           case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
-          case (ConstantF(d1), ConstantF(d2)) => d1 ≟ d2
+          case (Constant(d1), Constant(d2)) => d1 ≟ d2
           case (InvokeFUnapply(f1, v1), InvokeFUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
           case (FreeF(n1), FreeF(n2)) => n1 ≟ n2
           case (Let(ident1, form1, in1), Let(ident2, form2, in2)) =>
@@ -140,11 +140,7 @@ object LogicalPlan {
       Fix[LogicalPlan](new ReadF(path))
   }
 
-  final case class ConstantF[A](data: Data) extends LogicalPlan[A]
-  object Constant {
-    def apply(data: Data): Fix[LogicalPlan] =
-      Fix[LogicalPlan](ConstantF(data))
-  }
+  final case class Constant[A](data: Data) extends LogicalPlan[A]
 
   final case class InvokeF[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N]) extends LogicalPlan[A] {
     override def toString = {
@@ -297,8 +293,8 @@ object LogicalPlan {
       case ReadF(c) =>
         success(ReadF[Typed[LogicalPlan]](c))
 
-      case ConstantF(d) =>
-        success(ConstantF[Typed[LogicalPlan]](d))
+      case Constant(d) =>
+        success(Constant[Typed[LogicalPlan]](d))
 
       case InvokeF(func, args) => for {
         types <- func.untpe(typ)
@@ -338,7 +334,7 @@ object LogicalPlan {
       NameT[SemDisj, ConstrainedPlan] = {
     if (inf.contains(poss))
       emit(ConstrainedPlan(poss, Nil, poss match {
-        case Type.Const(d) => Constant(d)
+        case Type.Const(d) => Fix(Constant(d))
         case _ => term
       }))
     else if (poss.contains(inf)) {
@@ -376,11 +372,11 @@ object LogicalPlan {
       def applyConstraints(
           poss: Type, constraints: ConstrainedPlan)
           (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
-        unifyOrCheck(inf, poss, f(appConst(constraints, Constant(Data.NA))))
+        unifyOrCheck(inf, poss, f(appConst(constraints, Fix(Constant(Data.NA)))))
 
       term match {
         case ReadF(c)         => unifyOrCheck(inf, Type.Top, Read(c))
-        case ConstantF(d)     => unifyOrCheck(inf, Type.Const(d), Constant(d))
+        case Constant(d)     => unifyOrCheck(inf, Type.Const(d), Fix(Constant(d)))
         case InvokeFUnapply(MakeObject, Sized(name, value)) =>
           lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeObject(name.plan, x))))
@@ -403,16 +399,16 @@ object LogicalPlan {
           }).map(cp =>
             cp.copy(constraints = cp.constraints ++ constraints))
         case InvokeFUnapply(relations.Or, Sized(left, right)) =>
-          lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, Func.Input2(left, right).map(appConst(_, Constant(Data.NA))))))
+          lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(relations.Or, Func.Input2(left, right).map(appConst(_, Fix(Constant(Data.NA)))))))
         case InvokeFUnapply(structural.FlattenArray, Sized(arg)) =>
           for {
             types <- lift(structural.FlattenArray.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
-            consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))))
+            consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Fix(Constant(Data.Arr(List(Data.NA)))))))
             plan  <- unifyOrCheck(inf, types, Invoke[nat._1](structural.FlattenArray, consts))
           } yield plan
         case InvokeFUnapply(structural.FlattenMap, Sized(arg)) => for {
           types <- lift(structural.FlattenMap.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
-          consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))))
+          consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Fix(Constant(Data.Obj(ListMap("" -> Data.NA)))))))
           plan  <- unifyOrCheck(inf, types, Invoke[nat._1](structural.FlattenMap, consts))
         } yield plan
         case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
@@ -424,7 +420,7 @@ object LogicalPlan {
         case TypecheckF(expr, typ, cont, fallback) =>
           unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))
         case Let(name, value, in) =>
-          unifyOrCheck(inf, in.inferred, Fix(Let(name, appConst(value, Constant(Data.NA)), appConst(in, Constant(Data.NA)))))
+          unifyOrCheck(inf, in.inferred, Fix(Let(name, appConst(value, Fix(Constant(Data.NA))), appConst(in, Fix(Constant(Data.NA))))))
         // TODO: Get the possible type from the Let
         case FreeF(v) => emit(ConstrainedPlan(inf, Nil, Free(v)))
       }
@@ -448,7 +444,7 @@ object LogicalPlan {
 
       case _ =>
         lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
-          unifyOrCheck(inf, _, Invoke(func, args.map(appConst(_, Constant(Data.NA))))))
+          unifyOrCheck(inf, _, Invoke(func, args.map(appConst(_, Fix(Constant(Data.NA)))))))
     }
   }
 
@@ -460,7 +456,7 @@ object LogicalPlan {
     import StateT.stateTMonadState
 
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Constant(Data.NA))).evalZero.validation)
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Fix(Constant(Data.NA)))).evalZero.validation)
   }
 
   // TODO: Generalize this to Binder

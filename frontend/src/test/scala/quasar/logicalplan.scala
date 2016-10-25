@@ -55,7 +55,7 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
 
   def constGen[A]: Gen[LogicalPlan[A]] = for {
     data <- Arbitrary.arbitrary[Data]
-  } yield ConstantF(data)
+  } yield Constant(data)
 
   def freeGen[A](vars: List[Symbol]): Gen[LogicalPlan[A]] = for {
     n <- Gen.choose(0, 1000)
@@ -73,24 +73,24 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
         fixLet('foo, Read(file("foo")),
           fixLet('bar, Read(file("bar")),
             Fix(MakeObjectN(
-              Constant(Data.Str("x")) -> Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))),
-              Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y"))))))))) must_==
+              fixConstant(Data.Str("x")) -> Fix(ObjectProject(Free('foo), fixConstant(Data.Str("x")))),
+              fixConstant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), fixConstant(Data.Str("y"))))))))) must_==
         fixLet('__tmp0, Read(file("foo")),
           fixLet('__tmp1, Read(file("bar")),
             Fix(MakeObjectN(
-              Constant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), Constant(Data.Str("x")))),
-              Constant(Data.Str("y")) -> Fix(ObjectProject(Free('__tmp1), Constant(Data.Str("y"))))))))
+              fixConstant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), fixConstant(Data.Str("x")))),
+              fixConstant(Data.Str("y")) -> Fix(ObjectProject(Free('__tmp1), fixConstant(Data.Str("y"))))))))
     }
 
     "rename shadowed name" in {
       LogicalPlan.normalizeTempNames(
         fixLet('x, Read(file("foo")),
           fixLet('x, Fix(MakeObjectN(
-              Constant(Data.Str("x")) -> Fix(ObjectProject(Free('x), Constant(Data.Str("x")))))),
+              fixConstant(Data.Str("x")) -> Fix(ObjectProject(Free('x), fixConstant(Data.Str("x")))))),
             Free('x)))) must_==
         fixLet('__tmp0, Read(file("foo")),
           fixLet('__tmp1, Fix(MakeObjectN(
-              Constant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), Constant(Data.Str("x")))))),
+              fixConstant(Data.Str("x")) -> Fix(ObjectProject(Free('__tmp0), fixConstant(Data.Str("x")))))),
             Free('__tmp1)))
     }
   }
@@ -101,15 +101,15 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
         fixLet('bar,
           fixLet('foo,
             Read(file("foo")),
-            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Str("z"))))))), 
+            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z"))))))), 
           Fix(MakeObjectN(
-            Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y")))))))) must_==
+            fixConstant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), fixConstant(Data.Str("y")))))))) must_==
         fixLet('foo,
           Read(file("foo")),
           fixLet('bar,
-            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Str("z")))))), 
+            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z")))))), 
             Fix(MakeObjectN(
-              Constant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("y"))))))))
+              fixConstant(Data.Str("y")) -> Fix(ObjectProject(Free('bar), fixConstant(Data.Str("y"))))))))
     }
 
     "re-nest deep" in {
@@ -118,45 +118,45 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
           fixLet('bar,
             fixLet('foo,
               Read(file("foo")),
-              Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Int(0))))))),
-            Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("y")))), Constant(Data.Int(1))))))),
+              Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0))))))),
+            Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("y")))), fixConstant(Data.Int(1))))))),
           Fix(MakeObjectN(
-            Constant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("z")))))))) must_==
+            fixConstant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), fixConstant(Data.Str("z")))))))) must_==
         fixLet('foo,
           Read(file("foo")),
           fixLet('bar,
-            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("x")))), Constant(Data.Int(0)))))),
+            Fix(Filter(Free('foo), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0)))))),
             fixLet('baz,
-              Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("y")))), Constant(Data.Int(1)))))),
+              Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), fixConstant(Data.Str("y")))), fixConstant(Data.Int(1)))))),
               Fix(MakeObjectN(
-                Constant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("z")))))))))
+                fixConstant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), fixConstant(Data.Str("z")))))))))
     }
 
     "hoist multiple fixLets" in {
       LogicalPlan.normalizeLets(
         Fix(Add(
-          fixLet('x, Constant(Data.Int(0)), Fix(Add(Free('x), Constant(Data.Int(1))))),
-          fixLet('y, Constant(Data.Int(2)), Fix(Add(Free('y), Constant(Data.Int(3)))))))) must_==
-        fixLet('x, Constant(Data.Int(0)),
-          fixLet('y, Constant(Data.Int(2)),
+          fixLet('x, fixConstant(Data.Int(0)), Fix(Add(Free('x), fixConstant(Data.Int(1))))),
+          fixLet('y, fixConstant(Data.Int(2)), Fix(Add(Free('y), fixConstant(Data.Int(3)))))))) must_==
+        fixLet('x, fixConstant(Data.Int(0)),
+          fixLet('y, fixConstant(Data.Int(2)),
             Fix(Add(
-              Fix(Add(Free('x), Constant(Data.Int(1)))),
-              Fix(Add(Free('y), Constant(Data.Int(3))))))))
+              Fix(Add(Free('x), fixConstant(Data.Int(1)))),
+              Fix(Add(Free('y), fixConstant(Data.Int(3))))))))
     }
 
     "hoist deep fixLet by one level" in {
       LogicalPlan.normalizeLets(
         Fix(Add(
-          Constant(Data.Int(0)),
+          fixConstant(Data.Int(0)),
           Fix(Add(
-            fixLet('x, Constant(Data.Int(1)), Fix(Add(Free('x), Constant(Data.Int(2))))),
-            Constant(Data.Int(3))))))) must_==
+            fixLet('x, fixConstant(Data.Int(1)), Fix(Add(Free('x), fixConstant(Data.Int(2))))),
+            fixConstant(Data.Int(3))))))) must_==
         Fix(Add(
-          Constant(Data.Int(0)),
-          fixLet('x, Constant(Data.Int(1)),
+          fixConstant(Data.Int(0)),
+          fixLet('x, fixConstant(Data.Int(1)),
             Fix(Add(
-              Fix(Add(Free('x), Constant(Data.Int(2)))),
-              Constant(Data.Int(3)))))))
+              Fix(Add(Free('x), fixConstant(Data.Int(2)))),
+              fixConstant(Data.Int(3)))))))
     }
   }
 }

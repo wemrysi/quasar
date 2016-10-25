@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, GenericFunc, LogicalPlan}, LogicalPlan._
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
@@ -30,7 +31,7 @@ import shapeless.Nat
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
-class SimplifyStdLibSpec extends StdLibSpec {
+class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
@@ -70,7 +71,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
   def run(lp: Fix[LogicalPlan], expected: Data): Result =
     ensureCorrectTypes(lp).disjunction match {
-      case  \/-(Fix(LogicalPlan.ConstantF(d))) => (d must closeTo(expected)).toResult
+      case  \/-(Fix(LogicalPlan.Constant(d))) => (d must closeTo(expected)).toResult
       case  \/-(v) => Failure("not a constant", v.render.shows)
       case -\/ (err) => Failure("simplification failed", err.toString)
     }
@@ -82,15 +83,15 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
     def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
       check(List(arg), { case List(arg1) => prg(arg1) }) getOrElse
-        run(prg(LogicalPlan.Constant(arg)), expected)
+        run(prg(fixConstant(arg)), expected)
 
     def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
       check(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }) getOrElse
-        run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2)), expected)
+        run(prg(fixConstant(arg1), fixConstant(arg2)), expected)
 
     def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
       check(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }) getOrElse
-        run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2), LogicalPlan.Constant(arg3)), expected)
+        run(prg(fixConstant(arg1), fixConstant(arg2), fixConstant(arg3)), expected)
 
     def intDomain = arbitrary[BigInt]
 

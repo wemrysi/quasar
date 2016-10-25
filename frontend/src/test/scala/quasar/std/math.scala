@@ -19,6 +19,7 @@ package quasar.std
 import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
+import quasar.frontend.LogicalPlanHelpers
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
@@ -27,7 +28,7 @@ import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends quasar.Qspec with TypeArbitrary {
+class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const
@@ -73,12 +74,12 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     }
 
     "simplify add with zero" in {
-      Add.simplify(Add(LogicalPlan.Constant(Int(0)), Free('x))) should
+      Add.simplify(Add(fixConstant(Int(0)), Free('x))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
     "simplify add with Dec zero" in {
-      Add.simplify(Add(Free('x), LogicalPlan.Constant(Dec(0.0)))) should
+      Add.simplify(Add(Free('x), fixConstant(Dec(0.0)))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 
@@ -170,7 +171,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     }
 
     "simplify expression raised to 1st power" in {
-      Power.simplify(Power(Free('x), Constant(Int(1)))) should
+      Power.simplify(Power(Free('x), fixConstant(Int(1)))) should
         beSome(FreeF[Fix[LogicalPlan]]('x))
     }
 

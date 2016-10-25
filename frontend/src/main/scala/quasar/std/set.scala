@@ -37,8 +37,8 @@ trait SetLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Take, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-            Take(src, ConstantF[T[LogicalPlan]](Data.Int(m.min(n))).embed).some
+          case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Take(src, Constant[T[LogicalPlan]](Data.Int(m.min(n))).embed).some
           case _ => None
         }
     },
@@ -59,11 +59,11 @@ trait SetLib extends Library {
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Int(n)))))
+        case InvokeF(_, Sized(Embed(set), Embed(Constant(Data.Int(n)))))
             if n == 0 =>
           set.some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Drop, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-          Drop(src, ConstantF[T[LogicalPlan]](Data.Int(m + n)).embed).some
+        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Drop, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+          Drop(src, Constant[T[LogicalPlan]](Data.Int(m + n)).embed).some
         case _ => None
       }
     },
@@ -110,7 +110,7 @@ trait SetLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.True)))) =>
+          case InvokeF(_, Sized(Embed(set), Embed(Constant(Data.True)))) =>
             set.some
           case _ => None
         }
@@ -258,7 +258,7 @@ trait SetLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Set(Nil))))) =>
+        case InvokeF(_, Sized(Embed(set), Embed(Constant(Data.Set(Nil))))) =>
           set.some
         case _ => None
       }
@@ -281,8 +281,8 @@ trait SetLib extends Library {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case InvokeF(_, Sized(item, set)) => set.project match {
-            case ConstantF(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
-            case ConstantF(_)           => RelationsLib.Eq(item, set).some
+            case Constant(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
+            case Constant(_)           => RelationsLib.Eq(item, set).some
             case lp                     => Within(item, StructuralLib.UnshiftArray(set).embed).some
           }
           case _ => None

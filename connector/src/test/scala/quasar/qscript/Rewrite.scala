@@ -17,9 +17,10 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, _}
+import quasar._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._
 import quasar.sql.CompilerHelpers
 import quasar.qscript.MapFuncs._
@@ -30,7 +31,7 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers with LogicalPlanHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
@@ -67,7 +68,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
   // write an `Equal[PlannerError]` and test for specific errors too
   "rewriter" should {
     "elide a no-op map in a constant boolean" in {
-      val query = LP.Constant(Data.Bool(true))
+      val query = fixConstant(Data.Bool(true))
       val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] = {
         fa => QCI.prj(fa).fold(fa)(rewrite.elideNopQC(idPrism[QSI].reverseGet))
       }

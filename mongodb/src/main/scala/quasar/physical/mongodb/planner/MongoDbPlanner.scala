@@ -213,7 +213,7 @@ object MongoDbPlanner {
     }
 
     {
-      case c @ ConstantF(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
+      case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LP.Let(_, _, body) => body
@@ -282,10 +282,10 @@ object MongoDbPlanner {
     object IsBson {
       def unapply(v: (Fix[LP], Output)): Option[Bson] =
         v._1.unFix match {
-          case ConstantF(b) => BsonCodec.fromData(b).toOption
-          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
-          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
+          case Constant(b) => BsonCodec.fromData(b).toOption
+          case InvokeFUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          case InvokeFUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          case InvokeFUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
           case _ => None
         }
     }
@@ -309,7 +309,7 @@ object MongoDbPlanner {
     object IsDate {
       def unapply(v: (Fix[LP], Output)): Option[Data.Date] =
         v._1.unFix match {
-          case ConstantF(d @ Data.Date(_)) => Some(d)
+          case Constant(d @ Data.Date(_)) => Some(d)
           case _                           => None
         }
     }
@@ -439,7 +439,7 @@ object MongoDbPlanner {
       List(Here))
 
     node match {
-      case ConstantF(_)   => \/-(default)
+      case Constant(_)   => \/-(default)
       case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
       case Let(_, _, in) => in._2
       case TypecheckF(_, typ, cont, _) =>
@@ -513,7 +513,7 @@ object MongoDbPlanner {
 
     object HasData {
       def unapply(node: LP[Ann]): Option[Data] = node match {
-        case LP.ConstantF(data) => Some(data)
+        case LP.Constant(data) => Some(data)
         case _                           => None
       }
     }
@@ -534,8 +534,8 @@ object MongoDbPlanner {
       _ match {
         case MakeArrayN.Attr(array) =>
           array.traverse(d => isSortDir(d.tail))
-        case Cofree(_, ConstantF(Data.Arr(dirs))) =>
-          dirs.traverse(d => isSortDir(ConstantF(d)))
+        case Cofree(_, Constant(Data.Arr(dirs))) =>
+          dirs.traverse(d => isSortDir(Constant(d)))
         case n => isSortDir(n.tail).map(List(_))
       }
     }
@@ -758,7 +758,7 @@ object MongoDbPlanner {
       case InvokeFUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
       case InvokeFUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
-      case ConstantF(Data.Bool(true)) => Some(List())
+      case Constant(Data.Bool(true)) => Some(List())
       case _ => None
     }
 
@@ -783,7 +783,7 @@ object MongoDbPlanner {
       case ReadF(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WB.read))
-      case ConstantF(data) =>
+      case Constant(data) =>
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),
           WB.pure))

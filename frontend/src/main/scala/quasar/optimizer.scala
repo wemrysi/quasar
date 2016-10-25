@@ -55,7 +55,7 @@ object Optimizer {
       LP[T[LP]] => Option[LP[T[LP]]] = {
     case inv @ InvokeF(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
-      case ConstantF(_)
+      case Constant(_)
          | FreeF(_) => in.transPara(inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
         case 0 => in.project.some
@@ -101,8 +101,8 @@ object Optimizer {
 
   private val shapeƒ: GAlgebra[(Fix[LP], ?), LP, Option[List[Fix[LP]]]] = {
     case Let(_, _, body) => body._2
-    case ConstantF(Data.Obj(map)) =>
-      Some(map.keys.map(n => Constant(Data.Str(n))).toList)
+    case Constant(Data.Obj(map)) =>
+      Some(map.keys.map(n => Fix(Constant[Fix[LP]](Data.Str(n)))).toList)
     case InvokeFUnapply(DeleteField, Sized(src, field)) =>
       src._2.map(_.filterNot(_ == field._1))
     case InvokeFUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
@@ -262,7 +262,7 @@ object Optimizer {
     }
 
     def assembleCond(conds: List[Fix[LP]]): Fix[LP] =
-      conds.foldLeft(Constant(Data.True))((acc, c) => Fix(relations.And(acc, c)))
+      conds.foldLeft(Fix(Constant[Fix[LP]](Data.True)))((acc, c) => Fix(relations.And(acc, c)))
 
     def newJoin(lSrc: Fix[LP], rSrc: Fix[LP], comps: List[Component[Fix[LP]]]):
         State[NameGen, Fix[LP]] = {

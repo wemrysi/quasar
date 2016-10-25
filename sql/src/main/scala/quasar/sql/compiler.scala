@@ -335,12 +335,12 @@ trait Compiler[F[_]] {
         Fix[LP] = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(structural.MakeObject(LP.Constant(Data.Str(name)), value))
+          Fix(structural.MakeObject(Fix(LP.Constant[Fix[LP]](Data.Str(name))), value))
         case (None, value) => value
       }
 
       fields.reduceOption((a,b) => Fix(structural.ObjectConcat(a, b)))
-        .getOrElse(LP.Constant(Data.Obj()))
+        .getOrElse(Fix(LP.Constant(Data.Obj())))
     }
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LP]] =
@@ -447,7 +447,7 @@ trait Compiler[F[_]] {
                               Fix(set.OrderBy(
                                 t,
                                 Fix(structural.MakeArrayN(keys: _*)),
-                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => LP.Constant(Data.Str(order.shows)) }: _*))))))
+                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => Fix(LP.Constant[Fix[LP]](Data.Str(order.shows))) }: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
@@ -455,7 +455,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(t =>
                                   if (syntheticNames.nonEmpty)
                                     Fix(set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(structural.DeleteField(acc, LP.Constant(Data.Str(field)))))))
+                                      Fix(structural.DeleteField(acc, Fix(LP.Constant(Data.Str(field))))))))
                                   else Fix(set.Distinct(t))).some
                               case _ => None
                             }
@@ -465,7 +465,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
                                     Fix(structural.DeleteField(acc,
-                                      LP.Constant(Data.Str(field))))))
+                                      Fix(LP.Constant(Data.Str(field)))))))
 
                               pruned
                             }
@@ -558,18 +558,18 @@ trait Compiler[F[_]] {
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
-              Fix(structural.ObjectProject(obj, LP.Constant(Data.Str(name)))))
+              Fix(structural.ObjectProject(obj, Fix(LP.Constant(Data.Str(name))))))
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq(rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(structural.ObjectProject(table, LP.Constant(Data.Str(name)))))
+              else Fix(structural.ObjectProject(table, Fix(LP.Constant(Data.Str(name))))))
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
-          case Fix(LP.ConstantF(Data.Str(part))) :: expr :: Nil =>
+          case Fix(LP.Constant(Data.Str(part))) :: expr :: Nil =>
             (part.some collect {
               case "century"      => date.ExtractCentury
               case "day"          => date.ExtractDayOfMonth
@@ -614,7 +614,7 @@ trait Compiler[F[_]] {
             relations.Cond(
               // TODO: Ideally this would use `is null`, but that doesn’t makes it
               //       this far (but it should).
-              relations.Eq(LP.Free(name), LP.Constant(Data.Null)).embed,
+              relations.Eq(LP.Free(name), Fix(LP.Constant[Fix[LP]](Data.Null))).embed,
               c2,
               LP.Free(name)).embed))),
           functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
@@ -640,7 +640,7 @@ trait Compiler[F[_]] {
       case Match(expr, cases, default0) =>
         for {
           expr    <- compile0(expr)
-          default <- default0.fold(emit(LP.Constant(Data.Null)))(compile0)
+          default <- default0.fold(emit(Fix(LP.Constant[Fix[LP]](Data.Null))))(compile0)
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
               (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
@@ -649,17 +649,17 @@ trait Compiler[F[_]] {
         } yield cases
 
       case Switch(cases, default0) =>
-        default0.fold(emit(LP.Constant(Data.Null)))(compile0).flatMap(
+        default0.fold(emit(Fix(LP.Constant[Fix[LP]](Data.Null))))(compile0).flatMap(
           compileCases(cases, _) {
             case Case(cond, expr2) =>
               (compile0(cond) ⊛ compile0(expr2))((_, _))
           })
 
-      case IntLiteral(value) => emit(LP.Constant(Data.Int(value)))
-      case FloatLiteral(value) => emit(LP.Constant(Data.Dec(value)))
-      case StringLiteral(value) => emit(LP.Constant(Data.Str(value)))
-      case BoolLiteral(value) => emit(LP.Constant(Data.Bool(value)))
-      case NullLiteral() => emit(LP.Constant(Data.Null))
+      case IntLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Int(value))))
+      case FloatLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Dec(value))))
+      case StringLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Str(value))))
+      case BoolLiteral(value) => emit(Fix(LP.Constant[Fix[LP]](Data.Bool(value))))
+      case NullLiteral() => emit(Fix(LP.Constant[Fix[LP]](Data.Null)))
       case Vari(name) => emit(LP.Free(Symbol(name)))
     }
   }

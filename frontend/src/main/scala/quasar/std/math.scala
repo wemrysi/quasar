@@ -49,16 +49,16 @@ trait MathLib extends Library {
   }
 
   object ZeroF {
-    def apply() = ConstantF(Zero())
+    def apply() = Constant(Zero())
     def unapply[A](obj: LogicalPlan[A]): Boolean = obj match {
-      case ConstantF(Zero()) => true
+      case Constant(Zero()) => true
       case _                 => false
     }
   }
   object OneF {
-    def apply() = ConstantF(One())
+    def apply() = Constant(One())
     def unapply[A](obj: LogicalPlan[A]): Boolean = obj match {
-      case ConstantF(One()) => true
+      case Constant(One()) => true
       case _                => false
     }
   }

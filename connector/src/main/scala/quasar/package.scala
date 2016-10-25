@@ -84,8 +84,8 @@ package object quasar {
   /** Identify plans which reduce to a (set of) constant value(s). */
   def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
     lp.project match {
-      case LP.ConstantF(Data.Set(records)) => records.left
-      case LP.ConstantF(value)             => List(value).left
+      case LP.Constant(Data.Set(records)) => records.left
+      case LP.Constant(value)             => List(value).left
       case _                                        => lp.right
     }
 
@@ -103,9 +103,9 @@ package object quasar {
     lp: T[LP], off: Natural, lim: Option[Positive]):
       T[LP] = {
     val skipped =
-      Drop(lp, LP.ConstantF[T[LP]](Data.Int(off.get)).embed).embed
+      Drop(lp, LP.Constant[T[LP]](Data.Int(off.get)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, LP.ConstantF[T[LP]](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, LP.Constant[T[LP]](Data.Int(l.get)).embed).embed)
   }
 }

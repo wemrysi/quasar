@@ -43,9 +43,9 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(ConstantF(Data.Str(""))), Embed(second))) =>
+          case InvokeFUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
             second.some
-          case InvokeFUnapply(_, Sized(Embed(first), Embed(ConstantF(Data.Str(""))))) =>
+          case InvokeFUnapply(_, Sized(Embed(first), Embed(Constant(Data.Str(""))))) =>
             first.some
           case _ => None
         }
@@ -92,13 +92,13 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(str), Embed(ConstantF(Data.Str(pat))), Embed(ConstantF(Data.Str(esc))))) =>
+          case InvokeFUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
               Search(str.embed,
-                ConstantF[T[LogicalPlan]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
-                ConstantF[T[LogicalPlan]](Data.Bool(false)).embed).some
+                Constant[T[LogicalPlan]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
+                Constant[T[LogicalPlan]](Data.Bool(false)).embed).some
           case _ => None
         }
     },
@@ -182,13 +182,13 @@ trait StringLib extends Library {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case InvokeFUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
-            Embed(ConstantF(Data.Str(str))),
-            Embed(ConstantF(Data.Int(from))),
+            Embed(Constant(Data.Str(str))),
+            Embed(Constant(Data.Int(from))),
             for0))
               if 0 < from =>
             InvokeF(f, Func.Input3(
-              ConstantF[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
-              ConstantF[T[LogicalPlan]](Data.Int(0)).embed,
+              Constant[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
+              Constant[T[LogicalPlan]](Data.Int(0)).embed,
               for0)).some
           case _ => None
         }

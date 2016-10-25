@@ -22,6 +22,7 @@ import quasar._, LogicalPlan._
 import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._, eitherT._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._, InMemory.InMemState
 import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
@@ -33,7 +34,7 @@ import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
+class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers with LogicalPlanHelpers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch
@@ -186,8 +187,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         Fix(Take(
           Fix(Drop(
             Fix(Squash(Read(rootDir </> file("zips")))),
-            Constant(Data.Int(5)))),
-          Constant(Data.Int(10))))
+            fixConstant(Data.Int(5)))),
+          fixConstant(Data.Int(10))))
       val exp = (for {
         h   <- query.unsafe.eval(expQ)
         _   <- query.transforms.fsErrToExec(
@@ -602,8 +603,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         Take(
           Drop(
             Read(p),
-            Constant(Data.Int(5))).embed,
-          Constant(Data.Int(10))).embed
+            fixConstant(Data.Int(5))).embed,
+          fixConstant(Data.Int(10))).embed
 
       val innerLP =
         quasar.precompile(inner, Variables.empty, fileParent(p)).run.value.toOption.get
@@ -613,8 +614,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val exp = quasar.preparePlan(Take(
           Drop(
             innerLP,
-            Constant(Data.Int(5))).embed,
-          Constant(Data.Int(10))).embed).run.value.toOption.get
+            fixConstant(Data.Int(5))).embed,
+          fixConstant(Data.Int(10))).embed).run.value.toOption.get
 
       resolvedRefs(vs, outer) must beRightDisjunction.like {
         case r => r must beTree(exp)
@@ -650,12 +651,12 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = InnerJoin(
         Read(vp),
         Read(vp),
-        Constant(Data.Bool(true))).embed
+        fixConstant(Data.Bool(true))).embed
 
       val exp = InnerJoin(
         Squash(Read(zp)).embed,
         Squash(Read(zp)).embed,
-        Constant(Data.Bool(true))).embed
+        fixConstant(Data.Bool(true))).embed
 
       resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTree(exp) }
     }
@@ -698,8 +699,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           Take(
             Squash(Drop(
               Squash(Read(v2p)).embed,
-              Constant(Data.Int(5))).embed).embed,
-            Constant(Data.Int(10))).embed
+              fixConstant(Data.Int(5))).embed).embed,
+            fixConstant(Data.Int(10))).embed
         )
       }
     }

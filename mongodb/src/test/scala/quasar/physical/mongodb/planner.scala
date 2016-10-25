@@ -18,9 +18,9 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -3764,12 +3764,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         fixLet(
           'tmp0, read("db/foo"),
           fixLet(
-            'tmp1, makeObj("bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
+            'tmp1, makeObj("bar" -> ObjectProject(Free('tmp0), fixConstant(Data.Str("bar")))),
             fixLet('tmp2,
               s.OrderBy[FLP](
                 Free('tmp1),
-                MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
-                MakeArrayN(Constant(Data.Str("ASC")))),
+                MakeArrayN[Fix](ObjectProject(Free('tmp1), fixConstant(Data.Str("bar")))),
+                MakeArrayN(fixConstant(Data.Str("ASC")))),
               Free('tmp2))))
 
       plan(lp) must beWorkflow(chain[Workflow](
@@ -3787,9 +3787,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           s.OrderBy[FLP](
             Free('tmp0),
             MakeArrayN[Fix](math.Divide[FLP](
-              ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-              Constant(Data.Dec(10.0)))),
-            MakeArrayN(Constant(Data.Str("ASC")))))
+              ObjectProject(Free('tmp0), fixConstant(Data.Str("bar"))),
+              fixConstant(Data.Dec(10.0)))),
+            MakeArrayN(fixConstant(Data.Str("ASC")))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3813,12 +3813,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             s.Filter[FLP](
               Free('tmp0),
               relations.Eq[FLP](
-                ObjectProject(Free('tmp0), Constant(Data.Str("baz"))),
-                Constant(Data.Int(0)))),
+                ObjectProject(Free('tmp0), fixConstant(Data.Str("baz"))),
+                fixConstant(Data.Int(0)))),
             s.OrderBy[FLP](
               Free('tmp1),
-              MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
-              MakeArrayN(Constant(Data.Str("ASC"))))))
+              MakeArrayN[Fix](ObjectProject(Free('tmp1), fixConstant(Data.Str("bar")))),
+              MakeArrayN(fixConstant(Data.Str("ASC"))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3834,13 +3834,13 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           fixLet(
             'tmp9,
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
+              "bar" -> ObjectProject(Free('tmp0), fixConstant(Data.Str("bar")))),
             s.OrderBy[FLP](
               Free('tmp9),
               MakeArrayN[Fix](math.Divide[FLP](
-                ObjectProject(Free('tmp9), Constant(Data.Str("bar"))),
-                Constant(Data.Dec(10.0)))),
-              MakeArrayN(Constant(Data.Str("ASC"))))))
+                ObjectProject(Free('tmp9), fixConstant(Data.Str("bar"))),
+                fixConstant(Data.Dec(10.0)))),
+              MakeArrayN(fixConstant(Data.Str("ASC"))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3881,20 +3881,20 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("foo"))),
-                ObjectProject(Free('right), Constant(Data.Str("bar")))),
+                ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
+                ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
+                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
       beRightDisjunction(
         Fix(s.InnerJoin[FLP](Free('left), Free('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
+              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "swap a reversed condition" in {
@@ -3903,20 +3903,20 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
+                ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
+                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
+                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
       beRightDisjunction(
         Fix(s.InnerJoin[FLP](Free('left), Free('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
+              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "swap multiple reversed conditions" in {
@@ -3925,20 +3925,20 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           Func.Input3(Free('left), Free('right),
             relations.And[FLP](
               relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
+                ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
+                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("zab"))),
-                ObjectProject(Free('left), Constant(Data.Str("baz")))))))) must
+                ObjectProject(Free('right), fixConstant(Data.Str("zab"))),
+                ObjectProject(Free('left), fixConstant(Data.Str("baz")))))))) must
       beRightDisjunction(
         Fix(s.InnerJoin[FLP](Free('left), Free('right),
           relations.And[FLP](
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
+              ObjectProject(Free('left), fixConstant(Data.Str("foo"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("bar")))),
             relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+              ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+              ObjectProject(Free('right), fixConstant(Data.Str("zab"))))))))
     }
 
     "fail with “mixed” conditions" in {
@@ -3948,18 +3948,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             relations.And[FLP](
               relations.Eq[FLP](
                 math.Add[FLP](
-                  ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                  ObjectProject(Free('left), Constant(Data.Str("baz")))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
+                  ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
+                  ObjectProject(Free('left), fixConstant(Data.Str("baz")))),
+                ObjectProject(Free('left), fixConstant(Data.Str("foo")))),
               relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
+                ObjectProject(Free('left), fixConstant(Data.Str("baz"))),
+                ObjectProject(Free('right), fixConstant(Data.Str("zab")))))))) must
       beLeftDisjunction(UnsupportedJoinCondition(
         relations.Eq[FLP](
           math.Add[FLP](
-            ObjectProject(Free('right), Constant(Data.Str("bar"))),
-            ObjectProject(Free('left), Constant(Data.Str("baz")))),
-          ObjectProject(Free('left), Constant(Data.Str("foo"))))))
+            ObjectProject(Free('right), fixConstant(Data.Str("bar"))),
+            ObjectProject(Free('left), fixConstant(Data.Str("baz")))),
+          ObjectProject(Free('left), fixConstant(Data.Str("foo"))))))
     }
 
     "plan with extra squash and flattening" in {
@@ -3976,7 +3976,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               Free('check0),
               Type.Obj(Map(), Some(Type.Top)),
               Free('check0),
-              Constant(Data.NA))),
+              fixConstant(Data.NA))),
           s.Distinct[FLP](
             identity.Squash[FLP](
               makeObj(
@@ -3988,15 +3988,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       FlattenArray[FLP](
                         fixLet(
                           'check1,
-                          ObjectProject(Free('tmp0), Constant(Data.Str("loc"))),
+                          ObjectProject(Free('tmp0), fixConstant(Data.Str("loc"))),
                           LogicalPlan.Typecheck(
                             Free('check1),
                             Type.FlexArr(0, None, Type.Str),
                             Free('check1),
-                            Constant(Data.Arr(List(Data.NA)))))),
-                      Constant(Data.Str("^.*MONT.*$")),
-                      Constant(Data.Bool(false)))),
-                  Constant(Data.Str("city")))))))
+                            fixConstant(Data.Arr(List(Data.NA)))))),
+                      fixConstant(Data.Str("^.*MONT.*$")),
+                      fixConstant(Data.Bool(false)))),
+                  fixConstant(Data.Str("city")))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),

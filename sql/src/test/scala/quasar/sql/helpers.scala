@@ -17,10 +17,10 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Optimizer, TermLogicalPlanMatchers},
-  LogicalPlan._
+import quasar.{Data, LogicalPlan, Optimizer, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
@@ -29,7 +29,7 @@ import org.specs2.matcher.MustThrownMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait CompilerHelpers extends TermLogicalPlanMatchers {
+trait CompilerHelpers extends TermLogicalPlanMatchers with LogicalPlanHelpers {
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {
       select <- fixParser.parse(Query(query)).leftMap(_.toString)
@@ -73,5 +73,5 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   implicit def toFix[F[_]](unFixed: F[Fix[F]]): Fix[F] = Fix(unFixed)
 
   def makeObj(ts: (String, Fix[LogicalPlan])*): Fix[LogicalPlan] =
-    Fix(MakeObjectN(ts.map(t => Constant(Data.Str(t._1)) -> t._2): _*))
+    Fix(MakeObjectN(ts.map(t => fixConstant(Data.Str(t._1)) -> t._2): _*))
 }

@@ -451,7 +451,7 @@ class Transform
       //       compiler when the old Mongo backend is replaced. (#1298)
       shiftValues(pathToProj(path), ZipMapKeys(_)).right
 
-    case LogicalPlan.ConstantF(data) =>
+    case LogicalPlan.Constant(data) =>
       fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](
         {
           case Data.NA => Undefined[T, FreeMap]().right

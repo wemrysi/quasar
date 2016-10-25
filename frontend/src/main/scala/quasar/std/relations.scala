@@ -158,8 +158,8 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.True)), Embed(r))) => r.some
-          case InvokeF(_, Sized(Embed(l), Embed(ConstantF(Data.True)))) => l.some
+          case InvokeF(_, Sized(Embed(Constant(Data.True)), Embed(r))) => r.some
+          case InvokeF(_, Sized(Embed(l), Embed(Constant(Data.True)))) => l.some
           case _                                                       => None
         }
     },
@@ -181,8 +181,8 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.False)), Embed(r))) => r.some
-          case InvokeF(_, Sized(Embed(l), Embed(ConstantF(Data.False)))) => l.some
+          case InvokeF(_, Sized(Embed(Constant(Data.False)), Embed(r))) => r.some
+          case InvokeF(_, Sized(Embed(l), Embed(Constant(Data.False)))) => l.some
           case _                                                        => None
         }
     },
@@ -216,8 +216,8 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.True)),  Embed(c), _)) => c.some
-          case InvokeF(_, Sized(Embed(ConstantF(Data.False)), _, Embed(a))) => a.some
+          case InvokeF(_, Sized(Embed(Constant(Data.True)),  Embed(c), _)) => c.some
+          case InvokeF(_, Sized(Embed(Constant(Data.False)), _, Embed(a))) => a.some
           case _                                                            => None
         }
     },

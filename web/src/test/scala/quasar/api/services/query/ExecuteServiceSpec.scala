@@ -25,6 +25,7 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
+import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._, InMemory._
 import quasar.sql.Sql
 
@@ -47,7 +48,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import quasar.api.PathUtils._
 
-class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
+class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with LogicalPlanHelpers {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
@@ -167,8 +168,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
             Fix(Take(
               Fix(Drop(
                 lp,
-                LogicalPlan.Constant(Data.Int(offset.get)))),
-              LogicalPlan.Constant(Data.Int(limit.get))))
+                fixConstant(Data.Int(offset.get)))),
+              fixConstant(Data.Int(limit.get))))
           val limitedContents =
             filesystem.contents
               .drop(offset.get)

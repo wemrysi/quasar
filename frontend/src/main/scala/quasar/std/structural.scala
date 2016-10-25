@@ -359,12 +359,12 @@ trait StructuralLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
         case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftArray, Sized(Embed(array)))))) => array.some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftArrayIndices, Sized(Embed(ConstantF(Data.Arr(array)))))))) =>
-          ConstantF(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMap, Sized(Embed(ConstantF(Data.Obj(map)))))))) =>
-          ConstantF(Data.Arr(map.values.toList)).some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMapKeys, Sized(Embed(ConstantF(Data.Obj(map)))))))) =>
-          ConstantF(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
+        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftArrayIndices, Sized(Embed(Constant(Data.Arr(array)))))))) =>
+          Constant(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
+        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMap, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+          Constant(Data.Arr(map.values.toList)).some
+        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMapKeys, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+          Constant(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
         case _ => None
       }
     },
@@ -387,7 +387,7 @@ trait StructuralLib extends Library {
     // Note: signature does not match VirtualFunc
     def apply[T[_[_]]: Corecursive](args: (T[LogicalPlan], T[LogicalPlan])*): LogicalPlan[T[LogicalPlan]] =
       args.toList match {
-        case Nil      => ConstantF(Data.Obj())
+        case Nil      => Constant(Data.Obj())
         case x :: xs  =>
           xs.foldLeft(MakeObject(x._1, x._2))((a, b) =>
             ObjectConcat(a.embed, MakeObject(b._1, b._2).embed))
@@ -406,7 +406,7 @@ trait StructuralLib extends Library {
   object MakeArrayN {
     def apply[T[_[_]]: Corecursive](args: T[LogicalPlan]*): LogicalPlan[T[LogicalPlan]] =
       args.map(x => MakeArray(x)) match {
-        case Nil      => ConstantF(Data.Arr(Nil))
+        case Nil      => Constant(Data.Arr(Nil))
         case t :: Nil => t
         case mas      => mas.reduce((t, ma) => ArrayConcat(t.embed, ma.embed))
       }
