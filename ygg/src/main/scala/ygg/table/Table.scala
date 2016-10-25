@@ -136,6 +136,7 @@ trait Table {
   def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
   def schemas: Need[Set[JType]]
   def slices: NeedSlices
+  def sort(key: TransSpec1, order: DesiredSortOrder): NeedTable
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toData: Stream[Data]

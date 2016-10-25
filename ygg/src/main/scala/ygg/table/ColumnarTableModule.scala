@@ -1158,6 +1158,9 @@ trait ColumnarTableModule {
       distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
     }
 
+    def takeSlice(start: Long, end: Long): Table =
+      if (end <= 0 || end <= start) Table.empty else takeRange(start, end - start)
+
     def takeRange(startIndex: Long, numberToTake: Long): Table = {
       def loop(stream: NeedSlices, readSoFar: Long): Need[NeedSlices] = stream.uncons flatMap {
         // Prior to first needed slice, so skip
@@ -1294,16 +1297,11 @@ trait ColumnarTableModule {
 
       // Returns true iff masks contains an array equivalent to mask.
       def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {
-
         @tailrec
-        def equal(x: Array[Int], y: Array[Int], i: Int): Boolean =
-          if (i >= x.length) {
-            true
-          } else if (x(i) != y(i)) {
-            false
-          } else {
-            equal(x, y, i + 1)
-          }
+        def equal(x: Array[Int], y: Array[Int], i: Int): Boolean = (
+             i >= x.length
+          || x(i) == y(i) && equal(x, y, i + 1)
+        )
 
         @tailrec
         def loop(xs: List[RawBitSet], y: Array[Int]): Boolean = xs match {
@@ -1316,15 +1314,7 @@ trait ColumnarTableModule {
       }
 
       def isZero(x: Array[Int]): Boolean = {
-        @tailrec def loop(i: Int): Boolean =
-          if (i < 0) {
-            true
-          } else if (x(i) != 0) {
-            false
-          } else {
-            loop(i - 1)
-          }
-
+        @tailrec def loop(i: Int): Boolean = i < 0 || x(i) == 0 && loop(i - 1)
         loop(x.length - 1)
       }
 
@@ -1444,11 +1434,9 @@ trait ColumnarTableModule {
 trait BlockTableModule extends ColumnarTableModule {
   outer =>
 
-  def fromSlices(slices: NeedSlices, size: TableSize): Table = {
-    size match {
-      case ExactSize(1) => new SingletonTable(slices)
-      case _            => new ExternalTable(slices, size)
-    }
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
+    case ExactSize(1) => new SingletonTable(slices)
+    case _            => new ExternalTable(slices, size)
   }
 
   object Table extends TableCompanion
