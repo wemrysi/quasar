@@ -299,6 +299,8 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
+    def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
+
     /**
       * For each distinct path in the table, load all columns identified by the specified
       * jtype and concatenate the resulting slices into a new table.
@@ -357,13 +359,10 @@ trait ColumnarTableModule {
     }
 
     def compact(spec: TransSpec1, definedness: Definedness): Table = {
-      val specTransform = composeSliceTransform(spec)
-      val compactTransform = {
-        composeSliceTransform(Leaf(Source)).zip(specTransform) { (s1, s2) =>
-          s1.compact(s2, definedness)
-        }
-      }
-      Table(transformStream(compactTransform, slices), size).normalize
+      val transes   = Leaf(Source) -> spec mapBoth composeSliceTransform
+      val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
+
+      mapWithSameSize(transformStream(compacted, _)).normalize
     }
 
     /**
@@ -372,7 +371,7 @@ trait ColumnarTableModule {
       * unknown sort order.
       */
     def transform(spec: TransSpec1): Table =
-      Table(transformStream(composeSliceTransform(spec), slices), this.size)
+      mapWithSameSize(transformStream(composeSliceTransform(spec), _))
 
     def force: NeedTable = {
       def loop(slices: NeedSlices, acc: List[Slice], size: Long): Need[List[Slice] -> Long] = slices.uncons flatMap {
@@ -403,11 +402,10 @@ trait ColumnarTableModule {
       Table(slices2, size)
     }
 
-    def concat(t2: Table): Table = {
-      val resultSize   = TableSize(size.maxSize + t2.size.maxSize)
-      val resultSlices = slices ++ t2.slices
-      Table(resultSlices, resultSize)
-    }
+    def concat(t2: Table): Table = Table(
+      slices ++ t2.slices,
+      TableSize(size.maxSize + t2.size.maxSize)
+    )
 
     /**
       * Zips two tables together in their current sorted order.
@@ -439,10 +437,7 @@ trait ColumnarTableModule {
       // Table(resultSlices, resultSize)
     }
 
-    def toArray[A](implicit tpe: CValueType[A]): Table = {
-      val slices2: NeedSlices = slices map { _.toArray[A] }
-      Table(slices2, size)
-    }
+    def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
 
     /**
       * Returns a table where each slice (except maybe the last) has slice size `length`.
@@ -500,7 +495,7 @@ trait ColumnarTableModule {
         }
       }
 
-      Table(StreamT(step(0, Nil, slices)), size)
+      mapWithSameSize(ss => StreamT(step(0, Nil, ss)))
     }
 
     /**
@@ -1293,7 +1288,7 @@ trait ColumnarTableModule {
       }
     }
 
-    def normalize: Table = Table(slices.filter(!_.isEmpty), size)
+    def normalize: Table = mapWithSameSize(_ filter (x => !x.isEmpty))
 
     def schemas: Need[Set[JType]] = {
 

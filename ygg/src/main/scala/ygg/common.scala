@@ -73,6 +73,10 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
 
   object decimal extends DecimalConstructors(UNLIMITED)
 
+  implicit class PairOfOps[A](private val self: PairOf[A]) {
+    def mapBoth[B](f: A => B): PairOf[B] = f(self._1) -> f(self._2)
+  }
+
   implicit class ThrowValidationOps[A](private val self: Validation[Throwable, A]) {
     def orThrow: A = self.fold(throw _, x => x)
   }
