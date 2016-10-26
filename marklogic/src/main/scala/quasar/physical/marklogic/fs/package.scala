@@ -57,6 +57,9 @@ package object fs {
 
   val FsType = FileSystemType("marklogic")
 
+  def contentSourceAt(connectionUri: ConnectionUri): Task[ContentSource] =
+    Task.delay(ContentSourceFactory.newContentSource(new URI(connectionUri.value)))
+
   /** @param readChunkSize the size of a single chunk when streaming records from MarkLogic */
   def definition[S[_]](
     readChunkSize: Positive
@@ -80,11 +83,9 @@ package object fs {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def runMarkLogicFs(connectionUri: ConnectionUri): DefErrT[Task, (MarkLogicFs ~> Task, Task[Unit])] = {
     val contentSource: DefErrT[Task, ContentSource] =
-      EitherT(
-        Task.delay(new URI(connectionUri.value))
-          .flatMap(uri => Task.delay(ContentSourceFactory.newContentSource(uri)))
-          .attempt
-          .map(_.leftMap(_.getMessage.wrapNel.left)))
+      EitherT(contentSourceAt(connectionUri) map (_.right[DefinitionError]) handle {
+        case NonFatal(t) => t.getMessage.wrapNel.left[EnvironmentError].left
+      })
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                       |@|

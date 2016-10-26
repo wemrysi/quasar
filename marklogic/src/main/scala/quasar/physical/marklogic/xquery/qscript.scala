@@ -52,6 +52,22 @@ object qscript {
       }
     })
 
+  // qscript:as-dateTime($item as item()) as xs:dateTime?
+  def asDateTime[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("as-dateTime").qn[F] map { fname =>
+      declare(fname)(
+        $("item") as SequenceType("item()")
+      ).as(SequenceType("xs:dateTime?")) { item =>
+        if_(isCastable(item, SequenceType("xs:dateTime")))
+        .then_ { xs.dateTime(item) }
+        .else_ {
+          if_(isCastable(item, SequenceType("xs:date")))
+          .then_ { xs.dateTime(xs.date(item)) }
+          .else_ { emptySeq }
+        }
+      }
+    }
+
   // qscript:as-map-key($item as item()) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>

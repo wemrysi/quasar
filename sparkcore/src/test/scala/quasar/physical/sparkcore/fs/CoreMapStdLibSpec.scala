@@ -52,7 +52,7 @@ class CoreMapStdLibSpec extends StdLibSpec {
   def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
     val run = freeCataM(fm)(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
       a => κ(args(a)).right, CoreMap.change))
-    (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must closeTo(expected) }).toResult
+    (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }
 
   val runner = new MapFuncStdLibTestRunner {

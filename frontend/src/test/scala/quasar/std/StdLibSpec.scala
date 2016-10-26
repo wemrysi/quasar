@@ -31,7 +31,7 @@ import scala.math.abs
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
-  def closeTo(expected: Data): Matcher[Data] = new Matcher[Data] {
+  def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
       x == y || ((x - y).abs/(y.abs max err)).toDouble < err
 
