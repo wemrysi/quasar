@@ -71,7 +71,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
             makeObj(
               "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar")))))))) must
         beTree(
-          Invoke(ObjectProject, Func.Input2(
+          fixInvoke(ObjectProject, Func.Input2(
             read("foo"),
             makeObj(
               "bar" -> ObjectProject(read("bar"), fixConstant(Data.Str("bar")))))))
@@ -85,7 +85,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
               "baz" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz")))))))) must
         beTree(
-          Invoke(ObjectProject, Func.Input2(
+          fixInvoke(ObjectProject, Func.Input2(
             read("foo"),
             fixLet('tmp0, read("bar"),
               makeObj(

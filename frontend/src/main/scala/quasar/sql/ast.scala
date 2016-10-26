@@ -60,7 +60,7 @@ object Sql {
         case Binop(lhs, rhs, op) => (f(lhs) ⊛ f(rhs))(binop(_, _, op))
         case Unop(expr, op) => f(expr).map(unop(_, op))
         case Ident(name) => G.point(ident(name))
-        case InvokeFunction(name, args) =>
+        case Invokeunction(name, args) =>
           args.traverse(f).map(invokeFunction(name, _))
         case Match(expr, cases, default) =>
           (f(expr) ⊛ cases.traverse(traverseCase) ⊛ default.traverse(f))(
@@ -105,7 +105,7 @@ object Sql {
     extends Sql[A]
 @Lenses final case class Unop[A] private[sql] (expr: A, op: UnaryOperator) extends Sql[A]
 @Lenses final case class Ident[A] private[sql] (name: String) extends Sql[A]
-@Lenses final case class InvokeFunction[A] private[sql] (name: String, args: List[A])
+@Lenses final case class Invokeunction[A] private[sql] (name: String, args: List[A])
     extends Sql[A]
 @Lenses final case class Match[A] private[sql] (expr: A, cases: List[Case[A]], default: Option[A])
     extends Sql[A]

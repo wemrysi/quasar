@@ -65,15 +65,15 @@ class CoreMapStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LogicalPlan], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
-      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
+      case LogicalPlan.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateUnaryMapping(func)(a1))
 
-      case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
+      case LogicalPlan.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
 
-      case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
+      case LogicalPlan.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
           if func.effect ≟ Mapping =>
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 

@@ -61,7 +61,7 @@ class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
 
   /** Identify constructs that are expected not to be implemented. */
   def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
-    case LogicalPlan.InvokeF(func, _) => shortCircuit(func, args)
+    case LogicalPlan.Invoke(func, _) => shortCircuit(func, args)
     case _ => ().right
   }
 

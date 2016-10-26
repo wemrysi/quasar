@@ -20,7 +20,8 @@ import quasar.contrib.pathy._
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
 
-import matryoshka._
+import matryoshka.Fix
+import shapeless.Nat
 
 trait LogicalPlanHelpers {
   def fixLet(let: Symbol, form: Fix[LP], in: Fix[LP]): Fix[LP] =
@@ -37,4 +38,7 @@ trait LogicalPlanHelpers {
 
   def fixRead(path: FPath): Fix[LP] =
     Fix[LP](LP.Read(path))
+
+  def fixInvoke[N <: Nat](func: GenericFunc[N], values: Func.Input[Fix[LP], N]): Fix[LP] =
+    Fix[LP](LP.Invoke(func, values))
 }

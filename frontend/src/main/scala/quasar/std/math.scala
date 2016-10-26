@@ -94,8 +94,8 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
-          case InvokeF(_, Sized(Embed(ZeroF()), Embed(x))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
+          case Invoke(_, Sized(Embed(ZeroF()), Embed(x))) => x.some
           case _                                           => None
         }
     },
@@ -128,8 +128,8 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
-          case InvokeF(_, Sized(Embed(OneF()), Embed(x))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(OneF()), Embed(x))) => x.some
           case _                                          => None
         }
     },
@@ -155,7 +155,7 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None
         }
     },
@@ -180,8 +180,8 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
-          case InvokeF(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
+          case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
+          case Invoke(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
           case _                                           => None
         }
     },
@@ -219,7 +219,7 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None
         }
     },

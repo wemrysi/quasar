@@ -43,9 +43,9 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
+          case InvokeUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
             second.some
-          case InvokeFUnapply(_, Sized(Embed(first), Embed(Constant(Data.Str(""))))) =>
+          case InvokeUnapply(_, Sized(Embed(first), Embed(Constant(Data.Str(""))))) =>
             first.some
           case _ => None
         }
@@ -92,7 +92,7 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
+          case InvokeUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
@@ -181,12 +181,12 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeFUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
+          case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
             Embed(Constant(Data.Str(str))),
             Embed(Constant(Data.Int(from))),
             for0))
               if 0 < from =>
-            InvokeF(f, Func.Input3(
+            Invoke(f, Func.Input3(
               Constant[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
               Constant[T[LogicalPlan]](Data.Int(0)).embed,
               for0)).some

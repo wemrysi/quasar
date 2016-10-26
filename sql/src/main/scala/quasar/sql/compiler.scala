@@ -369,14 +369,14 @@ trait Compiler[F[_]] {
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))(
                 compile0(clause).map(c =>
-                  LP.Invoke(
+                  Fix(LP.Invoke(
                     tpe match {
                       case LeftJoin             => set.LeftOuterJoin
                       case quasar.sql.InnerJoin => set.InnerJoin
                       case RightJoin            => set.RightOuterJoin
                       case FullJoin             => set.FullOuterJoin
                     },
-                    Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
+                    Func.Input3(leftFree, rightFree, c))))))((left0, right0, join) =>
               Fix(LP.Let(leftName, left0,
                 Fix(LP.Let(rightName, right0, join)))))
             }).join
@@ -567,7 +567,7 @@ trait Compiler[F[_]] {
               if ((rName: String) ≟ name) table
               else Fix(structural.ObjectProject(table, Fix(LP.Constant(Data.Str(name))))))
 
-      case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
+      case Invokeunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
           case Fix(LP.Constant(Data.Str(part))) :: expr :: Nil =>
             (part.some collect {
@@ -600,7 +600,7 @@ trait Compiler[F[_]] {
             fail(WrongArgumentCount("DATE_PART", 2, args.length))
         }
 
-      case InvokeFunction(name, List(a1)) =>
+      case Invokeunction(name, List(a1)) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name))) {
           case func @ UnaryFunc(_, _, _, _, _, _, _) =>
@@ -608,7 +608,7 @@ trait Compiler[F[_]] {
           case func => fail(WrongArgumentCount(name, func.arity, 1))
         }
 
-      case InvokeFunction(name, List(a1, a2)) =>
+      case Invokeunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
           Fix(LP.Let(name, c1,
             relations.Cond(
@@ -624,7 +624,7 @@ trait Compiler[F[_]] {
             case func => fail(WrongArgumentCount(name, func.arity, 2))
           })
 
-      case InvokeFunction(name, List(a1, a2, a3)) =>
+      case Invokeunction(name, List(a1, a2, a3)) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name))) {
           case func @ TernaryFunc(_, _, _, _, _, _, _) =>
@@ -632,7 +632,7 @@ trait Compiler[F[_]] {
           case func => fail(WrongArgumentCount(name, func.arity, 3))
         }
 
-      case InvokeFunction(name, args) =>
+      case Invokeunction(name, args) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name)))(
           func => fail(WrongArgumentCount(name, func.arity, args.length)))
@@ -692,9 +692,9 @@ object Compiler {
     {
       def groupedKeys(t: LP[Fix[LP]], newSrc: Fix[LP]): Option[List[Fix[LP]]] = {
         t match {
-          case InvokeFUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
+          case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeFUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
+          case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
             groupedKeys(src.unFix, newSrc)
           case _ => None
         }
@@ -714,11 +714,11 @@ object Compiler {
       def strip(v: Cofree[LP, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
-          InvokeF[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
+        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+          Invoke[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
 
         case _ =>
-          if (t.head) InvokeF(agg.Arbitrary, Func.Input1(strip(t)))
+          if (t.head) Invoke(agg.Arbitrary, Func.Input1(strip(t)))
           else t.tail
       }
     }

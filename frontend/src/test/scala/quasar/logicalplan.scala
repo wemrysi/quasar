@@ -42,7 +42,7 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
   def addGen[A: Arbitrary]: Gen[LogicalPlan[A]] = for {
     l <- Arbitrary.arbitrary[A]
     r <- Arbitrary.arbitrary[A]
-  } yield InvokeF(std.MathLib.Add, Func.Input2(l, r))
+  } yield Invoke(std.MathLib.Add, Func.Input2(l, r))
 
   def letGen[A: Arbitrary]: Gen[LogicalPlan[A]] = for {
     n            <- Gen.choose(0, 1000)

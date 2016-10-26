@@ -175,7 +175,7 @@ trait StructuralLib extends Library {
     Func.Input2(AnyObject, Str),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeFUnapply(_, Sized(Embed(MakeObjectN(obj)), Embed(field))) =>
+        case InvokeUnapply(_, Sized(Embed(MakeObjectN(obj)), Embed(field))) =>
           obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
         case _ => None
       }
@@ -292,7 +292,7 @@ trait StructuralLib extends Library {
     Func.Input1(AnyArray),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(UnshiftArray, Sized(Embed(set)))))) => set.some
+        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(UnshiftArray, Sized(Embed(set)))))) => set.some
         case _                                                                                => None
       }
     },
@@ -337,7 +337,7 @@ trait StructuralLib extends Library {
     noSimplification,
     // new Func.Simplifier {
     //   def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-    //     case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
+    //     case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
     //     case _                                                                            => None
     //   }
     // },
@@ -358,12 +358,12 @@ trait StructuralLib extends Library {
     Func.Input1(Top),
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftArray, Sized(Embed(array)))))) => array.some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftArrayIndices, Sized(Embed(Constant(Data.Arr(array)))))))) =>
+        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArray, Sized(Embed(array)))))) => array.some
+        case InvokeUnapply(_, Sized(Embed(InvokeUnapply(ShiftArrayIndices, Sized(Embed(Constant(Data.Arr(array)))))))) =>
           Constant(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMap, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+        case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMap, Sized(Embed(Constant(Data.Obj(map)))))))) =>
           Constant(Data.Arr(map.values.toList)).some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply( ShiftMapKeys, Sized(Embed(Constant(Data.Obj(map)))))))) =>
+        case InvokeUnapply(_, Sized(Embed(InvokeUnapply( ShiftMapKeys, Sized(Embed(Constant(Data.Obj(map)))))))) =>
           Constant(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
         case _ => None
       }
@@ -397,8 +397,8 @@ trait StructuralLib extends Library {
     def unapply[T[_[_]]: Recursive](t: LogicalPlan[T[LogicalPlan]]):
         Option[List[(T[LogicalPlan], T[LogicalPlan])]] =
       t match {
-        case InvokeFUnapply(MakeObject, Sized(name, expr)) => Some(List((name, expr)))
-        case InvokeFUnapply(ObjectConcat, Sized(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
+        case InvokeUnapply(MakeObject, Sized(name, expr)) => Some(List((name, expr)))
+        case InvokeUnapply(ObjectConcat, Sized(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
         case _                                             => None
       }
   }
@@ -413,8 +413,8 @@ trait StructuralLib extends Library {
 
     def unapply[T[_[_]]: Recursive](t: T[LogicalPlan]): Option[List[T[LogicalPlan]]] =
       t.project match {
-        case InvokeFUnapply(MakeArray, Sized(x))      => Some(x :: Nil)
-        case InvokeFUnapply(ArrayConcat, Sized(a, b)) => (unapply(a) ⊛ unapply(b))(_ ::: _)
+        case InvokeUnapply(MakeArray, Sized(x))      => Some(x :: Nil)
+        case InvokeUnapply(ArrayConcat, Sized(a, b)) => (unapply(a) ⊛ unapply(b))(_ ::: _)
         case _                                        => None
       }
 

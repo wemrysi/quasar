@@ -215,11 +215,11 @@ object InMemory {
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
-          case InvokeFUnapply(Drop, Sized((_,src), (Fix(Constant(Data.Int(skip))),_))) =>
+          case InvokeUnapply(Drop, Sized((_,src), (Fix(Constant(Data.Int(skip))),_))) =>
             (src ⊛ skip.safeToInt.toRightDisjunction(unsupported(optLp)))(_.drop(_))
-          case InvokeFUnapply(Take, Sized((_,src), (Fix(Constant(Data.Int(limit))),_))) =>
+          case InvokeUnapply(Take, Sized((_,src), (Fix(Constant(Data.Int(limit))),_))) =>
             (src ⊛ limit.safeToInt.toRightDisjunction(unsupported(optLp)))(_.take(_))
-          case InvokeFUnapply(Squash, Sized((_,src))) => src
+          case InvokeUnapply(Squash, Sized((_,src))) => src
           case Constant(data) => Vector(data).right
           case other =>
             queryResponsesL.get(mem).mapKeys(Optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))

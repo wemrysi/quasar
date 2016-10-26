@@ -38,7 +38,7 @@ import shapeless.{Data => _, Coproduct => _, _}
 class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture with LogicalPlanHelpers {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
-  import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._
+  import ManageFile.MoveSemantics, QueryFile.ResultHandle
 
   val transforms = QueryFile.Transforms[F]
   val unsafeq = QueryFile.Unsafe[FileSystem]
@@ -144,8 +144,8 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
       val local = dir("d1") </> file("f1")
       val mnted = mntB </> local
 
-      val lp = Invoke(Take, Func.Input2(
-        Invoke(Squash, Func.Input1(fixRead(mnted))),
+      val lp = fixInvoke(Take, Func.Input2(
+        fixInvoke(Squash, Func.Input1(fixRead(mnted))),
         fixConstant(Data.Int(5))))
 
       val fss = bMem.set(
@@ -170,8 +170,8 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
           val rd = mntB </> file("f1")
           val out = mntC </> file("outf")
 
-          val lp = Invoke(Take, Func.Input2(
-            Invoke(Squash, Func.Input1(fixRead(rd))),
+          val lp = fixInvoke(Take, Func.Input2(
+            fixInvoke(Squash, Func.Input1(fixRead(rd))),
             fixConstant(Data.Int(5))))
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)

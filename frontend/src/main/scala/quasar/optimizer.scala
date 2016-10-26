@@ -53,7 +53,7 @@ object Optimizer {
 
   private def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
       LP[T[LP]] => Option[LP[T[LP]]] = {
-    case inv @ InvokeF(func, _) => func.simplify(inv)
+    case inv @ Invoke(func, _) => func.simplify(inv)
     case Let(ident, form, in) => form.project match {
       case Constant(_)
          | Free(_) => in.transPara(inlineƒ(ident, form.project)).project.some
@@ -103,23 +103,23 @@ object Optimizer {
     case Let(_, _, body) => body._2
     case Constant(Data.Obj(map)) =>
       Some(map.keys.map(n => Fix(Constant[Fix[LP]](Data.Str(n)))).toList)
-    case InvokeFUnapply(DeleteField, Sized(src, field)) =>
+    case InvokeUnapply(DeleteField, Sized(src, field)) =>
       src._2.map(_.filterNot(_ == field._1))
-    case InvokeFUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
-    case InvokeFUnapply(ObjectConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
-    // NB: the remaining InvokeF cases simply pass through or combine shapes
+    case InvokeUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
+    case InvokeUnapply(ObjectConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
+    // NB: the remaining Invoke cases simply pass through or combine shapes
     //     from their inputs. It would be great if this information could be
     //     handled generically by the type system.
-    case InvokeFUnapply(OrderBy, Sized(src, _, _)) => src._2
-    case InvokeFUnapply(Take, Sized(src, _)) => src._2
-    case InvokeFUnapply(Drop, Sized(src, _)) => src._2
-    case InvokeFUnapply(Filter, Sized(src, _)) => src._2
-    case InvokeFUnapply(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _) =>
+    case InvokeUnapply(OrderBy, Sized(src, _, _)) => src._2
+    case InvokeUnapply(Take, Sized(src, _)) => src._2
+    case InvokeUnapply(Drop, Sized(src, _)) => src._2
+    case InvokeUnapply(Filter, Sized(src, _)) => src._2
+    case InvokeUnapply(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _) =>
       Some(List(JoinDir.Left.const, JoinDir.Right.const))
-    case InvokeFUnapply(GroupBy, Sized(src, _)) => src._2
-    case InvokeFUnapply(Distinct, Sized(src, _)) => src._2
-    case InvokeFUnapply(DistinctBy, Sized(src, _)) => src._2
-    case InvokeFUnapply(identity.Squash, Sized(src)) => src._2
+    case InvokeUnapply(GroupBy, Sized(src, _)) => src._2
+    case InvokeUnapply(Distinct, Sized(src, _)) => src._2
+    case InvokeUnapply(DistinctBy, Sized(src, _)) => src._2
+    case InvokeUnapply(identity.Squash, Sized(src)) => src._2
     case _ => None
   }
 
@@ -142,14 +142,14 @@ object Optimizer {
       preserveFree0(x)(_._1)
 
     (node match {
-      case InvokeFUnapply(DeleteField, Sized(src, field)) =>
+      case InvokeUnapply(DeleteField, Sized(src, field)) =>
         src._2._2.fold(
-          Invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field)))) {
+          Fix(Invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field))))) {
           fields =>
             val name = uniqueName("src", fields)
               Fix(Let(name, preserveFree(src),
                 Fix(MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> Invoke(ObjectProject, Func.Input2(Fix(Free(name)), f))): _*))))
+                  f -> Fix(Invoke(ObjectProject, Func.Input2(Fix(Free[Fix[LP]](name)), f)))): _*))))
         }
       case lp => Fix(lp.map(preserveFree))
     },
@@ -233,7 +233,7 @@ object Optimizer {
     def preserveFree(x: (Fix[LP], Fix[LP])) = preserveFree0(x)(ι)
 
     def flattenAnd: Fix[LP] => List[Fix[LP]] = {
-      case Fix(InvokeFUnapply(relations.And, ts)) => ts.unsized.flatMap(flattenAnd)
+      case Fix(InvokeUnapply(relations.And, ts)) => ts.unsized.flatMap(flattenAnd)
       case t                                      => List(t)
     }
 
@@ -243,19 +243,19 @@ object Optimizer {
         case t if t.map(_._1) ≟ left.unFix  => LeftCond(ι)
         case t if t.map(_._1) ≟ right.unFix => RightCond(ι)
 
-        case InvokeFUnapply(relations.Eq, Sized((_, LeftCond(lc)), (_, RightCond(rc)))) =>
+        case InvokeUnapply(relations.Eq, Sized((_, LeftCond(lc)), (_, RightCond(rc)))) =>
           EquiCond((l, r) => Fix(relations.Eq(lc(l), rc(r))))
-        case InvokeFUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
+        case InvokeUnapply(relations.Eq, Sized((_, RightCond(rc)), (_, LeftCond(lc)))) =>
           EquiCond((l, r) => Fix(relations.Eq(rc(r), lc(l))))
 
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
-          Func.Input1(t1).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(InvokeF(func, ts)))
+        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
+          Func.Input1(t1).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(Invoke(func, ts)))
 
-        case InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
-          Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(InvokeF(func, ts)))
+        case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
+          Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(Invoke(func, ts)))
 
-        case InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
-          Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(InvokeF(func, ts)))
+        case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
+          Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LP]].map(ts => Fix(Invoke(func, ts)))
 
         case t => NeitherCond(Fix(t.map(_._1)))
       }
@@ -296,11 +296,11 @@ object Optimizer {
 
 
     node match {
-      case InvokeFUnapply(Filter, Sized((src, Fix(InvokeFUnapply(InnerJoin, Sized(joinL, joinR, joinCond)))), (cond, _))) =>
+      case InvokeUnapply(Filter, Sized((src, Fix(InvokeUnapply(InnerJoin, Sized(joinL, joinR, joinCond)))), (cond, _))) =>
         val comps = flattenAnd(joinCond).map(toComp(joinL, joinR)) ++
                     flattenAnd(cond).map(toComp(JoinDir.Left.projectFrom(src), JoinDir.Right.projectFrom(src)))
         newJoin(joinL, joinR, comps)
-      case InvokeFUnapply(InnerJoin, Sized((srcL, _), (srcR, _), (_, joinCond))) =>
+      case InvokeUnapply(InnerJoin, Sized((srcL, _), (srcR, _), (_, joinCond))) =>
         newJoin(srcL, srcR, flattenAnd(joinCond).map(toComp(srcL, srcR)))
       case _ => State.state(Fix(node.map(preserveFree)))
     }

@@ -214,7 +214,7 @@ object MongoDbPlanner {
 
     {
       case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
-      case InvokeF(f, a)    => invoke(f, a)
+      case Invoke(f, a)    => invoke(f, a)
       case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LP.Let(_, _, body) => body
       case x @ Typecheck(expr, typ, cont, fallback) =>
@@ -283,9 +283,9 @@ object MongoDbPlanner {
       def unapply(v: (Fix[LP], Output)): Option[Bson] =
         v._1.unFix match {
           case Constant(b) => BsonCodec.fromData(b).toOption
-          case InvokeFUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
-          case InvokeFUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          case InvokeFUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
+          case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          case InvokeUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
           case _ => None
         }
     }
@@ -440,7 +440,7 @@ object MongoDbPlanner {
 
     node match {
       case Constant(_)   => \/-(default)
-      case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
+      case Invoke(f, a)  => invoke(f, a) <+> \/-(default)
       case Let(_, _, in) => in._2
       case Typecheck(_, typ, cont, _) =>
         def selCheck: Type => Option[BsonField => Selector] =
@@ -603,7 +603,7 @@ object MongoDbPlanner {
 
         (ann.tail, f) match {
           case (Typecheck(_, _, _, _), There(1, _)) => !isSimpleRef
-          case (InvokeFUnapply(Cond, _), There(x, _))
+          case (InvokeUnapply(Cond, _), There(x, _))
               if x == 1 || x == 2                    => !isSimpleRef
           case _                                     => false
         }
@@ -755,9 +755,9 @@ object MongoDbPlanner {
     }
 
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
-      case InvokeFUnapply(relations.And, terms) =>
+      case InvokeUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
-      case InvokeFUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
+      case InvokeUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
       case Constant(Data.Bool(true)) => Some(List())
       case _ => None
     }
@@ -787,7 +787,7 @@ object MongoDbPlanner {
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),
           WB.pure))
-      case InvokeF(func, args) =>
+      case Invoke(func, args) =>
         val wb: Output = invoke(func, args)
         val js: Output = lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
             lift(pjs._2.traverse(_(Cofree(UnsupportedPlan(node, None).left, node.map(_.map(_._2)))))).flatMap(args =>
@@ -867,8 +867,8 @@ object MongoDbPlanner {
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.
   val elideJoinCheckƒ: Fix[LP] => LP[LPorLP] = _.unFix match {
-    case InvokeFUnapply(JoinFunc(jf), Sized(a1, a2, a3)) =>
-      InvokeF(jf, elideJoin(Func.Input3(a1, a2, a3)))
+    case InvokeUnapply(JoinFunc(jf), Sized(a1, a2, a3)) =>
+      Invoke(jf, elideJoin(Func.Input3(a1, a2, a3)))
     case x => x.map(\/-(_))
   }
 
@@ -883,19 +883,19 @@ object MongoDbPlanner {
       _.unFix match {
         case Typecheck(expr, typ, cont, fb) =>
           alignCondition(lt, rt)(cont).map(cont => Fix(Typecheck(expr, typ, cont, fb)))
-        case InvokeFUnapply(And, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(And, _))
-        case InvokeFUnapply(Or, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
-        case InvokeFUnapply(Not, Sized(t1)) =>
-          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
-        case x @ InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
+        case InvokeUnapply(And, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => Fix(Invoke(And, v)))
+        case InvokeUnapply(Or, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => Fix(Invoke(Or, v)))
+        case InvokeUnapply(Not, Sized(t1)) =>
+          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(v => Fix(Invoke(Not, v)))
+        case x @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
-            \/-(Invoke(func, Func.Input2(left, right)))
+            \/-(Fix(Invoke(func, Func.Input2(left, right))))
           else if (containsTableRefs(left, rt, right, lt))
             flip(func).fold[PlannerError \/ Fix[LP]](
               -\/(UnsupportedJoinCondition(Fix(x))))(
-              f => \/-(Invoke[nat._2](f, Func.Input2(right, left))))
+              f => \/-(Fix(Invoke(f, Func.Input2(right, left)))))
           else -\/(UnsupportedJoinCondition(Fix(x)))
 
         case Let(name, form, in) =>
@@ -905,8 +905,8 @@ object MongoDbPlanner {
       }
 
     {
-      case x @ InvokeFUnapply(JoinFunc(f), Sized(l, r, cond)) =>
-        alignCondition(l, r)(cond).map(c => Invoke[nat._3](f, Func.Input3(l, r, c)))
+      case x @ InvokeUnapply(JoinFunc(f), Sized(l, r, cond)) =>
+        alignCondition(l, r)(cond).map(c => Fix(Invoke(f, Func.Input3(l, r, c))))
 
       case x => \/-(Fix(x))
     }
