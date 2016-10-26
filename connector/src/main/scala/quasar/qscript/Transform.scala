@@ -444,7 +444,7 @@ class Transform
 
   // TODO: Replace disjunction with validation.
   def lpToQScript: AlgebraM[PlannerError \/ ?, LogicalPlan, Target[F]] = {
-    case LogicalPlan.ReadF(path) =>
+    case LogicalPlan.Read(path) =>
       // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
       //       however doing that would break the old Mongo backend, and we can
       //       handle it here for now. But it should be moved to the SQL²

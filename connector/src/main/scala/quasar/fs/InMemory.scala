@@ -211,7 +211,7 @@ object InMemory {
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
         optLp.para[FileSystemError \/ Vector[Data]] {
-          case ReadF(path) =>
+          case Read(path) =>
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))

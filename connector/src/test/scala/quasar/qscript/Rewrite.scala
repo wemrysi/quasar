@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._
 import quasar.ejson.EJson
 import quasar.fp._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._
 import quasar.sql.CompilerHelpers
 import quasar.qscript.MapFuncs._
@@ -31,7 +30,7 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers with LogicalPlanHelpers {
+class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =

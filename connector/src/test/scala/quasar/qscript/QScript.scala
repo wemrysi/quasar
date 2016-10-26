@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{Data, LogicalPlan => LP, Type}
 import quasar.fp._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.qscript.MapFuncs._
 import quasar.sql.{CompilerHelpers, JoinDir}
 import quasar.std.StdLib, StdLib._
@@ -30,7 +29,7 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers with LogicalPlanHelpers {
+class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {

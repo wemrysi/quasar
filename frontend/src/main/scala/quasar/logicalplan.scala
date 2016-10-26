@@ -45,7 +45,7 @@ object LogicalPlan {
         implicit G: Applicative[G]):
           G[LogicalPlan[B]] =
         fa match {
-          case ReadF(coll)           => G.point(ReadF(coll))
+          case Read(coll)           => G.point(Read(coll))
           case Constant(data)       => G.point(Constant(data))
           case InvokeF(func, values) => values.traverse(f).map(InvokeF(func, _))
           case Free(v)              => G.point(Free(v))
@@ -56,7 +56,7 @@ object LogicalPlan {
 
       override def map[A, B](v: LogicalPlan[A])(f: A => B): LogicalPlan[B] =
         v match {
-          case ReadF(coll)           => ReadF(coll)
+          case Read(coll)           => Read(coll)
           case Constant(data)       => Constant(data)
           case InvokeF(func, values) => InvokeF(func, values.map(f))
           case Free(v)              => Free(v)
@@ -67,7 +67,7 @@ object LogicalPlan {
 
       override def foldMap[A, B](fa: LogicalPlan[A])(f: A => B)(implicit B: Monoid[B]): B =
         fa match {
-          case ReadF(_)              => B.zero
+          case Read(_)              => B.zero
           case Constant(_)          => B.zero
           case InvokeF(_, values)    => values.foldMap(f)
           case Free(_)              => B.zero
@@ -78,7 +78,7 @@ object LogicalPlan {
 
       override def foldRight[A, B](fa: LogicalPlan[A], z: => B)(f: (A, => B) => B): B =
         fa match {
-          case ReadF(_)              => z
+          case Read(_)              => z
           case Constant(_)          => z
           case InvokeF(_, values)    => values.foldRight(z)(f)
           case Free(_)              => z
@@ -104,7 +104,7 @@ object LogicalPlan {
                 case (x, n) => NonTerminal("Invoke" :: nodeType, Some(func.shows), x :: n :: Nil)
               }
 
-            case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
+            case Read(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
             case Constant(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.shows), args.unsized.map(ra.render))
             case Free(name)                => Terminal("Free" :: nodeType, Some(name.toString))
@@ -120,7 +120,7 @@ object LogicalPlan {
     new EqualF[LogicalPlan] {
       def equal[A: Equal](v1: LogicalPlan[A], v2: LogicalPlan[A]): Boolean =
         (v1, v2) match {
-          case (ReadF(n1), ReadF(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
+          case (Read(n1), Read(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (Constant(d1), Constant(d2)) => d1 ≟ d2
           case (InvokeFUnapply(f1, v1), InvokeFUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
           case (Free(n1), Free(n2)) => n1 ≟ n2
@@ -132,12 +132,8 @@ object LogicalPlan {
         }
     }
 
-  final case class ReadF[A](path: FPath) extends LogicalPlan[A] {
+  final case class Read[A](path: FPath) extends LogicalPlan[A] {
     override def toString = s"""Read("${path.shows}")"""
-  }
-  object Read {
-    def apply(path: FPath): Fix[LogicalPlan] =
-      Fix[LogicalPlan](new ReadF(path))
   }
 
   final case class Constant[A](data: Data) extends LogicalPlan[A]
@@ -280,8 +276,8 @@ object LogicalPlan {
       SemValidation[Typed[LogicalPlan]] = {
 
     (term.unFix match {
-      case ReadF(c) =>
-        success(ReadF[Typed[LogicalPlan]](c))
+      case Read(c) =>
+        success(Read[Typed[LogicalPlan]](c))
 
       case Constant(d) =>
         success(Constant[Typed[LogicalPlan]](d))
@@ -365,8 +361,8 @@ object LogicalPlan {
         unifyOrCheck(inf, poss, f(appConst(constraints, Fix(Constant(Data.NA)))))
 
       term match {
-        case ReadF(c)         => unifyOrCheck(inf, Type.Top, Read(c))
-        case Constant(d)     => unifyOrCheck(inf, Type.Const(d), Fix(Constant(d)))
+        case Read(c)     => unifyOrCheck(inf, Type.Top, Fix(Read(c)))
+        case Constant(d) => unifyOrCheck(inf, Type.Const(d), Fix(Constant(d)))
         case InvokeFUnapply(MakeObject, Sized(name, value)) =>
           lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeObject(name.plan, x))))
@@ -487,7 +483,7 @@ object LogicalPlan {
   /** The set of paths referenced in the given plan. */
   def paths(lp: Fix[LogicalPlan]): Set[FPath] =
     lp.foldMap(_.cata[Set[FPath]] {
-      case ReadF(p) => Set(p)
+      case Read(p) => Set(p)
       case other    => other.fold
     })
 }

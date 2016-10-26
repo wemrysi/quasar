@@ -242,7 +242,7 @@ object QueryFile {
       *
       * Execution of certain plans may return a result file other than the
       * requested file if it is more efficient to do so (i.e. to avoid copying
-      * lots of data for a plan consisting of a single `ReadF(...)`).
+      * lots of data for a plan consisting of a single `Read(...)`).
       */
     def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[AFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])

@@ -56,7 +56,7 @@ object view {
       } yield h
 
     def openView(f: AFile, off: Natural, lim: Option[Positive]): FileSystemErrT[Free[S, ?], ReadHandle] = {
-      val readLP = addOffsetLimit(LogicalPlan.Read(f), off, lim)
+      val readLP = addOffsetLimit(Fix(LogicalPlan.Read[Fix[LogicalPlan]](f)), off, lim)
 
       def dataHandle(data: List[Data]): Free[S, ReadHandle] =
         for {
@@ -342,7 +342,7 @@ object view {
     val cleaned = lp.cata(Optimizer.elideTypeCheckƒ)
 
     (Set[FPath](), cleaned).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LogicalPlan] {
-      case (e, i @ Embed(r @ LogicalPlan.ReadF(p))) if !(e contains p) =>
+      case (e, i @ Embed(r @ LogicalPlan.Read(p))) if !(e contains p) =>
         refineTypeAbs(p).swap.map(f =>
           EitherT(compiledView(f) getOrElse i.right).map(_.unFix.map((e + f, _)))
         ).getOrElse(lift(e, i))

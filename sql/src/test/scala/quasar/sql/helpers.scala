@@ -65,7 +65,8 @@ trait CompilerHelpers extends TermLogicalPlanMatchers with LogicalPlanHelpers {
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
-  def read(file: String): Fix[LogicalPlan] = LogicalPlan.Read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
+  def read(file: String): Fix[LogicalPlan] =
+    fixRead(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
   // TODO: This type and implicit are a failed experiment and should be removed,
   //       but they infect the compiler tests.

@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.Data
 import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._
 
@@ -28,7 +27,7 @@ import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with LogicalPlanHelpers {
+class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {

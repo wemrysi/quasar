@@ -780,7 +780,7 @@ object MongoDbPlanner {
     // for an individual node without failing the fold. This code takes care of
     // mapping from one to the other.
     node => node match {
-      case ReadF(path) =>
+      case Read(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WB.read))
       case Constant(data) =>
@@ -919,7 +919,7 @@ object MongoDbPlanner {
     */
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
-    case x @ Let(n, r @ Fix(ReadF(_)),
+    case x @ Let(n, r @ Fix(Read(_)),
       Fix(Typecheck(Fix(Free(nf)), typ, cont, _)))
         if n == nf =>
       typ match {

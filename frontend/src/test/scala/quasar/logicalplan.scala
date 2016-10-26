@@ -49,7 +49,7 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
     (form, body) <- Arbitrary.arbitrary[(A, A)]
   } yield Let(Symbol("tmp" + n), form, body)
 
-  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(ReadF(rootDir </> file("foo")))
+  def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(Read(rootDir </> file("foo")))
 
   import DataArbitrary._
 
@@ -70,13 +70,13 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
   "normalizeTempNames" should {
     "rename simple nested lets" in {
       LogicalPlan.normalizeTempNames(
-        fixLet('foo, Read(file("foo")),
-          fixLet('bar, Read(file("bar")),
+        fixLet('foo, fixRead(file("foo")),
+          fixLet('bar, fixRead(file("bar")),
             Fix(MakeObjectN(
               fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))),
               fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("y"))))))))) must_==
-        fixLet('__tmp0, Read(file("foo")),
-          fixLet('__tmp1, Read(file("bar")),
+        fixLet('__tmp0, fixRead(file("foo")),
+          fixLet('__tmp1, fixRead(file("bar")),
             Fix(MakeObjectN(
               fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x")))),
               fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("y"))))))))
@@ -84,11 +84,11 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
 
     "rename shadowed name" in {
       LogicalPlan.normalizeTempNames(
-        fixLet('x, Read(file("foo")),
+        fixLet('x, fixRead(file("foo")),
           fixLet('x, Fix(MakeObjectN(
               fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('x), fixConstant(Data.Str("x")))))),
             fixFree('x)))) must_==
-        fixLet('__tmp0, Read(file("foo")),
+        fixLet('__tmp0, fixRead(file("foo")),
           fixLet('__tmp1, Fix(MakeObjectN(
               fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x")))))),
             fixFree('__tmp1)))
@@ -100,12 +100,12 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
       LogicalPlan.normalizeLets(
         fixLet('bar,
           fixLet('foo,
-            Read(file("foo")),
+            fixRead(file("foo")),
             Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z"))))))), 
           Fix(MakeObjectN(
             fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("y")))))))) must_==
         fixLet('foo,
-          Read(file("foo")),
+          fixRead(file("foo")),
           fixLet('bar,
             Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z")))))), 
             Fix(MakeObjectN(
@@ -117,13 +117,13 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
         fixLet('baz,
           fixLet('bar,
             fixLet('foo,
-              Read(file("foo")),
+              fixRead(file("foo")),
               Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0))))))),
             Fix(Filter(fixFree('bar), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("y")))), fixConstant(Data.Int(1))))))),
           Fix(MakeObjectN(
             fixConstant(Data.Str("z")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("z")))))))) must_==
         fixLet('foo,
-          Read(file("foo")),
+          fixRead(file("foo")),
           fixLet('bar,
             Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0)))))),
             fixLet('baz,

@@ -109,7 +109,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
           lp = prg(
                 (0 until args.length).toList.map(idx =>
                   Fix(StructuralLib.ObjectProject(
-                    LogicalPlan.Read(coll.asFile),
+                    fixRead(coll.asFile),
                     fixConstant(Data.Str("arg" + idx))))))
           t  <- compile(qm, coll, lp).point[Task].unattempt
           (wf, resultField) = t

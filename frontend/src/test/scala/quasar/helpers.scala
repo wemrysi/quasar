@@ -16,6 +16,7 @@
 
 package quasar.frontend
 
+import quasar.contrib.pathy._
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
 
@@ -33,4 +34,7 @@ trait LogicalPlanHelpers {
 
   def fixFree(name: Symbol): Fix[LP] =
     Fix[LP](LP.Free(name))
+
+  def fixRead(path: FPath): Fix[LP] =
+    Fix[LP](LP.Read(path))
 }

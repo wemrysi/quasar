@@ -353,7 +353,7 @@ trait Compiler[F[_]] {
 
         case TableRelationAST(path, _) =>
           sandboxCurrent(canonicalize(path)).cata(
-            p => emit(LP.Read(p)),
+            p => emit(Fix(LP.Read(p))),
             fail(InvalidPathError(path, None)))
 
         case ExprRelationAST(expr, _) => compile0(expr)

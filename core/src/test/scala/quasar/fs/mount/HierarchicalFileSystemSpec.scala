@@ -145,7 +145,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
       val mnted = mntB </> local
 
       val lp = Invoke(Take, Func.Input2(
-        Invoke(Squash, Func.Input1(Read(mnted))),
+        Invoke(Squash, Func.Input1(fixRead(mnted))),
         fixConstant(Data.Int(5))))
 
       val fss = bMem.set(
@@ -171,7 +171,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
           val out = mntC </> file("outf")
 
           val lp = Invoke(Take, Func.Input2(
-            Invoke(Squash, Func.Input1(Read(rd))),
+            Invoke(Squash, Func.Input1(fixRead(rd))),
             fixConstant(Data.Int(5))))
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)
