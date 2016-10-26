@@ -26,6 +26,7 @@ import quasar.contrib.pathy._
 import quasar.Data
 import quasar.DataCodec
 import quasar.qscript._
+import quasar.sql.JoinDir
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -326,8 +327,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
         def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
         def combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
-          Free.roll(MakeMap(StrLit("right"), RightSideF))
+          Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+          Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
         ))
 
         val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, Inner, combine)
@@ -337,8 +338,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             rdd.collect.toList must_== List(
               Data.Obj(ListMap(
-                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
               )
             ))
         }
@@ -366,8 +367,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
         def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
         def combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
-          Free.roll(MakeMap(StrLit("right"), RightSideF))
+          Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+          Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
         ))
 
         val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, LeftOuter, combine)
@@ -377,12 +378,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             rdd.collect.toList must_== List(
               Data.Obj(ListMap(
-                "left" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Null
+                JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Null
               )),
               Data.Obj(ListMap(
-                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
               ))
               )
         }
@@ -410,8 +411,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
         def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
         def combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
-          Free.roll(MakeMap(StrLit("right"), RightSideF))
+          Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+          Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
         ))
 
         val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, RightOuter, combine)
@@ -421,12 +422,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             rdd.collect.toList must_== List(
               Data.Obj(ListMap(
-                "left" ->  Data.Null,
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name ->  Data.Null,
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
               )),
               Data.Obj(ListMap(
-                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
               ))
               )
         }
@@ -455,8 +456,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
         def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
         def combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit("left"), LeftSideF)),
-          Free.roll(MakeMap(StrLit("right"), RightSideF))
+          Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
+          Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
         ))
 
         val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, FullOuter, combine)
@@ -466,16 +467,16 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             rdd.collect.toList must_== List(
               Data.Obj(ListMap(
-                "left" ->  Data.Null,
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name ->  Data.Null,
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
               )),
               Data.Obj(ListMap(
-                "left" ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Null
+                JoinDir.Left.name ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Null
               )),
               Data.Obj(ListMap(
-                "left" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                "right" -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
+                JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
+                JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
               ))
               )
         }

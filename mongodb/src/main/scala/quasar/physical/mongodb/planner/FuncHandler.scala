@@ -61,8 +61,6 @@ object FuncHandler {
           case Gt(a1, a2)            => $gt(a1, a2)
           case Gte(a1, a2)           => $gte(a1, a2)
 
-          case Coalesce(a1, a2)      => $ifNull(a1, a2)
-
           case ConcatArrays(a1, a2)  => $concat(a1, a2)  // NB: this is valid for strings only
           case Lower(a1)             => $toLower(a1)
           case Upper(a1)             => $toUpper(a1)
@@ -117,10 +115,12 @@ object FuncHandler {
           case ExtractMinute(a1) => $minute(a1)
           case ExtractMonth(a1) => $month(a1)
           case ExtractQuarter(a1) =>
-            // FIXME
-            trunc($add(
-              $divide($dayOfYear(a1), $literal(Bson.Int32(92))),
-              $literal(Bson.Int32(1))))
+            trunc(
+              $add(
+                $divide(
+                  $subtract($month(a1), $literal(Bson.Int32(1))),
+                  $literal(Bson.Int32(3))),
+                $literal(Bson.Int32(1))))
           case ExtractSecond(a1) =>
             $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
           case ExtractWeek(a1) => $week(a1)

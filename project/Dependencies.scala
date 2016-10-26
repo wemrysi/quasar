@@ -88,16 +88,17 @@ object Dependencies {
     .exclude("commons-logging", "commons-logging")
     .exclude("com.esotericsoftware.minlog", "minlog")
     .exclude("org.spark-project.spark", "unused")
+    .exclude("org.scalatest", "scalatest_2.11")
 
   val sparkDep =
     if(quasar4Spark == "yes")
       sparkDepCore % buildSparkScope
-    else 
+    else
       sparkDepCore
         .exclude("io.netty", "netty-all")
         .exclude("io.netty", "netty")
         .excludeAll(ExclusionRule(organization = "javax.servlet")) % buildSparkScope
-  
+
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(

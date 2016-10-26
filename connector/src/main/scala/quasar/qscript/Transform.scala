@@ -24,6 +24,7 @@ import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Planner._
 import quasar.Predef.{ Eq => _, _ }
+import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
@@ -397,8 +398,8 @@ class Transform
 
       // NB: This is a magic structure. Improve LP to not imply this structure.
       val combine: JoinFunc = Free.roll(ConcatMaps(
-        Free.roll(MakeMap(StrLit[T, JoinSide]("left"), leftValue.as(LeftSide))),
-        Free.roll(MakeMap(StrLit[T, JoinSide]("right"), rightValue.as(RightSide)))))
+        Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
+        Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
 
       // FIXME: The provenances are not correct here
       Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
@@ -470,7 +471,7 @@ class Transform
     case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.ann
       Target(
@@ -497,26 +498,29 @@ class Transform
       // (Ann[T](buckets, HoleF[T]),
       //   PB.inj(BucketIndex(src, lval, rval)).embed).right
 
-    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Mapping =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
         Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(func)(lval, rval))),
         base.src).right[PlannerError]
 
-    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
+    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
       merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(func)).right[PlannerError]
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>
       invokeReduction1(func, Func.Input1(a1)).right
 
-    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Reduction =>
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.Distinct, Sized(a1)) =>
+      // TODO: This currently duplicates a _portion_ of the bucket in the
+      //       reducer list, we could perhaps avoid doing that, or normalize it
+      //       away later.
       invokeReduction1(
         agg.Arbitrary,
         Func.Input1(
@@ -525,6 +529,17 @@ class Transform
               prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance),
               a1.ann.values),
             a1.value))).right
+
+    case LogicalPlan.InvokeFUnapply(set.DistinctBy, Sized(a1, a2)) =>
+      val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
+      invokeReduction1(
+        agg.Arbitrary,
+        Func.Input1(
+          Target(
+            Ann(
+              prov.swapProvenances(provenance.Value(rval) :: base.buckets),
+              lval),
+            base.src))).right
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
@@ -579,16 +594,16 @@ class Transform
         Ann[T](base.buckets, lval),
         QC.inj(Filter(base.src, rval)).embed).right
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Squashing =>
       val Ann(buckets, value) = a1.ann
       Target(Ann(prov.squashProvenances(buckets), value), a1.value).right
 
-    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Expansion =>
       invokeExpansion1(func, Func.Input1(a1)).right
 
-    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Expansion =>
       invokeExpansion2(func, Func.Input2(a1, a2)).right
 
@@ -658,7 +673,7 @@ class Transform
           LeftOuter,
           LeftSideF)).embed).right
 
-    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
+    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Transformation =>
       invokeThetaJoin(
         Func.Input3(a1, a2, a3),

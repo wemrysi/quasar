@@ -16,26 +16,14 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
-import quasar.fp.eitherT._
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._, common._
-import quasar.qscript, qscript._
+import quasar.fp.ski.κ
+import quasar.physical.couchbase._
+import quasar.Planner.InternalError
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class ConstReadPlanner[F[_]: Monad] extends Planner[F, Const[Read, ?]] {
-
-  def plan: AlgebraM[M, Const[Read, ?], N1QL] = {
-    case Const(Read(path)) =>
-      for {
-        n    <- readPath[PR](path, ExcludeId)
-        nStr =  n1ql(n)
-        _    <- prtell[M](Vector(Detail(
-                  "N1QL Read",
-                  s"""  path: $path
-                     |  n1ql: $nStr""".stripMargin('|'))))
-      } yield n
-  }
+final class UnreachablePlanner[F[_]: Applicative, QS[_]] extends Planner[F, QS] {
+  def plan: AlgebraM[M, QS, N1QL] =
+    κ(EitherT.fromDisjunction(InternalError("unreachable").left))
 }

@@ -114,7 +114,7 @@ object xdmitem {
     val el = SecureXML.loadString(xmlString).fold(_.toString.wrapNel.raiseError[F, Elem], _.point[F])
 
     el flatMap { e =>
-      if (xml.qualifiedName(e) === xml.namespaces.ejsonEjson.shows)
+      if (Option(e.prefix) exists (_ === xml.namespaces.ejsonNs.prefix.shows))
         data.decodeXml[F](e)
       else
         xml.toData(e).point[F]

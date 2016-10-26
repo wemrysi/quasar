@@ -44,17 +44,17 @@ object Planner {
 
   implicit def constDeadEndPlanner[F[_]: Monad]
     : Planner[F, Const[DeadEnd, ?]] =
-    new ConstDeadEndPlanner[F]
+    new UnreachablePlanner[F, Const[DeadEnd, ?]]
 
   implicit def constReadPlanner[F[_]: Monad]
     : Planner[F, Const[Read, ?]] =
-    new ConstReadPlanner[F]
+    new UnreachablePlanner[F, Const[Read, ?]]
 
   implicit def constShiftedRead[F[_]: Monad]
     : Planner[F, Const[ShiftedRead, ?]] =
     new ShiftedReadPlanner[F]
 
-  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
     : Planner[F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[F, T]
 
@@ -64,9 +64,9 @@ object Planner {
 
   implicit def projectBucketPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
     : Planner[F, ProjectBucket[T, ?]] =
-    new ProjectBucketPlanner[F, T]
+    new UnreachablePlanner[F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
     : Planner[F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[F, T]
 
@@ -76,6 +76,6 @@ object Planner {
 
   implicit def thetaJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
     : Planner[F, ThetaJoin[T, ?]] =
-    new ThetaJoinPlanner[F, T]
+    new UnreachablePlanner[F, ThetaJoin[T, ?]]
 
 }

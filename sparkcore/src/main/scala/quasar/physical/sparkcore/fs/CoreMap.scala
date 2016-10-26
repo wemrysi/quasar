@@ -17,7 +17,6 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef.{ Eq => _, _ }
-import quasar.qscript.MapFuncs
 import quasar.qscript.MapFuncs._
 import quasar.std.{DateLib, StringLib}
 import quasar.Data
@@ -217,10 +216,6 @@ object CoreMap extends Serializable {
     case Or(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => undefined
-    }).right
-    case MapFuncs.Coalesce(f1, f2) => ((x: Data) => f1(x) match {
-      case Data.Null => f2(x)
-      case d => d
     }).right
     case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
     case Cond(fCond, fThen, fElse) => ((x: Data) => fCond(x) match {
