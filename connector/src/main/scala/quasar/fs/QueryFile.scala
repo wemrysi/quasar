@@ -123,9 +123,7 @@ object QueryFile {
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
-      qs.fold(
-        κ(Vector()),
-        a => Vector(PhaseResult.tree("QScript", a.cata(transform.linearize).reverse))),
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.tree("QScript", a))),
       qs))
   }
 
@@ -167,9 +165,7 @@ object QueryFile {
         simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>
-      mtell.writer(
-        Vector(PhaseResult.tree("QScript", qs.cata(transform.linearize).reverse)),
-        qs)
+      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
     }
   }
 

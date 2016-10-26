@@ -7,7 +7,7 @@
         "mongodb_3_2":       "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "pending"
+        "couchbase":         "skip"
     },
     "data": "webapp.data",
     "query": "select \"servlet-name\", \"init-param\" is not null from webapp where \"init-param\" is null or \"init-param\".\"betaServer\"",

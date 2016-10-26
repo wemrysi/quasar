@@ -21,7 +21,8 @@ import quasar.Predef._
 import argonaut._, Json._
 
 case class ExpectedResult(
-  rows:           List[Json],
-  predicate:      Predicate,
-  ignoredFields:  List[JsonField]
+  rows:          List[Json],
+  predicate:     Predicate,
+  ignoredFields: List[JsonField],
+  fieldOrder:    FieldOrder
 )

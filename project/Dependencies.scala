@@ -50,6 +50,9 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
+  def effect = Seq(
+    "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
+  )
   def core = Seq(
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
@@ -85,16 +88,17 @@ object Dependencies {
     .exclude("commons-logging", "commons-logging")
     .exclude("com.esotericsoftware.minlog", "minlog")
     .exclude("org.spark-project.spark", "unused")
+    .exclude("org.scalatest", "scalatest_2.11")
 
   val sparkDep =
     if(quasar4Spark == "yes")
       sparkDepCore % buildSparkScope
-    else 
+    else
       sparkDepCore
         .exclude("io.netty", "netty-all")
         .exclude("io.netty", "netty")
         .excludeAll(ExclusionRule(organization = "javax.servlet")) % buildSparkScope
-  
+
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
@@ -103,13 +107,13 @@ object Dependencies {
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
-    "com.fasterxml.uuid"         %  "java-uuid-generator" % "3.1.4",
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.2",
+    "io.reactivex"         %% "rxscala"     % "0.26.3",
     "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(

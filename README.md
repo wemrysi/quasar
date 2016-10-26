@@ -183,6 +183,9 @@ To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
 e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+
+`xcc://<username>:<password>@<host>:<port>/<database>`
 
 #### View mounts
 
