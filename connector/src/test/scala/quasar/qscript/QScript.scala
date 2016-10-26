@@ -611,4 +611,54 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),
         Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0")))))).some)
   }
+
+  "convert a multi-field reduce" in {
+    val lp = fullCompileExp("select max(pop), min(city) from zips")
+    val qs = convert(listContents.some, lp)
+    qs must equal(chain(
+      ReadR(rootDir </> file("zips")),
+      QC.inj(LeftShift((), HoleF, RightSideF)),
+      QC.inj(Reduce((),
+        NullLit(),
+        List(
+          ReduceFuncs.Max(
+            Free.roll(Guard(
+              ProjectFieldR(
+                Free.roll(Guard(
+                  HoleF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  HoleF,
+                  Free.roll(Undefined()))),
+                StrLit("pop")),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  HoleF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  HoleF,
+                  Free.roll(Undefined()))),
+                StrLit("pop")),
+              Free.roll(Undefined())))),
+          ReduceFuncs.Min(
+            Free.roll(Guard(
+              ProjectFieldR(
+                Free.roll(Guard(
+                  HoleF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  HoleF,
+                  Free.roll(Undefined()))),
+                StrLit("city")),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  HoleF,
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  HoleF,
+                  Free.roll(Undefined()))),
+                StrLit("city")),
+              Free.roll(Undefined()))))),
+        Free.roll(ConcatMaps(
+          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))),
+          Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1)))))))).some)
+  }
 }

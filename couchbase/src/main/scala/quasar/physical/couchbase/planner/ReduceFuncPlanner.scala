@@ -31,7 +31,7 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
 
   def plan: AlgebraM[M, ReduceFunc, N1QL] = {
     case Arbitrary(a)     =>
-      ???
+      unimplementedP("Arbitrary")
     case Avg(a)           =>
       partialQueryString(s"avg(${n1ql(a)})").point[M]
     case Count(a)         =>
