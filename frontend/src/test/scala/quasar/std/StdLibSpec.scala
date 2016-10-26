@@ -27,42 +27,6 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
 import scala.math.abs
 
-trait StdLibTestRunner {
-  def nullary(
-    prg: Fix[LogicalPlan],
-    expected: Data): Result
-
-  def unary(
-    prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-    arg: Data,
-    expected: Data): Result
-
-  def binary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data,
-    expected: Data): Result
-
-  def ternary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data, arg3: Data,
-    expected: Data): Result
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def intDomain: Gen[BigInt]
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def decDomain: Gen[BigDecimal]
-
-  /** Defines the domain of values for `Data.Str` for which the implementation is
-    * well-behaved.
-    */
-  def stringDomain: Gen[String]
-}
-
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
   */
