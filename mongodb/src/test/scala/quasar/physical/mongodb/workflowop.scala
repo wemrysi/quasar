@@ -885,7 +885,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
     def render(op: Workflow)(implicit RO: RenderTree[Workflow]): String = RO.render(op).draw.mkString("\n")
 
     "render read" in {
-      render(readFoo) must_== "$Read(db; foo)"
+      render(readFoo) must_== "$ReadF(db; foo)"
     }
 
     "render simple project" in {
@@ -897,7 +897,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
+          |├─ $ReadF(db; foo)
           |╰─ $ProjectF
           |   ├─ Name("bar" -> "$baz")
           |   ╰─ IncludeId""".stripMargin
@@ -913,7 +913,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
+          |├─ $ReadF(db; foo)
           |╰─ $ProjectF
           |   ├─ Name("bar")
           |   │  ╰─ Name("0" -> "$baz")
@@ -934,7 +934,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
+          |├─ $ReadF(db; foo)
           |├─ $MapF
           |│  ├─ JavaScript(function (key) {})
           |│  ╰─ Scope(Map())
@@ -963,12 +963,12 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
       render(op) must_==
       """$FoldLeftF
         |├─ Chain
-        |│  ├─ $Read(db; foo)
+        |│  ├─ $ReadF(db; foo)
         |│  ╰─ $ProjectF
         |│     ├─ Name("bar" -> "$baz")
         |│     ╰─ IncludeId
         |╰─ Chain
-        |   ├─ $Read(db; foo)
+        |   ├─ $ReadF(db; foo)
         |   ├─ $MapF
         |   │  ├─ JavaScript(function (key) {})
         |   │  ╰─ Scope(Map())
