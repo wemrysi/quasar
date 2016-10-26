@@ -135,25 +135,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Or(a1, a2)          =>
       partialQueryString(s"(${n1ql(a1)} or ${n1ql(a2)})").point[M]
     case Between(a1, a2, a3) =>
-      for {
-        t      <- genName[M]
-        a1N1ql =  n1ql(a1)
-        a2N1ql =  n1ql(a2)
-        a3N1ql =  n1ql(a3)
-        s      =  select(
-                    value         = true,
-                    resultExprs   = t.wrapNel,
-                    keyspace      = a1,
-                    keyspaceAlias = t) |>
-                  filter.set(s"$t between $a2N1ql and $a3N1ql".some)
-        sN1ql  =  n1ql(s)
-        _      <- prtell[M](Vector(Detail(
-                    "N1QL Between",
-                    s"""  a1:   $a1N1ql
-                       |  a2:   $a2N1ql
-                       |  a3:   $a3N1ql
-                       |  n1ql: $sN1ql""".stripMargin('|'))))
-      } yield s
+      val a1N1ql =  n1ql(a1)
+      val a2N1ql =  n1ql(a2)
+      val a3N1ql =  n1ql(a3)
+      val b      =  s"$a1N1ql >= $a2N1ql and $a1N1ql <= $a3N1ql"
+      prtell[M](Vector(Detail(
+        "N1QL Between",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  a3:   $a3N1ql
+           |  n1ql: $b""".stripMargin('|')
+      ))).as(partialQueryString(b))
     case Cond(cond, then_, else_) =>
       partialQueryString(s"""
         (case
@@ -227,7 +219,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, "${n1ql(a1)}", ${n1ql(a2)})""").point[M]
+      partialQueryString(s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})""").point[M]
     case ConcatArrays(a1, a2)                     =>
       partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
     case ConcatMaps(a1, a2)                       =>
@@ -243,7 +235,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       )
     case ProjectField(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1.$a2N1ql"
+      val n1qlStr = s"$a1.[$a2N1ql]"
       prtell[M](Vector(Detail(
         "N1QL ProjectField(PartialQueryString(_), _)",
         s"""  a1:   $a1
@@ -259,7 +251,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         a2N1ql   =  n1ql(a2)
         s        =  select(
                       value         = true,
-                      resultExprs   = a2N1ql.wrapNel,
+                      resultExprs   = s"$tempName.[$a2N1ql]".wrapNel,
                       keyspace      = a1,
                       keyspaceAlias = tempName)
         sN1ql    =  n1ql(s)

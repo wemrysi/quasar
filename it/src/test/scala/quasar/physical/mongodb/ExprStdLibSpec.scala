@@ -47,7 +47,6 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, _) => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
-    case (date.ExtractQuarter, _) => Skipped("TODO").left
 
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
