@@ -41,6 +41,7 @@ import simulacrum.typeclass
   def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
 }
 
+// TODO divide planner instances into separate files
 object Planner {
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
@@ -218,8 +219,31 @@ object Planner {
           )
         case Sort(src, bucket, orders) =>
 
+          implicit def ordering: Order[Data] = new Order[Data] with Serializable {
+            def order(d1: Data, d2: Data) = (d1, d2) match {
+              case a -> b if a == b             => Ordering.EQ
+              case Data.Str(a) -> Data.Str(b)             => a cmp b
+              case Data.Bool(a) -> Data.Bool(b)           => a cmp b
+              case Data.Number(a) -> Data.Number(b)       => a cmp b
+              case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
+              case Data.Arr(a) -> Data.Arr(b)             => a cmp b
+              case Data.Set(a) -> Data.Set(b)             => a cmp b
+              case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
+              case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
+              case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
+              case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
+              case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
+              case Data.Id(a) -> Data.Id(b)               => a cmp b
+              case a -> b                       => a.getClass.## cmp b.getClass.##
+            }
+          }
+
+          /*
+           * Copy-paste from scalaz's `toScalaOrdering`
+           * Copied because scalaz's ListInstances are not Serializable
+           */
           implicit val ord: SOrdering[Data] = new SOrdering[Data] {
-            def compare(x: Data, y: Data) = Data.ordering.order(x, y).toInt
+            def compare(x: Data, y: Data) = ordering.order(x, y).toInt
           }
           
           implicit val listOrd = new SOrdering[List[Data]] {
