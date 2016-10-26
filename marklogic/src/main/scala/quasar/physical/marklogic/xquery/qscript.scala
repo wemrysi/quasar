@@ -74,6 +74,17 @@ object qscript {
       }
     }
 
+  // qscript:combine-apply($fns as (function(item()) as item())*) as function(item()) as item()*
+  def combineApply[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("combine-apply").qn[F] map { fname =>
+      declare(fname)(
+        $("fns") as SequenceType("(function(item()) as item())*")
+      ).as(SequenceType("function(item()) as item()*")) { fns: XQuery =>
+        val (f, x) = ("$f", "$x")
+        func(x) { fn.map(func(f) { f.xqy fnapply x.xqy }, fns) }
+      }
+    }
+
   // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
   def combineN[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("combine-n").qn[F] map { fname =>
@@ -305,7 +316,6 @@ object qscript {
     }
 
   // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
-  // TODO: This and combine-n are similar, DRY them up if we go this route
   def zipApply[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("zip-apply").qn[F] map { fname =>
       declare(fname)(

@@ -1,0 +1,13 @@
+{
+    "name": "trivial group by (MongoDB)",
+    "backends": {
+        "postgresql": "skip",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
+    "description": "Should project the result at the root (not under 'value').",
+    "data": "../zips.data",
+    "query": "select city, sum(pop) as totalPop from `../zips` group by city",
+    "predicate": "containsAtLeast",
+    "expected": [{ "totalPop": 110948, "city": "BOULDER" }]
+}
