@@ -18,8 +18,9 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.{NameGenerator, PlannerErrT, PhaseResults, PhaseResultT}
+import quasar.Planner.{InternalError, PlannerError}
 
-import scalaz._
+import scalaz._, Scalaz._
 
 package object planner {
 
@@ -33,5 +34,11 @@ package object planner {
 
   def genName[F[_]: Functor: NameGenerator]: F[String] =
     NameGenerator[F].prefixedName("_")
+
+  def unimplemented[A](name: String): PlannerError \/ A =
+    InternalError(s"unimplemented $name").left
+
+  def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
+    EitherT(unimplemented[A](name).point[PhaseResultT[F, ?]])
 
 }
