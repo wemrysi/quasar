@@ -28,9 +28,9 @@ import quasar.qscript._
 import pathy.Path, Path._
 import quasar.contrib.pathy._
 import scalaz._, Scalaz.{ ToIdOps => _, _ }
-import scalaz.concurrent.Task
 import FileSystemIndependentTypes._
 import matryoshka._
+import RenderTree.ops._
 
 // import ygg.table._
 // import ygg.json.JValue
@@ -64,6 +64,7 @@ package object fs extends fs.FilesystemEffect {
   type AFile                = quasar.contrib.pathy.AFile
   type ADir                 = quasar.contrib.pathy.ADir
   type APath                = quasar.contrib.pathy.APath
+  type PathSegment          = quasar.contrib.pathy.PathSegment
   type Fix[F[_]]            = matryoshka.Fix[F]
   type AsTask[F[X]]         = Task[F ~> Task]
   type FixPlan              = matryoshka.Fix[LogicalPlan]
@@ -72,6 +73,7 @@ package object fs extends fs.FilesystemEffect {
   type Task[A]              = scalaz.concurrent.Task[A]
   type Table                = ygg.table.Table
 
+  val Task          = scalaz.concurrent.Task
   val MoveSemantics = ManageFile.MoveSemantics
   val Unimplemented = quasar.fs.FileSystemError.Unimplemented
 
@@ -82,6 +84,9 @@ package object fs extends fs.FilesystemEffect {
   def unknownPath(p: APath): FileSystemError           = pathErr(PathError pathNotFound p)
   def unknownPlan(lp: FixPlan): FileSystemError        = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
   def cond[A](p: Boolean, ifp: => A, elsep: => A): A   = if (p) ifp else elsep
+
+  def diff[A: RenderTree](l: A, r: A): RenderedTree = l.render diff r.render
+  def showln[A: Show](x: A): Unit                   = println(x.shows)
 
   implicit class FixPlanOps(val self: FixPlan) {
     def to_s: String = FPlan("", self).toString

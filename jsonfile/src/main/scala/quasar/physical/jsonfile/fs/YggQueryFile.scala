@@ -18,33 +18,93 @@ package quasar.physical.jsonfile.fs
 
 import quasar._
 import quasar.Predef._
+import quasar.fp._
 import quasar.fs._
-import quasar.effect._
+import quasar.effect.MonotonicSeq
 import scalaz._, Scalaz._
 import quasar.{ qscript => q }
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._, RenderTree.ops._
 import QueryFile._
-import LogicalPlan._
 import quasar.qscript._
-// import quasar.contrib.matryoshka.ShowT
+import quasar.contrib.matryoshka._
+
+final case class YggQs[QS[_]](lp: Fix[LogicalPlan], qs: Fix[QS])(implicit RT: RenderTree[Fix[QS]]) {
+  override def toString = lp.render.shows + "\n" + qs.render.shows
+}
 
 class YggQueryFile[S[_]](implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]) extends STypesFree[S, Fix] {
   private def phaseResults(msg: String): F[PhaseResults] = Vector(PhaseResult.Detail("jsonfile", msg))
   private def TODO[A]: FLR[A]                            = Unimplemented
 
+  /*** Mostly straight out of QScriptHelpers ***/
+  type QS[A]  = (QScriptCore :\: ThetaJoin :\: Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+  type QST[A] = QScriptTotal[A]
+  type QSR[A] = quasar.qscript.QScriptRead[Fix, A]
+
+  implicit val QS: Injectable.Aux[QS, QST] = (
+    ::\::[QScriptCore](
+      ::\::[ThetaJoin](
+        ::/::[Fix,
+          Const[Read, ?],
+          Const[DeadEnd, ?]
+        ]
+      )
+    )
+  )
+
+  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
+  val R  =    implicitly[Const[Read, ?] :<: QS]
+  val QC =       implicitly[QScriptCore :<: QS]
+  val TJ =         implicitly[ThetaJoin :<: QS]
+
+  val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
+  val RT  =        implicitly[Const[Read, ?] :<: QST]
+  val QCT =           implicitly[QScriptCore :<: QST]
+  val TJT =             implicitly[ThetaJoin :<: QST]
+  val EJT =              implicitly[EquiJoin :<: QST]
+  val PBT =         implicitly[ProjectBucket :<: QST]
+  val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
+
+  implicit val monadTell: MonadTell[FileSystemErrT[PhaseResultT[Id, ?], ?], PhaseResults] =
+    EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
+      WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
+
+  def convert(lc: Option[DiscoverPath.ListContents[Id]], lp: FixPlan): Option[Fix[QS]] = {
+    val qs = lc match {
+      case Some(listFn) => convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](listFn >>>  (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]]))(lp)
+      case None         => convertToQScript[Fix, QS](lp)
+    }
+    qs.toOption.run.copoint
+  }
+
+  /*** ***/
+
   def queryFile(implicit MS: MonotonicSeq :<: S, KVF: KVFile[S], KVQ: KVQuery[S]): QueryFile ~> FS = {
-    def lpResultƒ: AlgebraM[FLR, LogicalPlan, QRep] = {
-      case ReadF(path)                           => TODO
-      case ConstantF(data)                       => TODO
-      case InvokeF(func, values)                 => TODO
-      case FreeF(sym)                            => TODO
-      case LetF(ident, form, in)                 => TODO
-      case TypecheckF(expr, typ, cont, fallback) => TODO
+    def evalPlan(lp: FixPlan): FLR[YggQs[QS]] = {
+      convert(None, lp).fold[LR[YggQs[QS]]](unknownPlan(lp)) { qs =>
+        val R = new Rewrite[Fix]
+        val C = Coalesce[Fix, QS, QS]
+        val N = Normalizable[QS]
+
+        val optimized: Fix[QS] = ( qs
+          transAna(
+                repeatedly(C.coalesceQC[QS](idPrism))
+            >>> repeatedly(C.coalesceTJ[QS](idPrism.get))
+            >>> repeatedly((q: QS[Fix[QS]]) => N normalizeF q)
+          )
+          transCata(
+            (R optimize reflNT)
+          )
+        )
+
+        showln(diff(qs, optimized))
+        YggQs(lp, optimized)
+      }
     }
 
-    def executePlan(lp: FixPlan, out: AFile): FLR[AFile] = TODO
-    def evaluatePlan(lp: FixPlan): FLR[QHandle]          = TODO
-    def explainPlan(lp: FixPlan): FLR[ExecutionPlan]     = ExecutionPlan(FsType, lp.to_s)
+    def executePlan(lp: FixPlan, out: AFile): FLR[AFile] = evalPlan(lp) flatMap (_ => Unimplemented)
+    def evaluatePlan(lp: FixPlan): FLR[QHandle]          = evalPlan(lp) flatMap (_ => Unimplemented)
+    def explainPlan(lp: FixPlan): FLR[ExecutionPlan]     = ExecutionPlan(FsType, lp.to_s + "\n" + evalPlan(lp).toString)
 
     λ[QueryFile ~> FS] {
       case Explain(lp)          => phaseResults(lp.to_s) tuple explainPlan(lp)
