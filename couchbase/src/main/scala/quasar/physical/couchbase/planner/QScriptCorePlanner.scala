@@ -19,12 +19,12 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._, ski.κ
-import quasar.ejson
-import quasar.NameGenerator
+import quasar.{ejson, NameGenerator, PhaseResultT}
 import quasar.PhaseResult.Detail
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._, Select._
 import quasar.physical.couchbase.planner.Planner._
+import quasar.Planner.{InternalError, PlannerError}
 import quasar.qscript, qscript.{Map => _, Read => _, _}
 
 import matryoshka.{Hole => _, _}, Recursive.ops._
@@ -43,8 +43,12 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           {
-            case Embed(ejson.Common(ejson.Str(key))) => key.point[M]
-            case key => ???
+            case Embed(ejson.Common(ejson.Str(key))) =>
+              key.point[M]
+            case key =>
+              EitherT(
+                (InternalError(s"Unsupported object key: ${key.shows}"): PlannerError)
+                  .left[String].point[PhaseResultT[F, ?]])
           },
           v => processFreeMapDefault(v.fromCoEnv, tmpName)
         )) ∘ (m =>
@@ -215,7 +219,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
     case qscript.Subset(src, from, op, count) => op match {
       case Drop   => takeOrDrop(src, from, count.right)
       case Take   => takeOrDrop(src, from, count.left)
-      case Sample => ???
+      case Sample => unimplementedP("Sample")
     }
 
     case qscript.Unreferenced() =>

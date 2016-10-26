@@ -41,7 +41,7 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Core
 
   def plan: AlgebraM[M, EquiJoin[T, ?], N1QL] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, f, combine) =>
-    for {
+    (for {
       tmpName <- genName[M]
       sN1ql   =  n1ql(src)
       lbN1ql  <- freeCataM(lBranch)(interpretM(
@@ -69,7 +69,8 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Core
                       |  f:       $f
                       |  combine: $cN1ql
                       |  n1ql:    ???""".stripMargin('|'))))
-    } yield partialQueryString("???EquiJoin???")
+    } yield ()) *>
+    unimplementedP("EquiJoin")
 
   }
 }

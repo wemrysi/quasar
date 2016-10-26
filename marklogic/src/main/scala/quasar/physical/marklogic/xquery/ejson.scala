@@ -253,6 +253,16 @@ object ejson {
   def seqToArray_[F[_]: PrologW](items: XQuery): F[XQuery] =
     ejsonN.qn[F] flatMap (ename => seqToArray[F].apply(ename.xqy, items))
 
+  // ejson:singleton-array($value as item()*) as element(ejson:ejson)
+  def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("singleton-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
+      declare(fname)(
+        $("value") as SequenceType.Top
+      ).as(SequenceType(s"element($ename)")) { value: XQuery =>
+        mkArrayElt[F](value) flatMap (mkArray[F].apply(ename.xqy, _))
+      }
+    }.join
+
   // ejson:singleton-object($key as xs:string, $value as item()*) as element(ejson:ejson)
   def singletonObject[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("singleton-object").qn[F] |@| ejsonN.qn) { (fname, ename) =>
@@ -283,17 +293,21 @@ object ejson {
         $("item") as SequenceType.Top
       ).as(SequenceType("xs:string?")) { item: XQuery =>
         ascribedType[F].apply(item) map { aType =>
-          typeswitch(item)(
-            SequenceType("element()")       return_ aType,
-            SequenceType("xs:boolean")      return_ "boolean".xs,
-            SequenceType("xs:dateTime")     return_ "timestamp".xs,
-            SequenceType("xs:integer")      return_ "integer".xs,
-            SequenceType("xs:decimal")      return_ "decimal".xs,
-            SequenceType("xs:double")       return_ "decimal".xs,
-            SequenceType("xs:float")        return_ "decimal".xs,
-            SequenceType("xs:base64Binary") return_ "binary".xs,
-            SequenceType("xs:hexBinary")    return_ "binary".xs
-          ) default emptySeq
+          if_(fn.empty(item))
+          .then_ { "na".xs }
+          .else_ {
+            typeswitch(item)(
+              SequenceType("element()")       return_ aType,
+              SequenceType("xs:boolean")      return_ "boolean".xs,
+              SequenceType("xs:dateTime")     return_ "timestamp".xs,
+              SequenceType("xs:integer")      return_ "integer".xs,
+              SequenceType("xs:decimal")      return_ "decimal".xs,
+              SequenceType("xs:double")       return_ "decimal".xs,
+              SequenceType("xs:float")        return_ "decimal".xs,
+              SequenceType("xs:base64Binary") return_ "binary".xs,
+              SequenceType("xs:hexBinary")    return_ "binary".xs
+            ) default emptySeq
+          }
         }
       }
     }
