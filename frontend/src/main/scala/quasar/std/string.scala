@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, LogicalPlan => LP, Type, Mapping, SemanticError}, LP._, SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
 import matryoshka._
@@ -41,7 +41,7 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input2(Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case InvokeUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
             second.some
@@ -90,15 +90,15 @@ trait StringLib extends Library {
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case InvokeUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
               Search(str.embed,
-                Constant[T[LogicalPlan]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
-                Constant[T[LogicalPlan]](Data.Bool(false)).embed).some
+                Constant[T[LP]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
+                Constant[T[LP]](Data.Bool(false)).embed).some
           case _ => None
         }
     },
@@ -179,7 +179,7 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input3(Type.Str, Type.Int, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
             Embed(Constant(Data.Str(str))),
@@ -187,8 +187,8 @@ trait StringLib extends Library {
             for0))
               if 0 < from =>
             Invoke(f, Func.Input3(
-              Constant[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
-              Constant[T[LogicalPlan]](Data.Int(0)).embed,
+              Constant[T[LP]](Data.Str(str.substring(from.intValue))).embed,
+              Constant[T[LP]](Data.Int(0)).embed,
               for0)).some
           case _ => None
         }

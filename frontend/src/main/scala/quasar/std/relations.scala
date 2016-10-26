@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, LogicalPlan, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}, LogicalPlan._
+import quasar.{Data, Func, LogicalPlan => LP, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}, LP._
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.success
@@ -156,7 +156,7 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.True)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.True)))) => l.some
@@ -179,7 +179,7 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.False)), Embed(r))) => r.some
           case Invoke(_, Sized(Embed(l), Embed(Constant(Data.False)))) => l.some
@@ -214,7 +214,7 @@ trait RelationsLib extends Library {
     Type.Bottom,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LP[T[LP]]) =
         orig match {
           case Invoke(_, Sized(Embed(Constant(Data.True)),  Embed(c), _)) => c.some
           case Invoke(_, Sized(Embed(Constant(Data.False)), _, Embed(a))) => a.some
