@@ -42,6 +42,7 @@ package object fs {
   type Type         = quasar.Type
 
   val Task = scalaz.concurrent.Task
+  val Type = quasar.Type
 
   def TODO: Nothing                                  = scala.Predef.???
   def cond[A](p: Boolean, ifp: => A, elsep: => A): A = if (p) ifp else elsep

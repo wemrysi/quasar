@@ -18,7 +18,7 @@ package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
 import quasar.fs._
-import quasar.qscript.{ MapFuncs => mf }
+import quasar.qscript.{ MapFunc, MapFuncs => mf }
 import matryoshka._
 import matryoshka.Recursive.ops._
 import scalaz._, Scalaz._
@@ -188,7 +188,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
 }
 
 object Fallback {
-  def apply[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep], undefinedInstance: Rep)(implicit
+  def create[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep], undefinedInstance: Rep)(implicit
     RT: Recursive[T],
     MO: Monad[F],
     NA: NumericAlgebra[Rep],
@@ -209,4 +209,71 @@ object Fallback {
     implicit val order          = OA
     implicit val facade         = JF
   }
+
+  def free[T[_[_]]: Recursive, R: NumericAlgebra : BooleanAlgebra : Order : Facade](undef: R)(implicit
+    TC: Classifier[R, Type]
+  ) =
+  create[T, InMemory.F, R](
+    InMemory.fileSystem,
+    _ => undef,
+    undef
+  )
+
+  import ygg.json._
+  import InMemory.InMemState
+
+  implicit object JValueClassifer extends Classifier[JValue, Type] {
+    def hasType(value: JValue, tpe: Type): Boolean = (value, tpe) match {
+      case (JBool(_), Type.Bool)  => true
+      case (JString(_), Type.Str) => true
+      case (JNull, Type.Null)     => true
+      case _                      => false
+    }
+  }
+
+  implicit object JValueNumericAlgebra extends NumericAlgebra[JValue] {
+    private type A = JValue
+    private def binop(x: A, y: A)(f: (BigDecimal, BigDecimal) => BigDecimal): A = (x, y) match {
+      case (JNum(a), JNum(b)) => JNum(f(a, b))
+      case _                  => JUndefined
+    }
+
+    def negate(x: A): A = x match { case JNum(a) => JNum(-a) ; case _ => JUndefined }
+    def plus(x: A, y: A): A  = binop(x, y)(_ + _)
+    def minus(x: A, y: A): A = binop(x, y)(_ - _)
+    def times(x: A, y: A): A = binop(x, y)(_ * _)
+    def div(x: A, y: A): A   = binop(x, y)(_ / _)
+    def mod(x: A, y: A): A   = binop(x, y)(_ % _)
+    def pow(x: A, y: A): A   = binop(x, y)(_ pow _.intValue)
+  }
+  implicit object JValueBooleanAlgebra extends BooleanAlgebra[JValue] {
+    private type A = JValue
+
+    def one: A = JTrue
+    def zero: A = JFalse
+
+    def complement(a: A): A = a match {
+      case JTrue  => JFalse
+      case JFalse => JTrue
+      case _      => JUndefined
+    }
+    def and(a: A, b: A): A = (a, b) match {
+      case (JBool(a), JBool(b)) => JBool(a && b)
+      case _                    => JUndefined
+    }
+    def or(a: A, b: A): A = (a, b) match {
+      case (JBool(a), JBool(b)) => JBool(a || b)
+      case _                    => JUndefined
+    }
+  }
+
+  implicit def liftIntJValue(x: Int): JNum       = JNum(x)
+  implicit def liftBoolJValue(x: Boolean): JBool = JBool(x)
+
+  def jvalue[T[_[_]]: Recursive] = free[T, JValue](JUndefined)
+
+  def evalT[T[_[_]]: Recursive](mf: MapFunc[T, JValue], state: InMemState = InMemState.empty): JValue =
+    jvalue[T].mapFunc(mf).eval(state)
+
+  def eval(mf: MapFunc[Fix, JValue]) = evalT[Fix](mf)
 }

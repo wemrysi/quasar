@@ -18,8 +18,8 @@ object Ygg {
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """
-    import quasar.physical.jsonfile.fs._, Queries._
-    import SqlQueries._
+    import quasar.physical.jsonfile.fs._, Fallback._
+    val mf = quasar.qscript.MapFuncs
   """.trim
 
   def yggDropWarts = Seq(
