@@ -17,11 +17,6 @@
 package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
-import quasar.Type
-import quasar.fs._
-import quasar.qscript.{ MapFuncs => mf }
-import quasar.ejson.EJson
-import matryoshka._
 import scalaz._, Scalaz._
 
 trait StringAlgebra[A] {

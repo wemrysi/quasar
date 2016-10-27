@@ -17,12 +17,11 @@
 package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
-import quasar.Type
 import quasar.fs._
 import quasar.qscript.{ MapFuncs => mf }
-import quasar.ejson.EJson
 import matryoshka._
 import scalaz._, Scalaz._
+import jawn.Facade
 
 trait Extractor[A, B] {
   def unapply(x: A): Option[B]
@@ -37,8 +36,6 @@ abstract class PExtractor[A, B](pf: PartialFunction[A, B]) extends Extractor[A, 
 }
 
 trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
-  def TODO: Nothing = scala.Predef.???
-
   implicit def monad: Monad[F]
   implicit def booleanAlgebra: BooleanAlgebra[Rep]
   implicit def numericAlgebra: NumericAlgebra[Rep]
@@ -51,16 +48,12 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   type QsAlgebra[QS[_]]   = AlgebraM[F, QS, Rep]
   type QsExtractor[QS[_]] = Extractor[QS[Rep], F[Rep]]
 
-  def queryFile: QueryFile ~> F
-  def readFile: ReadFile ~> F
-  def writeFile: WriteFile ~> F
-  def manageFile: ManageFile ~> F
   def fileSystem: FileSystem ~> F
 
   def undefined: Rep
   def isUndefined(value: Rep): Boolean
   def hasType(scrutinee: Rep, tpe: Type): Boolean
-  def constant(literal: T[EJson]): Rep
+  def constant(literal: T[EJson]): EJson[Rep]
   def asBoolean(value: Rep): F[Boolean]
 
   val MF: MapFuncExtractors
@@ -86,7 +79,7 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   }
 }
 
-trait FreshImpls[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
+trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
   self =>
 
   private implicit def liftRep(x: Rep): F[Rep] = x.point[F]
@@ -180,5 +173,24 @@ trait FreshImpls[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.IfUndefined(value, alt)           => if (isUndefined(value)) alt else value
       case mf.Undefined()                       => undefined
     }
+  }
+}
+
+object Fallback {
+  def apply[T[_[_]]: Recursive, F[_], Rep](fs: FileSystem ~> F)(implicit
+    F: Monad[F],
+    NA: NumericAlgebra[Rep],
+    BA: BooleanAlgebra[Rep],
+    OA: OrderAlgebra[Rep],
+    JF: Facade[Rep],
+    EJ: EJson :<: F
+  ) = new Fallback[T, F, Rep] {
+    val fileSystem = fs
+    implicit val monad          = F
+    implicit val numericAlgebra = NA
+    implicit val booleanAlgebra = BA
+    implicit val orderAlgebra   = OA
+
+    def constant(literal: T[EJson]): EJson[Rep]
   }
 }

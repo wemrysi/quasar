@@ -30,17 +30,20 @@ import RenderTree.ops._
 package object fs {
   val FsType = FileSystemType("jsonfile")
 
-  type AFile        = quasar.contrib.pathy.AFile
   type ADir         = quasar.contrib.pathy.ADir
+  type AFile        = quasar.contrib.pathy.AFile
   type APath        = quasar.contrib.pathy.APath
-  type PathSegment  = quasar.contrib.pathy.PathSegment
-  type Fix[F[_]]    = matryoshka.Fix[F]
   type AsTask[F[X]] = Task[F ~> Task]
-  type Task[A]      = scalaz.concurrent.Task[A]
+  type EJson[A]     = quasar.ejson.EJson[A]
+  type Fix[F[_]]    = matryoshka.Fix[F]
+  type PathSegment  = quasar.contrib.pathy.PathSegment
   type Table        = ygg.table.Table
+  type Task[A]      = scalaz.concurrent.Task[A]
+  type Type         = quasar.Type
 
   val Task = scalaz.concurrent.Task
 
+  def TODO: Nothing                                  = scala.Predef.???
   def cond[A](p: Boolean, ifp: => A, elsep: => A): A = if (p) ifp else elsep
   def diff[A: RenderTree](l: A, r: A): RenderedTree  = l.render diff r.render
   def showln[A: Show](x: A): Unit                    = println(x.shows)
