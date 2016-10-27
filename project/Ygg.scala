@@ -18,7 +18,7 @@ object Ygg {
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """
-    import quasar.physical.jsonfile.fs._, Fallback._
+    import quasar.physical.jsonfile.fs._, FallbackJV._
     val mf = quasar.qscript.MapFuncs
   """.trim
 

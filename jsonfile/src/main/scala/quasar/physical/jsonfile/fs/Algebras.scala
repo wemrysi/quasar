@@ -28,6 +28,23 @@ trait StringAlgebra[A] {
   def search(s: A, pattern: A, insensitive: A): A
   def substring(s: A, offset: A, length: A): A
 }
+trait NumericAlgebra[A] {
+  def negate(x: A): A
+  def plus(x: A, y: A): A
+  def minus(x: A, y: A): A
+  def times(x: A, y: A): A
+  def div(x: A, y: A): A
+  def mod(x: A, y: A): A
+  def pow(x: A, y: A): A
+}
+trait BooleanAlgebra[A] {
+  def one: A
+  def zero: A
+  def complement(a: A): A
+  def and(a: A, b: A): A
+  def or(a: A, b: A): A
+}
+
 trait TimeAlgebra[A] {
   import java.time._
   import java.time.temporal.IsoFields
@@ -82,87 +99,9 @@ trait TimeAlgebra[A] {
   def extractYear(x: A): A           = x.getYear
 }
 
-trait NumericAlgebra[A] {
-  def negate(x: A): A
-  def plus(x: A, y: A): A
-  def minus(x: A, y: A): A
-  def times(x: A, y: A): A
-  def div(x: A, y: A): A
-  def mod(x: A, y: A): A
-  def pow(x: A, y: A): A
-}
 object NumericAlgebra {
-  def apply[A](implicit z: NumericAlgebra[A]) = z
-
-  def lift[F[_]: Monad, A](alg: NumericAlgebra[A]): NumericAlgebra[F[A]] = new NumericAlgebra[F[A]] {
-    def negate(x: F[A]): F[A]         = x map alg.negate
-    def plus(x: F[A], y: F[A]): F[A]  = (x |@| y)(alg.plus)
-    def minus(x: F[A], y: F[A]): F[A] = (x |@| y)(alg.minus)
-    def times(x: F[A], y: F[A]): F[A] = (x |@| y)(alg.times)
-    def div(x: F[A], y: F[A]): F[A]   = (x |@| y)(alg.div)
-    def mod(x: F[A], y: F[A]): F[A]   = (x |@| y)(alg.mod)
-    def pow(x: F[A], y: F[A]): F[A]   = (x |@| y)(alg.pow)
-  }
-  implicit class NumericAlgebraOps[A](private val self: A) {
-    def unary_-(implicit alg: NumericAlgebra[A]): A     = alg.negate(self)
-    def +(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.plus(self, that)
-    def -(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.minus(self, that)
-    def *(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.times(self, that)
-    def /(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.div(self, that)
-    def %(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.mod(self, that)
-    def **(that: A)(implicit alg: NumericAlgebra[A]): A = alg.pow(self, that)
-  }
-}
-
-trait OrderAlgebra[A] {
-  def eqv(x: A, y: A): A
-  def neqv(x: A, y: A): A
-  def lt(x: A, y: A): A
-  def lte(x: A, y: A): A
-  def gt(x: A, y: A): A
-  def gte(x: A, y: A): A
-}
-object OrderAlgebra {
-  def apply[A](implicit z: OrderAlgebra[A]) = z
-
-  def lift[F[_]: Monad, A](alg: OrderAlgebra[A]): OrderAlgebra[F[A]] = new OrderAlgebra[F[A]] {
-    def eqv(x: F[A], y: F[A]): F[A]  = (x |@| y)(alg.eqv)
-    def neqv(x: F[A], y: F[A]): F[A] = (x |@| y)(alg.neqv)
-    def lt(x: F[A], y: F[A]): F[A]   = (x |@| y)(alg.lt)
-    def lte(x: F[A], y: F[A]): F[A]  = (x |@| y)(alg.lte)
-    def gt(x: F[A], y: F[A]): F[A]   = (x |@| y)(alg.gt)
-    def gte(x: F[A], y: F[A]): F[A]  = (x |@| y)(alg.gte)
-  }
-  implicit class OrderAlgebraOps[A](private val self: A) {
-    def <(that: A)(implicit alg: OrderAlgebra[A]): A   = alg.lt(self, that)
-    def <=(that: A)(implicit alg: OrderAlgebra[A]): A  = alg.lte(self, that)
-    def >(that: A)(implicit alg: OrderAlgebra[A]): A   = alg.gt(self, that)
-    def >=(that: A)(implicit alg: OrderAlgebra[A]): A  = alg.gte(self, that)
-    def ===(that: A)(implicit alg: OrderAlgebra[A]): A = alg.eqv(self, that)
-    def =/=(that: A)(implicit alg: OrderAlgebra[A]): A = alg.neqv(self, that)
-  }
-}
-
-trait BooleanAlgebra[A] {
-  def one: A
-  def zero: A
-  def complement(a: A): A
-  def and(a: A, b: A): A
-  def or(a: A, b: A): A
+  def apply[A](implicit z: NumericAlgebra[A]): NumericAlgebra[A] = z
 }
 object BooleanAlgebra {
-  def apply[A](implicit z: BooleanAlgebra[A]) = z
-
-  def lift[F[_]: Monad, A](alg: BooleanAlgebra[A]): BooleanAlgebra[F[A]] = new BooleanAlgebra[F[A]] {
-    def one: F[A]                   = alg.one.point[F]
-    def zero: F[A]                  = alg.zero.point[F]
-    def complement(a: F[A]): F[A]   = a map alg.complement
-    def and(a: F[A], b: F[A]): F[A] = (a |@| b)(alg.and)
-    def or(a: F[A], b: F[A]): F[A]  = (a |@| b)(alg.or)
-  }
-  implicit class BooleanAlgebraOps[A](private val self: A) {
-    def unary_!(implicit alg: BooleanAlgebra[A]): A     = alg.complement(self)
-    def &&(that: A)(implicit alg: BooleanAlgebra[A]): A = alg.and(self, that)
-    def ||(that: A)(implicit alg: BooleanAlgebra[A]): A = alg.or(self, that)
-  }
+  def apply[A](implicit z: BooleanAlgebra[A]): BooleanAlgebra[A] = z
 }

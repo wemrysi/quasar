@@ -30,16 +30,17 @@ import RenderTree.ops._
 package object fs {
   val FsType = FileSystemType("jsonfile")
 
-  type ADir         = quasar.contrib.pathy.ADir
-  type AFile        = quasar.contrib.pathy.AFile
-  type APath        = quasar.contrib.pathy.APath
-  type AsTask[F[X]] = Task[F ~> Task]
-  type EJson[A]     = quasar.ejson.EJson[A]
-  type Fix[F[_]]    = matryoshka.Fix[F]
-  type PathSegment  = quasar.contrib.pathy.PathSegment
-  type Table        = ygg.table.Table
-  type Task[A]      = scalaz.concurrent.Task[A]
-  type Type         = quasar.Type
+  type ADir                = quasar.contrib.pathy.ADir
+  type AFile               = quasar.contrib.pathy.AFile
+  type APath               = quasar.contrib.pathy.APath
+  type AsTask[F[X]]        = Task[F ~> Task]
+  type EJson[A]            = quasar.ejson.EJson[A]
+  type Fix[F[_]]           = matryoshka.Fix[F]
+  type PathSegment         = quasar.contrib.pathy.PathSegment
+  type Table               = ygg.table.Table
+  type Task[A]             = scalaz.concurrent.Task[A]
+  type Type                = quasar.Type
+  type MapFunc[T[_[_]], A] = quasar.qscript.MapFunc[T, A]
 
   val Task = scalaz.concurrent.Task
   val Type = quasar.Type
@@ -52,6 +53,20 @@ package object fs {
   implicit class PathyRFPathOps(val path: Path[Any, Any, Sandboxed]) {
     def toAbsolute: APath = mkAbsolute(rootDir, path)
     def toJavaFile: jFile = new jFile(posixCodec unsafePrintPath path)
+  }
+  implicit class BooleanAlgebraOps[A](private val self: A) {
+    def unary_!(implicit alg: BooleanAlgebra[A]): A     = alg.complement(self)
+    def &&(that: A)(implicit alg: BooleanAlgebra[A]): A = alg.and(self, that)
+    def ||(that: A)(implicit alg: BooleanAlgebra[A]): A = alg.or(self, that)
+  }
+  implicit class NumericAlgebraOps[A](private val self: A) {
+    def unary_-(implicit alg: NumericAlgebra[A]): A     = alg.negate(self)
+    def +(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.plus(self, that)
+    def -(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.minus(self, that)
+    def *(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.times(self, that)
+    def /(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.div(self, that)
+    def %(that: A)(implicit alg: NumericAlgebra[A]): A  = alg.mod(self, that)
+    def **(that: A)(implicit alg: NumericAlgebra[A]): A = alg.pow(self, that)
   }
 
   implicit def showPath: Show[APath]      = Show shows (posixCodec printPath _)

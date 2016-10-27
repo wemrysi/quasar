@@ -18,31 +18,12 @@ package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
 import quasar.fs._
-import quasar.qscript.{ MapFunc, MapFuncs => mf }
+import quasar.qscript.{ MapFuncs => mf }
 import matryoshka._
 import matryoshka.Recursive.ops._
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 import jawn.Facade
-
-trait Extractor[A, B] {
-  def unapply(x: A): Option[B]
-}
-object Extractor {
-  def partial[A, B](pf: PartialFunction[A, B]): Extractor[A, B] = apply(pf.lift)
-  def apply[A, B](f: A => Option[B]): Extractor[A, B]           = new Extractor[A, B] { def unapply(x: A) = f(x) }
-}
-
-abstract class PExtractor[A, B](pf: PartialFunction[A, B]) extends Extractor[A, B] {
-  def unapply(x: A): Option[B] = pf lift x
-}
-
-trait Classifier[Rep, Typ] {
-  def hasType(value: Rep, tpe: Typ): Boolean
-}
-object Classifier {
-}
-
-import BooleanAlgebra._, NumericAlgebra._
 
 trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def recursive: Recursive[T]
