@@ -17,7 +17,7 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.PlannerErrT
+import quasar.connector.PlannerErrT
 import quasar.contrib.pathy._
 import quasar.physical.couchbase, couchbase._
 import quasar.physical.couchbase.N1QL.{Read => _, _}

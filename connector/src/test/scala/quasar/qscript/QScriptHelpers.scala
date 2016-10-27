@@ -17,7 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, PhaseResult, PhaseResults, PhaseResultT}
+import quasar.{LogicalPlan => LP}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
