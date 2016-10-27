@@ -21,11 +21,15 @@ import quasar.fs._
 import quasar.qscript.{ MapFuncs => mf }
 import matryoshka._
 import matryoshka.Recursive.ops._
+// import matryoshka.FunctorT.ops._
+// import matryoshka.Corecursive.ops._
 import scalaz._
 import Scalaz._
 import jawn.Facade
+import java.time._
 
 trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
+  implicit def corecursive: Corecursive[T]
   implicit def recursive: Recursive[T]
   implicit def monad: Monad[F]
   implicit def booleanAlgebra: BooleanAlgebra[Rep]
@@ -35,11 +39,15 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def facade: Facade[Rep]
 
   implicit def liftBoolean(value: Boolean): F[Rep] = value.fold(booleanAlgebra.one.point[F], booleanAlgebra.zero.point[F])
+  implicit def liftLong(value: Long): F[Rep]       = (numericAlgebra fromLong value).point[F]
+  implicit def liftString(value: String): F[Rep]   = ???
 
   val BoolRep = Extractor.partial[Rep, Boolean] {
     case x if x === booleanAlgebra.one  => true
     case x if x === booleanAlgebra.zero => false
   }
+  val LongRep   = Extractor[Rep, Long](numericAlgebra asLong _)
+  val StringRep: Extractor[Rep, String] = null
 
   def undef: Rep
   def fileSystem: FileSystem ~> F
@@ -81,35 +89,35 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
     def mk(pf: PartialFunction[MapFunc[Rep], F[Rep]]) = Extractor partial pf
 
     val Time = mk {
-      case mf.Date(s)                     => TODO
-      case mf.Interval(s)                 => TODO
-      case mf.Length(len)                 => TODO
-      case mf.Now()                       => TODO
-      case mf.Time(s)                     => TODO
-      case mf.TimeOfDay(dt)               => TODO
-      case mf.Timestamp(s)                => TODO
-      case mf.ToTimestamp(millis)         => TODO
-      case mf.ExtractCentury(time)        => time.extractCentury
-      case mf.ExtractDayOfMonth(time)     => time.extractDayOfMonth
-      case mf.ExtractDayOfWeek(time)      => time.extractDayOfWeek
-      case mf.ExtractDayOfYear(time)      => time.extractDayOfYear
-      case mf.ExtractDecade(time)         => time.extractDecade
-      case mf.ExtractEpoch(time)          => time.extractEpoch
-      case mf.ExtractHour(time)           => time.extractHour
-      case mf.ExtractIsoDayOfWeek(time)   => time.extractIsoDayOfWeek
-      case mf.ExtractIsoYear(time)        => time.extractIsoYear
-      case mf.ExtractMicroseconds(time)   => time.extractMicroseconds
-      case mf.ExtractMillennium(time)     => time.extractMillennium
-      case mf.ExtractMilliseconds(time)   => time.extractMilliseconds
-      case mf.ExtractMinute(time)         => time.extractMinute
-      case mf.ExtractMonth(time)          => time.extractMonth
-      case mf.ExtractQuarter(time)        => time.extractQuarter
-      case mf.ExtractSecond(time)         => time.extractSecond
-      case mf.ExtractTimezone(time)       => time.extractTimezone
-      case mf.ExtractTimezoneHour(time)   => time.extractTimezoneHour
-      case mf.ExtractTimezoneMinute(time) => time.extractTimezoneMinute
-      case mf.ExtractWeek(time)           => time.extractWeek
-      case mf.ExtractYear(time)           => time.extractYear
+      case mf.Date(s)                      => TODO
+      case mf.Interval(s)                  => TODO
+      case mf.Length(len)                  => TODO
+      case mf.Now()                        => nowMillis
+      case mf.Time(s)                      => TODO
+      case mf.TimeOfDay(dt)                => TODO
+      case mf.Timestamp(StringRep(s))      => instantMillis(Instant.parse(s))
+      case mf.ToTimestamp(LongRep(millis)) => zonedUtcFromMillis(millis).toString
+      case mf.ExtractCentury(time)         => time.extractCentury
+      case mf.ExtractDayOfMonth(time)      => time.extractDayOfMonth
+      case mf.ExtractDayOfWeek(time)       => time.extractDayOfWeek
+      case mf.ExtractDayOfYear(time)       => time.extractDayOfYear
+      case mf.ExtractDecade(time)          => time.extractDecade
+      case mf.ExtractEpoch(time)           => time.extractEpoch
+      case mf.ExtractHour(time)            => time.extractHour
+      case mf.ExtractIsoDayOfWeek(time)    => time.extractIsoDayOfWeek
+      case mf.ExtractIsoYear(time)         => time.extractIsoYear
+      case mf.ExtractMicroseconds(time)    => time.extractMicroseconds
+      case mf.ExtractMillennium(time)      => time.extractMillennium
+      case mf.ExtractMilliseconds(time)    => time.extractMilliseconds
+      case mf.ExtractMinute(time)          => time.extractMinute
+      case mf.ExtractMonth(time)           => time.extractMonth
+      case mf.ExtractQuarter(time)         => time.extractQuarter
+      case mf.ExtractSecond(time)          => time.extractSecond
+      case mf.ExtractTimezone(time)        => time.extractTimezone
+      case mf.ExtractTimezoneHour(time)    => time.extractTimezoneHour
+      case mf.ExtractTimezoneMinute(time)  => time.extractTimezoneMinute
+      case mf.ExtractWeek(time)            => time.extractWeek
+      case mf.ExtractYear(time)            => time.extractYear
     }
     val Math = mk {
       case mf.Negate(x)      => -x
@@ -172,6 +180,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
 object Fallback {
   def create[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep], undefinedInstance: Rep)(implicit
     RT: Recursive[T],
+    CT: Corecursive[T],
     MO: Monad[F],
     NA: NumericAlgebra[Rep],
     BA: BooleanAlgebra[Rep],
@@ -186,6 +195,7 @@ object Fallback {
     val typeClassifier = TC
 
     implicit val recursive      = RT
+    implicit val corecursive    = CT
     implicit val monad          = MO
     implicit val numericAlgebra = NA
     implicit val booleanAlgebra = BA
@@ -194,7 +204,7 @@ object Fallback {
     implicit val facade         = JF
   }
 
-  def free[T[_[_]]: Recursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : Order : Facade](undef: R)(implicit
+  def free[T[_[_]]: Recursive : Corecursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : Order : Facade](undef: R)(implicit
     TC: Classifier[R, Type]
   ) =
   create[T, InMemory.F, R](

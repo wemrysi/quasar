@@ -28,6 +28,8 @@ trait StringAlgebra[A] {
   def substring(s: A, offset: A, length: A): A
 }
 trait NumericAlgebra[A] {
+  def asLong(x: A): Option[Long]
+  def fromLong(x: Long): A
   def negate(x: A): A
   def plus(x: A, y: A): A
   def minus(x: A, y: A): A

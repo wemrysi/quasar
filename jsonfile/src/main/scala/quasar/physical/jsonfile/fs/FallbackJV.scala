@@ -22,16 +22,15 @@ import matryoshka._
 import scalaz._
 import ygg.json._
 import InMemory.InMemState
-import java.time._
 
 object FallbackJV {
-  implicit def liftIntJValue(x: Int): JNum       = JNum(x)
-  implicit def liftBoolJValue(x: Boolean): JBool = JBool(x)
+  implicit def liftIntJValue(x: Int): JValue      = JNum(x)
+  implicit def liftBoolJValue(x: Boolean): JValue = JBool(x)
 
   implicit object JValueTimeAlgebra extends TimeAlgebra[JValue] {
     def fromLong(x: Long): JValue = JNum(x)
     def asZonedDateTime(x: JValue): ZonedDateTime = x match {
-      case JNum(x) => ZonedDateTime.ofInstant(Instant ofEpochMilli x.longValue, ZoneOffset.UTC)
+      case JNum(x) => zonedUtcFromMillis(x.longValue)
       case _       => null
     }
   }
@@ -52,7 +51,12 @@ object FallbackJV {
       case _                  => JUndefined
     }
 
-    def negate(x: A): A = x match { case JNum(a) => JNum(-a) ; case _ => JUndefined }
+    def asLong(x: A): Option[Long] = x match {
+      case JNum(x) => Some(x.longValue)
+      case _       => None
+    }
+    def fromLong(x: Long): A = JNum(x)
+    def negate(x: A): A      = asLong(x).fold[A](JUndefined)(x => JNum(-x))
     def plus(x: A, y: A): A  = binop(x, y)(_ + _)
     def minus(x: A, y: A): A = binop(x, y)(_ - _)
     def times(x: A, y: A): A = binop(x, y)(_ * _)
@@ -60,6 +64,7 @@ object FallbackJV {
     def mod(x: A, y: A): A   = binop(x, y)(_ % _)
     def pow(x: A, y: A): A   = binop(x, y)(_ pow _.intValue)
   }
+
   implicit object JValueBooleanAlgebra extends BooleanAlgebra[JValue] {
     private type A = JValue
 
@@ -81,7 +86,7 @@ object FallbackJV {
     }
   }
 
-  def apply[T[_[_]]: Recursive]                                                    = Fallback.free[T, JValue](JUndefined)
-  def evalT[T[_[_]]: Recursive](mf: MapFunc[T, JValue], state: InMemState): JValue = apply[T].mapFunc(mf).eval(state)
-  def eval(mf: MapFunc[Fix, JValue])                                               = evalT[Fix](mf, InMemState.empty)
+  def apply[T[_[_]]: Recursive : Corecursive]                                                    = Fallback.free[T, JValue](JUndefined)
+  def evalT[T[_[_]]: Recursive : Corecursive](mf: MapFunc[T, JValue], state: InMemState): JValue = apply[T].mapFunc(mf).eval(state)
+  def eval(mf: MapFunc[Fix, JValue])                                                             = evalT[Fix](mf, InMemState.empty)
 }

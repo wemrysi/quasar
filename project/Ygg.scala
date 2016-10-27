@@ -7,6 +7,8 @@ import scala.Seq
 object Ygg {
   def imports = """
     import quasar._, Predef._
+    import java.nio.file._
+    import java.time._
     import scalaz._, Scalaz._
     import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
   """.trim

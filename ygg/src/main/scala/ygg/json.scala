@@ -81,6 +81,8 @@ package object json {
   def jarray(elements: JValue*): JValue              = JArray(elements.toVector)
   def jobject(fields: JField*): JValue               = JObject(fields.toList)
   def jfield[A](name: String, value: JValue): JField = JField(name, value)
+  def jtrue(): JValue                                = JTrue
+  def jfalse(): JValue                               = JFalse
 
   implicit def liftJPathField(name: String): JPathNode = JPathField(name)
   implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)

@@ -54,6 +54,11 @@ package object fs {
   def diff[A: RenderTree](l: A, r: A): RenderedTree  = l.render diff r.render
   def showln[A: Show](x: A): Unit                    = println(x.shows)
 
+  def instantMillis(x: Instant): Long  = x.getEpochSecond * 1000
+  def nowMillis(): Long                = instantMillis(Instant.now)
+  def instantFromMillis(millis: Long)  = Instant ofEpochMilli millis
+  def zonedUtcFromMillis(millis: Long) = ZonedDateTime.ofInstant(instantFromMillis(millis), ZoneOffset.UTC)
+
   implicit class PathyRFPathOps(val path: Path[Any, Any, Sandboxed]) {
     def toAbsolute: APath = mkAbsolute(rootDir, path)
     def toJavaFile: jFile = new jFile(posixCodec unsafePrintPath path)
