@@ -184,10 +184,10 @@ object data {
          for {
            files <- hoist(Zip.unzipFiles(req.body)
                      .leftMap(err => InvalidMessageBodyFailure(err).toResponse[S]))
-           _     <- files.traverse { case (rFile, bytes) =>
+           _     <- files.traverse { case (aFile, bytes) =>
                      EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
                        .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
-                       .flatMap(str => handleOne(aDir </> rFile, fmt, Process.emit(str)))
+                       .flatMap(str => handleOne(rebaseA(aDir)(aFile), fmt, Process.emit(str)))
                     }
          } yield ()
         },
@@ -208,7 +208,7 @@ object data {
       Zip.zipFiles(files.toList map { file =>
         val data = R.scan(dir </> file, offset, limit)
         val bytes = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
-        (file, bytes)
+        (rootDir </> file, bytes)
       })
     }
 }
