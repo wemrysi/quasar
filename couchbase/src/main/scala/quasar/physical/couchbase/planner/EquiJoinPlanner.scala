@@ -36,12 +36,12 @@ import scalaz._, Scalaz._
 // When falling back to Map/Reduce can quickly arrive at "error (reduction too large)"
 // ╰─ https://github.com/couchbase/couchstore/search?utf8=%E2%9C%93&q=MAX_REDUCTION_SIZE
 
-final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
   extends Planner[F, EquiJoin[T, ?]] {
 
   def plan: AlgebraM[M, EquiJoin[T, ?], N1QL] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, f, combine) =>
-    for {
+    (for {
       tmpName <- genName[M]
       sN1ql   =  n1ql(src)
       lbN1ql  <- freeCataM(lBranch)(interpretM(
@@ -69,7 +69,8 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Show
                       |  f:       $f
                       |  combine: $cN1ql
                       |  n1ql:    ???""".stripMargin('|'))))
-    } yield partialQueryString("???EquiJoin???")
+    } yield ()) *>
+    unimplementedP("EquiJoin")
 
   }
 }

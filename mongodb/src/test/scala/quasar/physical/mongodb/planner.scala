@@ -364,7 +364,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $trunc(
                    $add(
-                     $divide($dayOfYear($field("baz")), $literal(Bson.Int32(92))),
+                     $divide(
+                       $subtract($month($field("baz")), $literal(Bson.Int32(1))),
+                       $literal(Bson.Int32(3))),
                      $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
            IgnoreId)))
