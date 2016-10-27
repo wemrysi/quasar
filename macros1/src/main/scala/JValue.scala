@@ -16,7 +16,6 @@
 
 package ygg.json
 
-import quasar._
 import quasar.Predef._
 import scalaz._, Scalaz._, Ordering._
 import scalaz.{ Order => Ord }
@@ -123,8 +122,12 @@ object JValue {
   }
 }
 object JBool {
-  def apply(value: Boolean): JBool         = if (value) JTrue else JFalse
-  def unapply(value: JBool): Some[Boolean] = Some(value eq JTrue)
+  def apply(value: Boolean): JBool            = if (value) JTrue else JFalse
+  def unapply(value: JValue): Option[Boolean] = value match {
+    case _: JTrue.type  => Some(true)
+    case _: JFalse.type => Some(false)
+    case _              => None
+  }
 }
 object JNum {
   def apply(value: Double): JValue             = if (value.isNaN || isInfinite(value)) JUndefined else apply(value.toString)

@@ -38,16 +38,15 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def order: Order[Rep]
   implicit def facade: Facade[Rep]
 
-  implicit def liftBoolean(value: Boolean): F[Rep] = value.fold(booleanAlgebra.one.point[F], booleanAlgebra.zero.point[F])
-  implicit def liftLong(value: Long): F[Rep]       = (numericAlgebra fromLong value).point[F]
-  implicit def liftString(value: String): F[Rep]   = ???
+  def lenses: FallbackLenses[Rep]
 
-  val BoolRep = Extractor.partial[Rep, Boolean] {
-    case x if x === booleanAlgebra.one  => true
-    case x if x === booleanAlgebra.zero => false
-  }
-  val LongRep   = Extractor[Rep, Long](numericAlgebra asLong _)
-  val StringRep: Extractor[Rep, String] = null
+  lazy val BoolRep   = Extractor(lenses.bool.getOption)
+  lazy val LongRep   = Extractor(lenses.long.getOption)
+  lazy val StringRep = Extractor(lenses.string.getOption)
+
+  implicit def liftBoolean(value: Boolean): F[Rep] = lenses.bool.set(value)(undef).point[F]
+  implicit def liftLong(value: Long): F[Rep]       = lenses.long.set(value)(undef).point[F]
+  implicit def liftString(value: String): F[Rep]   = lenses.string.set(value)(undef).point[F]
 
   def undef: Rep
   def fileSystem: FileSystem ~> F
@@ -91,7 +90,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
     val Time = mk {
       case mf.Date(s)                      => TODO
       case mf.Interval(s)                  => TODO
-      case mf.Length(len)                  => TODO
+      case mf.Length(s)                    => TODO
       case mf.Now()                        => nowMillis
       case mf.Time(s)                      => TODO
       case mf.TimeOfDay(dt)                => TODO
@@ -142,15 +141,17 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.Within(item, arr)  => TODO
     }
     val Str = mk {
-      case mf.Lower(s)                        => TODO
-      case mf.Upper(s)                        => TODO
-      case mf.Bool(s)                         => TODO
-      case mf.Integer(s)                      => TODO
-      case mf.Decimal(s)                      => TODO
-      case mf.Null(s)                         => TODO
-      case mf.ToString(value)                 => TODO
-      case mf.Search(s, pattern, insensitive) => TODO
-      case mf.Substring(s, offset, length)    => TODO
+      case mf.Lower(StringRep(s))                                 => s.toLowerCase
+      case mf.Upper(StringRep(s))                                 => s.toUpperCase
+      case mf.Bool(StringRep("true"))                             => true
+      case mf.Bool(StringRep("false"))                            => false
+      case mf.Bool(_)                                             => undef
+      case mf.Integer(StringRep(s))                               => TODO // BigInt(s)
+      case mf.Decimal(StringRep(s))                               => TODO // BigDecimal(s)
+      case mf.Null(StringRep(s))                                  => TODO
+      case mf.ToString(value)                                     => value.toString
+      case mf.Search(StringRep(s), pattern, insensitive)          => TODO
+      case mf.Substring(StringRep(s), LongRep(off), LongRep(len)) => s.slice(off.toInt, off.toInt + len.toInt): String
     }
     val Structural = mk {
       case mf.ConcatArrays(xs, ys)     => TODO
@@ -187,12 +188,14 @@ object Fallback {
     TA: TimeAlgebra[Rep],
     OA: Order[Rep],
     JF: Facade[Rep],
+    FL: FallbackLenses[Rep],
     TC: Classifier[Rep, Type]
   ) = new Fallback[T, F, Rep] {
     val fileSystem     = fs
     val ejsonImporter  = importer
     val undef          = undefinedInstance
     val typeClassifier = TC
+    val lenses         = FL
 
     implicit val recursive      = RT
     implicit val corecursive    = CT
@@ -204,7 +207,7 @@ object Fallback {
     implicit val facade         = JF
   }
 
-  def free[T[_[_]]: Recursive : Corecursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : Order : Facade](undef: R)(implicit
+  def free[T[_[_]]: Recursive : Corecursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : FallbackLenses : Order : Facade](undef: R)(implicit
     TC: Classifier[R, Type]
   ) =
   create[T, InMemory.F, R](

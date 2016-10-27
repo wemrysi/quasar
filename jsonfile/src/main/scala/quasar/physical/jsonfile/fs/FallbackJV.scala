@@ -24,14 +24,15 @@ import ygg.json._
 import InMemory.InMemState
 
 object FallbackJV {
-  implicit def liftIntJValue(x: Int): JValue      = JNum(x)
-  implicit def liftBoolJValue(x: Boolean): JValue = JBool(x)
+  implicit def liftIntJValue(x: Int): JValue       = JNum(x)
+  implicit def liftBoolJValue(x: Boolean): JValue  = JBool(x)
+  implicit def liftStringJValue(x: String): JValue = JString(x)
 
   implicit object JValueTimeAlgebra extends TimeAlgebra[JValue] {
     def fromLong(x: Long): JValue = JNum(x)
     def asZonedDateTime(x: JValue): ZonedDateTime = x match {
       case JNum(x) => zonedUtcFromMillis(x.longValue)
-      case _       => null
+      case _       => throw new Exception(x.toString)
     }
   }
 
@@ -84,6 +85,14 @@ object FallbackJV {
       case (JBool(a), JBool(b)) => JBool(a || b)
       case _                    => JUndefined
     }
+  }
+
+  implicit object JValueFallbackLenses extends FallbackLenses[JValue] {
+    import monocle._
+
+    val bool   = Optional[JValue, Boolean](JBool.unapply)(x => s => JBool(x))
+    val string = partialPrism[JValue, String] { case JString(x) => x } ((x, s) => JString(x))
+    val long   = partialPrism[JValue, Long] { case JNum(x) => x.longValue } ((x, s) => JNum(x))
   }
 
   def apply[T[_[_]]: Recursive : Corecursive]                                                    = Fallback.free[T, JValue](JUndefined)

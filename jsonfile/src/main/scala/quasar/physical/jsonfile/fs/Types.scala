@@ -17,6 +17,7 @@
 package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
+import monocle._
 
 trait Extractor[A, B] {
   def unapply(x: A): Option[B]
@@ -37,4 +38,10 @@ trait Classifier[Rep, Typ] {
   def hasType(value: Rep, tpe: Typ): Boolean
 }
 object Classifier {
+}
+
+trait FallbackLenses[Rep] {
+  def bool: Optional[Rep, Boolean]
+  def string: Optional[Rep, String]
+  def long: Optional[Rep, Long]
 }

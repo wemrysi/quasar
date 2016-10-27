@@ -28,6 +28,7 @@ import matryoshka._
 import RenderTree.ops._
 import java.time._
 import java.time.temporal.IsoFields
+import monocle.Optional
 
 package object fs {
   val FsType = FileSystemType("jsonfile")
@@ -50,9 +51,13 @@ package object fs {
   val Type = quasar.Type
 
   def TODO: Nothing                                  = scala.Predef.???
+  def abort(msg: String): Nothing                    = throw new RuntimeException(msg)
   def cond[A](p: Boolean, ifp: => A, elsep: => A): A = if (p) ifp else elsep
   def diff[A: RenderTree](l: A, r: A): RenderedTree  = l.render diff r.render
   def showln[A: Show](x: A): Unit                    = println(x.shows)
+
+  def partialPrism[S, A](f: PartialFunction[S, A])(g: (A, S) => S): Optional[S, A] =
+    Optional[S, A](f.lift)(a => s => g(a, s))
 
   def instantMillis(x: Instant): Long  = x.getEpochSecond * 1000
   def nowMillis(): Long                = instantMillis(Instant.now)
