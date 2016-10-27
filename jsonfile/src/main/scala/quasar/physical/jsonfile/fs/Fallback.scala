@@ -36,6 +36,14 @@ abstract class PExtractor[A, B](pf: PartialFunction[A, B]) extends Extractor[A, 
   def unapply(x: A): Option[B] = pf lift x
 }
 
+trait Classifier[Rep, Typ] {
+  def hasType(value: Rep, tpe: Typ): Boolean
+}
+object Classifier {
+}
+
+import BooleanAlgebra._, NumericAlgebra._
+
 trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def recursive: Recursive[T]
   implicit def monad: Monad[F]
@@ -44,19 +52,20 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def order: Order[Rep]
   implicit def facade: Facade[Rep]
 
+  implicit def liftBoolean(value: Boolean): F[Rep] = value.fold(booleanAlgebra.one.point[F], booleanAlgebra.zero.point[F])
+
+  val BoolRep = Extractor.partial[Rep, Boolean] {
+    case x if x === booleanAlgebra.one  => true
+    case x if x === booleanAlgebra.zero => false
+  }
+
+  def undef: Rep
+  def fileSystem: FileSystem ~> F
   def ejsonImporter: Algebra[EJson, Rep]
-  // implicit def fromEJson: EJson :<: F
+  def typeClassifier: Classifier[Rep, Type]
 
   type QsAlgebra[QS[_]]   = AlgebraM[F, QS, Rep]
   type QsExtractor[QS[_]] = Extractor[QS[Rep], F[Rep]]
-
-  def undefined: Rep
-  def fileSystem: FileSystem ~> F
-  def isUndefined(value: Rep): Boolean
-  def hasType(scrutinee: Rep, tpe: Type): Boolean
-  // def constant(lit: T[EJson]): Rep
-  def asBoolean(value: Rep): F[Boolean]
-  def fromBoolean(value: Boolean): F[Rep]
 
   val MF: MapFuncExtractors
 
@@ -85,7 +94,6 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
   self =>
 
   private implicit def liftRep(x: Rep): F[Rep] = x.point[F]
-  import BooleanAlgebra._, NumericAlgebra._
 
   object MF extends MapFuncExtractors {
     def mk(pf: PartialFunction[MapFunc[Rep], F[Rep]]) = Extractor partial pf
@@ -134,13 +142,13 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.Not(x)             => !x
       case mf.And(x, y)          => x && y
       case mf.Or(x, y)           => x || y
-      case mf.Eq(x, y)           => fromBoolean(x === y)
-      case mf.Neq(x, y)          => fromBoolean(x =/= y)
-      case mf.Lt(x, y)           => fromBoolean(x < y)
-      case mf.Lte(x, y)          => fromBoolean(x <= y)
-      case mf.Gt(x, y)           => fromBoolean(x > y)
-      case mf.Gte(x, y)          => fromBoolean(x >= y)
-      case mf.Between(x, lo, hi) => fromBoolean(lo <= x && x <= hi)
+      case mf.Eq(x, y)           => x === y
+      case mf.Neq(x, y)          => x =/= y
+      case mf.Lt(x, y)           => x < y
+      case mf.Lte(x, y)          => x <= y
+      case mf.Gt(x, y)           => x > y
+      case mf.Gte(x, y)          => x >= y
+      case mf.Between(x, lo, hi) => lo <= x && x <= hi
       case mf.Within(item, arr)  => TODO
     }
     val Str = mk {
@@ -169,33 +177,36 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.ZipMapKeys(map)          => TODO
     }
     val Special = mk {
-      case mf.Cond(p, ifp, elsep)               => asBoolean(p).ifM(ifp, elsep)
-      case mf.Constant(lit)                     => lit cata ejsonImporter //constant(lit) //lit cata ((x: EJson[Rep]) => fromEJson(x)) //constant(lit)
-      case mf.Guard(scrutinee, tpe, ifp, elsep) => if (hasType(scrutinee, tpe)) ifp else elsep
-      case mf.IfUndefined(value, alt)           => if (isUndefined(value)) alt else value
-      case mf.Undefined()                       => undefined
+      case mf.Cond(BoolRep(p), ifp, elsep)  => p.fold(ifp, elsep)
+      case mf.Cond(_, _, _)                 => undef
+      case mf.Constant(lit)                 => lit cata ejsonImporter
+      case mf.Guard(value, tpe, ifp, elsep) => typeClassifier.hasType(value, tpe).fold(ifp, elsep)
+      case mf.IfUndefined(value, alt)       => (value === undef).fold(alt, value)
+      case mf.Undefined()                   => undef
     }
   }
 }
 
 object Fallback {
-  def apply[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep])(implicit
+  def apply[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep], undefinedInstance: Rep)(implicit
     RT: Recursive[T],
     MO: Monad[F],
     NA: NumericAlgebra[Rep],
     BA: BooleanAlgebra[Rep],
     OA: Order[Rep],
-    JF: Facade[Rep]
+    JF: Facade[Rep],
+    TC: Classifier[Rep, Type]
   ) = new Fallback[T, F, Rep] {
-    val fileSystem              = fs
+    val fileSystem     = fs
+    val ejsonImporter  = importer
+    val undef          = undefinedInstance
+    val typeClassifier = TC
+
     implicit val recursive      = RT
     implicit val monad          = MO
     implicit val numericAlgebra = NA
     implicit val booleanAlgebra = BA
     implicit val order          = OA
     implicit val facade         = JF
-    val ejsonImporter           = importer
-
-    // def constant(lit: T[EJson]): Rep = lit cata importer
   }
 }
