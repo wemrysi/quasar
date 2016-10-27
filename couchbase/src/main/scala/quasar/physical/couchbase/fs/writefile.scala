@@ -20,13 +20,16 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.{Data, DataCodec}
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.uuid.GenUUID
 import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.couchbase.common._
 
 import com.couchbase.client.java.Bucket
+import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
+import rx.lang.scala._, JavaConverters._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -42,6 +45,7 @@ object writefile {
     S0: KeyValueStore[WriteHandle, State, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Read[Context, ?] :<:  S,
+    S3: GenUUID :<: S,
     S4: Task :<: S
   ): WriteFile ~> Free[S, ?] = λ[WriteFile ~> Free[S, ?]] {
     case Open(file)     => open(file)
@@ -85,23 +89,31 @@ object writefile {
     chunk: Vector[Data]
   )(implicit
     S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: Task :<: S
+    S1: GenUUID :<: S,
+    S2: Task :<: S
   ): Free[S, Vector[FileSystemError]] =
     (for {
       st   <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
       data <- EitherT(lift(Task.delay(chunk.foldMap(d =>
                 DataCodec.render(d).bimap(
                   err => Vector(FileSystemError.writeFailed(d, err.shows)),
-                  str => Vector({
+                  str => Vector(
                     JsonObject
                       .create()
                       .put("type", st.collection)
                       .put("value", jsonTranscoder.stringToJsonObject(str))
-                  }))
+                  ))
               ))).into)
-      _    <- lift(
-                insert(st.bucket, data)
-              ).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
+      docs <- data.traverse(d => GenUUID.Ops[S].asks(uuid =>
+                JsonDocument.create(uuid.toString, d)
+              )).liftM[EitherT[?[_], Vector[FileSystemError], ?]]
+      _    <- lift(Task.delay(
+                Observable
+                  .from(docs)
+                  .flatMap(st.bucket.async.insert(_).asScala)
+                  .toBlocking
+                  .last
+              )).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
     } yield Vector.empty).merge
 
   def close[S[_]](

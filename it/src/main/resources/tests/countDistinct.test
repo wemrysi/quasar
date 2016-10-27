@@ -3,17 +3,16 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "pending",
-    "couchbase":  "pending"
+    "couchbase":  "skip"
   },
 
   "data": "olympics.data",
 
-  "query": "select count(distinct sport) from olympics",
+  "query": "select count(distinct sport) as cnt from olympics",
 
   "predicate": "equalsExactly",
 
   "expected": [
-    { "0": 7 }
+    { "cnt": 7 }
   ]
 }

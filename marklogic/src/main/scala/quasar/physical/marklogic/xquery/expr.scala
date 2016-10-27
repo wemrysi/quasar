@@ -54,6 +54,9 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
+  def isCastable(x: XQuery, tpe: SequenceType): XQuery =
+    XQuery(s"$x castable as $tpe")
+
   def some(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
     QuantifiedExpr(Quantifier.Some, NonEmptyList(ts, tss: _*))
 
@@ -101,7 +104,7 @@ object expr {
 
       val orderClause = {
         val specs = orderSpecs map {
-          case (xqy, mod) => s"$xqy $mod"
+          case (xqy, sortDir) => s"$xqy ${sortDir.asOrderModifier}"
         } intercalate ", "
 
         val orderKeyword = orderIsStable.fold("stable order", "order")

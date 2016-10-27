@@ -29,7 +29,6 @@ trait StructuralLib extends Library {
 
   val MakeObject = BinaryFunc(
     Mapping,
-    "MAKE_OBJECT",
     "Makes a singleton object containing a single field",
     AnyObject,
     Func.Input2(Str, Top),
@@ -56,7 +55,6 @@ trait StructuralLib extends Library {
 
   val MakeArray = UnaryFunc(
     Mapping,
-    "MAKE_ARRAY",
     "Makes a singleton array containing a single element",
     AnyArray,
     Func.Input1(Top),
@@ -75,7 +73,6 @@ trait StructuralLib extends Library {
 
   val ObjectConcat: BinaryFunc = BinaryFunc(
     Mapping,
-    "OBJECT_CONCAT",
     "A right-biased merge of two objects into one object",
     AnyObject,
     Func.Input2(AnyObject, AnyObject),
@@ -104,7 +101,6 @@ trait StructuralLib extends Library {
 
   val ArrayConcat: BinaryFunc = BinaryFunc(
     Mapping,
-    "ARRAY_CONCAT",
     "A merge of two arrays into one array",
     AnyArray,
     Func.Input2(AnyArray, AnyArray),
@@ -147,7 +143,6 @@ trait StructuralLib extends Library {
   // NB: Used only during type-checking, and then compiled into either (string) Concat or ArrayConcat.
   val ConcatOp = BinaryFunc(
     Mapping,
-    "(||)",
     "A merge of two arrays/strings.",
     AnyArray ⨿ Str,
     Func.Input2(AnyArray ⨿ Str, AnyArray ⨿ Str),
@@ -175,7 +170,6 @@ trait StructuralLib extends Library {
 
   val ObjectProject = BinaryFunc(
     Mapping,
-    "({})",
     "Extracts a specified field of an object",
     Top,
     Func.Input2(AnyObject, Str),
@@ -193,7 +187,6 @@ trait StructuralLib extends Library {
 
   val ArrayProject = BinaryFunc(
     Mapping,
-    "([])",
     "Extracts a specified index of an array",
     Top,
     Func.Input2(AnyArray, Int),
@@ -207,7 +200,6 @@ trait StructuralLib extends Library {
 
   val DeleteField: BinaryFunc = BinaryFunc(
     Mapping,
-    "DELETE_FIELD",
     "Deletes a specified field from an object",
     AnyObject,
     Func.Input2(AnyObject, Str),
@@ -225,7 +217,6 @@ trait StructuralLib extends Library {
 
   val FlattenMap = UnaryFunc(
     Expansion,
-    "FLATTEN_MAP",
     "Zooms in on the values of a map, extending the current dimension with the keys",
     Top,
     Func.Input1(AnyObject),
@@ -242,7 +233,6 @@ trait StructuralLib extends Library {
 
   val FlattenArray = UnaryFunc(
     Expansion,
-    "FLATTEN_ARRAY",
     "Zooms in on the elements of an array, extending the current dimension with the indices",
     Top,
     Func.Input1(AnyArray),
@@ -258,7 +248,6 @@ trait StructuralLib extends Library {
 
   val FlattenMapKeys = UnaryFunc(
     Expansion,
-    "{*:}",
     "Zooms in on the keys of a map, also extending the current dimension with the keys",
     Top,
     Func.Input1(AnyObject),
@@ -271,7 +260,6 @@ trait StructuralLib extends Library {
 
   val FlattenArrayIndices = UnaryFunc(
     Expansion,
-    "[*:]",
     "Zooms in on the indices of an array, also extending the current dimension with the indices",
     Int,
     Func.Input1(AnyArray),
@@ -285,7 +273,6 @@ trait StructuralLib extends Library {
 
   val ShiftMap = UnaryFunc(
     Expansion,
-    "SHIFT_MAP",
     "Zooms in on the values of a map, adding the keys as a new dimension",
     Top,
     Func.Input1(AnyObject),
@@ -300,7 +287,6 @@ trait StructuralLib extends Library {
 
   val ShiftArray = UnaryFunc(
     Expansion,
-    "SHIFT_ARRAY",
     "Zooms in on the elements of an array, adding the indices as a new dimension",
     Top,
     Func.Input1(AnyArray),
@@ -321,7 +307,6 @@ trait StructuralLib extends Library {
 
   val ShiftMapKeys = UnaryFunc(
     Expansion,
-    "{_:}",
     "Zooms in on the keys of a map, also adding the keys as a new dimension",
     Top,
     Func.Input1(AnyObject),
@@ -333,7 +318,6 @@ trait StructuralLib extends Library {
 
   val ShiftArrayIndices = UnaryFunc(
     Expansion,
-    "[_:]",
     "Zooms in on the indices of an array, also adding the keys as a new dimension",
     Int,
     Func.Input1(AnyArray),
@@ -347,7 +331,6 @@ trait StructuralLib extends Library {
 
   val UnshiftMap: BinaryFunc = BinaryFunc(
     Reduction,
-    "({...})",
     "Puts the value into a map with the key.",
     AnyObject,
     Func.Input2(Top, Top),
@@ -370,7 +353,6 @@ trait StructuralLib extends Library {
 
   val UnshiftArray: UnaryFunc = UnaryFunc(
     Reduction,
-    "[...]",
     "Puts the values into an array.",
     AnyArray,
     Func.Input1(Top),
@@ -398,19 +380,6 @@ trait StructuralLib extends Library {
           x => success(Func.Input1(x)))
     })
 
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    MakeArray :: FlattenMap :: FlattenArray ::
-    FlattenMapKeys :: FlattenArrayIndices ::
-    ShiftMap :: ShiftArray :: ShiftMapKeys ::
-    ShiftArrayIndices :: UnshiftArray :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    MakeObject :: ObjectConcat :: ArrayConcat ::
-    ConcatOp :: ObjectProject :: ArrayProject ::
-    DeleteField :: UnshiftMap :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
-
   // TODO: fix types and add the VirtualFuncs to the list of functions
 
   // val MakeObjectN = new VirtualFunc {
@@ -418,7 +387,7 @@ trait StructuralLib extends Library {
     // Note: signature does not match VirtualFunc
     def apply[T[_[_]]: Corecursive](args: (T[LogicalPlan], T[LogicalPlan])*): LogicalPlan[T[LogicalPlan]] =
       args.toList match {
-        case Nil      => ConstantF(Data.Obj(ListMap()))
+        case Nil      => ConstantF(Data.Obj())
         case x :: xs  =>
           xs.foldLeft(MakeObject(x._1, x._2))((a, b) =>
             ObjectConcat(a.embed, MakeObject(b._1, b._2).embed))

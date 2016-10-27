@@ -17,8 +17,10 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, PhaseResult, PhaseResults, PhaseResultT}
+import quasar.{LogicalPlan => LP}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
+import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
@@ -65,8 +67,14 @@ trait QScriptHelpers extends TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(ProjectField(src, field))
 
+  def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ProjectIndex(src, field))
+
   def lpRead(path: String): Fix[LP] =
     LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+
+  val prov = new provenance.ProvenanceT[Fix]
 
   /** A helper when writing examples that allows them to be written in order of
     * execution.
@@ -114,4 +122,29 @@ trait QScriptHelpers extends TTypes[Fix] {
       QueryFile.convertToQScript[Fix, QS](lp))(
       f => QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](f >>> (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]]))(lp))
       .toOption.run.copoint
+
+  val ejsonNull =
+    ejson.CommonEJson(ejson.Null[Fix[EJson]]()).embed
+
+  def ejsonInt(int: Int) =
+    ejson.ExtEJson(ejson.Int[Fix[EJson]](int)).embed
+
+  def ejsonStr(str: String) =
+    ejson.CommonEJson(ejson.Str[Fix[EJson]](str)).embed
+
+  def ejsonArr(elems: Fix[EJson]*) =
+    ejson.CommonEJson(ejson.Arr(elems.toList)).embed
+
+  def ejsonMap(elems: (Fix[EJson], Fix[EJson])*) =
+    ejson.ExtEJson(ejson.Map(elems.toList)).embed
+
+  val ejsonNullArr =
+    ejsonArr(ejson.CommonEJson(ejson.Null[Fix[EJson]]()).embed)
+
+  def ejsonJoin(l: Fix[EJson], r: Fix[EJson]) =
+    ejsonMap((
+      ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
+      ejsonArr(l, r)))
+  def ejsonProjectField(field: Fix[EJson]) =
+    ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
 }

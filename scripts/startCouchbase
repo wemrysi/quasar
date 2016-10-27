@@ -16,8 +16,20 @@ curl -X POST $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
 
 sleep 5
 
-curl -X POST $CB:8091/pools/default/buckets -d 'ramQuotaMB=250&name=quasar-test&authType=sasl'
+curl -X POST $CB:8091/pools/default -d memoryQuota=400
+
+sleep 5
+
+curl -X POST $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=default&authType=sasl'
+
+sleep 5
+
+curl -X POST $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=quasar-test&authType=sasl'
 
 sleep 5
 
 curl -X POST $CB:8093/query -d 'statement=create primary index on `quasar-test`'
+
+sleep 5
+
+curl -X POST $CB:8093/query -d 'statement=create index quasar_test_type_idx on `quasar-test`(type)'

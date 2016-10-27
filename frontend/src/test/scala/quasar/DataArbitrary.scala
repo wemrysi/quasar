@@ -17,25 +17,24 @@
 package quasar
 
 import quasar.Predef._
-
-import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.threeten.bp._
+import quasar.pkg.tests._
 
 trait DataArbitrary {
   import DataArbitrary._
+  import Data.Obj
 
-  implicit val dataArbitrary: Arbitrary[Data] = Arbitrary {
+  private def genKey = Gen.alphaChar ^^ (_.toString)
+
+  implicit val dataArbitrary: Arbitrary[Data] = Arbitrary(
     Gen.oneOf(
       simpleData,
-      genData(Gen.alphaChar.map(_.toString), Gen.alphaStr, defaultInt, defaultDec, defaultId),
-      // TODO: These belong in MongoDB tests somewhere.
-      // Tricky cases:
-      Gen.const(Data.Obj(ListMap("$date" -> Data.Str("Jan 1")))),
-      SafeInt.map(x =>
-        Data.Obj(ListMap(
-          "$obj" -> Data.Obj(ListMap(
-            "$obj" -> Data.Int(x)))))))
-  }
+      genData(genKey, simpleData),
+      // Tricky cases: (TODO: These belong in MongoDB tests somewhere.)
+      const(Obj("$date" -> Data.Str("Jan 1"))),
+      SafeInt ^^ (x => Obj("$obj" -> Obj("$obj" -> Data.Int(x))))
+    )
+  )
 
   implicit def dataShrink(implicit l: Shrink[List[Data]], m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
     case Data.Arr(value) => l.shrink(value).map(Data.Arr(_))
@@ -45,69 +44,60 @@ trait DataArbitrary {
 }
 
 object DataArbitrary extends DataArbitrary {
-  import Arbitrary.arbitrary
-
   // Too big for Long
   val LargeInt = BigInt(Long.MaxValue.toString + "0")
 
   /** Long value that can safely be represented in any possible backend
     * (including those using JavaScript.)
     */
-  val SafeInt: Gen[Long] = Gen.choose(-1000L, 1000L)
+  val SafeInt: Gen[Long] = choose(-1000L, 1000L)
+  val SafeBigInt         = SafeInt ^^ (x => BigInt(x))
+  val IntAsDouble        = SafeInt ^^ (_.toDouble) // NB: Decimals that look like ints, may need special handling
 
-  val defaultInt: Gen[BigInt] =
-    Gen.oneOf(SafeInt.map(BigInt(_)), Gen.const(LargeInt))
+  val defaultInt: Gen[BigInt] = Gen.oneOf[BigInt](SafeBigInt, LargeInt)
 
   // NB: Decimals that look like ints, may need special handling
-  val defaultDec: Gen[BigDecimal] =
-    Gen.oneOf(Gen.choose(-1000.0, 1000.0), SafeInt.map(_.toDouble)) map (BigDecimal(_))
+  val defaultDec: Gen[BigDecimal] = Gen.oneOf[Double](Gen.choose(-1000.0, 1000.0), IntAsDouble) ^^ (x => BigDecimal(x))
 
-  // NB: a (nominally) valid MongoDB id, because we use this generator to test
-  //     BSON conversion, too
-  val defaultId = Gen.listOfN(24, Gen.oneOf[Char]("0123456789abcdef")) map (_.mkString)
+  // NB: a (nominally) valid MongoDB id, because we use this generator to test BSON conversion, too
+  val defaultId: Gen[String] = Gen.oneOf[Char]("0123456789abcdef") * 24 ^^ (_.mkString)
 
   // TODO: make this very conservative so as likely to work with as many backends as possible
-  val simpleData: Gen[Data] =
-    genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
+  val simpleData: Gen[Data] = genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
 
-  def genData(objKeySrc: Gen[String], strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] = {
-    val atomic = genAtomicData(strSrc, intSrc, decSrc, idSrc)
-    Gen.oneOf(
-      atomic,
-      Gen.listOf(Gen.zip(objKeySrc, atomic)) map (xs => Data.Obj(ListMap(xs: _*))),
-      Gen.listOf(atomic)                     map (Data.Arr(_)))
-  }
+  def genData(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
+    genAtomicData,
+    (genKey, genAtomicData).zip.list ^^ (xs => Data.Obj(xs: _*)),
+    genAtomicData.list ^^ Data.Arr
+  )
 
   /** Generator of atomic Data (everything but Obj and Arr). */
-  def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] =
-    Gen.oneOf(
-      Gen                    const (Data.Null        ),
-      Gen                    const (Data.True        ),
-      Gen                    const (Data.False       ),
-      Gen                    const (Data.NA          ),
-      strSrc                 map   (Data.Str(_)      ),
-      intSrc                 map   (Data.Int(_)      ),
-      decSrc                 map   (Data.Dec(_)      ),
-      genInstant             map   (Data.Timestamp(_)),
-      genDuration            map   (Data.Interval(_) ),
-      genDate                map   (Data.Date(_)     ),
-      genTime                map   (Data.Time(_)     ),
-      arbitrary[Array[Byte]] map   (Data.Binary.fromArray(_)),
-      idSrc                  map   (Data.Id(_)       ))
+  def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] = {
+    import Data._
+    Gen.oneOf[Data](
+      Null,
+      True,
+      False,
+      NA,
+      strSrc           ^^ Str,
+      intSrc           ^^ Int,
+      decSrc           ^^ Dec,
+      genInstant       ^^ Timestamp,
+      genDuration      ^^ Interval,
+      genDate          ^^ Date,
+      genTime          ^^ Time,
+      arrayOf(genByte) ^^ Binary.fromArray,
+      idSrc            ^^ Id
+    )
+  }
 
-  private def genInstant: Gen[Instant] =
-    Gen.zip(arbitrary[Int], Gen.choose[Long](0, 999)) map {
-      case (sec, millis) => Instant.ofEpochSecond(sec.toLong, millis * 1000000)
-    }
+  private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
+  private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)
+  private def genMillis: Gen[Long]      = choose(0L, 999L)
+  private def genNanos: Gen[Long]       = genMillis ^^ (_ * 1000000)
 
-  private def genDuration: Gen[Duration] =
-    Gen.zip(arbitrary[Int], Gen.choose[Long](0, 999)) map {
-      case (sec, millis) => Duration.ofSeconds(sec.toLong, millis * 1000000)
-    }
-
-  private def genDate: Gen[LocalDate] =
-    arbitrary[Int] map (d => LocalDate.ofEpochDay(d.toLong))
-
-  private def genTime: Gen[LocalTime] =
-    Gen.choose[Long](0, 24 * 60 * 60 - 1) map (LocalTime.ofSecondOfDay(_))
+  private def genInstant: Gen[Instant]   = (genSeconds, genNanos) >> Instant.ofEpochSecond
+  private def genDuration: Gen[Duration] = (genSeconds, genNanos) >> Duration.ofSeconds
+  private def genDate: Gen[LocalDate]    = genSeconds ^^ LocalDate.ofEpochDay
+  private def genTime: Gen[LocalTime]    = genSecondOfDay ^^ LocalTime.ofSecondOfDay
 }

@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar._
 import quasar.std.StdLib._
 
@@ -53,6 +54,27 @@ object ReduceFunc {
         case Arbitrary(a)    => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
         case UnshiftArray(a) => Cord("UnshiftArray(") ++ show.show(a) ++ Cord(")")
         case UnshiftMap(a1, a2) => Cord("UnshiftMap(") ++ show.show(a1) ++ Cord(", ") ++ show.show(a2) ++ Cord(")")
+      }
+    }
+
+  implicit val renderTree: Delay[RenderTree, ReduceFunc] =
+    new Delay[RenderTree, ReduceFunc] {
+      val nt = "ReduceFunc" :: Nil
+
+      def apply[A](r: RenderTree[A]) = {
+        def nAry(typ: String, as: A*): RenderedTree =
+          NonTerminal(typ :: nt, None, as.toList.map(r.render(_)))
+
+        RenderTree.make {
+          case Count(a)           => nAry("Count", a)
+          case Sum(a)             => nAry("Sum", a)
+          case Min(a)             => nAry("Min", a)
+          case Max(a)             => nAry("Max", a)
+          case Avg(a)             => nAry("Avg", a)
+          case Arbitrary(a)       => nAry("Arbitrary", a)
+          case UnshiftArray(a)    => nAry("UnshiftArray", a)
+          case UnshiftMap(a1, a2) => nAry("UnshiftMap", a1, a2)
+        }
       }
     }
 

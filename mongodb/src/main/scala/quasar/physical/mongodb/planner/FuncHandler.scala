@@ -54,14 +54,12 @@ object FuncHandler {
           case Modulo(a1, a2)        => $mod(a1, a2)
           case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
 
-          case Eq(a1, a2)            => $eq(a1, a2)
+          case MapFuncs.Eq(a1, a2)   => $eq(a1, a2)
           case Neq(a1, a2)           => $neq(a1, a2)
           case Lt(a1, a2)            => $lt(a1, a2)
           case Lte(a1, a2)           => $lte(a1, a2)
           case Gt(a1, a2)            => $gt(a1, a2)
           case Gte(a1, a2)           => $gte(a1, a2)
-
-          case Coalesce(a1, a2)      => $ifNull(a1, a2)
 
           case ConcatArrays(a1, a2)  => $concat(a1, a2)  // NB: this is valid for strings only
           case Lower(a1)             => $toLower(a1)
@@ -117,10 +115,12 @@ object FuncHandler {
           case ExtractMinute(a1) => $minute(a1)
           case ExtractMonth(a1) => $month(a1)
           case ExtractQuarter(a1) =>
-            // FIXME
-            trunc($add(
-              $divide($dayOfYear(a1), $literal(Bson.Int32(92))),
-              $literal(Bson.Int32(1))))
+            trunc(
+              $add(
+                $divide(
+                  $subtract($month(a1), $literal(Bson.Int32(1))),
+                  $literal(Bson.Int32(3))),
+                $literal(Bson.Int32(1))))
           case ExtractSecond(a1) =>
             $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
           case ExtractWeek(a1) => $week(a1)

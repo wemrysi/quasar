@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.contrib.matryoshka._
 
 import argonaut._, Argonaut._
 import matryoshka._, Recursive.ops._
@@ -158,9 +159,25 @@ object NonTerminal {
 object RenderTree extends RenderTreeInstances {
   import RenderTree.ops._
 
-  def make[A](f: A => RenderedTree): RenderTree[A] = new RenderTree[A] { def render(v: A) = f(v) }
+  def make[A](f: A => RenderedTree): RenderTree[A] =
+    new RenderTree[A] { def render(v: A) = f(v) }
 
-  def fromShow[A: Show](simpleType: String) = make[A](v => Terminal(List(simpleType), Some(v.shows)))
+  /** Always a Terminal, with a fixed type and computed label. */
+  def simple[A](nodeType: List[String], f: A => Option[String]): RenderTree[A] =
+    new RenderTree[A] { def render(v: A) = Terminal(nodeType, f(v)) }
+
+  /** Derive an instance from `Show[A]`, with a static type; e.g. `Shape(Circle(5))`. */
+  def fromShow[A: Show](simpleType: String): RenderTree[A] =
+    make[A](v => Terminal(List(simpleType), Some(v.shows)))
+
+  /** Derive an instance from `Show[A]`, where the result is one of a few choices,
+    * and suitable as the node's type; e.g. `LeftSide`. Note that the `parentType`
+    * is not shown in the usual text rendering. */
+  def fromShowAsType[A: Show](parentType: String): RenderTree[A] =
+    make[A](v => Terminal(List(v.shows, parentType), None))
+
+  /** Derive a `Show[A]` where RenderTree is defined. */
+  def toShow[A: RenderTree]: Show[A] = Show.show(_.render.show)
 
   def delayFromShow[F[_]: Functor: Foldable](implicit F: Delay[Show, F]) =
     new Delay[RenderTree, F] {
@@ -182,8 +199,8 @@ object RenderTree extends RenderTreeInstances {
   implicit def naturalTransformation[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
     F(RenderTree[A])
 
-  implicit def fix[F[_]](implicit RF: Delay[RenderTree, F]): RenderTree[Fix[F]] =
-    make(RF(fix[F]) render _.unFix)
+  implicit def free[F[_]: Functor, A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[Free[F, A]] =
+    RenderTreeT.free[A].renderTree[F](F)
 
   implicit def cofree[F[_], A: RenderTree](implicit RF: Delay[RenderTree, F]): RenderTree[Cofree[F, A]] =
     make(t => NonTerminal(List("Cofree"), None, List(t.head.render, RF(cofree[F, A]).render(t.tail))))

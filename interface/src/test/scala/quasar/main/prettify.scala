@@ -288,8 +288,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "format empty values" in {
       renderTable(List(
-        Data.Obj(ListMap()),
-        Data.Obj(ListMap()))) must_==
+        Data.Obj(),
+        Data.Obj())) must_==
         List(
           " <empty> |",
           "---------|",
@@ -311,8 +311,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "empty values" in {
       val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(ListMap()),
-        Data.Obj(ListMap())))
+        Data.Obj(),
+        Data.Obj()))
       val rows = renderStream(values, 100)
       rows.runLog.unsafePerformSync must_== Vector(
         List("<empty>"),

@@ -16,7 +16,8 @@
 
 package quasar.qscript
 
-import quasar.RenderTree
+import quasar.Predef._
+import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -75,8 +76,20 @@ object ThetaJoin {
       }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
-    RenderTree.delayFromShow
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
+    new Delay[RenderTree, ThetaJoin[T, ?]] {
+      val nt = List("ThetaJoin")
+      def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {
+          case ThetaJoin(src, lBr, rBr, on, f, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              lBr.render,
+              rBr.render,
+              on.render,
+              f.render,
+              combine.render))
+        }
+      }
 
   implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
       : Mergeable.Aux[T, ThetaJoin[T, ?]] =
@@ -101,7 +114,4 @@ object ThetaJoin {
             }
         }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[ThetaJoin[T, ?]] =
-    TTypes.normalizable[T].ThetaJoin
 }

@@ -2,8 +2,8 @@
     "name": "population of Boulder",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select sum(pop) as Population from zips where city=\"BOULDER\" and state=\"CO\"",

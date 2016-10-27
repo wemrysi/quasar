@@ -2,8 +2,8 @@
     "name": "flatten array with unflattened field",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "SELECT _id as zip, loc as loc, loc[*] as coord FROM zips",

@@ -3,8 +3,8 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "pending",
-    "couchbase":  "pending"
+    "marklogic":  "skip",
+    "couchbase":  "skip"
   },
 
   "query": "select * from zips where _id like \"8030%\" group by city",

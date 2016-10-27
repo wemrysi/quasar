@@ -2,8 +2,8 @@
     "name": "filter on list complement",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select count(*) from zips where state not in (\"AZ\", \"CO\")",

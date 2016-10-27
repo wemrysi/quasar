@@ -2,8 +2,8 @@
     "name": "group by array",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct count(*) from slamengine_commits group by parents",

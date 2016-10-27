@@ -1,8 +1,9 @@
 {
     "name": "unshift aggregation",
     "backends": {
-        "marklogic":  "pending",
-        "postgresql": "pending"
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
