@@ -3,8 +3,7 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "skip",
-    "couchbase":  "skip"
+    "marklogic":  "skip"
   },
 
   "data": "zips.data",
@@ -12,6 +11,8 @@
   "query": "select city, state, sum(pop) as totalPop from zips where city like \"BOULDER%\" group by city, state",
 
   "predicate": "containsExactly",
+
+  "ignoreFieldOrder": true,
 
   "expected": [
     { "city": "BOULDER",          "state": "CO", "totalPop": 108968 },
