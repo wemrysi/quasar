@@ -53,21 +53,21 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Date(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$dateRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$dateRegex") then v
          else null
          end)"""
       ).point[M]
     case Time(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$timeRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$timeRegex") then v
          else null
          end)"""
       ).point[M]
     case Timestamp(a1) =>
       partialQueryString(s"""
         (case
-         when regexp_contains("${n1ql(a1)}", "$timestampRegex") then v
+         when regexp_contains(${n1ql(a1)}, "$timestampRegex") then v
          else null
          end)"""
       ).point[M]
@@ -200,12 +200,12 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a3N1ql = n1ql(a3)
       partialQueryString(s"""
         (case
-         when $a3N1ql then regexp_contains("$a1N1ql", "(?i)" || "$a2N1ql")
-         else regexp_contains("$a1N1ql", "$a2N1ql")
+         when $a3N1ql then regexp_contains($a1N1ql, "(?i)" || $a2N1ql)
+         else regexp_contains($a1N1ql, $a2N1ql)
          end)"""
        ).point[M]
     case Substring(a1, a2, a3) =>
-      partialQueryString(s"""substr("${n1ql(a1)}", "${n1ql(a2)}", "${n1ql(a3)}")""").point[M]
+      partialQueryString(s"""substr(${n1ql(a1)}, ${n1ql(a2)}, ${n1ql(a3)})""").point[M]
 
     // structural
     case MakeArray(a1)                            =>
