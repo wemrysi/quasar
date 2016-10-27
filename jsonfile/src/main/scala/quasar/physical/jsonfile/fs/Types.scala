@@ -34,14 +34,10 @@ object Extractor {
   }
 }
 
-trait Classifier[Rep, Typ] {
-  def hasType(value: Rep, tpe: Typ): Boolean
-}
-object Classifier {
-}
-
-trait FallbackLenses[Rep] {
+trait FallbackTypes[Rep] {
+  def undef: Rep
   def bool: Optional[Rep, Boolean]
   def string: Optional[Rep, String]
   def long: Optional[Rep, Long]
+  def hasType(value: Rep, tpe: Type): Boolean
 }

@@ -38,25 +38,29 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def order: Order[Rep]
   implicit def facade: Facade[Rep]
 
-  def lenses: FallbackLenses[Rep]
+  val types: FallbackTypes[Rep]
+  val MF: MapFuncExtractors
 
-  lazy val BoolRep   = Extractor(lenses.bool.getOption)
-  lazy val LongRep   = Extractor(lenses.long.getOption)
-  lazy val StringRep = Extractor(lenses.string.getOption)
+  import types.undef
 
-  implicit def liftBoolean(value: Boolean): F[Rep] = lenses.bool.set(value)(undef).point[F]
-  implicit def liftLong(value: Long): F[Rep]       = lenses.long.set(value)(undef).point[F]
-  implicit def liftString(value: String): F[Rep]   = lenses.string.set(value)(undef).point[F]
+  lazy val BoolRep   = Extractor(types.bool.getOption)
+  lazy val LongRep   = Extractor(types.long.getOption)
+  lazy val StringRep = Extractor(types.string.getOption)
 
-  def undef: Rep
+  type EJRep = EJson[Rep]
+
+  implicit def liftBoolean(value: Boolean): F[Rep] = types.bool.set(value)(undef).point[F]
+  implicit def liftLong(value: Long): F[Rep]       = types.long.set(value)(undef).point[F]
+  implicit def liftString(value: String): F[Rep]   = types.string.set(value)(undef).point[F]
+  implicit def liftEJson(value: EJRep): F[Rep]     = fromEJson(value).point[F]
+
   def fileSystem: FileSystem ~> F
-  def ejsonImporter: Algebra[EJson, Rep]
-  def typeClassifier: Classifier[Rep, Type]
+  def fromEJson: Algebra[EJson, Rep]
+  def toEJson: Coalgebra[EJson, Rep]
 
   type QsAlgebra[QS[_]]   = AlgebraM[F, QS, Rep]
   type QsExtractor[QS[_]] = Extractor[QS[Rep], F[Rep]]
 
-  val MF: MapFuncExtractors
 
   trait MapFuncExtractors {
     type Ex = QsExtractor[MapFunc]
@@ -83,6 +87,8 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
   self =>
 
   private implicit def liftRep(x: Rep): F[Rep] = x.point[F]
+
+  import types.undef
 
   object MF extends MapFuncExtractors {
     def mk(pf: PartialFunction[MapFunc[Rep], F[Rep]]) = Extractor partial pf
@@ -154,7 +160,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.Substring(StringRep(s), LongRep(off), LongRep(len)) => s.slice(off.toInt, off.toInt + len.toInt): String
     }
     val Structural = mk {
-      case mf.ConcatArrays(xs, ys)     => TODO
+      case mf.ConcatArrays(xs, ys)     => ejfuns.concat(toEJson(xs), toEJson(ys))
       case mf.ConcatMaps(xs, ys)       => TODO
       case mf.DeleteField(src, field)  => TODO
       case mf.DupArrayIndices(arr)     => TODO
@@ -170,16 +176,25 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
     val Special = mk {
       case mf.Cond(BoolRep(p), ifp, elsep)  => p.fold(ifp, elsep)
       case mf.Cond(_, _, _)                 => undef
-      case mf.Constant(lit)                 => lit cata ejsonImporter
-      case mf.Guard(value, tpe, ifp, elsep) => typeClassifier.hasType(value, tpe).fold(ifp, elsep)
+      case mf.Constant(lit)                 => lit cata fromEJson
+      case mf.Guard(value, tpe, ifp, elsep) => types.hasType(value, tpe).fold(ifp, elsep)
       case mf.IfUndefined(value, alt)       => (value === undef).fold(alt, value)
       case mf.Undefined()                   => undef
+    }
+  }
+
+  object ejfuns {
+    import quasar.ejson._
+
+    def concat(xs: EJRep, ys: EJRep): EJRep = (xs.run, ys.run) match {
+      case (\/-(Arr(xs)), \/-(Arr(ys))) => Coproduct right Arr(xs ++ ys)
+      case _                            => ???
     }
   }
 }
 
 object Fallback {
-  def create[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep], undefinedInstance: Rep)(implicit
+  def create[T[_[_]], F[_], Rep](fs: FileSystem ~> F, alg: Algebra[EJson, Rep], coalg: Coalgebra[EJson, Rep])(implicit
     RT: Recursive[T],
     CT: Corecursive[T],
     MO: Monad[F],
@@ -188,14 +203,13 @@ object Fallback {
     TA: TimeAlgebra[Rep],
     OA: Order[Rep],
     JF: Facade[Rep],
-    FL: FallbackLenses[Rep],
-    TC: Classifier[Rep, Type]
+    FT: FallbackTypes[Rep]
   ) = new Fallback[T, F, Rep] {
-    val fileSystem     = fs
-    val ejsonImporter  = importer
-    val undef          = undefinedInstance
-    val typeClassifier = TC
-    val lenses         = FL
+
+    val fileSystem = fs
+    val fromEJson  = alg
+    val toEJson    = coalg
+    val types      = FT
 
     implicit val recursive      = RT
     implicit val corecursive    = CT
@@ -207,12 +221,9 @@ object Fallback {
     implicit val facade         = JF
   }
 
-  def free[T[_[_]]: Recursive : Corecursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : FallbackLenses : Order : Facade](undef: R)(implicit
-    TC: Classifier[R, Type]
+  def free[T[_[_]]: Recursive : Corecursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : FallbackTypes : Order : Facade](
+    alg: Algebra[EJson, R],
+    coalg: Coalgebra[EJson, R]
   ) =
-  create[T, InMemory.F, R](
-    InMemory.fileSystem,
-    _ => undef,
-    undef
-  )
+    create[T, InMemory.F, R](InMemory.fileSystem, alg, coalg)
 }

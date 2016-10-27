@@ -18,18 +18,7 @@ package quasar.physical.jsonfile.fs
 
 import quasar.Predef._
 
-trait StringAlgebra[A] {
-  def toLower(s: A): A
-  def toUpper(s: A): A
-  def asBoolean(s: A): A
-  def asInteger(s: A): A
-  def asDecimal(s: A): A
-  def search(s: A, pattern: A, insensitive: A): A
-  def substring(s: A, offset: A, length: A): A
-}
 trait NumericAlgebra[A] {
-  def asLong(x: A): Option[Long]
-  def fromLong(x: Long): A
   def negate(x: A): A
   def plus(x: A, y: A): A
   def minus(x: A, y: A): A
