@@ -567,7 +567,7 @@ trait Compiler[F[_]] {
               if ((rName: String) ≟ name) table
               else Fix(structural.ObjectProject(table, Fix(LP.Constant(Data.Str(name))))))
 
-      case Invokeunction(name, args) if name.toLowerCase ≟ "date_part" =>
+      case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
           case Fix(LP.Constant(Data.Str(part))) :: expr :: Nil =>
             (part.some collect {
@@ -600,7 +600,7 @@ trait Compiler[F[_]] {
             fail(WrongArgumentCount("DATE_PART", 2, args.length))
         }
 
-      case Invokeunction(name, List(a1)) =>
+      case InvokeFunction(name, List(a1)) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name))) {
           case func @ UnaryFunc(_, _, _, _, _, _, _) =>
@@ -608,7 +608,7 @@ trait Compiler[F[_]] {
           case func => fail(WrongArgumentCount(name, func.arity, 1))
         }
 
-      case Invokeunction(name, List(a1, a2)) =>
+      case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
           Fix(LP.Let(name, c1,
             relations.Cond(
@@ -624,7 +624,7 @@ trait Compiler[F[_]] {
             case func => fail(WrongArgumentCount(name, func.arity, 2))
           })
 
-      case Invokeunction(name, List(a1, a2, a3)) =>
+      case InvokeFunction(name, List(a1, a2, a3)) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name))) {
           case func @ TernaryFunc(_, _, _, _, _, _, _) =>
@@ -632,7 +632,7 @@ trait Compiler[F[_]] {
           case func => fail(WrongArgumentCount(name, func.arity, 3))
         }
 
-      case Invokeunction(name, args) =>
+      case InvokeFunction(name, args) =>
         functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
           fail(FunctionNotFound(name)))(
           func => fail(WrongArgumentCount(name, func.arity, args.length)))

@@ -39,7 +39,7 @@ package object sql {
   def binop[A] = Prism.partial[Sql[A], (A, A, BinaryOperator)] { case Binop(l, r, op) => (l, r, op) } ((Binop[A] _).tupled)
   def unop[A] = Prism.partial[Sql[A], (A, UnaryOperator)] { case Unop(a, op) => (a, op) } ((Unop[A] _).tupled)
   def ident[A] = Prism.partial[Sql[A], String] { case Ident(name) => name } (Ident(_))
-  def invokeFunction[A] = Prism.partial[Sql[A], (String, List[A])] { case Invokeunction(name, args) => (name, args) } ((Invokeunction[A] _).tupled)
+  def invokeFunction[A] = Prism.partial[Sql[A], (String, List[A])] { case InvokeFunction(name, args) => (name, args) } ((InvokeFunction[A] _).tupled)
   def matc[A] = Prism.partial[Sql[A], (A, List[Case[A]], Option[A])] { case Match(expr, cases, default) => (expr, cases, default) } ((Match[A] _).tupled)
   def switch[A] = Prism.partial[Sql[A], (List[Case[A]], Option[A])] { case Switch(cases, default) => (cases, default) } ((Switch[A] _).tupled)
   def let[A] = Prism.partial[Sql[A], (String, A, A)] { case Let(n, f, b) => (n, f, b) } ((Let[A](_, _, _)).tupled)
@@ -224,7 +224,7 @@ package object sql {
           if (op == Distinct) "(" + s + ")" else s
       }
       case Ident(name) => _qq("`", name)
-      case Invokeunction(name, args) =>
+      case InvokeFunction(name, args) =>
         (name, args) match {
           case ("like", (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
             "(" + value + ") like (" + pattern + ")"
@@ -333,7 +333,7 @@ package object sql {
           case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
           case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
 
-          case Invokeunction(name, args) => NonTerminal("Invokeunction" :: astType, Some(name), args.map(ra.render))
+          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
 
           case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
           case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))

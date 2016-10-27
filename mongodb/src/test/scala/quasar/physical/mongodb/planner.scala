@@ -3677,7 +3677,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
+    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
@@ -3703,13 +3703,13 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     sql.IdentR("pop"),
     // IntLiteralR(0),  // TODO: exposes bugs (see SD-478)
     sql.BinopR(sql.IdentR("pop"), sql.IntLiteralR(1), Minus), // an ExprOp
-    sql.InvokeunctionR("length", List(sql.IdentR("city")))) // requires JS
+    sql.InvokeFunctionR("length", List(sql.IdentR("city")))) // requires JS
   def genReduceInt = genInnerInt.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeunctionR("min", List(x)),
-    sql.InvokeunctionR("max", List(x)),
-    sql.InvokeunctionR("sum", List(x)),
-    sql.InvokeunctionR("count", List(sql.SpliceR(None)))))
+    sql.InvokeFunctionR("min", List(x)),
+    sql.InvokeFunctionR("max", List(x)),
+    sql.InvokeFunctionR("sum", List(x)),
+    sql.InvokeFunctionR("count", List(sql.SpliceR(None)))))
   def genOuterInt = Gen.oneOf(
     Gen.const(sql.IntLiteralR(0)),
     genReduceInt,
@@ -3719,17 +3719,17 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def genInnerStr = Gen.oneOf(
     sql.IdentR("city"),
     // StringLiteralR("foo"),  // TODO: exposes bugs (see SD-478)
-    sql.InvokeunctionR("lower", List(sql.IdentR("city"))))
+    sql.InvokeFunctionR("lower", List(sql.IdentR("city"))))
   def genReduceStr = genInnerStr.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeunctionR("min", List(x)),
-    sql.InvokeunctionR("max", List(x))))
+    sql.InvokeFunctionR("min", List(x)),
+    sql.InvokeFunctionR("max", List(x))))
   def genOuterStr = Gen.oneOf(
     Gen.const(sql.StringLiteralR("foo")),
     Gen.const(sql.IdentR("state")),  // possibly the grouping key, so never reduced
     genReduceStr,
-    genReduceStr.flatMap(x => sql.InvokeunctionR("lower", List(x))),   // an ExprOp
-    genReduceStr.flatMap(x => sql.InvokeunctionR("length", List(x))))  // requires JS
+    genReduceStr.flatMap(x => sql.InvokeFunctionR("lower", List(x))),   // an ExprOp
+    genReduceStr.flatMap(x => sql.InvokeFunctionR("length", List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
     fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))

@@ -308,7 +308,7 @@ object SemanticAnalysis {
             case x                => success(x)
           })(
           (Provenance.Relation(_)) ⋙ success)
-      case Invokeunction(_, args) => success(Provenance.allOf(args))
+      case InvokeFunction(_, args) => success(Provenance.allOf(args))
       case Match(_, cases, _)      =>
         success(Provenance.allOf(cases.map(_.expr)))
       case Switch(cases, _)        =>
