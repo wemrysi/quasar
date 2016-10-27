@@ -4,13 +4,17 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 set -x
 
-docker run -d --name cb -p 8091-8094:8091-8094 -p 11210:11210 arungupta/couchbase-server
+docker run -d --name cb -p 8091-8094:8091-8094 -p 11210:11210 couchbase/server:enterprise-4.5.1
 
 sleep 10
 
 # init
 
 CB='http://Administrator:password@0.0.0.0'
+
+curl $CB:8091/node/controller/setupServices -d services=kv%2Cn1ql%2Cindex%2Cfts
+
+curl $CB:8091/settings/web -d port=8091 -d username=Administrator -d password=password
 
 curl -X POST $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
 
