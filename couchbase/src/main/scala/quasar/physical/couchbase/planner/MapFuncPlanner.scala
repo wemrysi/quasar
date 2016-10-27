@@ -219,9 +219,29 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})""").point[M]
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})"""
+      prtell[M](Vector(Detail(
+        "N1QL MakeMap",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ConcatArrays(a1, a2)                     =>
-      partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"array_concat(${n1ql(a1)}, ${n1ql(a2)})"
+      prtell[M](Vector(Detail(
+        "N1QL ConcatArrays",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ConcatMaps(a1, a2)                       =>
       val a1N1ql  = n1ql(a1)
       val a2N1ql  = n1ql(a2)
