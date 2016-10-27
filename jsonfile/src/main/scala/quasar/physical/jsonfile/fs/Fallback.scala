@@ -30,6 +30,7 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def monad: Monad[F]
   implicit def booleanAlgebra: BooleanAlgebra[Rep]
   implicit def numericAlgebra: NumericAlgebra[Rep]
+  implicit def timeAlgebra: TimeAlgebra[Rep]
   implicit def order: Order[Rep]
   implicit def facade: Facade[Rep]
 
@@ -88,27 +89,27 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.TimeOfDay(dt)               => TODO
       case mf.Timestamp(s)                => TODO
       case mf.ToTimestamp(millis)         => TODO
-      case mf.ExtractCentury(time)        => TODO
-      case mf.ExtractDayOfMonth(time)     => TODO
-      case mf.ExtractDayOfWeek(time)      => TODO
-      case mf.ExtractDayOfYear(time)      => TODO
-      case mf.ExtractDecade(time)         => TODO
-      case mf.ExtractEpoch(time)          => TODO
-      case mf.ExtractHour(time)           => TODO
-      case mf.ExtractIsoDayOfWeek(time)   => TODO
-      case mf.ExtractIsoYear(year)        => TODO
-      case mf.ExtractMicroseconds(time)   => TODO
-      case mf.ExtractMillennium(time)     => TODO
-      case mf.ExtractMilliseconds(time)   => TODO
-      case mf.ExtractMinute(time)         => TODO
-      case mf.ExtractMonth(time)          => TODO
-      case mf.ExtractQuarter(time)        => TODO
-      case mf.ExtractSecond(time)         => TODO
-      case mf.ExtractTimezone(time)       => TODO
-      case mf.ExtractTimezoneHour(time)   => TODO
-      case mf.ExtractTimezoneMinute(time) => TODO
-      case mf.ExtractWeek(time)           => TODO
-      case mf.ExtractYear(time)           => TODO
+      case mf.ExtractCentury(time)        => time.extractCentury
+      case mf.ExtractDayOfMonth(time)     => time.extractDayOfMonth
+      case mf.ExtractDayOfWeek(time)      => time.extractDayOfWeek
+      case mf.ExtractDayOfYear(time)      => time.extractDayOfYear
+      case mf.ExtractDecade(time)         => time.extractDecade
+      case mf.ExtractEpoch(time)          => time.extractEpoch
+      case mf.ExtractHour(time)           => time.extractHour
+      case mf.ExtractIsoDayOfWeek(time)   => time.extractIsoDayOfWeek
+      case mf.ExtractIsoYear(time)        => time.extractIsoYear
+      case mf.ExtractMicroseconds(time)   => time.extractMicroseconds
+      case mf.ExtractMillennium(time)     => time.extractMillennium
+      case mf.ExtractMilliseconds(time)   => time.extractMilliseconds
+      case mf.ExtractMinute(time)         => time.extractMinute
+      case mf.ExtractMonth(time)          => time.extractMonth
+      case mf.ExtractQuarter(time)        => time.extractQuarter
+      case mf.ExtractSecond(time)         => time.extractSecond
+      case mf.ExtractTimezone(time)       => time.extractTimezone
+      case mf.ExtractTimezoneHour(time)   => time.extractTimezoneHour
+      case mf.ExtractTimezoneMinute(time) => time.extractTimezoneMinute
+      case mf.ExtractWeek(time)           => time.extractWeek
+      case mf.ExtractYear(time)           => time.extractYear
     }
     val Math = mk {
       case mf.Negate(x)      => -x
@@ -174,6 +175,7 @@ object Fallback {
     MO: Monad[F],
     NA: NumericAlgebra[Rep],
     BA: BooleanAlgebra[Rep],
+    TA: TimeAlgebra[Rep],
     OA: Order[Rep],
     JF: Facade[Rep],
     TC: Classifier[Rep, Type]
@@ -187,11 +189,12 @@ object Fallback {
     implicit val monad          = MO
     implicit val numericAlgebra = NA
     implicit val booleanAlgebra = BA
+    implicit val timeAlgebra    = TA
     implicit val order          = OA
     implicit val facade         = JF
   }
 
-  def free[T[_[_]]: Recursive, R: NumericAlgebra : BooleanAlgebra : Order : Facade](undef: R)(implicit
+  def free[T[_[_]]: Recursive, R: NumericAlgebra : BooleanAlgebra : TimeAlgebra : Order : Facade](undef: R)(implicit
     TC: Classifier[R, Type]
   ) =
   create[T, InMemory.F, R](

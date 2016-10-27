@@ -22,10 +22,19 @@ import matryoshka._
 import scalaz._
 import ygg.json._
 import InMemory.InMemState
+import java.time._
 
 object FallbackJV {
   implicit def liftIntJValue(x: Int): JNum       = JNum(x)
   implicit def liftBoolJValue(x: Boolean): JBool = JBool(x)
+
+  implicit object JValueTimeAlgebra extends TimeAlgebra[JValue] {
+    def fromLong(x: Long): JValue = JNum(x)
+    def asZonedDateTime(x: JValue): ZonedDateTime = x match {
+      case JNum(x) => ZonedDateTime.ofInstant(Instant ofEpochMilli x.longValue, ZoneOffset.UTC)
+      case _       => null
+    }
+  }
 
   implicit object JValueClassifer extends Classifier[JValue, Type] {
     def hasType(value: JValue, tpe: Type): Boolean = (value, tpe) match {
