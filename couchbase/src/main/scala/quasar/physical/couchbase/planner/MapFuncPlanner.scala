@@ -223,15 +223,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case ConcatArrays(a1, a2)                     =>
       partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
     case ConcatMaps(a1, a2)                       =>
-      val a1N1ql = n1ql(a1)
-      val a2N1ql = n1ql(a2)
+      val a1N1ql  = n1ql(a1)
+      val a2N1ql  = n1ql(a2)
+      val n1qlStr = s"object_concat(${n1ql(a1)}, ${n1ql(a2)})"
       prtell[M](Vector(Detail(
         "N1QL ConcatMaps",
         s"""  a1:   $a1N1ql
            |  a2:   $a2N1ql
-           |  n1ql: ???""".stripMargin('|')
-      ))) *>
-      unimplementedP("ConcatMaps")
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case ProjectField(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
       val n1qlStr = s"$a1.[$a2N1ql]"
