@@ -483,17 +483,18 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           ref2.unsafePerformSync.contents must_== contentMap
         }
       }
+
+      def utf8Bytes(str: String): Process[Task, ByteVector] =
+        Process.eval(ByteVector.encodeUtf8(str).disjunction.fold(
+          err => Task.fail(new RuntimeException(err.toString)),
+          Task.now))
+
       "upload mixed content" >> prop { (baseDir: ADir, files: Map[AFile, MessageFormat]) =>
         val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
 
         val metadata = ArchiveMetadata(files.map { case (p, fmt) =>
           p -> FileMetadata(`Content-Type`(fmt.mediaType))
         })
-
-        def utf8Bytes(str: String): Process[Task, ByteVector] =
-          Process.eval(ByteVector.encodeUtf8(str).disjunction.fold(
-            err => Task.fail(new RuntimeException(err.toString)),
-            Task.now))
 
         val metaBytes = utf8Bytes(EncodeJson.of[ArchiveMetadata].encode(metadata).pretty(minspace))
 
@@ -517,6 +518,32 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         } yield {
           response.status must_== Status.Ok
           body must_== ""
+          state.contents must_== contentMap
+        }).unsafePerformSync
+      }
+      "fail upload with no metadata" >> prop { (baseDir: ADir, files: Map[AFile, MessageFormat]) =>
+        val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+
+        val body = Zip.zipFiles[Task](
+          files.toList.map { case (p, fmt) =>
+            p -> fmt.encode[Task](Process.emitAll(content))
+                  .flatMap(str => utf8Bytes(str))
+          })
+
+        val contentMap = files.map { case (p, _) => p -> content }
+
+        val (service, ref) = serviceRef(InMemState.empty)
+        (for {
+          request <- Request(uri = pathUri(baseDir), method = Method.PUT)
+                        .withBody(body)
+                        .map(_.withContentType(`Content-Type`(MediaType.`application/zip`).some))
+          response <- service(request)
+          error    <- response.as[ApiError]
+          state    <- ref
+        } yield {
+          response.status must_== Status.UnsupportedMediaType
+          error must beApiErrorLike[DecodeFailure](
+            MediaTypeMissing(MessageFormat.supportedMediaTypes)) // TODO: Should mention ".quasar-metadata.json"
           state.contents must_== contentMap
         }).unsafePerformSync
       }
