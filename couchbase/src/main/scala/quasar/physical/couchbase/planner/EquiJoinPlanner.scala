@@ -17,14 +17,14 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._, ski.κ
 import quasar.NameGenerator
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._
-import quasar.physical.couchbase.N1QL._
+import quasar.common.PhaseResult.Detail
+import quasar.contrib.matryoshka._
+import quasar.fp._, eitherT._
+import quasar.fp.ski.κ
+import quasar.physical.couchbase._, N1QL._
 import quasar.physical.couchbase.planner.Planner._
-import quasar.qscript, qscript._
+import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -36,12 +36,12 @@ import scalaz._, Scalaz._
 // When falling back to Map/Reduce can quickly arrive at "error (reduction too large)"
 // ╰─ https://github.com/couchbase/couchstore/search?utf8=%E2%9C%93&q=MAX_REDUCTION_SIZE
 
-final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
   extends Planner[F, EquiJoin[T, ?]] {
 
   def plan: AlgebraM[M, EquiJoin[T, ?], N1QL] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, f, combine) =>
-    for {
+    (for {
       tmpName <- genName[M]
       sN1ql   =  n1ql(src)
       lbN1ql  <- freeCataM(lBranch)(interpretM(
@@ -69,7 +69,8 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Show
                       |  f:       $f
                       |  combine: $cN1ql
                       |  n1ql:    ???""".stripMargin('|'))))
-    } yield partialQueryString("???EquiJoin???")
+    } yield ()) *>
+    unimplementedP("EquiJoin")
 
   }
 }

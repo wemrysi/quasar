@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.common._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
@@ -124,9 +125,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
-      _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
+      _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
-      _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
+      _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
       phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
     } yield phys).run.value.toEither
   }
@@ -363,7 +364,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $trunc(
                    $add(
-                     $divide($dayOfYear($field("baz")), $literal(Bson.Int32(92))),
+                     $divide(
+                       $subtract($month($field("baz")), $literal(Bson.Int32(1))),
+                       $literal(Bson.Int32(3))),
                      $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
            IgnoreId)))

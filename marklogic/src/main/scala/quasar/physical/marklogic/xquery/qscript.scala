@@ -181,11 +181,18 @@ object qscript {
     qs.name("length").qn[F] map { fname =>
       declare(fname)(
         $("arrOrStr") as SequenceType("item()")
-      ).as(SequenceType("xs:integer")) { arrOrStr: XQuery =>
+      ).as(SequenceType("xs:integer?")) { arrOrStr: XQuery =>
         typeswitch(arrOrStr)(
-          $("str") as SequenceType("xs:string") return_ (fn.stringLength(_)),
-          $("arr") as SequenceType("element()") return_ (arr => fn.count(arr `/` child.node()))
-        ) default 0.xqy
+          $("arr") as SequenceType("element()") return_ { arr =>
+            let_("$ct" -> fn.count(arr `/` child.element())) return_ {
+              if_("$ct".xqy gt 0.xqy)
+              .then_ { "$ct".xqy }
+              .else_ { fname(fn.string(arr)) }
+            }
+          },
+          $("qn")  as SequenceType("xs:QName")  return_ (qn => fname(fn.string(qn))),
+          $("str") as SequenceType("xs:string") return_ (fn.stringLength(_))
+        ) default emptySeq
       }
     }
 

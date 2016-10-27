@@ -16,10 +16,11 @@
 
 package quasar.physical.couchbase.planner
 
+import quasar.NameGenerator
+import quasar.common.PhaseResultT
 import quasar.contrib.matryoshka.ShowT
-import quasar.{NameGenerator, PhaseResultT}
 import quasar.physical.couchbase._
-import quasar.qscript, qscript._
+import quasar.qscript._
 
 import matryoshka._
 import scalaz._
@@ -54,7 +55,7 @@ object Planner {
     : Planner[F, Const[ShiftedRead, ?]] =
     new ShiftedReadPlanner[F]
 
-  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
     : Planner[F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[F, T]
 
@@ -66,7 +67,7 @@ object Planner {
     : Planner[F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
     : Planner[F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[F, T]
 

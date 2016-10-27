@@ -18,6 +18,7 @@ package quasar.physical.mongodb.fs
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._

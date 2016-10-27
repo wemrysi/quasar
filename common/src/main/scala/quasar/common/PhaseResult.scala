@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.common
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
+import quasar.{NonTerminal, RenderedTree, RenderTree, Terminal}, RenderTree.ops._
 
 import argonaut._, Argonaut._
 import scalaz.Show

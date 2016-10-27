@@ -17,13 +17,13 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._, ski.κ
 import quasar.NameGenerator
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._
-import quasar.physical.couchbase.N1QL._, Select._
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
+import quasar.common.PhaseResult.Detail
+import quasar.contrib.matryoshka._
+import quasar.fp._, eitherT._
+import quasar.fp.ski.κ
+import quasar.physical.couchbase._, N1QL._, Select._
 import quasar.qscript, qscript._
 import quasar.std.StdLib.string._
 
@@ -71,30 +71,30 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
          else null
          end)"""
       ).point[M]
-    case Interval(a1) => ???
-    case TimeOfDay(a1) => ???
-    case ToTimestamp(a1) => ???
-    case ExtractCentury(a1) => ???
-    case ExtractDayOfMonth(a1) => ???
-    case ExtractDecade(a1) => ???
-    case ExtractDayOfWeek(a1) => ???
-    case ExtractDayOfYear(a1) => ???
-    case ExtractEpoch(a1) => ???
-    case ExtractHour(a1) => ???
-    case ExtractIsoDayOfWeek(a1) => ???
-    case ExtractIsoYear(a1) => ???
-    case ExtractMicroseconds(a1) => ???
-    case ExtractMillennium(a1) => ???
-    case ExtractMilliseconds(a1) => ???
-    case ExtractMinute(a1) => ???
-    case ExtractMonth(a1) => ???
-    case ExtractQuarter(a1) => ???
-    case ExtractSecond(a1) => ???
-    case ExtractTimezone(a1) => ???
-    case ExtractTimezoneHour(a1) => ???
-    case ExtractTimezoneMinute(a1) => ???
-    case ExtractWeek(a1) => ???
-    case ExtractYear(a1) => ???
+    case Interval(a1)              => unimplementedP("Interval")
+    case TimeOfDay(a1)             => unimplementedP("TimeOfDay")
+    case ToTimestamp(a1)           => unimplementedP("ToTimestamp")
+    case ExtractCentury(a1)        => unimplementedP("ExtractCentury")
+    case ExtractDayOfMonth(a1)     => unimplementedP("ExtractDayOfMonth")
+    case ExtractDecade(a1)         => unimplementedP("ExtractDecade")
+    case ExtractDayOfWeek(a1)      => unimplementedP("ExtractDayOfWeek")
+    case ExtractDayOfYear(a1)      => unimplementedP("ExtractDayOfYear")
+    case ExtractEpoch(a1)          => unimplementedP("ExtractEpoch")
+    case ExtractHour(a1)           => unimplementedP("ExtractHour")
+    case ExtractIsoDayOfWeek(a1)   => unimplementedP("ExtractIsoDayOfWeek")
+    case ExtractIsoYear(a1)        => unimplementedP("ExtractIsoYear")
+    case ExtractMicroseconds(a1)   => unimplementedP("ExtractMicroseconds")
+    case ExtractMillennium(a1)     => unimplementedP("ExtractMillennium")
+    case ExtractMilliseconds(a1)   => unimplementedP("ExtractMilliseconds")
+    case ExtractMinute(a1)         => unimplementedP("ExtractMinute")
+    case ExtractMonth(a1)          => unimplementedP("ExtractMonth")
+    case ExtractQuarter(a1)        => unimplementedP("ExtractQuarter")
+    case ExtractSecond(a1)         => unimplementedP("ExtractSecond")
+    case ExtractTimezone(a1)       => unimplementedP("ExtractTimezone")
+    case ExtractTimezoneHour(a1)   => unimplementedP("ExtractTimezoneHour")
+    case ExtractTimezoneMinute(a1) => unimplementedP("ExtractTimezoneMinute")
+    case ExtractWeek(a1)           => unimplementedP("ExtractWeek")
+    case ExtractYear(a1)           => unimplementedP("ExtractYear")
     case Now() =>
       partialQueryString("now_str()").point[M]
 
@@ -129,31 +129,23 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       partialQueryString(s"(${n1ql(a1)} > ${n1ql(a2)})").point[M]
     case Gte(a1, a2)         =>
       partialQueryString(s"(${n1ql(a1)} >= ${n1ql(a2)})").point[M]
-    case IfUndefined(a1, a2) => ???
+    case IfUndefined(a1, a2) => unimplementedP("IfUndefined")
     case And(a1, a2)         =>
       partialQueryString(s"(${n1ql(a1)} and ${n1ql(a2)})").point[M]
     case Or(a1, a2)          =>
       partialQueryString(s"(${n1ql(a1)} or ${n1ql(a2)})").point[M]
     case Between(a1, a2, a3) =>
-      for {
-        t      <- genName[M]
-        a1N1ql =  n1ql(a1)
-        a2N1ql =  n1ql(a2)
-        a3N1ql =  n1ql(a3)
-        s      =  select(
-                    value         = true,
-                    resultExprs   = t.wrapNel,
-                    keyspace      = a1,
-                    keyspaceAlias = t) |>
-                  filter.set(s"$t between $a2N1ql and $a3N1ql".some)
-        sN1ql  =  n1ql(s)
-        _      <- prtell[M](Vector(Detail(
-                    "N1QL Between",
-                    s"""  a1:   $a1N1ql
-                       |  a2:   $a2N1ql
-                       |  a3:   $a3N1ql
-                       |  n1ql: $sN1ql""".stripMargin('|'))))
-      } yield s
+      val a1N1ql =  n1ql(a1)
+      val a2N1ql =  n1ql(a2)
+      val a3N1ql =  n1ql(a3)
+      val b      =  s"$a1N1ql >= $a2N1ql and $a1N1ql <= $a3N1ql"
+      prtell[M](Vector(Detail(
+        "N1QL Between",
+        s"""  a1:   $a1N1ql
+           |  a2:   $a2N1ql
+           |  a3:   $a3N1ql
+           |  n1ql: $b""".stripMargin('|')
+      ))).as(partialQueryString(b))
     case Cond(cond, then_, else_) =>
       partialQueryString(s"""
         (case
@@ -227,7 +219,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, "${n1ql(a1)}", ${n1ql(a2)})""").point[M]
+      partialQueryString(s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})""").point[M]
     case ConcatArrays(a1, a2)                     =>
       partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
     case ConcatMaps(a1, a2)                       =>
@@ -238,12 +230,11 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         s"""  a1:   $a1N1ql
            |  a2:   $a2N1ql
            |  n1ql: ???""".stripMargin('|')
-      ))).as(
-        partialQueryString("???ConcatMaps???")
-      )
+      ))) *>
+      unimplementedP("ConcatMaps")
     case ProjectField(PartialQueryString(a1), a2) =>
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1.$a2N1ql"
+      val n1qlStr = s"$a1.[$a2N1ql]"
       prtell[M](Vector(Detail(
         "N1QL ProjectField(PartialQueryString(_), _)",
         s"""  a1:   $a1
@@ -259,7 +250,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         a2N1ql   =  n1ql(a2)
         s        =  select(
                       value         = true,
-                      resultExprs   = a2N1ql.wrapNel,
+                      resultExprs   = s"$tempName.[$a2N1ql]".wrapNel,
                       keyspace      = a1,
                       keyspaceAlias = tempName)
         sN1ql    =  n1ql(s)
@@ -298,18 +289,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       partialQueryString(s"object_remove(${n1ql(a2)}, ${n1ql(a1)})").point[M]
 
     // helpers & QScript-specific
-    case DupMapKeys(a1)                   => ???
-    case DupArrayIndices(a1)              => ???
+    case DupMapKeys(a1)                   => unimplementedP("DupMapKeys")
+    case DupArrayIndices(a1)              => unimplementedP("DupArrayIndices")
     case ZipMapKeys(a1)                   =>
       val a1N1ql = n1ql(a1)
       prtell[M](Vector(Detail(
         "N1QL ZipMapKeys",
         s"""  a1:   $a1N1ql
            |  n1ql: ???""".stripMargin('|')
-      ))).as(
-        partialQueryString(s"???ZipMapKeys???")
-      )
-    case ZipArrayIndices(a1)              => ???
+      ))) *>
+      unimplementedP("ZipMapKeys")
+    case ZipArrayIndices(a1)              => unimplementedP("ZipArrayIndices")
     case Range(a1, a2)                    =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)

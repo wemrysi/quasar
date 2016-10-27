@@ -136,6 +136,9 @@ object transformPaths {
     transformIn(g, liftFT[S])
   }
 
+  private def transformFile(inPath: EndoK[AbsPath])(lp: Fix[LogicalPlan]): Fix[LogicalPlan] =
+    lp.transAna[LogicalPlan](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
+
   /** Returns a natural transformation that transforms all paths in `QueryFile`
     * operations using the given functions.
     *
@@ -152,18 +155,17 @@ object transformPaths {
   ): S ~> Free[S, ?] = {
     import QueryFile._
 
-    val Q             = QueryFile.Ops[S]
-    val U             = QueryFile.Unsafe[S]
-    val translateFile = natToFunction[AbsPath, AbsPath, File](inPath)
+    val Q = QueryFile.Ops[S]
+    val U = QueryFile.Unsafe[S]
 
     val g = λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
-        Q.execute(lp.transAna(transformLPPaths(translateFile)), inPath(out))
+        Q.execute(transformFile(inPath)(lp), inPath(out))
           .bimap(transformErrorPath(outPath), outPath(_))
           .run.run
 
       case EvaluatePlan(lp) =>
-        U.eval(lp.transAna(transformLPPaths(translateFile)))
+        U.eval(transformFile(inPath)(lp))
           .leftMap(transformErrorPath(outPath))
           .run.run
 
@@ -176,7 +178,7 @@ object transformPaths {
         U.close(h)
 
       case Explain(lp) =>
-        Q.explain(lp.transAna(transformLPPaths(translateFile)))
+        Q.explain(transformFile(inPath)(lp))
           .leftMap(transformErrorPath(outPath))
           .run.run
 
@@ -240,7 +242,7 @@ object transformPaths {
     fsPathError.modify(f(_)) compose
     fsUnkRdError.modify(f(_)) compose
     fsUnkWrError.modify(f(_)) compose
-    fsPlannerError.modify(_.transAna(transformLPPaths(natToFunction[AbsPath,AbsPath,File](f))))
+    fsPlannerError.modify(transformFile(f))
 
   private def transformLPPaths(f: AFile => AFile) = λ[LogicalPlan ~> LogicalPlan] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
