@@ -16,6 +16,7 @@
 
 package ygg.json
 
+import quasar._
 import quasar.Predef._
 import scalaz._, Scalaz._, Ordering._
 import scalaz.{ Order => Ord }

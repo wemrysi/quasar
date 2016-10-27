@@ -316,7 +316,13 @@ trait ColumnarTableModule {
     def columns: ColumnMap          = slicesStream.head.columns
     def toVector: Vector[JValue]    = toJValues.toVector
     def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
-    def toData: Stream[Data]        = toJValues map (x => jawn.Parser.parseUnsafe[Data](x.toString))
+    def toDataStream = toJValues map jvalueToData
+
+    def toData: Data = toDataStream match {
+      case Seq()  => Data.NA
+      case Seq(d) => d
+      case xs     => Data.Arr(xs.toList)
+    }
 
     def companion                                                         = Table
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)

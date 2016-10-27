@@ -17,10 +17,13 @@
 package quasar.pkg
 
 import scala.{ inline, AnyVal }
-import scalaz.{ Show, Equal }
+import scalaz.{ Show, Order, Equal }
 
 final class EqualBy[A] {
   def apply[B](f: A => B)(implicit z: Equal[B]): Equal[A] = z contramap f
+}
+final class OrdBy[A] {
+  def apply[B](f: A => B)(implicit z: Order[B]): Order[A] = z contramap f
 }
 final class ShowBy[A] {
   def apply[B](f: A => B)(implicit z: Show[B]): Show[A] = Show.show[A](x => z show f(x))

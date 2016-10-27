@@ -25,27 +25,7 @@ import quasar.ejson.EJson
 object Table {
   implicit val codec = DataCodec.Precise
 
-  def fromEJson[A](json: EJson[A])(f: A => JValue): Table = ???
-
-  def dataToJValue(d: Data): JValue = d match {
-    case Data.NA => JUndefined
-    case _       =>
-      DataCodec render d match {
-        case -\/(e)  => throw new RuntimeException(e.toString)
-        case \/-(jv) =>
-          (JParser parseFromString jv).disjunction match {
-            case -\/(t) => throw t
-            case \/-(r) => r
-          }
-      }
-  }
-
-  def fromData(data: Vector[Data]): Table = {
-    val res = fromJson(data map dataToJValue)
-    println("DATA: " + data)
-    println("TABLE: " + res.toJValues.mkString("\n"))
-    res
-  }
+  def fromData(data: Vector[Data]): Table = fromJson(data map dataToJValue)
   def fromFile(file: jFile): Table        = fromJson((JParser parseManyFromFile file).orThrow)
   def fromString(json: String): Table     = fromJson(Seq(JParser parseUnsafe json))
   def fromJValues(json: JValue*): Table   = fromJson(json.toVector)
@@ -157,7 +137,7 @@ trait Table {
   def sort(key: TransSpec1, order: DesiredSortOrder): NeedTable
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
-  def toData: Stream[Data]
+  def toData: Data
   def toJValues: Stream[JValue]
   def toJson: Need[Stream[JValue]]
   def zip(t2: Table): NeedTable

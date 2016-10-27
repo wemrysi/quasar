@@ -49,5 +49,6 @@ trait PackageMethods {
 
   /** Type parameter curriers. */
   def eqBy[A]   = new EqualBy[A]
+  def ordBy[A]  = new OrdBy[A]
   def showBy[A] = new ShowBy[A]
 }

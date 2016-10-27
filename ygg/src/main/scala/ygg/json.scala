@@ -19,6 +19,7 @@ package ygg
 import jawn._
 import ygg.common._
 import scalaz._, Scalaz._
+import quasar.Data
 
 package object json {
   type JSchemaElem = ygg.json.JPath -> ygg.table.CType
@@ -31,6 +32,24 @@ package object json {
 
   val NoJPath = JPath()
   def undef: JValue = JUndefined
+
+  def jvalueToData(x: JValue): Data = x match {
+    case JUndefined => Data.NA
+    case _          => jawn.Parser.parseUnsafe[Data](x.toString)
+  }
+  def dataToJValue(d: Data): JValue = {
+    import quasar._
+    implicit val codec = DataCodec.Precise
+
+    d match {
+      case Data.NA => JUndefined
+      case _       =>
+        (DataCodec render d).fold(
+          e => abort(e.toString),
+          jv => (JParser parseFromString jv).disjunction.fold(throw _, x => x)
+        )
+    }
+  }
 
   def toRecord(ids: Array[Long], jv: JValue): JValue = jobject(
     "key"   -> jarray(ids map (x => JNum(x)): _*),
