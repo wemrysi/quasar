@@ -221,7 +221,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case MakeMap(a1, a2)                          =>
       val a1N1ql  = n1ql(a1)
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"""object_add({}, ${n1ql(a1)}, ${n1ql(a2)})"""
+      val n1qlStr = s"""object_add({}, $a1N1ql, $a2N1ql)"""
       prtell[M](Vector(Detail(
         "N1QL MakeMap",
         s"""  a1:   $a1N1ql
@@ -233,7 +233,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case ConcatArrays(a1, a2)                     =>
       val a1N1ql  = n1ql(a1)
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"array_concat(${n1ql(a1)}, ${n1ql(a2)})"
+      val n1qlStr = s"ifnull($a1N1ql || $a2N1ql, array_concat($a1N1ql, $a2N1ql))"
       prtell[M](Vector(Detail(
         "N1QL ConcatArrays",
         s"""  a1:   $a1N1ql
@@ -245,7 +245,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case ConcatMaps(a1, a2)                       =>
       val a1N1ql  = n1ql(a1)
       val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"object_concat(${n1ql(a1)}, ${n1ql(a2)})"
+      val n1qlStr = s"object_concat($a1N1ql, $a2N1ql)"
       prtell[M](Vector(Detail(
         "N1QL ConcatMaps",
         s"""  a1:   $a1N1ql

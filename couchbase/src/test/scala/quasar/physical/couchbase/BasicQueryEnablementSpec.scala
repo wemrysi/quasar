@@ -101,10 +101,6 @@ class BasicQueryEnablementSpec
       pending("#1545"))
 
     testSql2ToN1ql(
-      """select address from `beer-sample` where name = "Brasserie de Silly"""",
-      """select value v from (select value {"address": array_concat(array_concat(array_concat([array_concat([_1[0]], [_1[1]])[0]], [array_concat([_1[0]], [_1[1]])[0][0][0]]), [array_concat([_1[0]], [_1[1]])[1]]), [(array_concat([_1[0]], [_1[1]])[1].["name"] = "Brasserie de Silly")])[2].["address"]} from (select value _0 from (select value [meta(v).id, ifmissing(v.`value`, v)] from `beer-sample` v) as _0 where array_concat(array_concat(array_concat([array_concat([_0[0]], [_0[1]])[0]], [array_concat([_0[0]], [_0[1]])[0][0][0]]), [array_concat([_0[0]], [_0[1]])[1]]), [(array_concat([_0[0]], [_0[1]])[1].["name"] = "Brasserie de Silly")])[3]) as _1) as v""")
-
-    testSql2ToN1ql(
       "select count(*) from `beer-sample`",
       """select value v from (select value object_add({}, "0", count(_0)) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
 
