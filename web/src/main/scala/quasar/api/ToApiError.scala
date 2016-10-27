@@ -17,8 +17,9 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
+import quasar.{Data, DataCodec, Planner, SemanticError}
 import quasar.RenderTree.ops._
+import quasar.connector.EnvironmentError
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._

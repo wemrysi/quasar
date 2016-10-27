@@ -18,6 +18,8 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
+import quasar.common._
+import quasar.frontend._
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._, free._
 import quasar.fp.ski._

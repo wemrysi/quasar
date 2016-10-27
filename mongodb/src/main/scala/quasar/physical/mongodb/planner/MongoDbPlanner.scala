@@ -19,6 +19,7 @@ package quasar.physical.mongodb.planner
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{fs => _, LogicalPlan => LP, _}, RenderTree.ops._, Type._
+import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.shapeless._
 import quasar.fp._

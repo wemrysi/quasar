@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-import quasar.Predef.{List, String, Vector}
+import quasar.Predef._
 import quasar.{LogicalPlan => LP}
+import quasar.common.{PhaseResult, PhaseResultW}
+import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir
-import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.sql._
 import quasar.std.StdLib.set._
 
@@ -34,20 +36,6 @@ import scalaz.syntax.nel._
 import scalaz.syntax.writer._
 
 package object quasar {
-  type SemanticErrors = NonEmptyList[SemanticError]
-  type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
-
-  type PhaseResults = Vector[PhaseResult]
-  type PhaseResultW[A] = Writer[PhaseResults, A]
-  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
-
-  type CompileM[A] = SemanticErrsT[PhaseResultW, A]
-
-  type EnvErr[A] = Failure[EnvironmentError, A]
-  type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
-
-  type PlannerErrT[F[_], A] = EitherT[F, Planner.PlannerError, A]
-
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
       EitherT(r.point[PhaseResultW]) flatMap { a =>

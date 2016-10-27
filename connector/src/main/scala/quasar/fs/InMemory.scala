@@ -17,7 +17,8 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
+import quasar.{Data, LogicalPlan}
+import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
