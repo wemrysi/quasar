@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fs._
 import quasar.qscript.{ MapFuncs => mf }
 import matryoshka._
+import matryoshka.Recursive.ops._
 import scalaz._, Scalaz._
 import jawn.Facade
 
@@ -36,25 +37,26 @@ abstract class PExtractor[A, B](pf: PartialFunction[A, B]) extends Extractor[A, 
 }
 
 trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
+  implicit def recursive: Recursive[T]
   implicit def monad: Monad[F]
   implicit def booleanAlgebra: BooleanAlgebra[Rep]
   implicit def numericAlgebra: NumericAlgebra[Rep]
-  implicit def orderAlgebra: OrderAlgebra[Rep]
+  implicit def order: Order[Rep]
+  implicit def facade: Facade[Rep]
 
-  // implicit def booleanAlgebraF: BooleanAlgebra[F[Rep]] = BooleanAlgebra.lift[F, Rep](booleanAlgebra)
-  // implicit def numericAlgebraF: NumericAlgebra[F[Rep]] = NumericAlgebra.lift[F, Rep](numericAlgebra)
-  // implicit def orderAlgebraF: OrderAlgebra[F[Rep]]     = OrderAlgebra.lift[F, Rep](orderAlgebra)
+  def ejsonImporter: Algebra[EJson, Rep]
+  // implicit def fromEJson: EJson :<: F
 
   type QsAlgebra[QS[_]]   = AlgebraM[F, QS, Rep]
   type QsExtractor[QS[_]] = Extractor[QS[Rep], F[Rep]]
 
-  def fileSystem: FileSystem ~> F
-
   def undefined: Rep
+  def fileSystem: FileSystem ~> F
   def isUndefined(value: Rep): Boolean
   def hasType(scrutinee: Rep, tpe: Type): Boolean
-  def constant(literal: T[EJson]): EJson[Rep]
+  // def constant(lit: T[EJson]): Rep
   def asBoolean(value: Rep): F[Boolean]
+  def fromBoolean(value: Boolean): F[Rep]
 
   val MF: MapFuncExtractors
 
@@ -83,7 +85,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
   self =>
 
   private implicit def liftRep(x: Rep): F[Rep] = x.point[F]
-  import BooleanAlgebra._, NumericAlgebra._, OrderAlgebra._
+  import BooleanAlgebra._, NumericAlgebra._
 
   object MF extends MapFuncExtractors {
     def mk(pf: PartialFunction[MapFunc[Rep], F[Rep]]) = Extractor partial pf
@@ -130,15 +132,15 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
     }
     val Bool = mk {
       case mf.Not(x)             => !x
-      case mf.Eq(x, y)           => x === y
-      case mf.Neq(x, y)          => x =/= y
-      case mf.Lt(x, y)           => x < y
-      case mf.Lte(x, y)          => x <= y
-      case mf.Gt(x, y)           => x > y
-      case mf.Gte(x, y)          => x >= y
       case mf.And(x, y)          => x && y
       case mf.Or(x, y)           => x || y
-      case mf.Between(x, lo, hi) => lo <= x && x <= hi
+      case mf.Eq(x, y)           => fromBoolean(x === y)
+      case mf.Neq(x, y)          => fromBoolean(x =/= y)
+      case mf.Lt(x, y)           => fromBoolean(x < y)
+      case mf.Lte(x, y)          => fromBoolean(x <= y)
+      case mf.Gt(x, y)           => fromBoolean(x > y)
+      case mf.Gte(x, y)          => fromBoolean(x >= y)
+      case mf.Between(x, lo, hi) => fromBoolean(lo <= x && x <= hi)
       case mf.Within(item, arr)  => TODO
     }
     val Str = mk {
@@ -167,8 +169,8 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.ZipMapKeys(map)          => TODO
     }
     val Special = mk {
-      case mf.Cond(p, ifp, elsep)               => Monad[F].ifM(asBoolean(p), ifp, elsep)
-      case mf.Constant(lit)                     => constant(lit)
+      case mf.Cond(p, ifp, elsep)               => asBoolean(p).ifM(ifp, elsep)
+      case mf.Constant(lit)                     => lit cata ejsonImporter //constant(lit) //lit cata ((x: EJson[Rep]) => fromEJson(x)) //constant(lit)
       case mf.Guard(scrutinee, tpe, ifp, elsep) => if (hasType(scrutinee, tpe)) ifp else elsep
       case mf.IfUndefined(value, alt)           => if (isUndefined(value)) alt else value
       case mf.Undefined()                       => undefined
@@ -177,20 +179,23 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
 }
 
 object Fallback {
-  def apply[T[_[_]]: Recursive, F[_], Rep](fs: FileSystem ~> F)(implicit
-    F: Monad[F],
+  def apply[T[_[_]], F[_], Rep](fs: FileSystem ~> F, importer: Algebra[EJson, Rep])(implicit
+    RT: Recursive[T],
+    MO: Monad[F],
     NA: NumericAlgebra[Rep],
     BA: BooleanAlgebra[Rep],
-    OA: OrderAlgebra[Rep],
-    JF: Facade[Rep],
-    EJ: EJson :<: F
+    OA: Order[Rep],
+    JF: Facade[Rep]
   ) = new Fallback[T, F, Rep] {
-    val fileSystem = fs
-    implicit val monad          = F
+    val fileSystem              = fs
+    implicit val recursive      = RT
+    implicit val monad          = MO
     implicit val numericAlgebra = NA
     implicit val booleanAlgebra = BA
-    implicit val orderAlgebra   = OA
+    implicit val order          = OA
+    implicit val facade         = JF
+    val ejsonImporter           = importer
 
-    def constant(literal: T[EJson]): EJson[Rep]
+    // def constant(lit: T[EJson]): Rep = lit cata importer
   }
 }
