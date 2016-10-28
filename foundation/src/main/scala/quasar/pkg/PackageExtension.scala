@@ -18,6 +18,8 @@ package quasar.pkg
 
 import scala.{ inline, AnyVal }
 import scalaz.{ Show, Order, Equal }
+import scala.util.Try
+import java.lang.Throwable
 
 final class EqualBy[A] {
   def apply[B](f: A => B)(implicit z: Equal[B]): Equal[A] = z contramap f
@@ -31,6 +33,13 @@ final class ShowBy[A] {
 final class QuasarExtensionOps[A](private val self: A) extends AnyVal {
   @inline def |>[B](f: A => B): B = f(self)
   @inline def ->[B](y: B): (A, B) = scala.Tuple2(self, y)
+}
+final class QuasarTryOps[A](private val self: Try[A]) extends AnyVal {
+  def |(expr: => A): A = fold(_ => expr, x => x)
+  def fold[B](f: Throwable => B, g: A => B): B = self match {
+    case scala.util.Success(x) => g(x)
+    case scala.util.Failure(t) => f(t)
+  }
 }
 
 

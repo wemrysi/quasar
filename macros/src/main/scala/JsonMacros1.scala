@@ -20,7 +20,6 @@ import quasar.Predef._
 import scala.collection.{ mutable => scm }
 import scala.reflect.macros.blackbox._
 import jawn._
-import java.nio.file._
 import java.util.UUID
 import scala.Any
 
@@ -97,30 +96,14 @@ abstract class TreeFacades[C <: Context](val c: C) {
 class JsonMacros1(val c: Context) {
   import c.universe._
 
-  type MacroFacade = Facade[Tree]
-
   def jsonInterpolatorImpl(args: c.Expr[Any]*): Tree     = JsonMacroSingle(args: _*)
   def jsonManyInterpolatorImpl(args: c.Expr[Any]*): Tree = JsonMacroMany(args: _*)
 
   private def fail(msg: String): Nothing  = c.abort(c.enclosingPosition, msg)
   private def fail(t: Throwable): Nothing = fail("Exception during json interpolation: " + t.getMessage)
 
-  def parseFromPathImpl(path: c.Expr[String]): Tree = {
-    path.tree foreach (t => println("" + ((t, t.getClass))))
-
-    val jpath: Path = path.tree match {
-      case Literal(Constant(p: String)) => Paths get p
-      case _                            => fail("A StringContext part for the json interpolator is not a string")
-    }
-    val json = doTry(new String(Files readAllBytes jpath, "UTF-8")).toOption getOrElse ""
-    if (json.length == 0)
-      fail(s"No json found at $jpath")
-
-    JsonMacroSingle.parse(json, facades.create())
-  }
-
   trait JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree
+    def parse(json: String, facade: Facade[Tree]): Tree
 
     def apply(args: c.Expr[Any]*): Tree = c.prefix.tree match {
       case Apply(_, Apply(_, parts) :: Nil) =>
@@ -155,11 +138,11 @@ class JsonMacros1(val c: Context) {
   }
 
   object JsonMacroSingle extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree =
+    def parse(json: String, facade: Facade[Tree]): Tree =
       JParser.parse(json)(facade).fold(fail, x => x)
   }
   object JsonMacroMany extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree =
+    def parse(json: String, facade: Facade[Tree]): Tree =
       JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}")
   }
 
@@ -184,5 +167,140 @@ class JsonMacros1(val c: Context) {
     def jarray(xs: List[Tree]): Tree         = q"ygg.json.JArray($xs)"
     def jobject(xs: List[Tree]): Tree        = q"ygg.json.JObject($xs)"
     def jfield(key: Tree, value: Tree): Tree = q"ygg.json.JField($key, $value)"
+  }
+}
+
+class JsonMacroImpls(val c: Context) {
+  import c.universe._
+  import scalaz.\&/
+
+  type JMap = Map[UUID, Tree \&/ Tree]
+
+  def maybeUuid(k: String): Option[UUID] = scala.util.Try(UUID fromString k).toOption
+
+  class TreeFacade(prefix: Tree, uuidMap: JMap) extends Facade[Tree] {
+    def maybeTree(x: String) = maybeUuid(x) flatMap uuidMap.get
+
+    def keyOrLiteral(x: String): Tree   = maybeTree(x) flatMap (_.onlyThis) getOrElse q"$x"
+    def valueOrLiteral(x: String): Tree = maybeTree(x) flatMap (_.onlyThat) getOrElse jstring(x)
+
+    def jtrue(): Tree                 = q"$prefix.jtrue"
+    def jfalse(): Tree                = q"$prefix.jfalse"
+    def jnull: Tree                   = q"$prefix.jnull"
+    def jnum(s: String): Tree         = q"$prefix.jnum($s)"
+    def jint(s: String): Tree         = q"$prefix.jint($s)"
+    def jstring(s: String): Tree      = q"$prefix.jstring($s)"
+
+    def singleContext(): FContext[Tree] = new FContext[Tree] {
+      var value: Tree = _
+
+      def add(v: Tree): Unit   = value = v
+      def add(s: String): Unit = add(valueOrLiteral(s))
+      def finish: Tree         = value
+      def isObj: Boolean       = false
+    }
+    def arrayContext(): FContext[Tree] = new FContext[Tree] {
+      val buf = List.newBuilder[Tree]
+
+      def add(v: Tree): Unit   = discard(buf += v)
+      def add(s: String): Unit = add(valueOrLiteral(s))
+      def isObj: Boolean       = false
+      def finish: Tree         = q"""{
+        val fcontext = $prefix.arrayContext()
+        ${buf.result} foreach (fcontext add _)
+        fcontext.finish
+      }"""
+    }
+    def objectContext(): FContext[Tree] = new FContext[Tree] {
+      var key: String = null
+      val buf         = List.newBuilder[(Tree, Tree)]
+
+      private def pair(l: Tree, r: Tree): (Tree, Tree) = l -> r
+      private def clearKey[A](body: A): Unit           = discard(key = null)
+
+      def add(arg: String): Unit = key match {
+        case null => key = arg
+        case _    => clearKey(buf += (keyOrLiteral(key) -> valueOrLiteral(arg)))
+      }
+      def add(arg: Tree): Unit = clearKey(buf += (keyOrLiteral(key) -> arg))
+      def isObj: Boolean       = true
+      def finish: Tree         = q"""{
+        val fcontext = $prefix.objectContext()
+        for ((k, v) <- ${buf.result}) {
+          fcontext add k
+          fcontext add v
+        }
+        fcontext.finish
+      }"""
+    }
+  }
+
+  private def fail(msg: String): Nothing  = c.abort(c.enclosingPosition, msg)
+  private def fail(t: Throwable): Nothing = fail("Exception during json interpolation: " + t.getMessage)
+
+  object Args {
+    def extract(parts: Seq[Tree]): Seq[String] = parts map {
+      case Literal(Constant(part: String)) => part
+      case _                               => fail("A StringContext part for the json interpolator is not a string")
+    }
+
+    def unapply(t: Tree) = t match {
+      case Apply(Apply(_, Apply(_, parts) :: Nil), implicitArg :: Nil) => Some((extract(parts), implicitArg))
+      case Apply(qual, Apply(_, parts) :: Nil)                         => Some((extract(parts), q"$qual.facade"))
+      case _                                                           => None
+    }
+  }
+
+  trait JsonMacroBase[M[_]] {
+    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[M[A]]
+
+    def apply[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[M[A]] = c.prefix.tree match {
+      case Args(stringParts, facade) =>
+        val A       = weakTypeOf[A]
+        var uuids   = Vector[UUID]()
+        val uuidMap = scm.Map[UUID, Tree \&/ Tree]()
+
+        args foreach { arg =>
+          val tpe   = c.typecheck(arg.tree).tpe
+          val uuid  = UUID.randomUUID
+          uuids     = uuids :+ uuid
+          val vtree = q"quasar.JEncoder.lift[$tpe, $A]($arg)"
+
+          if (tpe <:< typeOf[String])
+            uuidMap(uuid) = \&/.Both(q"$arg", vtree)
+          else
+            uuidMap(uuid) = \&/.That(vtree)
+        }
+
+        if (stringParts.size != uuids.size + 1)
+          fail("Invalid arguments to json interpolator")
+
+        val buf = new java.lang.StringBuilder
+        for ((part, uuid) <- stringParts zip uuids) {
+          buf append part
+          buf append '"'
+          buf append uuid.toString
+          buf append '"'
+        }
+        buf append stringParts.last
+
+        parse(buf.toString, new TreeFacade(facade, uuidMap.toMap))
+
+      case tree =>
+        fail("Unexpected tree shape for json interpolation macro: " + tree.getClass + "\n" + showRaw(tree))
+    }
+  }
+
+
+  def singleImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[A]       = JsonMacroSingle[A](args: _*)
+  def manyImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[Vector[A]] = JsonMacroMany[A](args: _*)
+
+  object JsonMacroSingle extends JsonMacroBase[scalaz.Id.Id] {
+    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[A] =
+      c.Expr[A](JParser.parse(json)(facade).fold(fail, x => x))
+  }
+  object JsonMacroMany extends JsonMacroBase[Vector] {
+    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[Vector[A]] =
+      c.Expr[Vector[A]](JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}"))
   }
 }
