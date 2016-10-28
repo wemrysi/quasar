@@ -40,6 +40,9 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
 
   val types: FallbackTypes[Rep]
   val MF: MapFuncExtractors
+  def fileSystem: FileSystem ~> F
+  def fromEJson: Algebra[EJson, Rep]
+  def toEJson: Coalgebra[EJson, Rep]
 
   import types.undef
 
@@ -54,16 +57,8 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
   implicit def liftString(value: String): F[Rep]   = types.string.set(value)(undef).point[F]
   implicit def liftEJson(value: EJRep): F[Rep]     = fromEJson(value).point[F]
 
-  def fileSystem: FileSystem ~> F
-  def fromEJson: Algebra[EJson, Rep]
-  def toEJson: Coalgebra[EJson, Rep]
-
-  type QsAlgebra[QS[_]]   = AlgebraM[F, QS, Rep]
-  type QsExtractor[QS[_]] = Extractor[QS[Rep], F[Rep]]
-
-
   trait MapFuncExtractors {
-    type Ex = QsExtractor[MapFunc]
+    type Ex = Extractor[MapFunc[Rep], F[Rep]]
 
     val Time: Ex
     val Math: Ex
@@ -73,7 +68,7 @@ trait Fresh[T[_[_]], F[_], Rep] extends quasar.qscript.TTypes[T] {
     val Special: Ex
   }
 
-  def mapFunc: QsAlgebra[MapFunc] = {
+  def mapFunc: AlgebraM[F, MapFunc, Rep] = {
     case MF.Time(x)       => x
     case MF.Math(x)       => x
     case MF.Bool(x)       => x
@@ -161,7 +156,7 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
     }
     val Structural = mk {
       case mf.ConcatArrays(xs, ys)     => ejfuns.concat(toEJson(xs), toEJson(ys))
-      case mf.ConcatMaps(xs, ys)       => TODO
+      case mf.ConcatMaps(xs, ys)       => ejfuns.concat(toEJson(xs), toEJson(ys))
       case mf.DeleteField(src, field)  => TODO
       case mf.DupArrayIndices(arr)     => TODO
       case mf.DupMapKeys(map)          => TODO
@@ -186,9 +181,13 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
   object ejfuns {
     import quasar.ejson._
 
-    def concat(xs: EJRep, ys: EJRep): EJRep = (xs.run, ys.run) match {
-      case (\/-(Arr(xs)), \/-(Arr(ys))) => Coproduct right Arr(xs ++ ys)
-      case _                            => ???
+    def com[A](xs: Seq[A]): EJson[A]      = Coproduct right Arr(xs.toList)
+    def ext[A](xs: Seq[(A, A)]): EJson[A] = Coproduct left Map(xs.toList)
+
+    def concat(xs: EJRep, ys: EJRep): F[Rep] = (xs.run, ys.run) match {
+      case (\/-(Arr(xs)), \/-(Arr(ys))) => com(xs ++ ys)
+      case (-\/(Map(xs)), -\/(Map(ys))) => ext(xs ++ ys)
+      case _                            => undef
     }
   }
 }
