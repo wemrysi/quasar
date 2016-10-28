@@ -44,23 +44,26 @@ abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassT
   val xobj: Map[String, Int]             = Map("z" -> 3)
   val xobj2: Map[String, Array[Boolean]] = Map("z" -> xarr)
 
-  val jint    = json"""$xint"""
-  val jlong   = json"""$xlong"""
-  val jbigint = json"""$xbigint"""
-  val jdouble = json"""$xdouble"""
-  val jbigdec = json"""$xbigdec"""
-  val jbool   = json"""$xbool"""
-  val jarr    = json"""$xarr"""
-  val jobj    = json"""$xobj"""
-  val jobj2   = json"""$xobj2"""
+  val jint    = json"$xint"
+  val jlong   = json"$xlong"
+  val jbigint = json"$xbigint"
+  val jdouble = json"$xdouble"
+  val jbigdec = json"$xbigdec"
+  val jbool   = json"$xbool"
+  val jarr    = json"$xarr"
+  val jobj    = json"$xobj"
+  val jobj2   = json"$xobj2"
 
   "json files" should {
-    "load" >> {
+    "return Some(json) on json file" >> {
       val js = jawn.Parser.parseFromPath[A]("testdata/patients-mini.json").toOption
       js must beSome.which(ctag.runtimeClass isAssignableFrom _.getClass)
-
       // Doesn't work this way if A is abstract.
       // js must beSome(beAnInstanceOf[A])
+    }
+    "return None on missing file" >> {
+      val js = jawn.Parser.parseFromPath[A]("testdata/does-not-exist.json").toOption
+      js must beNone
     }
   }
 
@@ -70,7 +73,9 @@ abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassT
       ok
     }
     "interpolate" >> {
-      json"""{ "bob": $xobj, "tom": $jobj }""" must_=== json"""${ Map("bob" -> jobj, "tom" -> jobj) }"""
+      ( json"""{ "bob": $xobj, "tom": $jobj }""" must_===
+        json"""${ Map("bob" -> jobj, "tom" -> jobj) }"""
+      )
     }
     "interpolate keys" >> {
       val k1 = "bob"
@@ -100,60 +105,3 @@ abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassT
     }
   }
 }
-
-
-/***
-
-  sealed trait FieldTree
-  final case class FieldAtom() extends FieldTree
-  final case class FieldSeq(xs: Vector[FieldTree]) extends FieldTree
-  final case class FieldMap(xs: Vector[(FieldTree, FieldTree)]) extends FieldTree
-
-  type EJ = quasar.ejson.EJson[Data]
-
-  def childNames(x: Data): Set[String] = x match {
-    case Data.Arr(xs) => xs.map(childNames) reduceLeft (_ intersect _)
-    case Data.Obj(xs) => xs.keys.toSet
-    case _            => Set()
-  }
-  def childNamesEJ(x: EJ): Vector[String] = {
-    def extension(x: ejson.Extension[Data]): Vector[String] = x match {
-      case ejson.Map(xs) => childNames(Data.Obj(scala.collection.immutable.ListMap(xs collect { case (Data.Str(k), v) => k -> v } : _*))).toVector.sorted
-      case _             => Vector()
-    }
-    def common(x: ejson.Common[Data]): Vector[String] = x match {
-      case ejson.Arr(xs) => childNames(Data.Arr(xs)).toVector.sorted
-      case _             => Vector()
-    }
-    x.run.fold(extension, common)
-
-  }
-
-  def fieldTree(x: Data): FieldTree = x match {
-    case Data.Arr(xs) => FieldSeq(xs.toVector map fieldTree)
-    case Data.Obj(xs) => FieldMap(xs.toVector map { case (k, v) => fieldTree(Data.Str(k)) -> fieldTree(v) })
-    case _            => FieldAtom()
-  }
-  def fieldTreeEJ(x: EJ): FieldTree = {
-    def extension(x: ejson.Extension[Data]): FieldTree = x match {
-      case ejson.Map(xs) => FieldMap(xs.toVector map { case (k, v) => fieldTree(k) -> fieldTree(v) })
-      case _             => FieldAtom()
-    }
-    def common(x: ejson.Common[Data]): FieldTree = x match {
-      case ejson.Arr(xs) => FieldSeq(xs.toVector map fieldTree)
-      case _             => FieldAtom()
-    }
-
-    x.run.fold(extension, common)
-  }
-
-  "json files" should {
-    "load" >> {
-      val js = jawn.Parser.parseFromPath[EJ]("testdata/patients-mini.json")
-      val fs = childNamesEJ(js.get)
-      println(fs)
-      ok
-    }
-  }
-
-***/
