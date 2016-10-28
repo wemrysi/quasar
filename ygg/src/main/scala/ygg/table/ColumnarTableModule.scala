@@ -103,10 +103,9 @@ trait ColumnarTableModule {
       }
     }
 
-    def apply(slices: NeedSlices, size: TableSize): Table                                            = fromSlices(slices, size)
-    def singleton(slice: Slice): Table                                                               = fromSlices(singleStreamT(slice), ExactSize(1))
-    def fromJson(data: Seq[JValue]): Table                                                           = outer fromJson data
-    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = ???
+    def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
+    def singleton(slice: Slice): Table                    = fromSlices(singleStreamT(slice), ExactSize(1))
+    def fromJson(data: Seq[JValue]): Table                = outer fromJson data
 
     implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
 
@@ -272,26 +271,19 @@ trait ColumnarTableModule {
       )
     }
 
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
-                                                                             rightKeySpec: TransSpec1,
-                                                                             joinSpec: TransSpec2): Need[JoinOrder -> Table] = {
-      val emptySpec = trans.ConstLiteral(CEmptyArray, Leaf(Source))
-      for {
-        left0  <- left.sort(leftKeySpec)
-        right0 <- right.sort(rightKeySpec)
-        cogrouped = left0.cogroup(leftKeySpec, rightKeySpec, right0)(emptySpec, emptySpec, trans.WrapArray(joinSpec))
-      } yield {
-        JoinOrder.KeyOrder -> cogrouped.transform(trans.DerefArrayStatic(Leaf(Source), CPathIndex(0)))
-      }
-    }
+    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table] = (
+      ((left sort lspec) |@| (right sort rspec))((l, r) =>
+        JoinOrder.KeyOrder -> (
+          l.cogroup(lspec, rspec, r)(root.emptyArray, root.emptyArray, joinSpec.wrapArrayValue) transform root(0)
+        )
+      )
+    )
 
     def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table] = {
       import CrossOrder._
       Need(orderHint match {
-        case Some(CrossRight | CrossRightLeft) =>
-          CrossRight -> right.cross(left)(TransSpec2.flip(spec))
-        case _ =>
-          CrossLeft -> left.cross(right)(spec)
+        case Some(CrossRight | CrossRightLeft) => CrossRight -> right.cross(left)(TransSpec2.flip(spec))
+        case _                                 => CrossLeft -> left.cross(right)(spec)
       })
     }
   }
@@ -1423,9 +1415,7 @@ trait BlockTableModule extends ColumnarTableModule {
       Scan(WrapArray(spec), addGlobalIdScanner)
     }
 
-    // def singleton(slice: Slice) = new SingletonTable(singleStreamT(slice))
-
-    override def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = {
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = {
       import aligns._
 
       // we need a custom row comparator that ignores the global ID introduced to prevent elimination of

@@ -45,6 +45,8 @@ package trans {
   object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
 
   class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
+    def emptyArray() = ConstLiteral(CEmptyArray, spec0)
+
     def value = select("value")
     def key   = select("key")
   }

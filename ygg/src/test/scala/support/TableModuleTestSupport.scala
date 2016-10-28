@@ -71,7 +71,7 @@ abstract class TableQspec extends AbsTableQspec {
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
 
   type TableCompanion = ThisTableCompanion
-  final object Table extends ThisTableCompanion
+  final object Table extends ThisTableCompanion with TemporaryTableStrutCompanion
   final class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
 
   type ASD = Arbitrary[SampleData]

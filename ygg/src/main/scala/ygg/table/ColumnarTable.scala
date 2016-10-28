@@ -26,7 +26,7 @@ class ColumnarTable extends ColumnarTableModule {
   def toJson(dataset: Table): Need[Stream[JValue]]           = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]                   = toJson(table).copoint
 
-  object Table extends ThisTableCompanion
+  object Table extends ThisTableCompanion with TemporaryTableStrutCompanion
   class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
 }
 object ColumnarTable extends ColumnarTable {

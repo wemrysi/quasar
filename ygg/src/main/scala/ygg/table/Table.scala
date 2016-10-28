@@ -86,7 +86,10 @@ trait TableCompanion[T <: ygg.table.Table] {
   def singleton(slice: Slice): T
 }
 
-
+trait TemporaryTableStrutCompanion {
+  type Table
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = ???
+}
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
   def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
