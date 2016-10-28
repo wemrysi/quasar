@@ -27,43 +27,44 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   //     need to do a better job of handling this.
   import quasar.LogicalPlan._
   import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
+  import quasar.frontend.fixpoint.lpf
 
   "compiler" should {
     "compile simple constant example 1" in {
       testLogicalPlanCompile(
         "select 1",
-        makeObj("0" -> Constant(Data.Int(1))))
+        makeObj("0" -> lpf.constant(Data.Int(1))))
     }
 
     "compile simple boolean literal (true)" in {
       testLogicalPlanCompile(
         "select true",
-        makeObj("0" -> Constant(Data.Bool(true))))
+        makeObj("0" -> lpf.constant(Data.Bool(true))))
     }
 
     "compile simple boolean literal (false)" in {
       testLogicalPlanCompile(
         "select false",
-        makeObj("0" -> Constant(Data.Bool(false))))
+        makeObj("0" -> lpf.constant(Data.Bool(false))))
     }
 
     "compile simple constant with multiple named projections" in {
       testLogicalPlanCompile(
         "select 1.0 as a, \"abc\" as b",
         makeObj(
-          "a" -> Constant(Data.Dec(1.0)),
-          "b" -> Constant(Data.Str("abc"))))
+          "a" -> lpf.constant(Data.Dec(1.0)),
+          "b" -> lpf.constant(Data.Str("abc"))))
     }
 
     "compile complex constant" in {
       testTypedLogicalPlanCompile("[1, 2, 3, 4, 5][*] limit 3 offset 1",
-        Constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
+        lpf.constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
     }
 
     "select complex constant" in {
       testTypedLogicalPlanCompile(
         "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1",
-        Constant(Data.Set(List(
+        lpf.constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
           Data.Obj(ListMap("0" -> Data.Int(3)))))))
     }
@@ -71,7 +72,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "select complex constant 2" in {
       testTypedLogicalPlanCompile(
         "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*:} limit 3 offset 1",
-        Constant(Data.Set(List(
+        lpf.constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Str("b"))),
           Data.Obj(ListMap("0" -> Data.Str("c")))))))
     }
@@ -81,7 +82,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
       testTypedLogicalPlanCompile(
         """select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
-        Constant(Data.Obj(ListMap(
+        lpf.constant(Data.Obj(ListMap(
           "0" -> Data.Timestamp(Instant.parse("2014-11-17T22:43:40Z")),
           "1" -> Data.Date(LocalDate.parse("2015-01-19")),
           "2" -> Data.Time(LocalTime.parse("14:21:00.000"))))))
@@ -89,7 +90,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "compile simple constant from collection" in {
       testTypedLogicalPlanCompile("select 1 from zips",
-        Constant(Data.Obj(ListMap("0" -> Data.Int(1)))))
+        lpf.constant(Data.Obj(ListMap("0" -> Data.Int(1)))))
     }
 
     "compile select substring" in {
@@ -99,9 +100,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "0" ->
               Substring[FLP](
-                ObjectProject(read("foo"), Constant(Data.Str("bar"))),
-                Constant(Data.Int(2)),
-                Constant(Data.Int(3))))))
+                ObjectProject(read("foo"), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Int(2)),
+                lpf.constant(Data.Int(3))))))
     }
 
     "compile select length" in {
@@ -109,7 +110,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select length(bar) from foo",
         Squash(
           makeObj(
-            "0" -> Length[FLP](ObjectProject(read("foo"), Constant(Data.Str("bar")))))))
+            "0" -> Length[FLP](ObjectProject(read("foo"), lpf.constant(Data.Str("bar")))))))
     }
 
     "compile simple select *" in {
@@ -123,35 +124,35 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile qualified select * with additional fields" in {
       testLogicalPlanCompile(
         "select foo.*, bar.address from foo, bar",
-        Let('__tmp0,
-          InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
+        lpf.let('__tmp0,
+          InnerJoin(read("foo"), read("bar"), lpf.constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), JoinDir.Left.const),
+              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
-                    Constant(Data.Str("address"))))))))
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    lpf.constant(Data.Str("address"))))))))
     }
 
     "compile deeply-nested qualified select *" in {
       testLogicalPlanCompile(
         "select foo.bar.baz.*, bar.address from foo, bar",
-        Let('__tmp0,
-          InnerJoin(read("foo"), read("bar"), Constant(Data.Bool(true))),
+        lpf.let('__tmp0,
+          InnerJoin(read("foo"), read("bar"), lpf.constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
               ObjectProject[FLP](
                 ObjectProject[FLP](
-                  ObjectProject(Free('__tmp0), JoinDir.Left.const),
-                  Constant(Data.Str("bar"))),
-                Constant(Data.Str("baz"))),
+                  ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+                  lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Str("baz"))),
               makeObj(
                 "address" ->
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
-                    Constant(Data.Str("address"))))))))
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    lpf.constant(Data.Str("address"))))))))
     }
 
     "compile simple select with unnamed projection which is just an identifier" in {
@@ -159,25 +160,25 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select name from city",
         Squash(
           makeObj(
-            "name" -> ObjectProject(read("city"), Constant(Data.Str("name"))))))
+            "name" -> ObjectProject(read("city"), lpf.constant(Data.Str("name"))))))
     }
 
     "compile basic let" in {
       testLogicalPlanCompile(
         "foo := 5; foo",
-        Constant(Data.Int(5)))
+        lpf.constant(Data.Int(5)))
     }
 
     "compile basic let, ignoring the form" in {
       testLogicalPlanCompile(
         "bar := 5; 7",
-        Constant(Data.Int(7)))
+        lpf.constant(Data.Int(7)))
     }
 
     "compile nested lets" in {
       testLogicalPlanCompile(
         """foo := 5; bar := 7; bar + foo""",
-        Add[FLP](Constant(Data.Int(7)), Constant(Data.Int(5))))
+        Add[FLP](lpf.constant(Data.Int(7)), lpf.constant(Data.Int(5))))
     }
 
     "compile let with select in body from let binding ident" in {
@@ -187,9 +188,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           ShiftArray[FLP](
             ArrayConcat[FLP](
               ArrayConcat[FLP](
-                MakeArrayN[Fix](Constant(Data.Int(1))),
-                MakeArrayN[Fix](Constant(Data.Int(2)))),
-              MakeArrayN[Fix](Constant(Data.Int(3))))))
+                MakeArrayN[Fix](lpf.constant(Data.Int(1))),
+                MakeArrayN[Fix](lpf.constant(Data.Int(2)))),
+              MakeArrayN[Fix](lpf.constant(Data.Int(3))))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -200,7 +201,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "0" ->
-              Constant(Data.Int(12))))
+              lpf.constant(Data.Int(12))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -216,7 +217,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "foo" ->
-              ObjectProject[FLP](Squash(read("baz")), Constant(Data.Str("foo")))))
+              ObjectProject[FLP](Squash(read("baz")), lpf.constant(Data.Str("foo")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -227,7 +228,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "foo" ->
-              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("foo")))))
+              ObjectProject[FLP](Squash(lpf.constant(Data.Int(12))), lpf.constant(Data.Str("foo")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -238,7 +239,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "bar" ->
-              ObjectProject[FLP](Squash(Constant(Data.Int(12))), Constant(Data.Str("bar")))))
+              ObjectProject[FLP](Squash(lpf.constant(Data.Int(12))), lpf.constant(Data.Str("bar")))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -249,7 +250,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "0" ->
-              Squash(Constant(Data.Int(12)))))
+              Squash(lpf.constant(Data.Int(12)))))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -300,8 +301,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "bar" ->
               ObjectProject[FLP](
-                ObjectProject(read("baz"), Constant(Data.Str("foo"))),
-                Constant(Data.Str("bar"))))))
+                ObjectProject(read("baz"), lpf.constant(Data.Str("foo"))),
+                lpf.constant(Data.Str("bar"))))))
     }
 
     "compile simple 1-table projection when root identifier is also a table ref" in {
@@ -311,19 +312,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select foo.bar from foo",
         Squash(
           makeObj(
-            "bar" -> ObjectProject(read("foo"), Constant(Data.Str("bar"))))))
+            "bar" -> ObjectProject(read("foo"), lpf.constant(Data.Str("bar"))))))
     }
 
     "compile two term addition from one table" in {
       testLogicalPlanCompile(
         "select foo + bar from baz",
-        Let('__tmp0, read("baz"),
+        lpf.let('__tmp0, read("baz"),
           Squash(
             makeObj(
               "0" ->
                 Add[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("foo"))),
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))))))))
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))))))))
     }
 
     "compile negate" in {
@@ -332,33 +333,33 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "0" ->
-              Negate[FLP](ObjectProject(read("bar"), Constant(Data.Str("foo")))))))
+              Negate[FLP](ObjectProject(read("bar"), lpf.constant(Data.Str("foo")))))))
     }
 
     "compile modulo" in {
       testLogicalPlanCompile(
         "select foo % baz from bar",
-        Let('__tmp0, read("bar"),
+        lpf.let('__tmp0, read("bar"),
           Squash(
             makeObj(
               "0" ->
                 Modulo[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("foo"))),
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("baz"))))))))
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("baz"))))))))
     }
 
     "compile coalesce" in {
       testLogicalPlanCompile(
         "select coalesce(bar, baz) from foo",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1, ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
             Squash(
               makeObj(
                 "0" ->
                   Cond[FLP](
-                    Eq[FLP](Free('__tmp1), Constant(Data.Null)),
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("baz"))),
-                    Free('__tmp1)))))))
+                    Eq[FLP](lpf.free('__tmp1), lpf.constant(Data.Null)),
+                    ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("baz"))),
+                    lpf.free('__tmp1)))))))
     }
 
     "compile date field extraction" in {
@@ -368,21 +369,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "0" ->
               ExtractDayOfMonth[FLP](
-                ObjectProject(read("foo"), Constant(Data.Str("baz")))))))
+                ObjectProject(read("foo"), lpf.constant(Data.Str("baz")))))))
     }
 
     "compile conditional" in {
       testLogicalPlanCompile(
         "select case when pop < 10000 then city else loc end from zips",
-        Let('__tmp0, read("zips"),
+        lpf.let('__tmp0, read("zips"),
           Squash(makeObj(
             "0" ->
               Cond[FLP](
                 Lt[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))),
-                  Constant(Data.Int(10000))),
-                ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
-                ObjectProject(Free('__tmp0), Constant(Data.Str("loc"))))))))
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))),
+                  lpf.constant(Data.Int(10000))),
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("loc"))))))))
     }
 
     "compile conditional (match) without else" in {
@@ -416,124 +417,124 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "0" ->
               ArrayLength[FLP](
-                ObjectProject(read("foo"), Constant(Data.Str("bar"))),
-                Constant(Data.Int(1))))))
+                ObjectProject(read("foo"), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Int(1))))))
     }
 
     "compile concat" in {
       testLogicalPlanCompile(
         "select concat(foo, concat(\" \", bar)) from baz",
-        Let('__tmp0, read("baz"),
+        lpf.let('__tmp0, read("baz"),
           Squash(
             makeObj(
               "0" ->
                 Concat[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("foo"))),
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
                   Concat[FLP](
-                    Constant(Data.Str(" ")),
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("bar")))))))))
+                    lpf.constant(Data.Str(" ")),
+                    ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar")))))))))
     }
 
     "filter on constant false" in {
       testTypedLogicalPlanCompile("select * from zips where false",
-        Constant(Data.Set(Nil)))
+        lpf.constant(Data.Set(Nil)))
     }
 
     "filter with field in empty set" in {
       testTypedLogicalPlanCompile("select * from zips where state in ()",
-        Constant(Data.Set(Nil)))
+        lpf.constant(Data.Set(Nil)))
     }
 
     "compile between" in {
       testLogicalPlanCompile(
         "select * from foo where bar between 1 and 10",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               Between[FLP](
-                ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                Constant(Data.Int(1)),
-                Constant(Data.Int(10)))))))
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Int(1)),
+                lpf.constant(Data.Int(10)))))))
     }
 
     "compile not between" in {
       testLogicalPlanCompile(
         "select * from foo where bar not between 1 and 10",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash[FLP](
             Filter[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               Not[FLP](
                 Between[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                  Constant(Data.Int(1)),
-                  Constant(Data.Int(10))))))))
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.constant(Data.Int(1)),
+                  lpf.constant(Data.Int(10))))))))
     }
 
     "compile like" in {
       testLogicalPlanCompile(
         "select bar from foo where bar like \"a%\"",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                      Constant(Data.Str("^a.*$")),
-                      Constant(Data.Bool(false)))),
-                  Constant(Data.Str("bar")))))))
+                      ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                      lpf.constant(Data.Str("^a.*$")),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("bar")))))))
     }
 
     "compile like with escape char" in {
       testLogicalPlanCompile(
         "select bar from foo where bar like \"a=%\" escape \"=\"",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                      Constant(Data.Str("^a%$")),
-                      Constant(Data.Bool(false)))),
-                  Constant(Data.Str("bar")))))))
+                      ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                      lpf.constant(Data.Str("^a%$")),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("bar")))))))
     }
 
     "compile not like" in {
       testLogicalPlanCompile(
         "select bar from foo where bar not like \"a%\"",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash(makeObj("bar" -> ObjectProject[FLP](Filter[FLP](
-            Free('__tmp0),
+            lpf.free('__tmp0),
             Not[FLP](
               Search[FLP](
-                ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                Constant(Data.Str("^a.*$")),
-                Constant(Data.Bool(false))))),
-            Constant(Data.Str("bar")))))))
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Str("^a.*$")),
+                lpf.constant(Data.Bool(false))))),
+            lpf.constant(Data.Str("bar")))))))
     }
 
     "compile ~" in {
       testLogicalPlanCompile(
         "select bar from foo where bar ~ \"a.$\"",
-        Let('__tmp0, read("foo"),
+        lpf.let('__tmp0, read("foo"),
           Squash(
             makeObj(
               "bar" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     Search[FLP](
-                      ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
-                      Constant(Data.Str("a.$")),
-                      Constant(Data.Bool(false)))),
-                  Constant(Data.Str("bar")))))))
+                      ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                      lpf.constant(Data.Str("a.$")),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("bar")))))))
     }
 
     "compile complex expression" in {
@@ -545,10 +546,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               Add[FLP](
                 Divide[FLP](
                   Multiply[FLP](
-                    ObjectProject(read("cities"), Constant(Data.Str("avgTemp"))),
-                    Constant(Data.Int(9))),
-                  Constant(Data.Int(5))),
-                Constant(Data.Int(32))))))
+                    ObjectProject(read("cities"), lpf.constant(Data.Str("avgTemp"))),
+                    lpf.constant(Data.Int(9))),
+                  lpf.constant(Data.Int(5))),
+                lpf.constant(Data.Int(32))))))
     }
 
     "compile parenthesized expression" in {
@@ -559,37 +560,37 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             "0" ->
               Divide[FLP](
                 Add[FLP](
-                  ObjectProject(read("cities"), Constant(Data.Str("avgTemp"))),
-                  Constant(Data.Int(32))),
-                Constant(Data.Int(5))))))
+                  ObjectProject(read("cities"), lpf.constant(Data.Str("avgTemp"))),
+                  lpf.constant(Data.Int(32))),
+                lpf.constant(Data.Int(5))))))
     }
 
     "compile cross select *" in {
       testLogicalPlanCompile(
         "select * from person, car",
-        Let('__tmp0,
-          InnerJoin(read("person"), read("car"), Constant(Data.Bool(true))),
+        lpf.let('__tmp0,
+          InnerJoin(read("person"), read("car"), lpf.constant(Data.Bool(true))),
           Squash[FLP](
             ObjectConcat[FLP](
-              ObjectProject(Free('__tmp0), JoinDir.Left.const),
-              ObjectProject(Free('__tmp0), JoinDir.Right.const)))))
+              ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+              ObjectProject(lpf.free('__tmp0), JoinDir.Right.const)))))
     }
 
     "compile two term multiplication from two tables" in {
       testLogicalPlanCompile(
         "select person.age * car.modelYear from person, car",
-        Let('__tmp0,
-          InnerJoin(read("person"), read("car"), Constant(Data.Bool(true))),
+        lpf.let('__tmp0,
+          InnerJoin(read("person"), read("car"), lpf.constant(Data.Bool(true))),
           Squash(
             makeObj(
               "0" ->
                 Multiply[FLP](
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Left.const),
-                    Constant(Data.Str("age"))),
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Left.const),
+                    lpf.constant(Data.Str("age"))),
                   ObjectProject[FLP](
-                    ObjectProject(Free('__tmp0), JoinDir.Right.const),
-                    Constant(Data.Str("modelYear"))))))))
+                    ObjectProject(lpf.free('__tmp0), JoinDir.Right.const),
+                    lpf.constant(Data.Str("modelYear"))))))))
     }
 
     "compile simple where (with just a constant)" in {
@@ -599,85 +600,85 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "name" ->
               ObjectProject[FLP](
-                Filter(read("person"), Constant(Data.Int(1))),
-                Constant(Data.Str("name"))))))
+                Filter(read("person"), lpf.constant(Data.Int(1))),
+                lpf.constant(Data.Str("name"))))))
     }
 
     "compile simple where" in {
       testLogicalPlanCompile(
         "select name from person where age > 18",
-        Let('__tmp0, read("person"),
+        lpf.let('__tmp0, read("person"),
           Squash(
             makeObj(
               "name" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     Gt[FLP](
-                      ObjectProject(Free('__tmp0), Constant(Data.Str("age"))),
-                      Constant(Data.Int(18)))),
-                  Constant(Data.Str("name")))))))
+                      ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                      lpf.constant(Data.Int(18)))),
+                  lpf.constant(Data.Str("name")))))))
     }
 
     "compile simple group by" in {
       testLogicalPlanCompile(
         "select count(*) from person group by name",
-        Let('__tmp0, read("person"),
+        lpf.let('__tmp0, read("person"),
           Squash(
             makeObj(
               "0" ->
                 Count[FLP](
                   GroupBy[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     MakeArrayN[Fix](ObjectProject(
-                      Free('__tmp0),
-                      Constant(Data.Str("name"))))))))))
+                      lpf.free('__tmp0),
+                      lpf.constant(Data.Str("name"))))))))))
     }
 
     "compile group by with projected keys" in {
       testLogicalPlanCompile(
         "select lower(name), person.gender, avg(age) from person group by lower(person.name), gender",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("person"),
+          lpf.let('__tmp1,
             GroupBy[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               MakeArrayN[Fix](
                 Lower[FLP](
                   ObjectProject(
-                    Free('__tmp0),
-                    Constant(Data.Str("name")))),
+                    lpf.free('__tmp0),
+                    lpf.constant(Data.Str("name")))),
                 ObjectProject(
-                  Free('__tmp0),
-                  Constant(Data.Str("gender"))))),
+                  lpf.free('__tmp0),
+                  lpf.constant(Data.Str("gender"))))),
             Squash(
               makeObj(
                 "0" ->
                   Arbitrary[FLP](
                     Lower[FLP](
-                      ObjectProject(Free('__tmp1), Constant(Data.Str("name"))))),
+                      ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("name"))))),
                 "gender" ->
                   Arbitrary[FLP](
-                    ObjectProject(Free('__tmp1), Constant(Data.Str("gender")))),
+                    ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("gender")))),
                 "2" ->
                   Avg[FLP](
-                    ObjectProject(Free('__tmp1), Constant(Data.Str("age")))))))))
+                    ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("age")))))))))
     }
 
     "compile group by with perverse aggregated expression" in {
       testLogicalPlanCompile(
         "select count(name) from person group by name",
-        Let('__tmp0, read("person"),
+        lpf.let('__tmp0, read("person"),
           Squash(
             makeObj(
               "0" ->
                 Count[FLP](
                   ObjectProject[FLP](
                     GroupBy[FLP](
-                      Free('__tmp0),
+                      lpf.free('__tmp0),
                       MakeArrayN[Fix](ObjectProject(
-                        Free('__tmp0),
-                        Constant(Data.Str("name"))))),
-                    Constant(Data.Str("name"))))))))
+                        lpf.free('__tmp0),
+                        lpf.constant(Data.Str("name"))))),
+                    lpf.constant(Data.Str("name"))))))))
     }
 
     "compile sum in expression" in {
@@ -687,18 +688,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           makeObj(
             "0" ->
               Multiply[FLP](
-                Sum[FLP](ObjectProject(read("zips"), Constant(Data.Str("pop")))),
-                Constant(Data.Int(100))))))
+                Sum[FLP](ObjectProject(read("zips"), lpf.constant(Data.Str("pop")))),
+                lpf.constant(Data.Int(100))))))
     }
 
     val setA =
-      Let('__tmp0, read("zips"),
+      lpf.let('__tmp0, read("zips"),
         Squash(makeObj(
-          "loc" -> ObjectProject(Free('__tmp0), Constant(Data.Str("loc"))),
-          "pop" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))))
+          "loc" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("loc"))),
+          "pop" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))))
     val setB =
       Squash(makeObj(
-        "city" -> ObjectProject(read("zips"), Constant(Data.Str("city")))))
+        "city" -> ObjectProject(read("zips"), lpf.constant(Data.Str("city")))))
 
     "compile union" in {
       testLogicalPlanCompile(
@@ -802,21 +803,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile map shift / unshift" in {
-      val inner = ShiftMap[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), Constant(Data.Str("commit"))), Constant(Data.Str("author"))))
+      val inner = ShiftMap[FLP](ObjectProject[FLP](ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         "select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
-        Let('__tmp0, read("slamengine_commits"),
+        lpf.let('__tmp0, read("slamengine_commits"),
           Squash(makeObj("0" ->
             UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
 
     "compile map shift / unshift keys" in {
-      val inner = ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), Constant(Data.Str("commit"))), Constant(Data.Str("author"))))
+      val inner = ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         "select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
-        Let('__tmp0, read("slamengine_commits"),
+        lpf.let('__tmp0, read("slamengine_commits"),
           Squash(makeObj("0" ->
             UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
@@ -829,8 +830,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             "0" ->
               UnshiftArray[FLP](
                 Divide[FLP](
-                  ShiftArray[FLP](ObjectProject(read("zips"), Constant(Data.Str("loc")))),
-                  Constant(Data.Int(10)))))))
+                  ShiftArray[FLP](ObjectProject(read("zips"), lpf.constant(Data.Str("loc")))),
+                  lpf.constant(Data.Int(10)))))))
     }
 
     "compile array shift / unshift indices" in {
@@ -841,8 +842,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             "0" ->
               UnshiftArray[FLP](
                 Multiply[FLP](
-                  ShiftArrayIndices[FLP](ObjectProject(read("zips"), Constant(Data.Str("loc")))),
-                  Constant(Data.Int(10)))))))
+                  ShiftArrayIndices[FLP](ObjectProject(read("zips"), lpf.constant(Data.Str("loc")))),
+                  lpf.constant(Data.Int(10)))))))
     }
 
     "compile array flatten" in {
@@ -851,162 +852,162 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "loc" ->
-              FlattenArray[FLP](ObjectProject(read("zips"), Constant(Data.Str("loc")))))))
+              FlattenArray[FLP](ObjectProject(read("zips"), lpf.constant(Data.Str("loc")))))))
     }
 
     "compile simple order by" in {
       testLogicalPlanCompile(
         "select name from person order by height",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("person"),
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("name"))),
-                "__sd__0" -> ObjectProject(Free('__tmp0), Constant(Data.Str("height"))))),
+                "name" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
+                "__sd__0" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("__sd__0")))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
                 MakeArrayN(
-                  Constant(Data.Str("ASC")))),
-              Constant(Data.Str("__sd__0"))))))
+                  lpf.constant(Data.Str("ASC")))),
+              lpf.constant(Data.Str("__sd__0"))))))
     }
 
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
         "select name from person where gender = \"male\" order by name, height",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("person"),
+          lpf.let('__tmp1,
             Filter[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               Eq[FLP](
-                ObjectProject(Free('__tmp0), Constant(Data.Str("gender"))),
-                Constant(Data.Str("male")))),
-            Let('__tmp2,
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("gender"))),
+                lpf.constant(Data.Str("male")))),
+            lpf.let('__tmp2,
               Squash(
                 makeObj(
-                  "name"    -> ObjectProject(Free('__tmp1), Constant(Data.Str("name"))),
-                  "__sd__0" -> ObjectProject(Free('__tmp1), Constant(Data.Str("height"))))),
+                  "name"    -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
+                  "__sd__0" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("height"))))),
               DeleteField[FLP](
                 OrderBy[FLP](
-                  Free('__tmp2),
+                  lpf.free('__tmp2),
                   MakeArrayN[Fix](
-                    ObjectProject(Free('__tmp2), Constant(Data.Str("name"))),
-                    ObjectProject(Free('__tmp2), Constant(Data.Str("__sd__0")))),
+                    ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("name"))),
+                    ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0")))),
                   MakeArrayN(
-                    Constant(Data.Str("ASC")),
-                    Constant(Data.Str("ASC")))),
-                Constant(Data.Str("__sd__0")))))))
+                    lpf.constant(Data.Str("ASC")),
+                    lpf.constant(Data.Str("ASC")))),
+                lpf.constant(Data.Str("__sd__0")))))))
     }
 
     "compile simple order by with wildcard" in {
       testLogicalPlanCompile(
         "select * from person order by height",
-        Let('__tmp0, Squash(read("person")),
+        lpf.let('__tmp0, Squash(read("person")),
           OrderBy[FLP](
-            Free('__tmp0),
+            lpf.free('__tmp0),
             MakeArrayN[Fix](
-              ObjectProject(Free('__tmp0), Constant(Data.Str("height")))),
+              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height")))),
             MakeArrayN(
-              Constant(Data.Str("ASC"))))))
+              lpf.constant(Data.Str("ASC"))))))
     }
 
     "compile simple order by with ascending and descending" in {
       testLogicalPlanCompile(
         "select * from person order by height desc, name",
-        Let('__tmp0, Squash(read("person")),
+        lpf.let('__tmp0, Squash(read("person")),
           OrderBy[FLP](
-            Free('__tmp0),
+            lpf.free('__tmp0),
             MakeArrayN[Fix](
-              ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
-              ObjectProject(Free('__tmp0), Constant(Data.Str("name")))),
+              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name")))),
             MakeArrayN(
-              Constant(Data.Str("DESC")),
-              Constant(Data.Str("ASC"))))))
+              lpf.constant(Data.Str("DESC")),
+              lpf.constant(Data.Str("ASC"))))))
     }
 
     "compile simple order by with expression" in {
       testLogicalPlanCompile(
         "select * from person order by height*2.54",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("person"),
+          lpf.let('__tmp1,
             Squash[FLP](
               ObjectConcat(
-                Free('__tmp0),
+                lpf.free('__tmp0),
                 makeObj(
                   "__sd__0" -> Multiply[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
-                    Constant(Data.Dec(2.54)))))),
+                    ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                    lpf.constant(Data.Dec(2.54)))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("__sd__0")))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
                 MakeArrayN(
-                  Constant(Data.Str("ASC")))),
-              Constant(Data.Str("__sd__0"))))))
+                  lpf.constant(Data.Str("ASC")))),
+              lpf.constant(Data.Str("__sd__0"))))))
     }
 
     "compile order by with alias" in {
       testLogicalPlanCompile(
         "select firstName as name from person order by name",
-        Let('__tmp0,
+        lpf.let('__tmp0,
           Squash(
             makeObj(
-              "name" -> ObjectProject(read("person"), Constant(Data.Str("firstName"))))),
+              "name" -> ObjectProject(read("person"), lpf.constant(Data.Str("firstName"))))),
           OrderBy[FLP](
-            Free('__tmp0),
-            MakeArrayN[Fix](ObjectProject(Free('__tmp0), Constant(Data.Str("name")))),
-            MakeArrayN(Constant(Data.Str("ASC"))))))
+            lpf.free('__tmp0),
+            MakeArrayN[Fix](ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name")))),
+            MakeArrayN(lpf.constant(Data.Str("ASC"))))))
     }
 
     "compile simple order by with expression in synthetic field" in {
       testLogicalPlanCompile(
         "select name from person order by height*2.54",
-        Let('__tmp0, read("person"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("person"),
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("name"))),
+                "name" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
                 "__sd__0" ->
                   Multiply[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
-                    Constant(Data.Dec(2.54))))),
+                    ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                    lpf.constant(Data.Dec(2.54))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("__sd__0")))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
                 MakeArrayN(
-                  Constant(Data.Str("ASC")))),
-              Constant(Data.Str("__sd__0"))))))
+                  lpf.constant(Data.Str("ASC")))),
+              lpf.constant(Data.Str("__sd__0"))))))
     }
 
     "compile order by with nested projection" in {
       testLogicalPlanCompile(
         "select bar from foo order by foo.bar.baz.quux/3",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "bar" -> ObjectProject(Free('__tmp0), Constant(Data.Str("bar"))),
+                "bar" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                 "__sd__0" -> Divide[FLP](
                   ObjectProject[FLP](
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp0),
-                        Constant(Data.Str("bar"))),
-                      Constant(Data.Str("baz"))),
-                    Constant(Data.Str("quux"))),
-                  Constant(Data.Int(3))))),
+                      ObjectProject(lpf.free('__tmp0),
+                        lpf.constant(Data.Str("bar"))),
+                      lpf.constant(Data.Str("baz"))),
+                    lpf.constant(Data.Str("quux"))),
+                  lpf.constant(Data.Int(3))))),
             DeleteField[FLP](
               OrderBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("__sd__0")))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
                 MakeArrayN(
-                  Constant(Data.Str("ASC")))),
-              Constant(Data.Str("__sd__0"))))))
+                  lpf.constant(Data.Str("ASC")))),
+              lpf.constant(Data.Str("__sd__0"))))))
     }
 
     "compile order by with root projection a table ref" in {
@@ -1053,20 +1054,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           " order by cm" +
           " offset 10" +
           " limit 5",
-        Let('__tmp0, read("person"), // from person
-          Let('__tmp1,    // where height > 60
+        lpf.let('__tmp0, read("person"), // from person
+          lpf.let('__tmp1,    // where height > 60
             Filter[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               Gt[FLP](
-                ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
-                Constant(Data.Int(60)))),
-            Let('__tmp2,    // group by gender, height
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                lpf.constant(Data.Int(60)))),
+            lpf.let('__tmp2,    // group by gender, height
               GroupBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("gender"))),
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("height"))))),
-              Let('__tmp3,
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("gender"))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("height"))))),
+              lpf.let('__tmp3,
                 Squash(    // select height*2.54 as cm
                   makeObj(
                     "cm" ->
@@ -1074,20 +1075,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                         Arbitrary[FLP](
                           ObjectProject[FLP](
                             Filter[FLP](  // having count(*) > 10
-                              Free('__tmp2),
-                              Gt[FLP](Count(Free('__tmp2)), Constant(Data.Int(10)))),
-                            Constant(Data.Str("height")))),
-                        Constant(Data.Dec(2.54))))),
+                              lpf.free('__tmp2),
+                              Gt[FLP](Count(lpf.free('__tmp2)), lpf.constant(Data.Int(10)))),
+                            lpf.constant(Data.Str("height")))),
+                        lpf.constant(Data.Dec(2.54))))),
                 Take[FLP](
                   Drop[FLP](
                     OrderBy[FLP](  // order by cm
-                      Free('__tmp3),
+                      lpf.free('__tmp3),
                       MakeArrayN[Fix](
-                        ObjectProject(Free('__tmp3), Constant(Data.Str("cm")))),
+                        ObjectProject(lpf.free('__tmp3), lpf.constant(Data.Str("cm")))),
                       MakeArrayN(
-                        Constant(Data.Str("ASC")))),
-                  Constant(Data.Int(10))), // offset 10
-                Constant(Data.Int(5))))))))    // limit 5
+                        lpf.constant(Data.Str("ASC")))),
+                  lpf.constant(Data.Int(10))), // offset 10
+                lpf.constant(Data.Int(5))))))))    // limit 5
     }
 
     "compile simple sum" in {
@@ -1096,29 +1097,29 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Squash(
           makeObj(
             "0" ->
-              Sum[FLP](ObjectProject(read("person"), Constant(Data.Str("height")))))))
+              Sum[FLP](ObjectProject(read("person"), lpf.constant(Data.Str("height")))))))
     }
 
     "compile simple inner equi-join" in {
       testLogicalPlanCompile(
         "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
-              InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1, read("bar"),
+            lpf.let('__tmp2,
+              InnerJoin[FLP](lpf.free('__tmp0), lpf.free('__tmp1),
                 relations.Eq[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("id"))),
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("foo_id"))))),
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("id"))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))))),
               Squash(
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
-                      Constant(Data.Str("name"))),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const),
+                      lpf.constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
-                      Constant(Data.Str("address")))))))))
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const),
+                      lpf.constant(Data.Str("address")))))))))
     }
 
     "compile cross join to the equivalent inner equi-join" in {
@@ -1156,33 +1157,33 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // val equiv = "select foo.name, bar.address from (select * from foo where x < 10) foo join (select * from bar where y = 20) bar on foo.id = bar.foo_id"
 
       testLogicalPlanCompile(query,
-        Let('__tmp0, read("foo"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1,
              Fix(Filter(
-               Free('__tmp0),
+               lpf.free('__tmp0),
                Fix(Lt(
-                 ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
-                 Constant(Data.Int(10)))))),
-             Let('__tmp2, read("bar"),
-               Let('__tmp3,
+                 ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
+                 lpf.constant(Data.Int(10)))))),
+             lpf.let('__tmp2, read("bar"),
+               lpf.let('__tmp3,
                  Fix(Filter(
-                   Free('__tmp2),
+                   lpf.free('__tmp2),
                    Fix(Eq(
-                     ObjectProject(Free('__tmp2), Constant(Data.Str("y"))),
-                     Constant(Data.Int(20)))))),
-                  Let('__tmp4,
-                    Fix(InnerJoin(Free('__tmp1), Free('__tmp3),
+                     ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("y"))),
+                     lpf.constant(Data.Int(20)))))),
+                  lpf.let('__tmp4,
+                    Fix(InnerJoin(lpf.free('__tmp1), lpf.free('__tmp3),
                       Fix(Eq(
-                        ObjectProject(Free('__tmp1), Constant(Data.Str("id"))),
-                        ObjectProject(Free('__tmp3), Constant(Data.Str("foo_id"))))))),
+                        ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("id"))),
+                        ObjectProject(lpf.free('__tmp3), lpf.constant(Data.Str("foo_id"))))))),
                     Fix(Squash(
                        makeObj(
                          "name" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), JoinDir.Left.const),
-                           Constant(Data.Str("name"))),
+                           ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
+                           lpf.constant(Data.Str("name"))),
                          "address" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), JoinDir.Right.const),
-                           Constant(Data.Str("address"))))))))))))
+                           ObjectProject(lpf.free('__tmp4), JoinDir.Right.const),
+                           lpf.constant(Data.Str("address"))))))))))))
     }
 
     "compile filtered join with one-sided conditions" in {
@@ -1193,56 +1194,56 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       // because both require optimization)
 
       testLogicalPlanCompile(query,
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1, read("bar"),
+            lpf.let('__tmp2,
               Fix(Filter(
-                Free('__tmp0),
+                lpf.free('__tmp0),
                 Fix(Lt(
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
-                  Constant(Data.Int(10)))))),
-              Let('__tmp3,
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
+                  lpf.constant(Data.Int(10)))))),
+              lpf.let('__tmp3,
                 Fix(Filter(
-                  Free('__tmp1),
+                  lpf.free('__tmp1),
                   Fix(Eq(
-                    ObjectProject(Free('__tmp1), Constant(Data.Str("y"))),
-                    Constant(Data.Int(20)))))),
-                Let('__tmp4,
-                  Fix(InnerJoin(Free('__tmp2), Free('__tmp3),
+                    ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("y"))),
+                    lpf.constant(Data.Int(20)))))),
+                lpf.let('__tmp4,
+                  Fix(InnerJoin(lpf.free('__tmp2), lpf.free('__tmp3),
                     Fix(Eq(
-                      ObjectProject(Free('__tmp2), Constant(Data.Str("id"))),
-                      ObjectProject(Free('__tmp3), Constant(Data.Str("foo_id"))))))),
+                      ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("id"))),
+                      ObjectProject(lpf.free('__tmp3), lpf.constant(Data.Str("foo_id"))))))),
                   Fix(Squash(
                     makeObj(
                       "name" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), JoinDir.Left.const),
-                        Constant(Data.Str("name"))),
+                        ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
+                        lpf.constant(Data.Str("name"))),
                       "address" -> ObjectProject[FLP](
-                        ObjectProject(Free('__tmp4), JoinDir.Right.const),
-                        Constant(Data.Str("address"))))))))))))
+                        ObjectProject(lpf.free('__tmp4), JoinDir.Right.const),
+                        lpf.constant(Data.Str("address"))))))))))))
     }
 
     "compile simple left ineq-join" in {
       testLogicalPlanCompile(
         "select foo.name, bar.address " +
           "from foo left join bar on foo.id < bar.foo_id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
-              LeftOuterJoin[FLP](Free('__tmp0), Free('__tmp1),
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1, read("bar"),
+            lpf.let('__tmp2,
+              LeftOuterJoin[FLP](lpf.free('__tmp0), lpf.free('__tmp1),
                 relations.Lt[FLP](
-                  ObjectProject(Free('__tmp0), Constant(Data.Str("id"))),
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("foo_id"))))),
+                  ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("id"))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))))),
               Squash(
                 makeObj(
                   "name" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Left.const),
-                      Constant(Data.Str("name"))),
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Left.const),
+                      lpf.constant(Data.Str("name"))),
                   "address" ->
                     ObjectProject[FLP](
-                      ObjectProject(Free('__tmp2), JoinDir.Right.const),
-                      Constant(Data.Str("address")))))))))
+                      ObjectProject(lpf.free('__tmp2), JoinDir.Right.const),
+                      lpf.constant(Data.Str("address")))))))))
     }
 
     "compile complex equi-join" in {
@@ -1250,41 +1251,41 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select foo.name, bar.address " +
           "from foo join bar on foo.id = bar.foo_id " +
           "join baz on baz.bar_id = bar.id",
-        Let('__tmp0, read("foo"),
-          Let('__tmp1, read("bar"),
-            Let('__tmp2,
-              InnerJoin[FLP](Free('__tmp0), Free('__tmp1),
+        lpf.let('__tmp0, read("foo"),
+          lpf.let('__tmp1, read("bar"),
+            lpf.let('__tmp2,
+              InnerJoin[FLP](lpf.free('__tmp0), lpf.free('__tmp1),
                 relations.Eq[FLP](
                   ObjectProject(
-                    Free('__tmp0),
-                    Constant(Data.Str("id"))),
+                    lpf.free('__tmp0),
+                    lpf.constant(Data.Str("id"))),
                   ObjectProject(
-                    Free('__tmp1),
-                    Constant(Data.Str("foo_id"))))),
-              Let('__tmp3, read("baz"),
-                Let('__tmp4,
-                  InnerJoin[FLP](Free('__tmp2), Free('__tmp3),
+                    lpf.free('__tmp1),
+                    lpf.constant(Data.Str("foo_id"))))),
+              lpf.let('__tmp3, read("baz"),
+                lpf.let('__tmp4,
+                  InnerJoin[FLP](lpf.free('__tmp2), lpf.free('__tmp3),
                     relations.Eq[FLP](
-                      ObjectProject(Free('__tmp3),
-                        Constant(Data.Str("bar_id"))),
+                      ObjectProject(lpf.free('__tmp3),
+                        lpf.constant(Data.Str("bar_id"))),
                       ObjectProject[FLP](
-                        ObjectProject(Free('__tmp2),
+                        ObjectProject(lpf.free('__tmp2),
                           JoinDir.Right.const),
-                        Constant(Data.Str("id"))))),
+                        lpf.constant(Data.Str("id"))))),
                   Squash(
                     makeObj(
                       "name" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
                             JoinDir.Left.const),
-                          Constant(Data.Str("name"))),
+                          lpf.constant(Data.Str("name"))),
                       "address" ->
                         ObjectProject[FLP](
                           ObjectProject[FLP](
-                            ObjectProject(Free('__tmp4), JoinDir.Left.const),
+                            ObjectProject(lpf.free('__tmp4), JoinDir.Left.const),
                             JoinDir.Right.const),
-                          Constant(Data.Str("address")))))))))))
+                          lpf.constant(Data.Str("address")))))))))))
     }
 
     "compile sub-select in filter" in {
@@ -1296,31 +1297,31 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple sub-select" in {
       testLogicalPlanCompile(
         "select temp.name, temp.size from (select zips.city as name, zips.pop as size from zips) as temp",
-        Let('__tmp0, read("zips"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("zips"),
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
-                "size" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))),
+                "name" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "size" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             Squash(
               makeObj(
-                "name" -> ObjectProject(Free('__tmp1), Constant(Data.Str("name"))),
-                "size" -> ObjectProject(Free('__tmp1), Constant(Data.Str("size"))))))))
+                "name" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
+                "size" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("size"))))))))
     }
 
     "compile sub-select with same un-qualified names" in {
       testLogicalPlanCompile(
         "select city, pop from (select city, pop from zips) as temp",
-        Let('__tmp0, read("zips"),
-          Let('__tmp1,
+        lpf.let('__tmp0, read("zips"),
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
-                "pop" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))),
+                "city" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "pop" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp1), Constant(Data.Str("city"))),
-                "pop" -> ObjectProject(Free('__tmp1), Constant(Data.Str("pop"))))))))
+                "city" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("city"))),
+                "pop" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("pop"))))))))
     }
 
     "compile simple distinct" in {
@@ -1329,47 +1330,47 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         Distinct[FLP](
           Squash(
             makeObj(
-              "city" -> ObjectProject(read("zips"), Constant(Data.Str("city")))))))
+              "city" -> ObjectProject(read("zips"), lpf.constant(Data.Str("city")))))))
     }
 
     "compile simple distinct ordered" in {
       testLogicalPlanCompile(
         "select distinct city from zips order by city",
-        Let('__tmp0,
+        lpf.let('__tmp0,
           Squash(
             makeObj(
               "city" ->
-                ObjectProject(read("zips"), Constant(Data.Str("city"))))),
+                ObjectProject(read("zips"), lpf.constant(Data.Str("city"))))),
           Distinct[FLP](
             OrderBy[FLP](
-              Free('__tmp0),
+              lpf.free('__tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('__tmp0), Constant(Data.Str("city")))),
+                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city")))),
               MakeArrayN(
-                Constant(Data.Str("ASC")))))))
+                lpf.constant(Data.Str("ASC")))))))
     }
 
     "compile distinct with unrelated order by" in {
       testLogicalPlanCompile(
         "select distinct city from zips order by pop desc",
-        Let('__tmp0,
+        lpf.let('__tmp0,
           read("zips"),
-          Let('__tmp1,
+          lpf.let('__tmp1,
             Squash(
               makeObj(
-                "city" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
-                "__sd__0" -> ObjectProject(Free('__tmp0), Constant(Data.Str("pop"))))),
-            Let('__tmp2,
+                "city" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "__sd__0" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
+            lpf.let('__tmp2,
               OrderBy[FLP](
-                Free('__tmp1),
+                lpf.free('__tmp1),
                 MakeArrayN[Fix](
-                  ObjectProject(Free('__tmp1), Constant(Data.Str("__sd__0")))),
+                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
                 MakeArrayN(
-                  Constant(Data.Str("DESC")))),
+                  lpf.constant(Data.Str("DESC")))),
               DeleteField[FLP](
-                DistinctBy[FLP](Free('__tmp2),
-                  DeleteField(Free('__tmp2), Constant(Data.Str("__sd__0")))),
-                Constant(Data.Str("__sd__0")))))))
+                DistinctBy[FLP](lpf.free('__tmp2),
+                  DeleteField(lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0")))),
+                lpf.constant(Data.Str("__sd__0")))))))
     }
 
     "compile count(distinct(...))" in {
@@ -1377,18 +1378,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select count(distinct(lower(city))) from zips",
         Squash(
           makeObj(
-            "0" -> Count[FLP](Distinct[FLP](Lower[FLP](ObjectProject(read("zips"), Constant(Data.Str("city")))))))))
+            "0" -> Count[FLP](Distinct[FLP](Lower[FLP](ObjectProject(read("zips"), lpf.constant(Data.Str("city")))))))))
     }
 
     "compile simple distinct with two named projections" in {
       testLogicalPlanCompile(
         "select distinct city as CTY, state as ST from zips",
-        Let('__tmp0, read("zips"),
+        lpf.let('__tmp0, read("zips"),
           Distinct[FLP](
             Squash(
               makeObj(
-                "CTY" -> ObjectProject(Free('__tmp0), Constant(Data.Str("city"))),
-                "ST" -> ObjectProject(Free('__tmp0), Constant(Data.Str("state"))))))))
+                "CTY" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "ST" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("state"))))))))
     }
 
     "compile count distinct with two exprs" in {
@@ -1422,17 +1423,17 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "translate free variable" in {
       testLogicalPlanCompile("select name from zips where age < :age",
-        Let('__tmp0, read("zips"),
+        lpf.let('__tmp0, read("zips"),
           Squash(
             makeObj(
               "name" ->
                 ObjectProject[FLP](
                   Filter[FLP](
-                    Free('__tmp0),
+                    lpf.free('__tmp0),
                     Lt[FLP](
-                      ObjectProject(Free('__tmp0), Constant(Data.Str("age"))),
-                      Free('age))),
-                  Constant(Data.Str("name")))))))
+                      ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                      lpf.free('age))),
+                  lpf.constant(Data.Str("name")))))))
     }
   }
 
@@ -1451,91 +1452,91 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
     "insert ARBITRARY" in {
       val lp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        lpf.let('tmp0, read("zips"),
+          lpf.let('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
-            ObjectProject(Free('tmp1), Constant(Data.Str("city")))))
+              lpf.free('tmp0),
+              MakeArrayN[Fix](ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))))),
+            ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("city")))))
       val exp =
-        Let('tmp0, read("zips"),
+        lpf.let('tmp0, read("zips"),
           Arbitrary[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
-                Free('tmp0),
-                MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))), Constant(Data.Str("city")))))
+                lpf.free('tmp0),
+                MakeArrayN[Fix](ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))))), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
 
     "insert ARBITRARY with intervening filter" in {
       val lp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        lpf.let('tmp0, read("zips"),
+          lpf.let('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
-            Let('tmp2,
-              Filter[FLP](Free('tmp1), Gt[FLP](Count(Free('tmp1)), Constant(Data.Int(10)))),
-              ObjectProject(Free('tmp2), Constant(Data.Str("city"))))))
+              lpf.free('tmp0),
+              MakeArrayN[Fix](ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))))),
+            lpf.let('tmp2,
+              Filter[FLP](lpf.free('tmp1), Gt[FLP](Count(lpf.free('tmp1)), lpf.constant(Data.Int(10)))),
+              ObjectProject(lpf.free('tmp2), lpf.constant(Data.Str("city"))))))
       val exp =
-        Let('tmp0, read("zips"),
-          Let('tmp1,
+        lpf.let('tmp0, read("zips"),
+          lpf.let('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
-              MakeArrayN[Fix](ObjectProject(Free('tmp0), Constant(Data.Str("city"))))),
+              lpf.free('tmp0),
+              MakeArrayN[Fix](ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))))),
             Arbitrary[FLP](
               ObjectProject[FLP](
                 Filter[FLP](
-                  Free('tmp1),
-                  Gt[FLP](Count(Free('tmp1)), Constant(Data.Int(10)))),
-                Constant(Data.Str("city"))))))
+                  lpf.free('tmp1),
+                  Gt[FLP](Count(lpf.free('tmp1)), lpf.constant(Data.Int(10)))),
+                lpf.constant(Data.Str("city"))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
 
     "not insert redundant Reduction" in {
       val lp =
-        Let('tmp0, read("zips"),
+        lpf.let('tmp0, read("zips"),
           Count[FLP](
             ObjectProject[FLP](
               GroupBy[FLP](
-                Free('tmp0),
-                MakeArrayN[Fix](ObjectProject(Free('tmp0),
-                  Constant(Data.Str("city"))))), Constant(Data.Str("city")))))
+                lpf.free('tmp0),
+                MakeArrayN[Fix](ObjectProject(lpf.free('tmp0),
+                  lpf.constant(Data.Str("city"))))), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(lp)
     }
 
     "insert ARBITRARY with multiple keys and mixed projections" in {
       val lp =
-        Let('tmp0,
+        lpf.let('tmp0,
           read("zips"),
-          Let('tmp1,
+          lpf.let('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
+              lpf.free('tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('tmp0), Constant(Data.Str("city"))),
-                ObjectProject(Free('tmp0), Constant(Data.Str("state"))))),
+                ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))),
+                ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("state"))))),
             makeObj(
-              "city" -> ObjectProject(Free('tmp1), Constant(Data.Str("city"))),
-              "1"    -> Count[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("state")))),
-              "loc"  -> ObjectProject(Free('tmp1), Constant(Data.Str("loc"))),
-              "2"    -> Sum[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("pop")))))))
+              "city" -> ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("city"))),
+              "1"    -> Count[FLP](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("state")))),
+              "loc"  -> ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
+              "2"    -> Sum[FLP](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
       val exp =
-        Let('tmp0,
+        lpf.let('tmp0,
           read("zips"),
-          Let('tmp1,
+          lpf.let('tmp1,
             GroupBy[FLP](
-              Free('tmp0),
+              lpf.free('tmp0),
               MakeArrayN[Fix](
-                ObjectProject(Free('tmp0), Constant(Data.Str("city"))),
-                ObjectProject(Free('tmp0), Constant(Data.Str("state"))))),
+                ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("city"))),
+                ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("state"))))),
             makeObj(
-              "city" -> Arbitrary[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("city")))),
-              "1"    -> Count[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("state")))),
-              "loc"  -> ObjectProject(Free('tmp1), Constant(Data.Str("loc"))),
-              "2"    -> Sum[FLP](ObjectProject(Free('tmp1), Constant(Data.Str("pop")))))))
+              "city" -> Arbitrary[FLP](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("city")))),
+              "1"    -> Count[FLP](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("state")))),
+              "loc"  -> ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
+              "2"    -> Sum[FLP](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }

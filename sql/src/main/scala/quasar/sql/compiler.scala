@@ -36,6 +36,8 @@ trait Compiler[F[_]] {
   import identity._
   import JoinDir._
 
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+
   // HELPERS
   private type M[A] = EitherT[F, SemanticError, A]
 
@@ -302,13 +304,13 @@ trait Compiler[F[_]] {
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, name)        => BindingContext(Map(name -> LP.Free(stepName)))
-            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> LP.Free(stepName)))
-            case id @ IdentRelationAST(_, _) => BindingContext(Map(id.aliasName -> LP.Free(stepName)))
+            case ExprRelationAST(_, name)        => BindingContext(Map(name -> lpr.free(stepName)))
+            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
+            case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
             case r                               => BindingContext(Map())
           }
-          next2    <- CompilerState.contextual(bc, tableContext(LP.Free(stepName), relations))(next)
-        } yield LP.Let(stepName, current, next2)
+          next2    <- CompilerState.contextual(bc, tableContext(lpr.free(stepName), relations))(next)
+        } yield lpr.let(stepName, current, next2)
       }.getOrElse(next)
     }
 
@@ -335,12 +337,12 @@ trait Compiler[F[_]] {
         Fix[LP] = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(structural.MakeObject(LP.Constant(Data.Str(name)), value))
+          Fix(structural.MakeObject(lpr.constant(Data.Str(name)), value))
         case (None, value) => value
       }
 
       fields.reduceOption((a,b) => Fix(structural.ObjectConcat(a, b)))
-        .getOrElse(LP.Constant(Data.Obj()))
+        .getOrElse(lpr.constant(Data.Obj()))
     }
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LP]] =
@@ -353,15 +355,15 @@ trait Compiler[F[_]] {
 
         case TableRelationAST(path, _) =>
           sandboxCurrent(canonicalize(path)).cata(
-            p => emit(LP.Read(p)),
+            p => emit(lpr.read(p)),
             fail(InvalidPathError(path, None)))
 
         case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
-            val leftFree = LP.Free(leftName)
-            val rightFree = LP.Free(rightName)
+            val leftFree: Fix[LP] = lpr.free(leftName)
+            val rightFree: Fix[LP] = lpr.free(rightName)
 
             (compileRelation(left) ⊛
               compileRelation(right) ⊛
@@ -369,7 +371,7 @@ trait Compiler[F[_]] {
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))(
                 compile0(clause).map(c =>
-                  LP.Invoke(
+                  lpr.invoke(
                     tpe match {
                       case LeftJoin             => set.LeftOuterJoin
                       case quasar.sql.InnerJoin => set.InnerJoin
@@ -377,8 +379,8 @@ trait Compiler[F[_]] {
                       case FullJoin             => set.FullOuterJoin
                     },
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
-              LP.Let(leftName, left0,
-                LP.Let(rightName, right0, join)))
+              lpr.let(leftName, left0,
+                lpr.let(rightName, right0, join)))
             }).join
       }
 
@@ -447,7 +449,7 @@ trait Compiler[F[_]] {
                               Fix(set.OrderBy(
                                 t,
                                 Fix(structural.MakeArrayN(keys: _*)),
-                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => LP.Constant(Data.Str(order.shows)) }: _*))))))
+                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => lpr.constant(Data.Str(order.shows)) }: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
@@ -455,7 +457,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(t =>
                                   if (syntheticNames.nonEmpty)
                                     Fix(set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(structural.DeleteField(acc, LP.Constant(Data.Str(field)))))))
+                                      Fix(structural.DeleteField(acc, lpr.constant(Data.Str(field)))))))
                                   else Fix(set.Distinct(t))).some
                               case _ => None
                             }
@@ -465,7 +467,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
                                     Fix(structural.DeleteField(acc,
-                                      LP.Constant(Data.Str(field))))))
+                                      lpr.constant(Data.Str(field))))))
 
                               pruned
                             }
@@ -558,18 +560,18 @@ trait Compiler[F[_]] {
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
-              Fix(structural.ObjectProject(obj, LP.Constant(Data.Str(name)))))
+              Fix(structural.ObjectProject(obj, lpr.constant(Data.Str(name)))))
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq(rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(structural.ObjectProject(table, LP.Constant(Data.Str(name)))))
+              else Fix(structural.ObjectProject(table, lpr.constant(Data.Str(name)))))
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
-          case Fix(LP.ConstantF(Data.Str(part))) :: expr :: Nil =>
+          case Fix(LP.Constant(Data.Str(part))) :: expr :: Nil =>
             (part.some collect {
               case "century"      => date.ExtractCentury
               case "day"          => date.ExtractDayOfMonth
@@ -610,13 +612,13 @@ trait Compiler[F[_]] {
 
       case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
-          LP.Let(name, c1,
+          lpr.let(name, c1,
             relations.Cond(
               // TODO: Ideally this would use `is null`, but that doesn’t makes it
               //       this far (but it should).
-              relations.Eq(LP.Free(name), LP.Constant(Data.Null)).embed,
+              relations.Eq(lpr.free(name), lpr.constant(Data.Null)).embed,
               c2,
-              LP.Free(name)).embed)),
+              lpr.free(name)).embed)),
           functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
@@ -640,7 +642,7 @@ trait Compiler[F[_]] {
       case Match(expr, cases, default0) =>
         for {
           expr    <- compile0(expr)
-          default <- default0.fold(emit(LP.Constant(Data.Null)))(compile0)
+          default <- default0.fold(emit(lpr.constant(Data.Null)))(compile0)
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
               (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
@@ -649,18 +651,18 @@ trait Compiler[F[_]] {
         } yield cases
 
       case Switch(cases, default0) =>
-        default0.fold(emit(LP.Constant(Data.Null)))(compile0).flatMap(
+        default0.fold(emit(lpr.constant(Data.Null)))(compile0).flatMap(
           compileCases(cases, _) {
             case Case(cond, expr2) =>
               (compile0(cond) ⊛ compile0(expr2))((_, _))
           })
 
-      case IntLiteral(value) => emit(LP.Constant(Data.Int(value)))
-      case FloatLiteral(value) => emit(LP.Constant(Data.Dec(value)))
-      case StringLiteral(value) => emit(LP.Constant(Data.Str(value)))
-      case BoolLiteral(value) => emit(LP.Constant(Data.Bool(value)))
-      case NullLiteral() => emit(LP.Constant(Data.Null))
-      case Vari(name) => emit(LP.Free(Symbol(name)))
+      case IntLiteral(value) => emit(lpr.constant(Data.Int(value)))
+      case FloatLiteral(value) => emit(lpr.constant(Data.Dec(value)))
+      case StringLiteral(value) => emit(lpr.constant(Data.Str(value)))
+      case BoolLiteral(value) => emit(lpr.constant(Data.Bool(value)))
+      case NullLiteral() => emit(lpr.constant(Data.Null))
+      case Vari(name) => emit(lpr.free(Symbol(name)))
     }
   }
 
@@ -692,9 +694,9 @@ object Compiler {
     {
       def groupedKeys(t: LP[Fix[LP]], newSrc: Fix[LP]): Option[List[Fix[LP]]] = {
         t match {
-          case InvokeFUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
+          case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeFUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
+          case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
             groupedKeys(src.unFix, newSrc)
           case _ => None
         }
@@ -714,11 +716,11 @@ object Compiler {
       def strip(v: Cofree[LP, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
-          InvokeF[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
+        case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(arg)) if func.effect ≟ Reduction =>
+          Invoke[Cofree[LP, Boolean], nat._1](func, Func.Input1(strip(arg)))
 
         case _ =>
-          if (t.head) InvokeF(agg.Arbitrary, Func.Input1(strip(t)))
+          if (t.head) Invoke(agg.Arbitrary, Func.Input1(strip(t)))
           else t.tail
       }
     }
