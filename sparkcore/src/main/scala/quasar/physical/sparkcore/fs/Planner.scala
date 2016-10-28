@@ -203,11 +203,6 @@ object Planner {
               }).right
             }, CoreMap.change))
 
-          def postProcessAvg(d: Data): Data = d match {
-            case Data.Arr(List(Data.Dec(sum), Data.Int(count))) => Data.Dec(sum  / BigDecimal(count))
-            case _ => Data.NA
-          }
-
           def merge(a: Data, b: Data, f: List[(Data, Data) => Data]): Data = (a, b) match {
             case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(Zip[List].zipWith(f,(l1.zip(l2))) {
               case (f, (l1, l2)) => f(l1,l2)
