@@ -510,9 +510,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert basic join with explicit join condition" in {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
-      val lp = Fix(LP.Let('__tmp0, lpRead("/foo"),
-        Fix(LP.Let('__tmp1, lpRead("/bar"),
-          Fix(LP.Let('__tmp2,
+      val lp = lpf.let('__tmp0, lpRead("/foo"),
+        lpf.let('__tmp1, lpRead("/bar"),
+          lpf.let('__tmp2,
             StdLib.set.InnerJoin(lpf.free('__tmp0), lpf.free('__tmp1),
               relations.Eq(
                 structural.ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("id"))).embed,
@@ -525,11 +525,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               "address" ->
                 structural.ObjectProject(
                   JoinDir.Right.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("address"))))))))))
+                  lpf.constant(Data.Str("address")))))))
       convert(None, lp) must
-      equal(chain(
-        RootR,
-        QC.inj(Map((), ProjectFieldR(HoleF, StrLit("foo"))))).some)
+        equal(chain(
+          RootR,
+          QC.inj(Map((), ProjectFieldR(HoleF, StrLit("foo"))))).some)
     }.pendingUntilFixed
   }
 
