@@ -70,27 +70,28 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractCentury(f) => (f >>> {
-      case Data.Timestamp(v) => century(toDateTime(v).getYear())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => century(dt.getYear())).getOrElse(Data.NA)
       case Data.Date(v) => century(v.getYear())
       case _ => undefined
     }).right
     case ExtractDayOfMonth(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfMonth())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getDayOfMonth())).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getDayOfMonth())
       case _ => undefined
     }).right
     case ExtractDecade(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear() / 10)
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getYear() / 10)).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getYear() / 10)
       case _ => undefined
     }).right
     case ExtractDayOfWeek(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfWeek().getValue() % 7)
+      case Data.Timestamp(v) =>
+        toDateTime(v).map(dt => Data.Int(dt.getDayOfWeek().getValue() % 7)).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue() % 7)
       case _ => undefined
     }).right
     case ExtractDayOfYear(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfYear())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getDayOfYear())).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getDayOfYear())
       case _ => undefined
     }).right
@@ -100,13 +101,13 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractHour(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getHour())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getHour())).getOrElse(Data.NA)
       case Data.Time(v) => Data.Int(v.getHour())
       case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
     case ExtractIsoDayOfWeek(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfWeek().getValue())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getDayOfWeek().getValue())).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
       case _ => undefined
     }).right
@@ -115,9 +116,11 @@ object CoreMap extends Serializable {
     }).right
     case ExtractMicroseconds(f) => (f >>> {
       case Data.Timestamp(v) =>
-        val sec = toDateTime(v).getSecond() * 1000000
-        val milli = toDateTime(v).getNano() / 1000
-        Data.Int(sec + milli)
+        toDateTime(v).map { dt =>
+          val sec = dt.getSecond() * 1000000
+          val milli = dt.getNano() / 1000
+          Data.Int(sec + milli)
+        }.getOrElse(Data.NA)
       case Data.Time(v) =>
         val sec = v.getSecond() * 1000000
         val milli = v.getNano() / 1000
@@ -126,15 +129,18 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractMillennium(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(((toDateTime(v).getYear() - 1) / 1000) + 1)
+      case Data.Timestamp(v) =>
+        toDateTime(v).map(dt => Data.Int(((dt.getYear() - 1) / 1000) + 1)).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(((v.getYear() - 1) / 1000) + 1)
       case _ => undefined
     }).right
     case ExtractMilliseconds(f) => (f >>> {
       case Data.Timestamp(v) =>
-        val sec = toDateTime(v).getSecond() * 1000
-        val milli = toDateTime(v).getNano() / 1000000
-        Data.Int(sec + milli)
+        toDateTime(v).map { dt =>
+          val sec = dt.getSecond() * 1000
+          val milli = dt.getNano() / 1000000
+          Data.Int(sec + milli)
+        }.getOrElse(Data.NA)
       case Data.Time(v) =>
         val sec = v.getSecond() * 1000
         val milli = v.getNano() / 1000000
@@ -143,26 +149,29 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractMinute(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getMinute())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getMinute())).getOrElse(Data.NA)
       case Data.Time(v) => Data.Int(v.getMinute())
       case Data.Date(_) => Data.Int(0)
       case _ => undefined
     }).right
     case ExtractMonth(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getMonth().getValue())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getMonth().getValue())).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getMonth().getValue())
       case _ => undefined
     }).right
     case ExtractQuarter(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(((toDateTime(v).getMonth().getValue - 1) / 3) + 1)
+      case Data.Timestamp(v) =>
+        toDateTime(v).map(dt => Data.Int(((dt.getMonth().getValue - 1) / 3) + 1)).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(((v.getMonth().getValue - 1) / 3) + 1)
       case _ => undefined
     }).right
     case ExtractSecond(f) => (f >>> {
       case Data.Timestamp(v) =>
-        val sec = toDateTime(v).getSecond()
-        val milli = toDateTime(v).getNano() / 1000
-        Data.Dec(BigDecimal(s"$sec.$milli"))
+        toDateTime(v).map { dt =>
+          val sec = dt.getSecond()
+          val milli = dt.getNano() / 1000
+          Data.Dec(BigDecimal(s"$sec.$milli"))
+        }.getOrElse(Data.NA)
       case Data.Time(v) =>
         val sec = v.getSecond()
         val milli = v.getNano() / 1000
@@ -171,12 +180,12 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case ExtractWeek(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getDayOfYear() / 7)
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getDayOfYear() / 7)).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getDayOfYear() / 7)
       case _ => undefined
     }).right
     case ExtractYear(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(toDateTime(v).getYear())
+      case Data.Timestamp(v) => toDateTime(v).map(dt => Data.Int(dt.getYear())).getOrElse(Data.NA)
       case Data.Date(v) => Data.Int(v.getYear())
       case _ => undefined
     }).right
@@ -495,5 +504,6 @@ object CoreMap extends Serializable {
       case _ => undefined
     }
 
-  private def toDateTime(v: Instant) = v.atZone(ZoneOffset.UTC)
+  private def toDateTime(v: Instant) = \/.fromTryCatchNonFatal(v.atZone(ZoneOffset.UTC))
+
 }
