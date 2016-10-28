@@ -32,9 +32,9 @@ object Ygg {
   """.trim
 
   def yggImports = imports + "\n" + """
-    import ygg._, common._, json._, table._, trans._
+    import ygg._, ygg.common._, json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
-    import ygg.macros.Json._
+    import ygg.macros._
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """
@@ -68,14 +68,14 @@ object Ygg {
 
   def ygg(p: Project): Project = (
      yggSetup(p)
-    .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector)
+    .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector, 'sql)
     .settings(libraryDependencies ++= yggDeps)
     .settings(initialCommands in console := yggImports)
   )
 
   def jsonfile(p: Project): Project = (
      yggSetup(p)
-    .dependsOn('connector, 'ygg, 'sql)
+    .dependsOn('connector, 'ygg)
     .settings(initialCommands in console := jsonfileImports)
   )
 }
