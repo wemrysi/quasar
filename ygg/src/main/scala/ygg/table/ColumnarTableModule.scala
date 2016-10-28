@@ -1441,12 +1441,15 @@ trait ColumnarTableModule {
 trait BlockTableModule extends ColumnarTableModule {
   outer =>
 
+  type TableCompanion = BaseTableCompanion
+  type Table          = BaseTable
+  object Table extends BaseTableCompanion
+
   def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
     case ExactSize(1) => new SingletonTable(slices)
     case _            => new ExternalTable(slices, size)
   }
 
-  object Table extends TableCompanion
 
   def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
     case (_: JNum, CNum | CLong | CDouble) => true
@@ -1459,7 +1462,7 @@ trait BlockTableModule extends ColumnarTableModule {
     case _                                 => false
   }
 
-  trait TableCompanion extends ThisTableCompanion {
+  trait BaseTableCompanion extends ThisTableCompanion {
     lazy val sortMergeEngine = new MergeEngine
 
     def addGlobalId(spec: TransSpec1) = {
@@ -2078,7 +2081,7 @@ trait BlockTableModule extends ColumnarTableModule {
     }
   }
 
-  abstract class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
+  abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 
@@ -2121,7 +2124,7 @@ trait BlockTableModule extends ColumnarTableModule {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: NeedSlices) extends Table(slices0, ExactSize(1)) {
+  class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) {
     // TODO assert that this table only has one row
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
@@ -2154,7 +2157,7 @@ trait BlockTableModule extends ColumnarTableModule {
     * slice and are completely in-memory. Because they fit in memory, we are
     * allowed more optimizations when doing things like joins.
     */
-  class InternalTable(val slice: Slice) extends Table(singleStreamT(slice), ExactSize(slice.size)) {
+  class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
     def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
@@ -2174,7 +2177,7 @@ trait BlockTableModule extends ColumnarTableModule {
     )
   }
 
-  class ExternalTable(slices: NeedSlices, size: TableSize) extends Table(slices, size) {
+  class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) {
     import Table.{ Table => _, _ }
 
     def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
