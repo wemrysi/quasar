@@ -20,17 +20,59 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import trans.DerefObjectStatic
 
-abstract class TableQspec extends quasar.Qspec with ColumnarTableModuleTestSupport {
+object BlockTableQspec {
+  def fromSample(sampleData: SampleData): Impl = new Impl(sampleData)
+
+  class Impl(sampleData: SampleData) extends BlockTableQspec {
+    val Some((idCount, schema)) = sampleData.schema
+    val actualSchema            = CValueGenerators.inferSchema(sampleData.data map { _ \ "value" })
+
+    override val projections = List(actualSchema).map { subschema =>
+      val stream = sampleData.data flatMap { jv =>
+        val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
+          case (obj, (jpath, ctype)) => {
+            val vpath       = JPath(JPathField("value") :: jpath.nodes)
+            val valueAtPath = jv.get(vpath)
+
+            if (compliesWithSchema(valueAtPath, ctype)) {
+              obj.set(vpath, valueAtPath)
+            } else {
+              obj
+            }
+          }
+        }
+
+        if (back \ "value" == JUndefined)
+          None
+        else
+          Some(back)
+      }
+
+      Path("/test") -> Projection(stream)
+    } toMap
+  }
+}
+
+abstract class BlockTableQspec extends AbsTableQspec with BlockTableModule {
+}
+
+abstract class AbsTableQspec extends quasar.Qspec with ColumnarTableModule {
+  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
+  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
+}
+
+abstract class TableQspec extends AbsTableQspec {
   self =>
 
   import SampleData._
 
-  trait TableCompanion extends ThisTableCompanion
-  final object Table extends TableCompanion
-
-  final class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
-
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
+
+  type TableCompanion = ThisTableCompanion
+  final object Table extends ThisTableCompanion
+  final class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
 
   type ASD = Arbitrary[SampleData]
 

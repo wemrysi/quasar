@@ -89,10 +89,18 @@ trait TableCompanion[T <: ygg.table.Table] {
 
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
-  def toInternalTable(limit: Int): ETable \/ ITable                     = ???
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
+  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
+  def toInternalTable(limit: Int): ETable \/ ITable                                                                                   = ???
+  def toExternalTable(): ETable                                                                                                       = ???
 }
 
+// trait InternalTable extends Table {
+//   def slice: Slice
+// }
+// trait ExternalTable extends Table {
+
+// }
 trait Table {
   type NeedTable = Need[Table]
   type Table <: ygg.table.Table
@@ -141,29 +149,61 @@ trait Table {
     */
   def force: NeedTable
 
+  /**
+    * Sorts the KV table by ascending or descending order of a transformation
+    * applied to the rows.
+    *
+    * @param sortKey The transspec to use to obtain the values to sort on
+    * @param sortOrder Whether to sort ascending or descending
+    */
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
+
+  /**
+    * Sorts the KV table by ascending or descending order based on a seq of transformations
+    * applied to the rows.
+    *
+    * @param groupKeys The transspecs to use to obtain the values to sort on
+    * @param valueSpec The transspec to use to obtain the non-sorting values
+    * @param sortOrder Whether to sort ascending or descending
+    * @param unique If true, the same key values will sort into a single row, otherwise
+    * we assign a unique row ID as part of the key so that multiple equal values are
+    * preserved
+    */
+  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
+
+  /**
+    * Converts a table to an internal table, if possible. If the table is
+    * already an `InternalTable` or a `SingletonTable`, then the conversion
+    * will always succeed. If the table is an `ExternalTable`, then if it has
+    * less than `limit` rows, it will be converted to an `InternalTable`,
+    * otherwise it will stay an `ExternalTable`.
+    */
+  def toInternalTable(limit: Int): ETable \/ ITable
+  def toExternalTable(): ETable
+
+  /**
+    * For each distinct path in the table, load all columns identified by the specified
+    * jtype and concatenate the resulting slices into a new table.
+    */
+  def load(tpe: JType): NeedTable
+
   def canonicalize(length: Int): Table
+  def canonicalize(minLength: Int, maxLength: Int): Table
+  def columns: ColumnMap
   def companion: TableCompanion[Table]
   def concat(t2: Table): Table
-  def distinct(spec: TransSpec1): Table
+  def distinct(key: TransSpec1): Table
+  def mapWithSameSize(f: NeedSlices => NeedSlices): Table
+  def normalize: Table
   def paged(limit: Int): Table
   def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
+  def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]]
   def schemas: Need[Set[JType]]
   def slices: NeedSlices
-  def sort(key: TransSpec1, order: DesiredSortOrder): NeedTable
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toData: Data
   def toJValues: Stream[JValue]
   def toJson: Need[Stream[JValue]]
   def zip(t2: Table): NeedTable
-
-  def canonicalize(minLength: Int, maxLength: Int): Table
-  def columns: ColumnMap
-  def load(tpe: JType): NeedTable
-  def mapWithSameSize(f: NeedSlices => NeedSlices): Table
-  def normalize: Table
-  def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]]
-  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
-  def toInternalTable(limit: Int): ETable \/ ITable
-  def toExternalTable: ETable
 }

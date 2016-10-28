@@ -54,8 +54,7 @@ solve 'a, 'b
   ...
  */
 
-class GrouperSpec extends quasar.Qspec {
-  import DummyModule._
+class GrouperSpec extends BlockTableQspec {
   import trans._
   import constants._
 

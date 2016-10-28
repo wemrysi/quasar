@@ -40,7 +40,7 @@ private object JValueInColumnOrder {
   }
 }
 
-class BlockAlignSpec extends quasar.Qspec {
+class BlockAlignSpec extends BlockTableQspec {
   implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {
@@ -79,7 +79,6 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlign(sample: SampleData) = {
-    import DummyModule._
     import trans.constants._
 
     val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
@@ -161,7 +160,6 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlignSymmetry(i: Int) = {
-    import DummyModule._
     import trans._
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
@@ -323,7 +321,7 @@ class BlockAlignSpec extends quasar.Qspec {
     val cSortKeys = sortKeys map { CPath(_) }
 
     val resultM = for {
-      sorted <- DummyModule.fromSample(sample).sort(sortTransspec(cSortKeys: _*), sortOrder)
+      sorted <- fromSample(sample).sort(sortTransspec(cSortKeys: _*), sortOrder)
       json   <- sorted.toJson
     } yield (json, sorted)
 
@@ -554,7 +552,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testLoadDense(sample: SampleData) = {
-    val module = new BlockStoreLoadTestModule(sample)
+    val module = BlockTableQspec fromSample sample
 
     val expected = sample.data flatMap { jv =>
       val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
@@ -576,9 +574,8 @@ class BlockAlignSpec extends quasar.Qspec {
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
     val result: Need[Iterable[JValue]] = {
-      import module.Table
-      val t: Table      = Table constString Set("/test")
-      val loaded: Table = t.load(Schema.mkType(cschema).get).value
+      val t: module.Table      = module.Table constString Set("/test")
+      val loaded: module.Table = t.load(Schema.mkType(cschema).get).value
       loaded.toJson
     }
 

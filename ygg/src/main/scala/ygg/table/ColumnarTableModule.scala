@@ -301,28 +301,20 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
-    def toExternalTable(): ETable                                                                                                       = ???
-    def toInternalTable(): ETable \/ ITable                                                                                             = ???
+    // def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
+    // def toExternalTable(): ETable                                                                                                       = ???
+    // def toInternalTable(): ETable \/ ITable                                                                                             = ???
 
+    def toInternalTable(): ETable \/ ITable                 = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
-
-    /**
-      * For each distinct path in the table, load all columns identified by the specified
-      * jtype and concatenate the resulting slices into a new table.
-      */
-    def load(tpe: JType): NeedTable = companion.load(this, tpe)
-
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
-    def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
-
-    def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
-
-    def slicesStream: Stream[Slice] = slices.toStream.value
-    def columns: ColumnMap          = slicesStream.head.columns
-    def toVector: Vector[JValue]    = toJValues.toVector
-    def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
-    def toDataStream = toJValues map jvalueToData
+    def load(tpe: JType): NeedTable                         = companion.load(this, tpe)
+    def sort(sortKey: TransSpec1): NeedTable                = sort(sortKey, SortAscending)
+    def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
+    def slicesStream: Stream[Slice]                         = slices.toStream.value
+    def columns: ColumnMap                                  = slicesStream.head.columns
+    def toVector: Vector[JValue]                            = toJValues.toVector
+    def toJValues: Stream[JValue]                           = slicesStream flatMap (_.toJsonElements)
+    def toDataStream                                        = toJValues map jvalueToData
 
     def toData: Data = toDataStream match {
       case Seq()  => Data.NA
@@ -1162,7 +1154,7 @@ trait ColumnarTableModule {
         )
 
         Table(
-          StreamT.wrapEffect(sort(spec) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
+          StreamT.wrapEffect(Need(this) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
           EstimateSize(0L, size.maxSize)
         )
       }
@@ -2094,42 +2086,9 @@ trait BlockTableModule extends ColumnarTableModule {
     def toJsonString: String = toJValues mkString "\n"
 
     /**
-      * Sorts the KV table by ascending or descending order of a transformation
-      * applied to the rows.
-      *
-      * @param sortKey The transspec to use to obtain the values to sort on
-      * @param sortOrder Whether to sort ascending or descending
-      */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
-
-    /**
-      * Sorts the KV table by ascending or descending order based on a seq of transformations
-      * applied to the rows.
-      *
-      * @param groupKeys The transspecs to use to obtain the values to sort on
-      * @param valueSpec The transspec to use to obtain the non-sorting values
-      * @param sortOrder Whether to sort ascending or descending
-      * @param unique If true, the same key values will sort into a single row, otherwise
-      * we assign a unique row ID as part of the key so that multiple equal values are
-      * preserved
-      */
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
-
-    /**
-      * Converts a table to an internal table, if possible. If the table is
-      * already an `InternalTable` or a `SingletonTable`, then the conversion
-      * will always succeed. If the table is an `ExternalTable`, then if it has
-      * less than `limit` rows, it will be converted to an `InternalTable`,
-      * otherwise it will stay an `ExternalTable`.
-      */
-    def toInternalTable(limit: Int): ExternalTable \/ InternalTable
-
-    override def toInternalTable(): ExternalTable \/ InternalTable = toInternalTable(yggConfig.maxSliceSize)
-
-    /**
       * Forces a table to an external table, possibly de-optimizing it.
       */
-    override def toExternalTable: ExternalTable = new ExternalTable(slices, size)
+    def toExternalTable(): ExternalTable = new ExternalTable(slices, size)
   }
 
   class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) {
@@ -2151,7 +2110,7 @@ trait BlockTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
@@ -2168,7 +2127,7 @@ trait BlockTableModule extends ColumnarTableModule {
   class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
-    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable       = toExternalTable.sort(sortKey, sortOrder)
@@ -2232,7 +2191,7 @@ trait BlockTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
