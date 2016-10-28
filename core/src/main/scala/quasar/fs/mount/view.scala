@@ -23,6 +23,7 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
+import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.sql.Sql
 

@@ -18,7 +18,8 @@ package quasar.fs
 
 import quasar.Predef.{Vector, None, Set}
 import quasar.Planner.UnsupportedPlan
-import quasar.{LogicalPlan, PhaseResults}
+import quasar.LogicalPlan
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 
 import matryoshka.Fix

@@ -2,7 +2,6 @@
     "name": "match like pattern",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "skip"
     },
     "data": "zips.data",

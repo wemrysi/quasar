@@ -3,11 +3,10 @@
   "backends": {
     "mongodb_read_only": "pending",
     "postgresql":        "pending",
-    "marklogic":         "skip",
     "couchbase":         "skip"
   },
   "data": "olympics.data",
-  "query": "select count(distinct *) from olympics",
+  "query": "select count(distinct *) as cnt from olympics",
   "predicate": "equalsExactly",
-  "expected": [{ "0": 2304 }]
+  "expected": [{ "cnt": 2304 }]
 }

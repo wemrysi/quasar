@@ -5,8 +5,8 @@
         "postgresql":        "pending",
         "couchbase":         "skip"
     },
-    "data": "zips.data",
-    "query": "select integer(_id) as intId, decimal(_id) as decId from zips",
+    "data": "smallZips.data",
+    "query": "select integer(_id) as intId, decimal(_id) as decId from smallZips",
     "predicate": "containsAtLeast",
     "expected": [
         { "intId": 1001, "decId": 1001.0 },

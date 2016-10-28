@@ -16,15 +16,18 @@
 
 package quasar.api.services.query
 
-import scala.Predef.$conforms
 import quasar.Predef.{ -> => _, _ }
 import quasar._, RenderTree.ops._
 import quasar.api._, ToQResponse.ops._
 import quasar.api.services._
+import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp.numeric._
+import quasar.frontend._
 import quasar.fs._
+
+import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
 import matryoshka._
