@@ -497,6 +497,7 @@ trait ColumnarTableModule {
 
       mapWithSameSize(ss => StreamT(step(0, Nil, ss)))
     }
+    import Cogrouping._
 
     /**
       * Cogroups this table with another table, using equality on the specified
@@ -572,35 +573,6 @@ trait ColumnarTableModule {
             "both: " + (leqbuf.toArray zip reqbuf.toArray).mkString("[", ",", "]")
         }
       }
-
-      case class SlicePosition[K](sliceId: SliceId,
-                                  /** The position in the current slice. This will only be nonzero when the slice has been appended
-                                    * to as a result of a cartesian crossing the slice boundary */
-                                  pos: Int,
-                                  /** Present if not in a final right or left run. A pair of a key slice that is parallel to the
-                                    * current data slice, and the value that is needed as input to sltk or srtk to produce the next key. */
-                                  keyState: K,
-                                  key: Slice,
-                                  /** The current slice to be operated upon. */
-                                  data: Slice,
-                                  /** The remainder of the stream to be operated upon. */
-                                  tail: NeedSlices)
-
-      sealed trait NextStep[A, B] extends Product with Serializable
-      final case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
-      final case class SplitRight[A, B](rpos: Int) extends NextStep[A, B]
-      final case class NextCartesianLeft[A, B](left: SlicePosition[A],
-                                         right: SlicePosition[B],
-                                         rightStart: Option[SlicePosition[B]],
-                                         rightEnd: Option[SlicePosition[B]])
-          extends NextStep[A, B]
-      final case class NextCartesianRight[A, B](left: SlicePosition[A],
-                                          right: SlicePosition[B],
-                                          rightStart: Option[SlicePosition[B]],
-                                          rightEnd: Option[SlicePosition[B]])
-          extends NextStep[A, B]
-      final case class SkipRight[A, B](left: SlicePosition[A], rightEnd: SlicePosition[B])                                  extends NextStep[A, B]
-      final case class RestartRight[A, B](left: SlicePosition[A], rightStart: SlicePosition[B], rightEnd: SlicePosition[B]) extends NextStep[A, B]
       def cogroup0[LK, RK, LR, RR, BR](stlk: SliceTransform1[LK],
                                        strk: SliceTransform1[RK],
                                        stlr: SliceTransform1[LR],
@@ -2220,4 +2192,43 @@ trait BlockTableModule extends ColumnarTableModule {
       )
     }
   }
+}
+
+object Cogrouping {
+  final case class SlicePosition[K](
+    sliceId: SliceId,
+    /** The position in the current slice. This will only be nonzero when the slice has been appended
+      * to as a result of a cartesian crossing the slice boundary */
+    pos: Int,
+    /** Present if not in a final right or left run. A pair of a key slice that is parallel to the
+      * current data slice, and the value that is needed as input to sltk or srtk to produce the next key. */
+    keyState: K,
+    key: Slice,
+    /** The current slice to be operated upon. */
+    data: Slice,
+    /** The remainder of the stream to be operated upon. */
+    tail: NeedSlices
+  )
+
+  sealed trait NextStep[A, B] extends Product with Serializable
+
+  final case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
+  final case class SplitRight[A, B](rpos: Int) extends NextStep[A, B]
+
+  final case class NextCartesianLeft[A, B](
+    left: SlicePosition[A],
+    right: SlicePosition[B],
+    rightStart: Option[SlicePosition[B]],
+    rightEnd: Option[SlicePosition[B]]
+  ) extends NextStep[A, B]
+
+  final case class NextCartesianRight[A, B](
+    left: SlicePosition[A],
+    right: SlicePosition[B],
+    rightStart: Option[SlicePosition[B]],
+    rightEnd: Option[SlicePosition[B]]
+  ) extends NextStep[A, B]
+
+  final case class SkipRight[A, B](left: SlicePosition[A], rightEnd: SlicePosition[B])                                  extends NextStep[A, B]
+  final case class RestartRight[A, B](left: SlicePosition[A], rightStart: SlicePosition[B], rightEnd: SlicePosition[B]) extends NextStep[A, B]
 }
