@@ -25,10 +25,10 @@ abstract class TableQspec extends quasar.Qspec with ColumnarTableModuleTestSuppo
 
   import SampleData._
 
-  trait TableCompanion extends ColumnarTableCompanion
+  trait TableCompanion extends ThisTableCompanion
   final object Table extends TableCompanion
 
-  final class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+  final class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
     /** XXX FIXME */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = Need(this)
   }

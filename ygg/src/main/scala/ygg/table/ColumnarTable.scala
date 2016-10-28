@@ -20,14 +20,14 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._
 
 class ColumnarTable extends ColumnarTableModule {
-  type TableCompanion = ColumnarTableCompanion
+  type TableCompanion = ThisTableCompanion
 
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
   def toJson(dataset: Table): Need[Stream[JValue]]           = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]                   = toJson(table).copoint
 
-  object Table extends ColumnarTableCompanion
-  class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+  object Table extends ThisTableCompanion
+  class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
     /** XXX FIXME */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
   }

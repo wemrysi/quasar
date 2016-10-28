@@ -48,9 +48,10 @@ trait ColumnarTableModule {
 
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
+  type Table <: ThisTable
+  type TableCompanion <: ThisTableCompanion
+
   val Table: TableCompanion
-  type Table <: ColumnarTable
-  type TableCompanion <: ColumnarTableCompanion
 
   implicit val TR = new TableRep[Table] {
     type Companion = Table.type
@@ -84,7 +85,7 @@ trait ColumnarTableModule {
     )
   }
 
-  trait ColumnarTableCompanion extends ygg.table.TableCompanion[Table] {
+  trait ThisTableCompanion extends ygg.table.TableCompanion[Table] {
     def load(table: Table, tpe: JType): NeedTable = {
       val reduced = table reduce new CReducer[Set[Path]] {
         def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
@@ -294,7 +295,7 @@ trait ColumnarTableModule {
     }
   }
 
-  abstract class ColumnarTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
+  abstract class ThisTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
@@ -1458,7 +1459,7 @@ trait BlockTableModule extends ColumnarTableModule {
     case _                                 => false
   }
 
-  trait TableCompanion extends ColumnarTableCompanion {
+  trait TableCompanion extends ThisTableCompanion {
     lazy val sortMergeEngine = new MergeEngine
 
     def addGlobalId(spec: TransSpec1) = {
@@ -2077,7 +2078,7 @@ trait BlockTableModule extends ColumnarTableModule {
     }
   }
 
-  abstract class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
+  abstract class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 

@@ -39,7 +39,7 @@ class CompactSpec extends TableQspec {
   }
 
   private def tableStats(table: Table): List[Int -> Int] = table match {
-    case cTable: ColumnarTable =>
+    case cTable: ThisTable =>
       val slices = cTable.slices.toStream.copoint
       val sizes  = slices.map(_.size).toList
       val undefined = slices.map { slice =>
@@ -70,7 +70,7 @@ class CompactSpec extends TableQspec {
   }
 
   private def chooseColumn(table: Table): TransSpec1 = table match {
-    case cTable: ColumnarTable =>
+    case cTable: ThisTable =>
       cTable.slices.toStream.copoint.headOption.map { slice =>
         val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
         mkDeref(chosenPath)
@@ -78,7 +78,7 @@ class CompactSpec extends TableQspec {
   }
 
   private def undefineTable(fullTable: Table): Table = fullTable match {
-    case cTable: ColumnarTable =>
+    case cTable: ThisTable =>
       val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
 
@@ -97,7 +97,7 @@ class CompactSpec extends TableQspec {
   }
 
   private def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
-    case cTable: ColumnarTable =>
+    case cTable: ThisTable =>
       val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
 
