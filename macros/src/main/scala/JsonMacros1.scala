@@ -94,7 +94,7 @@ abstract class TreeFacades[C <: Context](val c: C) {
   }
 }
 
-class JsonMacros(val c: Context) {
+class JsonMacros1(val c: Context) {
   import c.universe._
 
   type MacroFacade = Facade[Tree]

@@ -22,7 +22,7 @@ import ygg.json._
 
 object Json {
   implicit final class JsonStringContext(sc: StringContext) {
-    def json(args: Any*): JValue             = macro ygg.macros.JsonMacros.jsonInterpolatorImpl
-    def jsonMany(args: Any*): Vector[JValue] = macro ygg.macros.JsonMacros.jsonManyInterpolatorImpl
+    def json(args: Any*): JValue             = macro ygg.macros.JsonMacros1.jsonInterpolatorImpl
+    def jsonMany(args: Any*): Vector[JValue] = macro ygg.macros.JsonMacros1.jsonManyInterpolatorImpl
   }
 }

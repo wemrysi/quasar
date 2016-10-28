@@ -49,15 +49,8 @@ object Ygg {
     .settings(scalacOptions += "-language:experimental.macros")
   )
 
-  def macros1(p: Project): Project = ( p
-    .dependsOn('foundation % BothScopes)
-    .settings(name := "quasar-macros1-internal")
-    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
-    .settings(scalacOptions += "-language:experimental.macros")
-  )
-
   def ygg(p: Project): Project = ( p
-    .dependsOn('foundation % BothScopes, 'macros1, 'ejson, 'connector)
+    .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector)
     .settings(name := "quasar-ygg-internal")
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)
