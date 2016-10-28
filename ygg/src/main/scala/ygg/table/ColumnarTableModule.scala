@@ -578,19 +578,8 @@ trait ColumnarTableModule {
                                        stlr: SliceTransform1[LR],
                                        strr: SliceTransform1[RR],
                                        stbr: SliceTransform2[BR]) = {
-
-        sealed trait CogroupState extends Product with Serializable
-        final case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices) extends CogroupState
-        final case class Cogroup(lr: LR,
-                           rr: RR,
-                           br: BR,
-                           left: SlicePosition[LK],
-                           right: SlicePosition[RK],
-                           rightStart: Option[SlicePosition[RK]],
-                           rightEnd: Option[SlicePosition[RK]])
-            extends CogroupState
-        final case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
-        case object CogroupDone                                            extends CogroupState
+        val stateAdt = new CogroupStateAdt[LK, RK, LR, RR, BR]
+        import stateAdt._
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
         def step(state: CogroupState): Need[Option[Slice -> CogroupState]] = {
@@ -2231,4 +2220,20 @@ object Cogrouping {
 
   final case class SkipRight[A, B](left: SlicePosition[A], rightEnd: SlicePosition[B])                                  extends NextStep[A, B]
   final case class RestartRight[A, B](left: SlicePosition[A], rightStart: SlicePosition[B], rightEnd: SlicePosition[B]) extends NextStep[A, B]
+
+  final class CogroupStateAdt[LK, RK, LR, RR, BR] {
+    sealed trait CogroupState extends Product with Serializable
+    final case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices)  extends CogroupState
+    final case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
+    final case object CogroupDone                                      extends CogroupState
+    final case class Cogroup(
+      lr: LR,
+      rr: RR,
+      br: BR,
+      left: SlicePosition[LK],
+      right: SlicePosition[RK],
+      rightStart: Option[SlicePosition[RK]],
+      rightEnd: Option[SlicePosition[RK]]
+    ) extends CogroupState
+  }
 }
