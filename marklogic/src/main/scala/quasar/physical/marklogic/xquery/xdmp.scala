@@ -45,6 +45,9 @@ object xdmp {
   def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
     XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
 
+  def integerToHex(int: XQuery): XQuery =
+    XQuery(s"xdmp:integer-to-hex($int)")
+
   def nodeKind(node: XQuery): XQuery =
     XQuery(s"xdmp:node-kind($node)")
 

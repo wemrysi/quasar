@@ -1,0 +1,4 @@
+- basic normalization for Filter & Sort
+- some fixes to Sort
+- ejson helpers for tests
+- normalization for MarkLogic & Mongo-QScript

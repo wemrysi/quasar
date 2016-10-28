@@ -3,8 +3,7 @@
 
   "backends": {
     "postgresql": "pending",
-    "marklogic":  "pending",
-    "couchbase":  "pending"
+    "couchbase":  "skip"
   },
 
   "data": "smallZips.data",
@@ -13,11 +12,11 @@
     "cutoff": "1000"
   },
 
-  "query": "select count(*) from smallZips where pop < :cutoff",
+  "query": "select count(*) as cnt from smallZips where pop < :cutoff",
 
   "predicate": "equalsExactly",
 
   "expected": [
-    { "0": 19 }
+    { "cnt": 19 }
   ]
 }

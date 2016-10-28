@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.connector
 
-import Predef._
+import quasar.Predef._
 
 import argonaut._, Argonaut._
 import monocle._
@@ -25,13 +25,13 @@ import scalaz._, Scalaz._
 sealed trait EnvironmentError
 
 object EnvironmentError {
-  final case class ConnectionFailed private[quasar] (error: Throwable)
+  final case class ConnectionFailed(error: Throwable)
     extends EnvironmentError
-  final case class InsufficientPermissions private[quasar] (message: String)
+  final case class InsufficientPermissions(message: String)
     extends EnvironmentError
-  final case class InvalidCredentials private[quasar] (message: String)
+  final case class InvalidCredentials(message: String)
     extends EnvironmentError
-  final case class UnsupportedVersion private[quasar] (backendName: String, version: String)
+  final case class UnsupportedVersion(backendName: String, version: String)
     extends EnvironmentError
 
   val connectionFailed: Prism[EnvironmentError, Throwable] =

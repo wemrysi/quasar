@@ -16,12 +16,10 @@
 
 package quasar
 
-import quasar.Predef._
+import quasar.Predef.{ -> => _, _ }
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
-
-import java.io.File
 
 import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
@@ -216,8 +214,8 @@ package object api {
     from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
 
   def staticFileService(basePath: String): HttpService = {
-    def pathCollector(file: File, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
-      if (file.isDirectory) StaticFile.fromFile(new File(file, "index.html"), Some(req))
+    def pathCollector(file: jFile, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
+      if (file.isDirectory) StaticFile.fromFile(new jFile(file, "index.html"), Some(req))
       else if (!file.isFile) None
       else StaticFile.fromFile(file, Some(req))
     }

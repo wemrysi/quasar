@@ -40,13 +40,13 @@ import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
-class queryfile(fileSystem:() => Task[FileSystem]) {
+class queryfile(fileSystem: Task[FileSystem]) {
 
   private def toPath(apath: APath): Task[Path] = Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = fileSystem().map { hdfs =>
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = fileSystem.map { hdfs =>
     val pathStr = posixCodec.unsafePrintPath(file)
     val host = hdfs.getUri().getHost()
     val port = hdfs.getUri().getPort()
@@ -57,7 +57,7 @@ class queryfile(fileSystem:() => Task[FileSystem]) {
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = for {
     path <- toPath(out)
-    hdfs <- fileSystem()
+    hdfs <- fileSystem
   } yield {
     val os: OutputStream = hdfs.create(path, new Progressable() {
       override def progress(): Unit = {}
@@ -78,7 +78,7 @@ class queryfile(fileSystem:() => Task[FileSystem]) {
 
   def fileExists(f: AFile): Task[Boolean] = for {
     path <- toPath(f)
-    hdfs <- fileSystem()
+    hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
     hdfs.close()
@@ -87,7 +87,7 @@ class queryfile(fileSystem:() => Task[FileSystem]) {
 
   def listContents(d: ADir): FileSystemErrT[Task, Set[PathSegment]] = EitherT(for {
     path <- toPath(d)
-    hdfs <- fileSystem()
+    hdfs <- fileSystem
   } yield {
     val result = if(hdfs.exists(path)) {
       hdfs.listStatus(path).toSet.map {
@@ -106,5 +106,5 @@ class queryfile(fileSystem:() => Task[FileSystem]) {
 }
 
 object queryfile {
-  def input(fileSystem:() => Task[FileSystem]): Input = new queryfile(fileSystem).input
+  def input(fileSystem: Task[FileSystem]): Input = new queryfile(fileSystem).input
 }

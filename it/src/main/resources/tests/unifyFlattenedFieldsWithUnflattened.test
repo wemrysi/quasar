@@ -2,8 +2,8 @@
     "name": "unify flattened fields with unflattened field",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select _id as zip, loc[*] from zips order by loc[*] limit 10",

@@ -1,0 +1,2 @@
+- Bugfix: take into account IdStatus in ShiftedRead
+- Simplify joins in sparkcore to EquiJoin

@@ -25,6 +25,7 @@ import matryoshka._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
+import shapeless.Nat
 
 object Planner {
   sealed trait PlannerError {
@@ -38,8 +39,8 @@ object Planner {
       extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data
   }
-  final case class UnsupportedFunction(name: String, hint: Option[String]) extends PlannerError {
-    def message = "The function '" + name + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
+  final case class UnsupportedFunction[N <: Nat](func: GenericFunc[N], hint: Option[String]) extends PlannerError {
+    def message = "The function '" + func.shows + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
   }
   final case class PlanPathError(error: PathError) extends PlannerError {
     def message = error.shows
@@ -50,8 +51,8 @@ object Planner {
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
     def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan
   }
-  final case class FuncApply(name: String, expected: String, actual: String) extends PlannerError {
-    def message = "A parameter passed to function " + name + " is invalid: Expected " + expected + " but found: " + actual
+  final case class FuncApply[N <: Nat](func: GenericFunc[N], expected: String, actual: String) extends PlannerError {
+    def message = "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual
   }
   final case class ObjectIdFormatError(str: String) extends PlannerError {
     def message = "Invalid ObjectId string: " + str

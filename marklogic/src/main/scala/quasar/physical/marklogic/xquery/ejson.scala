@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, every, for_, func, if_, let_}, axes.child
+  import syntax._, expr.{attribute, element, emptySeq, every, for_, func, if_, let_, typeswitch}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -45,7 +45,7 @@ object ejson {
         $("arr")  as SequenceType("element()"),
         $("item") as SequenceType.Top
       ).as(SequenceType("element()")) { (arr: XQuery, item: XQuery) =>
-        mkArrayElt[F].apply(item) flatMap (mem.nodeInsertChild(arr, _))
+        mkArrayElt[F](item) flatMap (mem.nodeInsertChild(arr, _))
       }
     }
 
@@ -60,14 +60,14 @@ object ejson {
       }
     }.join
 
-  // ejson:array-element-at($arr as element(), $idx as xs:integer) as item()*
+  // ejson:array-element-at($arr as element(), $idx as xs:integer) as element(ejson:array-element)?
   def arrayElementAt[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-element-at").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
       declare(fname)(
         $("arr") as SequenceType("element()"),
         $("idx") as SequenceType("xs:integer")
-      ).as(SequenceType.Top) { (arr: XQuery, idx: XQuery) =>
-        arr `/` child(aelt)(idx) `/` child.node()
+      ).as(SequenceType(s"element($aelt)?")) { (arr: XQuery, idx: XQuery) =>
+        arr `/` child(aelt)(idx)
       }
     }
 
@@ -95,9 +95,9 @@ object ejson {
         val (i, elts, zelts) = ("$i", "$elts", "$zelts")
 
         for {
-          ixelt <- mkArrayElt[F] apply i.xqy
+          ixelt <- mkArrayElt[F](i.xqy)
           pair  <- mkArray_[F](mkSeq_(ixelt, elts.xqy(i.xqy)))
-          zpair <- mkArrayElt[F] apply pair
+          zpair <- mkArrayElt[F](pair)
           zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts.xqy)
         } yield {
           let_(elts -> (arr `/` child(aelt))) return_ {
@@ -112,6 +112,17 @@ object ejson {
       }
     }.join
 
+  // ejson:ascribed-type($elt as element()) as xs:string?
+  def ascribedType[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("ascribed-type").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
+      declare(fname)(
+        $("elt") as SequenceType("element()")
+      ).as(SequenceType("xs:string?")) { (elt: XQuery) =>
+        elt `/` axes.attribute(tname)
+      }
+    }
+
+  // TODO: DRY up these predicates, they have the same impl.
   // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("is-array").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
@@ -156,15 +167,8 @@ object ejson {
   def mkArray_[F[_]: PrologW](elements: XQuery): F[XQuery] =
     ejsonN.qn[F] flatMap (ename => mkArray[F].apply(ename.xqy, elements))
 
-  // ejson:make-array-element($value as item()*) as element(ejson:array-element)
-  def mkArrayElt[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("make-array-element").qn[F] |@| arrayEltN.qn |@| arrayEltN.xs) { (fname, aelt, aeltxs) =>
-      declare(fname)(
-        $("value") as SequenceType.Top
-      ).as(SequenceType(s"element($aelt)")) { value =>
-        element { aeltxs } { value }
-      }
-    }
+  def mkArrayElt[F[_]: PrologW](value: XQuery): F[XQuery] =
+    arrayEltN.qn[F] flatMap (name => renameOrWrap[F].apply(name.xqy, value))
 
   // ejson:make-object($entries as element()*) as element(ejson:ejson)
   def mkObject[F[_]: PrologW]: F[FunctionDecl1] =
@@ -175,17 +179,6 @@ object ejson {
         $("entries") as SequenceType(s"element()*")
       ).as(SequenceType(s"element($ename)")) { entries =>
         element { ejsxs } { mkSeq_(attribute { tpexs } { "object".xs }, entries) }
-      }
-    }
-
-  // ejson:make-object-entry($key as xs:string*, $value as item()*) as element()
-  def mkObjectEntry[F[_]: PrologW]: F[FunctionDecl2] =
-    ejs.name("make-object-entry").qn[F] map { fname =>
-      declare(fname)(
-        $("key") as SequenceType("xs:QName"),
-        $("value") as SequenceType.Top
-      ).as(SequenceType(s"element()")) { (key, value) =>
-        element { key } { value }
       }
     }
 
@@ -205,7 +198,7 @@ object ejson {
             ys    -> fn.filter(func(e) {
                        every(n1 -> fn.nodeName(e.xqy), n2 -> names.xqy) satisfies (n1.xqy ne n2.xqy)
                      }, obj1 `/` child.element()))
-          .return_(mkSeq_(xs.xqy, ys.xqy))
+          .return_(mkSeq_(ys.xqy, xs.xqy))
         }
       }
     }.join
@@ -222,7 +215,23 @@ object ejson {
         $("key")   as SequenceType("xs:QName"),
         $("value") as SequenceType.Top
       ).as(SequenceType("element()")) { (obj: XQuery, key: XQuery, value: XQuery) =>
-        mkObjectEntry[F].apply(key, value) flatMap (mem.nodeInsertChild(obj, _))
+        renameOrWrap[F].apply(key, value) flatMap (mem.nodeInsertChild(obj, _))
+      }
+    }
+
+  // ejson:rename-or-wrap($name as xs:QName, $value as item()*) as element()
+  def renameOrWrap[F[_]: PrologW]: F[FunctionDecl2] =
+    ejs.name("rename-or-wrap").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("name")  as SequenceType("xs:QName"),
+        $("value") as SequenceType.Top
+      ).as(SequenceType(s"element()")) { (name: XQuery, value: XQuery) =>
+        typeAttrFor[F].apply(value) map { typeAttr =>
+          typeswitch(value)(
+            $("e") as SequenceType("element()") return_ (e =>
+              element { name } { mkSeq_(e `/` axes.attribute.node(), e `/` child.node()) })
+          ) default (element { name } { mkSeq_(typeAttr, value) })
+        }
       }
     }
 
@@ -235,7 +244,7 @@ object ejson {
       ).as(SequenceType(s"element()")) { (name: XQuery, items: XQuery) =>
         val x = "$x"
         for {
-          arrElt <- mkArrayElt[F] apply x.xqy
+          arrElt <- mkArrayElt[F](x.xqy)
           arr    <- mkArray[F] apply (name, fn.map(func(x) { arrElt }, items))
         } yield arr
       }
@@ -244,13 +253,13 @@ object ejson {
   def seqToArray_[F[_]: PrologW](items: XQuery): F[XQuery] =
     ejsonN.qn[F] flatMap (ename => seqToArray[F].apply(ename.xqy, items))
 
-  // ejson:singleton-array($item as item()*) as element(ejson:ejson)
+  // ejson:singleton-array($value as item()*) as element(ejson:ejson)
   def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("singleton-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
       declare(fname)(
-        $("item") as SequenceType.Top
-      ).as(SequenceType(s"element($ename)")) { item: XQuery =>
-        mkArrayElt[F].apply(item) flatMap (xqy => mkArray[F].apply(ename.xqy, xqy))
+        $("value") as SequenceType.Top
+      ).as(SequenceType(s"element($ename)")) { value: XQuery =>
+        mkArrayElt[F](value) flatMap (mkArray[F].apply(ename.xqy, _))
       }
     }.join
 
@@ -261,7 +270,45 @@ object ejson {
         $("key") as SequenceType("xs:QName"),
         $("value") as SequenceType.Top
       ).as(SequenceType(s"element($ename)")) { (key: XQuery, value: XQuery) =>
-        mkObjectEntry[F].apply(key, value) flatMap (xqy => mkObject[F].apply(xqy))
+        renameOrWrap[F].apply(key, value) flatMap (xqy => mkObject[F].apply(xqy))
       }
     }.join
+
+  // ejson:type-attr-for($item as item()*) as attribute()?
+  def typeAttrFor[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("type-attr-for").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
+      declare(fname)(
+        $("item") as SequenceType.Top
+      ).as(SequenceType("attribute()?")) { (item: XQuery) =>
+        typeOf[F].apply(item) map { tpe =>
+          fn.map(func("$x") { attribute { tname.xs } { "$x".xqy } }, tpe)
+        }
+      }
+    }.join
+
+  // ejson:type-of($item as item()*) as xs:string?
+  def typeOf[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.name("type-of").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("item") as SequenceType.Top
+      ).as(SequenceType("xs:string?")) { item: XQuery =>
+        ascribedType[F].apply(item) map { aType =>
+          if_(fn.empty(item))
+          .then_ { "na".xs }
+          .else_ {
+            typeswitch(item)(
+              SequenceType("element()")       return_ aType,
+              SequenceType("xs:boolean")      return_ "boolean".xs,
+              SequenceType("xs:dateTime")     return_ "timestamp".xs,
+              SequenceType("xs:integer")      return_ "integer".xs,
+              SequenceType("xs:decimal")      return_ "decimal".xs,
+              SequenceType("xs:double")       return_ "decimal".xs,
+              SequenceType("xs:float")        return_ "decimal".xs,
+              SequenceType("xs:base64Binary") return_ "binary".xs,
+              SequenceType("xs:hexBinary")    return_ "binary".xs
+            ) default emptySeq
+          }
+        }
+      }
+    }
 }

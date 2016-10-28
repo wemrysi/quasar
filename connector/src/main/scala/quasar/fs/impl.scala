@@ -17,7 +17,8 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, PhaseResults}
+import quasar.{Data, LogicalPlan}
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs.PathError._

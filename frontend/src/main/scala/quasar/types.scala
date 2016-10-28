@@ -197,7 +197,19 @@ trait TypeInstances {
     def append(f1: Type, f2: => Type) = Type.lub(f1, f2)
   }
 
-  implicit val show: Show[Type] = Show.showFromToString
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  implicit val show: Show[Type] = Show.show {
+    case Const(d) => s"constant value ${d.shows}"
+    case Arr(types) => "Arr(" + types.shows + ")"
+    case FlexArr(min, max, mbrs) =>
+      "FlexArr(" + min.shows + ", " + max.shows + ", "  + mbrs.shows + ")"
+    case Obj(assocs, unkns) =>
+      "Obj(" + assocs.shows + ", " + unkns.shows + ")"
+    case cp @ Coproduct(_, _) =>
+      val cos = cp.flatten.map(_.shows)
+      cos.init.mkString(", ") + ", or " + cos.last
+    case x => x.toString
+  }
 
   implicit val TypeRenderTree: RenderTree[Type] =
     RenderTree.fromShow[Type]("Type")

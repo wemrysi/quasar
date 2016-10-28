@@ -2,8 +2,8 @@
     "name": "merge differently-nested flattens",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

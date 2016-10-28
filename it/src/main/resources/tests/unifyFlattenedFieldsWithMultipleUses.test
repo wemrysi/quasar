@@ -2,8 +2,8 @@
     "name": "unify flattened fields with multiple shape-preserving ops.",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select _id as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",

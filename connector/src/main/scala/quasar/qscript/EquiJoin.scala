@@ -16,7 +16,8 @@
 
 package quasar.qscript
 
-import quasar.RenderTree
+import quasar.Predef._
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -72,8 +73,21 @@ object EquiJoin {
       }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
-    RenderTree.delayFromShow
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
+    new Delay[RenderTree, EquiJoin[T, ?]] {
+      val nt = List("EquiJoin")
+      def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {
+          case EquiJoin(src, lBr, rBr, lKey, rKey, tpe, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              lBr.render,
+              rBr.render,
+              lKey.render,
+              rKey.render,
+              tpe.render,
+              combine.render))
+        }
+      }
 
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {
@@ -109,7 +123,4 @@ object EquiJoin {
             }
         }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[EquiJoin[T, ?]] =
-    TTypes.normalizable[T].EquiJoin
 }

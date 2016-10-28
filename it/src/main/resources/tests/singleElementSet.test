@@ -2,8 +2,8 @@
     "name": "filter field in single-element set",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select * from zips where state in (\"MA\") and pop < 10",

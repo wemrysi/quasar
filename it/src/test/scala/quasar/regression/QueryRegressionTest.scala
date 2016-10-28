@@ -18,6 +18,8 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
+import quasar.common._
+import quasar.frontend._
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._, free._
 import quasar.fp.ski._
@@ -150,29 +152,26 @@ abstract class QueryRegressionTest[S[_]](
     act: Process[CompExecM, Data],
     run: Run
   ): Task[Result] = {
-    val liftRun: CompExecM ~> Task = {
-      type H1[A] = PhaseResultT[Task, A]
-      type H2[A] = SemanticErrsT[H1, A]
-      type H3[A] = FileSystemErrT[H2, A]
 
-      val h1: G ~> H1 = Hoist[PhaseResultT].hoist(run)
-      val h2: H ~> H2 = Hoist[SemanticErrsT].hoist(h1)
-      val h3: CompExecM ~> H3 = Hoist[FileSystemErrT].hoist(h2)
+    type H1[A] = PhaseResultT[Task, A]
+    type H2[A] = SemanticErrsT[H1, A]
+    type H3[A] = FileSystemErrT[H2, A]
 
-      new (CompExecM ~> Task) {
-        def apply[A](fa: CompExecM[A]) =
-          rethrow[H1, NonEmptyList[SemanticError]].apply(
-            rethrow[H2, FileSystemError].apply(
-              h3(fa))).value
-      }
-    }
+    val h1: G ~> H1 = Hoist[PhaseResultT].hoist(run)
+    val h2: H ~> H2 = Hoist[SemanticErrsT].hoist(h1)
+    val h3: CompExecM ~> H3 = Hoist[FileSystemErrT].hoist(h2)
+
+    val liftRun = λ[CompExecM ~> Task](fa =>
+      rethrow[H1, NonEmptyList[SemanticError]].apply(rethrow[H2, FileSystemError].apply(h3(fa))).value
+    )
 
     def deleteFields: Json => Json =
       _.withObject(obj => exp.ignoredFields.foldLeft(obj)(_ - _))
 
     exp.predicate(
       exp.rows.toVector,
-      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun))
+      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
+      exp.fieldOrder)
   }
 
   /** Parse and execute the given query, returning a stream of results. */

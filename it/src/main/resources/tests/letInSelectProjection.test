@@ -2,18 +2,16 @@
     "name": "handle let as project of select",
 
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "postgresql": "pending"
     },
 
-    "data": ["cars.data", "zips.data"],
+    "data": ["cars.data", "smallZips.data"],
 
-    "query": "select (zips := select * from cars; select * from zips) from zips",
+    "query": "select (smallZips := select * from cars; select * from smallZips) as value from smallZips",
 
     "predicate": "containsExactly",
 
-    "expected": [{ "0": { "_id": "1", "name": "RangeRover-Evoque" } },
-                 { "0": { "_id": "2", "name": "Honda-civic" } },
-                 { "0": { "_id": "3", "name": "BMW-X5" } }]
+    "expected": [{ "value": { "_id": "1", "name": "RangeRover-Evoque" } },
+                 { "value": { "_id": "2", "name": "Honda-civic" } },
+                 { "value": { "_id": "3", "name": "BMW-X5" } }]
 }

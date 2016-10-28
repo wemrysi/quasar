@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -89,9 +89,21 @@ object ProjectBucket {
         }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]:
-      Delay[RenderTree, ProjectBucket[T, ?]] =
-    RenderTree.delayFromShow
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ProjectBucket[T, ?]] =
+    new Delay[RenderTree, ProjectBucket[T, ?]] {
+      def apply[A](RA: RenderTree[A]): RenderTree[ProjectBucket[T, A]] = RenderTree.make {
+        case BucketField(src, value, name) =>
+          NonTerminal(List("BucketField"), None, List(
+            RA.render(src),
+            value.render,
+            name.render))
+        case BucketIndex(src, value, index) =>
+          NonTerminal(List("BucketIndex"), None, List(
+            RA.render(src),
+            value.render,
+            index.render))
+      }
+    }
 
   implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
@@ -115,8 +127,4 @@ object ProjectBucket {
           case (_, _) => None
       }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]
-      : Normalizable[ProjectBucket[T, ?]] =
-    TTypes.normalizable[T].ProjectBucket
 }

@@ -38,7 +38,12 @@ package object xquery {
   type Prologs = ISet[Prolog]
   type PrologW[F[_]] = MonadTell[F, Prologs]
 
-  sealed abstract class SortDirection
+  sealed abstract class SortDirection {
+    def asOrderModifier: String = this match {
+      case SortDirection.Ascending  => "ascending"
+      case SortDirection.Descending => "descending"
+    }
+  }
 
   object SortDirection {
 

@@ -140,7 +140,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       } yield state2).evalZero
 
       op must beLeftDisjunction(UnsupportedFunction(
-        quasar.std.StdLib.structural.ArrayProject.name,
+        quasar.std.StdLib.structural.ArrayProject,
         Some("array does not contain index ‘2’.")))
     }
 

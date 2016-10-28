@@ -2,8 +2,8 @@
     "name": "filter on contains",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "pending",
-        "couchbase":  "pending"
+        "marklogic":  "skip",
+        "couchbase":  "skip"
     },
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",

@@ -19,6 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.qscript.{provenance => prov}
 
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
@@ -89,17 +90,8 @@ package object qscript {
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
-  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
-
-  object Ann {
-    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
-      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
-
-    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
-      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
-  }
-
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
@@ -108,8 +100,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
-
-  final case class SrcMerge[A, B](src: A, left: B, right: B)
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
@@ -128,12 +118,36 @@ package object qscript {
               IntLit[T, Hole](p._2))))).some
     }
 
-  def concat[T[_[_]]: Corecursive, A](
+  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    // NB: Might be better to do this later, after some normalization, part of
+    //     array compaction, but this helps us avoid some autojoins.
+    (norm.freeMF(l) ≟ norm.freeMF(r)).fold(
+      (norm.freeMF(l), HoleF[T], HoleF[T]),
+      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+  }
+
+  def concat3[T[_[_]]: Corecursive, A](
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+
+  def concat4[T[_[_]]: Corecursive, A](
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
 
   def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
     (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
@@ -217,4 +231,33 @@ package object qscript {
     Injectable.coproduct(
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
+}
+
+package qscript {
+  final case class SrcMerge[A, B](src: A, left: B, right: B)
+
+  @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
+
+  object Ann {
+    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
+      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+
+    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
+      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
+  }
+
+  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
+
+  object Target {
+    implicit def equal[T[_[_]]: EqualT, F[_]](implicit F: Delay[Equal, F])
+        : Equal[Target[T, F]] =
+      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
+
+    implicit def show[T[_[_]]: ShowT, F[_]](implicit F: Delay[Show, F])
+        : Show[Target[T, F]] =
+      Show.show(target =>
+        Cord("Target(") ++
+          target.ann.shows ++ Cord(", ") ++
+          target.value.shows ++ Cord(")"))
+  }
 }
