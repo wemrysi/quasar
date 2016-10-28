@@ -17,6 +17,7 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs.mount._, FileSystemDef._
@@ -113,7 +114,7 @@ trait UnifiedFileSystemBuilder {
 /** Standardized aliases for filesystem implementations.
 */
 trait FileSystemTypes[F[_]] extends EitherTypes[F, FileSystemError] with FileSystemIndependentTypes {
-  type FPLR[A] = F[quasar.PhaseResults -> LR[A]]
+  type FPLR[A] = F[PhaseResults -> LR[A]]
 }
 trait FileSystemIndependentTypes {
   type Errors  = Vector[FileSystemError]

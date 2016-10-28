@@ -11,6 +11,10 @@ script: ./bin/run-travis.sh
 after_success:
 - if [ $QUASAR_CODECOV == "true" ]; then bash <(curl -s https://codecov.io/bash); fi
 
+branches:
+  except:
+    - /^v\d+\.\d+\.\d+-.*$/ # don't redundantly build tags
+
 cache:
   directories:
   - $HOME/.ivy2/cache

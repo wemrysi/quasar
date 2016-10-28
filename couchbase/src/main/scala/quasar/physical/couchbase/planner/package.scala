@@ -17,8 +17,10 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.{NameGenerator, PlannerErrT, PhaseResults, PhaseResultT}
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerError}
+import quasar.common.{PhaseResults, PhaseResultT}
+import quasar.connector.PlannerErrT
 
 import scalaz._, Scalaz._
 

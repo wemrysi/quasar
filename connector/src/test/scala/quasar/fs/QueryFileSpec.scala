@@ -18,7 +18,8 @@ package quasar.fs
 
 import scala.Predef.$conforms
 import quasar.Predef._
-import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
+import quasar.{Data, DataArbitrary, LogicalPlan}
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._
 import quasar.scalacheck._

@@ -17,10 +17,10 @@
 package quasar.fs
 
 import quasar.Predef._
-import scalaz._
 import quasar.fp._, numeric._
 import FileSystemError._
 import quasar.contrib.pathy._
+import scalaz._
 
 object Empty extends UnifiedFileSystemBuilder {
   val FsType = FileSystemType("empty")

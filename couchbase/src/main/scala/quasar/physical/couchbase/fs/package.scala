@@ -17,9 +17,9 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
+import quasar.connector.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
-import quasar.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT

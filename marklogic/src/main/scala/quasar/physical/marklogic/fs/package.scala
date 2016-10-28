@@ -17,7 +17,8 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.{Data, EnvironmentError}
+import quasar.Data
+import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq, uuid}
 import quasar.fp._, free._

@@ -60,7 +60,7 @@ object Ygg {
   )
 
   def jsonfile(p: Project): Project = ( p
-    .dependsOn('connector % BothScopes, 'ygg % BothScopes)
+    .dependsOn('connector % BothScopes, 'ygg % BothScopes, 'sql)
     .settings(name := "quasar-jsonfile-internal")
     .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
     .settings(initialCommands in (Compile, console) := jsonfileImports)

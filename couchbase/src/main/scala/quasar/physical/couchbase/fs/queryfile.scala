@@ -17,17 +17,17 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, PhaseResults, PhaseResultT}
+import quasar.{Data, LogicalPlan}
+import quasar.common.{PhaseResults, PhaseResultT}
+import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, eitherT._, free._, ski._
 import quasar.fs._
-import quasar.PhaseResult.{Detail, Tree}
 import quasar.physical.couchbase._, common._, N1QL._, planner._
 import quasar.qscript.{Read => _, _}
-import quasar.RenderTree.ops._
 
 import scala.collection.JavaConverters._
 
@@ -180,7 +180,7 @@ object queryfile {
     val n1qlStr = outerN1ql(n1ql)
 
     for {
-      _       <- prtell[Plan[S, ?]](Vector(Detail(
+      _       <- prtell[Plan[S, ?]](Vector(detail(
                    "N1QL Results",
                    s"""  n1ql: $n1qlStr""".stripMargin('|'))))
       ctx     <- context.ask.liftP
@@ -222,17 +222,17 @@ object queryfile {
     val tell = prtell[Plan[S, ?]] _
 
     for {
-      _    <- tell(Vector(Tree("lp", lp.render)))
+      _    <- tell(Vector(tree("lp", lp)))
       qs   <- convertToQScriptRead[
                 Fix,
                 Plan[S, ?],
                 QScriptRead[Fix, ?]
               ](lc)(lp)
-      _    <- tell(Vector(Tree("QS post convertToQScriptRead", qs.render)))
+      _    <- tell(Vector(tree("QS post convertToQScriptRead", qs)))
       shft =  shiftRead(qs).transCata(
                 SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
                   .simplifyJoin(idPrism.reverseGet))
-      _    <- tell(Vector(Tree("QS post shiftRead", qs.render)))
+      _    <- tell(Vector(tree("QS post shiftRead", qs)))
       n1ql <- shft.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))

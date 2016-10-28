@@ -17,14 +17,16 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._, ski.κ
-import quasar.{ejson, NameGenerator, PhaseResultT}
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._
-import quasar.physical.couchbase.N1QL._, Select._
-import quasar.physical.couchbase.planner.Planner._
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerError}
+import quasar.common.PhaseResult.detail
+import quasar.common.PhaseResultT
+import quasar.contrib.matryoshka._
+import quasar.ejson
+import quasar.fp._, eitherT._
+import quasar.fp.ski.κ
+import quasar.physical.couchbase._, N1QL._, Select._
+import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript.{Map => _, Read => _, _}
 
 import matryoshka.{Hole => _, _}, Recursive.ops._
@@ -80,7 +82,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                           let         = Map(tmpName -> srcN1ql))
                     }
         rN1qlStr =  n1ql(rN1ql)
-        _        <- prtell[M](Vector(Detail(
+        _        <- prtell[M](Vector(detail(
                      "N1QL Map",
                        s"""  src: ${n1ql(src)}
                           |  f:   $ffN1ql
@@ -111,7 +113,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                       },
                       mapFuncPlanner[F, T].plan))
         rN1ql    =  n1ql(r)
-        _        <- prtell[M](Vector(Detail(
+        _        <- prtell[M](Vector(detail(
                       "N1QL LeftShift",
                       s"""  src:    ${n1ql(src)}
                          |  struct: $sN1ql
@@ -139,7 +141,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                      keyspaceAlias = tmpName) |>
                      groupBy.set(bN1ql.some)
         sN1ql   =  n1ql(s)
-        _       <- prtell[M](Vector(Detail(
+        _       <- prtell[M](Vector(detail(
                      "N1QL Reduce",
                      s"""  src:      ${n1ql(src)}
                         |  bucket:   $bN1ql
@@ -167,7 +169,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                      keyspaceAlias = tmpName)     |>
                    groupBy.set(bN1ql.some) >>>
                    orderBy.set(o.some)
-        _       <- prtell[M](Vector(Detail(
+        _       <- prtell[M](Vector(detail(
                      "N1QL Sort",
                      s"""  src:    ${n1ql(src)}
                         |  bucket: $bN1ql
@@ -187,7 +189,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                       keyspace      = src,
                       keyspaceAlias = tmpName) |>
                     filter.set(fN1qlStr.some)
-        _        <- prtell[M](Vector(Detail(
+        _        <- prtell[M](Vector(detail(
                       "N1QL Filter",
                       s"""  src:  ${n1ql(src)}
                          |  f:    $fN1qlStr
@@ -208,7 +210,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
         lbN1ql    =  n1ql(lb)
         rbN1ql    =  n1ql(rb)
         n1qlStr   =  s"($srcN1ql).($lbN1ql) union ($srcN1ql).($rbN1ql)"
-        _         <- prtell[M](Vector(Detail(
+        _         <- prtell[M](Vector(detail(
                        "N1QL Union",
                        s"""  src:     $src
                           |  lBranch: $lb
@@ -261,7 +263,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                     keyspaceAlias = tmpName4)           |>
                 unnest.set(s"$tmpName4 $tmpName5".some)
       selN1ql =  n1ql(sel)
-      _       <- prtell[M](Vector(Detail(
+      _       <- prtell[M](Vector(detail(
                    s"""N1QL ${takeOrDrop.bimap(κ("Take"), κ("Drop")).merge}""",
                    s"""  src:   $sN1ql
                       |  from:  $fN1ql
