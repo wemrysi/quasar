@@ -18,7 +18,6 @@ package quasar
 
 import quasar.Predef._
 import quasar.LogicalPlan._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.set._, StdLib.structural._
 
@@ -29,149 +28,151 @@ import scalaz.{Free => _, _}, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
-class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers with LogicalPlanHelpers {
+class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
+  import quasar.sql.fixpoint.lpf
+
   "simplify" should {
 
     "inline trivial binding" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"), fixFree('tmp0))) must
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"), lpf.free('tmp0))) must
         beTree(read("foo"))
     }
 
     "not inline binding that's used twice" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
         makeObj(
-          "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
-          "baz" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz")))))) must
+          "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+          "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))) must
         beTree(
-          fixLet('tmp0, read("foo"),
+          lpf.let('tmp0, read("foo"),
             makeObj(
-              "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
-              "baz" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz"))))))
+              "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+              "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz"))))))
     }
 
     "completely inline stupid lets" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"), fixLet('tmp1, fixFree('tmp0), fixFree('tmp1)))) must
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"), lpf.let('tmp1, lpf.free('tmp0), lpf.free('tmp1)))) must
         beTree(read("foo"))
     }
 
     "inline correct value for shadowed binding" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
-        fixLet('tmp0, read("bar"),
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+        lpf.let('tmp0, read("bar"),
           makeObj(
-            "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))))))) must
+            "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))))))) must
         beTree(
           makeObj(
-            "bar" -> ObjectProject(read("bar"), fixConstant(Data.Str("bar")))))
+            "bar" -> ObjectProject(read("bar"), lpf.constant(Data.Str("bar")))))
     }
 
     "inline a binding used once, then shadowed once" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
-        ObjectProject(fixFree('tmp0),
-          fixLet('tmp0, read("bar"),
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+        ObjectProject(lpf.free('tmp0),
+          lpf.let('tmp0, read("bar"),
             makeObj(
-              "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar")))))))) must
+              "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))))))) must
         beTree(
-          fixInvoke(ObjectProject, Func.Input2(
+          lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
             makeObj(
-              "bar" -> ObjectProject(read("bar"), fixConstant(Data.Str("bar")))))))
+              "bar" -> ObjectProject(read("bar"), lpf.constant(Data.Str("bar")))))))
     }
 
     "inline a binding used once, then shadowed twice" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("foo"),
-        ObjectProject(fixFree('tmp0),
-          fixLet('tmp0, read("bar"),
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+        ObjectProject(lpf.free('tmp0),
+          lpf.let('tmp0, read("bar"),
             makeObj(
-              "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
-              "baz" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz")))))))) must
+              "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+              "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))))) must
         beTree(
-          fixInvoke(ObjectProject, Func.Input2(
+          lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
-            fixLet('tmp0, read("bar"),
+            lpf.let('tmp0, read("bar"),
               makeObj(
-                "bar" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("bar"))),
-                "baz" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("baz"))))))))
+                "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+                "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz"))))))))
     }
 
     "partially inline a more interesting case" in {
-      Optimizer.simplify[Fix](fixLet('tmp0, read("person"),
-        fixLet('tmp1,
+      Optimizer.simplify[Fix](lpf.let('tmp0, read("person"),
+        lpf.let('tmp1,
           makeObj(
-            "name" -> ObjectProject(fixFree('tmp0), fixConstant(Data.Str("name")))),
-          fixLet('tmp2,
+            "name" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("name")))),
+          lpf.let('tmp2,
             OrderBy[FLP](
-              fixFree('tmp1),
+              lpf.free('tmp1),
               MakeArray[FLP](
-                ObjectProject(fixFree('tmp1), fixConstant(Data.Str("name")))),
-              fixConstant(Data.Str("foobar"))),
-            fixFree('tmp2))))) must
+                ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
+              lpf.constant(Data.Str("foobar"))),
+            lpf.free('tmp2))))) must
         beTree(
-          fixLet('tmp1,
+          lpf.let('tmp1,
             makeObj(
               "name" ->
-                ObjectProject(read("person"), fixConstant(Data.Str("name")))),
+                ObjectProject(read("person"), lpf.constant(Data.Str("name")))),
             OrderBy[FLP](
-              fixFree('tmp1),
+              lpf.free('tmp1),
               MakeArray[FLP](
-                ObjectProject(fixFree('tmp1), fixConstant(Data.Str("name")))),
-              fixConstant(Data.Str("foobar")))))
+                ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
+              lpf.constant(Data.Str("foobar")))))
     }
   }
 
   "preferProjections" should {
     "ignore a delete with unknown shape" in {
       Optimizer.preferProjections(
-        DeleteField(fixRead(file("zips")),
-          fixConstant(Data.Str("pop")))) must
+        DeleteField(lpf.read(file("zips")),
+          lpf.constant(Data.Str("pop")))) must
         beTree[Fix[LogicalPlan]](
-          DeleteField(fixRead(file("zips")),
-            fixConstant(Data.Str("pop"))))
+          DeleteField(lpf.read(file("zips")),
+            lpf.constant(Data.Str("pop"))))
     }
 
     "convert a delete after a projection" in {
       Optimizer.preferProjections(
-        fixLet('meh, fixRead(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           DeleteField[FLP](
             makeObj(
-              "city" -> ObjectProject(fixFree('meh), fixConstant(Data.Str("city"))),
-              "pop"  -> ObjectProject(fixFree('meh), fixConstant(Data.Str("pop")))),
-            fixConstant(Data.Str("pop"))))) must
+              "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
+              "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
+            lpf.constant(Data.Str("pop"))))) must
       beTree(
-        fixLet('meh, fixRead(file("zips")),
+        lpf.let('meh, lpf.read(file("zips")),
           makeObj(
             "city" ->
               ObjectProject(
                 makeObj(
                   "city" ->
-                    ObjectProject(fixFree('meh), fixConstant(Data.Str("city"))),
+                    ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
                   "pop" ->
-                    ObjectProject(fixFree('meh), fixConstant(Data.Str("pop")))),
-                fixConstant(Data.Str("city"))))))
+                    ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
+                lpf.constant(Data.Str("city"))))))
     }
 
-    "convert a delete when the shape is hidden by a fixFree" in {
+    "convert a delete when the shape is hidden by a lpf.free" in {
       Optimizer.preferProjections(
-        fixLet('meh, fixRead(file("zips")),
-          fixLet('meh2,
+        lpf.let('meh, lpf.read(file("zips")),
+          lpf.let('meh2,
             makeObj(
-              "city" -> ObjectProject(fixFree('meh), fixConstant(Data.Str("city"))),
-              "pop"  -> ObjectProject(fixFree('meh), fixConstant(Data.Str("pop")))),
+              "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
+              "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
             makeObj(
-              "orig" -> fixFree('meh2),
+              "orig" -> lpf.free('meh2),
               "cleaned" ->
-                DeleteField(fixFree('meh2), fixConstant(Data.Str("pop"))))))) must
+                DeleteField(lpf.free('meh2), lpf.constant(Data.Str("pop"))))))) must
       beTree(
-        fixLet('meh, fixRead(file("zips")),
-          fixLet('meh2,
+        lpf.let('meh, lpf.read(file("zips")),
+          lpf.let('meh2,
             makeObj(
-              "city" -> ObjectProject(fixFree('meh), fixConstant(Data.Str("city"))),
-              "pop"  -> ObjectProject(fixFree('meh), fixConstant(Data.Str("pop")))),
+              "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
+              "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
             makeObj(
-              "orig" -> fixFree('meh2),
+              "orig" -> lpf.free('meh2),
               "cleaned" ->
                 makeObj(
                   "city" ->
-                    ObjectProject(fixFree('meh2), fixConstant(Data.Str("city"))))))))
+                    ObjectProject(lpf.free('meh2), lpf.constant(Data.Str("city"))))))))
     }
   }
 

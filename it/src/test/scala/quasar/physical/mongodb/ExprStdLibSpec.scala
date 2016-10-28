@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
 import quasar.std.StdLib._
 import quasar.fp.ski._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.physical.mongodb.fs._
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
@@ -37,7 +36,9 @@ import shapeless.Nat
   * from the rest of the MongoDb planner, this test runs the whole planner and
   * then simply fails if it finds that the generated plan required map-reduce.
   */
-class MongoDbExprStdLibSpec extends MongoDbStdLibSpec with LogicalPlanHelpers {
+class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
+  import quasar.sql.fixpoint.lpf
+
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
@@ -60,7 +61,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec with LogicalPlanHelpers {
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     val wrapped =
       Fix(structural.MakeObject(
-        fixConstant(Data.Str("result")),
+        lpf.constant(Data.Str("result")),
         lp))
 
     val ctx = QueryContext(queryModel, κ(None), κ(None))

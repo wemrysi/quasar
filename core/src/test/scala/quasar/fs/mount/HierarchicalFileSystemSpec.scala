@@ -21,7 +21,6 @@ import quasar.{Data, Func, LogicalPlan}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
@@ -35,10 +34,11 @@ import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
 
-class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture with LogicalPlanHelpers {
+class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle
+  import quasar.sql.fixpoint.lpf
 
   val transforms = QueryFile.Transforms[F]
   val unsafeq = QueryFile.Unsafe[FileSystem]
@@ -135,7 +135,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
 
   def succeedsForNoPaths[A](f: Fix[LogicalPlan] => ExecM[A]) =
     "containing no paths succeeds when at least one mount" >> {
-      runMntd(f(fixConstant(Data.Int(0))).run.value)
+      runMntd(f(lpf.constant(Data.Int(0))).run.value)
         .eval(emptyMS) must succeedH
     }
 
@@ -144,9 +144,9 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
       val local = dir("d1") </> file("f1")
       val mnted = mntB </> local
 
-      val lp = fixInvoke(Take, Func.Input2(
-        fixInvoke(Squash, Func.Input1(fixRead(mnted))),
-        fixConstant(Data.Int(5))))
+      val lp = lpf.invoke(Take, Func.Input2(
+        lpf.invoke(Squash, Func.Input1(lpf.read(mnted))),
+        lpf.constant(Data.Int(5))))
 
       val fss = bMem.set(
         InMemState.fromFiles(Map((rootDir </> local) -> Vector(Data.Int(1)))))(
@@ -157,7 +157,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
 
   def failsWhenNoPathsAndNoMounts[A](f: Fix[LogicalPlan] => ExecM[A]) =
     "containing no paths fails when no mounts defined" >> {
-      runEmpty(f(fixConstant(Data.Int(0))).run.value)
+      runEmpty(f(lpf.constant(Data.Int(0))).run.value)
         .eval(emptyMS) must failDueToNoMnts
     }
 
@@ -170,9 +170,9 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
           val rd = mntB </> file("f1")
           val out = mntC </> file("outf")
 
-          val lp = fixInvoke(Take, Func.Input2(
-            fixInvoke(Squash, Func.Input1(fixRead(rd))),
-            fixConstant(Data.Int(5))))
+          val lp = lpf.invoke(Take, Func.Input2(
+            lpf.invoke(Squash, Func.Input1(lpf.read(rd))),
+            lpf.constant(Data.Int(5))))
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)
 
@@ -182,7 +182,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture wit
 
         "containing no paths succeeds" >> {
           val out = mntC </> file("outfile")
-          runMntd(query.execute(fixConstant(Data.Obj(ListMap("0" -> Data.Int(3)))), out).run.value)
+          runMntd(query.execute(lpf.constant(Data.Obj(ListMap("0" -> Data.Int(3)))), out).run.value)
             .eval(emptyMS).toEither must beRight(out)
         }
       }

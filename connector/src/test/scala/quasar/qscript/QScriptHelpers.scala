@@ -22,7 +22,6 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
@@ -32,7 +31,9 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait QScriptHelpers extends TTypes[Fix] with LogicalPlanHelpers {
+trait QScriptHelpers extends TTypes[Fix] {
+  import quasar.sql.fixpoint.lpf
+
   type QS[A] =
     (QScriptCore :\:
       ThetaJoin :\:
@@ -73,7 +74,7 @@ trait QScriptHelpers extends TTypes[Fix] with LogicalPlanHelpers {
     Free.roll(ProjectIndex(src, field))
 
   def lpRead(path: String): Fix[LP] =
-    fixRead(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
   val prov = new provenance.ProvenanceT[Fix]
 

@@ -26,7 +26,6 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fs._, InMemory._
 import quasar.sql.Sql
 
@@ -49,10 +48,11 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import quasar.api.PathUtils._
 
-class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with LogicalPlanHelpers {
+class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
+  import quasar.sql.fixpoint.lpf
 
   type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
 
@@ -169,8 +169,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Logica
             Fix(Take(
               Fix(Drop(
                 lp,
-                fixConstant(Data.Int(offset.get)))),
-              fixConstant(Data.Int(limit.get))))
+                lpf.constant(Data.Int(offset.get)))),
+              lpf.constant(Data.Int(limit.get))))
           val limitedContents =
             filesystem.contents
               .drop(offset.get)

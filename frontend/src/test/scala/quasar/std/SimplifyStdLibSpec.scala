@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.{Data, GenericFunc, LogicalPlan => LP}, LP._
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
@@ -31,7 +30,9 @@ import shapeless.Nat
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
-class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
+class SimplifyStdLibSpec extends StdLibSpec {
+  import quasar.sql.fixpoint.lpf
+
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
@@ -66,7 +67,7 @@ class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
   }
 
   def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
-    prg((0 until args.length).toList.map(idx => fixFree(Symbol("arg" + idx))))
+    prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
       .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
   def run(lp: Fix[LP], expected: Data): Result =
@@ -83,15 +84,15 @@ class SimplifyStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
 
     def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data) =
       check(List(arg), { case List(arg1) => prg(arg1) }) getOrElse
-        run(prg(fixConstant(arg)), expected)
+        run(prg(lpf.constant(arg)), expected)
 
     def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, expected: Data) =
       check(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }) getOrElse
-        run(prg(fixConstant(arg1), fixConstant(arg2)), expected)
+        run(prg(lpf.constant(arg1), lpf.constant(arg2)), expected)
 
     def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
       check(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }) getOrElse
-        run(prg(fixConstant(arg1), fixConstant(arg2), fixConstant(arg3)), expected)
+        run(prg(lpf.constant(arg1), lpf.constant(arg2), lpf.constant(arg3)), expected)
 
     def intDomain = arbitrary[BigInt]
 

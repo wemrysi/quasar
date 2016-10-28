@@ -20,25 +20,25 @@ import quasar.contrib.pathy._
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
 
-import matryoshka.Fix
+import matryoshka._
 import shapeless.Nat
 
-trait LogicalPlanHelpers {
-  def fixLet(let: Symbol, form: Fix[LP], in: Fix[LP]): Fix[LP] =
-    Fix[LP](LP.Let(let, form, in))
+class LogicalPlanR[T[_[_]]: Corecursive] {
+  def let(let: Symbol, form: T[LP], in: T[LP]): T[LP] =
+    LP.Let(let, form, in).embed
 
-  def fixConstant(data: Data): Fix[LP] =
-    Fix[LP](LP.Constant(data))
+  def constant(data: Data): T[LP] =
+    LP.Constant[T[LP]](data).embed
 
-  def fixTypecheck(expr: Fix[LP], typ: Type, cont: Fix[LP], fallback: Fix[LP]): Fix[LP] =
-    Fix[LP](LP.Typecheck(expr, typ, cont, fallback))
+  def typecheck(expr: T[LP], typ: Type, cont: T[LP], fallback: T[LP]): T[LP] =
+    LP.Typecheck(expr, typ, cont, fallback).embed
 
-  def fixFree(name: Symbol): Fix[LP] =
-    Fix[LP](LP.Free(name))
+  def free(name: Symbol): T[LP] =
+    LP.Free[T[LP]](name).embed
 
-  def fixRead(path: FPath): Fix[LP] =
-    Fix[LP](LP.Read(path))
+  def read(path: FPath): T[LP] =
+    LP.Read[T[LP]](path).embed
 
-  def fixInvoke[N <: Nat](func: GenericFunc[N], values: Func.Input[Fix[LP], N]): Fix[LP] =
-    Fix[LP](LP.Invoke(func, values))
+  def invoke[N <: Nat](func: GenericFunc[N], values: Func.Input[T[LP], N]): T[LP] =
+    LP.Invoke(func, values).embed
 }

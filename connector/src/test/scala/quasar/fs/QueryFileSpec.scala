@@ -22,7 +22,6 @@ import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.scalacheck._
 
 import pathy.Path._
@@ -30,9 +29,10 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
 
-class QueryFileSpec extends quasar.Qspec with FileSystemFixture with LogicalPlanHelpers {
+class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
+  import quasar.sql.fixpoint.lpf
 
   "QueryFile" should {
     "descendantFiles" >> {
@@ -77,7 +77,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture with LogicalPlan
 
     "evaluate" >> {
       "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
-        val query = fixRead(s.file)
+        val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.runLogWE[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
         result.unsafePerformSync._2.toEither must beRight(s.contents)
@@ -88,7 +88,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture with LogicalPlan
       "streams results until an empty vector is received" >> prop {
         s: SingleFileMemState =>
 
-        val query = fixRead(s.file)
+        val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.interpret(enumerate(query).drainTo[Vector].run.value)
 
@@ -101,7 +101,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture with LogicalPlan
         s: SingleFileMemState =>
 
         val n = s.contents.length / 2
-        val query = fixRead(s.file)
+        val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.interpret(
           enumeratee.take[Data, ExecM](n)

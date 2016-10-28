@@ -19,7 +19,6 @@ package quasar.std
 import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
-import quasar.frontend.LogicalPlanHelpers
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
@@ -28,7 +27,7 @@ import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
+class MathSpec extends quasar.Qspec with TypeArbitrary {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const
@@ -36,6 +35,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
   import quasar.Data._
   import quasar.SemanticError
   import quasar.LogicalPlan, LogicalPlan._
+  import quasar.sql.fixpoint.lpf
 
   "MathLib" should {
     "type simple add with ints" in {
@@ -74,12 +74,12 @@ class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
     }
 
     "simplify add with zero" in {
-      Add.simplify(Add(fixConstant(Int(0)), fixFree('x))) should
+      Add.simplify(Add(lpf.constant(Int(0)), lpf.free('x))) should
         beSome(Free[Fix[LogicalPlan]]('x))
     }
 
     "simplify add with Dec zero" in {
-      Add.simplify(Add(fixFree('x), fixConstant(Dec(0.0)))) should
+      Add.simplify(Add(lpf.free('x), lpf.constant(Dec(0.0)))) should
         beSome(Free[Fix[LogicalPlan]]('x))
     }
 
@@ -171,7 +171,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary with LogicalPlanHelpers {
     }
 
     "simplify expression raised to 1st power" in {
-      Power.simplify(Power(fixFree('x), fixConstant(Int(1)))) should
+      Power.simplify(Power(lpf.free('x), lpf.constant(Int(1)))) should
         beSome(Free[Fix[LogicalPlan]]('x))
     }
 

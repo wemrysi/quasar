@@ -21,7 +21,6 @@ import quasar._, Planner.PlannerError
 import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.fs.DataCursor
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
@@ -40,7 +39,9 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
+abstract class MongoDbStdLibSpec extends StdLibSpec {
+  import quasar.sql.fixpoint.lpf
+
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
@@ -78,7 +79,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
       } yield rez
 
     def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
-      prg((0 until args.length).toList.map(idx => fixFree(Symbol("arg" + idx))))
+      prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
     final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
@@ -109,8 +110,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
           lp = prg(
                 (0 until args.length).toList.map(idx =>
                   Fix(StructuralLib.ObjectProject(
-                    fixRead(coll.asFile),
-                    fixConstant(Data.Str("arg" + idx))))))
+                    lpf.read(coll.asFile),
+                    lpf.constant(Data.Str("arg" + idx))))))
           t  <- compile(qm, coll, lp).point[Task].unattempt
           (wf, resultField) = t
 

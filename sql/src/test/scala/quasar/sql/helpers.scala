@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.{Data, LogicalPlan, Optimizer, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
@@ -29,7 +28,9 @@ import org.specs2.matcher.MustThrownMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait CompilerHelpers extends TermLogicalPlanMatchers with LogicalPlanHelpers {
+trait CompilerHelpers extends TermLogicalPlanMatchers {
+  import quasar.sql.fixpoint.lpf
+
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {
       select <- fixParser.parse(Query(query)).leftMap(_.toString)
@@ -66,7 +67,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers with LogicalPlanHelpers {
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
   def read(file: String): Fix[LogicalPlan] =
-    fixRead(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
+    lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
   // TODO: This type and implicit are a failed experiment and should be removed,
   //       but they infect the compiler tests.
@@ -74,5 +75,5 @@ trait CompilerHelpers extends TermLogicalPlanMatchers with LogicalPlanHelpers {
   implicit def toFix[F[_]](unFixed: F[Fix[F]]): Fix[F] = Fix(unFixed)
 
   def makeObj(ts: (String, Fix[LogicalPlan])*): Fix[LogicalPlan] =
-    Fix(MakeObjectN(ts.map(t => fixConstant(Data.Str(t._1)) -> t._2): _*))
+    Fix(MakeObjectN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*))
 }

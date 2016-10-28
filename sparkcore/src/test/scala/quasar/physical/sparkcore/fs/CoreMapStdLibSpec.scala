@@ -21,7 +21,6 @@ import quasar.{LogicalPlan => LP, _}
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.frontend.LogicalPlanHelpers
 import quasar.std._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 import quasar.contrib.matryoshka._
@@ -33,7 +32,9 @@ import scalaz._, Scalaz._
 import shapeless.Sized
 
 // TODO: pull out MapFunc translation as MapFuncStdLibSpec
-class CoreMapStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
+class CoreMapStdLibSpec extends StdLibSpec {
+  import quasar.sql.fixpoint.lpf
+
   val TODO: Result \/ Unit = Skipped("TODO").left
 
   /** Identify constructs that are expected not to be implemented. */
@@ -97,14 +98,14 @@ class CoreMapStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
       failure
 
     def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data) = {
-      val mf = translate(prg(fixFree('arg)), κ(UnaryArg._1))
+      val mf = translate(prg(lpf.free('arg)), κ(UnaryArg._1))
 
       check(mf, List(arg)) getOrElse
         run(mf, κ(arg), expected)
     }
 
     def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, expected: Data) = {
-      val mf = translate[BinaryArg](prg(fixFree('arg1), fixFree('arg2)), {
+      val mf = translate[BinaryArg](prg(lpf.free('arg1), lpf.free('arg2)), {
         case 'arg1 => BinaryArg._1
         case 'arg2 => BinaryArg._2
       })
@@ -114,7 +115,7 @@ class CoreMapStdLibSpec extends StdLibSpec with LogicalPlanHelpers {
     }
 
     def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, arg3: Data, expected: Data) = {
-      val mf = translate[TernaryArg](prg(fixFree('arg1), fixFree('arg2), fixFree('arg3)), {
+      val mf = translate[TernaryArg](prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
         case 'arg1 => TernaryArg._1
         case 'arg2 => TernaryArg._2
         case 'arg3 => TernaryArg._3

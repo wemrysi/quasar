@@ -27,7 +27,7 @@ import scalaz.scalacheck.ScalazProperties._
 import shapeless.contrib.scalaz.instances._
 import pathy.Path._
 
-class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
+class LogicalPlanSpecs extends Spec {
   import LogicalPlan._
 
   implicit val arbLogicalPlan: Arbitrary ~> λ[α => Arbitrary[LogicalPlan[α]]] =
@@ -66,97 +66,98 @@ class LogicalPlanSpecs extends Spec with frontend.LogicalPlanHelpers {
   checkAll(traverse.laws[LogicalPlan])
 
   import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._, math._
+  import quasar.sql.fixpoint.lpf
 
   "normalizeTempNames" should {
     "rename simple nested lets" in {
       LogicalPlan.normalizeTempNames(
-        fixLet('foo, fixRead(file("foo")),
-          fixLet('bar, fixRead(file("bar")),
+        lpf.let('foo, lpf.read(file("foo")),
+          lpf.let('bar, lpf.read(file("bar")),
             Fix(MakeObjectN(
-              fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))),
-              fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("y"))))))))) must_==
-        fixLet('__tmp0, fixRead(file("foo")),
-          fixLet('__tmp1, fixRead(file("bar")),
+              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))),
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))) must_==
+        lpf.let('__tmp0, lpf.read(file("foo")),
+          lpf.let('__tmp1, lpf.read(file("bar")),
             Fix(MakeObjectN(
-              fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x")))),
-              fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('__tmp1), fixConstant(Data.Str("y"))))))))
+              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))),
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("y"))))))))
     }
 
     "rename shadowed name" in {
       LogicalPlan.normalizeTempNames(
-        fixLet('x, fixRead(file("foo")),
-          fixLet('x, Fix(MakeObjectN(
-              fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('x), fixConstant(Data.Str("x")))))),
-            fixFree('x)))) must_==
-        fixLet('__tmp0, fixRead(file("foo")),
-          fixLet('__tmp1, Fix(MakeObjectN(
-              fixConstant(Data.Str("x")) -> Fix(ObjectProject(fixFree('__tmp0), fixConstant(Data.Str("x")))))),
-            fixFree('__tmp1)))
+        lpf.let('x, lpf.read(file("foo")),
+          lpf.let('x, Fix(MakeObjectN(
+              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('x), lpf.constant(Data.Str("x")))))),
+            lpf.free('x)))) must_==
+        lpf.let('__tmp0, lpf.read(file("foo")),
+          lpf.let('__tmp1, Fix(MakeObjectN(
+              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))))),
+            lpf.free('__tmp1)))
     }
   }
 
   "normalizeLets" should {
     "re-nest" in {
       LogicalPlan.normalizeLets(
-        fixLet('bar,
-          fixLet('foo,
-            fixRead(file("foo")),
-            Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z"))))))), 
+        lpf.let('bar,
+          lpf.let('foo,
+            lpf.read(file("foo")),
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))), 
           Fix(MakeObjectN(
-            fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("y")))))))) must_==
-        fixLet('foo,
-          fixRead(file("foo")),
-          fixLet('bar,
-            Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Str("z")))))), 
+            lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must_==
+        lpf.let('foo,
+          lpf.read(file("foo")),
+          lpf.let('bar,
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))), 
             Fix(MakeObjectN(
-              fixConstant(Data.Str("y")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("y"))))))))
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))
     }
 
     "re-nest deep" in {
       LogicalPlan.normalizeLets(
-        fixLet('baz,
-          fixLet('bar,
-            fixLet('foo,
-              fixRead(file("foo")),
-              Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0))))))),
-            Fix(Filter(fixFree('bar), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("y")))), fixConstant(Data.Int(1))))))),
+        lpf.let('baz,
+          lpf.let('bar,
+            lpf.let('foo,
+              lpf.read(file("foo")),
+              Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0))))))),
+            Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1))))))),
           Fix(MakeObjectN(
-            fixConstant(Data.Str("z")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("z")))))))) must_==
-        fixLet('foo,
-          fixRead(file("foo")),
-          fixLet('bar,
-            Fix(Filter(fixFree('foo), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("x")))), fixConstant(Data.Int(0)))))),
-            fixLet('baz,
-              Fix(Filter(fixFree('bar), Fix(Eq(Fix(ObjectProject(fixFree('foo), fixConstant(Data.Str("y")))), fixConstant(Data.Int(1)))))),
+            lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))) must_==
+        lpf.let('foo,
+          lpf.read(file("foo")),
+          lpf.let('bar,
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0)))))),
+            lpf.let('baz,
+              Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1)))))),
               Fix(MakeObjectN(
-                fixConstant(Data.Str("z")) -> Fix(ObjectProject(fixFree('bar), fixConstant(Data.Str("z")))))))))
+                lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))))
     }
 
-    "hoist multiple fixLets" in {
+    "hoist multiple lpf.lets" in {
       LogicalPlan.normalizeLets(
         Fix(Add(
-          fixLet('x, fixConstant(Data.Int(0)), Fix(Add(fixFree('x), fixConstant(Data.Int(1))))),
-          fixLet('y, fixConstant(Data.Int(2)), Fix(Add(fixFree('y), fixConstant(Data.Int(3)))))))) must_==
-        fixLet('x, fixConstant(Data.Int(0)),
-          fixLet('y, fixConstant(Data.Int(2)),
+          lpf.let('x, lpf.constant(Data.Int(0)), Fix(Add(lpf.free('x), lpf.constant(Data.Int(1))))),
+          lpf.let('y, lpf.constant(Data.Int(2)), Fix(Add(lpf.free('y), lpf.constant(Data.Int(3)))))))) must_==
+        lpf.let('x, lpf.constant(Data.Int(0)),
+          lpf.let('y, lpf.constant(Data.Int(2)),
             Fix(Add(
-              Fix(Add(fixFree('x), fixConstant(Data.Int(1)))),
-              Fix(Add(fixFree('y), fixConstant(Data.Int(3))))))))
+              Fix(Add(lpf.free('x), lpf.constant(Data.Int(1)))),
+              Fix(Add(lpf.free('y), lpf.constant(Data.Int(3))))))))
     }
 
-    "hoist deep fixLet by one level" in {
+    "hoist deep lpf.let by one level" in {
       LogicalPlan.normalizeLets(
         Fix(Add(
-          fixConstant(Data.Int(0)),
+          lpf.constant(Data.Int(0)),
           Fix(Add(
-            fixLet('x, fixConstant(Data.Int(1)), Fix(Add(fixFree('x), fixConstant(Data.Int(2))))),
-            fixConstant(Data.Int(3))))))) must_==
+            lpf.let('x, lpf.constant(Data.Int(1)), Fix(Add(lpf.free('x), lpf.constant(Data.Int(2))))),
+            lpf.constant(Data.Int(3))))))) must_==
         Fix(Add(
-          fixConstant(Data.Int(0)),
-          fixLet('x, fixConstant(Data.Int(1)),
+          lpf.constant(Data.Int(0)),
+          lpf.let('x, lpf.constant(Data.Int(1)),
             Fix(Add(
-              Fix(Add(fixFree('x), fixConstant(Data.Int(2)))),
-              fixConstant(Data.Int(3)))))))
+              Fix(Add(lpf.free('x), lpf.constant(Data.Int(2)))),
+              lpf.constant(Data.Int(3)))))))
     }
   }
 }
