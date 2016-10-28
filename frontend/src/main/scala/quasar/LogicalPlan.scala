@@ -36,6 +36,7 @@ sealed trait LogicalPlan[A] extends Product with Serializable
 object LogicalPlan {
   import quasar.std.StdLib._
   import structural._
+  import quasar.frontend.fixpoint.lpf
 
   implicit val LogicalPlanTraverse: Traverse[LogicalPlan] =
     new Traverse[LogicalPlan] {
@@ -229,33 +230,33 @@ object LogicalPlan {
     * NB: at the moment, Lets are only hoisted one level.
     */
   val normalizeLetsƒ: LogicalPlan[Fix[LogicalPlan]] => Option[LogicalPlan[Fix[LogicalPlan]]] = {
-      case Let(b, Fix(Let(a, x1, x2)), x3) => Let(a, x1, Fix(Let(b, x2, x3))).some
+      case Let(b, Fix(Let(a, x1, x2)), x3) => Let(a, x1, lpf.let(b, x2, x3)).some
 
       // TODO generalize the following three `GenericFunc` cases
       case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) => a1 match {
-        case Fix(Let(a, x1, x2)) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._1](func, Func.Input1(x2)))).some
+        case Fix(Let(a, x1, x2)) => Let(a, x1, lpf.invoke(func, Func.Input1(x2))).some
         case _ => None
       }
 
       case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) => (a1, a2) match {
-        case (Fix(Let(a, x1, x2)), a2) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._2](func, Func.Input2(x2, a2)))).some
-        case (a1, Fix(Let(a, x1, x2))) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._2](func, Func.Input2(a1, x2)))).some
+        case (Fix(Let(a, x1, x2)), a2) => Let(a, x1, lpf.invoke(func, Func.Input2(x2, a2))).some
+        case (a1, Fix(Let(a, x1, x2))) => Let(a, x1, lpf.invoke(func, Func.Input2(a1, x2))).some
         case _ => None
       }
 
       case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
-        case (Fix(Let(a, x1, x2)), a2, a3) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._3](func, Func.Input3(x2, a2, a3)))).some
-        case (a1, Fix(Let(a, x1, x2)), a3) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._3](func, Func.Input3(a1, x2, a3)))).some
-        case (a1, a2, Fix(Let(a, x1, x2))) => Let(a, x1, Fix(Invoke[Fix[LogicalPlan], nat._3](func, Func.Input3(a1, a2, x2)))).some
+        case (Fix(Let(a, x1, x2)), a2, a3) => Let(a, x1, lpf.invoke(func, Func.Input3(x2, a2, a3))).some
+        case (a1, Fix(Let(a, x1, x2)), a3) => Let(a, x1, lpf.invoke(func, Func.Input3(a1, x2, a3))).some
+        case (a1, a2, Fix(Let(a, x1, x2))) => Let(a, x1, lpf.invoke(func, Func.Input3(a1, a2, x2))).some
         case _ => None
       }
 
       case Typecheck(Fix(Let(a, x1, x2)), typ, cont, fallback) =>
-        Let(a, x1, Fix(Typecheck(x2, typ, cont, fallback))).some
+        Let(a, x1, lpf.typecheck(x2, typ, cont, fallback)).some
       case Typecheck(expr, typ, Fix(Let(a, x1, x2)), fallback) =>
-        Let(a, x1, Fix(Typecheck(expr, typ, x2, fallback))).some
+        Let(a, x1, lpf.typecheck(expr, typ, x2, fallback)).some
       case Typecheck(expr, typ, cont, Fix(Let(a, x1, x2))) =>
-        Let(a, x1, Fix(Typecheck(expr, typ, cont, x2))).some
+        Let(a, x1, lpf.typecheck(expr, typ, cont, x2)).some
 
       case t => None
   }
@@ -317,12 +318,12 @@ object LogicalPlan {
       NameT[SemDisj, ConstrainedPlan] = {
     if (inf.contains(poss))
       emit(ConstrainedPlan(poss, Nil, poss match {
-        case Type.Const(d) => Fix(Constant(d))
+        case Type.Const(d) => lpf.constant(d)
         case _ => term
       }))
     else if (poss.contains(inf)) {
       emitName(freshName("check").map(name =>
-        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), Fix(Free(name)))))
+        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), lpf.free(name))))
     }
     else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
   }
@@ -330,8 +331,8 @@ object LogicalPlan {
   private def appConst(constraints: ConstrainedPlan, fallback: Fix[LogicalPlan]):
       Fix[LogicalPlan] =
     constraints.constraints.foldLeft(constraints.plan)((acc, con) =>
-      Fix(Let(con.name, con.term,
-        Fix(Typecheck(Fix(Free(con.name)), con.inferred, acc, fallback)))))
+      lpf.let(con.name, con.term,
+        lpf.typecheck(lpf.free(con.name), con.inferred, acc, fallback)))
 
   /** This inserts a constraint on a node that might not strictly require a type
     * check. It protects operations (EG, array flattening) that need a certain
@@ -342,7 +343,7 @@ object LogicalPlan {
       (consts match {
         case Nil =>
           freshName("check").map(name =>
-            ConstrainedPlan(typ, List(NamedConstraint(name, typ, term)), Fix(Free(name))))
+            ConstrainedPlan(typ, List(NamedConstraint(name, typ, term)), lpf.free(name)))
         case _   => constraints.point[State[NameGen, ?]]
       }).map(appConst(_, fallback))
   }
@@ -355,11 +356,11 @@ object LogicalPlan {
       def applyConstraints(
           poss: Type, constraints: ConstrainedPlan)
           (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
-        unifyOrCheck(inf, poss, f(appConst(constraints, Fix(Constant(Data.NA)))))
+        unifyOrCheck(inf, poss, f(appConst(constraints, lpf.constant(Data.NA))))
 
       term match {
-        case Read(c)     => unifyOrCheck(inf, Type.Top, Fix(Read(c)))
-        case Constant(d) => unifyOrCheck(inf, Type.Const(d), Fix(Constant(d)))
+        case Read(c)     => unifyOrCheck(inf, Type.Top, lpf.read(c))
+        case Constant(d) => unifyOrCheck(inf, Type.Const(d), lpf.constant(d))
         case InvokeUnapply(MakeObject, Sized(name, value)) =>
           lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(x => Fix(MakeObject(name.plan, x))))
@@ -376,23 +377,23 @@ object LogicalPlan {
           val constraints = constraints0.unsized.flatten
 
           lift(ConcatOp.tpe(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
-            case t if Type.Str.contains(t) => unifyOrCheck(inf, poss, Fix(Invoke(string.Concat, terms)))
-            case t if t.arrayLike => unifyOrCheck(inf, poss, Fix(Invoke(ArrayConcat, terms)))
+            case t if Type.Str.contains(t) => unifyOrCheck(inf, poss, lpf.invoke(string.Concat, terms))
+            case t if t.arrayLike => unifyOrCheck(inf, poss, lpf.invoke(ArrayConcat, terms))
             case _                => lift(-\/(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types"))))
           }).map(cp =>
             cp.copy(constraints = cp.constraints ++ constraints))
         case InvokeUnapply(relations.Or, Sized(left, right)) =>
-          lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Fix(Invoke(relations.Or, Func.Input2(left, right).map(appConst(_, Fix(Constant(Data.NA))))))))
+          lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, lpf.invoke(relations.Or, Func.Input2(left, right).map(appConst(_, lpf.constant(Data.NA))))))
         case InvokeUnapply(structural.FlattenArray, Sized(arg)) =>
           for {
             types <- lift(structural.FlattenArray.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
-            consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Fix(Constant(Data.Arr(List(Data.NA)))))))
-            plan  <- unifyOrCheck(inf, types, Fix(Invoke(structural.FlattenArray, consts)))
+            consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, lpf.constant(Data.Arr(List(Data.NA))))))
+            plan  <- unifyOrCheck(inf, types, lpf.invoke(structural.FlattenArray, consts))
           } yield plan
         case InvokeUnapply(structural.FlattenMap, Sized(arg)) => for {
           types <- lift(structural.FlattenMap.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
-          consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, Fix(Constant(Data.Obj(ListMap("" -> Data.NA)))))))
-          plan  <- unifyOrCheck(inf, types, Fix(Invoke(structural.FlattenMap, consts)))
+          consts <- emitName[SemDisj, Func.Input[Fix[LogicalPlan], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, lpf.constant(Data.Obj(ListMap("" -> Data.NA))))))
+          plan  <- unifyOrCheck(inf, types, lpf.invoke(structural.FlattenMap, consts))
         } yield plan
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
           handleGenericInvoke(inf, Invoke(func, Func.Input1(a1)))
@@ -401,11 +402,11 @@ object LogicalPlan {
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           handleGenericInvoke(inf, Invoke(func, Func.Input3(a1, a2, a3)))
         case Typecheck(expr, typ, cont, fallback) =>
-          unifyOrCheck(inf, Type.glb(cont.inferred, typ), Fix(Typecheck(expr.plan, typ, cont.plan, fallback.plan)))
+          unifyOrCheck(inf, Type.glb(cont.inferred, typ), lpf.typecheck(expr.plan, typ, cont.plan, fallback.plan))
         case Let(name, value, in) =>
-          unifyOrCheck(inf, in.inferred, Fix(Let(name, appConst(value, Fix(Constant(Data.NA))), appConst(in, Fix(Constant(Data.NA))))))
+          unifyOrCheck(inf, in.inferred, lpf.let(name, appConst(value, lpf.constant(Data.NA)), appConst(in, lpf.constant(Data.NA))))
         // TODO: Get the possible type from the Let
-        case Free(v) => emit(ConstrainedPlan(inf, Nil, Fix(Free(v))))
+        case Free(v) => emit(ConstrainedPlan(inf, Nil, lpf.free(v)))
       }
   }
 
@@ -422,12 +423,12 @@ object LogicalPlan {
         val constraints = constraints0.unsized.flatten
 
         lift(func.tpe(types).disjunction).flatMap(
-          unifyOrCheck(inf, _, Fix(Invoke(func, terms)))).map(cp =>
+          unifyOrCheck(inf, _, lpf.invoke(func, terms))).map(cp =>
             cp.copy(constraints = cp.constraints ++ constraints))
 
       case _ =>
         lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
-          unifyOrCheck(inf, _, Fix(Invoke(func, args.map(appConst(_, Fix(Constant(Data.NA))))))))
+          unifyOrCheck(inf, _, lpf.invoke(func, args.map(appConst(_, lpf.constant(Data.NA))))))
     }
   }
 
@@ -439,7 +440,7 @@ object LogicalPlan {
     import StateT.stateTMonadState
 
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Fix(Constant(Data.NA)))).evalZero.validation)
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, lpf.constant(Data.NA))).evalZero.validation)
   }
 
   // TODO: Generalize this to Binder

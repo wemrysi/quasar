@@ -42,6 +42,7 @@ object view {
     S4: Mounting :<: S
   ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
+    import quasar.frontend.fixpoint.lpf
 
     val readUnsafe = ReadFile.Unsafe[S]
     val queryUnsafe = QueryFile.Unsafe[S]
@@ -57,7 +58,7 @@ object view {
       } yield h
 
     def openView(f: AFile, off: Natural, lim: Option[Positive]): FileSystemErrT[Free[S, ?], ReadHandle] = {
-      val readLP = addOffsetLimit(Fix(LP.Read[Fix[LP]](f)), off, lim)
+      val readLP = addOffsetLimit(lpf.read(f), off, lim)
 
       def dataHandle(data: List[Data]): Free[S, ReadHandle] =
         for {
