@@ -308,7 +308,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
                          |  n1ql: $n1qlStr""".stripMargin('|'))))
       } yield partialQueryString(n1qlStr)
     case DeleteField(a1, a2)                      =>
-      partialQueryString(s"object_remove(${n1ql(a2)}, ${n1ql(a1)})").point[M]
+      partialQueryString(s"object_remove(${n1ql(a1)}, ${n1ql(a2)})").point[M]
 
     // helpers & QScript-specific
     case DupMapKeys(a1)                   => unimplementedP("DupMapKeys")
