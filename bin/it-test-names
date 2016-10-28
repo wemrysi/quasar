@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-#
-
-shopt -s globstar
-
-for f in it/src/**/*.test ; do jq -M .name $f; done 2>/dev/null | sort-random

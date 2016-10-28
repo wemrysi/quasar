@@ -28,9 +28,7 @@ class FacadeBasedInterpolator[A] {
 }
 
 object JsonMacros {
-  object EJson extends FacadeBasedInterpolator[quasar.ejson.EJson[quasar.Data]] {
-    implicit def ejsonFacade = quasar.Data.EJsonDataFacade
-  }
+  object EJson extends FacadeBasedInterpolator[quasar.ejson.EJson[quasar.Data]]
   object Argonaut extends FacadeBasedInterpolator[argonaut.Json] {
     implicit def argonautFacade = argonaut.JawnParser.facade
   }

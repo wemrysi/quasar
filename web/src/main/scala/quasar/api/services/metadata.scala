@@ -26,13 +26,13 @@ import quasar.fs.mount._
 import scala.math.Ordering
 
 import argonaut._, Argonaut._
+import org.http4s.dsl._
 import pathy.Path._
 import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
 
 object metadata {
-  import org.http4s.dsl._
 
   final case class FsNode(name: String, typ: String, mount: Option[String])
 

@@ -225,5 +225,5 @@ object Fallback {
     alg: Algebra[EJson, R],
     coalg: Coalgebra[EJson, R]
   ) =
-    create[T, InMemory.F, R](InMemory.fileSystem, alg, coalg)
+    create[T, InMemory.InMemoryFs, R](InMemory.fileSystem, alg, coalg)
 }

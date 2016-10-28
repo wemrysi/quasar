@@ -65,7 +65,7 @@ package object fs {
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case FsCfg(FsType, uri) =>
+      case (FsType, uri) =>
         EitherT(lift(runMarkLogicFs(uri).run).into[S]) map { case (run, shutdown) =>
           DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(

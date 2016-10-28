@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.macros
+package ygg.macros
 
 import scala.StringContext
 import scala.reflect.ClassTag
 import scala.Predef.implicitly
 import quasar._, Predef._
-import ygg.macros._
 
 class ArgonautJsonSpec extends AbstractJsonSpec[argonaut.Json]()(argonaut.JawnParser.facade, implicitly[ClassTag[argonaut.Json]])
 class DataJsonSpec extends AbstractJsonSpec[Data]()
-class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[Data]]()(Data.EJsonDataFacade, implicitly)
+class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[Data]]()(EJsonDataFacade, implicitly)
 class JawnJsonSpec extends AbstractJsonSpec[jawn.ast.JValue]()
 // class PrecogJsonSpec extends AbstractJsonSpec[ygg.json.JValue]()
 
@@ -51,13 +50,13 @@ abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassT
 
   "json files" should {
     "return Some(json) on json file" >> {
-      val js = jawn.Parser.parseFromPath[A]("testdata/patients-mini.json").toOption
+      val js = jawn.Parser.parseFromPath[A]("macros/src/test/resources/patients-mini.json").toOption
       js must beSome.which(ctag.runtimeClass isAssignableFrom _.getClass)
       // Doesn't work this way if A is abstract.
       // js must beSome(beAnInstanceOf[A])
     }
     "return None on missing file" >> {
-      val js = jawn.Parser.parseFromPath[A]("testdata/does-not-exist.json").toOption
+      val js = jawn.Parser.parseFromPath[A]("macros/src/test/resources/does-not-exist.json").toOption
       js must beNone
     }
   }

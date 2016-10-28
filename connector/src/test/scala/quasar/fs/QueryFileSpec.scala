@@ -77,7 +77,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
     "evaluate" >> {
       "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
         val query = LogicalPlan.Read(s.file)
-        val state = s.state.copy(planMap = Map(query -> s.contents))
+        val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.runLogWE[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
         result.unsafePerformSync._2.toEither must beRight(s.contents)
       }
@@ -88,12 +88,12 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
         s: SingleFileMemState =>
 
         val query = LogicalPlan.Read(s.file)
-        val state = s.state.copy(planMap = Map(query -> s.contents))
+        val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.interpret(enumerate(query).drainTo[Vector].run.value)
 
         result.run(state)
           .unsafePerformSync
-          .leftMap(_.queryMap) ==== ((Map.empty, \/.right(s.contents)))
+          .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents)))
       }
 
       "closes result handle when terminated early" >> prop {
@@ -101,7 +101,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
 
         val n = s.contents.length / 2
         val query = LogicalPlan.Read(s.file)
-        val state = s.state.copy(planMap = Map(query -> s.contents))
+        val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.interpret(
           enumeratee.take[Data, ExecM](n)
             .run(enumerate(query))
@@ -111,7 +111,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
 
         result.run(state)
           .unsafePerformSync
-          .leftMap(_.queryMap) ==== ((Map.empty, \/.right(s.contents take n)))
+          .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents take n)))
       }
     }
   }

@@ -17,15 +17,10 @@
 package quasar.pkg
 
 import scala.{ inline, AnyVal }
-import scalaz.{ Show, Order, Equal }
-import scala.util.Try
-import java.lang.Throwable
+import scalaz.{ Show, Equal }
 
 final class EqualBy[A] {
   def apply[B](f: A => B)(implicit z: Equal[B]): Equal[A] = z contramap f
-}
-final class OrdBy[A] {
-  def apply[B](f: A => B)(implicit z: Order[B]): Order[A] = z contramap f
 }
 final class ShowBy[A] {
   def apply[B](f: A => B)(implicit z: Show[B]): Show[A] = Show.show[A](x => z show f(x))
@@ -34,26 +29,3 @@ final class QuasarExtensionOps[A](private val self: A) extends AnyVal {
   @inline def |>[B](f: A => B): B = f(self)
   @inline def ->[B](y: B): (A, B) = scala.Tuple2(self, y)
 }
-final class QuasarTryOps[A](private val self: Try[A]) extends AnyVal {
-  def |(expr: => A): A = fold(_ => expr, x => x)
-  def fold[B](f: Throwable => B, g: A => B): B = self match {
-    case scala.util.Success(x) => g(x)
-    case scala.util.Failure(t) => f(t)
-  }
-}
-
-
-/****
-
-object boop {
-  val ArrowAssoc = null
-  implicit def quasarExtensionOps[A](x: A): quasar.pkg.QuasarExtensionOps[A] = new quasar.pkg.QuasarExtensionOps(x)
-  val simpleData = List(
-    Data.Obj(ListMap("a" -> Data.Int(1))),
-    Data.Obj(ListMap("b" -> Data.Int(2))),
-    Data.Obj(ListMap("c" -> Data.Arr(List(Data.Int(3))))))
-
-  val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
-}
-
-****/

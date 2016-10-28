@@ -2,9 +2,27 @@ package quasar.project
 
 import sbt._, Keys._
 import wartremover._
-import scala.Seq
+import scala.{ Seq, StringContext }
 
 object Ygg {
+  def yggSetup(p: Project): Project = ( p
+    .settings(name := s"quasar-${p.id}-internal")
+    .settings(scalacOptions ++= Seq("-language:_"))
+    .settings(scalacOptions -= "-Xfatal-warnings")
+    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
+    .settings(scalacOptions in (Compile, console) --= Seq("-Ywarn-unused-code"))
+  )
+
+  def yggDeps = Seq(
+    "org.mapdb"      %  "mapdb"        % "3.0.1",
+    "org.spire-math" %% "spire-macros" % "0.12.0"
+  )
+  def macroDeps = Seq(
+    "org.spire-math" %% "jawn-ast"      % "0.10.1",
+    "org.spire-math" %% "jawn-parser"   % "0.10.1",
+    "io.argonaut"    %% "argonaut-jawn" % "6.2-M3"
+  )
+
   def imports = """
     import quasar._, Predef._
     import java.nio.file._
@@ -42,27 +60,22 @@ object Ygg {
     Wart.Option2Iterable
   )
 
-  def macros(p: Project): Project = ( p
+  def macros(p: Project): Project = (
+     yggSetup(p)
     .dependsOn('foundation % BothScopes, 'frontend)
-    .settings(name := "quasar-macros-internal")
-    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
-    .settings(scalacOptions += "-language:experimental.macros")
+    .settings(libraryDependencies ++= macroDeps)
   )
 
-  def ygg(p: Project): Project = ( p
+  def ygg(p: Project): Project = (
+     yggSetup(p)
     .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector)
-    .settings(name := "quasar-ygg-internal")
-    .settings(scalacOptions ++= Seq("-language:_"))
-    .settings(libraryDependencies ++= Dependencies.ygg)
-    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
-    .settings(initialCommands in (Compile, console) := yggImports)
-    .settings(scalacOptions in (Compile, console) --= Seq("-Ywarn-unused-code"))
+    .settings(libraryDependencies ++= yggDeps)
+    .settings(initialCommands in console := yggImports)
   )
 
-  def jsonfile(p: Project): Project = ( p
-    .dependsOn('connector % BothScopes, 'ygg % BothScopes, 'sql)
-    .settings(name := "quasar-jsonfile-internal")
-    .settings(wartremoverWarnings in (Compile, compile) --= yggDropWarts)
-    .settings(initialCommands in (Compile, console) := jsonfileImports)
+  def jsonfile(p: Project): Project = (
+     yggSetup(p)
+    .dependsOn('connector, 'ygg, 'sql)
+    .settings(initialCommands in console := jsonfileImports)
   )
 }

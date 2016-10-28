@@ -22,7 +22,8 @@ import scala.reflect.macros.blackbox._
 import jawn._
 import java.util.UUID
 import scala.Any
-import scalaz.{ Tree => _, _ }, Scalaz._
+
+// import scalaz.{ Tree => _, _ }, Scalaz._
 
 class JValueMacros(val c: Context) {
   import c.universe._

@@ -16,33 +16,88 @@
 
 package quasar.fs
 
-import quasar.Predef._
-import quasar.fp._, numeric._
-import FileSystemError._
+import quasar.Predef.{Vector, None, Set}
+import quasar.Planner.UnsupportedPlan
+import quasar.LogicalPlan
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import scalaz._
 
-object Empty extends UnifiedFileSystemBuilder {
-  val FsType = FileSystemType("empty")
-  def apply[F[_]: Applicative] : UnifiedFileSystem[F] = new Impl[F]
+import matryoshka.Fix
+import pathy.Path._
+import scalaz.{~>, \/, Applicative}
+import scalaz.syntax.equal._
+import scalaz.syntax.applicative._
+import scalaz.syntax.either._
+import scalaz.syntax.std.option._
 
-  class Impl[F[_]: Applicative] extends UnifiedFileSystem[F] {
-    def closeR(fh: RHandle): F[Unit]                                                     = ()
-    def closeW(fh: WHandle): F[Unit]                                                     = ()
-    def closeQ(rh: QHandle): F[Unit]                                                     = ()
-    def createTempFile(near: APath): FLR[AFile]                                          = unknownPath(near)
-    def deletePath(path: APath): FLR[Unit]                                               = unknownPath(path)
-    def evaluate(lp: FixPlan): FPLR[QHandle]                                             = unknownPlan(lp)
-    def execute(lp: FixPlan, out: AFile): FPLR[AFile]                                    = unknownPlan(lp)
-    def exists(file: AFile): F[Boolean]                                                  = false
-    def explain(lp: FixPlan): FPLR[ExecutionPlan]                                        = unknownPlan(lp)
-    def list(dir: ADir): FLR[DirList]                                                    = unknownPath(dir)
-    def more(rh: QHandle): FLR[Chunks]                                                   = unknownResultHandle(rh)
-    def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]               = unknownPath(src)
-    def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit]            = unknownPath(src)
-    def openForRead(file: AFile, offset: Natural, limit: Option[Positive]): FLR[RHandle] = unknownPath(file)
-    def openForWrite(file: AFile): FLR[WHandle]                                          = unknownPath(file)
-    def read(fh: RHandle): FLR[Chunks]                                                   = unknownReadHandle(fh)
-    def write(fh: WHandle, chunks: Chunks): F[Errors]                                    = Vector(unknownWriteHandle(fh))
+/** `FileSystem` interpreters for a filesystem that has no, and doesn't support
+  * creating any, files.
+  */
+object Empty {
+  import FileSystemError._, PathError._
+
+  def readFile[F[_]: Applicative] = λ[ReadFile ~> F] {
+    case ReadFile.Open(f, _, _) => fsPathNotFound(f)
+    case ReadFile.Read(h)       => unknownReadHandle(h).left.point[F]
+    case ReadFile.Close(_)      => ().point[F]
   }
+
+  def writeFile[F[_]: Applicative] = λ[WriteFile ~> F] {
+    case WriteFile.Open(f)        => WriteFile.WriteHandle(f, 0).right.point[F]
+    case WriteFile.Write(_, data) => data.map(writeFailed(_, "empty filesystem")).point[F]
+    case WriteFile.Close(_)       => ().point[F]
+  }
+
+  def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
+    case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
+    case ManageFile.Delete(p)    => fsPathNotFound(p)
+    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+  }
+
+  def queryFile[F[_]: Applicative]: QueryFile ~> F =
+    new (QueryFile ~> F) {
+      def apply[A](qf: QueryFile[A]) = qf match {
+        case QueryFile.ExecutePlan(lp, _) =>
+          lpResult(lp)
+
+        case QueryFile.EvaluatePlan(lp) =>
+          lpResult(lp)
+
+        case QueryFile.More(h) =>
+          unknownResultHandle(h).left.point[F]
+
+        case QueryFile.Close(_) =>
+          ().point[F]
+
+        case QueryFile.Explain(lp) =>
+          lpResult(lp)
+
+        case QueryFile.ListContents(d) =>
+          if (d === rootDir)
+            \/.right[FileSystemError, Set[PathSegment]](Set()).point[F]
+          else
+            fsPathNotFound(d)
+
+        case QueryFile.FileExists(_) =>
+          false.point[F]
+      }
+    }
+
+  def fileSystem[F[_]: Applicative]: FileSystem ~> F =
+    interpretFileSystem(queryFile, readFile, writeFile, manageFile)
+
+  ////
+
+  private def lpResult[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
+    LogicalPlan.paths(lp)
+      .headOption
+      // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+      .cata(p => fsPathNotFound[F, A](mkAbsolute(rootDir, p)), unsupportedPlan[F, A](lp))
+      .strengthL(Vector())
+
+  private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
+    pathErr(pathNotFound(p)).left.point[F]
+
+  private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
+    planningFailed(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]
 }

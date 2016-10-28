@@ -379,7 +379,7 @@ object QueryFile {
       new Unsafe[S]
   }
 
-  class Transforms[F[_]: Monad] extends FileSystemTypes[F] {
+  class Transforms[F[_]: Monad] {
     type G[A] = PhaseResultT[F, A]
     type H[A] = SemanticErrsT[G, A]
 

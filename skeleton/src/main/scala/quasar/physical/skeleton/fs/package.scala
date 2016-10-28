@@ -16,39 +16,26 @@
 
 package quasar.physical.skeleton
 
-import quasar.Predef._
-import quasar.fp.numeric._
 import quasar.fs._
-import FileSystemError.Unimplemented
-import quasar.contrib.pathy._
-import scalaz._
+import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
 
-package object fs extends UnifiedFileSystemBuilder {
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
+
+package object fs {
   val FsType = FileSystemType("skeleton")
 
-  def apply[F[_]: Applicative] = new Impl[F]
+  def query[S[_]]: QueryFile ~> Free[S, ?] = Empty.queryFile[Free[S, ?]]
+  def read[S[_]]: ReadFile ~> Free[S, ?] = Empty.readFile[Free[S, ?]]
+  def write[S[_]]: WriteFile ~> Free[S, ?] = Empty.writeFile[Free[S, ?]]
+  def manage[S[_]]: ManageFile ~> Free[S, ?] = Empty.manageFile[Free[S, ?]]
 
-  /** The skeleton filesystem is similar to Empty - but rather
-   *  than being a functional filesystem which contains no files,
-   *  it returns an Unimplemented error wherever possible.
-   */
-  class Impl[F[_]: Applicative] extends UnifiedFileSystem[F] {
-    def closeR(fh: RHandle): F[Unit]                                                     = ()
-    def closeW(fh: WHandle): F[Unit]                                                     = ()
-    def closeQ(rh: QHandle): F[Unit]                                                     = ()
-    def createTempFile(near: APath): FLR[AFile]                                          = Unimplemented
-    def deletePath(path: APath): FLR[Unit]                                               = Unimplemented
-    def evaluate(lp: FixPlan): FPLR[QHandle]                                             = Unimplemented
-    def execute(lp: FixPlan, out: AFile): FPLR[AFile]                                    = Unimplemented
-    def exists(file: AFile): F[Boolean]                                                  = false
-    def explain(lp: FixPlan): FPLR[ExecutionPlan]                                        = Unimplemented
-    def list(dir: ADir): FLR[DirList]                                                    = Unimplemented
-    def more(rh: QHandle): FLR[Chunks]                                                   = Unimplemented
-    def moveDir(src: ADir, dst: ADir, semantics: MoveSemantics): FLR[Unit]               = Unimplemented
-    def moveFile(src: AFile, dst: AFile, semantics: MoveSemantics): FLR[Unit]            = Unimplemented
-    def openForRead(file: AFile, offset: Natural, limit: Option[Positive]): FLR[RHandle] = Unimplemented
-    def openForWrite(file: AFile): FLR[WHandle]                                          = Unimplemented
-    def read(fh: RHandle): FLR[Chunks]                                                   = Unimplemented
-    def write(fh: WHandle, chunks: Chunks): F[Errors]                                    = Vector(Unimplemented)
-  }
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
+      FileSystemDef[Free[S, ?]] =
+    FileSystemDef.fromPF {
+      case (FsType, uri) =>
+        FileSystemDef.DefinitionResult[Free[S, ?]](
+          interpretFileSystem(query, read, write, manage),
+          Free.point(())).point[DefErrT[Free[S, ?], ?]]
+    }
 }

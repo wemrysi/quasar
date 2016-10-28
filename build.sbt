@@ -15,6 +15,8 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
+val BothScopes = "test->test;compile->compile"
+
 def isTravis: Boolean = sys.env contains "TRAVIS"
 
 // Exclusive execution settings
@@ -71,18 +73,18 @@ lazy val buildSettings = Seq(
   //   • AsInstanceOf   – puffnfresh/wartremover#266
   //   • NoNeedForMonad – puffnfresh/wartremover#268
   //   • others         – simply need to be reviewed & fixed
-  // wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-  //   Wart.Any,                   // - see puffnfresh/wartremover#263
-  //   Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
-  //   Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
-  //   Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-  //   Wart.Nothing),              // - see puffnfresh/wartremover#263
+  wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
+    Wart.Any,                   // - see puffnfresh/wartremover#263
+    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
+    Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
+    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
+    Wart.Nothing),              // - see puffnfresh/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
 
-  console <<= console in Test, // console alias test:console
+  console := (console in Test).value, // console alias test:console
 
   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
 
@@ -202,13 +204,13 @@ lazy val root = project.in(file("."))
 //   |    \   |
     sql, connector, marklogicValidation,
 //   |  /   | | \ \      |
-    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore, 'macros, 'ygg, 'jsonfile,
+    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
 //        /  \
       repl,   web,
 //        \  /
-           it)
+           it, macros, ygg, jsonfile)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -441,7 +443,6 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    'jsonfile,
     skeleton)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -492,8 +493,6 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
-  .settings(logBuffered in Test := false)
-  .settings(logBuffered in ExclusiveTests := false)
   .enablePlugins(AutomateHeaderPlugin)
 
 

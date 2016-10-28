@@ -129,7 +129,7 @@ package object hdfs {
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case FsCfg(FsType, uri) =>
+      case (FsType, uri) =>
         for {
           sparkFsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
           res <- {

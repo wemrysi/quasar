@@ -20,6 +20,7 @@ import jawn._
 import ygg.common._
 import scalaz._, Scalaz._
 import quasar.Data
+import ygg.macros.DataFacade
 
 package object json {
   type JSchemaElem = ygg.json.JPath -> ygg.table.CType

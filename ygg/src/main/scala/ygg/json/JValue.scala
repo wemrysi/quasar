@@ -24,7 +24,6 @@ import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
 import scala.annotation.tailrec
 import scala.{ collection => sc }
-import JValue._
 
 /**
   * Data type for Json AST.
@@ -163,8 +162,4 @@ final object JField {
   def apply(x: JStringValue): JField = JField(x._1, x._2)
 
   implicit def liftTuple(x: JStringValue): JField = apply(x)
-
-  def liftCollect(f: PartialFunction[JField, JField]): MaybeSelf[JValue] = {
-    case JObject.Fields(fields) if fields exists f.isDefinedAt => JObject(fields collect f)
-  }
 }

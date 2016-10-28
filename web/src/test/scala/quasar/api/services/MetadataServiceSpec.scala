@@ -24,7 +24,7 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.effect.KeyValueStore
 import quasar.fp.liftMT
 import quasar.fp.free, free._
-import quasar.fs._, InMemory._, Impl.{ queryFile }
+import quasar.fs._, InMemory._
 import quasar.fs.mount._
 import quasar.sql._
 

@@ -45,11 +45,9 @@ trait PackageMethods {
   @inline final def classTag[A](implicit z: CTag[A]): CTag[A] = z
   @inline final def implicitly[A](implicit value: A): A       = value
 
-  implicit def quasarExtensionOps[A](x: A) = new quasar.pkg.QuasarExtensionOps(x)
-  implicit def quasarTryOps[A](x: Try[A])  = new quasar.pkg.QuasarTryOps(x)
+  implicit def quasarExtensionOps[A](x: A) = new QuasarExtensionOps(x)
 
   /** Type parameter curriers. */
   def eqBy[A]   = new EqualBy[A]
-  def ordBy[A]  = new OrdBy[A]
   def showBy[A] = new ShowBy[A]
 }

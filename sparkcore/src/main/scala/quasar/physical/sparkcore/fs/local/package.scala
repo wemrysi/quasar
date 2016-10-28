@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount._, FileSystemDef._
+import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
 
 import java.io.PrintWriter
@@ -105,9 +105,10 @@ package object local {
     writefile.chrooted[Eff](fsConf.prefix),
     managefile.chrooted[Eff](fsConf.prefix))
 
-  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] =
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
+      FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case FsCfg(FsType, uri) =>
+      case (FsType, uri) =>
         for {
           fsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
           res <- {

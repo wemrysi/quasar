@@ -51,10 +51,11 @@ import scalaz.stream.Process
   */
 abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[FileSystemUT[S]]]
-) extends quasar.Qspec with FileSystemContext.Free[S] {
+) extends quasar.Qspec {
 
   sequential
 
+  type F[A]      = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
@@ -67,10 +68,17 @@ abstract class FileSystemTest[S[_]](
       ()
     }).unsafePerformSync
 
-  def runT(run: Run): ER ~> FsTask                               = Hoist[FileSystemErrT].hoist(run)
-  def runLog[A](run: Run, p: Process[F, A]): Task[Vector[A]]     = p.translate(run).runLog
-  def runLogT[A](run: Run, p: Process[ER, A]): FsTask[Vector[A]] = p.translate(runT(run)).runLog
-  def execT[A](run: Run, p: Process[ER, A]): FsTask[Unit]        = p.translate(runT(run)).run
+  def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
+    Hoist[FileSystemErrT].hoist(run)
+
+  def runLog[A](run: Run, p: Process[F, A]): Task[Vector[A]] =
+    p.translate[Task](run).runLog
+
+  def runLogT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Vector[A]] =
+    p.translate[FsTask](runT(run)).runLog
+
+  def execT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Unit] =
+    p.translate[FsTask](runT(run)).run
 
   ////
 
@@ -146,7 +154,7 @@ object FileSystemTest {
       TaskRef(0L)                                         |@|
       ViewState.toTask(Map())                             |@|
       TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty[HierarchicalFsEffM].fileSystem)       |@|
+      TaskRef(Empty.fileSystem[HierarchicalFsEffM])       |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>

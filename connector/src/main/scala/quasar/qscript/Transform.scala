@@ -657,7 +657,7 @@ class Transform
           merged.src,
           merged.lval,
           merged.rval,
-          Free.roll(MapFuncs.Eq(Free.point(LeftSide), Free.point(RightSide))),
+          Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide))),
           Inner,
           LeftSideF)).embed).right
 

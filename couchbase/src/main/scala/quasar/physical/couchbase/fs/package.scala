@@ -123,7 +123,7 @@ package object fs {
       S1: PhysErr :<: S
     ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
-      case FsCfg(FsType, uri) =>
+      case (FsType, uri) =>
         interp(uri).map { case (run, close) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             run compose interpretFileSystem(

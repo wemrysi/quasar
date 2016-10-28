@@ -37,7 +37,7 @@ import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
 class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
-  import ReadFilesSpec._, FileSystemError._, PathError._
+  import ReadFilesSpec._, FileSystemError._
   import ReadFile._
 
   val read   = ReadFile.Ops[FileSystem]
@@ -72,13 +72,6 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
       // Load read-only data
       step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
 
-      "open returns PathNotFound when file DNE" >>* {
-        val dne = rootDir </> dir("doesnt") </> file("exist")
-        read.unsafe.open(dne, 0L, None).run map { r =>
-          r must_= pathErr(pathNotFound(dne)).left
-        }
-      }
-
       "read unopened file handle returns UnknownReadHandle" >>* {
         val h = ReadHandle(rootDir </> file("f1"), 42)
         read.unsafe.read(h).run map { r =>
@@ -105,7 +98,8 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
 
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, 0L, None))
-        r.run_\/ must_= smallFile.data.toVector.right
+
+        r.run_\/.map(_.toSet) must_= smallFile.data.toSet.right
       }
 
       "scan with offset = |file| and no limit yields no data" >> {

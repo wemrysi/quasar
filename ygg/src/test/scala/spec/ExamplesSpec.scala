@@ -22,11 +22,15 @@ import Examples._
 class ExamplesSpec extends quasar.Qspec {
   import JParser._
 
+  private def liftCollect(f: PartialFunction[JField, JField]): MaybeSelf[JValue] = {
+    case JObject.Fields(fields) if fields exists f.isDefinedAt => JObject(fields collect f)
+  }
+
   "Lotto example"  in (lotto must_=== parseUnsafe(lotto.render))
   "Person example" in (person must_=== parseUnsafe(person.render))
 
   "Transformation example" in {
-    val uppercased = person.transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
+    val uppercased = person.transform(liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
     val rendered   = uppercased.render
     rendered.contains(""""NAME":"Joe"""") must_=== true
     rendered.contains(""""AGE":35.0""") must_=== true

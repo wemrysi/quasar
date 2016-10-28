@@ -50,20 +50,13 @@ object WriteFile {
   final case class Close(h: WriteHandle)
     extends WriteFile[Unit]
 
-  /** Ugh, Ops can't extend FileSystemContext.Impl[unsafe.F] because of
-   *    https://issues.scala-lang.org/browse/SI-5712
-   */
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     import FileSystemError._, PathError._
     import ManageFile.MoveSemantics
 
-    object types extends FileSystemContext.Impl[unsafe.F]
-    import types._
-
     type F[A]    = unsafe.F[A]
     type M[A]    = unsafe.M[A]
     type G[E, A] = EitherT[F, E, A]
-    type GE[A]   = G[FileSystemError,A]
 
     /** Returns a channel that appends chunks of data to the given file, creating
       * it if it doesn't exist. Any errors encountered while writing are emitted,
@@ -209,11 +202,13 @@ object WriteFile {
 
     ////
 
+    type GE[A] = G[FileSystemError,A]
+
     private def shouldNotExist(dst: AFile): M[FileSystemError] =
       MonadError[GE, FileSystemError].raiseError(pathErr(pathExists(dst)))
 
     private def shouldExist(dst: AFile): M[FileSystemError] =
-      MonadError[GE, FileSystemError].raiseError(unknownPath(dst))
+      MonadError[GE, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
 
     private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])

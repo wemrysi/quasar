@@ -72,7 +72,7 @@ abstract class UnifiedFileSystem[F[_]: Applicative]
   def fileSystem: FileSystem ~> F = interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
   def definition(FsType: FileSystemType): FileSystemDef[F] = FileSystemDef fromPF {
-    case FsCfg(FsType, init) => EitherT right point(DefinitionResult(fileSystem, ()))
+    case (FsType, init) => EitherT right point(DefinitionResult(fileSystem, ()))
   }
 }
 

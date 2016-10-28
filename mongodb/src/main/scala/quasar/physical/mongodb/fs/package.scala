@@ -76,7 +76,7 @@ package object fs {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
-    case FsCfg(MongoDBFsType, uri) =>
+    case (MongoDBFsType, uri) =>
       type M[A] = Free[S, A]
       for {
         client <- asyncClientDef[S](uri)
@@ -118,7 +118,7 @@ package object fs {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
-    case FsCfg(FileSystemType("mongodbq"), uri) =>
+    case (FileSystemType("mongodbq"), uri) =>
       type M[A] = Free[S, A]
       for {
         client <- asyncClientDef[S](uri)

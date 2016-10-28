@@ -138,7 +138,7 @@ class JawnFacadeMacros(val c: Context) {
         }
         buf append stringParts.last
 
-        parse(buf.toString, new TreeFacade(facade, keys.toMap, values.toMap)).fold(fail, t => t) // t => c.Expr[M[A]](t))
+        parse(buf.toString, new TreeFacade(facade, keys.toMap, values.toMap)).fold(fail, t => t)
 
       case tree =>
         fail("Unexpected tree shape for json interpolation macro: " + tree.getClass + "\n" + showRaw(tree))

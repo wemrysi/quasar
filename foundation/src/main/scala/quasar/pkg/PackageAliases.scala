@@ -108,7 +108,6 @@ trait PackageAliases {
   type jFile                = java.io.File
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
   type jPath                = java.nio.file.Path
-  type jUri                 = java.net.URI
 
   // scalaz aliases at present,
   // but also a single place to change implementations
@@ -117,7 +116,4 @@ trait PackageAliases {
   type Ord[A] = scalaz.Order[A]
   val Ord     = scalaz.Order
   val Eq      = scalaz.Equal
-
-  type ToSelf[A]    = A => A
-  type MaybeSelf[A] = A =?> A
 }

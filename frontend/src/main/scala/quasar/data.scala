@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.ejson.{Common, EJson, Extension}
-import quasar.ejson.FacadeOps._
 import quasar.Predef._
 import quasar.fp.ski._
 import quasar.fp._
@@ -38,23 +37,6 @@ sealed trait Data extends Product with Serializable {
 }
 
 object Data {
-  implicit object DataFacade extends jawn.SimpleFacade[Data] {
-    def jtrue(): Data                        = True
-    def jfalse(): Data                       = False
-    def jnull(): Data                        = Null
-    def jint(s: String): Data                = Int(BigInt(s))
-    def jnum(s: String): Data                = Dec(BigDecimal(s))
-    def jstring(s: String): Data             = Str(s)
-    def jarray(vs: List[Data]): Data         = Arr(vs)
-    def jobject(vs: Map[String, Data]): Data = Obj((ListMap.newBuilder[String, Data] ++= vs).result)
-  }
-
-  implicit def liftData(x: Data): EJson[Data] =
-    toEJson[EJson].apply(x).run.fold[EJson[Data]](x => x, x => x)
-
-  implicit lazy val EJsonDataFacade: jawn.SimpleFacade[EJson[Data]] =
-    DataFacade.xmap[EJson[Data]](liftData, fromEJson)
-
   final case object Null extends Data {
     def dataType = Type.Null
     def toJs = jscore.Literal(Js.Null).some
@@ -260,20 +242,24 @@ object Data {
   implicit val dataEqual: Equal[Data] = Equal.equalA
 
   object EJsonType {
-    def apply(typ: String): Data = Obj("_ejson.type" -> Data.Str(typ))
+    def apply(typ: String): Data =
+      Data.Obj(ListMap("_ejson.type" -> Data.Str(typ)))
 
     def unapply(data: Data) = data match {
-      case Data.Obj(map) => map.get("_ejson.type") collect { case Data.Str(s) => s }
-      case _             => None
+      case Data.Obj(map) =>
+        map.get("_ejson.type") >>= {
+          case Data.Str(str) => str.some
+          case _             => None
+        }
+      case _ => None
     }
   }
 
   object EJsonTypeSize {
     def apply(typ: String, size: BigInt): Data =
-      Obj(
+      Obj(ListMap(
         "_ejson.type" -> Data.Str(typ),
-        "_ejson.size" -> Data.Int(size)
-      )
+        "_ejson.size" -> Data.Int(size)))
 
     def unapply(data: Data) = data match {
       case Data.Obj(map) =>
@@ -358,54 +344,56 @@ object Data {
   //       gap in the meantime.
   val fromEJson: Algebra[EJson, Data] = _.run.fold(fromExtension, fromCommon)
 
-  def timestampObj(ldt: LocalDateTime): Obj = Obj(
-    "year"         -> Int(ldt.getYear),
-    "month"        -> Int(ldt.getMonth.getValue),
-    "day_of_month" -> Int(ldt.getDayOfMonth),
-    "hour"         -> Int(ldt.getHour),
-    "minute"       -> Int(ldt.getMinute),
-    "second"       -> Int(ldt.getSecond),
-    "nanosecond"   -> Int(ldt.getNano)
-  )
-  def dateObj(value: LocalDate): Obj = Obj(
-    "year"         -> Int(value.getYear),
-    "month"        -> Int(value.getMonth.getValue),
-    "day_of_month" -> Int(value.getDayOfMonth)
-  )
-  def timeObj(value: LocalTime): Obj = Obj(
-    "hour"       -> Int(value.getHour),
-    "minute"     -> Int(value.getMinute),
-    "second"     -> Int(value.getSecond),
-    "nanosecond" -> Int(value.getNano)
-  )
-
-  implicit class DataOps(private val self: Data) {
-    def @@(meta: Data): Extension[Data] = ejson.Meta(self, meta)
-  }
-
   /** Converts the parts of `Data` that it can, then stores the rest in,
     * effectively, `Free.Pure`.
     */
-  def toEJson[F[_]](implicit C: Common :<: F, E: Extension :<: F): Coalgebra[CoEnv[Data, F, ?], Data] = {
-    def com[A](ej: Common[A]): Data \/ F[A]    = C(ej).right
-    def ext[A](ej: Extension[A]): Data \/ F[A] = E(ej).right
-
+  def toEJson[F[_]](implicit C: Common :<: F, E: Extension :<: F):
+      Coalgebra[CoEnv[Data, F, ?], Data] =
     ed => CoEnv(ed match {
-      case Arr(value)       => com( ejson.Arr(value) )
-      case Obj(value)       => ext( ejson.Map(value.toList map (_ leftMap Str)) )
-      case Null             => com( ejson.Null() )
-      case Bool(value)      => com( ejson.Bool(value) )
-      case Str(value)       => com( ejson.Str(value) )
-      case Dec(value)       => com( ejson.Dec(value) )
-      case Int(value)       => ext( ejson.Int(value) )
-      case Timestamp(value) => ext( timestampObj(LocalDateTime.ofInstant(value, ZoneOffset.UTC)) @@ EJsonType("_ejson.timestamp") )
-      case Date(value)      => ext( dateObj(value) @@ EJsonType("_ejson.date") )
-      case Time(value)      => ext( timeObj(value) @@ EJsonType("_ejson.time") )
-      case Interval(value)  => ext( Obj("seconds" -> Dec(value.toNanos / nanosPerSec)) @@ EJsonType("_ejson.interval") )
-      case Binary(value)    => ext( Str(ejson.z85.encode(ByteVector.view(value.toArray))) @@ EJsonTypeSize("_ejson.binary", value.size) )
-      // FIXME: This evilly guesses the backend-specific OID formats
-      case Id(value)        => ext( Str(value) @@ EJsonType("_bson.oid") )
+      case Arr(value)       => C.inj(ejson.Arr(value)).right
+      case Obj(value)       =>
+        E.inj(ejson.Map(value.toList.map(_.leftMap(Str(_))))).right
+      case Null             => C.inj(ejson.Null()).right
+      case Bool(value)      => C.inj(ejson.Bool(value)).right
+      case Str(value)       => C.inj(ejson.Str(value)).right
+      case Dec(value)       => C.inj(ejson.Dec(value)).right
+      case Int(value)       => E.inj(ejson.Int(value)).right
+      case Timestamp(value) =>
+        val ldt = LocalDateTime.ofInstant(value, ZoneOffset.UTC)
+        E.inj(ejson.Meta(
+          Obj(ListMap(
+            "year"         -> Int(ldt.getYear),
+            "month"        -> Int(ldt.getMonth.getValue),
+            "day_of_month" -> Int(ldt.getDayOfMonth),
+            "hour"         -> Int(ldt.getHour),
+            "minute"       -> Int(ldt.getMinute),
+            "second"       -> Int(ldt.getSecond),
+            "nanosecond"   -> Int(ldt.getNano))),
+          EJsonType("_ejson.timestamp"))).right
+      case Date(value)      => E.inj(ejson.Meta(
+        Obj(ListMap(
+          "year" -> Int(value.getYear),
+          "month" -> Int(value.getMonth.getValue),
+          "day_of_month" -> Int(value.getDayOfMonth))),
+        EJsonType("_ejson.date"))).right
+      case Time(value)      => E.inj(ejson.Meta(
+        Obj(ListMap(
+          "hour"       -> Int(value.getHour),
+          "minute"     -> Int(value.getMinute),
+          "second"     -> Int(value.getSecond),
+          "nanosecond" -> Int(value.getNano))),
+        EJsonType("_ejson.time"))).right
+      case Interval(value)  =>
+        E.inj(ejson.Meta(
+          Obj(ListMap("seconds" -> Dec(value.toNanos / nanosPerSec))),
+          EJsonType("_ejson.interval"))).right
+      case Binary(value)    =>
+        E.inj(ejson.Meta(
+          Str(ejson.z85.encode(ByteVector.view(value.toArray))),
+          EJsonTypeSize("_ejson.binary", value.size))).right
+      case Id(value)        =>
+        // FIXME: This evilly guesses the backend-specific OID formats
+        E.inj(ejson.Meta(Str(value), EJsonType("_bson.oid"))).right
       case data             => data.left
     })
-  }
 }

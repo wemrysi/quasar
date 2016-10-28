@@ -22,4 +22,8 @@ trait PackageAliases extends quasar.pkg.PackageAliases {
   type CoGroupValue[V, V1, CC[X]]     = scalaz.Either3[V, CC[V] -> CC[V1], V1]
   type LazyPairOf[+A]                 = scalaz.Need[A -> A]
   type NeedStreamT[A]                 = scalaz.StreamT[scalaz.Need, A]
+
+  type jUri         = java.net.URI
+  type MaybeSelf[A] = A =?> A
+  type ToSelf[A]    = A => A
 }

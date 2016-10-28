@@ -19,7 +19,6 @@ package ygg.json
 import quasar.Predef._
 import scala.util.Sorting.quickSort
 import scala.annotation.switch
-import JValue._
 import java.lang.StringBuilder
 import scala.{ Iterator }
 
