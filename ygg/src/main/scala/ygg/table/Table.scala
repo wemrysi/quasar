@@ -91,21 +91,22 @@ trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
   def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
   def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
-  def toInternalTable(limit: Int): ETable \/ ITable                                                                                   = ???
-  def toExternalTable(): ETable                                                                                                       = ???
+  def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                     = ???
+  def toExternalTable(): ExternalTable                                                                                                = ???
 }
 
-// trait InternalTable extends Table {
-//   def slice: Slice
-// }
-// trait ExternalTable extends Table {
+trait InternalTable extends Table {
+  def slice: Slice
+}
+trait ExternalTable extends Table {
 
-// }
+}
 trait Table {
   type NeedTable = Need[Table]
+
   type Table <: ygg.table.Table
-  type ITable <: Table { def slice: Slice }
-  type ETable <: Table
+  type InternalTable <: Table with ygg.table.InternalTable
+  type ExternalTable <: Table with ygg.table.ExternalTable
 
   /**
     * Return an indication of table size, if known
@@ -178,8 +179,8 @@ trait Table {
     * less than `limit` rows, it will be converted to an `InternalTable`,
     * otherwise it will stay an `ExternalTable`.
     */
-  def toInternalTable(limit: Int): ETable \/ ITable
-  def toExternalTable(): ETable
+  def toInternalTable(limit: Int): ExternalTable \/ InternalTable
+  def toExternalTable(): ExternalTable
 
   /**
     * For each distinct path in the table, load all columns identified by the specified

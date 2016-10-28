@@ -301,11 +301,7 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
-    // def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
-    // def toExternalTable(): ETable                                                                                                       = ???
-    // def toInternalTable(): ETable \/ ITable                                                                                             = ???
-
-    def toInternalTable(): ETable \/ ITable                 = toInternalTable(yggConfig.maxSliceSize)
+    def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
     def load(tpe: JType): NeedTable                         = companion.load(this, tpe)
     def sort(sortKey: TransSpec1): NeedTable                = sort(sortKey, SortAscending)
@@ -2079,8 +2075,8 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
-    type ITable = InternalTable
-    type ETable = ExternalTable
+    type InternalTable = outer.InternalTable
+    type ExternalTable = outer.ExternalTable
 
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
@@ -2124,7 +2120,7 @@ trait BlockTableModule extends ColumnarTableModule {
     * slice and are completely in-memory. Because they fit in memory, we are
     * allowed more optimizations when doing things like joins.
     */
-  class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) {
+  class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
     def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
@@ -2144,7 +2140,7 @@ trait BlockTableModule extends ColumnarTableModule {
     )
   }
 
-  class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) {
+  class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
     import Table.{ Table => _, _ }
 
     def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
