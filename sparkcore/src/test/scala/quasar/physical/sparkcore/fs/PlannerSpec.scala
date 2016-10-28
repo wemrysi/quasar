@@ -47,6 +47,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   val qscore = Planner.qscriptCore[Fix]
 
   "Planner" should {
+
     "shiftedread" in {
 
       newSc.map ( sc => {
@@ -62,10 +63,10 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             val results = rdd.collect
             results.size must_== 1
-            results(0) must_== Data.Obj(ListMap(
+            results(0) must_== Data.Arr(List(Data.Int(0), Data.Obj(ListMap(
               "name" -> Data.Str("tom"),
               "age" -> Data.Int(28)
-            ))
+            ))))
         }
         sc.stop
       }).run.unsafePerformSync
@@ -99,7 +100,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       ok
     }
 
-    "core.reduce" in {
+    "core.reduce.max" in {
       newSc.map ( sc => {
         val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -126,6 +127,36 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       }).run.unsafePerformSync
       ok
     }
+
+    "core.reduce.avg" in {
+      newSc.map ( sc => {
+        val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+
+        val src: RDD[Data] = sc.parallelize(List(
+          Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(28)) + ("country" -> Data.Str("Poland"))),
+          Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
+        ))
+
+        def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+        def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
+        def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+        val reduce = Reduce(src, bucket, reducers, repair)
+
+        val state: SparkState[RDD[Data]] = alg(reduce)
+        state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+          case rdd =>
+            val results = rdd.collect
+            results.size must_== 2
+            results(1) must_== Data.Dec(28)
+            results(0) must_== Data.Dec(23)
+        }
+        sc.stop
+      }).run.unsafePerformSync
+      ok
+    }
+
 
     "core.filter" in {
       newSc.map ( sc => {
