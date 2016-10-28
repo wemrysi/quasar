@@ -60,24 +60,30 @@ trait TableCompanion[T <: ygg.table.Table] {
   type Table = T
   type NeedTable = Need[Table]
 
-  def apply(slices: NeedSlices, size: TableSize): Table
+  def apply(slices: NeedSlices, size: TableSize): T
 
-  def empty: Table
-  def constString(v: scSet[String]): Table
-  def constLong(v: scSet[Long]): Table
-  def constDouble(v: scSet[Double]): Table
-  def constDecimal(v: scSet[BigDecimal]): Table
-  def constDate(v: scSet[DateTime]): Table
-  def constBoolean(v: scSet[Boolean]): Table
-  def constNull: Table
-  def constEmptyObject: Table
-  def constEmptyArray: Table
-  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
+  def empty: T
+  def constString(v: scSet[String]): T
+  def constLong(v: scSet[Long]): T
+  def constDouble(v: scSet[Double]): T
+  def constDecimal(v: scSet[BigDecimal]): T
+  def constDate(v: scSet[DateTime]): T
+  def constBoolean(v: scSet[Boolean]): T
+  def constNull: T
+  def constEmptyObject: T
+  def constEmptyArray: T
+  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
-  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable
-  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table]
-  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
-  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
+  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table]
+  def join(left: T, right: T, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
+  def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+
+  def constSingletonTable(singleType: CType, column: Column): T
+  def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
+  def fromJson(data: Seq[JValue]): T
+  def load(table: T, tpe: JType): Need[T]
+  def singleton(slice: Slice): T
 }
 
 trait Table {
