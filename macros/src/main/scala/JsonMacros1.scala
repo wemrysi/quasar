@@ -22,6 +22,7 @@ import scala.reflect.macros.blackbox._
 import jawn._
 import java.util.UUID
 import scala.Any
+import scalaz.{ Tree => _, _ }, Scalaz._
 
 abstract class TreeFacades[C <: Context](val c: C) {
   outer =>
@@ -172,17 +173,15 @@ class JsonMacros1(val c: Context) {
 
 class JsonMacroImpls(val c: Context) {
   import c.universe._
-  import scalaz.\&/
 
-  type JMap = Map[UUID, Tree \&/ Tree]
+  type MacroFacade = Facade[Tree]
+  type JMap        = Map[UUID, Tree]
 
   def maybeUuid(k: String): Option[UUID] = scala.util.Try(UUID fromString k).toOption
 
-  class TreeFacade(prefix: Tree, uuidMap: JMap) extends Facade[Tree] {
-    def maybeTree(x: String) = maybeUuid(x) flatMap uuidMap.get
-
-    def keyOrLiteral(x: String): Tree   = maybeTree(x) flatMap (_.onlyThis) getOrElse q"$x"
-    def valueOrLiteral(x: String): Tree = maybeTree(x) flatMap (_.onlyThat) getOrElse jstring(x)
+  class TreeFacade(prefix: Tree, keyMap: JMap, valueMap: JMap) extends Facade[Tree] {
+    def keyOrLiteral(k: String): Tree   = maybeUuid(k) flatMap keyMap.get getOrElse q"$k"
+    def valueOrLiteral(x: String): Tree = maybeUuid(x) flatMap valueMap.get getOrElse jstring(x)
 
     def jtrue(): Tree                 = q"$prefix.jtrue"
     def jfalse(): Tree                = q"$prefix.jfalse"
@@ -251,25 +250,24 @@ class JsonMacroImpls(val c: Context) {
     }
   }
 
-  trait JsonMacroBase[M[_]] {
-    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[M[A]]
+  abstract class JsonMacroBase[M[_]: Traverse] {
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): scala.util.Try[Tree]
 
     def apply[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[M[A]] = c.prefix.tree match {
       case Args(stringParts, facade) =>
-        val A       = weakTypeOf[A]
-        var uuids   = Vector[UUID]()
-        val uuidMap = scm.Map[UUID, Tree \&/ Tree]()
+        val A      = weakTypeOf[A]
+        var uuids  = Vector[UUID]()
+        val keys   = scm.Map[UUID, Tree]()
+        val values = scm.Map[UUID, Tree]()
 
         args foreach { arg =>
-          val tpe   = c.typecheck(arg.tree).tpe
-          val uuid  = UUID.randomUUID
-          uuids     = uuids :+ uuid
-          val vtree = q"quasar.JEncoder.lift[$tpe, $A]($arg)"
+          val tpe      = c.typecheck(arg.tree).tpe
+          val uuid     = UUID.randomUUID
+          uuids        = uuids :+ uuid
+          values(uuid) = q"quasar.JEncoder.lift[$tpe, $A]($arg)"
 
           if (tpe <:< typeOf[String])
-            uuidMap(uuid) = \&/.Both(q"$arg", vtree)
-          else
-            uuidMap(uuid) = \&/.That(vtree)
+            keys(uuid) = q"$arg"
         }
 
         if (stringParts.size != uuids.size + 1)
@@ -284,23 +282,22 @@ class JsonMacroImpls(val c: Context) {
         }
         buf append stringParts.last
 
-        parse(buf.toString, new TreeFacade(facade, uuidMap.toMap))
+        parse(buf.toString, new TreeFacade(facade, keys.toMap, values.toMap)).fold(fail, t => c.Expr[M[A]](t))
 
       case tree =>
         fail("Unexpected tree shape for json interpolation macro: " + tree.getClass + "\n" + showRaw(tree))
     }
   }
 
-
   def singleImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[A]       = JsonMacroSingle[A](args: _*)
   def manyImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[Vector[A]] = JsonMacroMany[A](args: _*)
 
-  object JsonMacroSingle extends JsonMacroBase[scalaz.Id.Id] {
-    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[A] =
-      c.Expr[A](JParser.parse(json)(facade).fold(fail, x => x))
+  object JsonMacroSingle extends JsonMacroBase[Id.Id] {
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade) =
+      JParser.parse(json)(facade)
   }
   object JsonMacroMany extends JsonMacroBase[Vector] {
-    def parse[A: c.WeakTypeTag](json: String, facade: Facade[Tree]): c.Expr[Vector[A]] =
-      c.Expr[Vector[A]](JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}"))
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade) =
+      JParser.parseMany(json + "\n")(facade) map (x => q"${x.toVector}")
   }
 }

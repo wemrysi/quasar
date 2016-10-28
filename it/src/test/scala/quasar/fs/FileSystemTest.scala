@@ -129,7 +129,6 @@ object FileSystemTest {
     fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)        orElse
     fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)   orElse
     fsTestConfig(sparkcore.fs.hdfs.FsType, sparkcore.fs.hdfs.definition)     orElse
-    fsTestConfig(jsonfile.fs.FsType,        jsonfile.fs.definition)          orElse
     fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition(10000L)) orElse
     fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)
   }

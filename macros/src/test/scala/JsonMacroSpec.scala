@@ -16,7 +16,7 @@
 
 package quasar.macros
 
-import scala.{ Any, StringContext }
+import scala.StringContext
 import scala.reflect.ClassTag
 import scala.Predef.implicitly
 import quasar._, Predef._
@@ -28,12 +28,7 @@ class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[quasar.Data]
 class JawnJsonSpec extends AbstractJsonSpec[jawn.ast.JValue]()
 // class PrecogJsonSpec extends AbstractJsonSpec[ygg.json.JValue]()
 
-abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassTag[A]) extends quasar.Qspec {
-  implicit class Interpolator(sc: StringContext)(implicit val facade: jawn.Facade[A]) {
-    def json(args: Any*): A            = macro JsonMacroImpls.singleImpl[A]
-    def jsonSeq(args: Any*): Vector[A] = macro JsonMacroImpls.manyImpl[A]
-  }
-
+abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassTag[A]) extends JsonStringContexts[A] with quasar.QuasarSpecification {
   val xint: Int                          = 5
   val xlong: Long                        = 6L
   val xbigint: BigInt                    = BigInt(7)
