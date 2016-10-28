@@ -30,7 +30,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too

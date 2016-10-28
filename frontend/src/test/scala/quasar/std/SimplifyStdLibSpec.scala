@@ -31,7 +31,7 @@ import shapeless.Nat
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
 class SimplifyStdLibSpec extends StdLibSpec {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 

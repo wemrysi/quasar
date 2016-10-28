@@ -52,7 +52,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
 

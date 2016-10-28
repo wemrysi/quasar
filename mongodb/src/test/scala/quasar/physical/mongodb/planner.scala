@@ -51,7 +51,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   import jscore._
   import Planner._
   import CollectionUtil._
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   type EitherWriter[E, A] = EitherT[Writer[Vector[PhaseResult], ?], E, A]
 

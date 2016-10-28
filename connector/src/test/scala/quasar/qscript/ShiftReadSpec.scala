@@ -28,7 +28,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val rewrite = new Rewrite[Fix]
 

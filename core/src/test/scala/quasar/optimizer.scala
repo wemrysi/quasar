@@ -29,7 +29,7 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
 class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   "simplify" should {
 

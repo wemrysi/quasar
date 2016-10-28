@@ -29,7 +29,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait CompilerHelpers extends TermLogicalPlanMatchers {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {

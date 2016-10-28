@@ -32,7 +32,7 @@ import scalaz.scalacheck.ScalazArbitrary._
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   "QueryFile" should {
     "descendantFiles" >> {

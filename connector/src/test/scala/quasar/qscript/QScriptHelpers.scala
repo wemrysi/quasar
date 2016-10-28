@@ -32,7 +32,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait QScriptHelpers extends TTypes[Fix] {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   type QS[A] =
     (QScriptCore :\:

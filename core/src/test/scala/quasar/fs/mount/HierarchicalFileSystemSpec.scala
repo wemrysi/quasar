@@ -38,7 +38,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val transforms = QueryFile.Transforms[F]
   val unsafeq = QueryFile.Unsafe[FileSystem]

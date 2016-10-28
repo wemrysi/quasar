@@ -33,7 +33,7 @@ import shapeless.Sized
 
 // TODO: pull out MapFunc translation as MapFuncStdLibSpec
 class CoreMapStdLibSpec extends StdLibSpec {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val TODO: Result \/ Unit = Skipped("TODO").left
 

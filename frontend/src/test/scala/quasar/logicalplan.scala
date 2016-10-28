@@ -66,7 +66,7 @@ class LogicalPlanSpecs extends Spec {
   checkAll(traverse.laws[LogicalPlan])
 
   import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._, math._
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   "normalizeTempNames" should {
     "rename simple nested lets" in {

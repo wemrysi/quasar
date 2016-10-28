@@ -35,7 +35,7 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
   import quasar.Data._
   import quasar.SemanticError
   import quasar.LogicalPlan, LogicalPlan._
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   "MathLib" should {
     "type simple add with ints" in {

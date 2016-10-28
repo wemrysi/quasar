@@ -21,8 +21,6 @@ import quasar.Predef._
 import matryoshka._
 
 package object fixpoint {
-  val lpf = new quasar.frontend.LogicalPlanR[Fix]
-
   def SelectR(
     isDistinct:   IsDistinct,
     projections:  List[Proj[Fix[Sql]]],

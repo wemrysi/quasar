@@ -37,7 +37,7 @@ import shapeless.Nat
   * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
-  import quasar.sql.fixpoint.lpf
+  import quasar.frontend.fixpoint.lpf
 
   val notHandled = Skipped("not implemented in aggregation")
 
