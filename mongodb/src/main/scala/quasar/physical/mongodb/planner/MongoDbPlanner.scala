@@ -42,7 +42,8 @@ object MongoDbPlanner {
   import LP._
   import Planner._
   import WorkflowBuilder._
-  import quasar.frontend.fixpoint.lpf
+
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -884,31 +885,31 @@ object MongoDbPlanner {
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
         case Typecheck(expr, typ, cont, fb) =>
-          alignCondition(lt, rt)(cont).map(cont => lpf.typecheck(expr, typ, cont, fb))
+          alignCondition(lt, rt)(cont).map(cont => lpr.typecheck(expr, typ, cont, fb))
         case InvokeUnapply(And, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpf.invoke(And, v))
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(And, v))
         case InvokeUnapply(Or, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpf.invoke(Or, v))
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(Or, v))
         case InvokeUnapply(Not, Sized(t1)) =>
-          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(v => lpf.invoke(Not, v))
+          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(v => lpr.invoke(Not, v))
         case x @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
-            \/-(lpf.invoke(func, Func.Input2(left, right)))
+            \/-(lpr.invoke(func, Func.Input2(left, right)))
           else if (containsTableRefs(left, rt, right, lt))
             flip(func).fold[PlannerError \/ Fix[LP]](
               -\/(UnsupportedJoinCondition(Fix(x))))(
-              f => \/-(lpf.invoke(f, Func.Input2(right, left))))
+              f => \/-(lpr.invoke(f, Func.Input2(right, left))))
           else -\/(UnsupportedJoinCondition(Fix(x)))
 
         case Let(name, form, in) =>
-          alignCondition(lt, rt)(in).map(body => lpf.let(name, form, body))
+          alignCondition(lt, rt)(in).map(body => lpr.let(name, form, body))
 
         case x => \/-(Fix(x))
       }
 
     {
       case x @ InvokeUnapply(JoinFunc(f), Sized(l, r, cond)) =>
-        alignCondition(l, r)(cond).map(c => lpf.invoke(f, Func.Input3(l, r, c)))
+        alignCondition(l, r)(cond).map(c => lpr.invoke(f, Func.Input3(l, r, c)))
 
       case x => \/-(Fix(x))
     }
@@ -926,7 +927,7 @@ object MongoDbPlanner {
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
-          \/-(lpf.let(n, r, cont))
+          \/-(lpr.let(n, r, cont))
         case Type.Obj(_, _) =>
           \/-(Fix(x))
         case _ =>

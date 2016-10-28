@@ -35,7 +35,8 @@ import shapeless.{Annotations => _, Data => _, :: => _, _}
 trait Compiler[F[_]] {
   import identity._
   import JoinDir._
-  import quasar.frontend.fixpoint.lpf
+
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
 
   // HELPERS
   private type M[A] = EitherT[F, SemanticError, A]
@@ -303,13 +304,13 @@ trait Compiler[F[_]] {
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, name)        => BindingContext(Map(name -> lpf.free(stepName)))
-            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpf.free(stepName)))
-            case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpf.free(stepName)))
+            case ExprRelationAST(_, name)        => BindingContext(Map(name -> lpr.free(stepName)))
+            case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
+            case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
             case r                               => BindingContext(Map())
           }
-          next2    <- CompilerState.contextual(bc, tableContext(lpf.free(stepName), relations))(next)
-        } yield lpf.let(stepName, current, next2)
+          next2    <- CompilerState.contextual(bc, tableContext(lpr.free(stepName), relations))(next)
+        } yield lpr.let(stepName, current, next2)
       }.getOrElse(next)
     }
 
@@ -336,12 +337,12 @@ trait Compiler[F[_]] {
         Fix[LP] = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(structural.MakeObject(lpf.constant(Data.Str(name)), value))
+          Fix(structural.MakeObject(lpr.constant(Data.Str(name)), value))
         case (None, value) => value
       }
 
       fields.reduceOption((a,b) => Fix(structural.ObjectConcat(a, b)))
-        .getOrElse(lpf.constant(Data.Obj()))
+        .getOrElse(lpr.constant(Data.Obj()))
     }
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LP]] =
@@ -354,15 +355,15 @@ trait Compiler[F[_]] {
 
         case TableRelationAST(path, _) =>
           sandboxCurrent(canonicalize(path)).cata(
-            p => emit(lpf.read(p)),
+            p => emit(lpr.read(p)),
             fail(InvalidPathError(path, None)))
 
         case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
-            val leftFree: Fix[LP] = lpf.free(leftName)
-            val rightFree: Fix[LP] = lpf.free(rightName)
+            val leftFree: Fix[LP] = lpr.free(leftName)
+            val rightFree: Fix[LP] = lpr.free(rightName)
 
             (compileRelation(left) ⊛
               compileRelation(right) ⊛
@@ -370,7 +371,7 @@ trait Compiler[F[_]] {
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))(
                 compile0(clause).map(c =>
-                  lpf.invoke(
+                  lpr.invoke(
                     tpe match {
                       case LeftJoin             => set.LeftOuterJoin
                       case quasar.sql.InnerJoin => set.InnerJoin
@@ -378,8 +379,8 @@ trait Compiler[F[_]] {
                       case FullJoin             => set.FullOuterJoin
                     },
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
-              lpf.let(leftName, left0,
-                lpf.let(rightName, right0, join)))
+              lpr.let(leftName, left0,
+                lpr.let(rightName, right0, join)))
             }).join
       }
 
@@ -448,7 +449,7 @@ trait Compiler[F[_]] {
                               Fix(set.OrderBy(
                                 t,
                                 Fix(structural.MakeArrayN(keys: _*)),
-                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => lpf.constant(Data.Str(order.shows)) }: _*))))))
+                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => lpr.constant(Data.Str(order.shows)) }: _*))))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
@@ -456,7 +457,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(t =>
                                   if (syntheticNames.nonEmpty)
                                     Fix(set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(structural.DeleteField(acc, lpf.constant(Data.Str(field)))))))
+                                      Fix(structural.DeleteField(acc, lpr.constant(Data.Str(field)))))))
                                   else Fix(set.Distinct(t))).some
                               case _ => None
                             }
@@ -466,7 +467,7 @@ trait Compiler[F[_]] {
                                 CompilerState.rootTableReq.map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
                                     Fix(structural.DeleteField(acc,
-                                      lpf.constant(Data.Str(field))))))
+                                      lpr.constant(Data.Str(field))))))
 
                               pruned
                             }
@@ -559,14 +560,14 @@ trait Compiler[F[_]] {
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
-              Fix(structural.ObjectProject(obj, lpf.constant(Data.Str(name)))))
+              Fix(structural.ObjectProject(obj, lpr.constant(Data.Str(name)))))
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq(rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(structural.ObjectProject(table, lpf.constant(Data.Str(name)))))
+              else Fix(structural.ObjectProject(table, lpr.constant(Data.Str(name)))))
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
@@ -611,13 +612,13 @@ trait Compiler[F[_]] {
 
       case InvokeFunction(name, List(a1, a2)) =>
         (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
-          lpf.let(name, c1,
+          lpr.let(name, c1,
             relations.Cond(
               // TODO: Ideally this would use `is null`, but that doesn’t makes it
               //       this far (but it should).
-              relations.Eq(lpf.free(name), lpf.constant(Data.Null)).embed,
+              relations.Eq(lpr.free(name), lpr.constant(Data.Null)).embed,
               c2,
-              lpf.free(name)).embed)),
+              lpr.free(name)).embed)),
           functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
@@ -641,7 +642,7 @@ trait Compiler[F[_]] {
       case Match(expr, cases, default0) =>
         for {
           expr    <- compile0(expr)
-          default <- default0.fold(emit(lpf.constant(Data.Null)))(compile0)
+          default <- default0.fold(emit(lpr.constant(Data.Null)))(compile0)
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
               (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
@@ -650,18 +651,18 @@ trait Compiler[F[_]] {
         } yield cases
 
       case Switch(cases, default0) =>
-        default0.fold(emit(lpf.constant(Data.Null)))(compile0).flatMap(
+        default0.fold(emit(lpr.constant(Data.Null)))(compile0).flatMap(
           compileCases(cases, _) {
             case Case(cond, expr2) =>
               (compile0(cond) ⊛ compile0(expr2))((_, _))
           })
 
-      case IntLiteral(value) => emit(lpf.constant(Data.Int(value)))
-      case FloatLiteral(value) => emit(lpf.constant(Data.Dec(value)))
-      case StringLiteral(value) => emit(lpf.constant(Data.Str(value)))
-      case BoolLiteral(value) => emit(lpf.constant(Data.Bool(value)))
-      case NullLiteral() => emit(lpf.constant(Data.Null))
-      case Vari(name) => emit(lpf.free(Symbol(name)))
+      case IntLiteral(value) => emit(lpr.constant(Data.Int(value)))
+      case FloatLiteral(value) => emit(lpr.constant(Data.Dec(value)))
+      case StringLiteral(value) => emit(lpr.constant(Data.Str(value)))
+      case BoolLiteral(value) => emit(lpr.constant(Data.Bool(value)))
+      case NullLiteral() => emit(lpr.constant(Data.Null))
+      case Vari(name) => emit(lpr.free(Symbol(name)))
     }
   }
 

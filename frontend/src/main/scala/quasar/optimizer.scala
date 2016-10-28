@@ -35,7 +35,8 @@ object Optimizer {
   import quasar.std.StdLib._
   import set._
   import structural._
-  import quasar.frontend.fixpoint.lpf
+
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
 
   private def countUsageƒ(target: Symbol): Algebra[LP, Int] = {
     case Free(symbol) if symbol == target => 1
@@ -103,7 +104,7 @@ object Optimizer {
   private val shapeƒ: GAlgebra[(Fix[LP], ?), LP, Option[List[Fix[LP]]]] = {
     case Let(_, _, body) => body._2
     case Constant(Data.Obj(map)) =>
-      Some(map.keys.map(n => lpf.constant(Data.Str(n))).toList)
+      Some(map.keys.map(n => lpr.constant(Data.Str(n))).toList)
     case InvokeUnapply(DeleteField, Sized(src, field)) =>
       src._2.map(_.filterNot(_ == field._1))
     case InvokeUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
@@ -145,12 +146,12 @@ object Optimizer {
     (node match {
       case InvokeUnapply(DeleteField, Sized(src, field)) =>
         src._2._2.fold(
-          lpf.invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field)))) {
+          lpr.invoke(DeleteField, Func.Input2(preserveFree(src), preserveFree(field)))) {
           fields =>
             val name = uniqueName("src", fields)
-              lpf.let(name, preserveFree(src),
+              lpr.let(name, preserveFree(src),
                 Fix(MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> lpf.invoke(ObjectProject, Func.Input2(lpf.free(name), f))): _*)))
+                  f -> lpr.invoke(ObjectProject, Func.Input2(lpr.free(name), f))): _*)))
         }
       case lp => Fix(lp.map(preserveFree))
     },
@@ -163,7 +164,7 @@ object Optimizer {
   val elideTypeCheckƒ: Algebra[LP, Fix[LP]] = {
     case Let(n, b, Fix(Typecheck(Fix(Free(nf)), _, cont, _)))
         if n == nf =>
-      lpf.let(n, b, cont)
+      lpr.let(n, b, cont)
     case x => Fix(x)
   }
 
@@ -250,20 +251,20 @@ object Optimizer {
           EquiCond((l, r) => Fix(relations.Eq(rc(r), lc(l))))
 
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(t1)) =>
-          Func.Input1(t1).map(_._2).sequence[Component, Fix[LP]].map(ts => lpf.invoke(func, ts))
+          Func.Input1(t1).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
 
         case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(t1, t2)) =>
-          Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LP]].map(ts => lpf.invoke(func, ts))
+          Func.Input2(t1, t2).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
 
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(t1, t2, t3)) =>
-          Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LP]].map(ts => lpf.invoke(func, ts))
+          Func.Input3(t1, t2, t3).map(_._2).sequence[Component, Fix[LP]].map(ts => lpr.invoke(func, ts))
 
         case t => NeitherCond(Fix(t.map(_._1)))
       }
     }
 
     def assembleCond(conds: List[Fix[LP]]): Fix[LP] =
-      conds.foldLeft(lpf.constant(Data.True))((acc, c) => Fix(relations.And(acc, c)))
+      conds.foldLeft(lpr.constant(Data.True))((acc, c) => Fix(relations.And(acc, c)))
 
     def newJoin(lSrc: Fix[LP], rSrc: Fix[LP], comps: List[Component[Fix[LP]]]):
         State[NameGen, Fix[LP]] = {
@@ -282,15 +283,15 @@ object Optimizer {
       } yield {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
-          lpf.let(lName, lSrc,
-            lpf.let(lFName, Fix(Filter(lpf.free(lName), assembleCond(lefts.map(_.run0(lpf.free(lName)))))),
-              lpf.let(rName, rSrc,
-                lpf.let(rFName, Fix(Filter(lpf.free(rName), assembleCond(rights.map(_.run0(lpf.free(rName)))))),
-                  lpf.let(jName,
-                    Fix(InnerJoin(lpf.free(lFName), lpf.free(rFName),
-                      assembleCond(equis.map(_.run(lpf.free(lFName), lpf.free(rFName)))))),
-                    Fix(Filter(lpf.free(jName), assembleCond(
-                      others.map(_.run0(JoinDir.Left.projectFrom(lpf.free(jName)), JoinDir.Right.projectFrom(lpf.free(jName)))) ++
+          lpr.let(lName, lSrc,
+            lpr.let(lFName, Fix(Filter(lpr.free(lName), assembleCond(lefts.map(_.run0(lpr.free(lName)))))),
+              lpr.let(rName, rSrc,
+                lpr.let(rFName, Fix(Filter(lpr.free(rName), assembleCond(rights.map(_.run0(lpr.free(rName)))))),
+                  lpr.let(jName,
+                    Fix(InnerJoin(lpr.free(lFName), lpr.free(rFName),
+                      assembleCond(equis.map(_.run(lpr.free(lFName), lpr.free(rFName)))))),
+                    Fix(Filter(lpr.free(jName), assembleCond(
+                      others.map(_.run0(JoinDir.Left.projectFrom(lpr.free(jName)), JoinDir.Right.projectFrom(lpr.free(jName)))) ++
                       neithers.map(_.run0))))))))))
       }
     }

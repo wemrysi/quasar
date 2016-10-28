@@ -32,6 +32,8 @@ import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 object view {
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+
   /** Translate reads on view paths to the equivalent queries. */
   def readFile[S[_]](
     implicit
@@ -42,7 +44,6 @@ object view {
     S4: Mounting :<: S
   ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
-    import quasar.frontend.fixpoint.lpf
 
     val readUnsafe = ReadFile.Unsafe[S]
     val queryUnsafe = QueryFile.Unsafe[S]
@@ -58,7 +59,7 @@ object view {
       } yield h
 
     def openView(f: AFile, off: Natural, lim: Option[Positive]): FileSystemErrT[Free[S, ?], ReadHandle] = {
-      val readLP = addOffsetLimit(lpf.read(f), off, lim)
+      val readLP = addOffsetLimit(lpr.read(f), off, lim)
 
       def dataHandle(data: List[Data]): Free[S, ReadHandle] =
         for {
