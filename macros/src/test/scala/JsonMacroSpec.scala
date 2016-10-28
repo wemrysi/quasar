@@ -23,12 +23,12 @@ import quasar._, Predef._
 import ygg.macros._
 
 class ArgonautJsonSpec extends AbstractJsonSpec[argonaut.Json]()(argonaut.JawnParser.facade, implicitly[ClassTag[argonaut.Json]])
-class DataJsonSpec extends AbstractJsonSpec[quasar.Data]()
-class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[quasar.Data]]()(quasar.Data.EJsonDataFacade, implicitly)
+class DataJsonSpec extends AbstractJsonSpec[Data]()
+class EJsonDataJsonSpec extends AbstractJsonSpec[quasar.ejson.EJson[Data]]()(Data.EJsonDataFacade, implicitly)
 class JawnJsonSpec extends AbstractJsonSpec[jawn.ast.JValue]()
 // class PrecogJsonSpec extends AbstractJsonSpec[ygg.json.JValue]()
 
-abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassTag[A]) extends JsonStringContexts[A] with quasar.QuasarSpecification {
+abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassTag[A]) extends FacadeBasedInterpolator[A] with quasar.QuasarSpecification {
   val xint: Int                          = 5
   val xlong: Long                        = 6L
   val xbigint: BigInt                    = BigInt(7)
@@ -90,13 +90,13 @@ abstract class AbstractJsonSpec[A](implicit facade: jawn.Facade[A], ctag: ClassT
       json"$x" must_=== json"[ 5 ]"
     }
     "handle sequences" >> {
-      jsonSeq"""1 2 3""" must_=== Vector(json"1", json"2", json"3")
-      jsonSeq"""
+      jsonMany"""1 2 3""" must_=== Vector(json"1", json"2", json"3")
+      jsonMany"""
         [ 1, 2 ]
         [ 3, 4 ]
       """ must_=== Vector(json"[1, 2]", json"[3, 4]")
 
-      jsonSeq"""$xbool $xarr $xobj $xobj2""" must_=== Vector(jbool, jarr, jobj, jobj2)
+      jsonMany"""$xbool $xarr $xobj $xobj2""" must_=== Vector(jbool, jarr, jobj, jobj2)
     }
   }
 }

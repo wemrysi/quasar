@@ -18,31 +18,23 @@ package ygg.macros
 
 import quasar.Predef._
 import scala.{ Any, StringContext }
-import ygg.json._
 import jawn.Facade
 
-object Json {
-  implicit final class JsonStringContext(sc: StringContext) {
-    def json(args: Any*): JValue             = macro JsonMacros1.jsonInterpolatorImpl
-    def jsonMany(args: Any*): Vector[JValue] = macro JsonMacros1.jsonManyInterpolatorImpl
-  }
-}
-
-class JsonStringContexts[A] {
+class FacadeBasedInterpolator[A] {
   implicit class Interpolator(sc: StringContext)(implicit val facade: Facade[A]) {
-    def json(args: Any*): A            = macro JsonMacroImpls.singleImpl[A]
-    def jsonSeq(args: Any*): Vector[A] = macro JsonMacroImpls.manyImpl[A]
+    def json(args: Any*): A             = macro JawnFacadeMacros.singleImpl[A]
+    def jsonMany(args: Any*): Vector[A] = macro JawnFacadeMacros.manyImpl[A]
   }
 }
 
 object JsonMacros {
-  object EJson extends JsonStringContexts[quasar.ejson.EJson[quasar.Data]] {
+  object EJson extends FacadeBasedInterpolator[quasar.ejson.EJson[quasar.Data]] {
     implicit def ejsonFacade = quasar.Data.EJsonDataFacade
   }
-  object Argonaut extends JsonStringContexts[argonaut.Json] {
+  object Argonaut extends FacadeBasedInterpolator[argonaut.Json] {
     implicit def argonautFacade = argonaut.JawnParser.facade
   }
-  object Jawn extends JsonStringContexts[jawn.ast.JValue] {
+  object Jawn extends FacadeBasedInterpolator[jawn.ast.JValue] {
     implicit def janwFacade = jawn.ast.JawnFacade
   }
 }
