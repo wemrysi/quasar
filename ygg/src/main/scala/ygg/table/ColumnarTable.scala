@@ -27,10 +27,7 @@ class ColumnarTable extends ColumnarTableModule {
   def toJsonSeq(table: Table): Seq[JValue]                   = toJson(table).copoint
 
   object Table extends ThisTableCompanion
-  class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
-    /** XXX FIXME */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
-  }
+  class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
 }
 object ColumnarTable extends ColumnarTable {
   def empty: Table               = fromSlices(emptyStreamT(), ExactSize(0))

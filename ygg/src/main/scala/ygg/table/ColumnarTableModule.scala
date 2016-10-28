@@ -49,6 +49,7 @@ trait ColumnarTableModule {
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
   type Table <: ThisTable
+
   type TableCompanion <: ThisTableCompanion
 
   val Table: TableCompanion
@@ -299,6 +300,10 @@ trait ColumnarTableModule {
     self: Table =>
 
     type Table = outer.Table
+
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
+    def toExternalTable(): ETable                                                                                                       = ???
+    def toInternalTable(): ETable \/ ITable                                                                                             = ???
 
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
 
@@ -2082,6 +2087,9 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
+    type ITable = InternalTable
+    type ETable = ExternalTable
+
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 
@@ -2116,12 +2124,12 @@ trait BlockTableModule extends ColumnarTableModule {
       */
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable
 
-    def toInternalTable(): ExternalTable \/ InternalTable = toInternalTable(yggConfig.maxSliceSize)
+    override def toInternalTable(): ExternalTable \/ InternalTable = toInternalTable(yggConfig.maxSliceSize)
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.
       */
-    def toExternalTable: ExternalTable = new ExternalTable(slices, size)
+    override def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
   class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) {
@@ -2143,7 +2151,7 @@ trait BlockTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
@@ -2160,7 +2168,7 @@ trait BlockTableModule extends ColumnarTableModule {
   class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
+    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable       = toExternalTable.sort(sortKey, sortOrder)
@@ -2224,7 +2232,7 @@ trait BlockTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    override def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)

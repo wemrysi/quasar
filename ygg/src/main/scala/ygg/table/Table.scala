@@ -86,9 +86,18 @@ trait TableCompanion[T <: ygg.table.Table] {
   def singleton(slice: Slice): T
 }
 
+
+trait TemporaryTableStrut extends Table {
+  /** XXX FIXME */
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = ???
+  def toInternalTable(limit: Int): ETable \/ ITable                     = ???
+}
+
 trait Table {
   type NeedTable = Need[Table]
   type Table <: ygg.table.Table
+  type ITable <: Table { def slice: Slice }
+  type ETable <: Table
 
   /**
     * Return an indication of table size, if known
@@ -147,4 +156,14 @@ trait Table {
   def toJValues: Stream[JValue]
   def toJson: Need[Stream[JValue]]
   def zip(t2: Table): NeedTable
+
+  def canonicalize(minLength: Int, maxLength: Int): Table
+  def columns: ColumnMap
+  def load(tpe: JType): NeedTable
+  def mapWithSameSize(f: NeedSlices => NeedSlices): Table
+  def normalize: Table
+  def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]]
+  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
+  def toInternalTable(limit: Int): ETable \/ ITable
+  def toExternalTable: ETable
 }
