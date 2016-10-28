@@ -65,6 +65,9 @@ object SessionIO {
       .as(executed)
   }
 
+  def executeModule_(main: MainModule): SessionIO[Executed] =
+    executeModule(main, new RequestOptions)
+
   def evaluateQuery(query: XQuery, options: RequestOptions): SessionIO[QueryResults] =
     evaluateModule(defaultModule(query), options)
 

@@ -37,6 +37,7 @@ import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
 import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
+import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 object MongoDbQScriptPlanner {

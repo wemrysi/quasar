@@ -99,6 +99,9 @@ package object xquery {
   def declare(fname: QName): FunctionDecl.FunctionDeclDsl =
     FunctionDecl.FunctionDeclDsl(fname)
 
+  def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
+    declare(NSPrefix.local(fname))
+
   def freshVar[F[_]: NameGenerator: Functor]: F[String] =
     NameGenerator[F].prefixedName("$v")
 
