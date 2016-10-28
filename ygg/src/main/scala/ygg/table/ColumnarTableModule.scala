@@ -1122,7 +1122,7 @@ trait ColumnarTableModule {
     def takeSlice(start: Long, end: Long): Table =
       if (end <= 0 || end <= start) Table.empty else takeRange(start, end - start)
 
-    def takeRange(startIndex: Long, numberToTake: Long): Table = {
+    def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table = {
       def loop(stream: NeedSlices, readSoFar: Long): Need[NeedSlices] = stream.uncons flatMap {
         // Prior to first needed slice, so skip
         case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
@@ -2072,7 +2072,7 @@ trait BlockTableModule extends ColumnarTableModule {
       Need(List.fill(groupKeys.size)(xform))
     }
 
-    override def takeRange(startIndex: Long, numberToTake: Long): Table =
+    def takeRange(startIndex: Long, numberToTake: Long): Table =
       if (startIndex <= 0 && startIndex + numberToTake >= 1) this else Table.empty
   }
 
@@ -2093,7 +2093,7 @@ trait BlockTableModule extends ColumnarTableModule {
     override def force: NeedTable         = Need(this)
     override def paged(limit: Int): Table = this
 
-    override def takeRange(startIndex0: Long, numberToTake0: Long): Table = (
+    def takeRange(startIndex0: Long, numberToTake0: Long): Table = (
       if (startIndex0 > Int.MaxValue)
         new InternalTable(Slice.empty)
       else
@@ -2103,6 +2103,8 @@ trait BlockTableModule extends ColumnarTableModule {
 
   class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
     import Table.{ Table => _, _ }
+
+    def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
 
     def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
       val limit = limit0.toLong

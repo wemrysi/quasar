@@ -93,6 +93,9 @@ trait TemporaryTableStrut extends Table {
   def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
   def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                     = ???
   def toExternalTable(): ExternalTable                                                                                                = ???
+
+  def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
+  def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
 }
 
 trait InternalTable extends Table {
