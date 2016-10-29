@@ -20,7 +20,7 @@ curl -v -X POST $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
 
 sleep 5
 
-curl -v -X POST $CB:8091/pools/default -d memoryQuota=400
+curl -v -X POST $CB:8091/pools/default -d memoryQuota=400 -d indexMemoryQuota=1024
 
 sleep 5
 
