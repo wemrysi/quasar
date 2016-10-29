@@ -16,21 +16,23 @@
 
 package ygg.table
 
-import scalaz._
 import ygg._, common._, json._
 import trans._
 import quasar._
 import quasar.ejson.EJson
+import scalaz.{ Source => _, _ }
 
-object Table {
-  implicit val codec = DataCodec.Precise
+class TableSelector[A <: Table](val table: A { type Table = A }) {
+  def >>(): Unit = table.toVector foreach println
 
-  def fromData(data: Vector[Data]): Table = fromJson(data map dataToJValue)
-  def fromFile(file: jFile): Table        = fromJson((JParser parseManyFromFile file).orThrow)
-  def fromString(json: String): Table     = fromJson(Seq(JParser parseUnsafe json))
-  def fromJValues(json: JValue*): Table   = fromJson(json.toVector)
-  def fromJson(json: Seq[JValue]): Table  = BlockTable fromJson json
+  def filter(p: TransSpec[Source.type]) = table transform (root filter p)
+
+  def innerCross(that: A, left: String, right: String): A = {
+    val spec: TransSpec2 = InnerObjectConcat(WrapObject(Leaf(SourceLeft), left), WrapObject(Leaf(SourceRight), right))
+    table.companion.cross(table, that, None)(spec).value._2
+  }
 }
+object Table extends BlockTableBase
 
 trait TableConstructors[T <: ygg.table.Table] {
   type JsonRep
@@ -213,4 +215,9 @@ trait Table {
   def toJValues: Stream[JValue]
   def toJson: Need[Stream[JValue]]
   def zip(t2: Table): NeedTable
+
+  def slicesStream: Stream[Slice]
+  def toVector: Vector[JValue]
+  def toDataStream: Stream[Data]
+  def fields = slicesStream.flatMap(_.toJsonElements).toVector
 }

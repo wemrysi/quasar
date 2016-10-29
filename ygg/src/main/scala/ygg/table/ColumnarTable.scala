@@ -39,7 +39,19 @@ abstract class BlockTable extends BlockTableModule {
   def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 }
-object BlockTable extends BlockTable {
-  def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
-  def apply(file: jFile): Table  = apply(file.slurpString)
+
+abstract class BlockTableBase extends BlockTable {
+  import quasar._
+
+  implicit val codec = DataCodec.Precise
+
+  def apply(json: String): BaseTable = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
+  def apply(file: jFile): BaseTable  = apply(file.slurpString)
+
+  def fromData(data: Vector[Data]): BaseTable = fromJson(data map dataToJValue)
+  def fromFile(file: jFile): BaseTable        = fromJson((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): BaseTable     = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): BaseTable   = fromJson(json.toVector)
 }
+
+object BlockTable extends BlockTableBase

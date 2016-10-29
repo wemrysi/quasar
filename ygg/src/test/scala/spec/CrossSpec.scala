@@ -38,18 +38,14 @@ class CrossSpec extends TableQspec {
 
     def removeUndefined(jv: JValue): JValue = jv match {
       case JObject.Fields(jfields) => JObject(jfields collect { case JField(s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
-      case JArray(jvs) =>
-      JArray(jvs map { jv =>
-        removeUndefined(jv)
-        })
-      case v => v
+      case JArray(jvs)             => JArray(jvs map removeUndefined)
+      case v                       => v
     }
 
     val expected: Stream[JValue] = (
       for (lv <- l.data; rv <- r.data) yield
-        JObject(JField("left", removeUndefined(lv)) :: JField("right", removeUndefined(rv)) :: Nil)
+        jobject("left" -> removeUndefined(lv), "right" -> removeUndefined(rv))
     )
-
     val result = ltable.cross(rtable)(
       InnerObjectConcat(WrapObject(Leaf(SourceLeft), "left"), WrapObject(Leaf(SourceRight), "right"))
     )

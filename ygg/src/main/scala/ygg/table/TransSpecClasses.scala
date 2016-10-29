@@ -33,7 +33,7 @@ package object trans {
 }
 
 package trans {
-  sealed trait SourceType       extends AnyRef
+  sealed trait SourceType       extends Product with Serializable
   sealed trait Source1          extends SourceType
   sealed trait Source2          extends SourceType
   final case object Source      extends Source1
