@@ -56,11 +56,6 @@ trait ColumnarTableModule {
 
   implicit def tableCompanion: ygg.table.TableCompanion[Table] = Table
 
-  // implicit val TR = new TableRep[Table] {
-  //   type Companion = Table.type
-  //   def companion = Table
-  // }
-
   def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
     case x: GroupingSource                       => Vector(x)
     case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
@@ -365,21 +360,13 @@ trait ColumnarTableModule {
       }
     }
 
-    def paged(limit: Int): Table = {
-      val slices2 = slices flatMap { slice =>
-        StreamT.unfoldM(0) { idx =>
-          val back =
-            if (idx >= slice.size)
-              None
-            else
-              Some((slice.takeRange(idx, limit), idx + limit))
-
-          Need(back)
-        }
-      }
-
-      Table(slices2, size)
-    }
+    def paged(limit: Int): Table = mapWithSameSize(slices =>
+      slices flatMap (slice =>
+        StreamT.unfoldM(0)(idx =>
+          Need(idx >= slice.size option (slice.takeRange(idx, limit) -> (idx + limit)))
+        )
+      )
+    )
 
     def concat(t2: Table): Table = Table(
       slices ++ t2.slices,
@@ -1532,8 +1519,6 @@ trait BlockTableModule extends ColumnarTableModule {
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
     // TODO assert that this table only has one row
 
-    // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
-
     def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
 
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable =
@@ -1612,15 +1597,6 @@ trait BlockTableModule extends ColumnarTableModule {
 
       acc(slices, Nil, 0L).value
     }
-
-    /**
-      * Sorts the KV table by ascending or descending order of a transformation
-      * applied to the rows.
-      *
-      * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
-      */
-    // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable =
-    //   groupByN(Seq(sortKey), root, sortOrder, unique = false) map (_.headOption getOrElse Table.empty)
 
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable =
       groupByN(Seq(sortKey), root, sortOrder, unique = true) map (_.headOption getOrElse Table.empty)
