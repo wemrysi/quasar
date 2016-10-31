@@ -143,6 +143,9 @@ object data {
 
     val inj = free.injectFT[Task, S]
     def hoist = Hoist[EitherT[?[_], QResponse[S], ?]].hoist(inj)
+    def decodeUtf8(bytes: ByteVector): EitherT[FreeS, QResponse[S], String] =
+      EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
+        .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
 
     def errorsResponse(
       decodeErrors: IndexedSeq[DecodeError],
@@ -177,22 +180,30 @@ object data {
         .flatMap(dataStream => EitherT(inj(dataStream.runLog).flatMap(write(fPath, _))))
     }
 
-    (for {
-      fmt <- EitherT(MessageFormat.forMessage(req).point[FreeS]).leftMap(_.toResponse[S])
-      _   <- refineType(path).fold(
-        aDir => {
-         for {
-           files <- hoist(Zip.unzipFiles(req.body)
-                     .leftMap(err => InvalidMessageBodyFailure(err).toResponse[S]))
-           _     <- files.traverse { case (aFile, bytes) =>
-                     EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
-                       .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
-                       .flatMap(str => handleOne(rebaseA(aDir)(aFile), fmt, Process.emit(str)))
-                    }
-         } yield ()
-        },
-        aFile => handleOne(aFile, fmt, req.bodyAsText))
-    } yield QResponse.ok[S]).run.map(_.merge)
+    refineType(path).fold[EitherT[FreeS, QResponse[S], Unit]](
+      aDir =>
+        for {
+          files <- hoist(Zip.unzipFiles(req.body)
+                   .leftMap(err => InvalidMessageBodyFailure(err).toResponse[S]))
+          t <- files.partition(_._1 ≟ ArchiveMetadata.HiddenFile) match {
+            case ((_, meta) :: Nil, other) =>
+              decodeUtf8(meta).strengthR(other)
+            case _ =>
+              ???
+              // EitherT.left(InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S])
+          }
+          (meta, other) = t
+          _     <- other.traverse { case (aFile, bytes) =>
+                   // EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
+                   //   .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
+                   decodeUtf8(bytes)
+                     .flatMap(str => handleOne(rebaseA(aDir)(aFile), fmt, Process.emit(str)))
+                  }
+        } yield (),
+      aFile => for {
+        fmt <- EitherT(MessageFormat.forMessage(req).point[FreeS]).leftMap(_.toResponse[S])
+        _   <- handleOne(aFile, fmt, req.bodyAsText)
+      } yield ()).as(QResponse.ok[S]).run.map(_.merge)
   }
 
   private def zippedContents[S[_]](
