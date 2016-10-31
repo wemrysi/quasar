@@ -235,20 +235,6 @@ class BasicQueryEnablementSpec
 
       n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where _2.["bar"] >= 1 and _2.["bar"] <= 10) as v"""
     }
-
-    "convert a basic order by" in {
-      // select * from zips order by city
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
-          QCT.inj(Sort((),
-            NullLit(),
-            List((ProjectFieldR(HoleF, StrLit("city")), SortDir.Ascending)))))
-
-          val n1ql = n1qlFromQS(qs)
-
-          n1ql must_= """select value v from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _0 order by _0.["city"] ASC) as v"""
-      }
   }
 
 }
