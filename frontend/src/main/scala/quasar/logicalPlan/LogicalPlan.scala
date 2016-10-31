@@ -36,7 +36,16 @@ sealed abstract class LogicalPlan[A] extends Product with Serializable
 final case class Read[A](path: FPath) extends LogicalPlan[A]
 final case class Constant[A](data: Data) extends LogicalPlan[A]
 final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N])
-    extends LogicalPlan[A]
+    extends LogicalPlan[A] {
+  override def toString = {
+    func.shows + "(" + values.mkString(", ") + ")"
+  }
+  override def equals(that: scala.Any): Boolean = that match {
+    case that @ Invoke(_, _) =>
+      (this.func == that.func) && (this.values.unsized == that.values.unsized)
+    case _ => false
+  }
+}
 // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
 // https://issues.scala-lang.org/browse/SI-5900
 object InvokeUnapply {
