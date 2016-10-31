@@ -20,26 +20,20 @@ import ygg._, common._, json._
 import trans._
 import quasar._
 import quasar.ejson.EJson
-import scalaz.{ Source => _, _ }
+import scalaz.{ Source => _, _ }, Scalaz._
 
 class TableSelector[A <: Table](val table: A { type Table = A }) {
   def >>(): Unit = table.toVector foreach println
 
   def filter(p: TransSpec[Source.type]) = table transform (root filter p)
 
-  def innerCross(that: A, left: String, right: String): A = {
-    val spec: TransSpec2 = InnerObjectConcat(WrapObject(Leaf(SourceLeft), left), WrapObject(Leaf(SourceRight), right))
-    table.companion.cross(table, that, None)(spec).value._2
-  }
-}
-object Table extends BlockTableBase {
-  import trans.{ TransSpec1 => Unary }
-  import trans.{ TransSpec2 => Binary }
+  // def innerCross(that: A, left: String, right: String): A = {
+  //   val spec: TransSpec2 = InnerObjectConcat(WrapObject(Leaf(SourceLeft), left), WrapObject(Leaf(SourceRight), right))
 
-  implicit class TableMonadInfix[T <: ygg.table.Table](private val table: T)(implicit z: TableMonad[T]) {
-    def sort[F[_]: Monad](key: Unary): F[T] = z.sort[F](table)(key)
-  }
+  //   table.companion.cross(table, that, None)(spec).value._2
+  // }
 }
+object Table extends BlockTableBase
 
 trait TableConstructors[T <: ygg.table.Table] {
   type JsonRep
@@ -58,11 +52,15 @@ trait TableConstructors[T <: ygg.table.Table] {
   def fromSlices(data: Seq[Slice]): T
 }
 
-trait TableRep[T] {
-  type Table = T with ygg.table.Table
-  type Companion <: TableCompanion[Table]
+// trait TableRep[T] {
+//   type Table = T with ygg.table.Table
+//   type Companion <: TableCompanion[Table]
 
-  def companion: Companion
+//   def companion: Companion
+// }
+
+object TableCompanion {
+  def apply[A <: Table](implicit z: TableCompanion[A]): TableCompanion[A] = z
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
@@ -85,7 +83,21 @@ trait TableCompanion[T <: ygg.table.Table] {
 
   def merge(grouping: GroupingSpec)(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
   def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table]
-  def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+  // def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+
+  def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
+    Cogrouped[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
+
+  def sort[F[_]: Monad](table: T)(key: TransSpec1, order: DesiredSortOrder): F[T] = table match {
+    case _: SingletonTable => table.point[F]
+    case _: InternalTable  => sort[F](table.toExternalTable.asInstanceOf[T])(key, order)
+    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order) map (_.headOption getOrElse empty)
+  }
+  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder): F[Seq[T]] = {
+    ().point[F] map (_ =>
+      table.groupByN(keys, values, order, unique = false).value.toVector.map(x => x.asInstanceOf[T])
+    )
+  }
 
   def constSingletonTable(singleType: CType, column: Column): T
   def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
@@ -100,7 +112,7 @@ trait TemporaryTableStrutCompanion {
 }
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
+  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
   def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
   def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                     = ???
   def toExternalTable(): ExternalTable                                                                                                = ???
@@ -113,7 +125,8 @@ trait InternalTable extends Table {
   def slice: Slice
 }
 trait ExternalTable extends Table {
-
+}
+trait SingletonTable extends Table {
 }
 trait Table {
   type NeedTable = Need[Table]
@@ -121,6 +134,7 @@ trait Table {
   type Table <: ygg.table.Table
   type InternalTable <: Table with ygg.table.InternalTable
   type ExternalTable <: Table with ygg.table.ExternalTable
+  type SingletonTable <: Table with ygg.table.SingletonTable
 
   /**
     * Return an indication of table size, if known
@@ -171,7 +185,7 @@ trait Table {
     * @param sortKey The transspec to use to obtain the values to sort on
     * @param sortOrder Whether to sort ascending or descending
     */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
+  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
 
   /**
     * Sorts the KV table by ascending or descending order based on a seq of transformations
