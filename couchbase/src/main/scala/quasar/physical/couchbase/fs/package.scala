@@ -52,10 +52,11 @@ package object fs {
   )#M[A]
 
   object CBConnectException {
-    def unapply(ex: Throwable): Option[Throwable] = ex.getCause match {
-      case ex: ConnectException => ex.some
-      case _                    => none
-    }
+    def unapply(ex: Throwable): Option[ConnectException] =
+      ex.getCause match {
+        case ex: ConnectException => ex.some
+        case _                    => none
+      }
   }
 
   def interp[S[_]](
