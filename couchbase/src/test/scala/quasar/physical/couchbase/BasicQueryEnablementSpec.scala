@@ -94,15 +94,11 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` limit 1",
-      """select value v from (select value _4 from (select value _2[0:_1[0]] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[0:least(array_length(_2), _1[0])] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
     testSql2ToN1qlPending(
       "select name from `beer-sample` order by name",
       pending("#1545"))
-
-    testSql2ToN1ql(
-      """select address from `beer-sample` where name = "Brasserie de Silly"""",
-      """select value v from (select value {"address": array_concat(array_concat(array_concat([array_concat([_1[0]], [_1[1]])[0]], [array_concat([_1[0]], [_1[1]])[0][0][0]]), [array_concat([_1[0]], [_1[1]])[1]]), [(array_concat([_1[0]], [_1[1]])[1].["name"] = "Brasserie de Silly")])[2].["address"]} from (select value _0 from (select value [meta(v).id, ifmissing(v.`value`, v)] from `beer-sample` v) as _0 where array_concat(array_concat(array_concat([array_concat([_0[0]], [_0[1]])[0]], [array_concat([_0[0]], [_0[1]])[0][0][0]]), [array_concat([_0[0]], [_0[1]])[1]]), [(array_concat([_0[0]], [_0[1]])[1].["name"] = "Brasserie de Silly")])[3]) as _1) as v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",

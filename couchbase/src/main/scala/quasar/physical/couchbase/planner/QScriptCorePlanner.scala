@@ -145,7 +145,6 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                      "N1QL Reduce",
                      s"""  src:      ${n1ql(src)}
                         |  bucket:   $bN1ql
-                        |  reducers: $red
                         |  repair:   $repN1ql
                         |  n1ql:     $sN1ql""".stripMargin('|'))))
       } yield s
@@ -249,7 +248,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                     resultExprs   = fN1ql.wrapNel,
                     keyspace      = src,
                     keyspaceAlias = tmpName1)
-      slice    =  takeOrDrop.bimap(κ(s"0:$tmpName2[0]"), κ(s"$tmpName2[0]:")).merge
+      slice    =  takeOrDrop.bimap(
+                    κ(s"0:least(array_length($tmpName3), $tmpName2[0])"),
+                    κ(s"$tmpName2[0]:")
+                  ).merge
       slc      =  select(
                     value         = true,
                     resultExprs   = s"$tmpName3[$slice]".wrapNel,
