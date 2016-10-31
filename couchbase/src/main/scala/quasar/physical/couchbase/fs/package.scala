@@ -97,7 +97,7 @@ package object fs {
                    ).as(
                      ().right
                    ).handle {
-                     case ex: InvalidPasswordException =>
+                     case _: InvalidPasswordException =>
                        invalidCredentials(
                          "Unable to obtain a ClusterManager with provided credentials."
                        ).right[NonEmptyList[String]].left
