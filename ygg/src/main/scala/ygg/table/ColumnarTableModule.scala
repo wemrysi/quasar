@@ -271,14 +271,6 @@ trait ColumnarTableModule {
       )
     }
 
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table] = (
-      ((left sort lspec) |@| (right sort rspec))((l, r) =>
-        JoinOrder.KeyOrder -> (
-          l.cogroup(lspec, rspec, r)(root.emptyArray, root.emptyArray, joinSpec.wrapArrayValue) transform root(0)
-        )
-      )
-    )
-
     def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table] = {
       import CrossOrder._
       Need(orderHint match {
@@ -1947,85 +1939,9 @@ trait BlockTableModule extends ColumnarTableModule {
 
       Table(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
-
-    override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
-                                                                                rightKeySpec: TransSpec1,
-                                                                                joinSpec: TransSpec2): Need[JoinOrder -> Table] = {
-
-      def hashJoin(index: Slice, table: Table, flip: Boolean): NeedTable = {
-        val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
-
-        val initKeyTrans  = composeSliceTransform(tableKeySpec)
-        val initJoinTrans = composeSliceTransform2(joinSpec)
-
-        def joinWithHash(stream: NeedSlices, keyTrans: SliceTransform1[_], joinTrans: SliceTransform2[_], hashed: HashedSlice): NeedSlices = {
-
-          StreamT(stream.uncons flatMap {
-            case Some((head, tail)) =>
-              keyTrans.advance(head) flatMap {
-                case (keyTrans0, headKey) =>
-                  val headBuf  = new ArrayIntList(head.size)
-                  val indexBuf = new ArrayIntList(index.size)
-
-                  val rowMap = hashed.mapRowsFrom(headKey)
-
-                  @tailrec def loop(row: Int): Unit = if (row < head.size) {
-                    rowMap(row) { indexRow =>
-                      headBuf.add(row)
-                      indexBuf.add(indexRow)
-                      ()
-                    }
-                    loop(row + 1)
-                  }
-
-                  loop(0)
-
-                  val (index0, head0) = (index.remap(indexBuf), head.remap(headBuf))
-                  val advancedM = if (flip) {
-                    joinTrans.advance(head0, index0)
-                  } else {
-                    joinTrans.advance(index0, head0)
-                  }
-                  advancedM map {
-                    case (joinTrans0, slice) =>
-                      StreamT.Yield(slice, joinWithHash(tail, keyTrans0, joinTrans0, hashed))
-                  }
-              }
-
-            case None =>
-              Need(StreamT.Done)
-          })
-        }
-
-        composeSliceTransform(indexKeySpec).advance(index) map {
-          case (_, indexKey) =>
-            val hashed = HashedSlice(indexKey)
-            Table(joinWithHash(table.slices, initKeyTrans, initJoinTrans, hashed), UnknownSize)
-        }
-      }
-
-      // TODO: Let ColumnarTableModule do this for super.join and have toInternalTable
-      // take a transpec to compact by.
-
-      val left1  = left0.compact(leftKeySpec)
-      val right1 = right0.compact(rightKeySpec)
-
-      (left1.toInternalTable(), right1.toInternalTable()) match {
-        case (\/-(left), \/-(right)) =>
-          orderHint match {
-            case Some(JoinOrder.LeftOrder)  => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-            case Some(JoinOrder.RightOrder) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-            case _                          => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-          }
-
-        case (\/-(left), -\/(right)) => hashJoin(left.slice, right, flip = false) map (JoinOrder.RightOrder -> _)
-        case (-\/(left), \/-(right)) => hashJoin(right.slice, left, flip = true) map (JoinOrder.LeftOrder -> _)
-        case (-\/(left), -\/(right)) => super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
-      }
-    }
   }
 
-  abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
+  sealed abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
     type InternalTable = outer.InternalTable
     type ExternalTable = outer.ExternalTable
 
@@ -2038,7 +1954,7 @@ trait BlockTableModule extends ColumnarTableModule {
     def toExternalTable(): ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) {
+  final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) {
     // TODO assert that this table only has one row
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
@@ -2071,7 +1987,7 @@ trait BlockTableModule extends ColumnarTableModule {
     * slice and are completely in-memory. Because they fit in memory, we are
     * allowed more optimizations when doing things like joins.
     */
-  class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
+  final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
     def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
@@ -2091,7 +2007,7 @@ trait BlockTableModule extends ColumnarTableModule {
     )
   }
 
-  class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
+  final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
     import Table.{ Table => _, _ }
 
     def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)

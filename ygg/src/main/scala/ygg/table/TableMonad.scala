@@ -22,40 +22,65 @@ import trans._
 // json._
 // import quasar._
 // import quasar.ejson.EJson
-import scalaz.{ Source => _, _ }, Scalaz._
 import trans.{ TransSpec1 => Unary }
 import trans.{ TransSpec2 => Binary }
+import scalaz.{ Source => _, _ }
+import scalaz.Scalaz._
 
 trait TableMonad[T <: ygg.table.Table] {
-  def sort[F[_]: Monad](table: T)(key: Unary): F[T]
-  def transform[F[_]: Monad](table: T)(unary: Unary): F[T]
+  def transform(table: T)(unary: Unary): T
+  // def align(left: T, right: T)(lspec: Unary, rspec: Unary): T -> T
+  def cross(left: T, right: T)(crosser: Binary): T
+  def cogroup(left: T, right: T)(lkey: Unary, rkey: Unary, ltrans: Unary, rtrans: Unary, btrans: Binary): T
 
-  def align[F[_]: Monad](left: T, right: T)(lspec: Unary, rspec: Unary): F[T -> T]
-  def cross[F[_]: Monad](left: T, right: T)(crosser: Binary): F[T]
-  def join[F[_]: Monad](left: T, right: T)(lspec: Unary, rspec: Unary, joiner: Binary): F[T]
-  def cogroup[F[_]: Monad](left: T, right: T)(lkey: Unary, rkey: Unary, ltrans: Unary, rtrans: Unary, btrans: Binary): F[T]
+  def sort[F[_]: Monad](table: T)(key: Unary): F[T]
+  def groupByN[F[_]: Monad](table: T, keys: Seq[Unary], values: Unary): F[Seq[T]]
 }
 
-object TableMonad {
-  class ColumnarOp extends TableMonad[ColumnarTable.Table] {
+trait TableMonad0 {
+  implicit lazy val columnarTableMonad: TableMonad[ColumnarTable.Table] = new TableMonad.ColumnarTableMonad
+}
+object TableMonad extends TableMonad0 {
+  implicit lazy val blockTableMonad: TableMonad[BlockTable.Table] = new BlockTableMonad
+
+  class ColumnarTableMonad extends TableMonad[ColumnarTable.Table] {
     private type T = ColumnarTable.Table
 
-    def sort[F[_]: Monad](table: T)(key: Unary): F[T]                                                                         = ???
-    def transform[F[_]: Monad](table: T)(unary: Unary): F[T]                                                                  = ???
-    def align[F[_]: Monad](left: T, right: T)(lspec: Unary, rspec: Unary): F[T -> T]                                          = ???
+    def sort[F[_]: Monad](table: T)(key: Unary): F[T]                               = table.point[F]
+    // def align(left: T, right: T)(lspec: Unary, rspec: Unary): T -> T                = ???
+    def groupByN[F[_]: Monad](table: T, keys: Seq[Unary], values: Unary): F[Seq[T]] = ???
 
-    def cogroup[F[_]: Monad](left: T, right: T)(lkey: Unary, rkey: Unary, ltrans: Unary, rtrans: Unary, btrans: Binary): F[T] =
-      left.cogroup(lkey, rkey, right)(ltrans, rtrans, btrans).point[F]
+    def transform(table: T)(unary: Unary): T =
+      table transform unary
 
-    def join[F[_]: Monad](left: T, right: T)(lkey: Unary, rkey: Unary, joiner: Binary): F[T] = {
-      for {
-        l  <- sort[F](left)(lkey)
-        r  <- sort[F](right)(rkey)
-        co <- cogroup[F](l, r)(lkey, rkey, root.emptyArray, root.emptyArray, joiner.wrapArrayValue)
-        r  <- transform[F](co)(root(0))
-      }
-      yield r
+    def cogroup(left: T, right: T)(lkey: Unary, rkey: Unary, ltrans: Unary, rtrans: Unary, btrans: Binary): T =
+      left.cogroup(lkey, rkey, right)(ltrans, rtrans, btrans)
+
+    def cross(left: T, right: T)(crosser: Binary): T = (left cross right)(crosser)
+  }
+  class BlockTableMonad extends TableMonad[BlockTable.Table] {
+    import BlockTable._
+    private type T = BlockTable.Table
+    private def sortOrder = SortAscending
+
+    def sort[F[_]: Monad](table: T)(key: Unary): F[T] = table match {
+      case _: SingletonTable => table.point[F]
+      case _: InternalTable  => sort[F](table.toExternalTable)(key)
+      case _: ExternalTable  => groupByN[F](table, Seq(key), root) map (_.headOption getOrElse Table.empty)
     }
-    def cross[F[_]: Monad](left: T, right: T)(spec: Binary): F[T] = (left.point[F] |@| right.point[F])((l, r) => (l cross r)(spec))
+
+    def groupByN[F[_]: Monad](table: T, keys: Seq[Unary], values: Unary): F[Seq[T]] = {
+      ().point[F] map (_ =>
+        table.groupByN(keys, values, SortAscending, unique = false).value.toVector
+      )
+    }
+
+    def transform(table: T)(unary: Unary): T =
+      table transform unary
+
+    def cogroup(left: T, right: T)(lkey: Unary, rkey: Unary, ltrans: Unary, rtrans: Unary, btrans: Binary): T =
+      left.cogroup(lkey, rkey, right)(ltrans, rtrans, btrans)
+
+    def cross(left: T, right: T)(crosser: Binary): T = (left cross right)(crosser)
   }
 }

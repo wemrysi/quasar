@@ -32,7 +32,14 @@ class TableSelector[A <: Table](val table: A { type Table = A }) {
     table.companion.cross(table, that, None)(spec).value._2
   }
 }
-object Table extends BlockTableBase
+object Table extends BlockTableBase {
+  import trans.{ TransSpec1 => Unary }
+  import trans.{ TransSpec2 => Binary }
+
+  implicit class TableMonadInfix[T <: ygg.table.Table](private val table: T)(implicit z: TableMonad[T]) {
+    def sort[F[_]: Monad](key: Unary): F[T] = z.sort[F](table)(key)
+  }
+}
 
 trait TableConstructors[T <: ygg.table.Table] {
   type JsonRep
@@ -78,7 +85,6 @@ trait TableCompanion[T <: ygg.table.Table] {
 
   def merge(grouping: GroupingSpec)(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
   def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table]
-  def join(left: T, right: T, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
   def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 
   def constSingletonTable(singleType: CType, column: Column): T
