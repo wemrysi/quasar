@@ -98,10 +98,6 @@ class BasicQueryEnablementSpec
       "select name from `beer-sample` limit 1",
       """select value v from (select value _4 from (select value _2[0:least(array_length(_2), _1[0])] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
 
-    testSql2ToN1qlPending(
-      "select name from `beer-sample` order by name",
-      pending("#1545"))
-
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
       """select value v from (select value object_add({}, "0", count(_0)) from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _0) as v""")
@@ -217,25 +213,6 @@ class BasicQueryEnablementSpec
       val n1ql = n1qlFromQS(qs)
 
       n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where (_2.["bar"] = "baz")) as v"""
-    }
-
-    "convert a Between filter" in {
-      // select * from foo where bar between 1 and 10
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            Free.point(RightSide))),
-          QCT.inj(Filter((),
-            Free.roll(Between(
-              ProjectFieldR(HoleF, StrLit("bar")),
-              IntLit(1),
-              IntLit(10))))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= """select value v from (select value _2 from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2 where _2.["bar"] >= 1 and _2.["bar"] <= 10) as v"""
     }
   }
 
