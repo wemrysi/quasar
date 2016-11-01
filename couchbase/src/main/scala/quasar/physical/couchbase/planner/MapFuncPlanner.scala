@@ -17,13 +17,14 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.NameGenerator
+import quasar.{DataCodec, NameGenerator}
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
 import quasar.common.PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._, N1QL._, Select._
+import quasar.physical.couchbase.common.CBDataCodec
 import quasar.qscript, qscript._
 import quasar.std.StdLib.string._
 
@@ -34,14 +35,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   extends Planner[F, MapFunc[T, ?]] {
   import MapFuncs._
 
+  implicit val codec = CBDataCodec
+
   def plan: AlgebraM[M, MapFunc[T, ?], N1QL] = {
     // nullary
     case Constant(v) =>
-      EitherT(
-        v.cataM(EJson.fromEJson).bimap[PlannerError, N1QL](
-          κ(NonRepresentableEJson(v.shows)),
-          PartialQueryString(_)
-        ).point[PR])
+      EitherT(v.cataM(quasar.Data.fromEJson) >>= (d =>
+        DataCodec.render(d).bimap(
+          κ(NonRepresentableEJson(v.shows): PlannerError),
+          partialQueryString(_)
+        ).point[PR]
+      ))
     case Undefined() =>
       partialQueryString("null").point[M]
 

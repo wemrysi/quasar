@@ -44,6 +44,8 @@ object common {
 
   final case class Cursor(result: Vector[Data])
 
+  val CBDataCodec = DataCodec.Precise
+
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
       .toIList.unite.uncons(
