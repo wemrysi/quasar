@@ -1,8 +1,7 @@
 {
     "name": "trivial group by",
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "skip"
+        "postgresql":        "pending"
     },
     "description": "Should project the result at the root (not under 'value').",
     "data": "largeZips.data",
