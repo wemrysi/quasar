@@ -1,16 +1,12 @@
 {
     "name": "trivial group by",
     "backends": {
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
-        "mongodb_3_2":       "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "description": "Should project the result at the root (not under 'value').",
-    "data": "zips.data",
-    "query": "select city, sum(pop) as totalPop from zips group by city",
+    "data": "largeZips.data",
+    "query": "select city, sum(pop) as totalPop from largeZips group by city",
     "predicate": "containsAtLeast",
-    "expected": [{ "city": "BOULDER", "totalPop": 110948 }]
+    "ignoreFieldOrder": true,
+    "expected": [{ "totalPop": 110948, "city": "BOULDER" }]
 }

@@ -19,7 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.{Data, LogicalPlan, Planner => QPlanner}
-import quasar.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
@@ -99,7 +99,7 @@ object queryfile {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
                          // TODO: Change to include the QScript context when supported
-                         LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+                         LogicalPlan.Constant(Data.Str(s)), Some(mlerr.shows)))
 
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))

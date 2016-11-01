@@ -17,22 +17,23 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, PhaseResults, PhaseResultT}
+import quasar.{Data, DataCodec, LogicalPlan}
+import quasar.common.{PhaseResults, PhaseResultT}
+import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, eitherT._, free._, ski._
 import quasar.fs._
-import quasar.PhaseResult.{Detail, Tree}
 import quasar.physical.couchbase._, common._, N1QL._, planner._
 import quasar.qscript.{Read => _, _}
-import quasar.RenderTree.ops._
 
 import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
+import com.couchbase.client.java.transcoder.JsonTranscoder
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import pathy.Path._
 import rx.lang.scala._, JavaConverters._
@@ -47,6 +48,10 @@ object queryfile {
   implicit class LiftP[F[_]: Monad, A](p: F[A]) {
     val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
+
+  implicit val codec = DataCodec.Precise
+
+  val jsonTranscoder = new JsonTranscoder
 
   // TODO: Streaming
   def interpret[S[_]](
@@ -81,7 +86,11 @@ object queryfile {
                   e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
                   _.point[Free[S, ?]].liftP
                 ).merge
-      docs   <- r.traverse(d => GenUUID.Ops[S].asks(uuid =>
+      rObj   <- EitherT(r.traverse(d => DataCodec.render(d).bimap(
+                  err => FileSystemError.writeFailed(d, err.shows),
+                  str => jsonTranscoder.stringToJsonObject(str))
+                ).point[PhaseResultT[Free[S, ?], ?]])
+      docs   <- rObj.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
                     JsonObject
@@ -126,7 +135,7 @@ object queryfile {
   ): Free[S, FileSystemError \/ Vector[Data]] =
     (for {
       h <- results.get(handle).toRight(FileSystemError.unknownResultHandle(handle))
-      r <- EitherT(resultsFromCursor(h).point[Free[S, ?]])
+      r <- resultsFromCursor(h).point[FileSystemErrT[Free[S, ?], ?]]
       _ <- results.put(handle, r._1).liftM[FileSystemErrT]
     } yield r._2).run
 
@@ -176,24 +185,24 @@ object queryfile {
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
-  ): Plan[S, Vector[JsonObject]] = {
+  ): Plan[S, Vector[Data]] = {
     val n1qlStr = outerN1ql(n1ql)
 
     for {
-      _       <- prtell[Plan[S, ?]](Vector(Detail(
+      _       <- prtell[Plan[S, ?]](Vector(detail(
                    "N1QL Results",
                    s"""  n1ql: $n1qlStr""".stripMargin('|'))))
       ctx     <- context.ask.liftP
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
                  )).into.liftP
-      r       <- lift(Task.delay(
+      r       <- EitherT(lift(Task.delay(
                    bkt.query(n1qlQuery(n1qlStr))
                      .allRows
                      .asScala
                      .toVector
-                     .map(_.value)
-                 )).into.liftP
+                     .traverse(rowToData)
+                 )).into.liftM[PhaseResultT])
     } yield r
   }
 
@@ -222,17 +231,17 @@ object queryfile {
     val tell = prtell[Plan[S, ?]] _
 
     for {
-      _    <- tell(Vector(Tree("lp", lp.render)))
+      _    <- tell(Vector(tree("lp", lp)))
       qs   <- convertToQScriptRead[
                 Fix,
                 Plan[S, ?],
                 QScriptRead[Fix, ?]
               ](lc)(lp)
-      _    <- tell(Vector(Tree("QS post convertToQScriptRead", qs.render)))
+      _    <- tell(Vector(tree("QS post convertToQScriptRead", qs)))
       shft =  shiftRead(qs).transCata(
                 SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
                   .simplifyJoin(idPrism.reverseGet))
-      _    <- tell(Vector(Tree("QS post shiftRead", qs.render)))
+      _    <- tell(Vector(tree("QS post shiftRead", qs)))
       n1ql <- shft.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))

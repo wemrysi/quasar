@@ -25,8 +25,10 @@ import matryoshka.Fix
 sealed abstract class JoinDir(val name: String) {
   import structural.ObjectProject
 
+  val lpr = new quasar.frontend.LogicalPlanR[Fix]
+
   val data: Data = Data.Str(name)
-  val const: Fix[LP] = LP.Constant(data)
+  val const: Fix[LP] = lpr.constant(data)
   def projectFrom(lp: Fix[LP]): Fix[LP] = Fix(ObjectProject(lp, const))
 }
 

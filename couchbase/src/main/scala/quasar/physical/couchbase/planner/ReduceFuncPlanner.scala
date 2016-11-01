@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.PhaseResult.Detail
+import quasar.common.PhaseResult.detail
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._
 import quasar.qscript, qscript._
@@ -31,7 +31,15 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
 
   def plan: AlgebraM[M, ReduceFunc, N1QL] = {
     case Arbitrary(a)     =>
-      ???
+      val aN1ql   = n1ql(a)
+      val n1qlStr = s"min($aN1ql)"
+      prtell[M](Vector(detail(
+        "N1QL Arbitrary",
+        s"""  a:    $aN1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case Avg(a)           =>
       partialQueryString(s"avg(${n1ql(a)})").point[M]
     case Count(a)         =>
@@ -48,7 +56,7 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
       val kN1ql   = n1ql(k)
       val vN1ql   = n1ql(v)
       val n1qlStr = s"object_add({}, $kN1ql, $vN1ql)"
-      prtell[M](Vector(Detail(
+      prtell[M](Vector(detail(
         "N1QL UnshiftMap",
         s"""  k:    $kN1ql
            |  v:    $vN1ql

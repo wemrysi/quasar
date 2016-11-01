@@ -18,6 +18,7 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.ejson, ejson._
+import quasar.physical.couchbase.planner.unimplemented
 import quasar.Planner.PlannerError
 
 import argonaut.Argonaut._
@@ -35,10 +36,10 @@ object EJson {
   }
 
   def fromExtension: AlgebraM[PlannerError \/ ?, Extension, String] = {
-    case ejson.Meta(v, meta) => ???
+    case ejson.Meta(v, meta) => unimplemented("ejson.Meta")
     case ejson.Map(v)        => v.toMap.asJson.nospaces.right
-    case ejson.Byte(v)       => ???
-    case ejson.Char(v)       => ???
+    case ejson.Byte(v)       => unimplemented("ejson.Byte")
+    case ejson.Char(v)       => unimplemented("ejson.Char")
     case ejson.Int(v)        => v.shows.right
   }
 

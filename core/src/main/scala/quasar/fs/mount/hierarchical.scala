@@ -17,7 +17,8 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.{LogicalPlan, PhaseResults}
+import quasar.LogicalPlan
+import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._, eitherT._
@@ -320,10 +321,10 @@ object hierarchical {
     out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
       lp.cataM[M, Unit] {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-        case ReadF(p) => mountFor(mkAbsolute(rootDir, p))
-        case _        => ().point[M]
+        case Read(p) => mountFor(mkAbsolute(rootDir, p))
+        case _       => ().point[M]
       }.run.run(initMnt) match {
-        // NB: If mnt is empty, then there were no `ReadF`, so we should
+        // NB: If mnt is empty, then there were no `Read`, so we should
         // be able to get a result without needing an actual filesystem,
         // and we just pass it to an arbitrary mount, if there is at
         // least one present.

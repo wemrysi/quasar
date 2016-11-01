@@ -17,7 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, PhaseResult, PhaseResults, PhaseResultT}
+import quasar.{LogicalPlan => LP}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
@@ -31,6 +32,8 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait QScriptHelpers extends TTypes[Fix] {
+  import quasar.frontend.fixpoint.lpf
+
   type QS[A] =
     (QScriptCore :\:
       ThetaJoin :\:
@@ -71,7 +74,7 @@ trait QScriptHelpers extends TTypes[Fix] {
     Free.roll(ProjectIndex(src, field))
 
   def lpRead(path: String): Fix[LP] =
-    LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
   val prov = new provenance.ProvenanceT[Fix]
 
