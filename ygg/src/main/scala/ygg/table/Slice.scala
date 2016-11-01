@@ -18,7 +18,6 @@ package ygg.table
 
 import ygg._, common._, json._, data._
 import scalaz.{ =?> => _, _ }, Ordering._
-import ygg.macros.Spire._
 import scala.math.min
 
 sealed trait Slice {
@@ -508,7 +507,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val retained = definedness match {
       case AnyDefined =>
         doto(new ArrayIntList) { acc =>
-          cforRange(0 until filter.size)(i => if (cols.values exists (_ isDefinedAt i)) discard(acc.add(i)))
+          0 until filter.size foreach (i => if (cols.values exists (_ isDefinedAt i)) discard(acc.add(i)))
         }
 
       case AllDefined =>
@@ -517,10 +516,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
             case (ColumnRef(_, _: CNumericType[_]), _) => true
             case (ColumnRef(_, _), _)                  => false
           }
+          val grouped = numCols groupBy (_._1.selector)
 
-          val grouped = numCols groupBy { case (ColumnRef(cpath, _), _) => cpath }
-
-          cforRange(0 until filter.size) { i =>
+          0 until filter.size foreach { i =>
             def numBools  = grouped.values map (_.values.toArray exists (_ isDefinedAt i))
             def numBool   = numBools reduce (_ && _)
             def otherBool = otherCols.values.toArray forall (_ isDefinedAt i)

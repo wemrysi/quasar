@@ -19,7 +19,6 @@ package ygg.table
 import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import ygg.json._
-import ygg.macros.Spire._
 
 sealed trait RValue extends Product with Serializable
 final case class RObject(fields: Map[String, RValue]) extends RValue
@@ -278,13 +277,10 @@ object CValueType {
 // Homogeneous arrays
 //
 final case class CArray[A](value: Array[A], arrayType: CArrayType[A]) extends CWrappedValue[Array[A]] {
-  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = (as.length == bs.length) && {
-    cforRange(0 until as.length){ i =>
-      if (as(i) != bs(i))
-        return false
-    }
-    true
-  }
+  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = (
+       (as.length == bs.length)
+    && (as corresponds bs)(_ == _)
+  )
 
   private final def equiv(a: Any, b: Any, elemType: CValueType[_]): Boolean = elemType match {
     case CBoolean             => leafEquiv(a.asInstanceOf[Array[Boolean]], b.asInstanceOf[Array[Boolean]])

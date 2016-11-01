@@ -88,15 +88,16 @@ trait TableCompanion[T <: ygg.table.Table] {
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     Cogrouped[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
 
+  private def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
+  private def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
+
   def sort[F[_]: Monad](table: T)(key: TransSpec1, order: DesiredSortOrder): F[T] = table match {
-    case _: SingletonTable => table.point[F]
-    case _: InternalTable  => sort[F](table.toExternalTable.asInstanceOf[T])(key, order)
+    case _: SingletonTable => Monad[F].point(table)
+    case _: InternalTable  => sort[F](fixTable[T](table.toExternalTable))(key, order)
     case _: ExternalTable  => groupByN[F](table, Seq(key), root, order) map (_.headOption getOrElse empty)
   }
   def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder): F[Seq[T]] = {
-    ().point[F] map (_ =>
-      table.groupByN(keys, values, order, unique = false).value.toVector.map(x => x.asInstanceOf[T])
-    )
+    fixTables[T](table.groupByN(keys, values, order, unique = false).value).point[F]
   }
 
   def constSingletonTable(singleType: CType, column: Column): T

@@ -19,7 +19,6 @@ package ygg.data
 import ygg._, common._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
-import ygg.macros.Spire._
 
 final class RawBitSet(val bits: Array[Int]) {
   def length: Int = bits.length
@@ -70,9 +69,7 @@ object RawBitSet {
 
   final def toArray(bits: Array[Int]): Array[Int] = {
     val len  = bits.length
-    var size = 0
-    cforRange(0 until len)(i => size += bitCount(bits(i)))
-    val ints = new Array[Int](size)
+    val ints = new Array[Int](bits.map(bitCount).sum)
 
     @inline
     @tailrec

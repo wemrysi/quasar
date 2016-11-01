@@ -363,7 +363,7 @@ trait ColumnarTableModule {
     def paged(limit: Int): Table = mapWithSameSize(slices =>
       slices flatMap (slice =>
         StreamT.unfoldM(0)(idx =>
-          Need(idx >= slice.size option (slice.takeRange(idx, limit) -> (idx + limit)))
+          Need(idx < slice.size option (slice.takeRange(idx, limit) -> (idx + limit)))
         )
       )
     )
