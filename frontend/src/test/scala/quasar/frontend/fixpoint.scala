@@ -14,25 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.sql
-
-import quasar.{Data, LogicalPlan => LP}
-import quasar.Predef.String
-import quasar.std.StdLib._
+package quasar.frontend
 
 import matryoshka.Fix
 
-sealed abstract class JoinDir(val name: String) {
-  import structural.ObjectProject
-
-  val lpr = new quasar.frontend.LogicalPlanR[Fix]
-
-  val data: Data = Data.Str(name)
-  val const: Fix[LP] = lpr.constant(data)
-  def projectFrom(lp: Fix[LP]): Fix[LP] = Fix(ObjectProject(lp, const))
-}
-
-object JoinDir {
-  final case object Left extends JoinDir("left")
-  final case object Right extends JoinDir("right")
+object fixpoint {
+  val lpf = new LogicalPlanR[Fix]
 }

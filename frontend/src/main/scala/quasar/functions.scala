@@ -96,7 +96,7 @@ sealed abstract class GenericFunc[N <: Nat] {
   def untyper0: Func.Untyper[N]
 
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
-    LP.InvokeF[A, N](this, args)
+    LP.Invoke[A, N](this, args)
 
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
     untyper0((domain, codomain), tpe)

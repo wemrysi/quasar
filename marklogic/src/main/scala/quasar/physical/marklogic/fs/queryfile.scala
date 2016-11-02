@@ -99,7 +99,7 @@ object queryfile {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
                          // TODO: Change to include the QScript context when supported
-                         LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+                         LogicalPlan.Constant(Data.Str(s)), Some(mlerr.shows)))
 
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))

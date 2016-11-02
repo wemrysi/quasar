@@ -40,6 +40,8 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
+  import quasar.frontend.fixpoint.lpf
+
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
@@ -63,7 +65,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
     /** Identify constructs that are expected not to be implemented. */
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
-      case LogicalPlan.InvokeF(func, _) => shortCircuit(backend, func, args)
+      case LogicalPlan.Invoke(func, _) => shortCircuit(backend, func, args)
       case _ => ().right
     }
 
@@ -77,7 +79,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       } yield rez
 
     def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
-      prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
+      prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
     final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
@@ -108,8 +110,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
           lp = prg(
                 (0 until args.length).toList.map(idx =>
                   Fix(StructuralLib.ObjectProject(
-                    LogicalPlan.Read(coll.asFile),
-                    LogicalPlan.Constant(Data.Str("arg" + idx))))))
+                    lpf.read(coll.asFile),
+                    lpf.constant(Data.Str("arg" + idx))))))
           t  <- compile(qm, coll, lp).point[Task].unattempt
           (wf, resultField) = t
 

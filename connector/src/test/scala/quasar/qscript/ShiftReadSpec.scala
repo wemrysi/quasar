@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan => LP}
+import quasar.Data
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
@@ -28,6 +28,8 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
+  import quasar.frontend.fixpoint.lpf
+
   val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {
@@ -52,7 +54,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
   "shift a simple aggregated read" in {
     convert(listContents.some,
       structural.MakeObject(
-        LP.Constant(Data.Str("0")),
+        lpf.constant(Data.Str("0")),
         agg.Count(lpRead("/foo/bar")).embed).embed).map(
       transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
         .transCata(rewrite.normalize[QST])) must

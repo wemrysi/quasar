@@ -32,6 +32,8 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait QScriptHelpers extends TTypes[Fix] {
+  import quasar.frontend.fixpoint.lpf
+
   type QS[A] =
     (QScriptCore :\:
       ThetaJoin :\:
@@ -72,7 +74,7 @@ trait QScriptHelpers extends TTypes[Fix] {
     Free.roll(ProjectIndex(src, field))
 
   def lpRead(path: String): Fix[LP] =
-    LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
   val prov = new provenance.ProvenanceT[Fix]
 
