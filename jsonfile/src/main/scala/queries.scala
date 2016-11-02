@@ -32,6 +32,8 @@ final case class FPlan(sql: String, lp: Fix[LogicalPlan]) {
 }
 
 object FPlan {
+  val lpf = new quasar.frontend.LogicalPlanR[Fix]
+
   def compile(query: String): String \/ Fix[LogicalPlan] =
     for {
       select <- fixParser.parse(Query(query)).leftMap(_.toString)
@@ -47,7 +49,7 @@ object FPlan {
 
   def fromFile(file: jFile): FPlan = FPlan(
     file.slurpString,
-    LogicalPlan.Read(
+    lpf.read(
       sandboxCurrent(
         posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file.getPath).get
       ).get
