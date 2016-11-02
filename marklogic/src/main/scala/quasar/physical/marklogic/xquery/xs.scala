@@ -34,8 +34,8 @@ object xs {
   def dayTimeDuration(xqy: XQuery): XQuery =
     XQuery(s"xs:dayTimeDuration($xqy)")
 
-  def decimal(xqy: XQuery): XQuery =
-    XQuery(s"xs:decimal($xqy)")
+  def double(xqy: XQuery): XQuery =
+    XQuery(s"xs:double($xqy)")
 
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")

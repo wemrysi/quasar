@@ -48,8 +48,7 @@ object EncodeXQuery {
         case ejson.Null()  => ejsxqy.null_[M]
         case ejson.Bool(b) => b.fold(fn.True, fn.False).point[M]
         case ejson.Str(s)  => s.xs.point[M]
-        // FIXME: Should be 'double'
-        case ejson.Dec(d)  => xs.decimal(d.toString.xs).point[M]
+        case ejson.Dec(d)  => xs.double(d.toString.xs).point[M]
       }
     }
 

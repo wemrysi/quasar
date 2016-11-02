@@ -119,7 +119,7 @@ object MapFuncPlanner {
     case Upper(s)                     => fn.upperCase(s).point[F]
     case Bool(s)                      => xs.boolean(s).point[F]
     case Integer(s)                   => xs.integer(s).point[F]
-    case Decimal(s)                   => xs.decimal(s).point[F]
+    case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
                                            (n, e) => if_ (s eq "null".xs) then_ n else_ e)
     case ToString(x)                  => fn.string(x).point[F]
