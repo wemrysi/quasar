@@ -57,7 +57,7 @@ object Schema {
 
   def sample(jtype: JType, size: Int): Option[JType] = {
     val paths                          = flatten(jtype, Vec()) groupBy { _.selector } toVector
-    val sampledPaths: scSeq[ColumnRef] = paths.shuffle take size flatMap (_._2)
+    val sampledPaths: Seq[ColumnRef] = paths.shuffle take size flatMap (_._2)
 
     mkType(sampledPaths)
   }
@@ -154,7 +154,7 @@ object Schema {
     * value is true if the given row subsumes the provided `jtpe`
     */
   def findTypes(jtpe: JType, seenPath: CPath, cols: ColumnMap, size: Int): Int => Boolean = {
-    def handleRoot(providedCTypes: scSeq[CType], cols: ColumnMap) = {
+    def handleRoot(providedCTypes: Seq[CType], cols: ColumnMap) = {
       val filteredCols = cols filter {
         case (ColumnRef(path, ctpe), _) =>
           path == seenPath && providedCTypes.contains(ctpe)
@@ -205,19 +205,17 @@ object Schema {
         emptyBits(row)
     }
 
-    def combineFixedResults(results: scSeq[Int => Boolean]): Int => Boolean = { (row: Int) =>
+    def combineFixedResults(results: Seq[Int => Boolean]): Int => Boolean = { (row: Int) =>
       results.foldLeft(true) { case (bool, fcn) => bool && fcn(row) }
     }
 
     jtpe match {
-      case JNumberT  => handleRoot(Seq(CDouble, CLong, CNum), cols)
-      case JBooleanT => handleRoot(Seq(CBoolean), cols)
-      case JTextT    => handleRoot(Seq(CString), cols)
-      case JNullT    => handleRoot(Seq(CNull), cols)
-
-      case JDateT   => handleRoot(Seq(CDate), cols)
-      case JPeriodT => handleRoot(Seq(CPeriod), cols)
-
+      case JNumberT        => handleRoot(Seq(CDouble, CLong, CNum), cols)
+      case JBooleanT       => handleRoot(Seq(CBoolean), cols)
+      case JTextT          => handleRoot(Seq(CString), cols)
+      case JNullT          => handleRoot(Seq(CNull), cols)
+      case JDateT          => handleRoot(Seq(CDate), cols)
+      case JPeriodT        => handleRoot(Seq(CPeriod), cols)
       case JObjectUnfixedT => handleUnfixed(CEmptyObject, _.isInstanceOf[CPathField], cols)
       case JArrayUnfixedT  => handleUnfixed(CEmptyArray, _.isInstanceOf[CPathIndex], cols)
 
@@ -225,7 +223,7 @@ object Schema {
         if (fields.isEmpty) {
           handleEmpty(CEmptyObject, cols)
         } else {
-          val results: scSeq[Int => Boolean] = fields.toSeq map {
+          val results: Seq[Int => Boolean] = fields.toVector map {
             case (field, tpe) =>
               val seenPath0 = CPath(seenPath.nodes :+ CPathField(field))
               findTypes(tpe, seenPath0, cols, size)
@@ -238,7 +236,7 @@ object Schema {
         if (elements.isEmpty) {
           handleEmpty(CEmptyArray, cols)
         } else {
-          val results: scSeq[Int => Boolean] = elements.toSeq map {
+          val results: Seq[Int => Boolean] = elements.toVector map {
             case (idx, tpe) =>
               val seenPath0 = CPath(seenPath.nodes :+ CPathIndex(idx))
               findTypes(tpe, seenPath0, cols, size)
@@ -263,7 +261,7 @@ object Schema {
     * Constructs a JType corresponding to the supplied sequence of ColumnRefs. Returns None if the
     * supplied sequence is empty.
     */
-  def mkType(ctpes: scSeq[ColumnRef]): Option[JType] = {
+  def mkType(ctpes: Seq[ColumnRef]): Option[JType] = {
 
     val primitives = ctpes flatMap {
       case ColumnRef.id(t: CValueType[_]) => fromCValueType(t)
@@ -361,7 +359,7 @@ object Schema {
     * Tests whether the supplied sequence contains all the (CPath, CType) pairs that are
     * included by the supplied JType.
     */
-  def subsumes(ctpes: scSeq[CPath -> CType], jtpe: JType): Boolean = jtpe match {
+  def subsumes(ctpes: Seq[CPath -> CType], jtpe: JType): Boolean = jtpe match {
     case JNumberT =>
       ctpes.exists {
         case (CPath.Identity, CLong | CDouble | CNum) => true

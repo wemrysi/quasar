@@ -67,14 +67,13 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
 
   type ListMap[A, +B] = I.ListMap[A, B]
   val  ListMap        = I.ListMap
-  type Map[A, +B] = I.Map[A, B]
-  val  Map        = I.Map
-  type Set[A] = I.Set[A]
-  val  Set    = I.Set
-  type Seq[+A] = I.Seq[A]
-  type Stream[+A] = I.Stream[A]
-  val  Stream     = I.Stream
-  val  #::        = Stream.#::
+  type Map[A, +B]     = I.Map[A, B]
+  val  Map            = I.Map
+  type Set[A]         = I.Set[A]
+  val  Set            = I.Set
+  type Stream[+A]     = I.Stream[A]
+  val  Stream         = I.Stream
+  val  #::            = Stream.#::
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def ??? : Nothing = throw new java.lang.RuntimeException("not implemented")

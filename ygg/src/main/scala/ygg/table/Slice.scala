@@ -390,7 +390,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     * then on a row-by-row basis, using a BitSet, we use `Schema.findTypes(...)` to determine the Boolean values
     */
   def isType(jtpe: JType): Slice = {
-    val pathsAndTypes: scSeq[CPath -> CType] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
+    val pathsAndTypes: Seq[CPath -> CType] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
     // we cannot just use subsumes because there could be rows with undefineds in them
     val subsumes    = Schema.subsumes(pathsAndTypes, jtpe)
     val definedBits = (source.columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet

@@ -36,6 +36,7 @@ trait PackageAliases {
   type PairOf[+A]          = A -> A
   type Range               = sci.Range
   type Regex               = scala.util.matching.Regex
+  type Seq[+A]             = sci.Seq[A]
   type Some[A]             = scala.Some[A]
   type StringContext       = scala.StringContext
   type Traversable[+A]     = scala.collection.Traversable[A]
@@ -45,7 +46,6 @@ trait PackageAliases {
   type scIterable[A]       = scala.collection.Iterable[A]
   type scIterator[+A]      = scala.collection.Iterator[A]
   type scMap[K, V]         = scala.collection.Map[K, V]
-  type scSeq[A]            = scala.collection.Seq[A]
   type scSet[A]            = scala.collection.Set[A]
   type scTraversable[+A]   = scala.collection.Traversable[A]
   type sciMap[K, +V]       = sci.Map[K, V]
@@ -74,7 +74,6 @@ trait PackageAliases {
   val Seq                  = sci.Seq
   val Try                  = scala.util.Try
   val Vec                  = scala.Vector
-  val scSeq                = scala.collection.Seq
   val sciQueue             = sci.Queue
   val sciTreeMap           = sci.TreeMap
   val scmMap               = scm.HashMap

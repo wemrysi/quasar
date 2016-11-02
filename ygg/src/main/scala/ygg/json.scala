@@ -63,7 +63,7 @@ package object json {
     def apply(s: String): R       = apply(utf8Bytes(s))
     def apply(bb: Array[Byte]): R = apply(byteBuffer(bb))
     def apply(bb: ByteBuffer): R = p absorb bb match {
-      case scala.util.Right(x)                => AsyncParse(Nil, x) -> p.copy()
+      case scala.util.Right(x)                => AsyncParse(Nil, x.toVector) -> p.copy()
       case scala.util.Left(t: ParseException) => AsyncParse(Seq(t), Nil) -> p.copy()
       case scala.util.Left(t)                 => AsyncParse(Seq(new ParseException(t.getMessage, 0, 0, 0)), Nil) -> p.copy()
     }
@@ -399,7 +399,7 @@ package object json {
           case unmodified       => Some(unmodified)
         }
 
-      case scSeq() => None
+      case Seq() => None
     }
 
     /** Return direct child elements.

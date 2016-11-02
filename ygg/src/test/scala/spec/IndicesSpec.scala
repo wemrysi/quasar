@@ -25,15 +25,14 @@ class IndicesSpec extends TableQspec {
 
   "a table index" should {
     "handle empty tables" in {
-      val table = fromJson(Stream.empty[JValue])
-
-      val keySpecs = Array(groupkey("a"), groupkey("b"))
+      val table    = fromJson(Stream.empty[JValue])
+      val keySpecs = Vector(groupkey("a"), groupkey("b"))
       val valSpec  = valuekey("c")
 
       val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
       index.getUniqueKeys(0).size must_== 0
-      index.getSubTable(Array(0), Array(CString("a"))).size == ExactSize(0)
+      index.getSubTable(Vector(0), Vector(CString("a"))).size == ExactSize(0)
     }
 
     val json = jsonMany"""
@@ -53,7 +52,7 @@ class IndicesSpec extends TableQspec {
     """
 
     val table             = fromJson(json.toStream)
-    val keySpecs          = Array(groupkey("a"), groupkey("b"))
+    val keySpecs          = Vector(groupkey("a"), groupkey("b"))
     val valSpec           = valuekey("c")
     val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
@@ -63,28 +62,28 @@ class IndicesSpec extends TableQspec {
     }
 
     "determine unique groupkey sets" in {
-      index.getUniqueKeys() must_== Set[scSeq[RValue]](
-        Array(CLong(1), CLong(2)),
-        Array(CLong(2), CLong(2)),
-        Array(CString("foo"), CString("bar")),
-        Array(CLong(3), CString("")),
-        Array(CLong(3), CLong(2)),
-        Array(CString("foo"), CLong(999))
+      index.getUniqueKeys() must_== Set[Vector[RValue]](
+        Vector(CLong(1), CLong(2)),
+        Vector(CLong(2), CLong(2)),
+        Vector(CString("foo"), CString("bar")),
+        Vector(CLong(3), CString("")),
+        Vector(CLong(3), CLong(2)),
+        Vector(CString("foo"), CLong(999))
       )
     }
 
-    def subtableSet(index: TableIndex, ids: scSeq[Int], vs: scSeq[RValue]): Set[RValue] =
+    def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
       index.getSubTable(ids, vs).toJson.copoint.toSet.map(RValue.fromJValue)
 
-    def test(vs: scSeq[RValue], result: Set[RValue]) =
-      subtableSet(index, Array(0, 1), vs) must_== result
+    def test(vs: Seq[RValue], result: Set[RValue]) =
+      subtableSet(index, Vector(0, 1), vs) must_== result
 
     "generate subtables based on groupkeys" in {
       def empty = Set.empty[RValue]
 
-      test(Array(CLong(1), CLong(1)), empty)
+      test(Vector(CLong(1), CLong(1)), empty)
 
-      test(Array(CLong(1), CLong(2)), s1)
+      test(Vector(CLong(1), CLong(2)), s1)
       def s1 = Set[RValue](
         CLong(3),
         CLong(999),
@@ -92,25 +91,25 @@ class IndicesSpec extends TableQspec {
         RObject(Map("cat" -> CLong(13), "dog" -> CLong(12)))
       )
 
-      test(Array(CLong(2), CLong(2)), s2)
+      test(Vector(CLong(2), CLong(2)), s2)
       def s2 = Set[RValue](CLong(3), CLong(13))
 
-      test(Array(CString("foo"), CString("bar")), s3)
+      test(Vector(CString("foo"), CString("bar")), s3)
       def s3 = Set[RValue](CLong(3))
 
-      test(Array(CLong(3), CString("")), s4)
+      test(Vector(CLong(3), CString("")), s4)
       def s4 = Set[RValue](CLong(333))
 
-      test(Array(CLong(3), CLong(2)), s5)
+      test(Vector(CLong(3), CLong(2)), s5)
       def s5 = Set[RValue](RArray(CLong(1), CLong(2), CLong(3), CLong(4)))
 
-      test(Array(CString("foo"), CLong(999)), empty)
+      test(Vector(CString("foo"), CLong(999)), empty)
     }
 
     val index1 = TableIndex
       .createFromTable(
         table,
-        Array(groupkey("a")),
+        Vector(groupkey("a")),
         valuekey("c")
       )
       .copoint
@@ -118,14 +117,14 @@ class IndicesSpec extends TableQspec {
     val index2 = TableIndex
       .createFromTable(
         table,
-        Array(groupkey("b")),
+        Vector(groupkey("b")),
         valuekey("c")
       )
       .copoint
 
     "efficiently combine to produce unions" in {
 
-      def tryit(tpls: (TableIndex, scSeq[Int], Seq[RValue])*)(expected: JValue*) = {
+      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }

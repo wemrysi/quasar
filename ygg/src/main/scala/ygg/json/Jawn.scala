@@ -20,7 +20,7 @@ import jawn._, jawn.AsyncParser._
 import ygg._, common._
 import scalaz.Validation.fromTryCatchNonFatal
 
-final case class AsyncParse[A](errors: scSeq[ParseException], values: scSeq[A])
+final case class AsyncParse[A](errors: Seq[ParseException], values: Seq[A])
 
 object AsyncParser {
   def stream(): AsyncParser[JValue] = Parser.async[JValue](ValueStream)

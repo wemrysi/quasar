@@ -152,7 +152,7 @@ trait CValueGenerators {
 trait JdbmCValueGenerators {
   def maxArrayDepth = 3
 
-  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[scSeq[CValue]]] = containerOfN[List, scSeq[CValue]](size, values.map(_.toSeq))
+  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List, Seq[CValue]](size, values.map(_.toVector))
 
   private def genNonArrayCValueType: Gen[CValueType[_]] = Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum, CDate)
 

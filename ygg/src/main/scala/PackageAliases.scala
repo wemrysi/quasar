@@ -18,7 +18,7 @@ package ygg.pkg
 
 trait PackageAliases extends quasar.pkg.PackageAliases {
   type CBF[-From, -Elem, +To]         = scala.collection.generic.CanBuildFrom[From, Elem, To]
-  type CoGroupResult[K, V, V1, CC[X]] = scSeq[K -> CoGroupValue[V, V1, CC]]
+  type CoGroupResult[K, V, V1, CC[X]] = scala.collection.immutable.Seq[K -> CoGroupValue[V, V1, CC]]
   type CoGroupValue[V, V1, CC[X]]     = scalaz.Either3[V, CC[V] -> CC[V1], V1]
   type LazyPairOf[+A]                 = scalaz.Need[A -> A]
   type NeedStreamT[A]                 = scalaz.StreamT[scalaz.Need, A]

@@ -52,13 +52,6 @@ trait TableConstructors[T <: ygg.table.Table] {
   def fromSlices(data: Seq[Slice]): T
 }
 
-// trait TableRep[T] {
-//   type Table = T with ygg.table.Table
-//   type Companion <: TableCompanion[Table]
-
-//   def companion: Companion
-// }
-
 object TableCompanion {
   def apply[A <: Table](implicit z: TableCompanion[A]): TableCompanion[A] = z
 }
@@ -114,7 +107,7 @@ trait TemporaryTableStrutCompanion {
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
   // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
-  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
+  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
   def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                     = ???
   def toExternalTable(): ExternalTable                                                                                                = ???
 
@@ -130,12 +123,13 @@ trait ExternalTable extends Table {
 trait SingletonTable extends Table {
 }
 trait Table {
-  type NeedTable = Need[Table]
-
   type Table <: ygg.table.Table
   type InternalTable <: Table with ygg.table.InternalTable
   type ExternalTable <: Table with ygg.table.ExternalTable
   type SingletonTable <: Table with ygg.table.SingletonTable
+
+  type M[X]      = Need[X]
+  type NeedTable = M[Table]
 
   /**
     * Return an indication of table size, if known
@@ -145,7 +139,7 @@ trait Table {
   /**
     * Folds over the table to produce a single value (stored in a singleton table).
     */
-  def reduce[A: Monoid](reducer: CReducer[A]): Need[A]
+  def reduce[A: Monoid](reducer: CReducer[A]): M[A]
 
   /**
     * Removes all rows in the table for which definedness is satisfied
@@ -199,7 +193,7 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
+  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
 
   /**
     * Converts a table to an internal table, if possible. If the table is

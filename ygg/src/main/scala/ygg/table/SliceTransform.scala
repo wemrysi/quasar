@@ -142,7 +142,7 @@ object SliceTransform {
             )
 
             type ECCC = Either[Column, Column -> Column]
-            val simplifiedGroupNonNum: scSeq[ECCC] = groupedNonNum map {
+            val simplifiedGroupNonNum: Seq[ECCC] = groupedNonNum map {
               case (_, Left3(column))                        => Left(column): ECCC
               case (_, Right3(column))                       => Left(column): ECCC
               case (_, Middle3((left :: Nil, right :: Nil))) => Right(left -> right): ECCC

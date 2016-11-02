@@ -157,22 +157,14 @@ trait ColumnarTableModule {
       }).sequence.flatMap { sourceKeys =>
         val fullSchema = sourceKeys.flatMap(_.keySchema).distinct
 
-        val indicesGroupedBySource = sourceKeys.groupBy(_.groupId).mapValues(_.map(y => (y.index, y.keySchema)).toSeq).values.toSeq
+        val indicesGroupedBySource = sourceKeys.groupBy(_.groupId).mapValues(_.map(y => (y.index, y.keySchema)).toVector).values.toVector
 
-        def unionOfIntersections(indicesGroupedBySource: scSeq[scSeq[TableIndex -> KeySchema]]): Set[Key] = {
-          def allSourceDNF[T](l: scSeq[scSeq[T]]): scSeq[scSeq[T]] = {
-            l match {
-              case Seq(hd) => hd.map(Seq(_))
-              case Seq(hd, tl @ _ *) => {
-                for {
-                  disjunctHd <- hd
-                  disjunctTl <- allSourceDNF(tl)
-                } yield disjunctHd +: disjunctTl
-              }
-              case empty => empty
-            }
+        def unionOfIntersections(indicesGroupedBySource: Seq[Seq[TableIndex -> KeySchema]]): Set[Key] = {
+          def allSourceDNF[T](l: Seq[Seq[T]]): Seq[Seq[T]] = l match {
+            case Seq()       => Seq()
+            case hd +: Seq() => hd.map(Seq(_))
+            case hd +: tl    => hd flatMap (disjunctHd => allSourceDNF(tl) map (disjunctTl => disjunctHd +: disjunctTl))
           }
-
           def normalizedKeys(index: TableIndex, keySchema: KeySchema): scSet[Key] = {
             val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
             for (key       <- index.getUniqueKeys)
@@ -1324,7 +1316,7 @@ trait BlockTableModule extends ColumnarTableModule {
 
     def writeTables(slices: NeedSlices,
                     valueTrans: SliceTransform1[_],
-                    keyTrans: scSeq[SliceTransform1[_]],
+                    keyTrans: Seq[SliceTransform1[_]],
                     sortOrder: DesiredSortOrder): Need[List[String] -> IndexMap] = {
       def write0(slices: NeedSlices, state: WriteState): Need[List[String] -> IndexMap] = {
         slices.uncons flatMap {
@@ -1534,7 +1526,7 @@ trait BlockTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
@@ -1551,7 +1543,7 @@ trait BlockTableModule extends ColumnarTableModule {
   final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] =
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = toExternalTable.sortUnique(sortKey, sortOrder)
@@ -1607,7 +1599,7 @@ trait BlockTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
@@ -1617,12 +1609,12 @@ trait BlockTableModule extends ColumnarTableModule {
       }
     }
 
-    private def writeSorted(keys: scSeq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[scSeq[String] -> IndexMap] = uniq match {
+    private def writeSorted(keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[Seq[String] -> IndexMap] = uniq match {
       case false => writeSortedNonUnique(keys, spec, sort)
       case true  => writeSortedUnique(keys, spec, sort)
     }
 
-    private def writeSortedUnique(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[scSeq[String] -> IndexMap] =
+    private def writeSortedUnique(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] =
       writeTables(
         this transform root.spec slices,
         composeSliceTransform(valueSpec),
@@ -1630,7 +1622,7 @@ trait BlockTableModule extends ColumnarTableModule {
         order
       )
 
-    private def writeSortedNonUnique(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[scSeq[String] -> IndexMap] = {
+    private def writeSortedNonUnique(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
       val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1")))
       writeTables(
         this transform addGlobalId(root.spec) slices,
