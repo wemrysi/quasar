@@ -47,33 +47,38 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
 
     // array
     case Length(a1) =>
-      partialQueryString(s"array_length(${n1ql(a1)})").point[M]
+      val a1N1ql = n1ql(a1)
+      partialQueryString(s"ifnull(length($a1N1ql), array_length($a1N1ql))").point[M]
 
     // date
     case Date(a1) =>
+      val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when regexp_contains(${n1ql(a1)}, "$dateRegex") then v
+         when regexp_contains($a1N1ql, "$dateRegex") then $a1N1ql
          else null
          end)"""
       ).point[M]
     case Time(a1) =>
+      val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when regexp_contains(${n1ql(a1)}, "$timeRegex") then v
+         when regexp_contains($a1N1ql, "$timeRegex") then $a1N1ql
          else null
          end)"""
       ).point[M]
     case Timestamp(a1) =>
+      val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when regexp_contains(${n1ql(a1)}, "$timestampRegex") then v
+         when regexp_contains($a1N1ql, "$timestampRegex") then $a1N1ql
          else null
          end)"""
       ).point[M]
     case Interval(a1)              => unimplementedP("Interval")
     case TimeOfDay(a1)             => unimplementedP("TimeOfDay")
-    case ToTimestamp(a1)           => unimplementedP("ToTimestamp")
+    case ToTimestamp(a1)           =>
+      partialQueryString(s"millis_to_utc(${n1ql(a1)})").point[M]
     case ExtractCentury(a1)        => unimplementedP("ExtractCentury")
     case ExtractDayOfMonth(a1)     => unimplementedP("ExtractDayOfMonth")
     case ExtractDecade(a1)         => unimplementedP("ExtractDecade")
@@ -167,8 +172,8 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when lower("$a1N1ql") = "true"  then true
-         when lower("$a1N1ql") = "false" then false
+         when lower($a1N1ql) = "true"  then true
+         when lower($a1N1ql) = "false" then false
          else null
          end)"""
       ).point[M]
@@ -177,23 +182,23 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when tonumber("$a1N1ql") = floor(tonumber("$a1N1ql")) then tonumber("$a1N1ql")
+         when tonumber($a1N1ql) = floor(tonumber($a1N1ql)) then tonumber($a1N1ql)
          else null
          end)"""
       ).point[M]
     case Decimal(a1)           =>
-      partialQueryString(s"""tonumber("${n1ql(a1)}")""").point[M]
+      partialQueryString(s"""tonumber(${n1ql(a1)})""").point[M]
     case Null(a1)              =>
       // TODO: Undefined isn't available, what to use?
       partialQueryString(s"""
         (case
-         when lower("${n1ql(a1)}") = "null" then null
+         when lower(${n1ql(a1)}) = "null" then null
          else undefined
          end)"""
       ).point[M]
     case ToString(a1)          =>
-      // overly simplistic?
-      partialQueryString(s"tostring(${n1ql(a1)})").point[M]
+      val a1N1ql = n1ql(a1)
+      partialQueryString(s"ifnull(tostring($a1N1ql), $a1N1ql)").point[M]
     case Search(a1, a2, a3)    =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)
@@ -205,7 +210,10 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
          end)"""
        ).point[M]
     case Substring(a1, a2, a3) =>
-      partialQueryString(s"""substr(${n1ql(a1)}, ${n1ql(a2)}, ${n1ql(a3)})""").point[M]
+      val a1N1ql = n1ql(a1)
+      val a2N1ql = n1ql(a2)
+      val length = s"least(${n1ql(a3)}, length($a1N1ql) - $a2N1ql)"
+      partialQueryString(s"""substr($a1N1ql, $a2N1ql, $length)""").point[M]
 
     // structural
     case MakeArray(a1)                            =>
