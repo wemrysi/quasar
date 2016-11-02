@@ -20,7 +20,7 @@ import scala.Predef.$conforms
 import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 import ygg._, common._, data._
 
-object Align {
+object AlignTable {
   sealed trait AlignState                                                                 extends Product with Serializable
   final case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
   final case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState

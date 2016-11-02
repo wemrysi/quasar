@@ -24,16 +24,19 @@ import scalaz.{ Source => _, _ }
 import Scalaz.{ ToIdOps => _, _ }
 import JDBM.IndexMap
 
+private object addGlobalIdScanner extends Scanner {
+  type A = Long
+  val init = 0l
+  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
+    val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
+    (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
+  }
+}
+
 class TableSelector[A <: Table](val table: A { type Table = A }) {
   def >>(): Unit = table.toVector foreach println
 
   def filter(p: TransSpec[Source.type]) = table transform (root filter p)
-
-  // def innerCross(that: A, left: String, right: String): A = {
-  //   val spec: TransSpec2 = InnerObjectConcat(WrapObject(Leaf(SourceLeft), left), WrapObject(Leaf(SourceRight), right))
-
-  //   table.companion.cross(table, that, None)(spec).value._2
-  // }
 }
 object Table extends BlockTableBase
 
@@ -59,22 +62,23 @@ object TableCompanion {
 }
 
 trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
-  def sortMergeEngine: MergeEngine
-  def addGlobalId(spec: TransSpec1): TransSpec1
+  lazy val sortMergeEngine = new MergeEngine
+
+  def addGlobalId(spec: TransSpec1): TransSpec1                                        = Scan(WrapArray(spec), addGlobalIdScanner)
+  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = AlignTable[T](sourceL, alignL, sourceR, alignR)(this)
+
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState]
   def reduceSlices(slices: NeedSlices): NeedSlices
-
-  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = Align[T](sourceL, alignL, sourceR, alignR)(this)
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
   type M[X]  = T#M[X]
   type Table = T
 
+  def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
 
-  def empty: T
   def constString(v: scSet[String]): T
   def constLong(v: scSet[Long]): T
   def constDouble(v: scSet[Double]): T
@@ -87,7 +91,6 @@ trait TableCompanion[T <: ygg.table.Table] {
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
-  // def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
@@ -132,7 +135,6 @@ trait TableCompanion[T <: ygg.table.Table] {
   def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
   def fromJson(data: Seq[JValue]): T
   def load(table: T, tpe: JType): Need[T]
-  def singleton(slice: Slice): T
 }
 
 trait TemporaryTableStrut extends Table {

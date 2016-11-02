@@ -227,6 +227,17 @@ object CValue {
 object CType {
   def of(v: CValue): CType = v.cType
 
+  def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
+    case (_: JNum, CNum | CLong | CDouble) => true
+    case (JUndefined, CUndefined)          => true
+    case (JNull, CNull)                    => true
+    case (_: JBool, CBoolean)              => true
+    case (_: JString, CString)             => true
+    case (JObject(fields), CEmptyObject)   => fields.isEmpty
+    case (JArray(Seq()), CEmptyArray)      => true
+    case _                                 => false
+  }
+
   def canCompare(t1: CType, t2: CType): Boolean = (t1 == t2) || {
     (t1, t2) match {
       case (_: CNumericType[_], _: CNumericType[_]) => true

@@ -34,7 +34,7 @@ object BlockTableQspec {
             val vpath       = JPath(JPathField("value") :: jpath.nodes)
             val valueAtPath = jv.get(vpath)
 
-            if (compliesWithSchema(valueAtPath, ctype)) {
+            if (CType.compliesWithSchema(valueAtPath, ctype)) {
               obj.set(vpath, valueAtPath)
             } else {
               obj
@@ -53,8 +53,7 @@ object BlockTableQspec {
   }
 }
 
-abstract class BlockTableQspec extends AbsTableQspec with BlockTableModule {
-}
+abstract class BlockTableQspec extends AbsTableQspec with BlockTableModule
 
 abstract class AbsTableQspec extends quasar.Qspec with ColumnarTableModule {
   def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)

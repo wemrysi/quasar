@@ -31,27 +31,16 @@ final case class EnormousCartesianException(left: TableSize, right: TableSize) e
   override def getMessage =
     "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
 }
-private object addGlobalIdScanner extends Scanner {
-  type A = Long
-  val init = 0l
-  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
-    val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
-    (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
-  }
-}
 final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
 trait ColumnarTableModule {
   outer =>
 
   def projections: Map[Path, Projection] = Map[Path, Projection]()
-
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
   type Table <: ThisTable
-
   type TableCompanion <: ThisTableCompanion
-
   val Table: TableCompanion
 
   implicit def tableCompanion: ygg.table.TableCompanion[Table] = Table
@@ -100,13 +89,9 @@ trait ColumnarTableModule {
       }
     }
 
+    def empty: Table                                      = Table(emptyStreamT(), ExactSize(0))
     def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
-    def singleton(slice: Slice): Table                    = fromSlices(singleStreamT(slice), ExactSize(1))
     def fromJson(data: Seq[JValue]): Table                = outer fromJson data
-
-    implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
-
-    def empty: Table = Table(emptyStreamT(), ExactSize(0))
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
       singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
@@ -936,30 +921,14 @@ trait BlockTableModule extends ColumnarTableModule {
   type Table          = BaseTable
   object Table extends BaseTableCompanion
 
+  override implicit def tableCompanion: ygg.table.BlockTableCompanion[Table] = Table
+
   def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
     case ExactSize(1) => new SingletonTable(slices)
     case _            => new ExternalTable(slices, size)
   }
 
-
-  def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
-    case (_: JNum, CNum | CLong | CDouble) => true
-    case (JUndefined, CUndefined)          => true
-    case (JNull, CNull)                    => true
-    case (_: JBool, CBoolean)              => true
-    case (_: JString, CString)             => true
-    case (JObject(fields), CEmptyObject)   => fields.isEmpty
-    case (JArray(Seq()), CEmptyArray)      => true
-    case _                                 => false
-  }
-
-  trait BaseTableCompanion extends ThisTableCompanion with BlockTableCompanion[Table] {
-    lazy val sortMergeEngine = new MergeEngine
-
-    def addGlobalId(spec: TransSpec1) = {
-      Scan(WrapArray(spec), addGlobalIdScanner)
-    }
-
+  trait BaseTableCompanion extends ThisTableCompanion with ygg.table.BlockTableCompanion[Table] {
     /**
       * Passes over all slices and returns a new slices that is the concatenation
       * of all the slices. At some point this should lazily chunk the slices into
