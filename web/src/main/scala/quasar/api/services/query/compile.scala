@@ -26,7 +26,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend._
 import quasar.fs._
-import quasar.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
 import scala.Predef.$conforms
 

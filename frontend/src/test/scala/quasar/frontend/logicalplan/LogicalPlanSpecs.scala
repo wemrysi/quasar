@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.logicalplan
+package quasar.frontend.logicalplan
 
 import quasar.Predef._
 import quasar.{Data, Func}

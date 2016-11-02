@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.logicalplan
+package quasar.frontend.logicalplan
 
 import quasar.Predef._
 import quasar._
@@ -22,7 +22,7 @@ import quasar.contrib.pathy.FPath
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
 
 import scala.Predef.$conforms

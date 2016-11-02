@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import quasar.Predef._
-import quasar.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.Recursive
 import scalaz.Cofree

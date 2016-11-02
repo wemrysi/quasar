@@ -18,7 +18,7 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.Data
-import quasar.logicalplan.{LogicalPlan => LP, _}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
 import matryoshka._

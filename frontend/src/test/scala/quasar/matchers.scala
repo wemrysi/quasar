@@ -18,7 +18,7 @@ package quasar
 
 import quasar.RenderTree.ops._
 import quasar.fp._
-import quasar.logicalplan.{LogicalPlan, Optimizer}
+import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 
 import matryoshka._
 import org.specs2.matcher._

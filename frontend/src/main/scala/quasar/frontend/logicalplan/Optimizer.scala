@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.logicalplan
+package quasar.frontend.logicalplan
 
 import quasar.Predef._
 import quasar._
@@ -22,7 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.fp.ski._
-import quasar.logicalplan.{LogicalPlan => LP}
+import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.namegen._
 import quasar.sql.JoinDir
 

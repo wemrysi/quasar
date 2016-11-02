@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.frontend
 
 import quasar.Predef._
+import quasar._
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
 
