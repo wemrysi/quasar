@@ -529,33 +529,29 @@ abstract class StdLibSpec extends Qspec {
       // TODO: ExtractTimezoneMinute
 
       "ExtractWeek" >> {
-        // NB: current implementation, which is not consistent with IsoYear
-
         "2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(0))
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(53))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(0))
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(53))
         }
-
-        // These examples illustrate the "correct", ISO-compliant behavior:
 
         "2001-02-16" >> {
           unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2001-02-16")), Data.Int(7))
-        }.pendingUntilFixed
+        }
 
         "midnight 2016-10-03" >> {
           unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
-        }.pendingUntilFixed
+        }
 
         "2005-01-01" >> {
           unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2005-01-01")), Data.Int(53))
-        }.pendingUntilFixed
+        }
 
         "midnight 2005-01-01" >> {
           unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
-        }.pendingUntilFixed
+        }
       }
 
       "ExtractYear" >> {
