@@ -284,8 +284,8 @@ trait ColumnarTableModule {
       case xs     => Data.Arr(xs.toList)
     }
 
-    def companion                                                         = Table
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
+    def companion                                                      = Table
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
@@ -420,7 +420,7 @@ trait ColumnarTableModule {
           }
       }
 
-      def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): Need[StreamT.Step[Slice, NeedSlices]] = {
+      def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): M[StreamT.Step[Slice, NeedSlices]] = {
         stream.uncons flatMap {
           case Some((head, tail)) =>
             if (head.size == 0) {
@@ -465,10 +465,10 @@ trait ColumnarTableModule {
       * a single table.
       */
     def cross(that: Table)(spec: TransSpec2): Table = {
-      def cross0[A](transform: SliceTransform2[A]): Need[NeedSlices] = {
+      def cross0[A](transform: SliceTransform2[A]): M[NeedSlices] = {
         case class CrossState(a: A, position: Int, tail: NeedSlices)
 
-        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): Need[A -> NeedSlices] = {
+        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[A -> NeedSlices] = {
 
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
@@ -515,7 +515,7 @@ trait ColumnarTableModule {
         }
 
         def crossLeftSingle(lhead: Slice, right: NeedSlices)(a0: A): NeedSlices = {
-          def step(state: CrossState): Need[Option[Slice -> CrossState]] = {
+          def step(state: CrossState): M[Option[Slice -> CrossState]] = {
             if (state.position < lhead.size) {
               state.tail.uncons flatMap {
                 case Some((rhead, rtail0)) =>
@@ -660,7 +660,7 @@ trait ColumnarTableModule {
       if (end <= 0 || end <= start) Table.empty else takeRange(start, end - start)
 
     def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table = {
-      def loop(stream: NeedSlices, readSoFar: Long): Need[NeedSlices] = stream.uncons flatMap {
+      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
         // Prior to first needed slice, so skip
         case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
         // Somewhere in between, need to transition to splitting/reading
@@ -669,7 +669,7 @@ trait ColumnarTableModule {
         case _ => Need(emptyStreamT())
       }
 
-      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): Need[NeedSlices] = stream.uncons flatMap {
+      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
         case Some((head, tail)) if takenSoFar < numberToTake => {
           val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
           inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
@@ -791,7 +791,7 @@ trait ColumnarTableModule {
 
     def normalize: Table = mapWithSameSize(_ filter (x => !x.isEmpty))
 
-    def schemas: Need[Set[JType]] = {
+    def schemas: M[Set[JType]] = {
 
       // Returns true iff masks contains an array equivalent to mask.
       def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {

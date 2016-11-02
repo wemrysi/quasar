@@ -24,7 +24,7 @@ package object table {
   type TransSpec[A] = trans.TransSpec[A]
   type SourceType   = trans.SourceType
 
-  type NeedSlices     = NeedStreamT[Slice]
+  type NeedSlices     = StreamT[Need, Slice]
   type NeedTable      = Need[Table]
   type RowId          = Int
   type Identity       = Long

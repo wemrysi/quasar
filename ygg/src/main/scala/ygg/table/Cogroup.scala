@@ -16,20 +16,11 @@
 
 package ygg.table
 
-// import scala.Predef.$conforms
-import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 import ygg._, common._, data._, trans._
-// import ygg._, common._, data._, json._, trans._
-// import ygg.cf.{ Remap, Empty }
-// import scala.math.{ min, max }
-// import JDBM._
-// import quasar.Data
-// import scalaz.Ordering._
+import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 
-object Cogrouped {
+object CogroupTable {
   def apply[T <: Table](self: T, leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2)(implicit companion: TableCompanion[T]): T = {
-    // import Cogrouping._
-
     //println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
     class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
       val lbuf   = new ArrayIntList(lInitialSize)

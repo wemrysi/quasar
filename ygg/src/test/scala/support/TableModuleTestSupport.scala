@@ -119,7 +119,7 @@ abstract class TableQspec extends AbsTableQspec {
    *  generating a table and transforming it with `spec` produces a copoint which is equal
    *  to the result of the function `expect` applied to the original data.
    */
-  def checkSpec(spec: TransSpec1)(expect: ToSelf[Seq[JValue]])(implicit z: ASD): Prop =
+  def checkSpec(spec: TransSpec1)(expect: EndoA[Seq[JValue]])(implicit z: ASD): Prop =
     TableProp(sd => TableTest(fromSample(sd), spec, expect(sd.data))).check()
 
   def checkCommutes(f: Seq[JValue] => Seq[JValue], g: Table => Table, gen: Gen[Seq[JValue]]): Prop = {
@@ -130,7 +130,7 @@ abstract class TableQspec extends AbsTableQspec {
     new TableCommuteTest(f, g).checkR()
   }
 
-  def checkSpecDefault(spec: TransSpec1)(expect: ToSelf[Seq[JValue]]): Prop =
+  def checkSpecDefault(spec: TransSpec1)(expect: EndoA[Seq[JValue]]): Prop =
     checkSpec(spec)(expect)(defaultASD)
 
   def checkSpecData(spec: TransSpec1, data: Seq[JValue], expected: Seq[JValue]): Prop =

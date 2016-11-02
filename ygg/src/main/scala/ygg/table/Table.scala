@@ -57,7 +57,7 @@ object TableCompanion {
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
-  type Table = T
+  type Table     = T
   type NeedTable = Need[Table]
 
   def apply(slices: NeedSlices, size: TableSize): T
@@ -79,7 +79,7 @@ trait TableCompanion[T <: ygg.table.Table] {
   // def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    Cogrouped[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
+    CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
 
   private def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
   private def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
@@ -128,8 +128,9 @@ trait Table {
   type ExternalTable <: Table with ygg.table.ExternalTable
   type SingletonTable <: Table with ygg.table.SingletonTable
 
-  type M[X]      = Need[X]
-  type NeedTable = M[Table]
+  type M[X]       = Need[X]
+  type NeedTable  = M[Table]
+  type NeedSlices = StreamT[M, Slice]
 
   /**
     * Return an indication of table size, if known
@@ -171,7 +172,7 @@ trait Table {
     * Force the table to a backing store, and provice a restartable table
     * over the results.
     */
-  def force: NeedTable
+  def force: M[Table]
 
   /**
     * Sorts the KV table by ascending or descending order of a transformation
@@ -180,7 +181,7 @@ trait Table {
     * @param sortKey The transspec to use to obtain the values to sort on
     * @param sortOrder Whether to sort ascending or descending
     */
-  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
+  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table]
 
   /**
     * Sorts the KV table by ascending or descending order based on a seq of transformations
@@ -193,7 +194,7 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
+  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
   /**
     * Converts a table to an internal table, if possible. If the table is
@@ -209,7 +210,7 @@ trait Table {
     * For each distinct path in the table, load all columns identified by the specified
     * jtype and concatenate the resulting slices into a new table.
     */
-  def load(tpe: JType): NeedTable
+  def load(tpe: JType): M[Table]
 
   def canonicalize(length: Int): Table
   def canonicalize(minLength: Int, maxLength: Int): Table
@@ -217,19 +218,19 @@ trait Table {
   def companion: TableCompanion[Table]
   def concat(t2: Table): Table
   def distinct(key: TransSpec1): Table
-  def mapWithSameSize(f: NeedSlices => NeedSlices): Table
+  def mapWithSameSize(f: EndoA[NeedSlices]): Table
   def normalize: Table
   def paged(limit: Int): Table
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
-  def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]]
-  def schemas: Need[Set[JType]]
+  def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
+  def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
+  def schemas: M[Set[JType]]
   def slices: NeedSlices
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toData: Data
   def toJValues: Stream[JValue]
-  def toJson: Need[Stream[JValue]]
-  def zip(t2: Table): NeedTable
+  def toJson: M[Stream[JValue]]
+  def zip(t2: Table): M[Table]
 
   def slicesStream: Stream[Slice]
   def toVector: Vector[JValue]
