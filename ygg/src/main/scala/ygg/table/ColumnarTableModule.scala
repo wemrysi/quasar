@@ -84,7 +84,7 @@ trait ColumnarTableModule {
   }
 
   trait ThisTableCompanion extends ygg.table.TableCompanion[Table] {
-    def load(table: Table, tpe: JType): NeedTable = {
+    def load(table: Table, tpe: JType): M[Table] = {
       val reduced = table reduce new CReducer[Set[Path]] {
         def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
           case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
@@ -130,7 +130,7 @@ trait ColumnarTableModule {
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable = {
+    def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]
@@ -214,12 +214,12 @@ trait ColumnarTableModule {
 
         val groupKeys: Set[Key] = unionOfIntersections(indicesGroupedBySource)
 
-        // given a groupKey, return an NeedTable which represents running
+        // given a groupKey, return an M[Table] which represents running
         // the evaluator on that subgroup.
-        def evaluateGroupKey(groupKey: Key): NeedTable = {
+        def evaluateGroupKey(groupKey: Key): M[Table] = {
           val groupKeyTable = jValueFromGroupKey(groupKey, fullSchema)
 
-          def map(gid: GroupId): NeedTable = {
+          def map(gid: GroupId): M[Table] = {
             val subTableProjections = (sourceKeys
               .filter(_.groupId == gid)
               .map { indexedSource =>
@@ -266,11 +266,11 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
-    def sort(key: TransSpec1, order: DesiredSortOrder): NeedTable = companion.sort[Need](self)(key, order)
+    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self)(key, order)
 
     def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
-    def load(tpe: JType): NeedTable                         = companion.load(this, tpe)
+    def load(tpe: JType): M[Table]                         = companion.load(this, tpe)
     def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
     def slicesStream: Stream[Slice]                         = slices.toStream.value
     def columns: ColumnMap                                  = slicesStream.head.columns
@@ -339,7 +339,7 @@ trait ColumnarTableModule {
     def transform(spec: TransSpec1): Table =
       mapWithSameSize(transformStream(composeSliceTransform(spec), _))
 
-    def force: NeedTable = {
+    def force: M[Table] = {
       def loop(slices: NeedSlices, acc: List[Slice], size: Long): Need[List[Slice] -> Long] = slices.uncons flatMap {
         case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
         case Some((_, tail))                       => loop(tail, acc, size)
@@ -371,7 +371,7 @@ trait ColumnarTableModule {
       * then since the zipping is done per slice, this can produce a result that is
       * different than if the tables were normalized.
       */
-    def zip(t2: Table): NeedTable = {
+    def zip(t2: Table): M[Table] = {
       def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = {
         StreamT(slices1.uncons flatMap {
           case Some((head1, tail1)) =>
@@ -693,7 +693,7 @@ trait ColumnarTableModule {
       * In order to call partitionMerge, the table must be sorted according to
       * the values specified by the partitionBy transspec.
       */
-    def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable = {
+    def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table] = {
       // Find the first element that compares LT
       @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
         val minOrd = compare(imin)
@@ -721,8 +721,8 @@ trait ColumnarTableModule {
         }
       }
 
-      def subTable(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices): NeedTable = {
-        def subTable0(slices: NeedSlices, subSlices: NeedSlices, size: Int): NeedTable = {
+      def subTable(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices): M[Table] = {
+        def subTable0(slices: NeedSlices, subSlices: NeedSlices, size: Int): M[Table] = {
           slices.uncons flatMap {
             case Some((head, tail)) =>
               val headComparator = comparatorGen(head)
@@ -1511,7 +1511,7 @@ trait BlockTableModule extends ColumnarTableModule {
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
     // TODO assert that this table only has one row
 
-    def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
+    def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): M[Table] = Need[Table](this)
 
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable =
       slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
@@ -1546,9 +1546,9 @@ trait BlockTableModule extends ColumnarTableModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = toExternalTable.sortUnique(sortKey, sortOrder)
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] = toExternalTable.sortUnique(sortKey, sortOrder)
 
-    override def force: NeedTable         = Need(this)
+    override def force: M[Table]         = Need(this)
     override def paged(limit: Int): Table = this
 
     def takeRange(startIndex0: Long, numberToTake0: Long): Table = (
@@ -1590,7 +1590,7 @@ trait BlockTableModule extends ColumnarTableModule {
       acc(slices, Nil, 0L).value
     }
 
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable =
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] =
       groupByN(Seq(sortKey), root, sortOrder, unique = true) map (_.headOption getOrElse Table.empty)
 
     /**

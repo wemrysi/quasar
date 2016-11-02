@@ -57,8 +57,8 @@ object TableCompanion {
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
-  type Table     = T
-  type NeedTable = Need[Table]
+  type M[X]  = T#M[X]
+  type Table = T
 
   def apply(slices: NeedSlices, size: TableSize): T
 
@@ -129,7 +129,6 @@ trait Table {
   type SingletonTable <: Table with ygg.table.SingletonTable
 
   type M[X]       = Need[X]
-  type NeedTable  = M[Table]
   type NeedSlices = StreamT[M, Slice]
 
   /**
