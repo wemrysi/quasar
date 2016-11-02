@@ -20,7 +20,8 @@ import ygg._, common._, json._
 import trans._
 import quasar._
 import quasar.ejson.EJson
-import scalaz.{ Source => _, _ }, Scalaz._
+import scalaz.{ Source => _, _ }
+import Scalaz.{ ToIdOps => _, _ }
 
 class TableSelector[A <: Table](val table: A { type Table = A }) {
   def >>(): Unit = table.toVector foreach println
@@ -84,13 +85,18 @@ trait TableCompanion[T <: ygg.table.Table] {
   private def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
   private def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
 
-  def sort[F[_]: Monad](table: T)(key: TransSpec1, order: DesiredSortOrder): F[T] = table match {
-    case _: SingletonTable => Monad[F].point(table)
-    case _: InternalTable  => sort[F](fixTable[T](table.toExternalTable))(key, order)
-    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order) map (_.headOption getOrElse empty)
+  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
+  def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
+
+  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
+    case _: SingletonTable => table.point[F]
+    case _: InternalTable  => sortCommon[F](fixTable[T](table.toExternalTable), key, order, unique)
+    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
   }
-  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder): F[Seq[T]] = {
-    fixTables[T](table.groupByN(keys, values, order, unique = false).value).point[F]
+  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
+    case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
+    case _: InternalTable  => groupByN[F](fixTable[T](table.toExternalTable), keys, values, order, unique)
+    case t: ExternalTable  => ().point[F] map (_ => fixTables(t.groupExternalByN(keys, values, order, unique).value))
   }
 
   def constSingletonTable(singleType: CType, column: Column): T
@@ -106,10 +112,9 @@ trait TemporaryTableStrutCompanion {
 }
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                                               = ???
-  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
-  def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                     = ???
-  def toExternalTable(): ExternalTable                                                                                                = ???
+  // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
+  def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                 = ???
+  def toExternalTable(): ExternalTable                                                                                            = ???
 
   def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
   def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
@@ -119,6 +124,7 @@ trait InternalTable extends Table {
   def slice: Slice
 }
 trait ExternalTable extends Table {
+  def groupExternalByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 }
 trait SingletonTable extends Table {
 }
@@ -193,7 +199,7 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
+  // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
   /**
     * Converts a table to an internal table, if possible. If the table is

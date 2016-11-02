@@ -266,7 +266,7 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
-    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self)(key, order)
+    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
 
     def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
@@ -1511,7 +1511,7 @@ trait BlockTableModule extends ColumnarTableModule {
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
     // TODO assert that this table only has one row
 
-    def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): M[Table] = Need[Table](this)
+    // def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): M[Table] = Need[Table](this)
 
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable =
       slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
@@ -1526,10 +1526,10 @@ trait BlockTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
-      val xform = transform(valueSpec)
-      Need(List.fill(groupKeys.size)(xform))
-    }
+    // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
+    //   val xform = transform(valueSpec)
+    //   Need(List.fill(groupKeys.size)(xform))
+    // }
 
     def takeRange(startIndex: Long, numberToTake: Long): Table =
       if (startIndex <= 0 && startIndex + numberToTake >= 1) this else Table.empty
@@ -1543,10 +1543,10 @@ trait BlockTableModule extends ColumnarTableModule {
   final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
-      toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
+    // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
+    //   toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] = toExternalTable.sortUnique(sortKey, sortOrder)
+    // def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] = toExternalTable.sortUnique(sortKey, sortOrder)
 
     override def force: M[Table]         = Need(this)
     override def paged(limit: Int): Table = this
@@ -1590,8 +1590,7 @@ trait BlockTableModule extends ColumnarTableModule {
       acc(slices, Nil, 0L).value
     }
 
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] =
-      groupByN(Seq(sortKey), root, sortOrder, unique = true) map (_.headOption getOrElse Table.empty)
+    // def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] = companion.sortUnique[Table](this)(sortKey, sortOrder)
 
     /**
       * Sorts the KV table by ascending or descending order based on a seq of transformations
@@ -1599,7 +1598,7 @@ trait BlockTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
+    def groupExternalByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
