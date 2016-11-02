@@ -25,14 +25,11 @@ package object table {
   type SourceType   = trans.SourceType
 
   type NeedSlices     = StreamT[Need, Slice]
-  type NeedTable      = Need[Table]
   type RowId          = Int
   type Identity       = Long
   type Identities     = Array[Identity]
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
-
-  implicit def convertTableCompanion(x: Table.type): ColumnarTable.Table.type = ColumnarTable.Table
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =
     StreamT.unfoldM[Need, Slice, A](start)(f)

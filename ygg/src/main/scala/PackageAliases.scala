@@ -20,6 +20,5 @@ trait PackageAliases extends quasar.pkg.PackageAliases {
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
   type LazyPairOf[+A]         = scalaz.Need[PairOf[A]]
   type MaybeSelf[A]           = A =?> A
-  type ToSelf[A]              = A => A
   type jUri                   = java.net.URI
 }

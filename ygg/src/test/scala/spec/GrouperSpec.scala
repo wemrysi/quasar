@@ -87,12 +87,13 @@ class GrouperSpec extends BlockTableQspec {
   }
 
   private def testHistogramByValue(set: Stream[Int]) = {
-    val data    = augmentWithIdentities(set.map(JNum(_)))
-    val groupId = newGroupId
+    val data       = augmentWithIdentities(set.map(JNum(_)))
+    val groupId    = newGroupId
+    val tab: Table = fromJson(data)
 
-    val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource[Table](tab, root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => NeedTable) =>
+    val result = Table.merge(spec) { (key, map) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson
@@ -147,7 +148,7 @@ class GrouperSpec extends BlockTableQspec {
 
     val spec = GroupingSource(fromJson(data), root.key, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => NeedTable) =>
+    val result = Table.merge(spec) { (key, map) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson
@@ -197,7 +198,7 @@ class GrouperSpec extends BlockTableQspec {
 
     val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => NeedTable) =>
+    val result = Table.merge(spec) { (key, map) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson

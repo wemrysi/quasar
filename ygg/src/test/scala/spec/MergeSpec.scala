@@ -77,7 +77,7 @@ class MergeSpec extends TableQspec {
           ),
           GroupingSpec.Intersection)
 
-      def evaluator(key: RValue, partition: GroupId => NeedTable) = {
+      def evaluator[T <: ygg.table.Table](key: RValue, partition: GroupId => Need[T]) = {
         val K0 = RValue.fromJValue(json"""{"1":0,"2":4}""")
         val K1 = RValue.fromJValue(json"""{"1":1,"2":5}""")
         val K2 = RValue.fromJValue(json"""{"1":2,"2":6}""")
@@ -177,7 +177,7 @@ class MergeSpec extends TableQspec {
           ),
           GroupingSpec.Intersection)
 
-      def evaluator(key: RValue, partition: GroupId => NeedTable) = {
+      def evaluator[T <: ygg.table.Table](key: RValue, partition: GroupId => Need[T]) = {
         val K0 = RValue.fromJValue(json"""{"1":"1996","extra0":true,"extra1":true}""")
         val K1 = RValue.fromJValue(json"""{"1":"2000","extra0":true,"extra1":true}""")
         val K2 = RValue.fromJValue(json"""{"1":"2004","extra0":true,"extra1":true}""")

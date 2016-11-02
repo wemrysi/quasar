@@ -56,8 +56,8 @@ trait ColumnarTableModule {
 
   implicit def tableCompanion: ygg.table.TableCompanion[Table] = Table
 
-  def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
-    case x: GroupingSource                       => Vector(x)
+  def sourcesOf(gs: GroupingSpec[Table]): Vector[GroupingSource[Table]] = gs match {
+    case x: GroupingSource[Table]                => Vector(x)
     case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
   }
 
@@ -130,7 +130,7 @@ trait ColumnarTableModule {
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable = {
+    def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]

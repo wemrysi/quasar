@@ -74,7 +74,7 @@ trait TableCompanion[T <: ygg.table.Table] {
   def constEmptyArray: T
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
-  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
+  def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
   def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table]
   // def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 
