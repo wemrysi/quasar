@@ -103,9 +103,6 @@ object queryfile {
 
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
-
-                     case UnsupportedFunction(f) =>
-                       FileSystemError.planningFailed(lp, QPlanner.UnsupportedFunction(f, None))
                    })
         _       <- logPhase(PhaseResult.detail("XQuery", main.render))
       } yield main

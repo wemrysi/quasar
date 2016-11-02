@@ -151,6 +151,23 @@ object qscript {
         .else_ { elt `/` child.node() })
     })
 
+  // FIXME: Use new declare syntax and ST alias
+  // qscript:isoyear-from-dateTime($dt as xs:dateTime) as xs:integer
+  def isoyearFromDateTime[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("isoyear-from-dateTime").qn[F] map { fname =>
+      declare(fname)(
+        $("dt") as SequenceType("xs:dateTime")
+      ).as(SequenceType("xs:integer")) { dt: XQuery =>
+        if_((fn.monthFromDateTime(dt) eq 1.xqy) and (xdmp.weekFromDate(xs.date(dt)) ge 52.xqy))
+        .then_ { fn.yearFromDateTime(dt) - 1.xqy }
+        .else_ {
+          if_((fn.monthFromDateTime(dt) eq 12.xqy) and (xdmp.weekFromDate(xs.date(dt)) lt 52.xqy))
+          .then_ { fn.yearFromDateTime(dt) + 1.xqy }
+          .else_ { fn.yearFromDateTime(dt) }
+        }
+      }
+    }
+
   // qscript:identity($x as item()*) as item()*
   def identity[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("identity") map (_(

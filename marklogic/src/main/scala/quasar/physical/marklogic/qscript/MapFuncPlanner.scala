@@ -28,7 +28,6 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
-import quasar.std.StdLib
 
 import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
@@ -70,7 +69,7 @@ object MapFuncPlanner {
     case ExtractEpoch(time)           => qscript.asDateTime[F] apply time flatMap (qscript.secondsSinceEpoch[F].apply(_))
     case ExtractHour(time)            => qscript.asDateTime[F] apply time map fn.hoursFromDateTime
     case ExtractIsoDayOfWeek(time)    => qscript.asDate[F].apply(time) map (xdmp.weekdayFromDate)
-    case ExtractIsoYear(time)         => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unsupportedFunction(StdLib.date.ExtractIsoYear))
+    case ExtractIsoYear(time)         => qscript.asDateTime[F] apply time flatMap (qscript.isoyearFromDateTime[F].apply(_))
     case ExtractMicroseconds(time)    => qscript.asDateTime[F] apply time map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000000.xqy))
     case ExtractMillennium(time)      => qscript.asDateTime[F] apply time map (dt =>
