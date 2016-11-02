@@ -22,6 +22,7 @@ import quasar._
 import quasar.ejson.EJson
 import scalaz.{ Source => _, _ }
 import Scalaz.{ ToIdOps => _, _ }
+import JDBM.IndexMap
 
 class TableSelector[A <: Table](val table: A { type Table = A }) {
   def >>(): Unit = table.toVector foreach println
@@ -57,6 +58,16 @@ object TableCompanion {
   def apply[A <: Table](implicit z: TableCompanion[A]): TableCompanion[A] = z
 }
 
+trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
+  def sortMergeEngine: MergeEngine
+  def addGlobalId(spec: TransSpec1): TransSpec1
+  def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T
+  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState]
+  def reduceSlices(slices: NeedSlices): NeedSlices
+
+  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = Align[T](sourceL, alignL, sourceR, alignR)(this)
+}
+
 trait TableCompanion[T <: ygg.table.Table] {
   type M[X]  = T#M[X]
   type Table = T
@@ -76,7 +87,6 @@ trait TableCompanion[T <: ygg.table.Table] {
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
-  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table]
   // def cross(left: T, right: T, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
@@ -85,6 +95,13 @@ trait TableCompanion[T <: ygg.table.Table] {
   private def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
   private def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
 
+  /**
+    * Sorts the KV table by ascending or descending order of a transformation
+    * applied to the rows.
+    *
+    * @param key The transspec to use to obtain the values to sort on
+    * @param order Whether to sort ascending or descending
+    */
   def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
@@ -93,6 +110,18 @@ trait TableCompanion[T <: ygg.table.Table] {
     case _: InternalTable  => sortCommon[F](fixTable[T](table.toExternalTable), key, order, unique)
     case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
   }
+
+  /**
+    * Sorts the KV table by ascending or descending order based on a seq of transformations
+    * applied to the rows.
+    *
+    * @param keys The transspecs to use to obtain the values to sort on
+    * @param values The transspec to use to obtain the non-sorting values
+    * @param order Whether to sort ascending or descending
+    * @param unique If true, the same key values will sort into a single row, otherwise
+    * we assign a unique row ID as part of the key so that multiple equal values are
+    * preserved
+    */
   def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
     case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
     case _: InternalTable  => groupByN[F](fixTable[T](table.toExternalTable), keys, values, order, unique)
@@ -106,15 +135,10 @@ trait TableCompanion[T <: ygg.table.Table] {
   def singleton(slice: Slice): T
 }
 
-trait TemporaryTableStrutCompanion {
-  type Table
-  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] = ???
-}
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
-  def toInternalTable(limit: Int): ExternalTable \/ InternalTable                                                                 = ???
-  def toExternalTable(): ExternalTable                                                                                            = ???
+  def toInternalTable(limit: Int): ExternalTable \/ InternalTable = ???
+  def toExternalTable(): ExternalTable                            = ???
 
   def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
   def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
@@ -128,6 +152,7 @@ trait ExternalTable extends Table {
 }
 trait SingletonTable extends Table {
 }
+
 trait Table {
   type Table <: ygg.table.Table
   type InternalTable <: Table with ygg.table.InternalTable
@@ -178,28 +203,6 @@ trait Table {
     * over the results.
     */
   def force: M[Table]
-
-  /**
-    * Sorts the KV table by ascending or descending order of a transformation
-    * applied to the rows.
-    *
-    * @param sortKey The transspec to use to obtain the values to sort on
-    * @param sortOrder Whether to sort ascending or descending
-    */
-  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table]
-
-  /**
-    * Sorts the KV table by ascending or descending order based on a seq of transformations
-    * applied to the rows.
-    *
-    * @param groupKeys The transspecs to use to obtain the values to sort on
-    * @param valueSpec The transspec to use to obtain the non-sorting values
-    * @param sortOrder Whether to sort ascending or descending
-    * @param unique If true, the same key values will sort into a single row, otherwise
-    * we assign a unique row ID as part of the key so that multiple equal values are
-    * preserved
-    */
-  // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
   /**
     * Converts a table to an internal table, if possible. If the table is

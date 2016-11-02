@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, data._, trans._
+import ygg._, common._, trans._
 
 object F1Expr {
   def negate         = cf.math.Negate
@@ -150,21 +150,4 @@ final object CrossOrder {
   case object CrossRight       extends CrossOrder
   case object CrossLeftRight   extends CrossOrder
   case object CrossRightLeft   extends CrossOrder
-}
-
-object aligns {
-  sealed trait AlignState                                                                 extends Product with Serializable
-  final case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
-  final case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
-  final case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
-  final case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
-
-  sealed trait Span           extends Product with Serializable
-  final case object LeftSpan  extends Span
-  final case object RightSpan extends Span
-  final case object NoSpan    extends Span
-
-  sealed trait NextStep                                                       extends Product with Serializable
-  final case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
-  final case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
 }
