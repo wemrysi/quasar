@@ -40,6 +40,7 @@ final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A,
   override def toString = {
     func.shows + "(" + values.mkString(", ") + ")"
   }
+  // TODO remove this #1677
   override def equals(that: scala.Any): Boolean = that match {
     case that @ Invoke(_, _) =>
       (this.func == that.func) && (this.values.unsized == that.values.unsized)

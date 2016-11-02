@@ -34,6 +34,8 @@ package object logicalplan {
   def constant[A] =
     Prism.partial[LogicalPlan[A], Data] { case Constant(p) => p } (Constant(_))
 
+  // TODO this Prism is incorrect
+  // it needs to guarantee the same N <: Nat everywhere
   def invoke[A] =
     Prism.partial[LogicalPlan[A], (GenericFunc[Nat], Func.Input[A, Nat])] {
       case Invoke(f, as) => (f, as)
