@@ -319,6 +319,20 @@ object qscript {
       fn.timezoneFromDateTime(dt) div xs.dayTimeDuration("PT1S".xs)
     })
 
+  // qscript:to-string($item as item()) as xs:string?
+  def toString[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.name("to-string").qn[F] flatMap { fname =>
+      declare(fname)(
+        $("item") as SequenceType("item()")
+      ).as(SequenceType("xs:string")) { item: XQuery =>
+        ejson.typeOf[F].apply(item) map { tpe =>
+          if_(tpe eq "null".xs)
+          .then_ { "null".xs }
+          .else_ { fn.string(item) }
+        }
+      }
+    }
+
   // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
   def zipApply[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("zip-apply") map (_(

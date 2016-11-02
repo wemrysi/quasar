@@ -98,7 +98,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
     private val runSession: SessionIO ~> Task =
       ContentSourceIO.runNT(contentSource) compose ContentSourceIO.runSessionIO
 
-    // FIXME: need a function from Elem to XQuery literals, just using toString doesn't cut it due to escapes
+    // FIXME: need a function from Data to XQuery literals, just using toString doesn't cut it due to escapes
     //        maybe a fold using the element/attribute constructors?
     //
     //        Can we reuse the EncodeXQuery instance and the Data => EJson encoding?
