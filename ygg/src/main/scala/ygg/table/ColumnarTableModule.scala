@@ -682,28 +682,14 @@ trait ColumnarTableModule {
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table] = {
       // Find the first element that compares LT
       @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
-        val minOrd = compare(imin)
-        if (minOrd eq EQ) {
-          val maxOrd = compare(imax)
-          if (maxOrd eq EQ) {
-            imax + 1
-          } else if (maxOrd eq LT) {
-            val imid   = imin + ((imax - imin) / 2)
-            val midOrd = compare(imid)
-            if (midOrd eq LT) {
-              findEnd(compare, imin, imid - 1)
-            } else if (midOrd eq EQ) {
-              findEnd(compare, imid, imax - 1)
-            } else {
-              abort("Inputs to partitionMerge not sorted.")
-            }
-          } else {
-            abort("Inputs to partitionMerge not sorted.")
-          }
-        } else if ((minOrd eq LT) && (compare(imax) eq LT)) {
-          imin
-        } else {
-          abort("Inputs to partitionMerge not sorted.")
+        val imid = imin + (imax - imin) / 2
+
+        (compare(imin), compare(imid), compare(imax)) match {
+          case (LT, _, LT)  => imin
+          case (EQ, _, EQ)  => imax + 1
+          case (EQ, LT, LT) => findEnd(compare, imin, imid - 1)
+          case (EQ, EQ, LT) => findEnd(compare, imid, imax - 1)
+          case _            => abort("Inputs to partitionMerge not sorted.")
         }
       }
 
