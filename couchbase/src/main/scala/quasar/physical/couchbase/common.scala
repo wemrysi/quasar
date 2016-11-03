@@ -51,7 +51,7 @@ object common {
         FileSystemError.pathErr(PathError.invalidPath(f, "no bucket specified")).left,
         (h, t) => BucketCollection(h, t.intercalate("/")).right)
 
-  def docTypesFromPrefix[S[_]](
+  def docTypesFromPrefix(
     bucket: Bucket,
     prefix: String
   ): Task[List[DocType]] = Task.delay {
@@ -62,7 +62,7 @@ object common {
       .map(r => DocType(r.value.getString("type")))
   }
 
-  def existsWithPrefix[S[_]](
+  def existsWithPrefix(
     bucket: Bucket,
     prefix: String
   ): Task[Boolean] = Task.delay {
