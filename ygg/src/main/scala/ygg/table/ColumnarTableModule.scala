@@ -1099,36 +1099,6 @@ trait BlockTableModule extends ColumnarTableModule {
         jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> sortedSlice), insertCount = 0)
       }
     }
-
-    def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
-      import mergeEngine._
-      val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
-
-      // Map the distinct indices into SortProjections/Cells, then merge them
-      def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
-        case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
-          val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
-          // We can actually get the last key, but is that necessary?
-          Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
-
-        case (JDBM.SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          // Elided untested code.
-          ???
-      }
-
-      val head = StreamT.Skip(
-        StreamT.wrapEffect(
-          for (cellOptions <- cellsMs.sequence) yield {
-            mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
-              // only need to compare on the group keys (0th element of resulting table) between projections
-              slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
-            }
-          }
-        )
-      )
-
-      Table(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
-    }
   }
 
   sealed abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {

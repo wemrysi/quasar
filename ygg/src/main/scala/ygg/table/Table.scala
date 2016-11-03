@@ -22,7 +22,7 @@ import quasar._
 import quasar.ejson.EJson
 import scalaz.{ Source => _, _ }
 import Scalaz.{ ToIdOps => _, _ }
-import JDBM.IndexMap
+import JDBM.{ SortedSlice, IndexMap }
 
 private object addGlobalIdScanner extends Scanner {
   type A = Long
@@ -79,7 +79,36 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
   def addGlobalId(spec: TransSpec1): TransSpec1                                        = Scan(WrapArray(spec), addGlobalIdScanner)
   def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = AlignTable[T](sourceL, alignL, sourceR, alignR)(this)
 
-  def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T
+  def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
+    import mergeEngine._
+    val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
+
+    // Map the distinct indices into SortProjections/Cells, then merge them
+    def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
+      case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
+        val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
+        // We can actually get the last key, but is that necessary?
+        Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
+
+      case (JDBM.SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
+        // Elided untested code.
+        ???
+    }
+
+    val head = StreamT.Skip(
+      StreamT.wrapEffect(
+        for (cellOptions <- cellsMs.sequence) yield {
+          mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
+            // only need to compare on the group keys (0th element of resulting table) between projections
+            slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
+          }
+        }
+      )
+    )
+
+    fixTable(apply(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1))
+  }
+
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState]
   def reduceSlices(slices: NeedSlices): NeedSlices
 }

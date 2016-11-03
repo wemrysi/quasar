@@ -19,7 +19,6 @@ package ygg.table
 import scala.Predef.$conforms
 import scalaz._, Scalaz._, Ordering._
 import ygg._, common._
-import JDBM._
 
 class MergeEngine {
   type BlockData = BlockProjectionData[Bytes]

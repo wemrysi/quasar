@@ -46,16 +46,14 @@ object JDBMState {
 object JDBM {
   def jdbmCommitInterval: Long = 200000l
 
-  type Bytes             = Array[Byte]
   type BtoBEntry         = jMapEntry[Bytes, Bytes]
   type BtoBIterator      = scIterator[BtoBEntry]
   type BtoBMap           = java.util.SortedMap[Bytes, Bytes]
   type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
+  type IndexStore        = BtoBConcurrentMap
+  type IndexMap          = Map[IndexKey, SliceSorter]
 
   final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
-
-  type IndexStore = BtoBConcurrentMap
-  type IndexMap   = Map[IndexKey, SliceSorter]
 
   sealed trait SliceSorter {
     def name: String
