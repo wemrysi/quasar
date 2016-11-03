@@ -110,7 +110,23 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
   }
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState]
-  def reduceSlices(slices: NeedSlices): NeedSlices
+
+  /**
+    * Passes over all slices and returns a new slices that is the concatenation
+    * of all the slices. At some point this should lazily chunk the slices into
+    * fixed sizes so that we can individually sort/merge.
+    */
+  def reduceSlices(slices: NeedSlices): NeedSlices = {
+    def rec(ss: List[Slice], slices: NeedSlices): NeedSlices = {
+      StreamT[Need, Slice](slices.uncons map {
+        case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
+        case None if ss.isEmpty => StreamT.Done
+        case None               => StreamT.Yield(Slice.concat(ss.reverse), emptyStreamT())
+      })
+    }
+
+    rec(Nil, slices)
+  }
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
