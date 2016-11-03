@@ -107,18 +107,6 @@ class IntersectColumn[T <: Column](c1: T, c2: T) { this: T =>
   def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
 }
 
-class IntersectLotsColumn[T <: Column](cols: Array[T]) { this: T =>
-  def isDefinedAt(row: Int) = {
-    var i      = 0
-    var forall = true
-    while (i < cols.length && forall) {
-      forall = cols(i).isDefinedAt(row)
-      i += 1
-    }
-    forall
-  }
-}
-
 class AndLotsColumn(cols: Array[BoolColumn]) extends UnionLotsColumn[BoolColumn](cols) with BoolColumn {
   def apply(row: Int): Boolean = {
     var result = true

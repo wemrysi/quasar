@@ -1563,15 +1563,14 @@ class TransformSpec extends TableQspec {
   }
 
   private def testTrivialScan = {
-    val data = JObject(JField("value", JNum(BigDecimal("2705009941739170689"))) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil) #::
-        JObject(JField("value", JString("")) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil) #::
-          Stream.empty
+    val data = jsonMany"""
+      {"key":[1],"value":2705009941739170689}
+      {"key":[2],"value":""}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-    val results = toJson(table.transform {
-      Scan(root.value, lookupScanner(Nil, "sum"))
-    })
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
+    val results = toJson(table transform Scan(root.value, lookupScanner(Nil, "sum")))
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
@@ -1586,16 +1585,15 @@ class TransformSpec extends TableQspec {
   }
 
   private def testHetScan = {
-    val data = JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil) #::
-        JObject(JField("value", JNum(10)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil) #::
-          JObject(JField("value", JArray(JNum(13) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil) #::
-            Stream.empty
+    val data = jsonMany"""
+      {"key":[1],"value":12}
+      {"key":[2],"value":10}
+      {"key":[3],"value":[13]}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-    val results = toJson(table.transform {
-      Scan(root.value, lookupScanner(Nil, "sum"))
-    })
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
+    val results = toJson(table transform Scan(root.value, lookupScanner(Nil, "sum")))
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
