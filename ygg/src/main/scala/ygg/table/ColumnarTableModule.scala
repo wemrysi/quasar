@@ -102,12 +102,12 @@ trait ColumnarTableModule {
       ExactSize(1)
     )
 
-    def constBoolean(v: scSet[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
-    def constLong(v: scSet[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
-    def constDouble(v: scSet[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
-    def constDecimal(v: scSet[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
-    def constString(v: scSet[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
-    def constDate(v: scSet[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+    def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+    def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+    def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+    def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+    def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+    def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
     def constNull: Table                          = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
     def constEmptyObject: Table                   = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
     def constEmptyArray: Table                    = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
@@ -150,13 +150,13 @@ trait ColumnarTableModule {
             case hd +: Seq() => hd.map(Seq(_))
             case hd +: tl    => hd flatMap (disjunctHd => allSourceDNF(tl) map (disjunctTl => disjunctHd +: disjunctTl))
           }
-          def normalizedKeys(index: TableIndex, keySchema: KeySchema): scSet[Key] = {
+          def normalizedKeys(index: TableIndex, keySchema: KeySchema): Set[Key] = {
             val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
             for (key       <- index.getUniqueKeys)
               yield for (k <- schemaMap) yield if (k == -1) CUndefined else key(k)
           }
 
-          def intersect(keys0: scSet[Key], keys1: scSet[Key]): scSet[Key] = {
+          def intersect(keys0: Set[Key], keys1: Set[Key]): Set[Key] = {
             def consistent(key0: Key, key1: Key): Boolean =
               (key0 zip key1).forall {
                 case (k0, k1) => k0 == k1 || k0 == CUndefined || k1 == CUndefined

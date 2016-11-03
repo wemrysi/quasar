@@ -188,12 +188,12 @@ trait TableCompanion[T <: ygg.table.Table] {
   // TODO assert that this table only has one row
   def newInternalTable(slice: Slice): T
 
-  def constString(v: scSet[String]): T
-  def constLong(v: scSet[Long]): T
-  def constDouble(v: scSet[Double]): T
-  def constDecimal(v: scSet[BigDecimal]): T
-  def constDate(v: scSet[DateTime]): T
-  def constBoolean(v: scSet[Boolean]): T
+  def constString(v: Set[String]): T
+  def constLong(v: Set[Long]): T
+  def constDouble(v: Set[Double]): T
+  def constDecimal(v: Set[BigDecimal]): T
+  def constDate(v: Set[DateTime]): T
+  def constBoolean(v: Set[Boolean]): T
   def constNull: T
   def constEmptyObject: T
   def constEmptyArray: T
