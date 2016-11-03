@@ -54,7 +54,7 @@ solve 'a, 'b
   ...
  */
 
-class GrouperSpec extends BlockTableQspec {
+class GrouperSpec extends TableQspec {
   import trans._
   import constants._
 

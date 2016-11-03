@@ -20,10 +20,10 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import trans.DerefObjectStatic
 
-object BlockTableQspec {
+object TableQspec {
   def fromSample(sampleData: SampleData): Impl = new Impl(sampleData)
 
-  class Impl(sampleData: SampleData) extends BlockTableQspec {
+  class Impl(sampleData: SampleData) extends TableQspec {
     val Some((idCount, schema)) = sampleData.schema
     val actualSchema            = CValueGenerators.inferSchema(sampleData.data map { _ \ "value" })
 
@@ -53,28 +53,15 @@ object BlockTableQspec {
   }
 }
 
-abstract class BlockTableQspec extends AbsTableQspec with BlockTableModule
-
-abstract class AbsTableQspec extends quasar.Qspec with ColumnarTableModule {
-  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
-  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
-}
-
-abstract class TableQspec extends AbsTableQspec {
+abstract class TableQspec extends quasar.Qspec with TableModule {
   self =>
 
   import SampleData._
 
-  def fromSlices(slices: NeedSlices, size: TableSize): Table = new Table(slices, size)
-
-  type TableCompanion = ThisTableCompanion
-  final object Table extends ThisTableCompanion {
-    /** FIXME **/
-    def sort[F[_]: Monad](table: Table, key: TransSpec1, order: DesiredSortOrder): F[Table] = table.point[F]
-  }
-  final class Table(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) with TemporaryTableStrut
+  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
+  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
 
   type ASD = Arbitrary[SampleData]
 

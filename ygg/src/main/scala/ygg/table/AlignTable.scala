@@ -36,7 +36,7 @@ object AlignTable {
   final case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
   final case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
 
-  def apply[T <: ygg.table.Table](sourceL: T, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1)(implicit z: BlockTableCompanion[T]): PairOf[T] = {
+  def apply[T <: ygg.table.Table](sourceL: T, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1)(implicit z: TableCompanion[T]): PairOf[T] = {
     import z.{ empty, addGlobalId, sortMergeEngine, loadTable, writeAlignedSlices, reduceSlices }
 
     // we need a custom row comparator that ignores the global ID introduced to prevent elimination of

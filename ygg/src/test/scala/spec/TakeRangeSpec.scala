@@ -58,13 +58,13 @@ class TakeRangeSpec extends TableQspec {
       val start          = choose(-7, size + 7).sample.get
       val count          = choose(start, size + 7).sample.get
       val takeRangeTable = table.takeRange(start.toLong, count.toLong)
-      val result         = toJson(takeRangeTable).copoint
+      val result         = toJson(takeRangeTable).copoint.toVector
 
-      val expected =
-        if (start < 0) Stream()
-        else sample.data.toSeq.drop(start).take(count)
-
-      result must_== expected
+      val expected = (
+        if (start < 0) Vector()
+        else sample.data.toVector.slice(start, start + count)
+      )
+      result must_=== expected
     }
   }
 

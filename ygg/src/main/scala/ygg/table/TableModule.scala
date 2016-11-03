@@ -32,15 +32,20 @@ final case class EnormousCartesianException(left: TableSize, right: TableSize) e
 }
 final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
-trait ColumnarTableModule {
+trait TableModule {
   outer =>
 
   def projections: Map[Path, Projection] = Map[Path, Projection]()
-  def fromSlices(slices: NeedSlices, size: TableSize): Table
 
-  type Table <: ThisTable
-  type TableCompanion <: ThisTableCompanion
-  val Table: TableCompanion
+  def fromSlice(slice: Slice): Table = new InternalTable(slice)
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
+    case ExactSize(1) => new SingletonTable(slices)
+    case _            => new ExternalTable(slices, size)
+  }
+
+  type TableCompanion = BaseTableCompanion
+  type Table          = BaseTable
+  object Table extends BaseTableCompanion
 
   implicit def tableCompanion: ygg.table.TableCompanion[Table] = Table
 
@@ -71,7 +76,7 @@ trait ColumnarTableModule {
     )
   }
 
-  trait ThisTableCompanion extends ygg.table.TableCompanion[Table] {
+  trait BaseTableCompanion extends ygg.table.TableCompanion[Table] {
     def load(table: Table, tpe: JType): M[Table] = {
       val reduced = table reduce new CReducer[Set[Path]] {
         def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
@@ -88,10 +93,10 @@ trait ColumnarTableModule {
       }
     }
 
+    def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
+    def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
     def empty: Table                                                 = Table(emptyStreamT(), ExactSize(0))
     def apply(slices: NeedSlices, size: TableSize): Table            = fromSlices(slices, size)
-    def newInternalTable(slice: Slice): Table                        = apply(singleStreamT(slice), ExactSize(slice.size))
-    def newExternalTable(slices: NeedSlices, size: TableSize): Table = apply(slices, size)
     def fromJson(data: Seq[JValue]): Table                           = outer fromJson data
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
@@ -247,10 +252,18 @@ trait ColumnarTableModule {
     }
   }
 
-  abstract class ThisTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
+  sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
+
+    override def toString = s"Table(_, $size)"
+    def toJsonString: String = toJValues mkString "\n"
+
+    /**
+      * Forces a table to an external table, possibly de-optimizing it.
+      */
+    def toExternalTable(): ExternalTable = new outer.ExternalTable(slices, size)
 
     def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]    = companion.sort[Need](self, key, order)
     def toInternalTable(limit: Int): ExternalTable \/ InternalTable = companion.toInternalTable(self, limit).bimap(x => fixTable[ExternalTable](x), x => fixTable[InternalTable](x))
@@ -898,38 +911,6 @@ trait ColumnarTableModule {
         )
       )
     )
-  }
-}
-
-
-trait BlockTableModule extends ColumnarTableModule {
-  outer =>
-
-  type TableCompanion = BaseTableCompanion
-  type Table          = BaseTable
-  object Table extends BaseTableCompanion
-
-  override implicit def tableCompanion: ygg.table.BlockTableCompanion[Table] = Table
-
-  def fromSlice(slice: Slice): Table = new InternalTable(slice)
-  def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
-    case ExactSize(1) => new SingletonTable(slices)
-    case _            => new ExternalTable(slices, size)
-  }
-
-  trait BaseTableCompanion extends ThisTableCompanion with ygg.table.BlockTableCompanion[Table] {
-    override def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
-    override def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
-  }
-
-  sealed abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
-    override def toString = s"Table(_, $size)"
-    def toJsonString: String = toJValues mkString "\n"
-
-    /**
-      * Forces a table to an external table, possibly de-optimizing it.
-      */
-    def toExternalTable(): ExternalTable = new outer.ExternalTable(slices, size)
   }
 
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {

@@ -40,7 +40,7 @@ private object JValueInColumnOrder {
   }
 }
 
-class BlockAlignSpec extends BlockTableQspec {
+class BlockAlignSpec extends TableQspec {
   implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {
@@ -552,7 +552,7 @@ class BlockAlignSpec extends BlockTableQspec {
   }
 
   private def testLoadDense(sample: SampleData) = {
-    val module = BlockTableQspec fromSample sample
+    val module = TableQspec fromSample sample
 
     val expected = sample.data flatMap { jv =>
       val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {

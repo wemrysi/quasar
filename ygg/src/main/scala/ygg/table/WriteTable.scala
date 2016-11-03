@@ -21,10 +21,10 @@ import ygg._, common._
 import JDBM._
 
 object WriteTable {
-  def apply[T <: ygg.table.Table](implicit companion: BlockTableCompanion[T]) = new WriteTable[T]
+  def apply[T <: ygg.table.Table](implicit companion: TableCompanion[T]) = new WriteTable[T]
 }
 
-class WriteTable[T <: ygg.table.Table](implicit companion: BlockTableCompanion[T]) {
+class WriteTable[T <: ygg.table.Table](implicit companion: TableCompanion[T]) {
   def writeTables(slices: NeedSlices,
                   valueTrans: SliceTransform1[_],
                   keyTrans: Seq[SliceTransform1[_]],

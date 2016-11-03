@@ -33,12 +33,12 @@ private object addGlobalIdScanner extends Scanner {
   }
 }
 
-class TableSelector[A <: Table](val table: A { type Table = A }) {
+class TableSelector[A <: Table](val table: A) {
   def >>(): Unit = table.toVector foreach println
 
   def filter(p: TransSpec[Source.type]) = table transform (root filter p)
 }
-object Table extends BlockTableModule {
+object Table extends TableModule {
   implicit val codec = DataCodec.Precise
 
   def apply(json: String): BaseTable = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
@@ -73,7 +73,10 @@ object TableCompanion {
   def apply[A <: Table](implicit z: TableCompanion[A]): TableCompanion[A] = z
 }
 
-trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
+trait TableCompanion[T <: ygg.table.Table] {
+  type M[X]  = T#M[X]
+  type Table = T
+
   lazy val sortMergeEngine = new MergeEngine
 
   def addGlobalId(spec: TransSpec1): TransSpec1                                        = Scan(WrapArray(spec), addGlobalIdScanner)
@@ -177,11 +180,6 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
 
     rec(Nil, slices)
   }
-}
-
-trait TableCompanion[T <: ygg.table.Table] {
-  type M[X]  = T#M[X]
-  type Table = T
 
   def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
@@ -201,7 +199,6 @@ trait TableCompanion[T <: ygg.table.Table] {
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
-  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
