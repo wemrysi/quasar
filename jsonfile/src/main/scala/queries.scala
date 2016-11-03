@@ -59,7 +59,7 @@ object FPlan {
 
 object Queries {
   def zipsFile  = new jFile("it/src/main/resources/tests/zips.data")
-  lazy val zips = ygg.table.BlockTable(zipsFile)
+  lazy val zips = ygg.table.Table(zipsFile)
 
   def fplans: Vector[FPlan] = Vector(
     """SELECT * FROM zips OFFSET 100 LIMIT 5""",

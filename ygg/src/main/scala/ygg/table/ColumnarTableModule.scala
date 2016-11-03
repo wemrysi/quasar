@@ -91,6 +91,7 @@ trait ColumnarTableModule {
 
     def empty: Table                                      = Table(emptyStreamT(), ExactSize(0))
     def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
+    def newInternalTable(slice: Slice): Table             = apply(singleStreamT(slice), ExactSize(slice.size))
     def fromJson(data: Seq[JValue]): Table                = outer fromJson data
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
@@ -251,11 +252,12 @@ trait ColumnarTableModule {
 
     type Table = outer.Table
 
-    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
+    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]    = companion.sort[Need](self, key, order)
+    def toInternalTable(limit: Int): ExternalTable \/ InternalTable = companion.toInternalTable(self, limit).bimap(x => fixTable[ExternalTable](x), x => fixTable[InternalTable](x))
 
     def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
-    def load(tpe: JType): M[Table]                         = companion.load(this, tpe)
+    def load(tpe: JType): M[Table]                          = companion.load(this, tpe)
     def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
     def slicesStream: Stream[Slice]                         = slices.toStream.value
     def columns: ColumnMap                                  = slicesStream.head.columns
@@ -923,12 +925,15 @@ trait BlockTableModule extends ColumnarTableModule {
 
   override implicit def tableCompanion: ygg.table.BlockTableCompanion[Table] = Table
 
+  def fromSlice(slice: Slice): Table = new InternalTable(slice)
   def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
     case ExactSize(1) => new SingletonTable(slices)
     case _            => new ExternalTable(slices, size)
   }
 
   trait BaseTableCompanion extends ThisTableCompanion with ygg.table.BlockTableCompanion[Table] {
+    override def newInternalTable(slice: Slice): InternalTable = new InternalTable(slice)
+
     /**
       * Passes over all slices and returns a new slices that is the concatenation
       * of all the slices. At some point this should lazily chunk the slices into
@@ -1141,10 +1146,7 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
-    // TODO assert that this table only has one row
-    def toInternalTable(limit: Int): ExternalTable \/ InternalTable =
-      slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
-
+    def slice: Need[Slice] = slices0.head
     def toRValue: Need[RValue] = {
       def loop(stream: NeedSlices): Need[RValue] = stream.uncons flatMap {
         case Some((head, tail)) if head.size > 0 => Need(head.toRValue(0))
@@ -1164,8 +1166,6 @@ trait BlockTableModule extends ColumnarTableModule {
     * allowed more optimizations when doing things like joins.
     */
   final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
-    def toInternalTable(limit: Int): ExternalTable \/ InternalTable = \/-(this)
-
     override def force: M[Table]         = Need(this)
     override def paged(limit: Int): Table = this
 
@@ -1182,7 +1182,7 @@ trait BlockTableModule extends ColumnarTableModule {
 
     def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
 
-    def toInternalTable(limit0: Int): ExternalTable \/ InternalTable = {
+    def externalToInternal(limit0: Int): ExternalTable \/ InternalTable = {
       val limit = limit0.toLong
 
       def acc(slices: NeedSlices, buffer: List[Slice], size: Long): Need[ExternalTable \/ InternalTable] = {

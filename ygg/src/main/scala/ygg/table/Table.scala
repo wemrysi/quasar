@@ -38,7 +38,19 @@ class TableSelector[A <: Table](val table: A { type Table = A }) {
 
   def filter(p: TransSpec[Source.type]) = table transform (root filter p)
 }
-object Table extends BlockTableBase
+object Table extends BlockTableModule {
+  implicit val codec = DataCodec.Precise
+
+  def apply(json: String): BaseTable = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
+  def apply(file: jFile): BaseTable  = apply(file.slurpString)
+
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
+  def fromData(data: Vector[Data]): BaseTable      = fromJson(data map dataToJValue)
+  def fromFile(file: jFile): BaseTable             = fromJson((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): BaseTable          = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): BaseTable        = fromJson(json.toVector)
+}
 
 trait TableConstructors[T <: ygg.table.Table] {
   type JsonRep
@@ -78,6 +90,8 @@ trait TableCompanion[T <: ygg.table.Table] {
 
   def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
+  // TODO assert that this table only has one row
+  def newInternalTable(slice: Slice): T
 
   def constString(v: scSet[String]): T
   def constLong(v: scSet[Long]): T
@@ -94,9 +108,6 @@ trait TableCompanion[T <: ygg.table.Table] {
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
-
-  private def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
-  private def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
 
   /**
     * Sorts the KV table by ascending or descending order of a transformation
@@ -131,6 +142,21 @@ trait TableCompanion[T <: ygg.table.Table] {
     case t: ExternalTable  => ().point[F] map (_ => fixTables(t.groupExternalByN(keys, values, order, unique).value))
   }
 
+  /**
+    * Converts a table to an internal table, if possible. If the table is
+    * already an `InternalTable` or a `SingletonTable`, then the conversion
+    * will always succeed. If the table is an `ExternalTable`, then if it has
+    * less than `limit` rows, it will be converted to an `InternalTable`,
+    * otherwise it will stay an `ExternalTable`.
+    */
+  def toInternalTable(table: T, limit: Int): T#ExternalTable \/ T#InternalTable = table match {
+    case x: SingletonTable       => x.slices.toStream.map(xs => \/-(fixTable[T#InternalTable](newInternalTable(Slice concat xs takeRange (0, 1))))).value
+
+    // \/-(fixTable[T#InternalTable](x.slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
+    case x: InternalTable        => \/-(fixTable[T#InternalTable](x))
+    case x: ExternalTable with T => x externalToInternal limit
+  }
+
   def constSingletonTable(singleType: CType, column: Column): T
   def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
   def fromJson(data: Seq[JValue]): T
@@ -139,9 +165,7 @@ trait TableCompanion[T <: ygg.table.Table] {
 
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  def toInternalTable(limit: Int): ExternalTable \/ InternalTable = ???
-  def toExternalTable(): ExternalTable                            = ???
-
+  def toExternalTable(): ExternalTable = ???
   def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
   def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
 }
@@ -151,8 +175,10 @@ trait InternalTable extends Table {
 }
 trait ExternalTable extends Table {
   def groupExternalByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
+  def externalToInternal(limit: Int): ExternalTable \/ InternalTable
 }
 trait SingletonTable extends Table {
+  def slice: Need[Slice]
 }
 
 trait Table {
@@ -213,7 +239,6 @@ trait Table {
     * less than `limit` rows, it will be converted to an `InternalTable`,
     * otherwise it will stay an `ExternalTable`.
     */
-  def toInternalTable(limit: Int): ExternalTable \/ InternalTable
   def toExternalTable(): ExternalTable
 
   /**
