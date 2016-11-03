@@ -25,18 +25,26 @@ import quasar.std
 
 import matryoshka._
 import org.scalacheck._
-import org.specs2.scalaz._
+import org.specs2.scalaz.{ScalazMatchers, Spec}
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import scalaz.scalacheck.ScalazProperties.{equal => _, _}
 import shapeless.contrib.scalaz.instances._
 import pathy.Path._
 
-class LogicalPlanSpecs extends Spec {
+class LogicalPlanSpecs extends Spec with ScalazMatchers {
+  // `Gen.oneOf` calls `Gen.suchThat` which in turn calls `==`
+  // We cannot compare `LogicalPlan` instances with `==` and instead prefer `scalaz.Equal`.
+  // Removing the call to `Gen.suchThat` may have a negative performance impact or
+  // may result in nonoptimal example simplification.
+  def oneOfNoEquals[T](gs: Gen[T]*): Gen[T] = {
+    Gen.choose(0, gs.size - 1).flatMap(gs(_))
+  }
+
   implicit val arbLogicalPlan: Delay[Arbitrary, LogicalPlan] =
     new Delay[Arbitrary, LogicalPlan] {
       def apply[A](arb: Arbitrary[A]) =
         Arbitrary {
-          Gen.oneOf(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
+          oneOfNoEquals(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
         }
     }
 
@@ -74,12 +82,12 @@ class LogicalPlanSpecs extends Spec {
           lpf.let('bar, lpf.read(file("bar")),
             Fix(MakeObjectN(
               lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))),
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))) must_==
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))) must equal(
         lpf.let('__tmp0, lpf.read(file("foo")),
           lpf.let('__tmp1, lpf.read(file("bar")),
             Fix(MakeObjectN(
               lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))),
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("y"))))))))
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("y")))))))))
     }
 
     "rename shadowed name" in {
@@ -87,11 +95,11 @@ class LogicalPlanSpecs extends Spec {
         lpf.let('x, lpf.read(file("foo")),
           lpf.let('x, Fix(MakeObjectN(
               lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('x), lpf.constant(Data.Str("x")))))),
-            lpf.free('x)))) must_==
+            lpf.free('x)))) must equal(
         lpf.let('__tmp0, lpf.read(file("foo")),
           lpf.let('__tmp1, Fix(MakeObjectN(
               lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))))),
-            lpf.free('__tmp1)))
+            lpf.free('__tmp1))))
     }
   }
 
@@ -103,13 +111,13 @@ class LogicalPlanSpecs extends Spec {
             lpf.read(file("foo")),
             Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))),
           Fix(MakeObjectN(
-            lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must_==
+            lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must equal(
         lpf.let('foo,
           lpf.read(file("foo")),
           lpf.let('bar,
             Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))),
             Fix(MakeObjectN(
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))
+              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))))
     }
 
     "re-nest deep" in {
@@ -121,7 +129,7 @@ class LogicalPlanSpecs extends Spec {
               Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0))))))),
             Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1))))))),
           Fix(MakeObjectN(
-            lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))) must_==
+            lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))) must equal(
         lpf.let('foo,
           lpf.read(file("foo")),
           lpf.let('bar,
@@ -129,19 +137,19 @@ class LogicalPlanSpecs extends Spec {
             lpf.let('baz,
               Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1)))))),
               Fix(MakeObjectN(
-                lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))))
+                lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z"))))))))))
     }
 
     "hoist multiple Lets" in {
       lpf.normalizeLets(
         Fix(Add(
           lpf.let('x, lpf.constant(Data.Int(0)), Fix(Add(lpf.free('x), lpf.constant(Data.Int(1))))),
-          lpf.let('y, lpf.constant(Data.Int(2)), Fix(Add(lpf.free('y), lpf.constant(Data.Int(3)))))))) must_==
+          lpf.let('y, lpf.constant(Data.Int(2)), Fix(Add(lpf.free('y), lpf.constant(Data.Int(3)))))))) must equal(
         lpf.let('x, lpf.constant(Data.Int(0)),
           lpf.let('y, lpf.constant(Data.Int(2)),
             Fix(Add(
               Fix(Add(lpf.free('x), lpf.constant(Data.Int(1)))),
-              Fix(Add(lpf.free('y), lpf.constant(Data.Int(3))))))))
+              Fix(Add(lpf.free('y), lpf.constant(Data.Int(3)))))))))
     }
 
     "hoist deep Let by one level" in {
@@ -150,13 +158,13 @@ class LogicalPlanSpecs extends Spec {
           lpf.constant(Data.Int(0)),
           Fix(Add(
             lpf.let('x, lpf.constant(Data.Int(1)), Fix(Add(lpf.free('x), lpf.constant(Data.Int(2))))),
-            lpf.constant(Data.Int(3))))))) must_==
+            lpf.constant(Data.Int(3))))))) must equal(
         Fix(Add(
           lpf.constant(Data.Int(0)),
           lpf.let('x, lpf.constant(Data.Int(1)),
             Fix(Add(
               Fix(Add(lpf.free('x), lpf.constant(Data.Int(2)))),
-              lpf.constant(Data.Int(3)))))))
+              lpf.constant(Data.Int(3))))))))
     }
   }
 }
