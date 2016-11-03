@@ -100,7 +100,7 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
 
-  def cogroup[K, V, V1, CC[X] <: scIterable[X]](ls: scMap[K, CC[V]], rs: scMap[K, CC[V1]]): Cogrouped.Result[K, V, V1, CC] = Cogrouped.Builder(ls, rs).build
+  def cogroup[K, V, V1, CC[X] <: scIterable[X]](ls: Map[K, CC[V]], rs: Map[K, CC[V1]]): Cogrouped.Result[K, V, V1, CC] = Cogrouped.Builder(ls, rs).build
 
   implicit class YggByteBufferOps(private val bb: ByteBuffer) {
     def read[A](implicit z: Codec[A]): A = z read bb

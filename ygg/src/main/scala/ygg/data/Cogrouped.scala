@@ -23,7 +23,7 @@ object Cogrouped {
   type Element[V, V1, CC[X]]   = Either3[V, CC[V] -> CC[V1], V1]
   type Result[K, V, V1, CC[X]] = Seq[K -> Element[V, V1, CC]]
 
-  final case class Builder[K, V, V1, CC[X] <: scIterable[X]](lmap: scMap[K, CC[V]], rmap: scMap[K, CC[V1]]) {
+  final case class Builder[K, V, V1, CC[X] <: scIterable[X]](lmap: Map[K, CC[V]], rmap: Map[K, CC[V1]]) {
     lazy val leftKeys   = lmap.keySet -- rmap.keySet
     lazy val middleKeys = lmap.keySet & rmap.keySet
     lazy val rightKeys  = rmap.keySet -- lmap.keySet
