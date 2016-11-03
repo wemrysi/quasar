@@ -39,8 +39,7 @@ object common {
 
   final case class BucketCollection(bucket: String, collection: String)
 
-  final case class DocIdType(id: String, tpe: String)
-
+  // type field in Couchbase documents
   final case class DocType(v: String)
 
   final case class Cursor(result: Vector[Data])
