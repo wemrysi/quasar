@@ -39,8 +39,8 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
         s      <- freshVar[F]
         lhs    <- rebaseXQuery(lBranch, s.xqy)
         rhs    <- rebaseXQuery(rBranch, s.xqy)
-        filter <- planMapFunc(on)      { case LeftSide => l.xqy case RightSide => r.xqy }
-        body   <- planMapFunc(combine) { case LeftSide => l.xqy case RightSide => r.xqy }
+        filter <- mergeXQuery(on, l.xqy, r.xqy)
+        body   <- mergeXQuery(combine, l.xqy, r.xqy)
       } yield let_(s -> src) return_ (for_(l -> lhs, r -> rhs) where_ filter return_ body)
   }
 }
