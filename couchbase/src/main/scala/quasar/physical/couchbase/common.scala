@@ -41,6 +41,8 @@ object common {
 
   final case class DocIdType(id: String, tpe: String)
 
+  final case class DocType(v: String)
+
   final case class Cursor(result: Vector[Data])
 
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
@@ -49,15 +51,15 @@ object common {
         FileSystemError.pathErr(PathError.invalidPath(f, "no bucket specified")).left,
         (h, t) => BucketCollection(h, t.intercalate("/")).right)
 
-  def docIdTypesWithTypePrefix[S[_]](
+  def docTypesFromPrefix[S[_]](
     bucket: Bucket,
     prefix: String
-  ): Task[List[DocIdType]] = Task.delay {
-    val qStr = s"""SELECT meta(`${bucket.name}`).id, type FROM `${bucket.name}`
+  ): Task[List[DocType]] = Task.delay {
+    val qStr = s"""SELECT distinct type FROM `${bucket.name}`
                    WHERE type LIKE "${prefix}%"""";
 
     bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
-      .map(r => DocIdType(r.value.getString("id"), r.value.getString("type")))
+      .map(r => DocType(r.value.getString("type")))
   }
 
   def existsWithPrefix[S[_]](
@@ -80,8 +82,8 @@ object common {
   def pathSegmentsFromBucketCollections(bktCols: List[BucketCollection]): Set[PathSegment] =
     pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
 
-  def pathSegmentsFromPrefixDocIds(prefix: String, docIds: List[DocIdType]): Set[PathSegment] =
-    pathSegments(docIds.map(_.tpe.stripPrefix(prefix).stripPrefix("/").split("/").toList))
+  def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
+    pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
   def n1qlQuery(query: String): N1qlQuery =
     N1qlQuery.simple(

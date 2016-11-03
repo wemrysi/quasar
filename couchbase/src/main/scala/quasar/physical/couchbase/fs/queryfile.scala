@@ -163,7 +163,7 @@ object queryfile {
     context: Read.Ops[Context, S]
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
     if (dir === rootDir)
-      listRootContents(dir)
+      listRootContents
     else
       listNonRootContents(dir)
 
@@ -244,9 +244,8 @@ object queryfile {
     } yield q
   }
 
-  def listRootContents[S[_]](
-    dir: APath
-  )(implicit
+  def listRootContents[S[_]]
+  (implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
@@ -255,13 +254,7 @@ object queryfile {
       bktNames <- lift(Task.delay(
                     ctx.manager.getBuckets.asScala.toList.map(_.name)
                   )).into.liftM[FileSystemErrT]
-      bkts     <- bktNames.traverse(n => EitherT(getBucket(n)))
-      bktCols  <- bkts.traverseM(bkt => lift(Task.delay(
-                    bkt.query(n1qlQuery(s"select distinct type from `${bkt.name}`"))
-                      .allRows.asScala.toList.map(r =>
-                        BucketCollection(bkt.name, new String(r.byteValue)))
-                  )).into.liftM[FileSystemErrT])
-    } yield pathSegmentsFromBucketCollections(bktCols)).run
+    } yield bktNames.map(DirName(_).left[FileName]).toSet).run
 
   def listNonRootContents[S[_]](
     dir: APath
@@ -273,11 +266,11 @@ object queryfile {
       ctx    <- context.ask.liftM[FileSystemErrT]
       bktCol <- EitherT(bucketCollectionFromPath(dir).point[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
-      docIds <- lift(docIdTypesWithTypePrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+      types  <- lift(docTypesFromPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
       _      <- EitherT((
-                  if (docIds.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
+                  if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
                   else ().right
                 ).point[Free[S, ?]])
-    } yield pathSegmentsFromPrefixDocIds(bktCol.collection, docIds)).run
+    } yield pathSegmentsFromPrefixTypes(bktCol.collection, types)).run
 
 }
