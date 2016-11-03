@@ -79,6 +79,11 @@ sealed trait TableSize {
   def maxSize: Long
   def +(other: TableSize): TableSize
   def *(other: TableSize): TableSize
+
+  def isAtLeast(minSize: Long): TableSize = this match {
+    case EstimateSize(min, max) if min < minSize => EstimateSize(minSize, max)
+    case _                                       => this
+  }
 }
 object TableSize {
   def apply(size: Int): TableSize            = apply(size.toLong)

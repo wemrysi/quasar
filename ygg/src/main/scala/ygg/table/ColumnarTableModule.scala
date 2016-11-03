@@ -932,9 +932,6 @@ trait BlockTableModule extends ColumnarTableModule {
 
   trait BaseTableCompanion extends ThisTableCompanion with ygg.table.BlockTableCompanion[Table] {
     override def newInternalTable(slice: Slice): InternalTable = new InternalTable(slice)
-
-    def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
-      WriteTable[Table].writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
   }
 
   sealed abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
@@ -984,50 +981,28 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
-    import Table.{ Table => _, _ }
-
     def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
 
-    def externalToInternal(limit0: Int): ExternalTable \/ InternalTable = {
-      val limit = limit0.toLong
-
+    def externalToInternal(limit: Int): ExternalTable \/ InternalTable = {
       def acc(slices: NeedSlices, buffer: List[Slice], size: Long): Need[ExternalTable \/ InternalTable] = {
+        def finishInt() = Slice.concat(buffer.reverse)
         slices.uncons flatMap {
           case Some((head, tail)) =>
-            val size0 = size + head.size
-            if (size0 > limit) {
-              val slices0 = Slice.concat((head :: buffer).reverse) :: tail
-              val tableSize = this.size match {
-                case EstimateSize(min, max) if min < size0 => EstimateSize(size0, max)
-                case tableSize0                            => tableSize0
-              }
-              Need(-\/(new ExternalTable(slices0, tableSize)))
-            } else {
-              acc(tail, head :: buffer, head.size + size)
-            }
+            val nextSize    = size + head.size
+            val next        = head :: buffer
+            def finishExt() = Slice.concat(next.reverse) :: tail
+
+            if (nextSize > limit.toLong)
+              Need(-\/(new ExternalTable(finishExt, this.size isAtLeast nextSize)))
+            else
+              acc(tail, next, nextSize)
 
           case None =>
-            Need(\/-(new InternalTable(Slice.concat(buffer.reverse))))
+            Need(\/-(new InternalTable(finishInt)))
         }
       }
 
       acc(slices, Nil, 0L).value
-    }
-
-    /**
-      * Sorts the KV table by ascending or descending order based on a seq of transformations
-      * applied to the rows.
-      *
-      * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
-      */
-    def groupExternalByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
-      WriteTable[Table].writeSorted(this, groupKeys, valueSpec, sortOrder, unique) map {
-        case (streamIds, indices) =>
-          val streams = indices.groupBy(_._1.streamId)
-          streamIds.toStream map { streamId =>
-            streams get streamId map (loadTable(sortMergeEngine, _, sortOrder)) getOrElse Table.empty
-          }
-      }
     }
   }
 }

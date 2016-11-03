@@ -109,7 +109,57 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
     fixTable(apply(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1))
   }
 
-  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState]
+  /**
+    * Sorts the KV table by ascending or descending order based on a seq of transformations
+    * applied to the rows.
+    *
+    * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
+    */
+  def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
+    WriteTable[T](this).writeSorted(table, groupKeys, valueSpec, sortOrder, unique) map {
+      case (streamIds, indices) =>
+        val streams = indices.groupBy(_._1.streamId)
+        streamIds.toStream map { streamId =>
+          streams get streamId map (loadTable(sortMergeEngine, _, sortOrder)) getOrElse empty
+        }
+    }
+  }
+
+  /**
+    * Sorts the KV table by ascending or descending order of a transformation
+    * applied to the rows.
+    *
+    * @param key The transspec to use to obtain the values to sort on
+    * @param order Whether to sort ascending or descending
+    */
+  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
+  def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
+
+  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
+    case _: SingletonTable => table.point[F]
+    case _: InternalTable  => sortCommon[F](fixTable[T](table.toExternalTable), key, order, unique)
+    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
+  }
+
+  /**
+    * Sorts the KV table by ascending or descending order based on a seq of transformations
+    * applied to the rows.
+    *
+    * @param keys The transspecs to use to obtain the values to sort on
+    * @param values The transspec to use to obtain the non-sorting values
+    * @param order Whether to sort ascending or descending
+    * @param unique If true, the same key values will sort into a single row, otherwise
+    * we assign a unique row ID as part of the key so that multiple equal values are
+    * preserved
+    */
+  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
+    case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
+    case _: InternalTable  => groupByN[F](fixTable[T](table.toExternalTable), keys, values, order, unique)
+    case t: ExternalTable  => ().point[F] map (_ => fixTables(groupExternalByN(table, keys, values, order, unique).value))
+  }
+
+  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
+    WriteTable[T](this).writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   /**
     * Passes over all slices and returns a new slices that is the concatenation
@@ -150,42 +200,10 @@ trait TableCompanion[T <: ygg.table.Table] {
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
+  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
-
-  /**
-    * Sorts the KV table by ascending or descending order of a transformation
-    * applied to the rows.
-    *
-    * @param key The transspec to use to obtain the values to sort on
-    * @param order Whether to sort ascending or descending
-    */
-  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
-  def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
-
-  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
-    case _: SingletonTable => table.point[F]
-    case _: InternalTable  => sortCommon[F](fixTable[T](table.toExternalTable), key, order, unique)
-    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
-  }
-
-  /**
-    * Sorts the KV table by ascending or descending order based on a seq of transformations
-    * applied to the rows.
-    *
-    * @param keys The transspecs to use to obtain the values to sort on
-    * @param values The transspec to use to obtain the non-sorting values
-    * @param order Whether to sort ascending or descending
-    * @param unique If true, the same key values will sort into a single row, otherwise
-    * we assign a unique row ID as part of the key so that multiple equal values are
-    * preserved
-    */
-  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
-    case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
-    case _: InternalTable  => groupByN[F](fixTable[T](table.toExternalTable), keys, values, order, unique)
-    case t: ExternalTable  => ().point[F] map (_ => fixTables(t.groupExternalByN(keys, values, order, unique).value))
-  }
 
   /**
     * Converts a table to an internal table, if possible. If the table is
@@ -196,8 +214,6 @@ trait TableCompanion[T <: ygg.table.Table] {
     */
   def toInternalTable(table: T, limit: Int): T#ExternalTable \/ T#InternalTable = table match {
     case x: SingletonTable       => x.slices.toStream.map(xs => \/-(fixTable[T#InternalTable](newInternalTable(Slice concat xs takeRange (0, 1))))).value
-
-    // \/-(fixTable[T#InternalTable](x.slices.toStream.map(xs => \/-(new InternalTable(Slice concat xs takeRange (0, 1)))).value
     case x: InternalTable        => \/-(fixTable[T#InternalTable](x))
     case x: ExternalTable with T => x externalToInternal limit
   }
@@ -219,7 +235,6 @@ trait InternalTable extends Table {
   def slice: Slice
 }
 trait ExternalTable extends Table {
-  def groupExternalByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
   def externalToInternal(limit: Int): ExternalTable \/ InternalTable
 }
 trait SingletonTable extends Table {
