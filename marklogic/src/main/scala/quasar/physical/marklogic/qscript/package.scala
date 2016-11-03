@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.fp.ski.κ
-import quasar.contrib.matryoshka.{freeCataM, interpretM, ShowT}
+import quasar.contrib.matryoshka.{freeCataM, interpretM}
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
 import quasar.qscript._
 
@@ -39,7 +39,7 @@ package object qscript {
   object MarkLogicPlanner {
     def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP
 
-    implicit def qScriptCore[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
+    implicit def qScriptCore[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
       new QScriptCorePlanner[F, T]
 
     implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
@@ -54,29 +54,29 @@ package object qscript {
     implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
       new ProjectBucketPlanner[F, T]
 
-    implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
+    implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
       new ThetaJoinPlanner[F, T]
 
     implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
       new EquiJoinPlanner[F, T]
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
+  def mapFuncXQuery[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
     planMapFunc[T, F, Hole](fm)(κ(src))
 
-  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+  def mergeXQuery[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
     planMapFunc[T, F, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
+  def planMapFunc[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](
+  def rebaseXQuery[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr](
     fqs: FreeQS[T], src: XQuery
   ): F[XQuery] = {
     import MarkLogicPlanner._

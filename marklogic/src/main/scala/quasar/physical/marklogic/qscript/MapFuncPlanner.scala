@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.contrib.matryoshka.ShowT
 import quasar.ejson.EJson
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.{ErrorMessages, MonadError_}
@@ -39,10 +38,9 @@ import scalaz.syntax.std.either._
 object MapFuncPlanner {
   import expr.{emptySeq, if_, let_}, axes._
 
-  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  def apply[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
-      type M[A] = EitherT[F, ErrorMessages, A]
-      ejson.cataM(EncodeXQuery[M, EJson].encodeXQuery).run.flatMap(_.fold(
+      ejson.cataM(EncodeXQuery[EitherT[F, ErrorMessages, ?], EJson].encodeXQuery).run.flatMap(_.fold(
         msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
         _.point[F]))
 

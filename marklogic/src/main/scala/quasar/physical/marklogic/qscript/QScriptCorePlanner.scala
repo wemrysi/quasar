@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
 import quasar.NameGenerator
-import quasar.contrib.matryoshka.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -26,7 +25,7 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
+private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive]
   extends MarkLogicPlanner[F, QScriptCore[T, ?]] {
 
   import expr.{func, for_, let_}
