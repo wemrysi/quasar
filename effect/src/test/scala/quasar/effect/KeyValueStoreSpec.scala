@@ -59,7 +59,7 @@ abstract class KeyValueStoreSpec extends quasar.Qspec {
       key ≠ otherKey ==> {
         eval(
           ops.put(key, value) *> ops.put(otherKey, otherValue) *> ops.keys
-        ) must_= Vector(key, otherKey)
+        ) must contain(key, otherKey)
       }
     }
   }
