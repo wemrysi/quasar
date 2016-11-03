@@ -40,5 +40,5 @@ object EqualT {
 
   implicit val fix: EqualT[Fix] = recursive
   implicit val mu:  EqualT[Mu]  = recursive
-  implicit val nu:  EqualT[Mu]  = recursive
+  implicit val nu:  EqualT[Nu]  = recursive
 }
