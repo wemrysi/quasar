@@ -153,7 +153,7 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    (lpToN1ql(lp) ∘ (n1ql => ExecutionPlan(FsType, outerN1ql(n1ql)))).run.run
+    (lpToN1ql(lp) ∘ (n1ql => ExecutionPlan(FsType, n1qlQueryString(n1ql)))).run.run
 
 
   def listContents[S[_]](
@@ -185,26 +185,20 @@ object queryfile {
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
-  ): Plan[S, Vector[Data]] = {
-    val n1qlStr = outerN1ql(n1ql)
-
+  ): Plan[S, Vector[Data]] =
     for {
-      _       <- prtell[Plan[S, ?]](Vector(detail(
-                   "N1QL Results",
-                   s"""  n1ql: $n1qlStr""".stripMargin('|'))))
       ctx     <- context.ask.liftP
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
                  )).into.liftP
       r       <- EitherT(lift(Task.delay(
-                   bkt.query(n1qlQuery(n1qlStr))
+                   bkt.query(n1qlQuery(n1qlQueryString(n1ql)))
                      .allRows
                      .asScala
                      .toVector
                      .traverse(rowToData)
                  )).into.liftM[PhaseResultT])
     } yield r
-  }
 
   def lpToN1ql[S[_]](
     lp: Fix[LogicalPlan]
@@ -245,7 +239,9 @@ object queryfile {
       n1ql <- shft.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))
-    } yield n1ql
+      q    =  outerN1ql(n1ql)
+      _    <- tell(Vector(detail("N1QL", n1qlQueryString(q))))
+    } yield q
   }
 
   def listRootContents[S[_]](
