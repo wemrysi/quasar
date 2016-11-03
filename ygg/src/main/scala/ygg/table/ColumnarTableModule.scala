@@ -88,10 +88,11 @@ trait ColumnarTableModule {
       }
     }
 
-    def empty: Table                                      = Table(emptyStreamT(), ExactSize(0))
-    def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
-    def newInternalTable(slice: Slice): Table             = apply(singleStreamT(slice), ExactSize(slice.size))
-    def fromJson(data: Seq[JValue]): Table                = outer fromJson data
+    def empty: Table                                                 = Table(emptyStreamT(), ExactSize(0))
+    def apply(slices: NeedSlices, size: TableSize): Table            = fromSlices(slices, size)
+    def newInternalTable(slice: Slice): Table                        = apply(singleStreamT(slice), ExactSize(slice.size))
+    def newExternalTable(slices: NeedSlices, size: TableSize): Table = apply(slices, size)
+    def fromJson(data: Seq[JValue]): Table                           = outer fromJson data
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
       singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
@@ -917,21 +918,18 @@ trait BlockTableModule extends ColumnarTableModule {
   }
 
   trait BaseTableCompanion extends ThisTableCompanion with ygg.table.BlockTableCompanion[Table] {
-    override def newInternalTable(slice: Slice): InternalTable = new InternalTable(slice)
+    override def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
+    override def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
   }
 
   sealed abstract class BaseTable(slices: NeedSlices, size: TableSize) extends ThisTable(slices, size) {
-    type InternalTable  = outer.InternalTable
-    type ExternalTable  = outer.ExternalTable
-    type SingletonTable = outer.SingletonTable
-
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.
       */
-    def toExternalTable(): ExternalTable = new ExternalTable(slices, size)
+    def toExternalTable(): ExternalTable = new outer.ExternalTable(slices, size)
   }
 
   final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
@@ -955,14 +953,14 @@ trait BlockTableModule extends ColumnarTableModule {
     * allowed more optimizations when doing things like joins.
     */
   final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
-    override def force: M[Table]         = Need(this)
+    override def force: M[Table]          = Need(this)
     override def paged(limit: Int): Table = this
 
     def takeRange(startIndex0: Long, numberToTake0: Long): Table = (
       if (startIndex0 > Int.MaxValue)
-        new InternalTable(Slice.empty)
+        new outer.InternalTable(Slice.empty)
       else
-        new InternalTable(slice.takeRange(startIndex0.toInt, numberToTake0.toInt))
+        new outer.InternalTable(slice.takeRange(startIndex0.toInt, numberToTake0.toInt))
     )
   }
 
@@ -979,12 +977,12 @@ trait BlockTableModule extends ColumnarTableModule {
             def finishExt() = Slice.concat(next.reverse) :: tail
 
             if (nextSize > limit.toLong)
-              Need(-\/(new ExternalTable(finishExt, this.size isAtLeast nextSize)))
+              Need(-\/(new outer.ExternalTable(finishExt, this.size isAtLeast nextSize)))
             else
               acc(tail, next, nextSize)
 
           case None =>
-            Need(\/-(new InternalTable(finishInt)))
+            Need(\/-(new outer.InternalTable(finishInt)))
         }
       }
 

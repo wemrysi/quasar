@@ -137,7 +137,7 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
 
   private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
     case _: SingletonTable => table.point[F]
-    case _: InternalTable  => sortCommon[F](fixTable[T](table.toExternalTable), key, order, unique)
+    case _: InternalTable  => sortCommon[F](fixTable[T](toExternalTable(table)), key, order, unique)
     case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
   }
 
@@ -154,7 +154,7 @@ trait BlockTableCompanion[T <: ygg.table.Table] extends TableCompanion[T] {
     */
   def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
     case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
-    case _: InternalTable  => groupByN[F](fixTable[T](table.toExternalTable), keys, values, order, unique)
+    case _: InternalTable  => groupByN[F](fixTable[T](toExternalTable(table)), keys, values, order, unique)
     case t: ExternalTable  => ().point[F] map (_ => fixTables(groupExternalByN(table, keys, values, order, unique).value))
   }
 
@@ -187,6 +187,7 @@ trait TableCompanion[T <: ygg.table.Table] {
   def apply(slices: NeedSlices, size: TableSize): T
   // TODO assert that this table only has one row
   def newInternalTable(slice: Slice): T
+  def newExternalTable(slices: NeedSlices, size: TableSize): T
 
   def constString(v: Set[String]): T
   def constLong(v: Set[Long]): T
@@ -217,6 +218,7 @@ trait TableCompanion[T <: ygg.table.Table] {
     case x: InternalTable        => \/-(fixTable[T#InternalTable](x))
     case x: ExternalTable with T => x externalToInternal limit
   }
+  def toExternalTable(table: T): T#ExternalTable = fixTable[T#ExternalTable](newExternalTable(table.slices, table.size))
 
   def constSingletonTable(singleType: CType, column: Column): T
   def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
@@ -226,7 +228,6 @@ trait TableCompanion[T <: ygg.table.Table] {
 
 trait TemporaryTableStrut extends Table {
   /** XXX FIXME */
-  def toExternalTable(): ExternalTable = ???
   def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
   def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
 }
@@ -243,9 +244,10 @@ trait SingletonTable extends Table {
 
 trait Table {
   type Table <: ygg.table.Table
-  type InternalTable <: Table with ygg.table.InternalTable
-  type ExternalTable <: Table with ygg.table.ExternalTable
-  type SingletonTable <: Table with ygg.table.SingletonTable
+
+  type InternalTable  = Table with ygg.table.InternalTable
+  type ExternalTable  = Table with ygg.table.ExternalTable
+  type SingletonTable = Table with ygg.table.SingletonTable
 
   type M[X]       = Need[X]
   type NeedSlices = StreamT[M, Slice]
@@ -291,15 +293,6 @@ trait Table {
     * over the results.
     */
   def force: M[Table]
-
-  /**
-    * Converts a table to an internal table, if possible. If the table is
-    * already an `InternalTable` or a `SingletonTable`, then the conversion
-    * will always succeed. If the table is an `ExternalTable`, then if it has
-    * less than `limit` rows, it will be converted to an `InternalTable`,
-    * otherwise it will stay an `ExternalTable`.
-    */
-  def toExternalTable(): ExternalTable
 
   /**
     * For each distinct path in the table, load all columns identified by the specified
