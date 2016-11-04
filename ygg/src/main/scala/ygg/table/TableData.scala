@@ -22,48 +22,71 @@ import scalaz._
 import quasar.Data
 
 sealed trait TableData {
+  type M[X]
+
   def size: TableSize
-  def slices: NeedSlices
+  def slices: StreamT[M, Slice]
 }
 object TableData {
-  final case class External(slices: NeedSlices, size: TableSize) extends TableData
+  private type V           = JValue
+  private type T           = TableData
+  private type TS          = Seq[T]
+  private type F1          = TransSpec1
+  private type F2          = TransSpec2
+  private type LazySeq[+A] = Stream[A]
+
+  final case class External(slices: NeedSlices, size: TableSize) extends TableData {
+    type M[X] = Need[X]
+  }
   final case class Internal(slice: Slice) extends TableData {
+    type M[X] = Need[X]
     def slices = singleStreamT(slice)
     def size   = ExactSize(slice.size)
   }
 
-  class Impl(val table: TableData) extends TableMethods[TableData] {
-    private type Table = TableData
+  class BinaryTableData(left: TableData, right: TableData) {
+    def cogroup(left: PairOf[F1], right: PairOf[F1], both: F2): T = ???
+    def concat(): T                                               = ???
+    def cross(spec: F2): T                                        = ???
+    def zip(): T                                                  = ???
+  }
 
-    def canonicalize(length: Int): Table                                                                                              = ???
-    def canonicalize(minLength: Int, maxLength: Int): Table                                                                           = ???
-    def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table = ???
-    def columns: ColumnMap                                                                                                            = ???
-    def compact(spec: TransSpec1, definedness: Definedness): Table                                                                    = ???
-    def concat(t2: Table): Table                                                                                                      = ???
-    def cross(that: Table)(spec: TransSpec2): Table                                                                                   = ???
-    def distinct(key: TransSpec1): Table                                                                                              = ???
-    def force: M[Table]                                                                                                               = ???
-    def load(tpe: JType): M[Table]                                                                                                    = ???
-    def mapWithSameSize(f: EndoA[NeedSlices]): Table                                                                                  = ???
-    def normalize: Table                                                                                                              = ???
-    def paged(limit: Int): Table                                                                                                      = ???
-    def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]                                                       = ???
-    def reduce[A: Monoid](reducer: CReducer[A]): M[A]                                                                                 = ???
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]                                                                = ???
-    def schemas: M[Set[JType]]                                                                                                        = ???
-    def size: TableSize                                                                                                               = ???
-    def slices: NeedSlices                                                                                                            = ???
-    def slicesStream: Stream[Slice]                                                                                                   = ???
-    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]                                                                      = ???
-    def takeRange(startIndex: Long, numberToTake: Long): Table                                                                        = ???
-    def toArray[A](implicit tpe: CValueType[A]): Table                                                                                = ???
-    def toData: Data                                                                                                                  = ???
-    def toDataStream: Stream[Data]                                                                                                    = ???
-    def toJValues: Stream[JValue]                                                                                                     = ???
-    def toJson: M[Stream[JValue]]                                                                                                     = ???
-    def toVector: Vector[JValue]                                                                                                      = ???
-    def transform(spec: TransSpec1): Table                                                                                            = ???
-    def zip(t2: Table): M[Table]                                                                                                      = ???
+  class Impl(val table: TableData) extends TableMethods[TableData] {
+    private type LazySeqT[A] = StreamT[M, A]
+
+    def size: TableSize              = ???
+    def slices: LazySeqT[Slice]      = ???
+    def columns: ColumnMap           = ???
+    def schemas: M[Set[JType]]       = ???
+    def slicesStream: LazySeq[Slice] = ???
+
+    def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
+    def concat(that: T): T                                                            = ???
+    def cross(that: T)(spec: F2): T                                                   = ???
+    def zip(that: T): M[T]                                                            = ???
+
+    def canonicalize(length: Int): T                        = ???
+    def canonicalize(minLength: Int, maxLength: Int): T     = ???
+    def compact(spec: F1, definedness: Definedness): T      = ???
+    def distinct(key: F1): T                                = ???
+    def mapWithSameSize(f: EndoA[LazySeqT[Slice]]): T       = ???
+    def partitionMerge(partitionBy: F1)(f: T => M[T]): M[T] = ???
+    def reduce[A: Monoid](reducer: CReducer[A]): M[A]       = ???
+    def sample(size: Int, specs: Seq[F1]): M[TS]            = ???
+    def sort(key: F1, order: DesiredSortOrder): M[T]        = ???
+    def takeRange(start: Long, length: Long): T             = ???
+    def transform(spec: F1): T                              = ???
+
+    def force(): M[T]          = ???
+    def load(tpe: JType): M[T] = ???
+    def normalize(): T         = ???
+    def paged(limit: Int): T   = ???
+
+    def toArray[A: CValueType] : T   = ???
+    def toData: Data                 = ???
+    def toDataStream: LazySeq[Data]  = ???
+    def toJValues: LazySeq[V]        = ???
+    def toJson: M[LazySeq[V]]        = ???
+    def toVector: Vector[V]          = ???
   }
 }
