@@ -21,7 +21,6 @@ import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.ejson.EncodeXQuery
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._

@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.ejson
+package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.ejson
+import quasar.{ejson => ejs}
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs_}
 import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xquery.{ejson => ejsxqy, _}
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.refineV
@@ -41,37 +40,37 @@ object EncodeXQuery {
         _.run.fold(F.encodeXQuery, G.encodeXQuery)
     }
 
-  implicit def commonEncodeXQuery[M[_]: NameGenerator: PrologW]: EncodeXQuery[M, ejson.Common] =
-    new EncodeXQuery[M, ejson.Common] {
-      val encodeXQuery: AlgebraM[M, ejson.Common, XQuery] = {
-        case ejson.Arr(xs) => ejsxqy.seqToArray_[M](mkSeq(xs))
-        case ejson.Null()  => ejsxqy.null_[M]
-        case ejson.Bool(b) => b.fold(fn.True, fn.False).point[M]
-        case ejson.Str(s)  => s.xs.point[M]
-        case ejson.Dec(d)  => xs.double(d.toString.xs).point[M]
+  implicit def commonEncodeXQuery[M[_]: NameGenerator: PrologW]: EncodeXQuery[M, ejs.Common] =
+    new EncodeXQuery[M, ejs.Common] {
+      val encodeXQuery: AlgebraM[M, ejs.Common, XQuery] = {
+        case ejs.Arr(xs) => ejson.seqToArray_[M](mkSeq(xs))
+        case ejs.Null()  => ejson.null_[M]
+        case ejs.Bool(b) => b.fold(fn.True, fn.False).point[M]
+        case ejs.Str(s)  => s.xs.point[M]
+        case ejs.Dec(d)  => xs.double(d.toString.xs).point[M]
       }
     }
 
-  implicit def extensionEncodeXQuery[M[_]: PrologW: MonadErrMsgs_]: EncodeXQuery[M, ejson.Extension] =
-    new EncodeXQuery[M, ejson.Extension] {
+  implicit def extensionEncodeXQuery[M[_]: PrologW: MonadErrMsgs_]: EncodeXQuery[M, ejs.Extension] =
+    new EncodeXQuery[M, ejs.Extension] {
       type ValM[A] = Validation[ErrorMessages, M[A]]
 
       implicit val valMApplicative: Applicative[ValM] =
         Applicative[Validation[ErrorMessages, ?]].compose[M]
 
-      val encodeXQuery: AlgebraM[M, ejson.Extension, XQuery] = {
+      val encodeXQuery: AlgebraM[M, ejs.Extension, XQuery] = {
         // TODO: We'd like to be able to deconstruct 'meta' to see if it was a stringly-keyd map or some
         //       atomic type that we could turn into attributes.
         //
-        // TODO: We likely have to deal with the EJson encoding of Data used in the LP -> QScript conversion
+        // TODO: We likely have to deal with the ejs encoding of Data used in the LP -> QScript conversion
         //       so this may be needed sooner than later?
-        case ejson.Meta(value, meta) => value.point[M]
+        case ejs.Meta(value, meta) => value.point[M]
 
-        case ejson.Map(entries)      =>
+        case ejs.Map(entries)      =>
           val objEntries = entries.traverse[ValM, XQuery] {
             case (XQuery.StringLit(s), value) =>
               refineV[IsNCName](s).validation map { ncname =>
-                ejsxqy.renameOrWrap[M] apply (xs.QName(ncname.get.xs), value)
+                ejson.renameOrWrap[M] apply (xs.QName(ncname.get.xs), value)
               } leftAs s"'$s' is not a valid XML QName.".wrapNel
 
             case (xqy, _) =>
@@ -79,13 +78,13 @@ object EncodeXQuery {
           }
 
           objEntries.valueOr(MonadErrMsgs_[M].raiseError(_))
-            .flatMap(ents => ejsxqy.mkObject[M] apply mkSeq[List](ents))
+            .flatMap(ents => ejson.mkObject[M] apply mkSeq[List](ents))
 
-        case ejson.Byte(b)           => xs.byte(b.toInt.xqy).point[M]
-        case ejson.Char(c)           => c.toString.xs.point[M]
+        case ejs.Byte(b)           => xs.byte(b.toInt.xqy).point[M]
+        case ejs.Char(c)           => c.toString.xs.point[M]
         // TODO: There appears to be a limit on integers in MarkLogic, find out what it is
         //       and validate `i`.
-        case ejson.Int(i)            => xs.integer(i.toString.xqy).point[M]
+        case ejs.Int(i)            => xs.integer(i.toString.xqy).point[M]
       }
     }
 }
