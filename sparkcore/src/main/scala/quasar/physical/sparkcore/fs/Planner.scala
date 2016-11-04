@@ -27,6 +27,7 @@ import quasar.qscript.ReduceFuncs._
 import quasar.qscript.SortDir._
 
 import scala.math.{Ordering => SOrdering}
+import SOrdering.Implicits._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -43,6 +44,36 @@ import simulacrum.typeclass
 
 // TODO divide planner instances into separate files
 object Planner {
+
+  // TODO consider moving to data.scala (conflicts with existing code)
+  implicit def ordering: Order[Data] = new Order[Data] with Serializable {
+    def order(d1: Data, d2: Data) = (d1, d2) match {
+      case Data.Null -> Data.Null                 => Ordering.EQ
+      case Data.Str(a) -> Data.Str(b)             => a cmp b
+      case Data.Bool(a) -> Data.Bool(b)           => a cmp b
+      case Data.Number(a) -> Data.Number(b)       => a cmp b
+      case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
+      case Data.Arr(a) -> Data.Arr(b)             => a cmp b
+      case Data.Set(a) -> Data.Set(b)             => a cmp b
+      case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
+      case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
+      case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
+      case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
+      case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
+      case Data.Id(a) -> Data.Id(b)               => a cmp b
+      case Data.NA -> Data.NA                 => Ordering.EQ
+      case a -> b                       => a.getClass.## cmp b.getClass.##
+    }
+  }
+
+  /*
+   * Copy-paste from scalaz's `toScalaOrdering`
+   * Copied because scalaz's ListInstances are not Serializable
+   */
+  implicit val ord: SOrdering[Data] = new SOrdering[Data] {
+    def compare(x: Data, y: Data) = ordering.order(x, y).toInt
+  }
+
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
@@ -219,44 +250,7 @@ object Planner {
           )
         case Sort(src, bucket, orders) =>
 
-          implicit def ordering: Order[Data] = new Order[Data] with Serializable {
-            def order(d1: Data, d2: Data) = (d1, d2) match {
-              case a -> b if a == b             => Ordering.EQ
-              case Data.Str(a) -> Data.Str(b)             => a cmp b
-              case Data.Bool(a) -> Data.Bool(b)           => a cmp b
-              case Data.Number(a) -> Data.Number(b)       => a cmp b
-              case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
-              case Data.Arr(a) -> Data.Arr(b)             => a cmp b
-              case Data.Set(a) -> Data.Set(b)             => a cmp b
-              case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
-              case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
-              case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
-              case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
-              case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
-              case Data.Id(a) -> Data.Id(b)               => a cmp b
-              case a -> b                       => a.getClass.## cmp b.getClass.##
-            }
-          }
-
-          /*
-           * Copy-paste from scalaz's `toScalaOrdering`
-           * Copied because scalaz's ListInstances are not Serializable
-           */
-          implicit val ord: SOrdering[Data] = new SOrdering[Data] {
-            def compare(x: Data, y: Data) = ordering.order(x, y).toInt
-          }
           
-          implicit val listOrd = new SOrdering[List[Data]] {
-            def compare(l1: List[Data], l2: List[Data]) = (l1, l2) match {
-              case (Nil, Nil)     => 0
-              case (Nil, _::_)    => -1
-              case (_::_, Nil)    => 1
-              case (a::as, b::bs) => ord.compare(a, b) match {
-                case 0 => compare(as, bs)
-                case x  => x
-              }
-            }
-          }
 
           val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
             orders.traverse {
