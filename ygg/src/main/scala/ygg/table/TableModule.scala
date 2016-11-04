@@ -656,39 +656,6 @@ trait TableModule {
       distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
     }
 
-    def takeSlice(start: Long, end: Long): Table =
-      if (end <= 0 || end <= start) Table.empty else takeRange(start, end - start)
-
-    def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table = {
-      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
-        // Prior to first needed slice, so skip
-        case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
-        // Somewhere in between, need to transition to splitting/reading
-        case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
-        // Read off the end (we took nothing)
-        case _ => Need(emptyStreamT())
-      }
-
-      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
-        case Some((head, tail)) if takenSoFar < numberToTake => {
-          val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
-          inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
-        }
-        case _ => Need(emptyStreamT())
-      }
-
-      def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
-
-      val newSize = size match {
-        case ExactSize(sz)            => ExactSize(calcNewSize(sz))
-        case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
-        case UnknownSize              => UnknownSize
-        case InfiniteSize             => InfiniteSize
-      }
-
-      Table(StreamT.wrapEffect(loop(slices, 0)), newSize)
-    }
-
     /**
       * In order to call partitionMerge, the table must be sorted according to
       * the values specified by the partitionBy transspec.
@@ -937,16 +904,44 @@ trait TableModule {
     override def force: M[Table]          = Need(this)
     override def paged(limit: Int): Table = this
 
-    def takeRange(startIndex0: Long, numberToTake0: Long): Table = (
-      if (startIndex0 > Int.MaxValue)
+    def takeRange(start: Long, len: Long): Table = (
+      if (start > Int.MaxValue)
         new outer.InternalTable(Slice.empty)
       else
-        new outer.InternalTable(slice.takeRange(startIndex0.toInt, numberToTake0.toInt))
+        new outer.InternalTable(slice.takeRange(start.toInt, len.toInt))
     )
   }
 
   final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
-    def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
+    def takeRange(startIndex: Long, numberToTake: Long): Table = {
+      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
+        // Prior to first needed slice, so skip
+        case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
+        // Somewhere in between, need to transition to splitting/reading
+        case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
+        // Read off the end (we took nothing)
+        case _ => Need(emptyStreamT())
+      }
+
+      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
+        case Some((head, tail)) if takenSoFar < numberToTake => {
+          val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
+          inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
+        }
+        case _ => Need(emptyStreamT())
+      }
+
+      def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
+
+      val newSize = size match {
+        case ExactSize(sz)            => ExactSize(calcNewSize(sz))
+        case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
+        case UnknownSize              => UnknownSize
+        case InfiniteSize             => InfiniteSize
+      }
+
+      Table(StreamT.wrapEffect(loop(slices, 0)), newSize)
+    }
 
     def externalToInternal(limit: Int): ExternalTable \/ InternalTable = {
       def acc(slices: NeedSlices, buffer: List[Slice], size: Long): Need[ExternalTable \/ InternalTable] = {

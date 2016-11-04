@@ -38,6 +38,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def nonEmpty           = !isEmpty
   def columns: ColumnMap = source.columns
 
+  def lazyMapColumns(f: EndoA[Column]): ColumnMap = columns lazyMapValues f
+
   def logicalColumns: JType => Set[Column] = { jtpe =>
     // TODO Use a flatMap and:
     // If ColumnRef(_, CArrayType(_)) and jType has a JArrayFixedT of this type,
@@ -450,11 +452,11 @@ class SliceOps(private val source: Slice) extends AnyVal {
   // and the values give the indices in the sparsened slice.
   def sparsen(index: Array[Int], toSize: Int): Slice = Slice(
     toSize,
-    source.columns lazyMapValues (col => cf.Sparsen(index, toSize)(col).get) //sparsen is total
+    lazyMapColumns(col => cf.Sparsen(index, toSize)(col).get) //sparsen is total
   )
   def remap(indices: ArrayIntList): Slice = Slice(
     indices.size,
-    source.columns lazyMapValues (col => cf.RemapIndices(indices).apply(col).get)
+    lazyMapColumns(col => cf.RemapIndices(indices).apply(col).get)
   )
 
   def map(from: CPath, to: CPath)(f: CF1): Slice = {
@@ -501,7 +503,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
           }
     }
 
-    Slice(source.size, source.columns lazyMapValues (col => cf.filter(0, source.size, defined)(col).get))
+    Slice(source.size, lazyMapColumns(col => cf.filter(0, source.size, defined)(col).get))
   }
 
   def compact(filter: Slice, definedness: Definedness): Slice = {
@@ -531,7 +533,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         }
     }
 
-    Slice(retained.size, source.columns lazyMapValues (_ |> cf.RemapIndices(retained) get))
+    Slice(retained.size, lazyMapColumns(_ |> cf.RemapIndices(retained) get))
   }
 
   def retain(refs: Set[ColumnRef]): Slice = Slice(source.size, source.columns filterKeys refs) // !!! filterKeys is on-demand
@@ -593,7 +595,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       }
     }
 
-    Slice(retained.size, source.columns lazyMapValues (_ |> cf.RemapIndices(retained) get))
+    Slice(retained.size, lazyMapColumns(_ |> cf.RemapIndices(retained) get))
   }
 
   def order: Ord[Int] =
@@ -696,23 +698,21 @@ class SliceOps(private val source: Slice) extends AnyVal {
     * new prefix will contain all indices less than that index, and
     * the new suffix will contain indices >= that index.
     */
-  def split(idx: Int): (Slice, Slice) = {
-    (take(idx), drop(idx))
-  }
+  def split(idx: Int): PairOf[Slice] = take(idx) -> drop(idx)
 
   def take(sz: Int): Slice = (
     if (sz >= source.size) source
-    else Slice(sz, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < sz, 0) get))
+    else Slice(sz, lazyMapColumns(_ |> cf.RemapFilter(_ < sz, 0) get))
   )
 
   def drop(sz: Int): Slice = (
     if (sz <= 0) source
-    else Slice(source.size - sz, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < size, sz) get))
+    else Slice(source.size - sz, lazyMapColumns(_ |> cf.RemapFilter(_ < size, sz) get))
   )
 
   def takeRange(start: Int, len: Int): Slice = {
     val take = min(size, start + len) - start
-    Slice(take, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < take, start) get))
+    Slice(take, lazyMapColumns(_ |> cf.RemapFilter(_ < take, start) get))
   }
 
   def zip(other: Slice): Slice = Slice(
@@ -728,7 +728,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     */
   def materialized: Slice = Slice(
     source.size,
-    source.columns lazyMapValues {
+    lazyMapColumns {
       case col: BoolColumn =>
         val defined = col.definedAt(0, source.size)
         val values = Bits.filteredRange(0, source.size) { row =>
