@@ -20,20 +20,16 @@ import quasar.Predef._
 import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp.eitherT._
-import quasar.physical.marklogic.{ErrorMessages, MonadError_}
+import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.ejson.EncodeXQuery
-import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
-import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
 import scalaz.{Apply, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
-import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
   import expr.{emptySeq, if_, let_}, axes._
@@ -200,9 +196,6 @@ object MapFuncPlanner {
 
   ////
 
-  // A string consisting only of digits.
-  private val IntegralNumber = "^(\\d+)$".r
-
   private def binOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
     (freshVar[F] |@| freshVar[F])((vx, vy) =>
       mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
@@ -210,13 +203,4 @@ object MapFuncPlanner {
   private def ternOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
     (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
       mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
-
-  private def whenValidQName[F[_]: MonadPlanErr, A](s: String)(f: QName => F[A]): F[A] =
-    refineV[IsNCName](s).disjunction
-      .map(ncname => f(QName.local(NCName(ncname))))
-      .getOrElse(invalidQName(s))
-
-  private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
-    MonadError_[F, MarkLogicPlannerError].raiseError(
-      MarkLogicPlannerError.invalidQName(s))
 }
