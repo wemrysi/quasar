@@ -44,8 +44,8 @@ trait TableModule {
 
   implicit def tableCompanion: TableCompanion = Table
 
-  def sourcesOf(gs: GroupingSpec[Table]): Vector[GroupingSource[Table]] = gs match {
-    case x: GroupingSource[Table]                => Vector(x)
+  def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
+    case x: GroupingSource                       => Vector(x)
     case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
   }
 
@@ -81,7 +81,7 @@ trait TableModule {
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = {
+    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]
@@ -404,6 +404,9 @@ trait TableModule {
 
     def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
       companion.cogroup(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
+
+    def groupingSource(idTrans: TransSpec1, targetTrans: Option[TransSpec1], groupId: GroupId, groupKeySpec: GroupKeySpec): GroupingSource =
+      GroupingSource(self, idTrans, targetTrans, groupId, groupKeySpec)
 
     /**
       * Performs a full cartesian cross on this table with the specified table,

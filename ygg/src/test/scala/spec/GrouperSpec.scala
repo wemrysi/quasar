@@ -91,7 +91,7 @@ class GrouperSpec extends TableQspec {
     val groupId    = newGroupId
     val tab: Table = fromJson(data)
 
-    val spec = GroupingSource[Table](tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     val result = Table.merge(spec) { (key, map) =>
       for {

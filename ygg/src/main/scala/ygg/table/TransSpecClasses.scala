@@ -89,6 +89,10 @@ package trans {
   sealed trait ObjectSpec[+A] extends TransSpec[A]
   sealed trait ArraySpec[+A]  extends TransSpec[A]
 
+  object Filter {
+    def apply[A](spec: TransSpec[A]): Filter[A] = Filter(spec, spec)
+  }
+
   /** Done (according to the existing comments)
    *
    *  Scan: Adds a column to the output in the manner of scanLeft
@@ -286,6 +290,10 @@ package trans {
   final case class GroupKeySpecSource(key: CPathField, spec: TransSpec1)    extends GroupKeySpec
   final case class GroupKeySpecAnd(left: GroupKeySpec, right: GroupKeySpec) extends GroupKeySpec
   final case class GroupKeySpecOr(left: GroupKeySpec, right: GroupKeySpec)  extends GroupKeySpec
+
+  object GroupKeySpecSource {
+    implicit def apply(kv: String -> TransSpec1) = new GroupKeySpecSource(CPathField(kv._1), kv._2)
+  }
 
   object GroupKeySpec {
     def dnf(keySpec: GroupKeySpec): GroupKeySpec = {

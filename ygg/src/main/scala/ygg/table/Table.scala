@@ -196,6 +196,7 @@ trait TableCompanion {
 
   def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table]
 
   def newInternalTable(slice: Slice): T
   def newExternalTable(slices: NeedSlices, size: TableSize): T

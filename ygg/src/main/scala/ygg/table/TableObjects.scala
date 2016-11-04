@@ -58,22 +58,28 @@ object GroupingSpec {
   * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
   */
 
-sealed trait GroupingSpec[+T <: ygg.table.Table]
-final case class GroupingSource[T <: ygg.table.Table](
-  table: T,
+sealed trait GroupingSpec
+final case class GroupingSource(
+  table: Table,
   idTrans: TransSpec1,
   targetTrans: Option[TransSpec1],
   groupId: GroupId,
   groupKeySpec: GroupKeySpec
-) extends GroupingSpec[T]
+) extends GroupingSpec
 
-final case class GroupingAlignment[T <: ygg.table.Table](
+final case class GroupingAlignment(
   groupKeyLeftTrans: TransSpec1,
   groupKeyRightTrans: TransSpec1,
-  left: GroupingSpec[T],
-  right: GroupingSpec[T],
+  left: GroupingSpec,
+  right: GroupingSpec,
   alignment: GroupingSpec.Alignment
-) extends GroupingSpec[T]
+) extends GroupingSpec
+
+object GroupingAlignment {
+  def intersect(l: GroupingSpec, r: GroupingSpec): GroupingAlignment =
+    GroupingAlignment(TransSpec1.Id, TransSpec1.Id, l, r, GroupingSpec.Intersection)
+
+}
 
 sealed trait TableSize {
   def maxSize: Long

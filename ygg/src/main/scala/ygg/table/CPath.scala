@@ -36,12 +36,7 @@ object CPath {
 
   def apply(l: Vec[CPathNode]): CPath = CPathClass(l)
   def apply(n: CPathNode*): CPath     = apply(n.toVector)
-  def apply(path: JPath): CPath       = apply(
-    path.nodes.toVector map {
-      case JPathField(name) => CPathField(name)
-      case JPathIndex(idx)  => CPathIndex(idx)
-    }
-  )
+  def apply(path: JPath): CPath       = apply(path.nodes.toVector map (CPathNode apply _))
 
   def unapplySeq(path: CPath): Option[Vec[CPathNode]]  = Some(path.nodes)
   def unapplySeq(path: String): Option[Vec[CPathNode]] = Some(apply(path).nodes)

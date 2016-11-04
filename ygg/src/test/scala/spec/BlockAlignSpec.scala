@@ -40,7 +40,7 @@ private object JValueInColumnOrder {
   }
 }
 
-class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
+abstract class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
   import sampleData.data
 
   val schema       = sampleData.schema.get._2
@@ -69,7 +69,6 @@ class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
 
     Path("/test") -> Projection(stream)
   } toMap
-
 
   def testLoadDense() = {
     val expected = data flatMap { jv =>
@@ -609,7 +608,7 @@ class BlockAlignSpec extends TableQspec {
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
 
-  private def testLoadDense(sample: SampleData) = new ProjectionsTableSpec(sample).testLoadDense()
+  private def testLoadDense(sample: SampleData) = (new ProjectionsTableSpec(sample) {}).testLoadDense()
 
   private def testLoadSample1 = {
     val sampleData = SampleData(

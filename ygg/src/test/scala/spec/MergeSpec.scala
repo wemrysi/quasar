@@ -136,43 +136,23 @@ class MergeSpec extends TableQspec {
       val valueField = CPathField("value")
       val oneField   = CPathField("1")
 
-      val grouping =
-        GroupingAlignment(
-          TransSpec1.Id,
-          TransSpec1.Id,
-          GroupingSource(
-            medals,
-            dotKey,
-            Some(
-              InnerObjectConcat(
-                ObjectDelete(root, Set(valueField)),
-                WrapObject(dotValue.Gender, "value"))),
-            0,
-            GroupKeySpecAnd(
-              GroupKeySpecSource(
-                CPathField("extra0"),
-                Filter(
-                  EqualLiteral(dotValue.Gender, CString("Men"), false),
-                  EqualLiteral(dotValue.Gender, CString("Men"), false))),
-              GroupKeySpecSource(oneField, dotValue.Edition))
-          ),
-          GroupingSource(
-            medals,
-            dotKey,
-            Some(
-              InnerObjectConcat(
-                ObjectDelete(root, Set(valueField)),
-                WrapObject(dotValue.Gender, "value"))),
-            2,
-            GroupKeySpecAnd(
-              GroupKeySpecSource(
-                CPathField("extra1"),
-                Filter(
-                  EqualLiteral(dotValue.Gender, CString("Women"), false),
-                  EqualLiteral(dotValue.Gender, CString("Women"), false))),
-              GroupKeySpecSource(oneField, dotValue.Edition))
-          ),
-          GroupingSpec.Intersection)
+      def genderFilter(str: String) = Filter(EqualLiteral(dotValue.Gender, CString(str), false))
+      def targetTrans = InnerObjectConcat(
+        root delete valueField,
+        dotValue.Gender wrapObjectField "value"
+      )
+      def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
+        medals,
+        dotKey,
+        Some(targetTrans),
+        groupId = groupId,
+        GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.Edition)
+      )
+
+      val grouping = GroupingAlignment.intersect(
+        mkSource(0, "extra0", "Men"),
+        mkSource(2, "extra1", "Women")
+      )
 
       def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(json"""{"1":"1996","extra0":true,"extra1":true}""")

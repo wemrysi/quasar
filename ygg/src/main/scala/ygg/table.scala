@@ -31,6 +31,9 @@ package object table {
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
 
+  implicit def s2PathNode(name: String): CPathField = CPathField(name)
+  implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
+
   implicit class TableMethodsOps[T](val table: T)(implicit z: HasTableMethods[T]) {
     val methods = z methods table
     import methods._

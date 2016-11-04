@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg.common._
+import ygg.common._, ygg.json._
 import scalaz._, Scalaz._, Ordering._
 
 sealed trait CPathNode extends Product with Serializable {
@@ -35,9 +35,10 @@ final case class CPathIndex(index: Int) extends CPathNode
 final case object CPathArray extends CPathNode
 
 object CPathNode {
-  implicit def s2PathNode(name: String): CPathNode = CPathField(name)
-  implicit def i2PathNode(index: Int): CPathNode   = CPathIndex(index)
-
+  def apply(n: JPathNode): CPathNode = n match {
+    case JPathField(name) => CPathField(name)
+    case JPathIndex(idx)  => CPathIndex(idx)
+  }
   implicit object CPathNodeOrder extends Ord[CPathNode] {
     def order(n1: CPathNode, n2: CPathNode): Cmp = (n1, n2) match {
       case (CPathField(s1), CPathField(s2)) => Cmp(s1 compare s2)
