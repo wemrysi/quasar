@@ -139,9 +139,8 @@ trait TableCompanion[T <: ygg.table.Table] {
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
   private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
-    case _: SingletonTable => table.point[F]
-    case _: InternalTable  => sortCommon[F](fixTable[T](toExternalTable(table)), key, order, unique)
-    case _: ExternalTable  => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
+    case _: InternalTable => sortCommon[F](fixTable[T](toExternalTable(table)), key, order, unique)
+    case _: ExternalTable => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
   }
 
   /**
@@ -156,9 +155,8 @@ trait TableCompanion[T <: ygg.table.Table] {
     * preserved
     */
   def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
-    case _: SingletonTable => table.transform(values) |> (xform => Seq.fill(keys.size)(fixTable[T](xform)).point[F])
-    case _: InternalTable  => groupByN[F](fixTable[T](toExternalTable(table)), keys, values, order, unique)
-    case t: ExternalTable  => ().point[F] map (_ => fixTables(groupExternalByN(table, keys, values, order, unique).value))
+    case _: InternalTable => groupByN[F](fixTable[T](toExternalTable(table)), keys, values, order, unique)
+    case t: ExternalTable => ().point[F] map (_ => fixTables(groupExternalByN(table, keys, values, order, unique).value))
   }
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
@@ -211,7 +209,6 @@ trait TableCompanion[T <: ygg.table.Table] {
     * otherwise it will stay an `ExternalTable`.
     */
   def toInternalTable(table: T, limit: Int): T#ExternalTable \/ T#InternalTable = table match {
-    case x: SingletonTable       => x.slices.toStream.map(xs => \/-(fixTable[T#InternalTable](newInternalTable(Slice concat xs takeRange (0, 1))))).value
     case x: InternalTable        => \/-(fixTable[T#InternalTable](x))
     case x: ExternalTable with T => x externalToInternal limit
   }
@@ -230,16 +227,12 @@ trait InternalTable extends Table {
 trait ExternalTable extends Table {
   def externalToInternal(limit: Int): ExternalTable \/ InternalTable
 }
-trait SingletonTable extends Table {
-  def slice: Need[Slice]
-}
 
 trait Table {
   type Table <: ygg.table.Table
 
   type InternalTable  = Table with ygg.table.InternalTable
   type ExternalTable  = Table with ygg.table.ExternalTable
-  type SingletonTable = Table with ygg.table.SingletonTable
 
   type M[X]       = Need[X]
   type NeedSlices = StreamT[M, Slice]

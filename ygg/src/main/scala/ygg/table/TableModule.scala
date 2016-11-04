@@ -37,11 +37,8 @@ trait TableModule {
 
   def projections: Map[Path, Projection] = Map[Path, Projection]()
 
-  def fromSlice(slice: Slice): Table = new InternalTable(slice)
-  def fromSlices(slices: NeedSlices, size: TableSize): Table = size match {
-    case ExactSize(1) => new SingletonTable(slices)
-    case _            => new ExternalTable(slices, size)
-  }
+  def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
 
   type TableCompanion = BaseTableCompanion
   type Table          = BaseTable
@@ -114,9 +111,9 @@ trait TableModule {
     def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
     def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
     def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
-    def constNull: Table                          = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
-    def constEmptyObject: Table                   = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
-    def constEmptyArray: Table                    = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
+    def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
+    def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
+    def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
 
     /**
       * Merge controls the iteration over the table of group key values.
@@ -607,12 +604,9 @@ trait TableModule {
 
       val sizeCheck = for (resultSize <- newSizeM) yield resultSize < yggConfig.maxSaneCrossSize && resultSize >= 0
 
-      if (sizeCheck getOrElse true) {
-        Table(StreamT(cross0(composeSliceTransform2(spec)) map { tail =>
-          StreamT.Skip(tail)
-        }), newSize)
-      } else {
-        throw EnormousCartesianException(this.size, that.size)
+      sizeCheck match {
+        case Some(false) => abort(s"cannot evaluate cartesian of sets with size $size and ${that.size}")
+        case _           => Table(StreamT(cross0(composeSliceTransform2(spec)) map (StreamT Skip _)), newSize)
       }
     }
 
@@ -878,21 +872,6 @@ trait TableModule {
         )
       )
     )
-  }
-
-  final class SingletonTable(slices0: NeedSlices) extends BaseTable(slices0, ExactSize(1)) with ygg.table.SingletonTable {
-    def slice: Need[Slice] = slices0.head
-    def toRValue: Need[RValue] = {
-      def loop(stream: NeedSlices): Need[RValue] = stream.uncons flatMap {
-        case Some((head, tail)) if head.size > 0 => Need(head.toRValue(0))
-        case Some((_, tail))                     => loop(tail)
-        case None                                => Need(CUndefined)
-      }
-
-      loop(slices)
-    }
-    def takeRange(startIndex: Long, numberToTake: Long): Table =
-      if (startIndex <= 0 && startIndex + numberToTake >= 1) this else Table.empty
   }
 
   /**
