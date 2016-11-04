@@ -109,7 +109,8 @@ trait TableCompanion[T <: ygg.table.Table] {
       )
     )
 
-    fixTable(apply(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1))
+    val tab = apply(StreamT(Need(head)), ExactSize(totalCount))
+    fixTable(tab transform TransSpec1.DerefArray1)
   }
 
   /**
@@ -118,7 +119,7 @@ trait TableCompanion[T <: ygg.table.Table] {
     *
     * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
     */
-  def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
+  private def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
     WriteTable[T](this).writeSorted(table, groupKeys, valueSpec, sortOrder, unique) map {
       case (streamIds, indices) =>
         val streams = indices.groupBy(_._1.streamId)
@@ -138,10 +139,8 @@ trait TableCompanion[T <: ygg.table.Table] {
   def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
-  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] = table match {
-    case _: InternalTable => sortCommon[F](fixTable[T](toExternalTable(table)), key, order, unique)
-    case _: ExternalTable => groupByN[F](table, Seq(key), root, order, unique) map (_.headOption getOrElse empty)
-  }
+  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] =
+    groupByN[F](externalize(table), Seq(key), root, order, unique) map (_.headOption getOrElse empty)
 
   /**
     * Sorts the KV table by ascending or descending order based on a seq of transformations
@@ -154,10 +153,8 @@ trait TableCompanion[T <: ygg.table.Table] {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] = table match {
-    case _: InternalTable => groupByN[F](fixTable[T](toExternalTable(table)), keys, values, order, unique)
-    case t: ExternalTable => ().point[F] map (_ => fixTables(groupExternalByN(table, keys, values, order, unique).value))
-  }
+  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] =
+    ().point[F] map (_ => fixTables(groupExternalByN(externalize(table), keys, values, order, unique).value))
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
     WriteTable[T](this).writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
@@ -216,40 +213,89 @@ trait TableCompanion[T <: ygg.table.Table] {
 
   def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
+
   def newInternalTable(slice: Slice): T
   def newExternalTable(slices: NeedSlices, size: TableSize): T
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
 
-  /**
-    * Converts a table to an internal table, if possible. If the table is
-    * already an `InternalTable` or a `SingletonTable`, then the conversion
-    * will always succeed. If the table is an `ExternalTable`, then if it has
-    * less than `limit` rows, it will be converted to an `InternalTable`,
-    * otherwise it will stay an `ExternalTable`.
-    */
-  def toInternalTable(table: T, limit: Int): T#ExternalTable \/ T#InternalTable = table match {
-    case x: InternalTable        => \/-(fixTable[T#InternalTable](x))
-    case x: ExternalTable with T => x externalToInternal limit
+  def externalize(table: T): T = newExternalTable(table.slices, table.size)
+}
+
+
+sealed trait TableAdt {
+  def size: TableSize
+  def slices: NeedSlices
+}
+object TableAdt {
+  final case class External(slices: NeedSlices, size: TableSize) extends TableAdt
+  final case class Internal(slice: Slice) extends TableAdt {
+    def slices = singleStreamT(slice)
+    def size   = ExactSize(slice.size)
   }
-  def toExternalTable(table: T): T#ExternalTable = fixTable[T#ExternalTable](newExternalTable(table.slices, table.size))
+
+  class Impl(val table: TableAdt) extends TableMethods {
+    type Table = TableAdt
+
+    def canonicalize(length: Int): Table                                                                                              = ???
+    def canonicalize(minLength: Int, maxLength: Int): Table                                                                           = ???
+    def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table = ???
+    def columns: ColumnMap                                                                                                            = ???
+    def compact(spec: TransSpec1, definedness: Definedness): Table                                                                    = ???
+    def concat(t2: Table): Table                                                                                                      = ???
+    def cross(that: Table)(spec: TransSpec2): Table                                                                                   = ???
+    def distinct(key: TransSpec1): Table                                                                                              = ???
+    def force: M[Table]                                                                                                               = ???
+    def load(tpe: JType): M[Table]                                                                                                    = ???
+    def mapWithSameSize(f: EndoA[NeedSlices]): Table                                                                                  = ???
+    def normalize: Table                                                                                                              = ???
+    def paged(limit: Int): Table                                                                                                      = ???
+    def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]                                                       = ???
+    def reduce[A: Monoid](reducer: CReducer[A]): M[A]                                                                                 = ???
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]                                                                = ???
+    def schemas: M[Set[JType]]                                                                                                        = ???
+    def size: TableSize                                                                                                               = ???
+    def slices: NeedSlices                                                                                                            = ???
+    def slicesStream: Stream[Slice]                                                                                                   = ???
+    def takeRange(startIndex: Long, numberToTake: Long): Table                                                                        = ???
+    def toArray[A](implicit tpe: CValueType[A]): Table                                                                                = ???
+    def toData: Data                                                                                                                  = ???
+    def toDataStream: Stream[Data]                                                                                                    = ???
+    def toJValues: Stream[JValue]                                                                                                     = ???
+    def toJson: M[Stream[JValue]]                                                                                                     = ???
+    def toVector: Vector[JValue]                                                                                                      = ???
+    def transform(spec: TransSpec1): Table                                                                                            = ???
+    def zip(t2: Table): M[Table]                                                                                                      = ???
+  }
 }
 
-
-trait InternalTable extends Table {
-  def slice: Slice
-}
-trait ExternalTable extends Table {
-  def externalToInternal(limit: Int): ExternalTable \/ InternalTable
-}
-
-trait Table {
+trait Table extends TableMethods {
   type Table <: ygg.table.Table
 
-  type InternalTable  = Table with ygg.table.InternalTable
-  type ExternalTable  = Table with ygg.table.ExternalTable
+  def companion: TableCompanion[Table]
+}
 
+object TableMethods {
+  type Aux[T] = TableMethods { type Table = T }
+}
+
+trait HasTableMethods[R, T] {
+  def methods(x: R): TableMethods { type Table = T }
+
+  // def methods(x: Table { type Table = T }): TableMethods { type Table = T }
+}
+object HasTableMethods {
+  implicit def oldTableMethods[T <: ygg.table.Table] = new HasTableMethods[T { type Table = T }, T] {
+    def methods(x: T { type Table = T }) = x
+  }
+  implicit def tableAdtMethods: HasTableMethods[TableAdt, TableAdt] = new HasTableMethods[TableAdt, TableAdt] {
+    def methods(x: TableAdt) = new TableAdt.Impl(x)
+  }
+}
+
+trait TableMethods {
+  type Table
   type M[X]       = Need[X]
   type NeedSlices = StreamT[M, Slice]
 
@@ -304,7 +350,6 @@ trait Table {
   def canonicalize(length: Int): Table
   def canonicalize(minLength: Int, maxLength: Int): Table
   def columns: ColumnMap
-  def companion: TableCompanion[Table]
   def concat(t2: Table): Table
   def distinct(key: TransSpec1): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
@@ -324,5 +369,4 @@ trait Table {
   def slicesStream: Stream[Slice]
   def toVector: Vector[JValue]
   def toDataStream: Stream[Data]
-  def fields = slicesStream.flatMap(_.toJsonElements).toVector
 }

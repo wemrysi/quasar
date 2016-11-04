@@ -17,6 +17,7 @@
 package ygg
 
 import ygg.common._
+import ygg.json.JValue
 import scalaz.{ =?> => _, _}, Scalaz._, Ordering._
 
 package object table {
@@ -33,6 +34,14 @@ package object table {
 
   private[table] def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
   private[table] def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
+
+
+  implicit class TableMethodsOps[R, T](val table: R)(implicit z: HasTableMethods[R, T]) {
+    val methods = z methods table
+    import methods._
+
+    def fields: Vector[JValue] = slicesStream.flatMap(_.toJsonElements).toVector
+  }
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =
     StreamT.unfoldM[Need, Slice, A](start)(f)

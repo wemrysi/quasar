@@ -222,15 +222,8 @@ trait TableModule {
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 
-    /**
-      * Forces a table to an external table, possibly de-optimizing it.
-      */
-    def toExternalTable(): ExternalTable = new outer.ExternalTable(slices, size)
-
     def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]    = companion.sort[Need](self, key, order)
-    def toInternalTable(limit: Int): ExternalTable \/ InternalTable = companion.toInternalTable(self, limit).bimap(x => fixTable[ExternalTable](x), x => fixTable[InternalTable](x))
 
-    def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
     def load(tpe: JType): M[Table]                          = companion.load(this, tpe, outer.projections)
     def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
@@ -351,10 +344,6 @@ trait TableModule {
 
       val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
       Need(Table(rec(slices, t2.slices), resultSize))
-
-      // todo investigate why the code below makes all of RandomLibSpecs explode
-      // val resultSlices = Apply[({ type l[a] = StreamT[M, a] })#l].zip.zip(slices, t2.slices) map { case (s1, s2) => s1.zip(s2) }
-      // Table(resultSlices, resultSize)
     }
 
     def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
@@ -844,7 +833,7 @@ trait TableModule {
     * slice and are completely in-memory. Because they fit in memory, we are
     * allowed more optimizations when doing things like joins.
     */
-  final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.InternalTable {
+  final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.Table {
     override def force: M[Table]          = Need(this)
     override def paged(limit: Int): Table = this
 
@@ -856,7 +845,7 @@ trait TableModule {
     )
   }
 
-  final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.ExternalTable {
+  final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.Table {
     def takeRange(startIndex: Long, numberToTake: Long): Table = {
       def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
         // Prior to first needed slice, so skip
@@ -885,28 +874,6 @@ trait TableModule {
       }
 
       Table(StreamT.wrapEffect(loop(slices, 0)), newSize)
-    }
-
-    def externalToInternal(limit: Int): ExternalTable \/ InternalTable = {
-      def acc(slices: NeedSlices, buffer: List[Slice], size: Long): Need[ExternalTable \/ InternalTable] = {
-        def finishInt() = Slice.concat(buffer.reverse)
-        slices.uncons flatMap {
-          case Some((head, tail)) =>
-            val nextSize    = size + head.size
-            val next        = head :: buffer
-            def finishExt() = Slice.concat(next.reverse) :: tail
-
-            if (nextSize > limit.toLong)
-              Need(-\/(new outer.ExternalTable(finishExt, this.size isAtLeast nextSize)))
-            else
-              acc(tail, next, nextSize)
-
-          case None =>
-            Need(\/-(new outer.InternalTable(finishInt)))
-        }
-      }
-
-      acc(slices, Nil, 0L).value
     }
   }
 }
