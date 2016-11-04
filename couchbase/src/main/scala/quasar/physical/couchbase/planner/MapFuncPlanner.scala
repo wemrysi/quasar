@@ -61,19 +61,12 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   def rel(a1: N1QL, a2: N1QL, op: String): M[N1QL] = {
     val a1N1ql = n1ql(a1)
     val a2N1ql = n1ql(a2)
-    val l = s"""
+    def unwrap(expr: String) = s"""
       (case
-       when $a1N1ql.["$DateKey"]      is not null then $a1N1ql.["$DateKey"]
-       when $a1N1ql.["$TimeKey"]      is not null then $a1N1ql.["$TimeKey"]
-       when $a1N1ql.["$TimestampKey"] is not null then $a1N1ql.["$TimestampKey"]
-       else $a1N1ql
-       end)"""
-    val r = s"""
-      (case
-       when $a2N1ql.["$DateKey"]      is not null then $a2N1ql.["$DateKey"]
-       when $a2N1ql.["$TimeKey"]      is not null then $a2N1ql.["$TimeKey"]
-       when $a2N1ql.["$TimestampKey"] is not null then $a2N1ql.["$TimestampKey"]
-       else $a2N1ql
+       when $expr.["$DateKey"]      is not null then $expr.["$DateKey"]
+       when $expr.["$TimeKey"]      is not null then $expr.["$TimeKey"]
+       when $expr.["$TimestampKey"] is not null then $expr.["$TimestampKey"]
+       else $expr
        end)"""
     def trunc(v: String) = s"""
       (case
@@ -81,8 +74,8 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
        then date_trunc_millis(millis($v), "day")
        else $v
        end)"""
-    val lTrunc = trunc(l)
-    val rTrunc = trunc(r)
+    val lTrunc = trunc(unwrap(a1N1ql))
+    val rTrunc = trunc(unwrap(a2N1ql))
 
     partialQueryString(s"""$lTrunc $op $rTrunc""").point[M]
   }
