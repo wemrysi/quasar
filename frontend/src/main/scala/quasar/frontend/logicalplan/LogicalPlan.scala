@@ -31,22 +31,19 @@ import scalaz._, Scalaz._
 import shapeless.{Nat, Sized}
 import pathy.Path.posixCodec
 
-sealed abstract class LogicalPlan[A] extends Product with Serializable
+sealed abstract class LogicalPlan[A] extends Product with Serializable {
+  // TODO this should be removed, but usage of `==` is so pervasive in
+  // external dependencies (and scalac) that removal may never be possible
+  override def equals(that: scala.Any): Boolean = that match {
+    case lp: LogicalPlan[A] => LogicalPlan.equal(Equal.equalA[A]).equal(this, lp)
+    case _                  => false
+  }
+}
 
 final case class Read[A](path: FPath) extends LogicalPlan[A]
 final case class Constant[A](data: Data) extends LogicalPlan[A]
 final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N])
-    extends LogicalPlan[A] {
-  override def toString = {
-    func.shows + "(" + values.mkString(", ") + ")"
-  }
-  // TODO remove this #1677
-  override def equals(that: scala.Any): Boolean = that match {
-    case that @ Invoke(_, _) =>
-      (this.func == that.func) && (this.values.unsized == that.values.unsized)
-    case _ => false
-  }
-}
+    extends LogicalPlan[A]
 // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
 // https://issues.scala-lang.org/browse/SI-5900
 object InvokeUnapply {
@@ -117,6 +114,19 @@ object LogicalPlan {
         }
     }
 
+  implicit val show: Delay[Show, LogicalPlan] =
+    new Delay[Show, LogicalPlan] {
+      def apply[A](sa: Show[A]): Show[LogicalPlan[A]] =
+        Show.show {
+          case Read(v)               => Cord("Read(") ++ v.show ++ Cord(")")
+          case Constant(v)           => Cord("Constant(") ++ v.show ++ Cord(")")
+          case Invoke(func, values)  => func.show ++ Cord("(") ++ values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(",") } ++ Cord(")") // TODO remove trailing comma
+          case Free(n)               => Cord("Free(") ++ Cord(n.toString) ++ Cord(")")
+          case Let(n, f, b)          => Cord("Let(") ++ Cord(n.toString) ++ Cord(",") ++ sa.show(f) ++ Cord(",") ++ sa.show(b) ++ Cord(")")
+          case Typecheck(e, t, c, f) => Cord("Typecheck(") ++ sa.show(e) ++ Cord(",") ++ t.show ++ Cord(",") ++ sa.show(c) ++ Cord(",") ++ sa.show(f) ++ Cord(")")
+        }
+    }
+
   implicit val renderTree: Delay[RenderTree, LogicalPlan] =
     new Delay[RenderTree, LogicalPlan] {
       def apply[A](ra: RenderTree[A]): RenderTree[LogicalPlan[A]] =
@@ -152,7 +162,7 @@ object LogicalPlan {
         Equal.equal {
           case (Read(n1), Read(n2)) => refineTypeAbs(n1) ≟ refineTypeAbs(n2)
           case (Constant(d1), Constant(d2)) => d1 ≟ d2
-          case (InvokeUnapply(f1, v1), InvokeUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized
+          case (InvokeUnapply(f1, v1), InvokeUnapply(f2, v2)) => f1 == f2 && v1.unsized ≟ v2.unsized  // TODO impl `scalaz.Equal` for `GenericFunc`
           case (Free(n1), Free(n2)) => n1 ≟ n2
           case (Let(ident1, form1, in1), Let(ident2, form2, in2)) =>
             ident1 ≟ ident2 && form1 ≟ form2 && in1 ≟ in2
