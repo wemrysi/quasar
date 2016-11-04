@@ -32,8 +32,8 @@ object TableData {
     def size   = ExactSize(slice.size)
   }
 
-  class Impl(val table: TableData) extends TableMethods {
-    type Table = TableData
+  class Impl(val table: TableData) extends TableMethods[TableData] {
+    private type Table = TableData
 
     def canonicalize(length: Int): Table                                                                                              = ???
     def canonicalize(minLength: Int, maxLength: Int): Table                                                                           = ???
@@ -55,6 +55,7 @@ object TableData {
     def size: TableSize                                                                                                               = ???
     def slices: NeedSlices                                                                                                            = ???
     def slicesStream: Stream[Slice]                                                                                                   = ???
+    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]                                                                      = ???
     def takeRange(startIndex: Long, numberToTake: Long): Table                                                                        = ???
     def toArray[A](implicit tpe: CValueType[A]): Table                                                                                = ???
     def toData: Data                                                                                                                  = ???

@@ -35,7 +35,7 @@ object Ygg {
     import ygg._, ygg.common._, json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
     import ygg.macros._, JsonMacros.EJson._
-    implicit def mkSelector[A <: Table](x: A) = new TableSelector[A](x)
+    implicit def mkSelector(x: Table) = new TableSelector(x)
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """

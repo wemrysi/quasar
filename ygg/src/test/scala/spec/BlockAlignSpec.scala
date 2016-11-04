@@ -574,11 +574,8 @@ class BlockAlignSpec extends TableQspec {
 
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
-    val result: Need[Iterable[JValue]] = {
-      val t: module.Table      = module.Table constString Set("/test")
-      val loaded: module.Table = t.load(Schema.mkType(cschema).get).value
-      loaded.toJson
-    }
+    def ctype  = Schema mkType cschema get
+    def result = (module.Table constString Set("/test") load ctype).value.toJson
 
     result.value.toList must_=== expected.toList
   }

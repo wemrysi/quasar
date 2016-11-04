@@ -40,11 +40,9 @@ trait TableModule {
   def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
 
-  type TableCompanion = BaseTableCompanion
-  type Table          = BaseTable
   object Table extends BaseTableCompanion
 
-  implicit def tableCompanion: ygg.table.TableCompanion[Table] = Table
+  implicit def tableCompanion: TableCompanion = Table
 
   def sourcesOf(gs: GroupingSpec[Table]): Vector[GroupingSource[Table]] = gs match {
     case x: GroupingSource[Table]                => Vector(x)
@@ -73,7 +71,7 @@ trait TableModule {
     )
   }
 
-  trait BaseTableCompanion extends ygg.table.TableCompanion[Table] {
+  trait BaseTableCompanion extends ygg.table.TableCompanion {
     def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
     def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
     def empty: Table                                                 = Table(emptyStreamT(), ExactSize(0))
@@ -215,18 +213,15 @@ trait TableModule {
   }
 
   sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
-    self: Table =>
-
-    type Table = outer.Table
+    self =>
 
     override def toString = s"Table(_, $size)"
     def toJsonString: String = toJValues mkString "\n"
 
-    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]    = companion.sort[Need](self, key, order)
+    def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
 
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
     def load(tpe: JType): M[Table]                          = companion.load(this, tpe, outer.projections)
-    def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
     def slicesStream: Stream[Slice]                         = slices.toStream.value
     def columns: ColumnMap                                  = slicesStream.head.columns
     def toVector: Vector[JValue]                            = toJValues.toVector
@@ -240,7 +235,7 @@ trait TableModule {
     }
 
     def companion                                                      = Table
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, sampleSize, specs)
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
@@ -510,7 +505,9 @@ trait TableModule {
         val left  = this.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
         val right = that.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
 
-        left.slices.uncons flatMap {
+        val ss = left.slices.uncons
+
+        ss flatMap {
           case Some((lhead, ltail)) =>
             right.slices.uncons flatMap {
               case Some((rhead, rtail)) =>

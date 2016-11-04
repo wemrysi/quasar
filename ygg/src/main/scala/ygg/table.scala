@@ -32,11 +32,7 @@ package object table {
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
 
-  private[table] def fixTable[T <: ygg.table.Table](x: ygg.table.Table): T                  = x.asInstanceOf[T]
-  private[table] def fixTables[T <: ygg.table.Table](xs: Iterable[ygg.table.Table]): Seq[T] = xs.toVector map (x => fixTable[T](x))
-
-
-  implicit class TableMethodsOps[R, T](val table: R)(implicit z: HasTableMethods[R, T]) {
+  implicit class TableMethodsOps[T](val table: T)(implicit z: HasTableMethods[T]) {
     val methods = z methods table
     import methods._
 

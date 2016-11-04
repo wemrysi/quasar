@@ -41,7 +41,7 @@ class TableIndex(private[table] val indices: List[SliceIndex]) {
     * Return the subtable where each group key in keyIds is set to
     * the corresponding value in keyValues.
     */
-  def getSubTable[A <: Table](keyIds: Seq[Int], keyValues: Seq[RValue])(implicit companion: TableCompanion[A]): A = {
+  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(implicit companion: TableCompanion): Table = {
     // Each slice index will build us a slice, so we just return a
     // table of those slices.
     //
@@ -105,7 +105,7 @@ object TableIndex {
     * the table, since it's assumed that all indices have the same
     * value spec.
     */
-  def joinSubTables[A <: Table : TableCompanion](tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): A = {
+  def joinSubTables(tpls: List[(TableIndex, Seq[Int], Seq[RValue])])(implicit z: TableCompanion): Table = {
     // Filter out negative integers. This allows the caller to do
     // arbitrary remapping of their own Seq[RValue] by filtering
     // values they don't want.
@@ -125,7 +125,7 @@ object TableIndex {
       slice
     }
 
-    TableCompanion[A].apply(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+    z(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
   }
 }
 
@@ -169,8 +169,8 @@ class SliceIndex(
     * Return the subtable where each group key in keyIds is set to
     * the corresponding value in keyValues.
     */
-  def getSubTable[A <: Table : TableCompanion](keyIds: Seq[Int], keyValues: Seq[RValue]) =
-    buildSubTable[A](getRowsForKeys(keyIds, keyValues))
+  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(implicit z: TableCompanion) =
+    buildSubTable(getRowsForKeys(keyIds, keyValues))
 
   private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
     //assertSorted(as)
@@ -214,10 +214,8 @@ class SliceIndex(
   /**
     * Given a set of rows, builds the appropriate subslice.
     */
-  private[table] def buildSubTable[A <: Table : TableCompanion](rows: ArrayIntList): A = {
-    val slices = singleStreamT(buildSubSlice(rows))
-    TableCompanion[A].apply(slices, ExactSize(rows.size))
-  }
+  private[table] def buildSubTable(rows: ArrayIntList)(implicit z: TableCompanion): Table =
+    z(singleStreamT(buildSubSlice(rows)), ExactSize(rows.size))
 
   /**
     * Given a set of rows, builds the appropriate slice.

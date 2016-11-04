@@ -34,8 +34,8 @@ object Sampling {
     * Of course, the hope is that this will not be used once we get efficient
     * sampling in that runs in O(m lg n) time.
     */
-  def sample[T <: Table : TableCompanion](table: T, sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[T]] = {
-    def build(states: List[SampleState], slices: NeedSlices): Need[List[T]] = {
+  def sample(table: Table, sampleSize: Int, specs: Seq[TransSpec1])(implicit z: TableCompanion): Need[Seq[Table]] = {
+    def build(states: List[SampleState], slices: NeedSlices): Need[List[Table]] = {
       slices.uncons flatMap {
         case Some((origSlice, tail)) =>
           val nextStates = states map {
@@ -74,14 +74,14 @@ object Sampling {
           Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
 
         case None =>
-          Need[List[T]](
+          Need[List[Table]](
             states map { case SampleState(inserter, length, _) =>
               val len = length min sampleSize
 
               (  inserter map (_ toSlice len)
-                   map (slice => TableCompanion[T].apply(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize))
-                   getOrElse TableCompanion[T].empty
-              ).asInstanceOf[T]
+                   map (slice => z(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize))
+                   getOrElse z.empty
+              )
             }
           )
       }

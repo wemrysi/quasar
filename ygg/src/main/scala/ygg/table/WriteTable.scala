@@ -21,10 +21,10 @@ import ygg._, common._
 import JDBM._
 
 object WriteTable {
-  def apply[T <: ygg.table.Table](implicit companion: TableCompanion[T]) = new WriteTable[T]
+  def apply()(implicit companion: TableCompanion) = new WriteTable
 }
 
-class WriteTable[T <: ygg.table.Table](implicit companion: TableCompanion[T]) {
+class WriteTable(implicit companion: TableCompanion) {
   def writeTables(slices: NeedSlices,
                   valueTrans: SliceTransform1[_],
                   keyTrans: Seq[SliceTransform1[_]],
@@ -176,12 +176,12 @@ class WriteTable[T <: ygg.table.Table](implicit companion: TableCompanion[T]) {
 
   import trans._
 
-  def writeSorted(table: T, keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[Seq[String] -> IndexMap] = uniq match {
+  def writeSorted(table: Table, keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[Seq[String] -> IndexMap] = uniq match {
     case false => writeSortedNonUnique(table, keys, spec, sort)
     case true  => writeSortedUnique(table, keys, spec, sort)
   }
 
-  def writeSortedUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] =
+  def writeSortedUnique(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] =
     writeTables(
       table transform root.spec slices,
       composeSliceTransform(valueSpec),
@@ -189,7 +189,7 @@ class WriteTable[T <: ygg.table.Table](implicit companion: TableCompanion[T]) {
       order
     )
 
-  def writeSortedNonUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
+  def writeSortedNonUnique(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
     val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1")))
     writeTables(
       table transform companion.addGlobalId(root.spec) slices,

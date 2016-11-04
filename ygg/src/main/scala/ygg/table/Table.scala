@@ -33,7 +33,7 @@ private object addGlobalIdScanner extends Scanner {
   }
 }
 
-class TableSelector[A <: Table](val table: A) {
+class TableSelector(val table: Table) {
   def >>(): Unit = table.toVector foreach println
 
   def filter(p: TransSpec[Source.type]) = table transform (root filter p)
@@ -41,15 +41,15 @@ class TableSelector[A <: Table](val table: A) {
 object Table extends TableModule {
   implicit val codec = DataCodec.Precise
 
-  def apply(json: String): BaseTable = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
-  def apply(file: jFile): BaseTable  = apply(file.slurpString)
+  def apply(json: String): Table = fromJson(JParser.parseManyFromString(json).fold(throw _, x => x))
+  def apply(file: jFile): Table  = apply(file.slurpString)
 
   def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
-  def fromData(data: Vector[Data]): BaseTable      = fromJson(data map dataToJValue)
-  def fromFile(file: jFile): BaseTable             = fromJson((JParser parseManyFromFile file).orThrow)
-  def fromString(json: String): BaseTable          = fromJson(Seq(JParser parseUnsafe json))
-  def fromJValues(json: JValue*): BaseTable        = fromJson(json.toVector)
+  def fromData(data: Vector[Data]): Table          = fromJson(data map dataToJValue)
+  def fromFile(file: jFile): Table                 = fromJson((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): Table              = fromJson(Seq(JParser parseUnsafe json))
+  def fromJValues(json: JValue*): Table            = fromJson(json.toVector)
 }
 
 trait TableConstructors[T <: ygg.table.Table] {
@@ -69,18 +69,14 @@ trait TableConstructors[T <: ygg.table.Table] {
   def fromSlices(data: Seq[Slice]): T
 }
 
-object TableCompanion {
-  def apply[A <: Table](implicit z: TableCompanion[A]): TableCompanion[A] = z
-}
-
-trait TableCompanion[T <: ygg.table.Table] {
-  type M[X]  = T#M[X]
-  type Table = T
+trait TableCompanion {
+  type T    = Table
+  type M[X] = Table#M[X]
 
   lazy val sortMergeEngine = new MergeEngine
 
-  def addGlobalId(spec: TransSpec1): TransSpec1                                        = Scan(WrapArray(spec), addGlobalIdScanner)
-  def align(sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = AlignTable[T](sourceL, alignL, sourceR, alignR)(this)
+  def addGlobalId(spec: TransSpec1): TransSpec1                                                = Scan(WrapArray(spec), addGlobalIdScanner)
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table] = AlignTable(sourceL, alignL, sourceR, alignR)(this)
 
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
     import mergeEngine._
@@ -109,8 +105,7 @@ trait TableCompanion[T <: ygg.table.Table] {
       )
     )
 
-    val tab = apply(StreamT(Need(head)), ExactSize(totalCount))
-    fixTable(tab transform TransSpec1.DerefArray1)
+    apply(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
   }
 
   /**
@@ -120,7 +115,7 @@ trait TableCompanion[T <: ygg.table.Table] {
     * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
     */
   private def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
-    WriteTable[T](this).writeSorted(table, groupKeys, valueSpec, sortOrder, unique) map {
+    WriteTable()(this).writeSorted(table, groupKeys, valueSpec, sortOrder, unique) map {
       case (streamIds, indices) =>
         val streams = indices.groupBy(_._1.streamId)
         streamIds.toStream map { streamId =>
@@ -129,13 +124,6 @@ trait TableCompanion[T <: ygg.table.Table] {
     }
   }
 
-  /**
-    * Sorts the KV table by ascending or descending order of a transformation
-    * applied to the rows.
-    *
-    * @param key The transspec to use to obtain the values to sort on
-    * @param order Whether to sort ascending or descending
-    */
   def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
@@ -154,10 +142,10 @@ trait TableCompanion[T <: ygg.table.Table] {
     * preserved
     */
   def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] =
-    ().point[F] map (_ => fixTables(groupExternalByN(externalize(table), keys, values, order, unique).value))
+    ().point[F] map (_ => groupExternalByN(externalize(table), keys, values, order, unique).value)
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
-    WriteTable[T](this).writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
+    (new WriteTable()(this)).writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   /**
     * Passes over all slices and returns a new slices that is the concatenation
@@ -218,38 +206,29 @@ trait TableCompanion[T <: ygg.table.Table] {
   def newExternalTable(slices: NeedSlices, size: TableSize): T
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
+    CogroupTable(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
 
   def externalize(table: T): T = newExternalTable(table.slices, table.size)
 }
 
-trait Table extends TableMethods {
-  type Table <: ygg.table.Table
-
-  def companion: TableCompanion[Table]
+trait Table extends TableMethods[Table] {
+  def companion: TableCompanion
 }
 
-object TableMethods {
-  type Aux[T] = TableMethods { type Table = T }
-}
-
-trait HasTableMethods[R, T] {
-  def methods(x: R): TableMethods { type Table = T }
-
-  // def methods(x: Table { type Table = T }): TableMethods { type Table = T }
+trait HasTableMethods[T] {
+  def methods(x: T): TableMethods[T]
 }
 object HasTableMethods {
-  implicit def oldTableMethods[T <: ygg.table.Table] = new HasTableMethods[T { type Table = T }, T] {
-    def methods(x: T { type Table = T }) = x
+  implicit def oldTableMethods = new HasTableMethods[Table] {
+    def methods(x: Table): TableMethods[Table] = x
   }
-  implicit def tableDataMethods: HasTableMethods[TableData, TableData] = new HasTableMethods[TableData, TableData] {
-    def methods(x: TableData) = new TableData.Impl(x)
+  implicit def tableDataMethods = new HasTableMethods[TableData] {
+    def methods(x: TableData): TableMethods[TableData] = new TableData.Impl(x)
   }
 }
 
-trait TableMethods {
-  type Table
-  type M[X]       = Need[X]
+trait TableMethods[Table] {
+  type M[+X]      = Need[X]
   type NeedSlices = StreamT[M, Slice]
 
   /**
@@ -267,6 +246,16 @@ trait TableMethods {
     * Remaps the indicies.
     */
   def compact(spec: TransSpec1, definedness: Definedness): Table
+  def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
+
+  /**
+    * Sorts the KV table by ascending or descending order of a transformation
+    * applied to the rows.
+    *
+    * @param key The transspec to use to obtain the values to sort on
+    * @param order Whether to sort ascending or descending
+    */
+  def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]
 
   /**
     * Performs a one-pass transformation of the keys and values in the table.

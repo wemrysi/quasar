@@ -20,7 +20,7 @@ import ygg._, common._, data._, trans._
 import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 
 object CogroupTable {
-  def apply[T <: Table](self: T, leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2)(implicit companion: TableCompanion[T]): T = {
+  def apply(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2)(implicit companion: TableCompanion): Table = {
     //println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
     class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
       val lbuf   = new ArrayIntList(lInitialSize)
@@ -91,7 +91,7 @@ object CogroupTable {
                                      strk: SliceTransform1[RK],
                                      stlr: SliceTransform1[LR],
                                      strr: SliceTransform1[RR],
-                                     stbr: SliceTransform2[BR]): T = {
+                                     stbr: SliceTransform2[BR]): Table = {
       val stateAdt = new CogroupStateAdt[LK, RK, LR, RR, BR]
       import stateAdt._
 
