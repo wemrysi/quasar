@@ -46,6 +46,7 @@ package object fs {
   type MapFunc[T[_[_]], A] = quasar.qscript.MapFunc[T, A]
   type ZonedDateTime       = java.time.ZonedDateTime
   type LocalDateTime       = java.time.LocalDateTime
+  type LogicalPlan[A]      = quasar.frontend.logicalplan.LogicalPlan[A]
 
   val Task = scalaz.concurrent.Task
   val Type = quasar.Type

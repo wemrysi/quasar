@@ -32,7 +32,8 @@ final case class FPlan(sql: String, lp: Fix[LogicalPlan]) {
 }
 
 object FPlan {
-  val lpf = new quasar.frontend.LogicalPlanR[Fix]
+  val lpf = new quasar.frontend.logicalplan.LogicalPlanR[Fix]
+  val opt = new quasar.frontend.logicalplan.Optimizer[Fix]
 
   def compile(query: String): String \/ Fix[LogicalPlan] =
     for {
@@ -43,8 +44,8 @@ object FPlan {
 
   def fromString(q: String): FPlan = (
     compile(q)
-      map     Optimizer.optimize
-      flatMap (x => (LogicalPlan ensureCorrectTypes x).disjunction leftMap (_.list.toList mkString ";"))
+      map     opt.optimize
+      flatMap (x => (lpf ensureCorrectTypes x).disjunction leftMap (_.list.toList mkString ";"))
   ).fold(abort, FPlan(q, _))
 
   def fromFile(file: jFile): FPlan = FPlan(

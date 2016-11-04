@@ -120,7 +120,7 @@ trait FileSystemIndependentTypes {
   type Errors  = Vector[FileSystemError]
   type DirList = Set[PathSegment]
   type Chunks  = Vector[quasar.Data]
-  type FixPlan = matryoshka.Fix[quasar.LogicalPlan]
+  type FixPlan = matryoshka.Fix[quasar.frontend.logicalplan.LogicalPlan]
 
   type WHandle = WriteFile.WriteHandle
   type RHandle = ReadFile.ReadHandle
