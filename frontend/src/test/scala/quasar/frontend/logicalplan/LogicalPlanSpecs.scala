@@ -32,19 +32,11 @@ import shapeless.contrib.scalaz.instances._
 import pathy.Path._
 
 class LogicalPlanSpecs extends Spec with ScalazMatchers {
-  // `Gen.oneOf` calls `Gen.suchThat` which in turn calls `==`
-  // We cannot compare `LogicalPlan` instances with `==` and instead prefer `scalaz.Equal`.
-  // Removing the call to `Gen.suchThat` may have a negative performance impact or
-  // may result in nonoptimal example simplification.
-  def oneOfNoEquals[T](gs: Gen[T]*): Gen[T] = {
-    Gen.choose(0, gs.size - 1).flatMap(gs(_))
-  }
-
   implicit val arbLogicalPlan: Delay[Arbitrary, LogicalPlan] =
     new Delay[Arbitrary, LogicalPlan] {
       def apply[A](arb: Arbitrary[A]) =
         Arbitrary {
-          oneOfNoEquals(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
+          Gen.oneOf(readGen[A], addGen(arb), constGen[A], letGen(arb), freeGen[A](Nil))
         }
     }
 
