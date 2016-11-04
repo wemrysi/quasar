@@ -35,7 +35,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
     "inline trivial binding" in {
       optimizer.simplify(lpf.let('tmp0, read("foo"), lpf.free('tmp0))) must
-        beTree(read("foo"))
+        beTreeEqual(read("foo"))
     }
 
     "not inline binding that's used twice" in {
@@ -43,7 +43,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
         makeObj(
           "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
           "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))) must
-        beTree(
+        beTreeEqual(
           lpf.let('tmp0, read("foo"),
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
@@ -52,7 +52,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
     "completely inline stupid lets" in {
       optimizer.simplify(lpf.let('tmp0, read("foo"), lpf.let('tmp1, lpf.free('tmp0), lpf.free('tmp1)))) must
-        beTree(read("foo"))
+        beTreeEqual(read("foo"))
     }
 
     "inline correct value for shadowed binding" in {
@@ -60,7 +60,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
         lpf.let('tmp0, read("bar"),
           makeObj(
             "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))))))) must
-        beTree(
+        beTreeEqual(
           makeObj(
             "bar" -> ObjectProject(read("bar"), lpf.constant(Data.Str("bar")))))
     }
@@ -71,7 +71,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
           lpf.let('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))))))) must
-        beTree(
+        beTreeEqual(
           lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
             makeObj(
@@ -85,7 +85,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
               "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))))) must
-        beTree(
+        beTreeEqual(
           lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
             lpf.let('tmp0, read("bar"),
@@ -106,7 +106,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
                 ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
               lpf.constant(Data.Str("foobar"))),
             lpf.free('tmp2))))) must
-        beTree(
+        beTreeEqual(
           lpf.let('tmp1,
             makeObj(
               "name" ->
@@ -124,7 +124,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
       optimizer.preferProjections(
         DeleteField(lpf.read(file("zips")),
           lpf.constant(Data.Str("pop")))) must
-        beTree[Fix[LogicalPlan]](
+        beTreeEqual[Fix[LogicalPlan]](
           DeleteField(lpf.read(file("zips")),
             lpf.constant(Data.Str("pop"))))
     }
@@ -137,7 +137,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
               "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
             lpf.constant(Data.Str("pop"))))) must
-      beTree(
+      beTreeEqual(
         lpf.let('meh, lpf.read(file("zips")),
           makeObj(
             "city" ->
@@ -161,7 +161,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "orig" -> lpf.free('meh2),
               "cleaned" ->
                 DeleteField(lpf.free('meh2), lpf.constant(Data.Str("pop"))))))) must
-      beTree(
+      beTreeEqual(
         lpf.let('meh, lpf.read(file("zips")),
           lpf.let('meh2,
             makeObj(
