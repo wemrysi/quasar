@@ -98,13 +98,10 @@ class MarkLogicStdLibSpec extends StdLibSpec {
     private val runSession: SessionIO ~> Task =
       ContentSourceIO.runNT(contentSource) compose ContentSourceIO.runSessionIO
 
-    // FIXME: need a function from Data to XQuery literals, just using toString doesn't cut it due to escapes
-    //        maybe a fold using the element/attribute constructors?
-    //
-    //        Can we reuse the EncodeXQuery instance and the Data => EJson encoding?
     private def asXqy(d: Data): H[XQuery] =
-      data.encodeXml[EitherT[F, ErrorMessages, ?]](d)
-        .bimap(errs => ko(errs.head).toResult, elem => XQuery(elem.toString))
+      EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
+        .encodeXQuery(Const(d))
+        .leftMap(errs => ko(errs.head).toResult)
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

@@ -19,6 +19,9 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object xs {
+  def base64Binary(xqy: XQuery): XQuery =
+    XQuery(s"xs:base64Binary($xqy)")
+
   def boolean(xqy: XQuery): XQuery =
     XQuery(s"xs:boolean($xqy)")
 
@@ -36,6 +39,9 @@ object xs {
 
   def double(xqy: XQuery): XQuery =
     XQuery(s"xs:double($xqy)")
+
+  def duration(xqy: XQuery): XQuery =
+    XQuery(s"xs:duration($xqy)")
 
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")
