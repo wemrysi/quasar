@@ -232,6 +232,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
         }
     })
   )
+  def deref(i: Int): Slice             = deref(CPathIndex(i))
+  def deref(name: scala.Symbol): Slice = deref(CPathField(name.name))
 
   def wrap(wrapper: CPathNode): Slice = Slice(
     source.size,

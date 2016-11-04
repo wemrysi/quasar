@@ -18,7 +18,6 @@ package ygg.json
 
 import quasar.Predef._
 import scalaz._, Scalaz._, Ordering._
-import scalaz.{ Order => Ord }
 import scala.util.Try
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
@@ -49,7 +48,7 @@ sealed trait JValue {
     case _          => java.lang.System identityHashCode this
   }
   final override def equals(other: scala.Any) = other match {
-    case x: JValue => (this eq x) || (JValue.Order.order(this, x) == EQ)
+    case x: JValue => (this eq x) || (JValue.StdOrder.order(this, x) == EQ)
     case _         => false
   }
 }
@@ -87,7 +86,26 @@ object JValue {
     def jobject(vs: Map[String, JValue]) = JObject(vs)
   }
 
-  implicit object Order extends Ord[JValue] {
+  object StdOrder extends Order[JValue] {
+    private def fieldsCompare(m1: Map[String, JValue], m2: Map[String, JValue]): Ordering = {
+      @tailrec def rec(fields: Array[String], i: Int): Ordering = {
+        if (i < fields.length) {
+          val key = fields(i)
+          val v1  = m1.getOrElse(key, JUndefined)
+          val v2  = m2.getOrElse(key, JUndefined)
+          if (v1 == JUndefined && v2 == JUndefined) rec(fields, i + 1)
+          else if (v1 == JUndefined) GT
+          else if (v2 == JUndefined) LT
+          else {
+            val cres = v1 ?|? v2
+            if (cres == EQ) rec(fields, i + 1) else cres
+          }
+        } else EQ
+      }
+      val arr: Array[String] = (m1.keySet ++ m2.keySet).toArray
+      quickSort(arr)
+      rec(arr, 0)
+    }
     def order(x: JValue, y: JValue): Ordering = (x, y) match {
       case (JObject(m1), JObject(m2))     => fieldsCompare(m1, m2)
       case (JString(x), JString(y))       => x ?|? y
@@ -98,26 +116,6 @@ object JValue {
       case (JBool(x), JBool(y))           => x ?|? y
       case (x, y)                         => x.typeIndex ?|? y.typeIndex
     }
-  }
-
-  private def fieldsCompare(m1: Map[String, JValue], m2: Map[String, JValue]): Ordering = {
-    @tailrec def rec(fields: Array[String], i: Int): Ordering = {
-      if (i < fields.length) {
-        val key = fields(i)
-        val v1  = m1.getOrElse(key, JUndefined)
-        val v2  = m2.getOrElse(key, JUndefined)
-        if (v1 == JUndefined && v2 == JUndefined) rec(fields, i + 1)
-        else if (v1 == JUndefined) GT
-        else if (v2 == JUndefined) LT
-        else {
-          val cres = v1 ?|? v2
-          if (cres == EQ) rec(fields, i + 1) else cres
-        }
-      } else EQ
-    }
-    val arr: Array[String] = (m1.keySet ++ m2.keySet).toArray
-    quickSort(arr)
-    rec(arr, 0)
   }
 }
 object JBool {

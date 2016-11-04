@@ -42,21 +42,12 @@ object AlignTable {
     // we need a custom row comparator that ignores the global ID introduced to prevent elimination of
     // duplicate rows in the write to JDBM
     def buildRowComparator(lkey: Slice, rkey: Slice, rauth: Slice): RowComparator = new RowComparator {
-      private val mainComparator = Slice.rowComparatorFor(lkey.deref(CPathIndex(0)), rkey.deref(CPathIndex(0))) {
-        _.columns.keys map (_.selector)
-      }
+      private def make(rhs: Slice) = Slice.rowComparatorFor(lkey deref 0, rhs deref 0)(_.columns.keys map (_.selector))
+      private val mainComparator   = make(rkey)
+      private val auxComparator    = if (rauth == null) null else make(rauth)
 
-      private val auxComparator =
-        if (rauth == null) null
-        else {
-          Slice.rowComparatorFor(lkey.deref(CPathIndex(0)), rauth.deref(CPathIndex(0))) {
-            _.columns.keys map (_.selector)
-          }
-        }
-
-      def compare(i1: Int, i2: Int) = {
+      def compare(i1: Int, i2: Int) =
         if (i2 < 0 && rauth != null) auxComparator.compare(i1, rauth.size + i2) else mainComparator.compare(i1, i2)
-      }
     }
 
     // this method exists only to skolemize A and B

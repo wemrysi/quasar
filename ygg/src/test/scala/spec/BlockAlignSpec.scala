@@ -41,7 +41,8 @@ private object JValueInColumnOrder {
 }
 
 class BlockAlignSpec extends TableQspec {
-  implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
+  /** Shadowing the package object order. */
+  implicit def JValueOrder: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {
     "a simple example"                                     in alignSimple

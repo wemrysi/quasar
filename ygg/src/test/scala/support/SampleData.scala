@@ -25,7 +25,7 @@ final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema]
       "\nschema: " + schema
   }
 
-  def sorted(implicit z: Ord[JValue]): SampleData                = transform(_.sorted)
+  def sorted(implicit z: Ord[JValue]): SampleData                = transform(_.sorted(z.toScalaOrdering))
   def sortBy[B: Ord](f: JValue => B): SampleData                 = transform(_ sortBy f)
   def transform(f: Stream[JValue] => Stream[JValue]): SampleData = copy(data = f(data))
 }

@@ -91,6 +91,10 @@ package object json {
 
   implicit def JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
   implicit def JPathOrder: Order[JPath]         = Order orderBy (_.nodes.toList) /* .toList VERY IMPORTANT */
+  implicit def JValueOrder: Order[JValue]       = JValue.StdOrder
+
+  implicit def JFieldOrder(implicit ord: Order[JValue]): Order[JField] =
+    Order order ((x, y) => (x.name ?|? y.name) |+| ord.order(x.value, y.value))
 
   implicit val JObjectMergeMonoid = new Monoid[JObject] {
     val zero = JObject(Nil)
@@ -342,7 +346,7 @@ package object json {
       rec(rootTarget, rootPath, rootValue)
     }
 
-    def set(path: JPath, value: JValue): JValue =
+    def set(path: JPath, value: JValue): JValue = {
       if (path == NoJPath) value
       else {
         def arraySet(l: Vector[JValue], i: Int, rem: JPath, v: JValue): Vector[JValue] = {
@@ -381,6 +385,7 @@ package object json {
             }
         }
       }
+    }
 
     def delete(path: JPath): Option[JValue] = path.nodes match {
       case JPathField(name) +: xs =>

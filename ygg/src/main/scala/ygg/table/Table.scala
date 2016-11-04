@@ -223,11 +223,6 @@ trait TableCompanion[T <: ygg.table.Table] {
   def load(table: T, tpe: JType): Need[T]
 }
 
-trait TemporaryTableStrut extends Table {
-  /** XXX FIXME */
-  def takeRange(startIndex: Long, numberToTake: Long): Table = takeRangeDefaultImpl(startIndex, numberToTake)
-  def takeRangeDefaultImpl(startIndex: Long, numberToTake: Long): Table
-}
 
 trait InternalTable extends Table {
   def slice: Slice
