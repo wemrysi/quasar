@@ -46,7 +46,7 @@ import simulacrum.typeclass
 object Planner {
 
   // TODO consider moving to data.scala (conflicts with existing code)
-  implicit def ordering: Order[Data] = new Order[Data] with Serializable {
+  implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
     def order(d1: Data, d2: Data) = (d1, d2) match {
       case Data.Null -> Data.Null                 => Ordering.EQ
       case Data.Str(a) -> Data.Str(b)             => a cmp b
