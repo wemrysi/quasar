@@ -74,46 +74,11 @@ trait TableModule {
   }
 
   trait BaseTableCompanion extends ygg.table.TableCompanion[Table] {
-    def load(table: Table, tpe: JType): M[Table] = {
-      val reduced = table reduce new CReducer[Set[Path]] {
-        def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
-          case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
-          case _            => Set()
-        }
-      }
-      reduced map { paths =>
-        val projs = paths.toList flatMap projections.get
-        Table(
-          projs foldMap (_ getBlockStreamForType tpe),
-          ExactSize(projs.foldMap(_.length)(Monoid[Long]))
-        )
-      }
-    }
-
     def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
     def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
     def empty: Table                                                 = Table(emptyStreamT(), ExactSize(0))
     def apply(slices: NeedSlices, size: TableSize): Table            = fromSlices(slices, size)
     def fromJson(data: Seq[JValue]): Table                           = outer fromJson data
-
-    def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
-      singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
-      ExactSize(vs.length)
-    )
-    def constSingletonTable(singleType: CType, column: Column): Table = Table(
-      singleStreamT(Slice(1, columnMap(ColumnRef.id(singleType) -> column))),
-      ExactSize(1)
-    )
-
-    def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
-    def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
-    def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
-    def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
-    def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
-    def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
-    def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
-    def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
-    def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
 
     /**
       * Merge controls the iteration over the table of group key values.
@@ -267,7 +232,7 @@ trait TableModule {
 
     def toInternalTable(): ExternalTable \/ InternalTable   = toInternalTable(yggConfig.maxSliceSize)
     def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
-    def load(tpe: JType): M[Table]                          = companion.load(this, tpe)
+    def load(tpe: JType): M[Table]                          = companion.load(this, tpe, outer.projections)
     def compact(spec: TransSpec1): Table                    = compact(spec, AnyDefined)
     def slicesStream: Stream[Slice]                         = slices.toStream.value
     def columns: ColumnMap                                  = slicesStream.head.columns

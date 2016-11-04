@@ -179,24 +179,45 @@ trait TableCompanion[T <: ygg.table.Table] {
     rec(Nil, slices)
   }
 
+  def load(table: Table, tpe: JType, projections: Map[Path, Projection]): M[Table] = {
+    val reduced = table reduce new CReducer[Set[Path]] {
+      def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
+        case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
+        case _            => Set()
+      }
+    }
+    reduced map { paths =>
+      val projs = paths.toList flatMap projections.get
+      apply(
+        projs foldMap (_ getBlockStreamForType tpe),
+        ExactSize(projs.foldMap(_.length)(Monoid[Long]))
+      )
+    }
+  }
+
+  def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = apply(
+    singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
+    ExactSize(vs.length)
+  )
+  def constSingletonTable(singleType: CType, column: Column): Table = apply(
+    singleStreamT(Slice(1, columnMap(ColumnRef.id(singleType) -> column))),
+    ExactSize(1)
+  )
+
+  def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+  def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+  def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+  def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+  def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+  def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+  def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
+  def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
+  def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
+
   def empty: T
   def apply(slices: NeedSlices, size: TableSize): T
-  // TODO assert that this table only has one row
   def newInternalTable(slice: Slice): T
   def newExternalTable(slices: NeedSlices, size: TableSize): T
-
-  def constString(v: Set[String]): T
-  def constLong(v: Set[Long]): T
-  def constDouble(v: Set[Double]): T
-  def constDecimal(v: Set[BigDecimal]): T
-  def constDate(v: Set[DateTime]): T
-  def constBoolean(v: Set[Boolean]): T
-  def constNull: T
-  def constEmptyObject: T
-  def constEmptyArray: T
-  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): T
-
-  def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => Need[T]) => Need[T]): Need[T]
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable[T](self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)(this)
@@ -213,11 +234,6 @@ trait TableCompanion[T <: ygg.table.Table] {
     case x: ExternalTable with T => x externalToInternal limit
   }
   def toExternalTable(table: T): T#ExternalTable = fixTable[T#ExternalTable](newExternalTable(table.slices, table.size))
-
-  def constSingletonTable(singleType: CType, column: Column): T
-  def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): T
-  def fromJson(data: Seq[JValue]): T
-  def load(table: T, tpe: JType): Need[T]
 }
 
 
