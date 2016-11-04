@@ -32,6 +32,8 @@ import shapeless.{Nat, Sized}
 import pathy.Path.posixCodec
 
 sealed abstract class LogicalPlan[A] extends Product with Serializable {
+  // TODO this should be removed, but usage of `==` is so pervasive in
+  // external dependencies (and scalac) that removal may never be possible
   override def equals(that: scala.Any): Boolean = that match {
     case lp: LogicalPlan[A] => LogicalPlan.equal(Equal.equalA[A]).equal(this, lp)
     case _                  => false
