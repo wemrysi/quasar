@@ -17,22 +17,17 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.Data
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib._
 
-import matryoshka._
+import scalaz._
 
-sealed abstract class JoinDir(val name: String) {
-  import structural.ObjectProject
+sealed abstract class JoinType(val sql: String) extends Product with Serializable
 
-  val data: Data = Data.Str(name)
-  def const[T[_[_]]: Corecursive]: T[LP] = constant[T[LP]](data).embed
-  def projectFrom[T[_[_]]: Corecursive](lp: T[LP]): T[LP] =
-    ObjectProject(lp, const).embed
-}
+final case object LeftJoin extends JoinType("left join")
+final case object RightJoin extends JoinType("right join")
+final case object InnerJoin extends JoinType("inner join")
+final case object FullJoin extends JoinType("full join")
 
-object JoinDir {
-  final case object Left extends JoinDir("left")
-  final case object Right extends JoinDir("right")
+object JoinType {
+  implicit val equal: Equal[JoinType] = Equal.equalRef
+  implicit val show: Show[JoinType] = Show.showFromToString
 }

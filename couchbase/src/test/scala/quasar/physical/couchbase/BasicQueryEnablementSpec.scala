@@ -20,13 +20,15 @@ import quasar.Predef._
 import quasar.{Planner => _, _}
 import quasar.contrib.pathy.{ADir, PathSegment}
 import quasar.effect.MonotonicSeq
-import quasar.fp._, eitherT._, free._, ski.ι
-import quasar.physical.couchbase.planner._
-import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
-import quasar.sql.CompilerHelpers
+import quasar.fp._, eitherT._
+import quasar.fp.free._
+import quasar.fp.ski.ι
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.couchbase.N1QL._
 import quasar.physical.couchbase.fs.queryfile._
 import quasar.physical.couchbase.planner._, Planner._
+import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
+import quasar.sql.CompilerHelpers
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
@@ -46,7 +48,7 @@ class BasicQueryEnablementSpec
   sequential
 
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =
-    compile(query).map(Optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
+    compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
 
   def lc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
     Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName("beer-sample").right))
@@ -56,14 +58,14 @@ class BasicQueryEnablementSpec
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Eff](compileLogicalPlan(sql2), lc) ∘ outerN1ql)
+    (lpLcToN1ql[Eff](compileLogicalPlan(sql2), lc) ∘ n1qlQueryString)
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Free[MonotonicSeq, ?], QST].plan) ∘ outerN1ql)
+    (qs.cataM(Planner[Free[MonotonicSeq, ?], QST].plan) ∘ (outerN1ql _ >>> n1qlQueryString))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync

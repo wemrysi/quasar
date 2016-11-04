@@ -17,22 +17,15 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.Data
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib._
 
-import matryoshka._
+import scalaz._
 
-sealed abstract class JoinDir(val name: String) {
-  import structural.ObjectProject
+sealed trait IsDistinct extends Product with Serializable
 
-  val data: Data = Data.Str(name)
-  def const[T[_[_]]: Corecursive]: T[LP] = constant[T[LP]](data).embed
-  def projectFrom[T[_[_]]: Corecursive](lp: T[LP]): T[LP] =
-    ObjectProject(lp, const).embed
-}
+final case object SelectDistinct extends IsDistinct
+final case object SelectAll extends IsDistinct
 
-object JoinDir {
-  final case object Left extends JoinDir("left")
-  final case object Right extends JoinDir("right")
+object IsDistinct {
+  implicit val equal: Equal[IsDistinct] = Equal.equalRef
+  implicit val show: Show[IsDistinct] = Show.showFromToString
 }
