@@ -16,8 +16,7 @@
 
 package ygg
 
-import ygg.common._
-import ygg.json.JValue
+import common._, json._
 import scalaz.{ =?> => _, _}, Scalaz._, Ordering._
 
 package object table {
@@ -36,7 +35,7 @@ package object table {
     val methods = z methods table
     import methods._
 
-    def fields: Vector[JValue] = slicesStream.flatMap(_.toJsonElements).toVector
+    def fields: Vector[JValue] = slicesStream flatMap (_.toJsonElements) toVector
   }
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =

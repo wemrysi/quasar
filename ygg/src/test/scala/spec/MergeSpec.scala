@@ -56,24 +56,21 @@ class MergeSpec extends TableQspec {
           TransSpec1.Id,
           GroupingSource(
             bar,
-            root.key,
-            Some(
-              InnerObjectConcat(
-                ObjectDelete(root, Set(valueField)),
-                WrapObject(root.value.c, "value"))),
+            dotKey,
+            Some(InnerObjectConcat(root delete valueField, dotValue.c wrapObjectField "value")),
             0,
             GroupKeySpecOr(
-              GroupKeySpecSource(oneField, root.value.a),
-              GroupKeySpecSource(twoField, root.value.b))
+              GroupKeySpecSource(oneField, dotValue.a),
+              GroupKeySpecSource(twoField, dotValue.b))
           ),
           GroupingSource(
             foo,
-            root.key,
+            dotKey,
             Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
             3,
             GroupKeySpecAnd(
-              GroupKeySpecSource(oneField, root.value.a),
-              GroupKeySpecSource(twoField, root.value.b))
+              GroupKeySpecSource(oneField, dotValue.a),
+              GroupKeySpecSource(twoField, dotValue.b))
           ),
           GroupingSpec.Intersection)
 
@@ -145,48 +142,48 @@ class MergeSpec extends TableQspec {
           TransSpec1.Id,
           GroupingSource(
             medals,
-            root.key,
+            dotKey,
             Some(
               InnerObjectConcat(
                 ObjectDelete(root, Set(valueField)),
-                WrapObject(root.value.Gender, "value"))),
+                WrapObject(dotValue.Gender, "value"))),
             0,
             GroupKeySpecAnd(
               GroupKeySpecSource(
                 CPathField("extra0"),
                 Filter(
-                  EqualLiteral(root.value.Gender, CString("Men"), false),
-                  EqualLiteral(root.value.Gender, CString("Men"), false))),
-              GroupKeySpecSource(oneField, root.value.Edition))
+                  EqualLiteral(dotValue.Gender, CString("Men"), false),
+                  EqualLiteral(dotValue.Gender, CString("Men"), false))),
+              GroupKeySpecSource(oneField, dotValue.Edition))
           ),
           GroupingSource(
             medals,
-            root.key,
+            dotKey,
             Some(
               InnerObjectConcat(
                 ObjectDelete(root, Set(valueField)),
-                WrapObject(root.value.Gender, "value"))),
+                WrapObject(dotValue.Gender, "value"))),
             2,
             GroupKeySpecAnd(
               GroupKeySpecSource(
                 CPathField("extra1"),
                 Filter(
-                  EqualLiteral(root.value.Gender, CString("Women"), false),
-                  EqualLiteral(root.value.Gender, CString("Women"), false))),
-              GroupKeySpecSource(oneField, root.value.Edition))
+                  EqualLiteral(dotValue.Gender, CString("Women"), false),
+                  EqualLiteral(dotValue.Gender, CString("Women"), false))),
+              GroupKeySpecSource(oneField, dotValue.Edition))
           ),
           GroupingSpec.Intersection)
 
-      def evaluator[T <: ygg.table.Table](key: RValue, partition: GroupId => Need[T]) = {
+      def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(json"""{"1":"1996","extra0":true,"extra1":true}""")
         val K1 = RValue.fromJValue(json"""{"1":"2000","extra0":true,"extra1":true}""")
         val K2 = RValue.fromJValue(json"""{"1":"2004","extra0":true,"extra1":true}""")
         val K3 = RValue.fromJValue(json"""{"1":"2008","extra0":true,"extra1":true}""")
 
-        val r0 = fromJson(jsonMany"""{"key":[],"value":{"year":"1996","ratio":139.0}}""".toStream)
-        val r1 = fromJson(jsonMany"""{"key":[],"value":{"year":"2000","ratio":126.0}}""".toStream)
-        val r2 = fromJson(jsonMany"""{"key":[],"value":{"year":"2004","ratio":122.0}}""".toStream)
-        val r3 = fromJson(jsonMany"""{"key":[],"value":{"year":"2008","ratio":119.0}}""".toStream)
+        val r0 = fromJson(jsonMany"""{"key":[],"value":{"year":"1996","ratio":139.0}}""")
+        val r1 = fromJson(jsonMany"""{"key":[],"value":{"year":"2000","ratio":126.0}}""")
+        val r2 = fromJson(jsonMany"""{"key":[],"value":{"year":"2004","ratio":122.0}}""")
+        val r3 = fromJson(jsonMany"""{"key":[],"value":{"year":"2008","ratio":119.0}}""")
 
         Need {
           key match {

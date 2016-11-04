@@ -44,6 +44,9 @@ package trans {
   object rootLeft extends KVTransSpecBuilder(Leaf(SourceLeft))
   object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
 
+  object dotValue extends KVTransSpecBuilder(root select "value")
+  object dotKey extends KVTransSpecBuilder(root select "key")
+
   class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
     def emptyArray() = ConstLiteral(CEmptyArray, spec0)
 
@@ -56,7 +59,6 @@ package trans {
 
     protected def next[A](x: This): Builder = new TransSpecBuilder(x)
 
-    def apply(index: Int): Builder             = next(DerefArrayStatic(spec, CPathIndex(index)))
     def deepMap(pf: MaybeSelf[This]): Builder  = next(TransSpec.deepMap(spec)(pf))
     def deepMap1(fn: CF1): Builder             = next(DeepMap1(spec, fn))
     def deepEquals(that: This): Builder        = next(Equal(spec, that))
@@ -70,6 +72,17 @@ package trans {
     def selectDynamic(name: String): Builder   = select(name)
     def wrapArrayValue(): Builder              = next(WrapArray(spec))
     def wrapObjectField(name: String): Builder = next(WrapObject(spec, name))
+    def metadata(name: String): Builder        = next(DerefMetadataStatic(spec, CPathMeta(name)))
+
+    def apply(index: Int): Builder = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def apply(node: CPathNode): Builder = node match {
+      case CPathField(name) => select(name)
+      case CPathIndex(idx)  => apply(idx)
+      case CPathMeta(meta)  => metadata(meta)
+      case CPathArray       => ???
+    }
+
+    def \(path: CPath): Builder = path.nodes.foldLeft(spec)(_ apply _)
   }
 
   sealed trait TransSpec[+A]  extends AnyRef
@@ -308,12 +321,12 @@ package trans {
     val SortKey = CPathField("sortkey")
 
     object SourceKey {
-      val Single = root.key
+      val Single = dotKey
       val Left   = rootLeft.key
       val Right  = rootRight.key
     }
     object SourceValue {
-      val Single = root.value
+      val Single = dotValue
       val Left   = rootLeft.value
       val Right  = rootRight.value
     }

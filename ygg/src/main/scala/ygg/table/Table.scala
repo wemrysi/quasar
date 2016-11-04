@@ -33,11 +33,6 @@ private object addGlobalIdScanner extends Scanner {
   }
 }
 
-class TableSelector(val table: Table) {
-  def >>(): Unit = table.toVector foreach println
-
-  def filter(p: TransSpec[Source.type]) = table transform (root filter p)
-}
 object Table extends TableModule {
   implicit val codec = DataCodec.Precise
 

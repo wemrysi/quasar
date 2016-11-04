@@ -54,7 +54,7 @@ class PartitionMergeSpec extends TableQspec {
       "4a"
     """
     val tbl    = fromJson(data)
-    val result = tbl.partitionMerge(root.key)(table => table transform root.value.a  reduce reducer map (s => Table constString Set(s)))
+    val result = tbl.partitionMerge(dotKey)(_ transform dotValue.a reduce reducer map (s => Table constString Set(s)))
 
     result.flatMap(_.toJson).copoint must_=== expected.toStream
   }
