@@ -19,18 +19,20 @@ package ygg.tests
 import ygg._, common._, json._, table._
 import scala.util.Random
 
-final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
+final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema]) {
   override def toString = {
     "SampleData: \ndata = " + data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
       "\nschema: " + schema
   }
 
-  def sorted(implicit z: Ord[JValue]): SampleData                = transform(_.sorted(z.toScalaOrdering))
-  def sortBy[B: Ord](f: JValue => B): SampleData                 = transform(_ sortBy f)
-  def transform(f: Stream[JValue] => Stream[JValue]): SampleData = copy(data = f(data))
+  def sorted(implicit z: Ord[JValue]): SampleData     = transform(_.sorted(z.toScalaOrdering))
+  def sortBy[B: Ord](f: JValue => B): SampleData      = transform(_ sortBy f)
+  def transform(f: EndoA[Stream[JValue]]): SampleData = copy(data = f(data))
 }
 
 object SampleData extends CValueGenerators {
+  def apply(data: Stream[JValue]): SampleData = new SampleData(data, None)
+
   implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
 
   def sample(schema: Int => Gen[JSchema]): Arbitrary[SampleData] = Arbitrary(
@@ -65,15 +67,8 @@ object SampleData extends CValueGenerators {
     builder.result
   }
 
-  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CBF[C[T], T, C[T]]): C[T] = {
-    val builder = cbf()
-
-    for (t <- c)
-      if (randomDouble < freq)
-        builder += t
-
-    builder.result
-  }
+  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CBF[C[T], T, C[T]]): C[T] =
+    doto(cbf())(buf => c withFilter (_ => randomDouble < freq) foreach (buf += _)).result
 
   def sort(sd: Arbitrary[SampleData]): Arbitrary[SampleData]         = sd ^^ (_.sorted)
   def shuffle(sd: Arbitrary[SampleData]): Arbitrary[SampleData]      = sd ^^ (_ transform Random.shuffle)

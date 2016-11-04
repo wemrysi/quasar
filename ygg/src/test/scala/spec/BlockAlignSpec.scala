@@ -40,6 +40,63 @@ private object JValueInColumnOrder {
   }
 }
 
+class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
+  import sampleData.data
+
+  val schema       = sampleData.schema.get._2
+  val actualSchema = CValueGenerators inferSchema (data map (_ \ "value"))
+
+  override val projections = List(actualSchema).map { subschema =>
+    val stream = data flatMap { jv =>
+      val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
+        case (obj, (jpath, ctype)) => {
+          val vpath       = JPath(JPathField("value") :: jpath.nodes)
+          val valueAtPath = jv.get(vpath)
+
+          if (CType.compliesWithSchema(valueAtPath, ctype)) {
+            obj.set(vpath, valueAtPath)
+          } else {
+            obj
+          }
+        }
+      }
+
+      if (back \ "value" == JUndefined)
+        None
+      else
+        Some(back)
+    }
+
+    Path("/test") -> Projection(stream)
+  } toMap
+
+
+  def testLoadDense() = {
+    val expected = data flatMap { jv =>
+      val back = schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
+        case (obj, (jpath, ctype)) => {
+          val vpath       = JPath(JPathField("value") :: jpath.nodes)
+          val valueAtPath = jv.get(vpath)
+
+          if (CType.compliesWithSchema(valueAtPath, ctype)) {
+            obj.set(vpath, valueAtPath)
+          } else {
+            obj
+          }
+        }
+      }
+
+      (back \ "value" != JUndefined).option(back)
+    }
+
+    val cschema = schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
+    def ctype  = Schema mkType cschema get
+    def result = (this.Table constString Set("/test") load ctype).value.toJson
+
+    result.value.toList must_=== expected.toList
+  }
+}
+
 class BlockAlignSpec extends TableQspec {
   /** Shadowing the package object order. */
   implicit def JValueOrder: Ord[JValue] = JValueInColumnOrder.columnOrder
@@ -552,33 +609,7 @@ class BlockAlignSpec extends TableQspec {
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
 
-  private def testLoadDense(sample: SampleData) = {
-    val module = TableQspec fromSample sample
-
-    val expected = sample.data flatMap { jv =>
-      val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
-        case (obj, (jpath, ctype)) => {
-          val vpath       = JPath(JPathField("value") :: jpath.nodes)
-          val valueAtPath = jv.get(vpath)
-
-          if (CType.compliesWithSchema(valueAtPath, ctype)) {
-            obj.set(vpath, valueAtPath)
-          } else {
-            obj
-          }
-        }
-      }
-
-      (back \ "value" != JUndefined).option(back)
-    }
-
-    val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
-
-    def ctype  = Schema mkType cschema get
-    def result = (module.Table constString Set("/test") load ctype).value.toJson
-
-    result.value.toList must_=== expected.toList
-  }
+  private def testLoadDense(sample: SampleData) = new ProjectionsTableSpec(sample).testLoadDense()
 
   private def testLoadSample1 = {
     val sampleData = SampleData(

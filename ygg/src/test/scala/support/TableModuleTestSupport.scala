@@ -20,42 +20,7 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import trans.DerefObjectStatic
 
-object TableQspec {
-  def fromSample(sampleData: SampleData): Impl = new Impl(sampleData)
-
-  class Impl(sampleData: SampleData) extends TableQspec {
-    val Some((idCount, schema)) = sampleData.schema
-    val actualSchema            = CValueGenerators.inferSchema(sampleData.data map { _ \ "value" })
-
-    override val projections = List(actualSchema).map { subschema =>
-      val stream = sampleData.data flatMap { jv =>
-        val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
-          case (obj, (jpath, ctype)) => {
-            val vpath       = JPath(JPathField("value") :: jpath.nodes)
-            val valueAtPath = jv.get(vpath)
-
-            if (CType.compliesWithSchema(valueAtPath, ctype)) {
-              obj.set(vpath, valueAtPath)
-            } else {
-              obj
-            }
-          }
-        }
-
-        if (back \ "value" == JUndefined)
-          None
-        else
-          Some(back)
-      }
-
-      Path("/test") -> Projection(stream)
-    } toMap
-  }
-}
-
 abstract class TableQspec extends quasar.Qspec with TableModule {
-  self =>
-
   import SampleData._
 
   def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
