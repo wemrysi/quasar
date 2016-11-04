@@ -123,18 +123,11 @@ object MapFuncPlanner {
     // structural
     case MakeArray(x)                 => ejson.singletonArray[F] apply x
 
-    case MakeMap(k, v) =>
-      def withLitKey(s: String): F[XQuery] =
-        whenValidQName(s)(qn =>
-          ejson.singletonObject[F] apply (xs.QName(qn.xs), v))
-
+    case MakeMap(k, v)                =>
       k match {
-        // Makes numeric strings valid QNames by prepending an underscore
-        case XQuery.StringLit(IntegralNumber(s)) =>
-          withLitKey("_" + s)
-
         case XQuery.StringLit(s) =>
-          withLitKey(s)
+          asQName(s) flatMap (qn =>
+            ejson.singletonObject[F] apply (xs.QName(qn.xs), v))
 
         case _ => ejson.singletonObject[F] apply (k, v)
       }
@@ -143,42 +136,29 @@ object MapFuncPlanner {
     case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
-    case ProjectField(src, field) =>
-      def projectLit(s: String): F[XQuery] =
-        whenValidQName(s)(qn => freshVar[F] map { m =>
-          let_(m -> src) return_ (m.xqy `/` child(qn))
-        })
-
+    case ProjectField(src, field)     =>
       field match {
         case XQuery.Step(_) =>
           (src `/` field).point[F]
 
-        // Makes numeric strings valid QNames by prepending an underscore
-        case XQuery.StringLit(IntegralNumber(s)) =>
-          projectLit("_" + s)
-
         case XQuery.StringLit(s) =>
-          projectLit(s)
+          (asQName[F](s) |@| freshVar[F])((qn, m) =>
+            let_(m -> src) return_ (m.xqy `/` child(qn)))
 
         case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
 
-    case DeleteField(src, field) =>
-      def deleteLit(s: String): F[XQuery] =
-        whenValidQName(s)(qn => for {
-          m <- freshVar[F]
-          n <- mem.nodeDelete[F](m.xqy)
-        } yield let_(m -> src) return_ n)
-
+    case DeleteField(src, field)      =>
       field match {
         case XQuery.Step(_) =>
           mem.nodeDelete[F](src `/` field)
 
-        case XQuery.StringLit(IntegralNumber(n)) =>
-          deleteLit("_" + n)
-
         case XQuery.StringLit(s) =>
-          deleteLit(s)
+          for {
+            qn <- asQName(s)
+            m  <- freshVar[F]
+            n  <- mem.nodeDelete[F](m.xqy)
+          } yield let_(m -> src) return_ n
 
         case _ => qscript.deleteField[F] apply (src, xs.QName(field))
       }

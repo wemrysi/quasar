@@ -68,10 +68,13 @@ package object qscript {
       new EquiJoinPlanner[F, T]
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] = {
-    def litQName(s: String): F[XQuery] =
-      whenValidQName(s)(qn => xs.QName(qn.xs).point[F])
+  /** Converts the given string to a QName if valid, failing with an error otherwise. */
+  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
+    refineV[IsNCName](encodeForQName(s)).disjunction
+      .map(ncn => QName.local(NCName(ncn)).point[F])
+      .getOrElse(invalidQName(s))
 
+  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
     fm.toCoEnv[T].project match {
       case MapFunc.StaticArray(elements) =>
         for {
@@ -83,10 +86,8 @@ package object qscript {
       case MapFunc.StaticMap(entries)    =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     // FIXME: Some sort of CandidateQName extractor that handles the numeric case
-                     case Embed(Common(Str(IntegralNumber(n)))) => litQName("_" + n)
-                     case Embed(Common(Str(s)))                 => litQName(s)
-                     case key                                   => invalidQName[F, XQuery](key.convertTo[Fix].shows)
+                     case Embed(Common(Str(s))) => asQName(s) map (qn => xs.QName(qn.xs))
+                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix].shows)
                    },
                    mapFuncXQueryP(_, src)))
           elts  <- xqyKV.traverse { case (k, v) => ejs.renameOrWrap[F].apply(k, v) }
@@ -95,7 +96,6 @@ package object qscript {
 
       case other                         => mapFuncXQueryP(other.embed, src)
     }
-  }
 
   def mapFuncXQueryP[T[_[_]]: Recursive: Corecursive, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: T[CoEnv[Hole, MapFunc[T, ?], ?]], src: XQuery): F[XQuery] =
     planMapFuncP(fm)(κ(src))
@@ -125,15 +125,16 @@ package object qscript {
     freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
   }
 
-  def whenValidQName[F[_]: MonadPlanErr, A](s: String)(f: QName => F[A]): F[A] =
-    refineV[IsNCName](s).disjunction
-      .map(ncname => f(QName.local(NCName(ncname))))
-      .getOrElse(invalidQName(s))
-
   ////
 
   // A string consisting only of digits.
-  private[qscript] val IntegralNumber = "^(\\d+)$".r
+  private val IntegralNumber = "^(\\d+)$".r
+
+  // Applies transformations to string to make them valid QNames
+  private val encodeForQName: String => String = {
+    case IntegralNumber(n) => "_" + n
+    case other             => other
+  }
 
   private implicit def comfTraverse[T[_[_]], A]: Traverse[CoEnv[A, MapFunc[T, ?], ?]] =
     Bitraverse[CoEnv[?, MapFunc[T, ?], ?]].rightTraverse[A]
