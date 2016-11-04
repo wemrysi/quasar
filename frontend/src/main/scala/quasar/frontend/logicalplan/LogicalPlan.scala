@@ -31,20 +31,17 @@ import scalaz._, Scalaz._
 import shapeless.{Nat, Sized}
 import pathy.Path.posixCodec
 
-sealed abstract class LogicalPlan[A] extends Product with Serializable
+sealed abstract class LogicalPlan[A] extends Product with Serializable {
+  override def equals(that: scala.Any): Boolean = that match {
+    case lp: LogicalPlan[A] => LogicalPlan.equal(Equal.equalA[A]).equal(this, lp)
+    case _                  => false
+  }
+}
 
 final case class Read[A](path: FPath) extends LogicalPlan[A]
 final case class Constant[A](data: Data) extends LogicalPlan[A]
 final case class Invoke[A, N <: Nat](func: GenericFunc[N], values: Func.Input[A, N])
-    extends LogicalPlan[A] {
-  // TODO this should be removed, but usage of `==` is so pervasive in
-  // external dependencies (and scalac) that removal may never be possible
-  override def equals(that: scala.Any): Boolean = that match {
-    case that @ Invoke(_, _) =>
-      (this.func == that.func) && (this.values.unsized == that.values.unsized)
-    case _ => false
-  }
-}
+    extends LogicalPlan[A]
 // TODO we create a custom `unapply` to bypass a scalac pattern matching bug
 // https://issues.scala-lang.org/browse/SI-5900
 object InvokeUnapply {
