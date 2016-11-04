@@ -75,7 +75,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     def intDomain    = arbitrary[Long]   map (BigInt(_))
     def decDomain    = arbitrary[Double] map (BigDecimal(_))
-    def stringDomain = arbitrary[String]
+    def stringDomain = StdLibTestRunner.genPrintableAscii
 
     ////
 
