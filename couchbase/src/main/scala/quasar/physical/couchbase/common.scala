@@ -27,8 +27,7 @@ import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.cluster.ClusterManager
-import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.query.{N1qlParams, N1qlQuery}
+import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
 import scalaz._, Scalaz._
@@ -40,9 +39,10 @@ object common {
 
   final case class BucketCollection(bucket: String, collection: String)
 
-  final case class DocIdType(id: String, tpe: String)
+  // type field in Couchbase documents
+  final case class DocType(v: String)
 
-  final case class Cursor(result: Vector[JsonObject])
+  final case class Cursor(result: Vector[Data])
 
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
@@ -50,18 +50,18 @@ object common {
         FileSystemError.pathErr(PathError.invalidPath(f, "no bucket specified")).left,
         (h, t) => BucketCollection(h, t.intercalate("/")).right)
 
-  def docIdTypesWithTypePrefix[S[_]](
+  def docTypesFromPrefix(
     bucket: Bucket,
     prefix: String
-  ): Task[List[DocIdType]] = Task.delay {
-    val qStr = s"""SELECT meta(`${bucket.name}`).id, type FROM `${bucket.name}`
+  ): Task[List[DocType]] = Task.delay {
+    val qStr = s"""SELECT distinct type FROM `${bucket.name}`
                    WHERE type LIKE "${prefix}%"""";
 
     bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
-      .map(r => DocIdType(r.value.getString("id"), r.value.getString("type")))
+      .map(r => DocType(r.value.getString("type")))
   }
 
-  def existsWithPrefix[S[_]](
+  def existsWithPrefix(
     bucket: Bucket,
     prefix: String
   ): Task[Boolean] = Task.delay {
@@ -81,8 +81,8 @@ object common {
   def pathSegmentsFromBucketCollections(bktCols: List[BucketCollection]): Set[PathSegment] =
     pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
 
-  def pathSegmentsFromPrefixDocIds(prefix: String, docIds: List[DocIdType]): Set[PathSegment] =
-    pathSegments(docIds.map(_.tpe.stripPrefix(prefix).stripPrefix("/").split("/").toList))
+  def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
+    pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
   def n1qlQuery(query: String): N1qlQuery =
     N1qlQuery.simple(
@@ -101,10 +101,14 @@ object common {
         Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
     ).into)
 
-  def resultsFromCursor(cursor: Cursor): FileSystemError \/ (Cursor, Vector[Data]) =
-    cursor.result.traverse(jObj =>
-      DataCodec.parse(jObj.toString)(DataCodec.Precise).leftMap(err =>
-        FileSystemError.readFailed(jObj.toString, err.shows))
-    ).strengthL(Cursor(Vector.empty))
+  def resultsFromCursor(cursor: Cursor): (Cursor, Vector[Data]) =
+    (Cursor(Vector.empty), cursor.result)
+
+  def rowToData(row: N1qlQueryRow): FileSystemError \/ Data = {
+    val rowStr = new String(row.byteValue)
+
+    DataCodec.parse(rowStr)(DataCodec.Precise).leftMap(err =>
+      FileSystemError.readFailed(rowStr, err.shows))
+  }
 
 }

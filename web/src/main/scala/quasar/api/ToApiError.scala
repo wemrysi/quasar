@@ -17,8 +17,9 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
+import quasar.{Data, DataCodec, Planner, SemanticError}
 import quasar.RenderTree.ops._
+import quasar.connector.EnvironmentError
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -91,12 +92,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Failed to execute SQL^2 query.",
           reason,
           det.toList : _*)            :+
-        ("logicalPlan" :=  lp.render) :?+
+        ("logicalplan" :=  lp.render) :?+
         ("cause"       :?= cause.map(_.shows))
       case PathErr(e) =>
         e.toApiError
       case PlanningFailed(lp, e) =>
-        e.toApiError :+ ("logicalPlan" := lp.render)
+        e.toApiError :+ ("logicalplan" := lp.render)
       case QScriptPlanningFailed(e) =>
         e.toApiError
       case UnknownReadHandle(ReadHandle(path, id)) =>

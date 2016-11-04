@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-import quasar.Predef.{List, String, Vector}
-import quasar.{LogicalPlan => LP}
+import quasar.Predef._
+import quasar.common.{PhaseResult, PhaseResultW}
+import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir
-import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.frontend.{SemanticErrors, SemanticErrsT}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql._
 import quasar.std.StdLib.set._
-
-import scala.Option
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Leibniz._
@@ -34,20 +34,6 @@ import scalaz.syntax.nel._
 import scalaz.syntax.writer._
 
 package object quasar {
-  type SemanticErrors = NonEmptyList[SemanticError]
-  type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
-
-  type PhaseResults = Vector[PhaseResult]
-  type PhaseResultW[A] = Writer[PhaseResults, A]
-  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
-
-  type CompileM[A] = SemanticErrsT[PhaseResultW, A]
-
-  type EnvErr[A] = Failure[EnvironmentError, A]
-  type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
-
-  type PlannerErrT[F[_], A] = EitherT[F, Planner.PlannerError, A]
-
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
       EitherT(r.point[PhaseResultW]) flatMap { a =>
@@ -73,20 +59,23 @@ package object quasar {
     } yield logical
   }
 
+  private val optimizer = new Optimizer[Fix]
+  private val lpr = optimizer.lpr
+
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
     */
   def preparePlan(lp: Fix[LP]): CompileM[Fix[LP]] =
     for {
-      optimized   <- phase("Optimized", Optimizer.optimize(lp).right)
-      typechecked <- phase("Typechecked", LP.ensureCorrectTypes(optimized).disjunction)
+      optimized   <- phase("Optimized", optimizer.optimize(lp).right)
+      typechecked <- phase("Typechecked", lpr.ensureCorrectTypes(optimized).disjunction)
     } yield typechecked
 
   /** Identify plans which reduce to a (set of) constant value(s). */
   def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
     lp.project match {
-      case LP.ConstantF(Data.Set(records)) => records.left
-      case LP.ConstantF(value)             => List(value).left
-      case _                                        => lp.right
+      case Constant(Data.Set(records)) => records.left
+      case Constant(value)             => List(value).left
+      case _                           => lp.right
     }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
@@ -103,9 +92,9 @@ package object quasar {
     lp: T[LP], off: Natural, lim: Option[Positive]):
       T[LP] = {
     val skipped =
-      Drop(lp, LP.ConstantF[T[LP]](Data.Int(off.get)).embed).embed
+      Drop(lp, constant[T[LP]](Data.Int(off.get)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, LP.ConstantF[T[LP]](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T[LP]](Data.Int(l.get)).embed).embed)
   }
 }

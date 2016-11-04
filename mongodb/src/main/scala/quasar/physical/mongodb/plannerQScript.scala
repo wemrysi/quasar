@@ -19,12 +19,14 @@ package quasar.physical.mongodb
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -272,9 +274,9 @@ object MongoDbQScriptPlanner {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
         v._1.project match {
           case Constant(b) => b.cataM(BsonCodec.fromEJson).toOption
-          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
-          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          // case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
+          // case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          // case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          // case InvokeUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId(str).toOption
           case _ => None
         }
     }

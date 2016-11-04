@@ -26,7 +26,7 @@ import quasar.fp.ski._
 
 import scala.math
 
-import org.threeten.bp.{Instant, ZoneOffset}
+import org.threeten.bp._
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -69,24 +69,126 @@ object CoreMap extends Serializable {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => undefined
     }).right
-    case ExtractCentury(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractDecade(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfYear(f) => InternalError("not implemented").left // TODO
-    case ExtractEpoch(f) => InternalError("not implemented").left // TODO
-    case ExtractHour(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoYear(f) => InternalError("not implemented").left // TODO
-    case ExtractMicroseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMillennium(f) => InternalError("not implemented").left // TODO
-    case ExtractMilliseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMinute(f) => InternalError("not implemented").left // TODO
-    case ExtractMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractQuarter(f) => InternalError("not implemented").left // TODO
-    case ExtractSecond(f) => InternalError("not implemented").left // TODO
-    case ExtractWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractYear(f) => InternalError("not implemented").left // TODO
+    case ExtractCentury(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => century(dt.getYear()))
+      case Data.Date(v) => century(v.getYear())
+      case _ => undefined
+    }).right
+    case ExtractDayOfMonth(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfMonth()))
+      case Data.Date(v) => Data.Int(v.getDayOfMonth())
+      case _ => undefined
+    }).right
+    case ExtractDecade(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear() / 10))
+      case Data.Date(v) => Data.Int(v.getYear() / 10)
+      case _ => undefined
+    }).right
+    case ExtractDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue() % 7))
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue() % 7)
+      case _ => undefined
+    }).right
+    case ExtractDayOfYear(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear()))
+      case Data.Date(v) => Data.Int(v.getDayOfYear())
+      case _ => undefined
+    }).right
+    case ExtractEpoch(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(v.toEpochMilli() / 1000)
+      case Data.Date(v) => Data.Int(v.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
+      case _ => undefined
+    }).right
+    case ExtractHour(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getHour()))
+      case Data.Time(v) => Data.Int(v.getHour())
+      case Data.Date(_) => Data.Int(0)
+      case _ => undefined
+    }).right
+    case ExtractIsoDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue()))
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
+      case _ => undefined
+    }).right
+    case ExtractIsoYear(f) => (f >>> {
+      case _ => undefined
+    }).right
+    case ExtractMicroseconds(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond() * 1000000
+          val milli = dt.getNano() / 1000
+          Data.Int(sec + milli)
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000000
+        val milli = v.getNano() / 1000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractMillennium(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(((dt.getYear() - 1) / 1000) + 1))
+      case Data.Date(v) => Data.Int(((v.getYear() - 1) / 1000) + 1)
+      case _ => undefined
+    }).right
+    case ExtractMilliseconds(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond() * 1000
+          val milli = dt.getNano() / 1000000
+          Data.Int(sec + milli)
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000
+        val milli = v.getNano() / 1000000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractMinute(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMinute()))
+      case Data.Time(v) => Data.Int(v.getMinute())
+      case Data.Date(_) => Data.Int(0)
+      case _ => undefined
+    }).right
+    case ExtractMonth(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMonth().getValue()))
+      case Data.Date(v) => Data.Int(v.getMonth().getValue())
+      case _ => undefined
+    }).right
+    case ExtractQuarter(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(((dt.getMonth().getValue - 1) / 3) + 1))
+      case Data.Date(v) => Data.Int(((v.getMonth().getValue - 1) / 3) + 1)
+      case _ => undefined
+    }).right
+    case ExtractSecond(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond()
+          val milli = dt.getNano() / 1000
+          Data.Dec(BigDecimal(s"$sec.$milli"))
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond()
+        val milli = v.getNano() / 1000
+        Data.Dec(BigDecimal(s"$sec.$milli"))
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractWeek(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear() / 7))
+      case Data.Date(v) => Data.Int(v.getDayOfYear() / 7)
+      case _ => undefined
+    }).right
+    case ExtractYear(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear()))
+      case Data.Date(v) => Data.Int(v.getYear())
+      case _ => undefined
+    }).right
     case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
@@ -386,6 +488,8 @@ object CoreMap extends Serializable {
     case _ => undefined
   }
 
+  private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
+
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {
       case (Data.Str(str), Data.Str(pattern), Data.Bool(insen)) =>
@@ -399,5 +503,8 @@ object CoreMap extends Serializable {
         \/.fromTryCatchNonFatal(Data.Str(StringLib.safeSubstring(str, from.toInt, count.toInt))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
+
+  private def fromDateTime(v: Instant)(f: ZonedDateTime => Data): Data =
+    \/.fromTryCatchNonFatal(v.atZone(ZoneOffset.UTC)).fold(κ(Data.NA), f)
 
 }

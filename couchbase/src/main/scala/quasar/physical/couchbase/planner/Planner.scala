@@ -16,10 +16,11 @@
 
 package quasar.physical.couchbase.planner
 
+import quasar.NameGenerator
+import quasar.common.PhaseResultT
 import quasar.contrib.matryoshka.ShowT
-import quasar.{NameGenerator, PhaseResultT}
 import quasar.physical.couchbase._
-import quasar.qscript, qscript._
+import quasar.qscript._
 
 import matryoshka._
 import scalaz._

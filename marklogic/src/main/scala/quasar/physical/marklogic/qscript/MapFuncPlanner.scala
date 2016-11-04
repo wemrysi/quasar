@@ -116,7 +116,7 @@ object MapFuncPlanner {
 
     // structural
     case MakeArray(x) =>
-      ejson.seqToArray_[F](x)
+      ejson.singletonArray[F] apply x
 
     case MakeMap(k, v) =>
       def withLitKey(s: String): F[XQuery] =

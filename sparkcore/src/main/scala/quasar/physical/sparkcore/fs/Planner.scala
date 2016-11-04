@@ -71,9 +71,8 @@ object Planner {
    * Copied because scalaz's ListInstances are not Serializable
    */
   implicit val ord: SOrdering[Data] = new SOrdering[Data] {
-    def compare(x: Data, y: Data) = ordering.order(x, y).toInt
+    def compare(x: Data, y: Data) = dataOrder.order(x, y).toInt
   }
-
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
@@ -249,8 +248,6 @@ object Planner {
             }).map((sc, _)).point[Task])
           )
         case Sort(src, bucket, orders) =>
-
-          
 
           val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
             orders.traverse {
