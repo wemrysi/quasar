@@ -46,7 +46,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     def nullary(
       prg: Fix[LP],
-      expected: Data): Result = ???
+      expected: Data): Result = skipped
 
     def unary(
       prg: Fix[LP] => Fix[LP],
