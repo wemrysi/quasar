@@ -285,7 +285,6 @@ trait TableMethods[Table] {
     */
   def load(tpe: JType): M[Table]
 
-  def canonicalize(length: Int): Table
   def canonicalize(minLength: Int, maxLength: Int): Table
   def concat(t2: Table): Table
   def distinct(key: TransSpec1): Table

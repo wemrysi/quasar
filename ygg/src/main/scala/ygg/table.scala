@@ -38,12 +38,13 @@ package object table {
     val methods = z methods table
     import methods._
 
-    def toJsonString: String        = toJValues mkString "\n"
-    def toVector: Vector[JValue]    = toJValues.toVector
-    def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
-    def slicesStream: Stream[Slice] = slices.toStream.value
-    def columns: ColumnMap          = slicesStream.head.columns
-    def fields: Vector[JValue]      = toVector
+    def canonicalize(length: Int): T = methods.canonicalize(length, length)
+    def toJsonString: String         = toJValues mkString "\n"
+    def toVector: Vector[JValue]     = toJValues.toVector
+    def toJValues: Stream[JValue]    = slicesStream flatMap (_.toJsonElements)
+    def slicesStream: Stream[Slice]  = slices.toStream.value
+    def columns: ColumnMap           = slicesStream.head.columns
+    def fields: Vector[JValue]       = toVector
   }
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =

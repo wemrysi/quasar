@@ -296,10 +296,7 @@ trait TableModule {
       )
     )
 
-    def concat(t2: Table): Table = Table(
-      slices ++ t2.slices,
-      TableSize(size.maxSize + t2.size.maxSize)
-    )
+    def concat(t2: Table): Table = Table(slices ++ t2.slices, size + t2.size)
 
     /**
       * Zips two tables together in their current sorted order.
@@ -308,20 +305,16 @@ trait TableModule {
       * different than if the tables were normalized.
       */
     def zip(t2: Table): M[Table] = {
-      def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = {
-        StreamT(slices1.uncons flatMap {
+      def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = StreamT(
+        slices1.uncons flatMap {
+          case None                 => Need(StreamT.Done)
           case Some((head1, tail1)) =>
             slices2.uncons map {
-              case Some((head2, tail2)) =>
-                StreamT.Yield(head1 zip head2, rec(tail1, tail2))
-              case None =>
-                StreamT.Done
+              case Some((head2, tail2)) => StreamT.Yield(head1 zip head2, rec(tail1, tail2))
+              case None                 => StreamT.Done
             }
-
-          case None =>
-            Need(StreamT.Done)
-        })
-      }
+        }
+      )
 
       val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
       Need(Table(rec(slices, t2.slices), resultSize))
@@ -336,51 +329,36 @@ trait TableModule {
       * For slices being loaded from ingest, it is often the case that we are missing a
       * few rows at the end, so we shouldn't be too strict.
       */
-    def canonicalize(length: Int): Table = canonicalize(length, length)
     def canonicalize(minLength: Int, maxLength: Int): Table = {
       scala.Predef.assert(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
       def concat(rslices: List[Slice]): Slice = rslices.reverse match {
         case Nil          => Slice.empty
         case slice :: Nil => slice
-        case slices =>
-          val slice = Slice.concat(slices)
-          if (slices.size > (slice.size / yggConfig.smallSliceSize)) {
-            slice.materialized // Deal w/ lots of small slices by materializing them.
-          } else {
-            slice
-          }
+        case all          =>
+          val result      = Slice concat all
+          val materialize = all.size > (result.size / yggConfig.smallSliceSize)
+          // Deal w/ lots of small slices by materializing them.
+          materialize.fold(result, result.materialized)
       }
 
       def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): M[StreamT.Step[Slice, NeedSlices]] = {
+        def mkYield(hds: List[Slice], tl: NeedSlices) =
+          Need(StreamT.Yield(concat(hds), StreamT(step(0, Nil, tl))))
+
         stream.uncons flatMap {
-          case Some((head, tail)) =>
-            if (head.size == 0) {
-              // Skip empty slices.
-              step(sliceSize, acc, tail)
-
-            } else if (sliceSize + head.size >= minLength) {
-              // We emit a slice, but the last slice added may fall on a stream boundary.
-              val splitAt = min(head.size, maxLength - sliceSize)
-              if (splitAt < head.size) {
-                val (prefix, suffix) = head.split(splitAt)
-                val slice            = concat(prefix :: acc)
-                Need(StreamT.Yield(slice, StreamT(step(0, Nil, suffix :: tail))))
-              } else {
-                val slice = concat(head :: acc)
-                Need(StreamT.Yield(slice, StreamT(step(0, Nil, tail))))
-              }
-
-            } else {
-              // Just keep swimming (aka accumulating).
-              step(sliceSize + head.size, head :: acc, tail)
-            }
-
-          case None =>
-            if (sliceSize > 0) {
-              Need(StreamT.Yield(concat(acc), emptyStreamT()))
-            } else {
-              Need(StreamT.Done)
+          case None if sliceSize > 0                                   => mkYield(acc, emptyStreamT())
+          case None                                                    => Need(StreamT.Done)
+          case Some((EmptySlice(), tail))                              => step(sliceSize, acc, tail) // Skip empty slices.
+          case Some((head, tail)) if sliceSize + head.size < minLength => step(sliceSize + head.size, head :: acc, tail) // Keep accumulating.
+          case Some((head, tail))                                      =>
+            // We emit a slice, but the last slice added may fall on a stream boundary.
+            min(head.size, maxLength - sliceSize) match {
+              case splitAt if splitAt < head.size =>
+                val (prefix, suffix) = head split splitAt
+                mkYield(prefix :: acc, suffix :: tail)
+              case _ =>
+                mkYield(head :: acc, tail)
             }
         }
       }

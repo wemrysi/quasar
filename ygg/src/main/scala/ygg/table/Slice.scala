@@ -873,6 +873,10 @@ class SliceOps(private val source: Slice) extends AnyVal {
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n")
 }
 
+object EmptySlice {
+  def unapply(x: Slice): Boolean = x.size == 0
+}
+
 object Slice {
   implicit def sliceOps(s: Slice): SliceOps           = new SliceOps(s)
   implicit def derefSliceOps(s: Slice): DerefSliceOps = new DerefSliceOps(s)
