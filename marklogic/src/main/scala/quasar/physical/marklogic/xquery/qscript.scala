@@ -54,19 +54,17 @@ object qscript {
 
   // qscript:as-dateTime($item as item()) as xs:dateTime?
   def asDateTime[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.name("as-dateTime").qn[F] map { fname =>
-      declare(fname)(
-        $("item") as SequenceType("item()")
-      ).as(SequenceType("xs:dateTime?")) { item =>
-        if_(isCastable(item, SequenceType("xs:dateTime")))
-        .then_ { xs.dateTime(item) }
-        .else_ {
-          if_(isCastable(item, SequenceType("xs:date")))
-          .then_ { xs.dateTime(xs.date(item)) }
-          .else_ { emptySeq }
-        }
+    qs.declare("as-dateTime") map (_(
+      $("item") as ST("item()")
+    ).as(ST("xs:dateTime?")) { item =>
+      if_(isCastable(item, ST("xs:dateTime")))
+      .then_ { xs.dateTime(item) }
+      .else_ {
+        if_(isCastable(item, ST("xs:date")))
+        .then_ { xs.dateTime(xs.date(item)) }
+        .else_ { emptySeq }
       }
-    }
+    })
 
   // qscript:as-map-key($item as item()) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
@@ -151,22 +149,19 @@ object qscript {
         .else_ { elt `/` child.node() })
     })
 
-  // FIXME: Use new declare syntax and ST alias
   // qscript:isoyear-from-dateTime($dt as xs:dateTime) as xs:integer
   def isoyearFromDateTime[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.name("isoyear-from-dateTime").qn[F] map { fname =>
-      declare(fname)(
-        $("dt") as SequenceType("xs:dateTime")
-      ).as(SequenceType("xs:integer")) { dt: XQuery =>
-        if_((fn.monthFromDateTime(dt) eq 1.xqy) and (xdmp.weekFromDate(xs.date(dt)) ge 52.xqy))
-        .then_ { fn.yearFromDateTime(dt) - 1.xqy }
-        .else_ {
-          if_((fn.monthFromDateTime(dt) eq 12.xqy) and (xdmp.weekFromDate(xs.date(dt)) lt 52.xqy))
-          .then_ { fn.yearFromDateTime(dt) + 1.xqy }
-          .else_ { fn.yearFromDateTime(dt) }
-        }
+    qs.declare("isoyear-from-dateTime") map (_(
+      $("dt") as ST("xs:dateTime")
+    ).as(ST("xs:integer")) { dt: XQuery =>
+      if_((fn.monthFromDateTime(dt) eq 1.xqy) and (xdmp.weekFromDate(xs.date(dt)) ge 52.xqy))
+      .then_ { fn.yearFromDateTime(dt) - 1.xqy }
+      .else_ {
+        if_((fn.monthFromDateTime(dt) eq 12.xqy) and (xdmp.weekFromDate(xs.date(dt)) lt 52.xqy))
+        .then_ { fn.yearFromDateTime(dt) + 1.xqy }
+        .else_ { fn.yearFromDateTime(dt) }
       }
-    }
+    })
 
   // qscript:identity($x as item()*) as item()*
   def identity[F[_]: PrologW]: F[FunctionDecl1] =
@@ -321,17 +316,15 @@ object qscript {
 
   // qscript:to-string($item as item()) as xs:string?
   def toString[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.name("to-string").qn[F] flatMap { fname =>
-      declare(fname)(
-        $("item") as SequenceType("item()")
-      ).as(SequenceType("xs:string")) { item: XQuery =>
-        ejson.typeOf[F].apply(item) map { tpe =>
-          if_(tpe eq "null".xs)
-          .then_ { "null".xs }
-          .else_ { fn.string(item) }
-        }
+    qs.declare("to-string") flatMap (_(
+      $("item") as ST("item()")
+    ).as(ST("xs:string")) { item: XQuery =>
+      ejson.typeOf[F].apply(item) map { tpe =>
+        if_(tpe eq "null".xs)
+        .then_ { "null".xs }
+        .else_ { fn.string(item) }
       }
-    }
+    })
 
   // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
   def zipApply[F[_]: PrologW]: F[FunctionDecl1] =
