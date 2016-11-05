@@ -19,7 +19,6 @@ package ygg.table
 import ygg._, common._, json._
 import trans._
 import scalaz._
-import quasar.Data
 
 sealed trait TableData {
   type M[X]
@@ -54,11 +53,10 @@ object TableData {
   class Impl(val table: TableData) extends TableMethods[TableData] {
     private type LazySeqT[A] = StreamT[M, A]
 
-    def size: TableSize              = ???
-    def slices: LazySeqT[Slice]      = ???
-    def columns: ColumnMap           = ???
-    def schemas: M[Set[JType]]       = ???
-    def slicesStream: LazySeq[Slice] = ???
+    def size: TableSize         = ???
+    def slices: LazySeqT[Slice] = ???
+    def columns: ColumnMap      = ???
+    def schemas: M[Set[JType]]  = ???
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
     def concat(that: T): T                                                            = ???
@@ -82,11 +80,9 @@ object TableData {
     def normalize(): T         = ???
     def paged(limit: Int): T   = ???
 
-    def toArray[A: CValueType] : T   = ???
-    def toData: Data                 = ???
-    def toDataStream: LazySeq[Data]  = ???
-    def toJValues: LazySeq[V]        = ???
-    def toJson: M[LazySeq[V]]        = ???
-    def toVector: Vector[V]          = ???
+    def toArray[A: CValueType] : T = ???
+    def toJValues: LazySeq[V]      = ???
+    def toJson: M[LazySeq[V]]      = ???
+    def toVector: Vector[V]        = ???
   }
 }

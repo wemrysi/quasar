@@ -287,7 +287,6 @@ trait TableMethods[Table] {
 
   def canonicalize(length: Int): Table
   def canonicalize(minLength: Int, maxLength: Int): Table
-  def columns: ColumnMap
   def concat(t2: Table): Table
   def distinct(key: TransSpec1): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
@@ -299,12 +298,6 @@ trait TableMethods[Table] {
   def slices: NeedSlices
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
-  def toData: Data
-  def toJValues: Stream[JValue]
   def toJson: M[Stream[JValue]]
   def zip(t2: Table): M[Table]
-
-  def slicesStream: Stream[Slice]
-  def toVector: Vector[JValue]
-  def toDataStream: Stream[Data]
 }

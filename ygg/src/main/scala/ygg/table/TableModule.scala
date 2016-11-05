@@ -21,7 +21,6 @@ import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
 import ygg.cf.{ Remap, Empty }
 import scala.math.{ min, max }
-import quasar.Data
 
 final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
@@ -216,26 +215,13 @@ trait TableModule {
     self =>
 
     override def toString = s"Table(_, $size)"
-    def toJsonString: String = toJValues mkString "\n"
 
     def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
 
-    def mapWithSameSize(f: NeedSlices => NeedSlices): Table = Table(f(slices), size)
-    def load(tpe: JType): M[Table]                          = companion.load(this, tpe, outer.projections)
-    def slicesStream: Stream[Slice]                         = slices.toStream.value
-    def columns: ColumnMap                                  = slicesStream.head.columns
-    def toVector: Vector[JValue]                            = toJValues.toVector
-    def toJValues: Stream[JValue]                           = slicesStream flatMap (_.toJsonElements)
-    def toDataStream                                        = toJValues map jvalueToData
-
-    def toData: Data = toDataStream match {
-      case Seq()  => Data.NA
-      case Seq(d) => d
-      case xs     => Data.Arr(xs.toList)
-    }
-
-    def companion                                                      = Table
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, sampleSize, specs)
+    def mapWithSameSize(f: EndoA[NeedSlices]): Table             = Table(f(slices), size)
+    def load(tpe: JType): M[Table]                               = companion.load(this, tpe, outer.projections)
+    def companion                                                = Table
+    def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
