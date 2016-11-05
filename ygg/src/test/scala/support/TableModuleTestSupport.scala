@@ -20,13 +20,23 @@ import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import trans.DerefObjectStatic
 
-abstract class TableQspec extends quasar.Qspec with TableModule {
+abstract class TableQspec extends quasar.Qspec {
+  outer =>
+
+  val Table  = ygg.table.Table
+  type Table = ygg.table.Table
+
+  protected implicit def liftTestTableRep(t: Table): TableRep[Table] = TableRep(t, x => x, Table)
+
   import SampleData._
 
+  def emptyRep: TableRep[Table]                                            = Table.empty.asRep
+  def fromJson(values: Seq[JValue]): Table                                 = Table.fromJValues(values, None)
+  def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table      = Table.fromJValues(values, maxSliceSize)
+  def fromSample(sampleData: SampleData): Table                            = Table.fromJValues(sampleData.data, None)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = Table.fromJValues(sampleData.data, maxBlockSize)
   def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
-  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
 
   type ASD = Arbitrary[SampleData]
 

@@ -82,6 +82,22 @@ class GrouperSpec extends TableQspec {
       }
   }
 
+  private def GroupingAlignment(
+    groupKeyLeftTrans: TransSpec1,
+    groupKeyRightTrans: TransSpec1,
+    left: GroupingSpec[Table],
+    right: GroupingSpec[Table],
+    alignment: GroupingSpec.Alignment
+  ) = ygg.table.GroupingAlignment(left.rep, groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment)
+
+  private def GroupingSource(
+    table: Table,
+    idTrans: TransSpec1,
+    targetTrans: Option[TransSpec1],
+    groupId: GroupId,
+    groupKeySpec: GroupKeySpec
+  ) = ygg.table.GroupingSource(table.asRep, table, idTrans, targetTrans, groupId, groupKeySpec)
+
   private def augmentWithIdentities(json: Stream[JValue]) = json.zipWithIndex map {
     case (v, i) => JObject(JField("key", JArray(JNum(i) :: Nil)) :: JField("value", v) :: Nil)
   }
@@ -146,7 +162,8 @@ class GrouperSpec extends TableQspec {
     val valueTrans =
       InnerObjectConcat(WrapObject(dotKey, Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), Value.name))
 
-    val spec = GroupingSource(fromJson(data), dotKey, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val tab  = fromJson(data)
+    val spec = GroupingSource(tab, dotKey, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -196,7 +213,8 @@ class GrouperSpec extends TableQspec {
 
     val groupId = newGroupId
 
-    val spec = GroupingSource(fromJson(data), dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
+    val tab  = fromJson(data)
+    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
     val result = Table.merge(spec) { (key, map) =>
       for {

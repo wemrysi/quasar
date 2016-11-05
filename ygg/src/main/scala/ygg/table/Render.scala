@@ -21,8 +21,10 @@ import ygg._, common._, data._
 import java.lang.Character.{ codePointAt, forDigit }
 
 object Render {
-  def renderTable(table: Table, prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
+  def renderTable[T](rep: TableRep[T], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
+    import rep._
     val slices = table.slices
+
     def wrap(stream: StreamT[Need, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") charBuffer(prefix) :: stream

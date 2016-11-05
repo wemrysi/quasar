@@ -24,7 +24,7 @@ final case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 final case class Projection(data: Stream[JValue]) {
   type Key = JArray
 
-  private val slices            = Table.fromJson(data).slices.toStream.copoint
+  private val slices            = Table.fromJValues(data).slices.toStream.copoint
   val length: Long              = data.length.toLong
   val structure: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
 

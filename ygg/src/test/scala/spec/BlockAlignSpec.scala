@@ -46,7 +46,7 @@ abstract class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
   val schema       = sampleData.schema.get._2
   val actualSchema = CValueGenerators inferSchema (data map (_ \ "value"))
 
-  override val projections = List(actualSchema).map { subschema =>
+  lazy val testProjections = List(actualSchema).map { subschema =>
     val stream = data flatMap { jv =>
       val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
         case (obj, (jpath, ctype)) => {
@@ -90,7 +90,7 @@ abstract class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
 
     val cschema = schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
     def ctype  = Schema mkType cschema get
-    def result = (this.Table constString Set("/test") load ctype).value.toJson
+    def result = (Table constString Set("/test") withProjections testProjections load ctype).value.toJson
 
     result.value.toList must_=== expected.toList
   }

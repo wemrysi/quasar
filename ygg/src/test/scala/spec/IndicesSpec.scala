@@ -125,7 +125,7 @@ class IndicesSpec extends TableQspec {
     "efficiently combine to produce unions" in {
 
       def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
-        val table = TableIndex.joinSubTables(tpls.toList)
+        val table = TableIndex.joinSubTables(emptyRep, tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }
 

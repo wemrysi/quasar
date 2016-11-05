@@ -34,17 +34,17 @@ package object table {
   implicit def s2PathNode(name: String): CPathField = CPathField(name)
   implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
 
-  implicit class TableMethodsOps[T](val table: T)(implicit z: HasTableMethods[T]) {
-    val methods = z methods table
-    import methods._
+  class TableExtensionMethods[T](rep: TableRep[T]) {
+    import rep._
 
-    def canonicalize(length: Int): T = methods.canonicalize(length, length)
-    def toJsonString: String         = toJValues mkString "\n"
-    def toVector: Vector[JValue]     = toJValues.toVector
-    def toJValues: Stream[JValue]    = slicesStream flatMap (_.toJsonElements)
-    def slicesStream: Stream[Slice]  = slices.toStream.value
-    def columns: ColumnMap           = slicesStream.head.columns
-    def fields: Vector[JValue]       = toVector
+    def slicesStream: Stream[Slice]  = table.slices.toStream.value
+
+    def toJsonString: String      = toJValues mkString "\n"
+    def toVector: Vector[JValue]  = toJValues.toVector
+    def toJValues: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
+    def columns: ColumnMap        = slicesStream.head.columns
+    def fields: Vector[JValue]    = toVector
+    def dump(): Unit              = toVector foreach println
   }
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =

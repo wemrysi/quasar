@@ -21,11 +21,9 @@ import ygg._, common._
 import JDBM._
 
 object WriteTable {
-  def apply()(implicit companion: TableCompanion) = new WriteTable
-}
-
-class WriteTable(implicit companion: TableCompanion) {
-  def writeTables(slices: NeedSlices,
+  def writeTables[T](
+                  rep: TableRep[T],
+                  slices: NeedSlices,
                   valueTrans: SliceTransform1[_],
                   keyTrans: Seq[SliceTransform1[_]],
                   sortOrder: DesiredSortOrder): Need[List[String] -> IndexMap] = {
@@ -42,7 +40,7 @@ class WriteTable(implicit companion: TableCompanion) {
       }
     }
     val identifiedKeyTrans = keyTrans.zipWithIndex map { case (kt, i) => kt -> i.toString }
-    write0(companion.reduceSlices(slices), WriteState(JDBMState.empty("writeSortedSpace"), valueTrans, identifiedKeyTrans.toList))
+    write0(rep.companion.reduceSlices(slices), WriteState(JDBMState.empty("writeSortedSpace"), valueTrans, identifiedKeyTrans.toList))
   }
 
   def writeSlice(slice: Slice, state: WriteState, sortOrder: DesiredSortOrder, source: String): Need[WriteState] = {
@@ -176,22 +174,29 @@ class WriteTable(implicit companion: TableCompanion) {
 
   import trans._
 
-  def writeSorted(table: Table, keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[Seq[String] -> IndexMap] = uniq match {
-    case false => writeSortedNonUnique(table, keys, spec, sort)
-    case true  => writeSortedUnique(table, keys, spec, sort)
+  def writeSorted[T](rep: TableRep[T], keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): Need[Seq[String] -> IndexMap] = uniq match {
+    case false => writeSortedNonUnique(rep, keys, spec, sort)
+    case true  => writeSortedUnique(rep, keys, spec, sort)
   }
 
-  def writeSortedUnique(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] =
-    writeTables(
+  def writeSortedUnique[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
+    import rep._
+
+    writeTables[T](
+      rep,
       table transform root.spec slices,
       composeSliceTransform(valueSpec),
       groupKeys map composeSliceTransform,
       order
     )
+  }
 
-  def writeSortedNonUnique(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
+  def writeSortedNonUnique[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
+    import rep._
+
     val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1")))
-    writeTables(
+    writeTables[T](
+      rep,
       table transform companion.addGlobalId(root.spec) slices,
       composeSliceTransform(valueSpec deepMap { case Leaf(_) => TransSpec1.DerefArray0 } spec),
       keys1 map composeSliceTransform,

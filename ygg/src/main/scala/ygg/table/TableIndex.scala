@@ -41,7 +41,7 @@ class TableIndex(private[table] val indices: List[SliceIndex]) {
     * Return the subtable where each group key in keyIds is set to
     * the corresponding value in keyValues.
     */
-  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(implicit companion: TableCompanion): Table = {
+  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]): Table = {
     // Each slice index will build us a slice, so we just return a
     // table of those slices.
     //
@@ -56,7 +56,7 @@ class TableIndex(private[table] val indices: List[SliceIndex]) {
       slice
     }
 
-    companion(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+    Table(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
   }
 }
 
@@ -74,7 +74,8 @@ object TableIndex {
     * Despite being in M, the TableIndex will be eagerly constructed
     * as soon as the underlying slices are available.
     */
-  def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
+  def createFromTable[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
+    import rep._
 
     def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[Need, SliceIndex]): Need[TableIndex] =
       stream.uncons flatMap {
@@ -105,7 +106,9 @@ object TableIndex {
     * the table, since it's assumed that all indices have the same
     * value spec.
     */
-  def joinSubTables(tpls: List[(TableIndex, Seq[Int], Seq[RValue])])(implicit z: TableCompanion): Table = {
+  def joinSubTables[T](rep: TableRep[T], tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): T = {
+    import rep._
+
     // Filter out negative integers. This allows the caller to do
     // arbitrary remapping of their own Seq[RValue] by filtering
     // values they don't want.
@@ -125,7 +128,7 @@ object TableIndex {
       slice
     }
 
-    z(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+    companion(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
   }
 }
 
@@ -169,8 +172,7 @@ class SliceIndex(
     * Return the subtable where each group key in keyIds is set to
     * the corresponding value in keyValues.
     */
-  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue])(implicit z: TableCompanion) =
-    buildSubTable(getRowsForKeys(keyIds, keyValues))
+  def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]) = buildSubTable(getRowsForKeys(keyIds, keyValues))
 
   private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
     //assertSorted(as)
@@ -214,8 +216,8 @@ class SliceIndex(
   /**
     * Given a set of rows, builds the appropriate subslice.
     */
-  private[table] def buildSubTable(rows: ArrayIntList)(implicit z: TableCompanion): Table =
-    z(singleStreamT(buildSubSlice(rows)), ExactSize(rows.size))
+  private[table] def buildSubTable(rows: ArrayIntList): Table =
+    Table(singleStreamT(buildSubSlice(rows)), ExactSize(rows.size))
 
   /**
     * Given a set of rows, builds the appropriate slice.

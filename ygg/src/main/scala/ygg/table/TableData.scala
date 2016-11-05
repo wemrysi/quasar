@@ -21,24 +21,28 @@ import trans._
 import scalaz._
 
 sealed trait TableData {
-  type M[X]
+  type M[+X] = Need[X]
 
   def size: TableSize
   def slices: StreamT[M, Slice]
 }
-object TableData {
+trait TableDataCompanion extends TableMethodsCompanion[TableData] {
+  def empty: TableData                                           = new TableData.Internal(Slice.empty)
+  def fromSlices(slices: NeedSlices, size: TableSize): TableData = new TableData.External(slices, size)
+}
+
+object TableData extends TableDataCompanion {
   private type V           = JValue
   private type T           = TableData
   private type TS          = Seq[T]
   private type F1          = TransSpec1
   private type F2          = TransSpec2
   private type LazySeq[+A] = Stream[A]
+  private type Projs       = Map[Path, Projection]
 
   final case class External(slices: NeedSlices, size: TableSize) extends TableData {
-    type M[X] = Need[X]
   }
   final case class Internal(slice: Slice) extends TableData {
-    type M[X] = Need[X]
     def slices = singleStreamT(slice)
     def size   = ExactSize(slice.size)
   }
@@ -50,11 +54,13 @@ object TableData {
     def zip(): T                                                  = ???
   }
 
-  class Impl(val table: TableData) extends TableMethods[TableData] {
+  class Impl(val self: TableData) extends TableMethods[TableData] {
     private type LazySeqT[A] = StreamT[M, A]
 
-    def size: TableSize         = ???
-    def slices: LazySeqT[Slice] = ???
+    def companion = TableData
+
+    def size: TableSize         = self.size
+    def slices: LazySeqT[Slice] = self.slices
     def columns: ColumnMap      = ???
     def schemas: M[Set[JType]]  = ???
 
@@ -63,7 +69,6 @@ object TableData {
     def cross(that: T)(spec: F2): T                                                   = ???
     def zip(that: T): M[T]                                                            = ???
 
-    def canonicalize(length: Int): T                        = ???
     def canonicalize(minLength: Int, maxLength: Int): T     = ???
     def compact(spec: F1, definedness: Definedness): T      = ???
     def distinct(key: F1): T                                = ???
@@ -84,5 +89,8 @@ object TableData {
     def toJValues: LazySeq[V]      = ???
     def toJson: M[LazySeq[V]]      = ???
     def toVector: Vector[V]        = ???
+
+    def projections: Projs            = ???
+    def withProjections(ps: Projs): T = ???
   }
 }

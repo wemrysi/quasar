@@ -52,9 +52,11 @@ class MergeSpec extends TableQspec {
 
       val grouping =
         GroupingAlignment(
+          emptyRep,
           TransSpec1.Id,
           TransSpec1.Id,
           GroupingSource(
+            bar.asRep,
             bar,
             dotKey,
             Some(InnerObjectConcat(root delete valueField, dotValue.c wrapObjectField "value")),
@@ -64,6 +66,7 @@ class MergeSpec extends TableQspec {
               GroupKeySpecSource(twoField, dotValue.b))
           ),
           GroupingSource(
+            foo.asRep,
             foo,
             dotKey,
             Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
@@ -74,7 +77,7 @@ class MergeSpec extends TableQspec {
           ),
           GroupingSpec.Intersection)
 
-      def evaluator[T <: ygg.table.Table](key: RValue, partition: GroupId => Need[T]) = {
+      def evaluator(key: RValue, partition: GroupId => Need[Table]): Need[Table] = {
         val K0 = RValue.fromJValue(json"""{"1":0,"2":4}""")
         val K1 = RValue.fromJValue(json"""{"1":1,"2":5}""")
         val K2 = RValue.fromJValue(json"""{"1":2,"2":6}""")
@@ -108,7 +111,7 @@ class MergeSpec extends TableQspec {
         }
       }
 
-      val result = Table.merge(grouping)(evaluator)
+      val result = MergeTable(grouping)(evaluator)
       result.flatMap(_.toJson).copoint.toSet must_== resultJson.toSet
     }
 
@@ -142,6 +145,7 @@ class MergeSpec extends TableQspec {
         dotValue.Gender wrapObjectField "value"
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
+        medals.asRep,
         medals,
         dotKey,
         Some(targetTrans),

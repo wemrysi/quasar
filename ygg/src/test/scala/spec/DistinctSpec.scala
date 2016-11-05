@@ -28,7 +28,7 @@ class DistinctSpec extends TableQspec {
   }
 
   def testDistinctIdentity = {
-    implicit val gen: Arbitrary[SampleData] = sort(distinct(sample(schema)))
+    implicit val gen: Arbitrary[SampleData] = SampleData.sort(distinct(sample(schema)))
 
     prop { (sample: SampleData) =>
       val table  = fromSample(sample)
@@ -71,7 +71,7 @@ class DistinctSpec extends TableQspec {
   }
 
   def testDistinct = {
-    implicit val gen = sort(duplicateRows(sample(schema)))
+    implicit val gen = SampleData.sort(duplicateRows(sample(schema)))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       toJsonSeq(table distinct root) must_=== sample.data.distinct

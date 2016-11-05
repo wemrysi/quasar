@@ -18,10 +18,10 @@ package ygg
 
 import common._, macros._
 import json._, table._, trans.{ TransSpec => _, _ }
-import Table.fromJson
 import scalaz.{ Source => _, _ }
 
 object repl {
+  import Table.{ fromJValues => fromJson }
 
   implicit final class JvalueInterpolator(sc: StringContext) {
     def json(args: Any*): JValue             = macro JValueMacros.jsonInterpolatorImpl
@@ -29,7 +29,7 @@ object repl {
   }
 
   def medals      = fromJson(medalsIn)
-  def medalsMerge = Table.Table.merge(grouping)(evaluator)
+  def medalsMerge = MergeTable(grouping)(evaluator)
 
   def medalsIn = jsonMany"""
     {"key":[5908438637678314371],"value":{"Edition":"2000","Gender":"Men"}}
@@ -59,6 +59,7 @@ object repl {
       dotValue.Gender wrapObjectField "value"
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
+      medals.asRep,
       medals,
       dotKey,
       Some(targetTrans),
@@ -92,26 +93,27 @@ object repl {
     }
   }
 
-  implicit class TableSelectionOps(val table: Table) {
+  implicit class TableSelectionOps[T](val rep: TableRep[T]) {
+    import rep._
+
+    private implicit def nextOps(next: T): TableSelectionOps[T] = TableSelectionOps[T](rep.copy(table = next))
+
     private type F1 = TransSpec[Source.type]
 
-    def dump(): Unit                             = table.toVector foreach println
-    def p(): Unit                                = dump()
+    def p(): Unit                = table.dump()
+    def map(f: TransSpec1): T    = table transform f
+    def filter(p: F1): T         = map(root filter p)
+    def delete(p: JPathField): T = map(root delete CPathField(p.name))
 
-    def map(f: TransSpec1): Table    = table transform f
-    def filter(p: F1): Table         = map(root filter p)
-    def delete(p: JPathField): Table = map(root delete CPathField(p.name))
+    def filterAt[A: CValueType](select: F1, literal: A): T = filter(EqualLiteral(select, literal, invert = false))
 
-    def filterAt[A: CValueType](select: F1, literal: A): Table = filter(EqualLiteral(select, literal, invert = false))
-
-    def \(path: JPath): Table  = path.nodes.foldLeft(table)(_ \ _)
-    def \(path: String): Table = this \ JPath(path)
-    def \(node: JPathNode): Table = node match {
+    def \(path: JPath): T  = path.nodes.foldLeft(table)(_ \ _)
+    def \(path: String): T = this \ JPath(path)
+    def \(node: JPathNode): T = node match {
       case JPathField(name) => map(root select name)
       case JPathIndex(idx)  => map(root apply idx)
     }
 
-    def --(fields: Iterable[JPathField]): Table = fields.foldLeft(table)(_ delete _)
-
+    def --(fields: Iterable[JPathField]): T = fields.foldLeft(table)(_ delete _)
   }
 }
