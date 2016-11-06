@@ -16,12 +16,10 @@
 
 package ygg.table
 
-import ygg._, common._, json._
-import trans._
+import ygg._, common._, json._, trans._
 import quasar._
-import scalaz.{ Source => _, _ }
-import Scalaz.{ ToIdOps => _, _ }
 import scala.math.{ min, max }
+import scalaz._, Scalaz._
 
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
@@ -73,6 +71,7 @@ trait TableMethodsCompanion[Table] {
   def fromString(json: String): Table              = fromJValues(Seq(JParser parseUnsafe json))
   def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
   def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
+  def externalize(table: Table): Table             = fromSlices(table.slices, table.size)
 
   def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
   def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
@@ -151,15 +150,17 @@ trait TableMethods[Table] {
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
     AlignTable(sourceL.asRep, alignL, sourceR, alignR)
 
-  def slicesStream: Stream[Slice]     = slices.toStream.value
-  def toJsonString: String            = toJValues mkString "\n"
-  def toVector: Vector[JValue]        = toJValues.toVector
-  def toJValues: Stream[JValue]       = slicesStream flatMap (_.toJsonElements)
   def columns: ColumnMap              = slicesStream.head.columns
-  def fields: Vector[JValue]          = toVector
+  def concat(t2: Table): Table        = makeTable(slices ++ t2.slices, size + t2.size)
   def dump(): Unit                    = toVector foreach println
-  def toStrings: Need[Stream[String]] = toEvents(_ toString _)
+  def fields: Vector[JValue]          = toVector
+  def normalize: Table                = mapWithSameSize(_ filter (x => !x.isEmpty))
+  def slicesStream: Stream[Slice]     = slices.toStream.value
+  def toJValues: Stream[JValue]       = slicesStream flatMap (_.toJsonElements)
   def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
+  def toJsonString: String            = toJValues mkString "\n"
+  def toStrings: Need[Stream[String]] = toEvents(_ toString _)
+  def toVector: Vector[JValue]        = toJValues.toVector
 
   private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] =
     compact(root.spec).slices.toStream map (stream =>
@@ -235,12 +236,6 @@ trait TableMethods[Table] {
   def transform(spec: TransSpec1): Table =
     mapWithSameSize(transformStream(composeSliceTransform(spec), _))
 
-  def concat(t2: Table): Table =
-    makeTable(slices ++ t2.slices, size + t2.size)
-
-  def normalize: Table =
-    mapWithSameSize(_ filter (x => !x.isEmpty))
-
   private def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
     def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
       for {
@@ -270,7 +265,7 @@ trait TableMethods[Table] {
     */
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
-    val transes   = Leaf(Source) -> spec mapBoth composeSliceTransform
+    val transes   = Leaf(trans.Source) -> spec mapBoth composeSliceTransform
     val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
 
     mapWithSameSize(transformStream(compacted, _)).normalize

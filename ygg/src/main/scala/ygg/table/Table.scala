@@ -53,9 +53,7 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
 
   lazy val sortMergeEngine = new MergeEngine
 
-  def empty: T
-
-  def addGlobalId(spec: TransSpec1): TransSpec1                                                = Scan(WrapArray(spec), addGlobalIdScanner)
+  def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
 
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
     import mergeEngine._
@@ -127,8 +125,6 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
     WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)
-
-  def externalize(table: T): T = fromSlices(table.slices, table.size)
 
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
     val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
