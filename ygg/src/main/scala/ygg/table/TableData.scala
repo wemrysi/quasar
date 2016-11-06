@@ -71,7 +71,6 @@ object TableData extends TableDataCompanion {
     def schemas: M[Set[JType]]  = ???
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
-    def cross(that: T)(spec: F2): T                                                   = ???
 
     def canonicalize(minLength: Int, maxLength: Int): T     = ???
     def mapWithSameSize(f: EndoA[LazySeqT[Slice]]): T       = ???
