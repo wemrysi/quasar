@@ -21,6 +21,7 @@ import trans._
 import quasar._
 import scalaz.{ Source => _, _ }
 import Scalaz.{ ToIdOps => _, _ }
+import scala.math.min
 
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
@@ -98,6 +99,8 @@ trait TableMethodsCompanion[Table] {
 trait TableMethods[Table] {
   type M[+X] = Need[X]
 
+  private implicit def tableMethods(table: Table): TableMethods[Table] = companion tableMethods table
+
   def slices: NeedSlices
   def size: TableSize
   def projections: Map[Path, Projection]
@@ -170,7 +173,7 @@ trait TableMethods[Table] {
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: M[Stream[JValue]]
-  def zip(t2: Table): M[Table]
+  // def zip(t2: Table): M[Table]
 
   def withProjections(ps: Map[Path, Projection]): Table
 
@@ -225,4 +228,25 @@ trait TableMethods[Table] {
     distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
   }
 
+  /**
+    * Zips two tables together in their current sorted order.
+    * If the tables are not normalized first and thus have different slices sizes,
+    * then since the zipping is done per slice, this can produce a result that is
+    * different than if the tables were normalized.
+    */
+  def zip(t2: Table): M[Table] = {
+    def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = StreamT(
+      slices1.uncons flatMap {
+        case None                 => Need(StreamT.Done)
+        case Some((head1, tail1)) =>
+          slices2.uncons map {
+            case Some((head2, tail2)) => StreamT.Yield(head1 zip head2, rec(tail1, tail2))
+            case None                 => StreamT.Done
+          }
+      }
+    )
+
+    val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
+    Need(companion.fromSlices(rec(slices, t2.slices), resultSize))
+  }
 }

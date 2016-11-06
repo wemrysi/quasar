@@ -116,28 +116,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   def concat(t2: Table): Table = Table(slices ++ t2.slices, size + t2.size)
 
-  /**
-    * Zips two tables together in their current sorted order.
-    * If the tables are not normalized first and thus have different slices sizes,
-    * then since the zipping is done per slice, this can produce a result that is
-    * different than if the tables were normalized.
-    */
-  def zip(t2: Table): M[Table] = {
-    def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = StreamT(
-      slices1.uncons flatMap {
-        case None                 => Need(StreamT.Done)
-        case Some((head1, tail1)) =>
-          slices2.uncons map {
-            case Some((head2, tail2)) => StreamT.Yield(head1 zip head2, rec(tail1, tail2))
-            case None                 => StreamT.Done
-          }
-      }
-    )
-
-    val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
-    Need(Table(rec(slices, t2.slices), resultSize))
-  }
-
   def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
 
   /**

@@ -73,7 +73,6 @@ object TableData extends TableDataCompanion {
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
     def concat(that: T): T                                                            = ???
     def cross(that: T)(spec: F2): T                                                   = ???
-    def zip(that: T): M[T]                                                            = ???
 
     def canonicalize(minLength: Int, maxLength: Int): T     = ???
     def compact(spec: F1, definedness: Definedness): T      = ???
