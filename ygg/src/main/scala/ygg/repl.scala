@@ -21,7 +21,7 @@ import json._, table._, trans.{ TransSpec => _, _ }
 import scalaz.{ Source => _, _ }
 
 object repl {
-  import Table.{ fromJValues => fromJson }
+  import TableData.{ fromJValues => fromJson }
 
   implicit final class JvalueInterpolator(sc: StringContext) {
     def json(args: Any*): JValue             = macro JValueMacros.jsonInterpolatorImpl
@@ -71,7 +71,7 @@ object repl {
       mkSource(2, "extra1", "Women")
     )
   }
-  def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
+  def evaluator(key: RValue, partition: GroupId => Need[TableData]) = {
     val K0 = RValue.fromJValue(json"""{"1":"1996","extra0":true,"extra1":true}""")
     val K1 = RValue.fromJValue(json"""{"1":"2000","extra0":true,"extra1":true}""")
     val K2 = RValue.fromJValue(json"""{"1":"2004","extra0":true,"extra1":true}""")

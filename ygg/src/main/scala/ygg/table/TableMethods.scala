@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, json._, trans._
+import ygg._, common._, json._, trans._, data._
 import quasar._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
@@ -40,6 +40,52 @@ trait TableMethodsCompanion[Table] {
 
   def empty: Table = fromSlices(emptyStreamT(), ExactSize(0))
 
+  /**
+    * Return the subtable where each group key in keyIds is set to
+    * the corresponding value in keyValues.
+    */
+  def getSubTable(tableIndex: TableIndex, keyIds: Seq[Int], keyValues: Seq[RValue]): Table = {
+    import tableIndex.indices
+
+    // Each slice index will build us a slice, so we just return a
+    // table of those slices.
+    //
+    // Currently we assemble the slices eagerly. After some testing
+    // it might be the case that we want to use StreamT in a more
+    // traditional (lazy) manner.
+    var size = 0L
+    val slices: List[Slice] = indices.map { sliceIndex =>
+      val rows  = getRowsForKeys(sliceIndex, keyIds, keyValues)
+      val slice = buildSubSlice(sliceIndex, rows)
+      size += slice.size
+      slice
+    }
+
+    fromSlices(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+  }
+
+  /**
+    * Return the subtable where each group key in keyIds is set to
+    * the corresponding value in keyValues.
+    */
+  def getSubTable(sliceIndex: SliceIndex, keyIds: Seq[Int], keyValues: Seq[RValue]) =
+    buildSubTable(sliceIndex, getRowsForKeys(sliceIndex, keyIds, keyValues))
+
+  /**
+    * Given a set of rows, builds the appropriate subslice.
+    */
+  private[table] def buildSubTable(sliceIndex: SliceIndex, rows: ArrayIntList): Table =
+    fromSlices(singleStreamT(buildSubSlice(sliceIndex, rows)), ExactSize(rows.size))
+
+  /**
+    * Given a set of rows, builds the appropriate slice.
+    */
+  private[table] def buildSubSlice(sliceIndex: SliceIndex, rows: ArrayIntList): Slice =
+    if (rows.isEmpty)
+      Slice.empty
+    else
+      sliceIndex.valueSlice.remap(rows)
+
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
     val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
 
@@ -50,6 +96,39 @@ trait TableMethodsCompanion[Table] {
       unfoldStream(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
       ExactSize(values.length)
     )
+  }
+
+  /**
+    * Returns the rows specified by the given group key values.
+    */
+  private def getRowsForKeys(sliceIndex: SliceIndex, keyIds: Seq[Int], keyValues: Seq[RValue]): ArrayIntList = {
+    var rows: ArrayIntList = sliceIndex.dict.getOrElse((keyIds(0), keyValues(0)), ArrayIntList.empty)
+    var i: Int             = 1
+    while (i < keyIds.length && !rows.isEmpty) {
+      rows = rows intersect sliceIndex.dict.getOrElse((keyIds(i), keyValues(i)), ArrayIntList.empty)
+      i += 1
+    }
+    rows
+  }
+
+  /**
+    * For a list of slice indices, return a slice containing all the
+    * rows for which any of the indices matches.
+    *
+    * NOTE: Only the first slice's value spec is used to construct
+    * the slice since it's assumed that all slices have the same
+    * value spec.
+    */
+  def joinSubSlices(tpls: List[(SliceIndex, (Seq[Int], Seq[RValue]))]): Slice = tpls match {
+    case Nil =>
+      abort("empty slice") // FIXME
+    case (index, (ids, vals)) :: tail =>
+      var rows = getRowsForKeys(index, ids, vals)
+      tail.foreach {
+        case (index, (ids, vals)) =>
+          rows = rows union getRowsForKeys(index, ids, vals)
+      }
+      buildSubSlice(index, rows)
   }
 
   def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)

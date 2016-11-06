@@ -20,20 +20,24 @@ import ygg._, common._, json._
 import trans._
 import scalaz._
 
+final case class TableRep[T](table: T, companion: TableMethodsCompanion[T]) {
+  implicit def tableMethods(table: T): TableMethods[T] = companion tableMethods table
+}
+
 sealed trait TableData {
-  type M[+X] = Need[X]
-
-  def slices: StreamT[M, Slice]
   def size: TableSize
+  def slices: StreamT[Need, Slice]
   def projections: Map[Path, Projection]
-}
-trait TableDataCompanion extends TableMethodsCompanion[TableData] {
-  override def empty: TableData                                        = new TableData.Internal(Slice.empty)
-  def fromSlices(slices: NeedSlices, size: TableSize): TableData       = new TableData.External(slices, size)
-  implicit def tableMethods(table: TableData): TableMethods[TableData] = new TableData.Impl(table)
+
+  def self: TableData           = this
+  def companion: TableData.type = TableData
 }
 
-object TableData extends TableDataCompanion {
+object TableData extends TableMethodsCompanion[TableData] {
+  override def empty: TableData                                        = new Internal(Slice.empty)
+  def fromSlices(slices: NeedSlices, size: TableSize): TableData       = new External(slices, size)
+  implicit def tableMethods(table: TableData): TableMethods[TableData] = new Impl(table)
+
   private type V           = JValue
   private type T           = TableData
   private type TS          = Seq[T]

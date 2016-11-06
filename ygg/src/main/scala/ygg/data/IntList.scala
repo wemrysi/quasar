@@ -18,9 +18,75 @@ package ygg.data
 
 import ygg.common._
 
+object ArrayIntList {
+  val empty = new ArrayIntList(0)
+}
+
 class ArrayIntList(initialCapacity: Int) {
   private[this] var _size: Int        = 0
   private[this] var _data: Array[Int] = new Array[Int](initialCapacity)
+
+  def intersect(bs: ArrayIntList): ArrayIntList = {
+    val as = this
+
+    //assertSorted(as)
+    //assertSorted(bs)
+    var i    = 0
+    var j    = 0
+    val alen = as.size
+    val blen = bs.size
+    val out  = new ArrayIntList(alen min blen)
+    while (i < alen && j < blen) {
+      val a = as.get(i)
+      val b = bs.get(j)
+      if (a < b) {
+        i += 1
+      } else if (a > b) {
+        j += 1
+      } else {
+        out.add(a)
+        i += 1
+        j += 1
+      }
+    }
+    out
+  }
+
+  def union(bs: ArrayIntList): ArrayIntList = {
+    val as = this
+
+    //assertSorted(as)
+    //assertSorted(bs)
+    var i    = 0
+    var j    = 0
+    val alen = as.size
+    val blen = bs.size
+    val out  = new ArrayIntList(alen max blen)
+    while (i < alen && j < blen) {
+      val a = as.get(i)
+      val b = bs.get(j)
+      if (a < b) {
+        out.add(a)
+        i += 1
+      } else if (a > b) {
+        out.add(b)
+        j += 1
+      } else {
+        out.add(a)
+        i += 1
+        j += 1
+      }
+    }
+    while (i < alen) {
+      out.add(as.get(i))
+      i += 1
+    }
+    while (j < blen) {
+      out.add(bs.get(j))
+      j += 1
+    }
+    out
+  }
 
   def this()                              = this(8)
   def size(): Int                         = _size

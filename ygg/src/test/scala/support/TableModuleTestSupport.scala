@@ -23,8 +23,8 @@ import trans.DerefObjectStatic
 abstract class TableQspec extends quasar.Qspec {
   outer =>
 
-  val Table  = ygg.table.Table
-  type Table = ygg.table.Table
+  val Table  = ygg.table.TableData
+  type Table = ygg.table.TableData
 
   protected implicit def liftTableRep(t: Table): TableRep[Table] = t.asRep
 

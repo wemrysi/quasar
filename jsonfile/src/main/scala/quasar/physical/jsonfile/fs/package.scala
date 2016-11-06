@@ -40,7 +40,7 @@ package object fs {
   type EJson[A]            = quasar.ejson.EJson[A]
   type Fix[F[_]]           = matryoshka.Fix[F]
   type PathSegment         = quasar.contrib.pathy.PathSegment
-  type Table               = ygg.table.Table
+  type Table               = ygg.table.TableData
   type Task[A]             = scalaz.concurrent.Task[A]
   type Type                = quasar.Type
   type MapFunc[T[_[_]], A] = quasar.qscript.MapFunc[T, A]
