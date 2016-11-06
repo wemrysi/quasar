@@ -99,7 +99,10 @@ trait TableMethodsCompanion[Table] {
 trait TableMethods[Table] {
   type M[+X] = Need[X]
 
-  private implicit def tableMethods(table: Table): TableMethods[Table] = companion tableMethods table
+  private implicit def tableMethods(table: Table): TableMethods[Table]          = companion tableMethods table
+  private def makeTable(slices: NeedSlices, size: TableSize): Table             = companion.fromSlices(slices, size)
+  private def needTable(slices: => NeedSlices, size: => TableSize): Need[Table] = Need(makeTable(slices, size))
+  private def makeEmpty: Table                                                  = companion.empty
 
   def slices: NeedSlices
   def size: TableSize
@@ -150,7 +153,6 @@ trait TableMethods[Table] {
 
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
   def paged(limit: Int): Table
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
   def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   def schemas: M[Set[JType]]
   def toArray[A](implicit tpe: CValueType[A]): Table
@@ -199,7 +201,7 @@ trait TableMethods[Table] {
         } yield back
       )
 
-      companion.fromSlices(
+      makeTable(
         StreamT.wrapEffect(Need(this) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
         EstimateSize(0L, size.maxSize)
       )
@@ -227,7 +229,7 @@ trait TableMethods[Table] {
     )
 
     val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
-    Need(companion.fromSlices(rec(slices, t2.slices), resultSize))
+    needTable(rec(slices, t2.slices), resultSize)
   }
   /**
     * Performs a one-pass transformation of the keys and values in the table.
@@ -238,7 +240,7 @@ trait TableMethods[Table] {
     mapWithSameSize(transformStream(composeSliceTransform(spec), _))
 
   def concat(t2: Table): Table =
-    companion.fromSlices(slices ++ t2.slices, size + t2.size)
+    makeTable(slices ++ t2.slices, size + t2.size)
 
   def normalize: Table =
     mapWithSameSize(_ filter (x => !x.isEmpty))
@@ -304,7 +306,7 @@ trait TableMethods[Table] {
       case InfiniteSize             => InfiniteSize
     }
 
-    companion.fromSlices(StreamT.wrapEffect(loop(slices, 0)), newSize)
+    makeTable(StreamT.wrapEffect(loop(slices, 0)), newSize)
   }
 
   /**
@@ -461,7 +463,7 @@ trait TableMethods[Table] {
 
     sizeCheck match {
       case Some(false) => abort(s"cannot evaluate cartesian of sets with size $size and ${that.size}")
-      case _           => companion.fromSlices(StreamT(cross0(composeSliceTransform2(spec)) map (StreamT Skip _)), newSize)
+      case _           => makeTable(StreamT(cross0(composeSliceTransform2(spec)) map (StreamT Skip _)), newSize)
     }
   }
 
@@ -508,5 +510,92 @@ trait TableMethods[Table] {
     }
 
     mapWithSameSize(ss => StreamT(step(0, Nil, ss)))
+  }
+
+
+  /**
+    * In order to call partitionMerge, the table must be sorted according to
+    * the values specified by the partitionBy transspec.
+    */
+  def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table] = {
+    import Ordering._
+
+    // Find the first element that compares LT
+    @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
+      val imid = imin + (imax - imin) / 2
+
+      (compare(imin), compare(imid), compare(imax)) match {
+        case (LT, _, LT)  => imin
+        case (EQ, _, EQ)  => imax + 1
+        case (EQ, LT, LT) => findEnd(compare, imin, imid - 1)
+        case (EQ, EQ, LT) => findEnd(compare, imid, imax - 1)
+        case _            => abort("Inputs to partitionMerge not sorted.")
+      }
+    }
+
+    def subTable(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices): M[Table] = {
+      def subTable0(slices: NeedSlices, subSlices: NeedSlices, size: Int): M[Table] = {
+        slices.uncons flatMap {
+          case Some((head, tail)) =>
+            val headComparator = comparatorGen(head)
+            val spanEnd        = findEnd(headComparator, 0, head.size - 1)
+            if (spanEnd < head.size) {
+              needTable(subSlices ++ singleStreamT(head take spanEnd), ExactSize(size + spanEnd))
+            } else {
+              subTable0(tail, subSlices ++ singleStreamT(head), size + head.size)
+            }
+
+          case None =>
+            needTable(subSlices, ExactSize(size))
+        }
+      }
+
+      subTable0(slices, emptyStreamT(), 0)
+    }
+
+    def dropAndSplit(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices, spanStart: Int): NeedSlices = StreamT.wrapEffect {
+      slices.uncons map {
+        case Some((head, tail)) =>
+          val headComparator = comparatorGen(head)
+          val spanEnd        = findEnd(headComparator, spanStart, head.size - 1)
+          if (spanEnd < head.size) {
+            stepPartition(head, spanEnd, tail)
+          } else {
+            dropAndSplit(comparatorGen, tail, 0)
+          }
+
+        case None =>
+          emptyStreamT()
+      }
+    }
+
+    def stepPartition(head: Slice, spanStart: Int, tail: NeedSlices): NeedSlices = {
+      val comparatorGen = (s: Slice) => {
+        val rowComparator = Slice.rowComparatorFor(head, s) { s0 =>
+          s0.columns.keys collect {
+            case ColumnRef(path @ CPath(CPathField("0"), _ @_ *), _) => path
+          }
+        }
+
+        (i: Int) =>
+          rowComparator.compare(spanStart, i)
+      }
+
+      val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
+      val groupedM                         = groupTable.map(_ transform root.`1`).flatMap(f)
+      val groupedStream: NeedSlices = StreamT.wrapEffect(groupedM.map(_.slices))
+
+      groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)
+    }
+
+    val keyTrans = OuterObjectConcat(
+      WrapObject(partitionBy, "0"),
+      WrapObject(Leaf(trans.Source), "1")
+    )
+
+    this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {
+      case Some((head, tail)) => makeTable(stepPartition(head, 0, tail), UnknownSize)
+      case None               => makeEmpty
+    }
   }
 }

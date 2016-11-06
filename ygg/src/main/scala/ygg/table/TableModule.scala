@@ -17,7 +17,7 @@
 package ygg.table
 
 import ygg._, common._, data._, json._, trans._
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Scalaz._
 
 final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
@@ -78,92 +78,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     companion.cogroup(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
-
-  /**
-    * In order to call partitionMerge, the table must be sorted according to
-    * the values specified by the partitionBy transspec.
-    */
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table] = {
-    // Find the first element that compares LT
-    @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
-      val imid = imin + (imax - imin) / 2
-
-      (compare(imin), compare(imid), compare(imax)) match {
-        case (LT, _, LT)  => imin
-        case (EQ, _, EQ)  => imax + 1
-        case (EQ, LT, LT) => findEnd(compare, imin, imid - 1)
-        case (EQ, EQ, LT) => findEnd(compare, imid, imax - 1)
-        case _            => abort("Inputs to partitionMerge not sorted.")
-      }
-    }
-
-    def subTable(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices): M[Table] = {
-      def subTable0(slices: NeedSlices, subSlices: NeedSlices, size: Int): M[Table] = {
-        slices.uncons flatMap {
-          case Some((head, tail)) =>
-            val headComparator = comparatorGen(head)
-            val spanEnd        = findEnd(headComparator, 0, head.size - 1)
-            if (spanEnd < head.size) {
-              Need(Table(subSlices ++ singleStreamT(head take spanEnd), ExactSize(size + spanEnd)))
-            } else {
-              subTable0(tail, subSlices ++ singleStreamT(head), size + head.size)
-            }
-
-          case None =>
-            Need(Table(subSlices, ExactSize(size)))
-        }
-      }
-
-      subTable0(slices, emptyStreamT(), 0)
-    }
-
-    def dropAndSplit(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices, spanStart: Int): NeedSlices = StreamT.wrapEffect {
-      slices.uncons map {
-        case Some((head, tail)) =>
-          val headComparator = comparatorGen(head)
-          val spanEnd        = findEnd(headComparator, spanStart, head.size - 1)
-          if (spanEnd < head.size) {
-            stepPartition(head, spanEnd, tail)
-          } else {
-            dropAndSplit(comparatorGen, tail, 0)
-          }
-
-        case None =>
-          emptyStreamT()
-      }
-    }
-
-    def stepPartition(head: Slice, spanStart: Int, tail: NeedSlices): NeedSlices = {
-      val comparatorGen = (s: Slice) => {
-        val rowComparator = Slice.rowComparatorFor(head, s) { s0 =>
-          s0.columns.keys collect {
-            case ColumnRef(path @ CPath(CPathField("0"), _ @_ *), _) => path
-          }
-        }
-
-        (i: Int) =>
-          rowComparator.compare(spanStart, i)
-      }
-
-      val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
-      val groupedM                         = groupTable.map(_ transform root.`1`).flatMap(f)
-      val groupedStream: NeedSlices = StreamT.wrapEffect(groupedM.map(_.slices))
-
-      groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)
-    }
-
-    val keyTrans = OuterObjectConcat(
-      WrapObject(partitionBy, "0"),
-      WrapObject(Leaf(trans.Source), "1")
-    )
-
-    this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {
-      case Some((head, tail)) =>
-        Table(stepPartition(head, 0, tail), UnknownSize)
-      case None =>
-        Table.empty
-    }
-  }
 
   def schemas: M[Set[JType]] = {
     // Returns true iff masks contains an array equivalent to mask.
