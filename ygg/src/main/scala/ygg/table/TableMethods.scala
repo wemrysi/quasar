@@ -98,14 +98,13 @@ trait TableMethodsCompanion[Table] {
 trait TableMethods[Table] {
   type M[+X] = Need[X]
 
+  def slices: NeedSlices
+  def size: TableSize
+  def projections: Map[Path, Projection]
+
   def self: Table
   def asRep: TableRep[Table]
   def companion: TableMethodsCompanion[Table]
-
-  /**
-    * Return an indication of table size, if known
-    */
-  def size: TableSize
 
   /**
     * Folds over the table to produce a single value (stored in a singleton table).
@@ -169,13 +168,11 @@ trait TableMethods[Table] {
   def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
   def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   def schemas: M[Set[JType]]
-  def slices: NeedSlices
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: M[Stream[JValue]]
   def zip(t2: Table): M[Table]
 
-  def projections: Map[Path, Projection]
   def withProjections(ps: Map[Path, Projection]): Table
 
   def canonicalize(length: Int): Table = canonicalize(length, length)

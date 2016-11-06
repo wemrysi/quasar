@@ -23,8 +23,9 @@ import scalaz._
 sealed trait TableData {
   type M[+X] = Need[X]
 
-  def size: TableSize
   def slices: StreamT[M, Slice]
+  def size: TableSize
+  def projections: Map[Path, Projection]
 }
 trait TableDataCompanion extends TableMethodsCompanion[TableData] {
   def empty: TableData                                                 = new TableData.Internal(Slice.empty)
@@ -42,10 +43,12 @@ object TableData extends TableDataCompanion {
   private type Projs       = Map[Path, Projection]
 
   final case class External(slices: NeedSlices, size: TableSize) extends TableData {
+    def projections = Map()
   }
   final case class Internal(slice: Slice) extends TableData {
-    def slices = singleStreamT(slice)
-    def size   = ExactSize(slice.size)
+    def slices      = singleStreamT(slice)
+    def size        = ExactSize(slice.size)
+    def projections = Map()
   }
 
   class BinaryTableData(left: TableData, right: TableData) {
@@ -61,8 +64,10 @@ object TableData extends TableDataCompanion {
     def asRep: TableRep[TableData] = ??? // TableRep[TableData](self, x => new Impl(x), companion)
     def companion = TableData
 
-    def size: TableSize         = self.size
-    def slices: LazySeqT[Slice] = self.slices
+    def size: TableSize                    = self.size
+    def slices: LazySeqT[Slice]            = self.slices
+    def projections: Map[Path, Projection] = self.projections
+
     def schemas: M[Set[JType]]  = ???
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
@@ -88,7 +93,6 @@ object TableData extends TableDataCompanion {
 
     def toArray[A: CValueType] : T    = ???
     def toJson: M[LazySeq[V]]         = ???
-    def projections: Projs            = ???
     def withProjections(ps: Projs): T = ???
   }
 }
