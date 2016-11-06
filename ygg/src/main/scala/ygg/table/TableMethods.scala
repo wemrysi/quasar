@@ -113,11 +113,6 @@ trait TableMethods[Table] {
   def companion: TableMethodsCompanion[Table]
 
   /**
-    * Folds over the table to produce a single value (stored in a singleton table).
-    */
-  def reduce[A: Monoid](reducer: CReducer[A]): M[A]
-
-  /**
     * Sorts the KV table by ascending or descending order of a transformation
     * applied to the rows.
     *
@@ -132,42 +127,18 @@ trait TableMethods[Table] {
     */
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
 
-  /**
-    * Performs a full cartesian cross on this table with the specified table,
-    * applying the specified transformation to merge the two tables into
-    * a single table.
-    */
-  // def cross(that: Table)(spec: TransSpec2): Table
-
-  /**
-    * Force the table to a backing store, and provice a restartable table
-    * over the results.
-    */
-  def force: M[Table]
-
-  /**
-    * For each distinct path in the table, load all columns identified by the specified
-    * jtype and concatenate the resulting slices into a new table.
-    */
-  def load(tpe: JType): M[Table]
-
-  def mapWithSameSize(f: EndoA[NeedSlices]): Table
-  def paged(limit: Int): Table
   def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
-  def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: M[Stream[JValue]]
-
   def withProjections(ps: Map[Path, Projection]): Table
 
-  def slicesStream: Stream[Slice]  = slices.toStream.value
 
-  def toJsonString: String      = toJValues mkString "\n"
-  def toVector: Vector[JValue]  = toJValues.toVector
-  def toJValues: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
-  def columns: ColumnMap        = slicesStream.head.columns
-  def fields: Vector[JValue]    = toVector
-  def dump(): Unit              = toVector foreach println
-
+  def slicesStream: Stream[Slice] = slices.toStream.value
+  def toJsonString: String        = toJValues mkString "\n"
+  def toVector: Vector[JValue]    = toJValues.toVector
+  def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
+  def columns: ColumnMap          = slicesStream.head.columns
+  def fields: Vector[JValue]      = toVector
+  def dump(): Unit                = toVector foreach println
 
   /**
     * Yields a new table with distinct rows. Assumes this table is sorted.
@@ -720,4 +691,53 @@ trait TableMethods[Table] {
 
     collectSchemas(Set.empty, slices)
   }
+
+  def mapWithSameSize(f: EndoA[NeedSlices]): Table = companion.fromSlices(f(slices), size)
+
+  /**
+    * For each distinct path in the table, load all columns identified by the specified
+    * jtype and concatenate the resulting slices into a new table.
+    */
+  def load(tpe: JType): M[Table]                               = companion.load(self, tpe)
+
+  /**
+    * Folds over the table to produce a single value (stored in a singleton table).
+    */
+  def reduce[A](reducer: CReducer[A])(implicit monoid: Monoid[A]): Need[A] = {
+    def rec(stream: StreamT[Need, A], acc: A): Need[A] = stream.uncons flatMap {
+      case Some((head, tail)) => rec(tail, head |+| acc)
+      case None               => Need(acc)
+    }
+    rec(
+      slices map (s => reducer.reduce(new CSchema(s.columns.keySet, s logicalColumns _), 0 until s.size)),
+      monoid.zero
+    )
+  }
+
+  /**
+    * Force the table to a backing store, and provice a restartable table
+    * over the results.
+    */
+  def force: M[Table] = {
+    def loop(slices: NeedSlices, acc: List[Slice], size: Long): Need[List[Slice] -> Long] = slices.uncons flatMap {
+      case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
+      case Some((_, tail))                       => loop(tail, acc, size)
+      case None                                  => Need(acc.reverse -> size)
+    }
+    val former = new (Id.Id ~> Need) { def apply[A](a: Id.Id[A]): Need[A] = Need(a) }
+    loop(slices, Nil, 0L) map {
+      case (stream, size) =>
+        makeTable(StreamT.fromIterable(stream).trans(former), ExactSize(size))
+    }
+  }
+
+  def paged(limit: Int): Table = mapWithSameSize(slices =>
+    slices flatMap (slice =>
+      StreamT.unfoldM(0)(idx =>
+        Need(idx < slice.size option (slice.takeRange(idx, limit) -> (idx + limit)))
+      )
+    )
+  )
+
+  def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
 }

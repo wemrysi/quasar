@@ -70,17 +70,9 @@ object TableData extends TableDataCompanion {
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
 
-    def mapWithSameSize(f: EndoA[LazySeqT[Slice]]): T = ???
-    def reduce[A: Monoid](reducer: CReducer[A]): M[A] = ???
-    def sample(size: Int, specs: Seq[F1]): M[TS]      = ???
-    def sort(key: F1, order: DesiredSortOrder): M[T]  = ???
-
-    def force(): M[T]          = ???
-    def load(tpe: JType): M[T] = ???
-    def paged(limit: Int): T   = ???
-
-    def toArray[A: CValueType] : T    = ???
-    def toJson: M[LazySeq[V]]         = ???
-    def withProjections(ps: Projs): T = ???
+    def sample(size: Int, specs: Seq[F1]): M[TS]     = ???
+    def sort(key: F1, order: DesiredSortOrder): M[T] = ???
+    def toJson: M[LazySeq[V]]                        = ???
+    def withProjections(ps: Projs): T                = ???
   }
 }
