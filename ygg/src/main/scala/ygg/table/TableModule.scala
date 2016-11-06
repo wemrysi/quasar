@@ -16,9 +16,8 @@
 
 package ygg.table
 
-import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
-import scala.math.min
+import scalaz._, Scalaz._, Ordering._
 
 final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
@@ -76,50 +75,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
   )
 
   def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
-
-  /**
-    * Returns a table where each slice (except maybe the last) has slice size `length`.
-    * Also removes slices of size zero. If an optional `maxLength0` size is provided,
-    * then the slices need only land in the range between `length` and `maxLength0`.
-    * For slices being loaded from ingest, it is often the case that we are missing a
-    * few rows at the end, so we shouldn't be too strict.
-    */
-  def canonicalize(minLength: Int, maxLength: Int): Table = {
-    scala.Predef.assert(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
-
-    def concat(rslices: List[Slice]): Slice = rslices.reverse match {
-      case Nil          => Slice.empty
-      case slice :: Nil => slice
-      case all          =>
-        val result      = Slice concat all
-        val materialize = all.size > (result.size / yggConfig.smallSliceSize)
-        // Deal w/ lots of small slices by materializing them.
-        materialize.fold(result, result.materialized)
-    }
-
-    def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): M[StreamT.Step[Slice, NeedSlices]] = {
-      def mkYield(hds: List[Slice], tl: NeedSlices) =
-        Need(StreamT.Yield(concat(hds), StreamT(step(0, Nil, tl))))
-
-      stream.uncons flatMap {
-        case None if sliceSize > 0                                   => mkYield(acc, emptyStreamT())
-        case None                                                    => Need(StreamT.Done)
-        case Some((EmptySlice(), tail))                              => step(sliceSize, acc, tail) // Skip empty slices.
-        case Some((head, tail)) if sliceSize + head.size < minLength => step(sliceSize + head.size, head :: acc, tail) // Keep accumulating.
-        case Some((head, tail))                                      =>
-          // We emit a slice, but the last slice added may fall on a stream boundary.
-          min(head.size, maxLength - sliceSize) match {
-            case splitAt if splitAt < head.size =>
-              val (prefix, suffix) = head split splitAt
-              mkYield(prefix :: acc, suffix :: tail)
-            case _ =>
-              mkYield(head :: acc, tail)
-          }
-      }
-    }
-
-    mapWithSameSize(ss => StreamT(step(0, Nil, ss)))
-  }
 
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     companion.cogroup(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
@@ -199,7 +154,7 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
     val keyTrans = OuterObjectConcat(
       WrapObject(partitionBy, "0"),
-      WrapObject(Leaf(Source), "1")
+      WrapObject(Leaf(trans.Source), "1")
     )
 
     this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {

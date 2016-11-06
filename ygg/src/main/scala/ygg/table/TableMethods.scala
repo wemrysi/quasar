@@ -148,7 +148,6 @@ trait TableMethods[Table] {
     */
   def load(tpe: JType): M[Table]
 
-  def canonicalize(minLength: Int, maxLength: Int): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
   def paged(limit: Int): Table
   def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
@@ -159,7 +158,6 @@ trait TableMethods[Table] {
 
   def withProjections(ps: Map[Path, Projection]): Table
 
-  def canonicalize(length: Int): Table = canonicalize(length, length)
   def slicesStream: Stream[Slice]  = slices.toStream.value
 
   def toJsonString: String      = toJValues mkString "\n"
@@ -465,5 +463,50 @@ trait TableMethods[Table] {
       case Some(false) => abort(s"cannot evaluate cartesian of sets with size $size and ${that.size}")
       case _           => companion.fromSlices(StreamT(cross0(composeSliceTransform2(spec)) map (StreamT Skip _)), newSize)
     }
+  }
+
+  /**
+    * Returns a table where each slice (except maybe the last) has slice size `length`.
+    * Also removes slices of size zero. If an optional `maxLength0` size is provided,
+    * then the slices need only land in the range between `length` and `maxLength0`.
+    * For slices being loaded from ingest, it is often the case that we are missing a
+    * few rows at the end, so we shouldn't be too strict.
+    */
+  def canonicalize(length: Int): Table = canonicalize(length, length)
+  def canonicalize(minLength: Int, maxLength: Int): Table = {
+    scala.Predef.assert(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
+
+    def concat(rslices: List[Slice]): Slice = rslices.reverse match {
+      case Nil          => Slice.empty
+      case slice :: Nil => slice
+      case all          =>
+        val result      = Slice concat all
+        val materialize = all.size > (result.size / yggConfig.smallSliceSize)
+        // Deal w/ lots of small slices by materializing them.
+        materialize.fold(result, result.materialized)
+    }
+
+    def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): M[StreamT.Step[Slice, NeedSlices]] = {
+      def mkYield(hds: List[Slice], tl: NeedSlices) =
+        Need(StreamT.Yield(concat(hds), StreamT(step(0, Nil, tl))))
+
+      stream.uncons flatMap {
+        case None if sliceSize > 0                                   => mkYield(acc, emptyStreamT())
+        case None                                                    => Need(StreamT.Done)
+        case Some((EmptySlice(), tail))                              => step(sliceSize, acc, tail) // Skip empty slices.
+        case Some((head, tail)) if sliceSize + head.size < minLength => step(sliceSize + head.size, head :: acc, tail) // Keep accumulating.
+        case Some((head, tail))                                      =>
+          // We emit a slice, but the last slice added may fall on a stream boundary.
+          min(head.size, maxLength - sliceSize) match {
+            case splitAt if splitAt < head.size =>
+              val (prefix, suffix) = head split splitAt
+              mkYield(prefix :: acc, suffix :: tail)
+            case _ =>
+              mkYield(head :: acc, tail)
+          }
+      }
+    }
+
+    mapWithSameSize(ss => StreamT(step(0, Nil, ss)))
   }
 }

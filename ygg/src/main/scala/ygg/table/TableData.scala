@@ -72,7 +72,6 @@ object TableData extends TableDataCompanion {
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
 
-    def canonicalize(minLength: Int, maxLength: Int): T     = ???
     def mapWithSameSize(f: EndoA[LazySeqT[Slice]]): T       = ???
     def partitionMerge(partitionBy: F1)(f: T => M[T]): M[T] = ???
     def reduce[A: Monoid](reducer: CReducer[A]): M[A]       = ???
