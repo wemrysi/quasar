@@ -114,8 +114,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
     )
   )
 
-  def concat(t2: Table): Table = Table(slices ++ t2.slices, size + t2.size)
-
   def toArray[A](implicit tpe: CValueType[A]): Table = mapWithSameSize(_ map (_.toArray[A]))
 
   /**

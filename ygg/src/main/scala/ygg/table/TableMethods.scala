@@ -163,7 +163,6 @@ trait TableMethods[Table] {
   def load(tpe: JType): M[Table]
 
   def canonicalize(minLength: Int, maxLength: Int): Table
-  def concat(t2: Table): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
   def normalize: Table
   def paged(limit: Int): Table
@@ -173,7 +172,6 @@ trait TableMethods[Table] {
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: M[Stream[JValue]]
-  // def zip(t2: Table): M[Table]
 
   def withProjections(ps: Map[Path, Projection]): Table
 
@@ -249,4 +247,6 @@ trait TableMethods[Table] {
     val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
     Need(companion.fromSlices(rec(slices, t2.slices), resultSize))
   }
+
+  def concat(t2: Table): Table = companion.fromSlices(slices ++ t2.slices, size + t2.size)
 }
