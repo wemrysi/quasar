@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, data._, json._, trans._
+import ygg._, common._, json._, trans._
 import scalaz._, Scalaz._
 
 final case class SliceId(id: Int) {
@@ -78,127 +78,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     companion.cogroup(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
-
-  def schemas: M[Set[JType]] = {
-    // Returns true iff masks contains an array equivalent to mask.
-    def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {
-      @tailrec
-      def equal(x: Array[Int], y: Array[Int], i: Int): Boolean = (
-           i >= x.length
-        || x(i) == y(i) && equal(x, y, i + 1)
-      )
-
-      @tailrec
-      def loop(xs: List[RawBitSet], y: Array[Int]): Boolean = xs match {
-        case x :: xs if x.length == y.length && equal(x.bits, y, 0) => true
-        case _ :: xs                                                => loop(xs, y)
-        case Nil                                                    => false
-      }
-
-      loop(masks, mask)
-    }
-
-    def isZero(x: Array[Int]): Boolean = {
-      @tailrec def loop(i: Int): Boolean = i < 0 || x(i) == 0 && loop(i - 1)
-      loop(x.length - 1)
-    }
-
-    // Constructs a schema from a set of defined ColumnRefs. Metadata is
-    // ignored and there can be no unions. The set of ColumnRefs must all be
-    // defined and hence must create a valid JSON object.
-    def mkSchema(cols: List[ColumnRef]): Option[JType] = {
-      def leafType(ctype: CType): JType = ctype match {
-        case CBoolean               => JBooleanT
-        case CLong | CDouble | CNum => JNumberT
-        case CString                => JTextT
-        case CDate                  => JDateT
-        case CPeriod                => JPeriodT
-        case CArrayType(elemType)   => leafType(elemType)
-        case CEmptyObject           => JType.Object()
-        case CEmptyArray            => JType.Array()
-        case CNull                  => JNullT
-        case CUndefined             => abort("not supported")
-      }
-
-      def fresh(paths: Seq[CPathNode], leaf: JType): Option[JType] = paths match {
-        case CPathField(field) +: paths => fresh(paths, leaf) map (tpe => JType.Object(field -> tpe))
-        case CPathIndex(i) +: paths     => fresh(paths, leaf) map (tpe => JType.Indexed(i -> tpe))
-        case CPathArray +: paths        => fresh(paths, leaf) map (tpe => JArrayHomogeneousT(tpe))
-        case CPathMeta(field) +: _      => None
-        case Seq()                      => Some(leaf)
-      }
-
-      def merge(schema: Option[JType], paths: Seq[CPathNode], leaf: JType): Option[JType] = (schema, paths) match {
-        case (Some(JObjectFixedT(fields)), CPathField(field) +: paths) =>
-          merge(fields get field, paths, leaf) map { tpe =>
-            JObjectFixedT(fields + (field -> tpe))
-          } orElse schema
-        case (Some(JArrayFixedT(indices)), CPathIndex(idx) +: paths) =>
-          merge(indices get idx, paths, leaf) map { tpe =>
-            JArrayFixedT(indices + (idx -> tpe))
-          } orElse schema
-        case (None, paths) =>
-          fresh(paths, leaf)
-        case (jtype, paths) =>
-          abort("Invalid schema.") // This shouldn't happen for any real data.
-      }
-
-      cols.foldLeft(None: Option[JType]) {
-        case (schema, ColumnRef(cpath, ctype)) =>
-          merge(schema, cpath.nodes, leafType(ctype))
-      }
-    }
-
-    // Collects all possible schemas from some slices.
-    def collectSchemas(schemas: Set[JType], slices: NeedSlices): Need[Set[JType]] = {
-      def buildMasks(cols: Array[Column], sliceSize: Int): List[RawBitSet] = {
-        import java.util.Arrays.copyOf
-        val mask = RawBitSet.create(cols.length)
-
-        @tailrec def build0(row: Int, masks: List[RawBitSet]): List[RawBitSet] = {
-          if (row < sliceSize) {
-            mask.clear()
-
-            var j = 0
-            while (j < cols.length) {
-              if (cols(j) isDefinedAt row) mask.set(j)
-              j += 1
-            }
-
-            val next = (
-              if (!contains(masks, mask.bits) && !isZero(mask.bits))
-                new RawBitSet(copyOf(mask.bits, mask.length)) :: masks
-              else
-                masks
-            )
-
-            build0(row + 1, next)
-          }
-          else masks
-        }
-
-        build0(0, Nil)
-      }
-
-      slices.uncons flatMap {
-        case Some((slice, slices)) =>
-          val (refs0, cols0) = slice.columns.unzip
-
-          val masks                        = buildMasks(cols0.toArray, slice.size)
-          val refs: List[ColumnRef -> Int] = refs0.zipWithIndex.toList
-          val next = masks flatMap { schemaMask =>
-            mkSchema(refs collect { case (ref, i) if schemaMask.get(i) => ref })
-          }
-
-          collectSchemas(schemas ++ next, slices)
-
-        case None =>
-          Need(schemas)
-      }
-    }
-
-    collectSchemas(Set.empty, slices)
-  }
 
   def toStrings: Need[Stream[String]]                       = toEvents(_ toString _)
   def toJson: Need[Stream[JValue]]                          = toEvents(_ toJson _)

@@ -68,8 +68,6 @@ object TableData extends TableDataCompanion {
     def slices: LazySeqT[Slice]            = self.slices
     def projections: Map[Path, Projection] = self.projections
 
-    def schemas: M[Set[JType]]  = ???
-
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
 
     def mapWithSameSize(f: EndoA[LazySeqT[Slice]]): T = ???
