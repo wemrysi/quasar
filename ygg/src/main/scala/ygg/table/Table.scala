@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, json._
+import ygg._, common._
 import trans._
 import scalaz._, Scalaz._
 import JDBM.{ SortedSlice, IndexMap }
@@ -142,22 +142,6 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
     }
 
     rec(Nil, slices)
-  }
-
-  def load(table: Table, tpe: JType, projections: Map[Path, Projection]): M[Table] = {
-    val reduced = table reduce new CReducer[Set[Path]] {
-      def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
-        case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
-        case _            => Set()
-      }
-    }
-    reduced map { paths =>
-      val projs = paths.toList flatMap projections.get
-      apply(
-        projs foldMap (_ getBlockStreamForType tpe),
-        ExactSize(projs.foldMap(_.length)(Monoid[Long]))
-      )
-    }
   }
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)

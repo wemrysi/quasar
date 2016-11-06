@@ -26,9 +26,24 @@ trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
   implicit def tableMethods(table: Table): TableMethods[Table]
-
   def empty: Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
+
+  def load(table: Table, tpe: JType): Need[Table] = {
+    val reduced = table reduce new CReducer[Set[Path]] {
+      def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
+        case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
+        case _            => Set()
+      }
+    }
+    reduced map { paths =>
+      val projs = paths.toList flatMap (table.projections get _)
+      apply(
+        projs foldMap (_ getBlockStreamForType tpe),
+        ExactSize(projs.foldMap(_.length)(Monoid[Long]))
+      )
+    }
+  }
 
   def apply(file: jFile): Table                         = apply(file.slurpString)
   def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)

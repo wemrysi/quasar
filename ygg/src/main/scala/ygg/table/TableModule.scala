@@ -35,12 +35,10 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   override def toString = s"Table(_, $size)"
 
-  // def projections: Map[Path, Projection] = Map[Path, Projection]()
-
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
 
   def mapWithSameSize(f: EndoA[NeedSlices]): Table             = Table(f(slices), size)
-  def load(tpe: JType): M[Table]                               = companion.load(this, tpe, projections)
+  def load(tpe: JType): M[Table]                               = companion.load(this, tpe)
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
 
   /**
