@@ -593,8 +593,10 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
     collectSchemas(Set.empty, slices)
   }
 
-  def toStrings: Need[Stream[String]] = toEvents(_ toString _)
-  def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
+  def toStrings: Need[Stream[String]]                       = toEvents(_ toString _)
+  def toJson: Need[Stream[JValue]]                          = toEvents(_ toJson _)
+  def projections: Map[Path, Projection]                    = Map()
+  def withProjections(ps: Map[Path, Projection]): BaseTable = new ProjectionsTable(this, projections ++ ps)
 
   private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] = (
     (self compact root.spec).slices.toStream map (stream =>
@@ -606,8 +608,40 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
     )
   )
 
-  def projections: Map[Path, Projection] = Map()
-  def withProjections(ps: Map[Path, Projection]): BaseTable = new ProjectionsTable(this, projections ++ ps)
+  def takeRange(start: Long, length: Long): Table = this match {
+    case x: InternalTable if start > Int.MaxValue => companion.empty
+    case x: InternalTable                         => companion.fromSlice(x.slice.takeRange(start.toInt, length.toInt))
+    case x: ProjectionsTable                      => x.underlying.takeRange(start, length) withProjections x.projections
+    case x: ExternalTable                         =>
+      val startIndex   = start
+      val numberToTake = length
+      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
+        // Prior to first needed slice, so skip
+        case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
+        // Somewhere in between, need to transition to splitting/reading
+        case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
+        // Read off the end (we took nothing)
+        case _ => Need(emptyStreamT())
+      }
+
+      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
+        case Some((head, tail)) if takenSoFar < numberToTake => {
+          val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
+          inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
+        }
+        case _ => Need(emptyStreamT())
+      }
+      def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
+
+      val newSize = size match {
+        case ExactSize(sz)            => ExactSize(calcNewSize(sz))
+        case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
+        case UnknownSize              => UnknownSize
+        case InfiniteSize             => InfiniteSize
+      }
+
+      companion.fromSlices(StreamT.wrapEffect(loop(slices, 0)), newSize)
+  }
 }
 
 /**
@@ -615,50 +649,7 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
   * slice and are completely in-memory. Because they fit in memory, we are
   * allowed more optimizations when doing things like joins.
   */
-final class InternalTable(val slice: Slice) extends BaseTable(singleStreamT(slice), ExactSize(slice.size)) with ygg.table.Table {
-  override def force: M[Table]          = Need(this)
-  override def paged(limit: Int): Table = this
 
-  def takeRange(start: Long, len: Long): Table = (
-    if (start > Int.MaxValue)
-      new InternalTable(Slice.empty)
-    else
-      new InternalTable(slice.takeRange(start.toInt, len.toInt))
-  )
-}
-
-final class ProjectionsTable(table: Table, override val projections: Map[Path, Projection]) extends BaseTable(table.slices, table.size) {
-  def takeRange(start: Long, len: Long): Table = ???
-}
-
-final class ExternalTable(slices: NeedSlices, size: TableSize) extends BaseTable(slices, size) with ygg.table.Table {
-  def takeRange(startIndex: Long, numberToTake: Long): Table = {
-    def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
-      // Prior to first needed slice, so skip
-      case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
-      // Somewhere in between, need to transition to splitting/reading
-      case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
-      // Read off the end (we took nothing)
-      case _ => Need(emptyStreamT())
-    }
-
-    def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
-      case Some((head, tail)) if takenSoFar < numberToTake => {
-        val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
-        inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
-      }
-      case _ => Need(emptyStreamT())
-    }
-
-    def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
-
-    val newSize = size match {
-      case ExactSize(sz)            => ExactSize(calcNewSize(sz))
-      case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
-      case UnknownSize              => UnknownSize
-      case InfiniteSize             => InfiniteSize
-    }
-
-    Table(StreamT.wrapEffect(loop(slices, 0)), newSize)
-  }
-}
+final class InternalTable(val slice: Slice)                                                          extends BaseTable(singleStreamT(slice), ExactSize(slice.size))
+final class ProjectionsTable(val underlying: Table, override val projections: Map[Path, Projection]) extends BaseTable(underlying.slices, underlying.size)
+final class ExternalTable(slices: NeedSlices, size: TableSize)                                       extends BaseTable(slices, size)
