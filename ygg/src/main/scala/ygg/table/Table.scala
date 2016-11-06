@@ -18,7 +18,6 @@ package ygg.table
 
 import ygg._, common._, json._
 import trans._
-import quasar._
 import scalaz._, Scalaz._
 import JDBM.{ SortedSlice, IndexMap }
 
@@ -52,16 +51,12 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
   type M[+X] = Need[X]
   type Table = T
 
-  implicit def tableMethods(table: T): TableMethods[T]
-
-  private implicit def liftRep(table: T): TableRep[T] = TableRep(table, tableMethods, this)
-
   lazy val sortMergeEngine = new MergeEngine
 
   def empty: T
 
   def addGlobalId(spec: TransSpec1): TransSpec1                                                = Scan(WrapArray(spec), addGlobalIdScanner)
-  def align(sourceL: Table, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table] = AlignTable(sourceL, alignL, sourceR, alignR)
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table] = AlignTable(sourceL.asRep, alignL, sourceR, alignR)
 
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
     import mergeEngine._
@@ -100,7 +95,7 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
     * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
     */
   private def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
-    WriteTable.writeSorted(table, groupKeys, valueSpec, sortOrder, unique) map {
+    WriteTable.writeSorted(table.asRep, groupKeys, valueSpec, sortOrder, unique) map {
       case (streamIds, indices) =>
         val streams = indices.groupBy(_._1.streamId)
         streamIds.toStream map { streamId =>
@@ -165,37 +160,12 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
     }
   }
 
-  def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = apply(
-    singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
-    ExactSize(vs.length)
-  )
-  def constSingletonTable(singleType: CType, column: Column): Table = apply(
-    singleStreamT(Slice(1, columnMap(ColumnRef.id(singleType) -> column))),
-    ExactSize(1)
-  )
-
-  def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
-  def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
-  def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
-  def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
-  def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
-  def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
-  def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
-  def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
-  def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
-
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)
 
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    CogroupTable(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
+    CogroupTable(self.asRep, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
   def externalize(table: T): T = fromSlices(table.slices, table.size)
-
-  def fromData(data: Vector[Data]): Table          = fromJValues(data map dataToJValue)
-  def fromFile(file: jFile): Table                 = fromJValues((JParser parseManyFromFile file).orThrow)
-  def fromString(json: String): Table              = fromJValues(Seq(JParser parseUnsafe json))
-  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
     val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)

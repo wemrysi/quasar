@@ -27,8 +27,9 @@ sealed trait TableData {
   def slices: StreamT[M, Slice]
 }
 trait TableDataCompanion extends TableMethodsCompanion[TableData] {
-  def empty: TableData                                           = new TableData.Internal(Slice.empty)
-  def fromSlices(slices: NeedSlices, size: TableSize): TableData = new TableData.External(slices, size)
+  def empty: TableData                                                 = new TableData.Internal(Slice.empty)
+  def fromSlices(slices: NeedSlices, size: TableSize): TableData       = new TableData.External(slices, size)
+  implicit def tableMethods(table: TableData): TableMethods[TableData] = new TableData.Impl(table)
 }
 
 object TableData extends TableDataCompanion {
@@ -57,6 +58,7 @@ object TableData extends TableDataCompanion {
   class Impl(val self: TableData) extends TableMethods[TableData] {
     private type LazySeqT[A] = StreamT[M, A]
 
+    def asRep: TableRep[TableData] = ??? // TableRep[TableData](self, x => new Impl(x), companion)
     def companion = TableData
 
     def size: TableSize         = self.size

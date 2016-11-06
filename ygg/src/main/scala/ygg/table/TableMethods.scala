@@ -25,12 +25,38 @@ import Scalaz.{ ToIdOps => _, _ }
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
+  implicit def tableMethods(table: Table): TableMethods[Table]
+
   def empty: Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
   def apply(file: jFile): Table                         = apply(file.slurpString)
   def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
   def apply(json: String): Table                        = fromJValues(JParser.parseManyFromString(json).fold[Seq[JValue]](throw _, x => x))
+
+  def fromData(data: Vector[Data]): Table          = fromJValues(data map dataToJValue)
+  def fromFile(file: jFile): Table                 = fromJValues((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): Table              = fromJValues(Seq(JParser parseUnsafe json))
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
+
+  def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+  def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+  def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+  def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+  def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+  def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+  def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
+  def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
+  def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
+  def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = fromSlices(
+    singleStreamT(Slice(vs.length, columnMap(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
+    ExactSize(vs.length)
+  )
+  def constSingletonTable(singleType: CType, column: Column): Table = fromSlices(
+    singleStreamT(Slice(1, columnMap(ColumnRef.id(singleType) -> column))),
+    ExactSize(1)
+  )
 
   def fromJValues(values: Seq[JValue]): Table = fromJValues(values, None)
   def fromJValues(values: Seq[JValue], maxSliceSize: Option[Int]): Table = {
@@ -58,6 +84,7 @@ trait TableMethods[Table] {
   type M[+X] = Need[X]
 
   def self: Table
+  def asRep: TableRep[Table]
   def companion: TableMethodsCompanion[Table]
 
   /**
