@@ -161,7 +161,6 @@ trait TableMethods[Table] {
 
   def canonicalize(minLength: Int, maxLength: Int): Table
   def concat(t2: Table): Table
-  def distinct(key: TransSpec1): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
   def normalize: Table
   def paged(limit: Int): Table
@@ -184,4 +183,46 @@ trait TableMethods[Table] {
   def columns: ColumnMap        = slicesStream.head.columns
   def fields: Vector[JValue]    = toVector
   def dump(): Unit              = toVector foreach println
+
+
+  /**
+    * Yields a new table with distinct rows. Assumes this table is sorted.
+    */
+  def distinct(spec: TransSpec1): Table = {
+    def distinct0[T](id: SliceTransform1[Option[Slice]], filter: SliceTransform1[T]): Table = {
+      def stream(state: (Option[Slice], T), slices: NeedSlices): NeedSlices = StreamT(
+        for {
+          head <- slices.uncons
+
+          back <- {
+            head map {
+              case (s, sx) => {
+                for {
+                  pairPrev <- id.f(state._1, s)
+                  // TODO use an Applicative
+                  pairNext <- filter.f(state._2, s)
+                } yield {
+                  val (prevFilter, cur)  = pairPrev
+                  val (nextT, curFilter) = pairNext
+                  val next               = cur.distinct(prevFilter, curFilter)
+
+                  StreamT.Yield(next, stream((if (next.size > 0) Some(curFilter) else prevFilter, nextT), sx))
+                }
+              }
+            } getOrElse {
+              Need(StreamT.Done)
+            }
+          }
+        } yield back
+      )
+
+      companion.fromSlices(
+        StreamT.wrapEffect(Need(this) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
+        EstimateSize(0L, size.maxSize)
+      )
+    }
+
+    distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
+  }
+
 }

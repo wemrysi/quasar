@@ -37,7 +37,7 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
 
-  def mapWithSameSize(f: EndoA[NeedSlices]): Table             = Table(f(slices), size)
+  def mapWithSameSize(f: EndoA[NeedSlices]): Table             = companion.fromSlices(f(slices), size)
   def load(tpe: JType): M[Table]                               = companion.load(this, tpe)
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
 
@@ -341,46 +341,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
       case Some(false) => abort(s"cannot evaluate cartesian of sets with size $size and ${that.size}")
       case _           => Table(StreamT(cross0(composeSliceTransform2(spec)) map (StreamT Skip _)), newSize)
     }
-  }
-
-  /**
-    * Yields a new table with distinct rows. Assumes this table is sorted.
-    */
-  def distinct(spec: TransSpec1): Table = {
-    def distinct0[T](id: SliceTransform1[Option[Slice]], filter: SliceTransform1[T]): Table = {
-      def stream(state: (Option[Slice], T), slices: NeedSlices): NeedSlices = StreamT(
-        for {
-          head <- slices.uncons
-
-          back <- {
-            head map {
-              case (s, sx) => {
-                for {
-                  pairPrev <- id.f(state._1, s)
-                  // TODO use an Applicative
-                  pairNext <- filter.f(state._2, s)
-                } yield {
-                  val (prevFilter, cur)  = pairPrev
-                  val (nextT, curFilter) = pairNext
-                  val next               = cur.distinct(prevFilter, curFilter)
-
-                  StreamT.Yield(next, stream((if (next.size > 0) Some(curFilter) else prevFilter, nextT), sx))
-                }
-              }
-            } getOrElse {
-              Need(StreamT.Done)
-            }
-          }
-        } yield back
-      )
-
-      Table(
-        StreamT.wrapEffect(Need(this) map (sorted => stream(id.initial -> filter.initial, sorted.slices))),
-        EstimateSize(0L, size.maxSize)
-      )
-    }
-
-    distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
   }
 
   /**
