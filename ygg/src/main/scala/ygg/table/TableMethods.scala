@@ -115,13 +115,6 @@ trait TableMethods[Table] {
   def reduce[A: Monoid](reducer: CReducer[A]): M[A]
 
   /**
-    * Removes all rows in the table for which definedness is satisfied
-    * Remaps the indicies.
-    */
-  def compact(spec: TransSpec1, definedness: Definedness): Table
-  def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
-
-  /**
     * Sorts the KV table by ascending or descending order of a transformation
     * applied to the rows.
     *
@@ -129,13 +122,6 @@ trait TableMethods[Table] {
     * @param order Whether to sort ascending or descending
     */
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]
-
-  /**
-    * Performs a one-pass transformation of the keys and values in the table.
-    * If the key transform is not identity, the resulting table will have
-    * unknown sort order.
-    */
-  def transform(spec: TransSpec1): Table
 
   /**
     * Cogroups this table with another table, using equality on the specified
@@ -247,6 +233,50 @@ trait TableMethods[Table] {
     val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
     Need(companion.fromSlices(rec(slices, t2.slices), resultSize))
   }
+  /**
+    * Performs a one-pass transformation of the keys and values in the table.
+    * If the key transform is not identity, the resulting table will have
+    * unknown sort order.
+    */
+  def transform(spec: TransSpec1): Table =
+    mapWithSameSize(transformStream(composeSliceTransform(spec), _))
 
-  def concat(t2: Table): Table = companion.fromSlices(slices ++ t2.slices, size + t2.size)
+  def concat(t2: Table): Table =
+    companion.fromSlices(slices ++ t2.slices, size + t2.size)
+
+  private def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
+    def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
+      for {
+        head <- slices.uncons
+
+        back <- {
+          head map {
+            case (s, sx) => {
+              sliceTransform.f(state, s) map {
+                case (nextState, s0) =>
+                  StreamT.Yield(s0, stream(nextState, sx))
+              }
+            }
+          } getOrElse {
+            Need(StreamT.Done)
+          }
+        }
+      } yield back
+    )
+
+    stream(sliceTransform.initial, slices)
+  }
+
+
+  /**
+    * Removes all rows in the table for which definedness is satisfied
+    * Remaps the indicies.
+    */
+  def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
+  def compact(spec: TransSpec1, definedness: Definedness): Table = {
+    val transes   = Leaf(Source) -> spec mapBoth composeSliceTransform
+    val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
+
+    mapWithSameSize(transformStream(compacted, _)).normalize
+  }
 }

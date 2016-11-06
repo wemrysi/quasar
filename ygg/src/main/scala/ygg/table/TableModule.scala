@@ -55,44 +55,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
     )
   }
 
-  private def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
-    def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
-      for {
-        head <- slices.uncons
-
-        back <- {
-          head map {
-            case (s, sx) => {
-              sliceTransform.f(state, s) map {
-                case (nextState, s0) =>
-                  StreamT.Yield(s0, stream(nextState, sx))
-              }
-            }
-          } getOrElse {
-            Need(StreamT.Done)
-          }
-        }
-      } yield back
-    )
-
-    stream(sliceTransform.initial, slices)
-  }
-
-  def compact(spec: TransSpec1, definedness: Definedness): Table = {
-    val transes   = Leaf(Source) -> spec mapBoth composeSliceTransform
-    val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
-
-    mapWithSameSize(transformStream(compacted, _)).normalize
-  }
-
-  /**
-    * Performs a one-pass transformation of the keys and values in the table.
-    * If the key transform is not identity, the resulting table will have
-    * unknown sort order.
-    */
-  def transform(spec: TransSpec1): Table =
-    mapWithSameSize(transformStream(composeSliceTransform(spec), _))
-
   def force: M[Table] = {
     def loop(slices: NeedSlices, acc: List[Slice], size: Long): Need[List[Slice] -> Long] = slices.uncons flatMap {
       case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
