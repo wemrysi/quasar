@@ -129,6 +129,8 @@ trait TableMethods[Table] {
   def self: Table
   def asRep: TableRep[Table]
   def companion: TableMethodsCompanion[Table]
+  def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
+  def withProjections(ps: Map[Path, Projection]): Table
 
   /**
     * Sorts the KV table by ascending or descending order of a transformation
@@ -146,17 +148,23 @@ trait TableMethods[Table] {
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable(self.asRep, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
-  def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
-  def toJson: M[Stream[JValue]]
-  def withProjections(ps: Map[Path, Projection]): Table
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
+    AlignTable(sourceL.asRep, alignL, sourceR, alignR)
 
-  def slicesStream: Stream[Slice] = slices.toStream.value
-  def toJsonString: String        = toJValues mkString "\n"
-  def toVector: Vector[JValue]    = toJValues.toVector
-  def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJsonElements)
-  def columns: ColumnMap          = slicesStream.head.columns
-  def fields: Vector[JValue]      = toVector
-  def dump(): Unit                = toVector foreach println
+  def slicesStream: Stream[Slice]     = slices.toStream.value
+  def toJsonString: String            = toJValues mkString "\n"
+  def toVector: Vector[JValue]        = toJValues.toVector
+  def toJValues: Stream[JValue]       = slicesStream flatMap (_.toJsonElements)
+  def columns: ColumnMap              = slicesStream.head.columns
+  def fields: Vector[JValue]          = toVector
+  def dump(): Unit                    = toVector foreach println
+  def toStrings: Need[Stream[String]] = toEvents(_ toString _)
+  def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
+
+  private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] =
+    compact(root.spec).slices.toStream map (stream =>
+      stream flatMap (slice => 0 until slice.size flatMap (f(slice, _)))
+    )
 
   /**
     * Yields a new table with distinct rows. Assumes this table is sorted.
@@ -716,7 +724,7 @@ trait TableMethods[Table] {
     * For each distinct path in the table, load all columns identified by the specified
     * jtype and concatenate the resulting slices into a new table.
     */
-  def load(tpe: JType): M[Table]                               = companion.load(self, tpe)
+  def load(tpe: JType): M[Table] = companion.load(self, tpe)
 
   /**
     * Folds over the table to produce a single value (stored in a singleton table).

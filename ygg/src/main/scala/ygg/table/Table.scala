@@ -56,7 +56,6 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
   def empty: T
 
   def addGlobalId(spec: TransSpec1): TransSpec1                                                = Scan(WrapArray(spec), addGlobalIdScanner)
-  def align(sourceL: Table, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[Table] = AlignTable(sourceL.asRep, alignL, sourceR, alignR)
 
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
     import mergeEngine._

@@ -70,7 +70,6 @@ object TableData extends TableDataCompanion {
 
     def sample(size: Int, specs: Seq[F1]): M[TS]     = ???
     def sort(key: F1, order: DesiredSortOrder): M[T] = ???
-    def toJson: M[LazySeq[V]]                        = ???
     def withProjections(ps: Projs): T                = ???
   }
 }
