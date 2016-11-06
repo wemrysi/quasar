@@ -41,11 +41,9 @@ trait Table extends TableMethods[Table] {
   def companion: Table.type  = Table
 }
 object Table extends OldTableCompanion[Table] {
-  def fromSlice(slice: Slice): Table                               = new InternalTable(slice)
-  def fromSlices(slices: NeedSlices, size: TableSize): Table       = new ExternalTable(slices, size)
-  def newInternalTable(slice: Slice): InternalTable                = new InternalTable(slice)
-  def newExternalTable(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
-  def empty: Table                                                 = Table(emptyStreamT(), ExactSize(0))
+  def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
+  def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
+  def empty: Table                                           = Table(emptyStreamT(), ExactSize(0))
 
   implicit def tableMethods(table: Table): TableMethods[Table] = table
 }
@@ -60,8 +58,6 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
 
   lazy val sortMergeEngine = new MergeEngine
 
-  def newInternalTable(slice: Slice): T
-  def newExternalTable(slices: NeedSlices, size: TableSize): T
   def empty: T
 
   def addGlobalId(spec: TransSpec1): TransSpec1                                                = Scan(WrapArray(spec), addGlobalIdScanner)
@@ -193,7 +189,7 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
   def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
     CogroupTable(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
-  def externalize(table: T): T = newExternalTable(table.slices, table.size)
+  def externalize(table: T): T = fromSlices(table.slices, table.size)
 
   def fromData(data: Vector[Data]): Table          = fromJValues(data map dataToJValue)
   def fromFile(file: jFile): Table                 = fromJValues((JParser parseManyFromFile file).orThrow)
