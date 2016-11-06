@@ -28,7 +28,7 @@ sealed trait TableData {
   def projections: Map[Path, Projection]
 }
 trait TableDataCompanion extends TableMethodsCompanion[TableData] {
-  def empty: TableData                                                 = new TableData.Internal(Slice.empty)
+  override def empty: TableData                                        = new TableData.Internal(Slice.empty)
   def fromSlices(slices: NeedSlices, size: TableSize): TableData       = new TableData.External(slices, size)
   implicit def tableMethods(table: TableData): TableMethods[TableData] = new TableData.Impl(table)
 }
@@ -40,7 +40,7 @@ object TableData extends TableDataCompanion {
   private type F1          = TransSpec1
   private type F2          = TransSpec2
   private type LazySeq[+A] = Stream[A]
-  private type Projs       = Map[Path, Projection]
+  private type ProjMap     = Map[Path, Projection]
 
   final case class External(slices: NeedSlices, size: TableSize) extends TableData {
     def projections = Map()
@@ -49,6 +49,11 @@ object TableData extends TableDataCompanion {
     def slices      = singleStreamT(slice)
     def size        = ExactSize(slice.size)
     def projections = Map()
+  }
+  final case class Projs(underlying: TableData, proj: Map[Path, Projection]) extends TableData {
+    def slices      = underlying.slices
+    def size        = underlying.size
+    def projections = underlying.projections ++ proj
   }
 
   class BinaryTableData(left: TableData, right: TableData) {
@@ -59,16 +64,11 @@ object TableData extends TableDataCompanion {
   }
 
   class Impl(val self: TableData) extends TableMethods[TableData] {
-    private type LazySeqT[A] = StreamT[M, A]
-
-    def asRep: TableRep[TableData] = ??? // TableRep[TableData](self, x => new Impl(x), companion)
     def companion = TableData
 
     def size: TableSize                    = self.size
-    def slices: LazySeqT[Slice]            = self.slices
+    def slices: StreamT[Need, Slice]       = self.slices
     def projections: Map[Path, Projection] = self.projections
-
-    def sample(size: Int, specs: Seq[F1]): M[TS]     = ???
-    def withProjections(ps: Projs): T                = ???
+    def withProjections(proj: ProjMap): T  = Projs(self, proj)
   }
 }

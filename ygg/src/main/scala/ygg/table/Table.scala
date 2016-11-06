@@ -16,27 +16,15 @@
 
 package ygg.table
 
-import ygg._, common._
-import trans._
-import scalaz._, Scalaz._
-
-final case class TableRep[T](table: T, convert: T => TableMethods[T], companion: TableMethodsCompanion[T]) {
-  implicit def tableToMethods(table: T): TableMethods[T] = convert(table)
+final case class TableRep[T](table: T, companion: TableMethodsCompanion[T]) {
+  implicit def tableMethods(table: T): TableMethods[T] = companion tableMethods table
 }
 
 trait Table extends TableMethods[Table] {
-  def asRep: TableRep[Table] = TableRep[Table](this, x => x, companion)
   def self: Table            = this
   def companion: Table.type  = Table
 }
 object Table extends TableMethodsCompanion[Table] {
-  type M[+X] = Need[X]
-
-  def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
-  def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
-  def empty: Table                                           = fromSlices(emptyStreamT(), ExactSize(0))
-
+  def fromSlices(slices: NeedSlices, size: TableSize): Table   = new ExternalTable(slices, size)
   implicit def tableMethods(table: Table): TableMethods[Table] = table
-
-  def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = MergeTable[Table](grouping)(body)
 }

@@ -35,9 +35,10 @@ trait TableMethodsCompanion[Table] {
 
   lazy val sortMergeEngine = new MergeEngine
 
-  def empty: Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
   implicit def tableMethods(table: Table): TableMethods[Table]
+
+  def empty: Table = fromSlices(emptyStreamT(), ExactSize(0))
 
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
     val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
@@ -146,6 +147,9 @@ trait TableMethodsCompanion[Table] {
   def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
   def externalize(table: Table): Table             = fromSlices(table.slices, table.size)
 
+  def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => Need[Table]) => Need[Table]): Need[Table] =
+    MergeTable[Table](grouping)(body)
+
   def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
   def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
   def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
@@ -199,10 +203,11 @@ trait TableMethods[Table] {
   def projections: Map[Path, Projection]
 
   def self: Table
-  def asRep: TableRep[Table]
+  def asRep: TableRep[Table] = TableRep[Table](self, companion)
   def companion: TableMethodsCompanion[Table]
-  def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   def withProjections(ps: Map[Path, Projection]): Table
+
+  def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(asRep, size, specs)
 
   /**
     * Sorts the KV table by ascending or descending order of a transformation

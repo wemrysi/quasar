@@ -23,9 +23,8 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   override def toString = s"Table(_, $size)"
 
-  def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
-  def projections: Map[Path, Projection]                       = Map()
-  def withProjections(ps: Map[Path, Projection]): BaseTable    = new ProjectionsTable(this, projections ++ ps)
+  def projections: Map[Path, Projection]                    = Map()
+  def withProjections(ps: Map[Path, Projection]): BaseTable = new ProjectionsTable(this, projections ++ ps)
 }
 
 /**

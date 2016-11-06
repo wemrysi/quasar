@@ -26,7 +26,7 @@ abstract class TableQspec extends quasar.Qspec {
   val Table  = ygg.table.Table
   type Table = ygg.table.Table
 
-  protected implicit def liftTestTableRep(t: Table): TableRep[Table] = TableRep(t, x => x, Table)
+  protected implicit def liftTableRep(t: Table): TableRep[Table] = t.asRep
 
   import SampleData._
 
