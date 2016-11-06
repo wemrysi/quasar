@@ -20,16 +20,7 @@ import ygg._, common._
 import trans._
 import scalaz._, Scalaz._
 
-private object addGlobalIdScanner extends Scanner {
-  type A = Long
-  val init = 0l
-  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
-    val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
-    (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
-  }
-}
-
-final case class TableRep[T](table: T, convert: T => TableMethods[T], companion: OldTableCompanion[T]) {
+final case class TableRep[T](table: T, convert: T => TableMethods[T], companion: TableMethodsCompanion[T]) {
   implicit def tableToMethods(table: T): TableMethods[T] = convert(table)
 }
 
@@ -38,28 +29,21 @@ trait Table extends TableMethods[Table] {
   def self: Table            = this
   def companion: Table.type  = Table
 }
-object Table extends OldTableCompanion[Table] {
+object Table extends TableMethodsCompanion[Table] {
+  type M[+X] = Need[X]
+  type T     = Table
+
   def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
   def empty: Table                                           = Table(emptyStreamT(), ExactSize(0))
 
   implicit def tableMethods(table: Table): TableMethods[Table] = table
-}
-
-trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
-  type M[+X] = Need[X]
-  type Table = T
-
-  def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
 
   def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
   private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] =
     groupByN[F](externalize(table), Seq(key), root, order, unique) map (_.headOption getOrElse empty)
-
-  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
-    WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)
 

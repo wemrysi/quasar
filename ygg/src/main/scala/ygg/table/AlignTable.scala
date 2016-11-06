@@ -57,7 +57,7 @@ object AlignTable {
                            right: NeedSlices,
                            rightKeyTrans: SliceTransform1[B],
                            leftWriteState: JDBMState,
-                           rightWriteState: JDBMState): LazyPairOf[Table] = {
+                           rightWriteState: JDBMState): LazyPairOf[T] = {
 
       // We will *always* have a lhead and rhead, because if at any point we
       // run out of data, we'll still be hanging on to the last slice on the

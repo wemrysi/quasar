@@ -21,6 +21,15 @@ import quasar._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
+private object addGlobalIdScanner extends Scanner {
+  type A = Long
+  val init = 0l
+  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
+    val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
+    (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
+  }
+}
+
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
@@ -29,6 +38,11 @@ trait TableMethodsCompanion[Table] {
   def empty: Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
   implicit def tableMethods(table: Table): TableMethods[Table]
+
+  def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
+
+  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
+    WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   import JDBM.{ IndexMap, SortedSlice }
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
