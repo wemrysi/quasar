@@ -19,7 +19,6 @@ package ygg.table
 import ygg._, common._
 import trans._
 import scalaz._, Scalaz._
-import JDBM.{ SortedSlice, IndexMap }
 
 private object addGlobalIdScanner extends Scanner {
   type A = Long
@@ -51,75 +50,13 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
   type M[+X] = Need[X]
   type Table = T
 
-  lazy val sortMergeEngine = new MergeEngine
-
   def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
-
-  def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): T = {
-    import mergeEngine._
-    val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
-
-    // Map the distinct indices into SortProjections/Cells, then merge them
-    def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
-      case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
-        val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
-        // We can actually get the last key, but is that necessary?
-        Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
-
-      case (JDBM.SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-        // Elided untested code.
-        ???
-    }
-
-    val head = StreamT.Skip(
-      StreamT.wrapEffect(
-        for (cellOptions <- cellsMs.sequence) yield {
-          mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
-            // only need to compare on the group keys (0th element of resulting table) between projections
-            slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
-          }
-        }
-      )
-    )
-
-    apply(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
-  }
-
-  /**
-    * Sorts the KV table by ascending or descending order based on a seq of transformations
-    * applied to the rows.
-    *
-    * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
-    */
-  private def groupExternalByN(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
-    WriteTable.writeSorted(table.asRep, groupKeys, valueSpec, sortOrder, unique) map {
-      case (streamIds, indices) =>
-        val streams = indices.groupBy(_._1.streamId)
-        streamIds.toStream map { streamId =>
-          streams get streamId map (loadTable(sortMergeEngine, _, sortOrder)) getOrElse empty
-        }
-    }
-  }
 
   def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
   def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
 
   private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] =
     groupByN[F](externalize(table), Seq(key), root, order, unique) map (_.headOption getOrElse empty)
-
-  /**
-    * Sorts the KV table by ascending or descending order based on a seq of transformations
-    * applied to the rows.
-    *
-    * @param keys The transspecs to use to obtain the values to sort on
-    * @param values The transspec to use to obtain the non-sorting values
-    * @param order Whether to sort ascending or descending
-    * @param unique If true, the same key values will sort into a single row, otherwise
-    * we assign a unique row ID as part of the key so that multiple equal values are
-    * preserved
-    */
-  def groupByN[F[_]: Monad](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[T]] =
-    ().point[F] map (_ => groupExternalByN(externalize(table), keys, values, order, unique).value)
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
     WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)

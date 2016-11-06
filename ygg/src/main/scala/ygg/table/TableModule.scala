@@ -27,8 +27,7 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
   def projections: Map[Path, Projection]                       = Map()
-
-  def withProjections(ps: Map[Path, Projection]): BaseTable = new ProjectionsTable(this, projections ++ ps)
+  def withProjections(ps: Map[Path, Projection]): BaseTable    = new ProjectionsTable(this, projections ++ ps)
 }
 
 /**

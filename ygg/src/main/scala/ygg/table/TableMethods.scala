@@ -24,9 +24,63 @@ import scalaz._, Scalaz._
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
-  implicit def tableMethods(table: Table): TableMethods[Table]
+  lazy val sortMergeEngine = new MergeEngine
+
   def empty: Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
+  implicit def tableMethods(table: Table): TableMethods[Table]
+
+  import JDBM.{ IndexMap, SortedSlice }
+  def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
+    import mergeEngine._
+    val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
+
+    // Map the distinct indices into SortProjections/Cells, then merge them
+    def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
+      case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
+        val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
+        // We can actually get the last key, but is that necessary?
+        Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
+
+      case (JDBM.SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
+        // Elided untested code.
+        ???
+    }
+
+    val head = StreamT.Skip(
+      StreamT.wrapEffect(
+        for (cellOptions <- cellsMs.sequence) yield {
+          mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
+            // only need to compare on the group keys (0th element of resulting table) between projections
+            slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @_ *), _) => path }
+          }
+        }
+      )
+    )
+
+    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
+  }
+
+  /**
+    * Sorts the KV table by ascending or descending order based on a seq of transformations
+    * applied to the rows.
+    *
+    * @param keys The transspecs to use to obtain the values to sort on
+    * @param values The transspec to use to obtain the non-sorting values
+    * @param order Whether to sort ascending or descending
+    * @param unique If true, the same key values will sort into a single row, otherwise
+    * we assign a unique row ID as part of the key so that multiple equal values are
+    * preserved
+    */
+  def groupByN[F[_]: Monad](table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[Table]] =
+    ().point[F] map { _ =>
+      val rep = externalize(table).asRep
+      (WriteTable.writeSorted(rep, keys, values, order, unique) map {
+        case (streamIds, indices) =>
+          val streams = indices.groupBy(_._1.streamId)
+          streamIds.toStream map (id => (streams get id).fold(empty)(loadTable(sortMergeEngine, _, order)))
+      }).value
+    }
 
   def load(table: Table, tpe: JType): Need[Table] = {
     val reduced = table reduce new CReducer[Set[Path]] {
@@ -265,7 +319,7 @@ trait TableMethods[Table] {
     */
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
-    val transes   = Leaf(trans.Source) -> spec mapBoth composeSliceTransform
+    val transes   = root.spec -> spec mapBoth composeSliceTransform
     val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
 
     mapWithSameSize(transformStream(compacted, _)).normalize
@@ -581,7 +635,7 @@ trait TableMethods[Table] {
 
     val keyTrans = OuterObjectConcat(
       WrapObject(partitionBy, "0"),
-      WrapObject(Leaf(trans.Source), "1")
+      WrapObject(root, "1")
     )
 
     this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {
