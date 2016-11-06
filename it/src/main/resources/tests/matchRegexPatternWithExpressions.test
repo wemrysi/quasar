@@ -4,8 +4,7 @@
   "backends": {
     "mongodb_read_only": "pending",
     "postgresql":        "pending",
-    "marklogic":         "skip",
-    "couchbase":         "skip"
+    "marklogic":         "skip"
   },
 
   "data": "largeZips.data",
@@ -16,6 +15,8 @@
       where city ~ \"^B[^ ]+ER$\" and \"BOULDER or BEELER\" ~ city",
 
   "predicate": "containsExactly",
+
+  "ignoreFieldOrder": [ "couchbase" ],
 
   "expected": [
     { "city": "BOULDER", "1": true,  "2": true  },

@@ -6,7 +6,7 @@
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
         "postgresql":        "pending",
-        "couchbase":         "skip"
+        "couchbase":         "pending"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",

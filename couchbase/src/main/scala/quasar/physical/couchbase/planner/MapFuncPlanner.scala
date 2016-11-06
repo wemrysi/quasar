@@ -187,7 +187,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
 
     // relations
     case Not(a1)             =>
-      partialQueryString(s"not ${n1ql(a1)})").point[M]
+      partialQueryString(s"not ${n1ql(a1)}").point[M]
     case Eq(a1, a2)          =>
       rel(a1, a2, "=")
     case Neq(a1, a2)         =>
@@ -200,7 +200,8 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       rel(a1, a2, ">")
     case Gte(a1, a2)         =>
       rel(a1, a2, ">=")
-    case IfUndefined(a1, a2) => unimplementedP("IfUndefined")
+    case IfUndefined(a1, a2) =>
+      partialQueryString(s"ifmissing(${n1ql(a1)}, ${n1ql(a2)})").point[M]
     case And(a1, a2)         =>
       partialQueryString(s"(${n1ql(a1)} and ${n1ql(a2)})").point[M]
     case Or(a1, a2)          =>
@@ -268,15 +269,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       ).point[M]
     case ToString(a1)          =>
       val a1N1ql = n1ql(a1)
-      partialQueryString(s"ifnull(tostring($a1N1ql), $a1N1ql)").point[M]
+      partialQueryString(
+        s"""ifnull(tostring($a1N1ql), case when type($a1N1ql) = "null" then "null" else $a1N1ql end)"""
+      ).point[M]
     case Search(a1, a2, a3)    =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)
       val a3N1ql = n1ql(a3)
       partialQueryString(s"""
         (case
-         when $a3N1ql then regexp_contains($a1N1ql, "(?i)" || $a2N1ql)
-         else regexp_contains($a1N1ql, $a2N1ql)
+         when $a3N1ql then regexp_contains($a1N1ql, "(?i)(?s)" || $a2N1ql)
+         else regexp_contains($a1N1ql, "(?s)" || $a2N1ql)
          end)"""
        ).point[M]
     case Substring(a1, a2, a3) =>
