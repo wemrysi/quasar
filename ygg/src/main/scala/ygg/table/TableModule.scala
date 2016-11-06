@@ -19,15 +19,6 @@ package ygg.table
 import ygg._, common._, json._, trans._
 import scalaz._, Scalaz._
 
-final case class SliceId(id: Int) {
-  def +(n: Int): SliceId = SliceId(id + n)
-}
-final case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
-  override def getMessage =
-    "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
-}
-final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
-
 sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
   self =>
 
@@ -35,9 +26,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
 
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
-
-  def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    companion.cogroup(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
   def toStrings: Need[Stream[String]]                       = toEvents(_ toString _)
   def toJson: Need[Stream[JValue]]                          = toEvents(_ toJson _)

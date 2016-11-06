@@ -20,6 +20,10 @@ import ygg._, common._, data._, trans._
 import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
 
 object CogroupTable {
+  final case class SliceId(id: Int) {
+    def +(n: Int): SliceId = SliceId(id + n)
+  }
+
   def apply[T](rep: TableRep[T], leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): T = {
     val self = rep.table
     import rep._

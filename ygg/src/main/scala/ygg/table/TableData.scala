@@ -68,8 +68,6 @@ object TableData extends TableDataCompanion {
     def slices: LazySeqT[Slice]            = self.slices
     def projections: Map[Path, Projection] = self.projections
 
-    def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
-
     def sample(size: Int, specs: Seq[F1]): M[TS]     = ???
     def sort(key: F1, order: DesiredSortOrder): M[T] = ???
     def toJson: M[LazySeq[V]]                        = ???

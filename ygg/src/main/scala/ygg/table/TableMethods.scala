@@ -46,6 +46,24 @@ trait TableMethodsCompanion[Table] {
     }
   }
 
+  /**
+    * Passes over all slices and returns a new slices that is the concatenation
+    * of all the slices. At some point this should lazily chunk the slices into
+    * fixed sizes so that we can individually sort/merge.
+    */
+  def reduceSlices(slices: NeedSlices): NeedSlices = {
+    def rec(ss: List[Slice], slices: NeedSlices): NeedSlices = {
+      StreamT[Need, Slice](slices.uncons map {
+        case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
+        case None if ss.isEmpty => StreamT.Done
+        case None               => StreamT.Yield(Slice.concat(ss.reverse), emptyStreamT())
+      })
+    }
+
+    rec(Nil, slices)
+  }
+
+
   def apply(file: jFile): Table                         = apply(file.slurpString)
   def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
   def apply(json: String): Table                        = fromJValues(JParser.parseManyFromString(json).fold[Seq[JValue]](throw _, x => x))
@@ -125,12 +143,12 @@ trait TableMethods[Table] {
     * Cogroups this table with another table, using equality on the specified
     * transformation on rows of the table.
     */
-  def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
+  def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
+    CogroupTable(self.asRep, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
   def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   def toJson: M[Stream[JValue]]
   def withProjections(ps: Map[Path, Projection]): Table
-
 
   def slicesStream: Stream[Slice] = slices.toStream.value
   def toJsonString: String        = toJValues mkString "\n"

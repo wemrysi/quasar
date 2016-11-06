@@ -21,6 +21,8 @@ import ygg._, common._
 import JDBM._
 
 object WriteTable {
+  final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
+
   def writeTables[T](
                   rep: TableRep[T],
                   slices: NeedSlices,

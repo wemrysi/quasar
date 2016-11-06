@@ -127,27 +127,7 @@ trait OldTableCompanion[T] extends TableMethodsCompanion[T] {
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
     WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
-  /**
-    * Passes over all slices and returns a new slices that is the concatenation
-    * of all the slices. At some point this should lazily chunk the slices into
-    * fixed sizes so that we can individually sort/merge.
-    */
-  def reduceSlices(slices: NeedSlices): NeedSlices = {
-    def rec(ss: List[Slice], slices: NeedSlices): NeedSlices = {
-      StreamT[Need, Slice](slices.uncons map {
-        case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
-        case None if ss.isEmpty => StreamT.Done
-        case None               => StreamT.Yield(Slice.concat(ss.reverse), emptyStreamT())
-      })
-    }
-
-    rec(Nil, slices)
-  }
-
   def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)
-
-  def cogroup(self: Table, leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    CogroupTable(self.asRep, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
   def externalize(table: T): T = fromSlices(table.slices, table.size)
 
