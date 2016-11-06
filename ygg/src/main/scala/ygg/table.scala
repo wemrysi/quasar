@@ -16,8 +16,8 @@
 
 package ygg
 
-import common._, json._
-import scalaz.{ =?> => _, _}, Scalaz._, Ordering._
+import common._
+import scalaz._, Scalaz._, Ordering._
 
 package object table {
   type TransSpec1   = trans.TransSpec1
@@ -34,26 +34,9 @@ package object table {
   implicit def s2PathNode(name: String): CPathField = CPathField(name)
   implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
 
-  class TableExtensionMethods[T](rep: TableRep[T]) {
-    import rep._
-
-    def slicesStream: Stream[Slice]  = table.slices.toStream.value
-
-    def toJsonString: String      = toJValues mkString "\n"
-    def toVector: Vector[JValue]  = toJValues.toVector
-    def toJValues: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
-    def columns: ColumnMap        = slicesStream.head.columns
-    def fields: Vector[JValue]    = toVector
-    def dump(): Unit              = toVector foreach println
-  }
-
-  def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] =
-    StreamT.unfoldM[Need, Slice, A](start)(f)
-
-  def columnMap(xs: ColumnKV*): EagerColumnMap             = EagerColumnMap(xs.toVector)
-  def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap = LazyColumnMap(() => expr.toVector)
-
-  val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
+  def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] = StreamT.unfoldM[Need, Slice, A](start)(f)
+  def columnMap(xs: ColumnKV*): EagerColumnMap                                          = EagerColumnMap(xs.toVector)
+  def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap                              = LazyColumnMap(() => expr.toVector)
 
   def composeSliceTransform(spec: TransSpec1): SliceTransform1[_]             = SliceTransform.composeSliceTransform(spec)
   def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = SliceTransform.composeSliceTransform2(spec)
@@ -67,6 +50,7 @@ package object table {
     }
     EQ
   }
+
   def prefixIdentityOrder(prefixLength: Int): Ord[Identities] =
     Ord order (prefixIdentityOrdering(_, _, prefixLength))
 

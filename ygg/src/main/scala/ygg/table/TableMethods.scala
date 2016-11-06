@@ -137,4 +137,12 @@ trait TableMethods[Table] {
   def withProjections(ps: Map[Path, Projection]): Table
 
   def canonicalize(length: Int): Table = canonicalize(length, length)
+  def slicesStream: Stream[Slice]  = slices.toStream.value
+
+  def toJsonString: String      = toJValues mkString "\n"
+  def toVector: Vector[JValue]  = toJValues.toVector
+  def toJValues: Stream[JValue] = slicesStream flatMap (_.toJsonElements)
+  def columns: ColumnMap        = slicesStream.head.columns
+  def fields: Vector[JValue]    = toVector
+  def dump(): Unit              = toVector foreach println
 }

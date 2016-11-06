@@ -32,8 +32,7 @@ private object addGlobalIdScanner extends Scanner {
 }
 
 final case class TableRep[T](table: T, convert: T => TableMethods[T], companion: OldTableCompanion[T]) {
-  implicit def tableToMethods(table: T): TableMethods[T]             = convert(table)
-  implicit def tableToExtMethods(table: T): TableExtensionMethods[T] = new TableExtensionMethods[T](this)
+  implicit def tableToMethods(table: T): TableMethods[T] = convert(table)
 }
 
 trait Table extends TableMethods[Table] {

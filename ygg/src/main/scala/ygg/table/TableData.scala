@@ -61,7 +61,6 @@ object TableData extends TableDataCompanion {
 
     def size: TableSize         = self.size
     def slices: LazySeqT[Slice] = self.slices
-    def columns: ColumnMap      = ???
     def schemas: M[Set[JType]]  = ???
 
     def cogroup(leftKey: F1, rightKey: F1, that: T)(left: F1, right: F1, both: F2): T = ???
@@ -85,11 +84,8 @@ object TableData extends TableDataCompanion {
     def normalize(): T         = ???
     def paged(limit: Int): T   = ???
 
-    def toArray[A: CValueType] : T = ???
-    def toJValues: LazySeq[V]      = ???
-    def toJson: M[LazySeq[V]]      = ???
-    def toVector: Vector[V]        = ???
-
+    def toArray[A: CValueType] : T    = ???
+    def toJson: M[LazySeq[V]]         = ???
     def projections: Projs            = ???
     def withProjections(ps: Projs): T = ???
   }

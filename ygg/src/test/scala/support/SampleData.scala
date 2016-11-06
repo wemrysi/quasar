@@ -31,6 +31,8 @@ final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema]
 }
 
 object SampleData extends CValueGenerators {
+  val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
+
   def apply(data: Stream[JValue]): SampleData = new SampleData(data, None)
 
   implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
