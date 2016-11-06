@@ -69,7 +69,6 @@ object TableData extends TableDataCompanion {
     def projections: Map[Path, Projection] = self.projections
 
     def sample(size: Int, specs: Seq[F1]): M[TS]     = ???
-    def sort(key: F1, order: DesiredSortOrder): M[T] = ???
     def withProjections(ps: Projs): T                = ???
   }
 }

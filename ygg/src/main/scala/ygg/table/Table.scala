@@ -31,31 +31,12 @@ trait Table extends TableMethods[Table] {
 }
 object Table extends TableMethodsCompanion[Table] {
   type M[+X] = Need[X]
-  type T     = Table
 
   def fromSlice(slice: Slice): Table                         = new InternalTable(slice)
   def fromSlices(slices: NeedSlices, size: TableSize): Table = new ExternalTable(slices, size)
-  def empty: Table                                           = Table(emptyStreamT(), ExactSize(0))
+  def empty: Table                                           = fromSlices(emptyStreamT(), ExactSize(0))
 
   implicit def tableMethods(table: Table): TableMethods[Table] = table
 
-  def sort[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T]       = sortCommon[F](table, key, order, unique = false)
-  def sortUnique[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder): F[T] = sortCommon[F](table, key, order, unique = true)
-
-  private def sortCommon[F[_]: Monad](table: T, key: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[T] =
-    groupByN[F](externalize(table), Seq(key), root, order, unique) map (_.headOption getOrElse empty)
-
-  def merge(grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = MergeTable[T](grouping)(body)
-
-  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
-    val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
-
-    def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
-      data splitAt sliceSize leftMap (Slice fromRValues _)
-
-    fromSlices(
-      unfoldStream(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
-      ExactSize(values.length)
-    )
-  }
+  def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = MergeTable[Table](grouping)(body)
 }

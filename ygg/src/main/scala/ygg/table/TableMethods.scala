@@ -39,6 +39,18 @@ trait TableMethodsCompanion[Table] {
   def fromSlices(slices: NeedSlices, size: TableSize): Table
   implicit def tableMethods(table: Table): TableMethods[Table]
 
+  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
+    val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
+
+    def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
+      data splitAt sliceSize leftMap (Slice fromRValues _)
+
+    fromSlices(
+      unfoldStream(values)(events => Need(events.nonEmpty option makeSlice(events.toStream))),
+      ExactSize(values.length)
+    )
+  }
+
   def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
@@ -87,14 +99,7 @@ trait TableMethodsCompanion[Table] {
     * preserved
     */
   def groupByN[F[_]: Monad](table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[Table]] =
-    ().point[F] map { _ =>
-      val rep = externalize(table).asRep
-      (WriteTable.writeSorted(rep, keys, values, order, unique) map {
-        case (streamIds, indices) =>
-          val streams = indices.groupBy(_._1.streamId)
-          streamIds.toStream map (id => (streams get id).fold(empty)(loadTable(sortMergeEngine, _, order)))
-      }).value
-    }
+    ().point[F] map (_ => WriteTable.groupByN(externalize(table).asRep, keys, values, order, unique).value)
 
   def load(table: Table, tpe: JType): Need[Table] = {
     val reduced = table reduce new CReducer[Set[Path]] {
@@ -206,7 +211,8 @@ trait TableMethods[Table] {
     * @param key The transspec to use to obtain the values to sort on
     * @param order Whether to sort ascending or descending
     */
-  def sort(key: TransSpec1, order: DesiredSortOrder): M[Table]
+  def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] =
+    WriteTable.groupByN(companion.externalize(self).asRep, Seq(key), root.spec, order, unique = false) map (_.headOption getOrElse makeEmpty)
 
   /**
     * Cogroups this table with another table, using equality on the specified

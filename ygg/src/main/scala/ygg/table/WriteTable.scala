@@ -23,6 +23,16 @@ import JDBM._
 object WriteTable {
   final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
+  def groupByN[T](rep: TableRep[T], keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
+    import rep._, companion._
+
+    writeSorted(rep, keys, values, order, unique) map {
+      case (streamIds, indices) =>
+        val streams = indices.groupBy(_._1.streamId)
+        streamIds.toStream map (id => (streams get id).fold(empty)(loadTable(sortMergeEngine, _, order)))
+    }
+  }
+
   def writeTables[T](
                   rep: TableRep[T],
                   slices: NeedSlices,

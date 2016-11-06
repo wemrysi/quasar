@@ -17,14 +17,12 @@
 package ygg.table
 
 import ygg._, common._
-import scalaz._
 
 sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
   self =>
 
   override def toString = s"Table(_, $size)"
 
-  def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] = companion.sort[Need](self, key, order)
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
   def projections: Map[Path, Projection]                       = Map()
   def withProjections(ps: Map[Path, Projection]): BaseTable    = new ProjectionsTable(this, projections ++ ps)
