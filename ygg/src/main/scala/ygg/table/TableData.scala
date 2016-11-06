@@ -79,12 +79,9 @@ object TableData extends TableDataCompanion {
     def reduce[A: Monoid](reducer: CReducer[A]): M[A]       = ???
     def sample(size: Int, specs: Seq[F1]): M[TS]            = ???
     def sort(key: F1, order: DesiredSortOrder): M[T]        = ???
-    def takeRange(start: Long, length: Long): T             = ???
-    def transform(spec: F1): T                              = ???
 
     def force(): M[T]          = ???
     def load(tpe: JType): M[T] = ???
-    def normalize(): T         = ???
     def paged(limit: Int): T   = ???
 
     def toArray[A: CValueType] : T    = ???

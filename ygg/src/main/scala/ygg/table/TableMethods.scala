@@ -21,7 +21,7 @@ import trans._
 import quasar._
 import scalaz.{ Source => _, _ }
 import Scalaz.{ ToIdOps => _, _ }
-import scala.math.min
+import scala.math.{ min, max }
 
 trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
@@ -150,12 +150,10 @@ trait TableMethods[Table] {
 
   def canonicalize(minLength: Int, maxLength: Int): Table
   def mapWithSameSize(f: EndoA[NeedSlices]): Table
-  def normalize: Table
   def paged(limit: Int): Table
   def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
   def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   def schemas: M[Set[JType]]
-  def takeRange(startIndex: Long, numberToTake: Long): Table
   def toArray[A](implicit tpe: CValueType[A]): Table
   def toJson: M[Stream[JValue]]
 
@@ -244,6 +242,9 @@ trait TableMethods[Table] {
   def concat(t2: Table): Table =
     companion.fromSlices(slices ++ t2.slices, size + t2.size)
 
+  def normalize: Table =
+    mapWithSameSize(_ filter (x => !x.isEmpty))
+
   private def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
     def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
       for {
@@ -267,7 +268,6 @@ trait TableMethods[Table] {
     stream(sliceTransform.initial, slices)
   }
 
-
   /**
     * Removes all rows in the table for which definedness is satisfied
     * Remaps the indicies.
@@ -278,5 +278,34 @@ trait TableMethods[Table] {
     val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
 
     mapWithSameSize(transformStream(compacted, _)).normalize
+  }
+
+  def takeRange(startIndex: Long, numberToTake: Long): Table = {
+    def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
+      // Prior to first needed slice, so skip
+      case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
+      // Somewhere in between, need to transition to splitting/reading
+      case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
+      // Read off the end (we took nothing)
+      case _ => Need(emptyStreamT())
+    }
+
+    def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
+      case Some((head, tail)) if takenSoFar < numberToTake => {
+        val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
+        inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
+      }
+      case _ => Need(emptyStreamT())
+    }
+    def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
+
+    val newSize = size match {
+      case ExactSize(sz)            => ExactSize(calcNewSize(sz))
+      case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
+      case UnknownSize              => UnknownSize
+      case InfiniteSize             => InfiniteSize
+    }
+
+    companion.fromSlices(StreamT.wrapEffect(loop(slices, 0)), newSize)
   }
 }

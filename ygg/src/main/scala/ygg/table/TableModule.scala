@@ -367,10 +367,7 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
     }
   }
 
-  def normalize: Table = mapWithSameSize(_ filter (x => !x.isEmpty))
-
   def schemas: M[Set[JType]] = {
-
     // Returns true iff masks contains an array equivalent to mask.
     def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {
       @tailrec
@@ -505,41 +502,6 @@ sealed abstract class BaseTable(val slices: NeedSlices, val size: TableSize) ext
       )
     )
   )
-
-  def takeRange(start: Long, length: Long): Table = this match {
-    case x: InternalTable if start > Int.MaxValue => companion.empty
-    case x: InternalTable                         => companion.fromSlice(x.slice.takeRange(start.toInt, length.toInt))
-    case x: ProjectionsTable                      => x.underlying.takeRange(start, length) withProjections x.projections
-    case x: ExternalTable                         =>
-      val startIndex   = start
-      val numberToTake = length
-      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
-        // Prior to first needed slice, so skip
-        case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
-        // Somewhere in between, need to transition to splitting/reading
-        case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
-        // Read off the end (we took nothing)
-        case _ => Need(emptyStreamT())
-      }
-
-      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
-        case Some((head, tail)) if takenSoFar < numberToTake => {
-          val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
-          inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
-        }
-        case _ => Need(emptyStreamT())
-      }
-      def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
-
-      val newSize = size match {
-        case ExactSize(sz)            => ExactSize(calcNewSize(sz))
-        case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
-        case UnknownSize              => UnknownSize
-        case InfiniteSize             => InfiniteSize
-      }
-
-      companion.fromSlices(StreamT.wrapEffect(loop(slices, 0)), newSize)
-  }
 }
 
 /**
