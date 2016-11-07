@@ -90,8 +90,15 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case Filter(src, f) =>
       for {
         x <- freshVar[F]
-        p <- mapFuncXQuery(f, x.xqy)
-      } yield fn.filter(func(x) { p }, src)
+        // FIXME: This cast shouldn't be necessary once projecting produces typed values.
+        p <- mapFuncXQuery(f, x.xqy) map (xs.boolean)
+      } yield src match {
+        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) =>
+          XQuery.Flwor(tuples, lets ::: IList((x, result)), Some(filter.fold(p)(_ and p)), order, isStable, x.xqy)
+
+        case _ =>
+          for_(x -> src) where_ p return_ x.xqy
+      }
 
     // NB: XQuery sequences use 1-based indexing.
     case Subset(src, from, sel, count) =>
