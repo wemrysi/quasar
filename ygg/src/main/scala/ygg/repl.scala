@@ -55,10 +55,10 @@ object repl {
 
 
   def grouping = {
-    def genderFilter(str: String) = Filter(EqualLiteral(dotValue.Gender, CString(str), false))
+    def genderFilter(str: String) = Filter(EqualLiteral(dotValue.dyn.Gender, CString(str), false))
     def targetTrans = InnerObjectConcat(
       root delete "value",
-      dotValue.Gender wrapObjectField "value"
+      dotValue.dyn.Gender wrapObjectField "value"
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
       medals.asRep,
@@ -66,7 +66,7 @@ object repl {
       dotKey,
       Some(targetTrans),
       groupId = groupId,
-      GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.Edition)
+      GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.dyn.Edition)
     )
     GroupingAlignment.intersect(
       mkSource(0, "extra0", "Men"),

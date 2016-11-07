@@ -395,8 +395,8 @@ class CogroupSpec extends TableQspec {
       root,
       OuterObjectConcat(
         WrapObject(rootLeft.id, "id"),
-        WrapObject(rootLeft.`val`, "left"),
-        WrapObject(rootRight.`val`, "right")
+        WrapObject(rootLeft.dyn.`val`, "left"),
+        WrapObject(rootRight.dyn.`val`, "right")
       )
     )
 

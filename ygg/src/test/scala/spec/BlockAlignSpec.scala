@@ -287,8 +287,8 @@ class BlockAlignSpec extends TableQspec {
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(root(1).`000001`, "000000"),
-              WrapObject(root(1).`000000`, "000001")
+              WrapObject(root(1).dyn.`000001`, "000000"),
+              WrapObject(root(1).dyn.`000000`, "000001")
             ),
             CPathField("000000")
           ),
@@ -329,8 +329,8 @@ class BlockAlignSpec extends TableQspec {
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(root(1).`000000`, "000000"),
-              WrapObject(root(1).`000001`, "000001")
+              WrapObject(root(1).dyn.`000000`, "000000"),
+              WrapObject(root(1).dyn.`000001`, "000001")
             ),
             CPathField("000000")
           ),

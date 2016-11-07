@@ -732,8 +732,8 @@ trait TableMethods[Table] {
           rowComparator.compare(spanStart, i)
       }
 
-      val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
-      val groupedM                         = groupTable.map(_ transform root.`1`).flatMap(f)
+      val groupTable                = subTable(comparatorGen, head.drop(spanStart) :: tail)
+      val groupedM                  = groupTable.map(_ transform root.dyn.`1`).flatMap(f)
       val groupedStream: NeedSlices = StreamT.wrapEffect(groupedM.map(_.slices))
 
       groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)

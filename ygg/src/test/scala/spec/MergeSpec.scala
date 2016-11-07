@@ -139,10 +139,10 @@ class MergeSpec extends TableQspec {
       val valueField = CPathField("value")
       val oneField   = CPathField("1")
 
-      def genderFilter(str: String) = Filter(EqualLiteral(dotValue.Gender, CString(str), false))
+      def genderFilter(str: String) = Filter(EqualLiteral(dotValue.dyn.Gender, CString(str), false))
       def targetTrans = InnerObjectConcat(
         root delete valueField,
-        dotValue.Gender wrapObjectField "value"
+        dotValue.dyn.Gender wrapObjectField "value"
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
         medals.asRep,
@@ -150,7 +150,7 @@ class MergeSpec extends TableQspec {
         dotKey,
         Some(targetTrans),
         groupId = groupId,
-        GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.Edition)
+        GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.dyn.Edition)
       )
 
       val grouping = GroupingAlignment.intersect(
