@@ -61,19 +61,17 @@ class CrossSpec extends TableQspec {
   }
 
   private def testCrossLarge = {
-    val sample = jsonMany"""
-      {"key":[-1,0],"value":null}
-      {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307],-3.536399224770604E+307]}}
-      {"key":[-3918416808128018609,-1],"value":-1.0}
-      {"key":[-3918416898128018609,-2],"value":-1.0}
-      {"key":[-3918426808128018609,-3],"value":-1.0}
-    """
-
-    val dataset1 = fromJson(sample, 3)
-
-    dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
-      case Some((head, _)) => head.size must beLessThanOrEqualTo(companion.maxSliceSize)
-    }
+    val data = fromJson(
+      jsonMany"""
+        {"key":[-1,0],"value":null}
+        {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307],-3.536399224770604E+307]}}
+        {"key":[-3918416808128018609,-1],"value":-1.0}
+        {"key":[-3918416898128018609,-2],"value":-1.0}
+        {"key":[-3918426808128018609,-3],"value":-1.0}
+      """,
+      sliceSize = 3
+    )
+    data.cross(data)(InnerObjectConcat(rootLeft, rootRight)).slicesStream.forall(_.size <= companion.maxSliceSize) must_=== true
   }
 
   private def testCrossSingles = {

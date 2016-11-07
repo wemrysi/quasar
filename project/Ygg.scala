@@ -35,6 +35,7 @@ object Ygg {
     import ygg._, ygg.common._, json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
     import ygg.repl._
+    import TableData.{ fromJValues => fromJson }
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """

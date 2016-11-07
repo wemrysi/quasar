@@ -271,12 +271,12 @@ class TransformSpec extends TableQspec {
     val table   = fromJson(data)
     val table2  = fromJson(data2)
 
-    val leftIdentitySpec    = select(Leaf(SourceLeft), "key")
-    val rightIdentitySpec   = select(Leaf(SourceRight), "key")
+    val leftIdentitySpec    = select(rootLeft, "key")
+    val rightIdentitySpec   = select(rootRight, "key")
     val newIdentitySpec     = OuterArrayConcat(leftIdentitySpec, rightIdentitySpec)
     val wrappedIdentitySpec = trans.WrapObject(newIdentitySpec, "key")
-    val leftValueSpec       = select(Leaf(SourceLeft), "value")
-    val rightValueSpec      = select(Leaf(SourceRight), "value")
+    val leftValueSpec       = select(rootLeft, "value")
+    val rightValueSpec      = select(rootRight, "value")
     val wrappedValueSpec    = trans.WrapObject(Equal(leftValueSpec, rightValueSpec), "value")
 
     val results = toJson(table.cross(table2)(InnerObjectConcat(wrappedIdentitySpec, wrappedValueSpec)))
