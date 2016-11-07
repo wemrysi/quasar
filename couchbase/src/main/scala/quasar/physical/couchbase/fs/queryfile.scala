@@ -52,7 +52,7 @@ object queryfile {
     val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec = CBDataCodec
 
   val jsonTranscoder = new JsonTranscoder
 

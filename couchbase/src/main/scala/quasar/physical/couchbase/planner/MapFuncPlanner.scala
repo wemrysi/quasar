@@ -17,6 +17,7 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
+import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
 import quasar.NameGenerator
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
 import quasar.common.PhaseResult.detail
@@ -24,6 +25,7 @@ import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._, N1QL._, Select._
+import quasar.physical.couchbase.common.CBDataCodec
 import quasar.qscript, qscript._
 import quasar.std.StdLib.string._
 
@@ -34,67 +36,136 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   extends Planner[F, MapFunc[T, ?]] {
   import MapFuncs._
 
+  implicit val codec = CBDataCodec
+
+  // TODO: Move datetime handling out of generated N1QL once enriched N1QL representation is available
+
+  def unwrap(expr: N1QL): N1QL = {
+    val exprN1ql = n1ql(expr)
+    partialQueryString(
+      s"""ifmissing($exprN1ql.["$DateKey"], $exprN1ql.["$TimeKey"], $exprN1ql.["$TimestampKey"], $exprN1ql)"""
+    )
+  }
+
+  def extract(expr: N1QL, part: String): M[N1QL] =
+    partialQueryString(
+      s"""date_part_str(${n1ql(unwrap(expr))}, "$part")"""
+    ).point[M]
+
+  def datetime(expr: N1QL, key: String, regex: String): M[N1QL] = {
+    val exprN1ql = n1ql(expr)
+    partialQueryString(s"""
+      (case
+       when $exprN1ql.["$key"] is not null then $exprN1ql
+       when regexp_contains($exprN1ql, "$regex") then { "$key": $exprN1ql }
+       else null
+       end)"""
+    ).point[M]
+  }
+
+  def rel(a1: N1QL, a2: N1QL, op: String): M[N1QL] = {
+    val a1N1ql = n1ql(a1)
+    val a2N1ql = n1ql(a2)
+    def trunc(v: String) = s"""
+      (case
+       when ifmissing($a1N1ql.["$DateKey"], $a2N1ql.["$DateKey"]) is not null
+       then date_trunc_millis(millis($v), "day")
+       else $v
+       end)"""
+    val lTrunc = trunc(n1ql(unwrap(a1)))
+    val rTrunc = trunc(n1ql(unwrap(a2)))
+
+    partialQueryString(s"""$lTrunc $op $rTrunc""").point[M]
+  }
+
   def plan: AlgebraM[M, MapFunc[T, ?], N1QL] = {
     // nullary
     case Constant(v) =>
-      EitherT(
-        v.cataM(EJson.fromEJson).bimap[PlannerError, N1QL](
-          κ(NonRepresentableEJson(v.shows)),
-          PartialQueryString(_)
-        ).point[PR])
+      EitherT(v.cataM(quasar.Data.fromEJson) >>= (d =>
+        DataCodec.render(d).bimap(
+          κ(NonRepresentableEJson(v.shows): PlannerError),
+          partialQueryString(_)
+        ).point[PR]
+      ))
     case Undefined() =>
       partialQueryString("null").point[M]
 
     // array
     case Length(a1) =>
-      partialQueryString(s"array_length(${n1ql(a1)})").point[M]
+      val a1N1ql = n1ql(a1)
+      partialQueryString(s"ifnull(length($a1N1ql), array_length($a1N1ql))").point[M]
 
     // date
     case Date(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains(${n1ql(a1)}, "$dateRegex") then v
-         else null
-         end)"""
-      ).point[M]
+      datetime(a1, DateKey, dateRegex)
     case Time(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains(${n1ql(a1)}, "$timeRegex") then v
-         else null
-         end)"""
-      ).point[M]
+      datetime(a1, TimeKey, timeRegex)
     case Timestamp(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains(${n1ql(a1)}, "$timestampRegex") then v
-         else null
-         end)"""
+      datetime(a1, TimestampKey, timestampRegex)
+    case Interval(a1)              =>
+      unimplementedP("Interval")
+    case TimeOfDay(a1)             =>
+      partialQueryString(
+        s"""millis_to_utc(millis(${n1ql(a1)}), "00:00:00")"""
       ).point[M]
-    case Interval(a1)              => unimplementedP("Interval")
-    case TimeOfDay(a1)             => unimplementedP("TimeOfDay")
-    case ToTimestamp(a1)           => unimplementedP("ToTimestamp")
-    case ExtractCentury(a1)        => unimplementedP("ExtractCentury")
-    case ExtractDayOfMonth(a1)     => unimplementedP("ExtractDayOfMonth")
-    case ExtractDecade(a1)         => unimplementedP("ExtractDecade")
-    case ExtractDayOfWeek(a1)      => unimplementedP("ExtractDayOfWeek")
-    case ExtractDayOfYear(a1)      => unimplementedP("ExtractDayOfYear")
-    case ExtractEpoch(a1)          => unimplementedP("ExtractEpoch")
-    case ExtractHour(a1)           => unimplementedP("ExtractHour")
-    case ExtractIsoDayOfWeek(a1)   => unimplementedP("ExtractIsoDayOfWeek")
-    case ExtractIsoYear(a1)        => unimplementedP("ExtractIsoYear")
-    case ExtractMicroseconds(a1)   => unimplementedP("ExtractMicroseconds")
-    case ExtractMillennium(a1)     => unimplementedP("ExtractMillennium")
-    case ExtractMilliseconds(a1)   => unimplementedP("ExtractMilliseconds")
-    case ExtractMinute(a1)         => unimplementedP("ExtractMinute")
-    case ExtractMonth(a1)          => unimplementedP("ExtractMonth")
-    case ExtractQuarter(a1)        => unimplementedP("ExtractQuarter")
-    case ExtractSecond(a1)         => unimplementedP("ExtractSecond")
-    case ExtractTimezone(a1)       => unimplementedP("ExtractTimezone")
-    case ExtractTimezoneHour(a1)   => unimplementedP("ExtractTimezoneHour")
-    case ExtractTimezoneMinute(a1) => unimplementedP("ExtractTimezoneMinute")
-    case ExtractWeek(a1)           => unimplementedP("ExtractWeek")
-    case ExtractYear(a1)           => unimplementedP("ExtractYear")
+    case ToTimestamp(a1)           =>
+      partialQueryString(
+        s"""{ "$TimestampKey": millis_to_utc(${n1ql(a1)}) }"""
+      ).point[M]
+    case ExtractCentury(a1)        =>
+      extract(a1, "century")
+    case ExtractDayOfMonth(a1)     =>
+      extract(a1, "day")
+    case ExtractDecade(a1)         =>
+      extract(a1, "decade")
+    case ExtractDayOfWeek(a1)      =>
+      extract(a1, "day_of_week")
+    case ExtractDayOfYear(a1)      =>
+      extract(a1, "day_of_year")
+    case ExtractEpoch(a1)          =>
+      partialQueryString(
+        s"""millis(${n1ql(a1)})"""
+      ).point[M]
+    case ExtractHour(a1)           =>
+      extract(a1, "hour")
+    case ExtractIsoDayOfWeek(a1)   =>
+      extract(a1, "iso_dow")
+    case ExtractIsoYear(a1)        =>
+      extract(a1, "iso_year")
+    case ExtractMicroseconds(a1)   =>
+      (
+        extract(a1, "seconds")     ⊛
+        extract(a1, "millisecond")
+      )((seconds, millis) =>
+        partialQueryString(s"((${n1ql(seconds)} * 1000) + ${n1ql(millis)}) * 1000")
+      )
+    case ExtractMillennium(a1)     =>
+      extract(a1, "millennium")
+    case ExtractMilliseconds(a1)   =>
+    (
+      extract(a1, "seconds")     ⊛
+      extract(a1, "millisecond")
+    )((seconds, millis) =>
+      partialQueryString(s"(${n1ql(seconds)} * 1000) + ${n1ql(millis)}")
+    )
+    case ExtractMinute(a1)         =>
+      extract(a1, "minute")
+    case ExtractMonth(a1)          =>
+      extract(a1, "month")
+    case ExtractQuarter(a1)        =>
+      extract(a1, "quarter")
+    case ExtractSecond(a1)         =>
+      extract(a1, "second")
+    case ExtractTimezone(a1)       =>
+      extract(a1, "timezone")
+    case ExtractTimezoneHour(a1)   =>
+      extract(a1, "timezone_hour")
+    case ExtractTimezoneMinute(a1) =>
+      extract(a1, "timezone_minute")
+    case ExtractWeek(a1)           =>
+      extract(a1, "week")
+    case ExtractYear(a1)           =>
+      extract(a1, "year")
     case Now() =>
       partialQueryString("now_str()").point[M]
 
@@ -118,17 +189,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Not(a1)             =>
       partialQueryString(s"not ${n1ql(a1)})").point[M]
     case Eq(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} = ${n1ql(a2)})").point[M]
+      rel(a1, a2, "=")
     case Neq(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} != ${n1ql(a2)})").point[M]
+      rel(a1, a2, "!=")
     case Lt(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} < ${n1ql(a2)})").point[M]
+      rel(a1, a2, "<")
     case Lte(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} <= ${n1ql(a2)})").point[M]
+      rel(a1, a2, "<=")
     case Gt(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} > ${n1ql(a2)})").point[M]
+      rel(a1, a2, ">")
     case Gte(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} >= ${n1ql(a2)})").point[M]
+      rel(a1, a2, ">=")
     case IfUndefined(a1, a2) => unimplementedP("IfUndefined")
     case And(a1, a2)         =>
       partialQueryString(s"(${n1ql(a1)} and ${n1ql(a2)})").point[M]
@@ -138,14 +209,18 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a1N1ql =  n1ql(a1)
       val a2N1ql =  n1ql(a2)
       val a3N1ql =  n1ql(a3)
-      val b      =  s"$a1N1ql >= $a2N1ql and $a1N1ql <= $a3N1ql"
-      prtell[M](Vector(detail(
-        "N1QL Between",
-        s"""  a1:   $a1N1ql
-           |  a2:   $a2N1ql
-           |  a3:   $a3N1ql
-           |  n1ql: $b""".stripMargin('|')
-      ))).as(partialQueryString(b))
+      for {
+        b <- (rel(a1, a2, ">=") ⊛ rel(a1, a3, "<="))((a, b) =>
+               partialQueryString(s"${n1ql(a)} and ${n1ql(b)}")
+             )
+        _ <- prtell[M](Vector(detail(
+               "N1QL Between",
+               s"""  a1:   $a1N1ql
+                  |  a2:   $a2N1ql
+                  |  a3:   $a3N1ql
+                  |  n1ql: $b""".stripMargin('|')
+             )))
+      } yield b
     case Cond(cond, then_, else_) =>
       partialQueryString(s"""
         (case
@@ -167,8 +242,8 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when lower("$a1N1ql") = "true"  then true
-         when lower("$a1N1ql") = "false" then false
+         when lower($a1N1ql) = "true"  then true
+         when lower($a1N1ql) = "false" then false
          else null
          end)"""
       ).point[M]
@@ -177,23 +252,23 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       val a1N1ql = n1ql(a1)
       partialQueryString(s"""
         (case
-         when tonumber("$a1N1ql") = floor(tonumber("$a1N1ql")) then tonumber("$a1N1ql")
+         when tonumber($a1N1ql) = floor(tonumber($a1N1ql)) then tonumber($a1N1ql)
          else null
          end)"""
       ).point[M]
     case Decimal(a1)           =>
-      partialQueryString(s"""tonumber("${n1ql(a1)}")""").point[M]
+      partialQueryString(s"""tonumber(${n1ql(a1)})""").point[M]
     case Null(a1)              =>
       // TODO: Undefined isn't available, what to use?
       partialQueryString(s"""
         (case
-         when lower("${n1ql(a1)}") = "null" then null
+         when lower(${n1ql(a1)}) = "null" then null
          else undefined
          end)"""
       ).point[M]
     case ToString(a1)          =>
-      // overly simplistic?
-      partialQueryString(s"tostring(${n1ql(a1)})").point[M]
+      val a1N1ql = n1ql(a1)
+      partialQueryString(s"ifnull(tostring($a1N1ql), $a1N1ql)").point[M]
     case Search(a1, a2, a3)    =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)
@@ -205,7 +280,10 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
          end)"""
        ).point[M]
     case Substring(a1, a2, a3) =>
-      partialQueryString(s"""substr(${n1ql(a1)}, ${n1ql(a2)}, ${n1ql(a3)})""").point[M]
+      val a1N1ql = n1ql(a1)
+      val a2N1ql = n1ql(a2)
+      val length = s"least(${n1ql(a3)}, length($a1N1ql) - $a2N1ql)"
+      partialQueryString(s"""substr($a1N1ql, $a2N1ql, $length)""").point[M]
 
     // structural
     case MakeArray(a1)                            =>

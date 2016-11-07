@@ -82,6 +82,9 @@ object fn {
   def hoursFromDuration(dur: XQuery): XQuery =
     XQuery(s"fn:hours-from-duration($dur)")
 
+  def indexOf(seq: XQuery, elt: XQuery): XQuery =
+    XQuery(s"fn:index-of($seq, $elt)")
+
   val last: XQuery =
     XQuery("fn:last()")
 
