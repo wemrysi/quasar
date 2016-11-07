@@ -201,7 +201,7 @@ trait TableCompanion[Table] extends TableConfig {
       }
     }
     reduced map { paths =>
-      val projs = paths.toList flatMap (projectionsOf(table) get _) // (table.projections get _)
+      val projs = paths.toList flatMap (projectionsOf(table) get _)
       apply(
         projs foldMap (_ getBlockStreamForType tpe),
         ExactSize(projs.foldMap(_.length)(Monoid[Long]))
@@ -240,12 +240,13 @@ trait TableCompanion[Table] extends TableConfig {
   def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => Need[Table]) => Need[Table]): Need[Table] =
     MergeTable[Table](grouping)(body)
 
-  def constBoolean(v: Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
-  def constLong(v: Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
-  def constDouble(v: Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
-  def constDecimal(v: Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
-  def constString(v: Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
-  def constDate(v: Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+  def constBoolean(v: Boolean*): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+  def constLong(v: Long*): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+  def constDouble(v: Double*): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+  def constDecimal(v: BigDecimal*): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+  def constString(v: String*): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+  def constDate(v: DateTime*): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+
   def constNull: Table                        = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
   def constEmptyObject: Table                 = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
   def constEmptyArray: Table                  = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)

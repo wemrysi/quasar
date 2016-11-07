@@ -90,7 +90,7 @@ abstract class ProjectionsTableSpec(sampleData: SampleData) extends TableQspec {
 
     val cschema = schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
     def ctype  = Schema mkType cschema get
-    def result = (Table constString Set("/test") withProjections testProjections load ctype).value.toJson
+    def result = (Table constString "/test" withProjections testProjections load ctype).value.toJson
 
     result.value.toList must_=== expected.toList
   }
