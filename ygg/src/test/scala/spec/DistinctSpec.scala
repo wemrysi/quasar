@@ -45,7 +45,7 @@ class DistinctSpec extends TableQspec {
       {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
       {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
     """
-    val table = fromJson(data, maxSliceSize = Some(5))
+    val table = fromJson(data, sliceSize = 5)
     toJsonSeq(table distinct root) must_=== data.distinct.toStream
   }
 
@@ -65,7 +65,7 @@ class DistinctSpec extends TableQspec {
       {"key":[8.0,1.0],"value":[[]]}
       {"key":[8.0,4.0],"value":[[]]}
     """
-    val table = fromJson(data, maxSliceSize = Some(5))
+    val table = fromJson(data, sliceSize = 5)
 
     toJsonSeq(table distinct root) must_=== data.distinct
   }

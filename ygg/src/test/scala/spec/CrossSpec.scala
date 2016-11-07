@@ -69,7 +69,7 @@ class CrossSpec extends TableQspec {
       {"key":[-3918426808128018609,-3],"value":-1.0}
     """
 
-    val dataset1 = fromJson(sample, Some(3))
+    val dataset1 = fromJson(sample, 3)
 
     dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
       case Some((head, _)) => head.size must beLessThanOrEqualTo(companion.maxSliceSize)

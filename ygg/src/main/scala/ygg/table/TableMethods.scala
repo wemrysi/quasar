@@ -90,9 +90,8 @@ trait TableMethodsCompanion[Table] {
     else
       sliceIndex.valueSlice.remap(rows)
 
-  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
-    val sliceSize = maxSliceSize.getOrElse(this.maxSliceSize)
-
+  def fromRValues(values: Stream[RValue]): Table = fromRValues(values, maxSliceSize)
+  def fromRValues(values: Stream[RValue], sliceSize: Int): Table = {
     def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
       data splitAt sliceSize leftMap (Slice fromRValues _)
 
@@ -251,9 +250,8 @@ trait TableMethodsCompanion[Table] {
     ExactSize(1)
   )
 
-  def fromJValues(values: Seq[JValue]): Table = fromJValues(values, None)
-  def fromJValues(values: Seq[JValue], maxSliceSize: Option[Int]): Table = {
-    val sliceSize = maxSliceSize getOrElse this.maxSliceSize
+  def fromJValues(values: Seq[JValue]): Table = fromJValues(values, maxSliceSize)
+  def fromJValues(values: Seq[JValue], sliceSize: Int): Table = {
     def makeSlice(data: Stream[JValue]): Slice -> Stream[JValue] = {
       @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): ArrayColumnMap -> Int = from match {
         case jv #:: xs => buildColArrays(xs, Slice.withIdsAndValues(jv, into, sliceIndex, sliceSize), sliceIndex + 1)

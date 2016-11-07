@@ -113,17 +113,17 @@ class TakeRangeSpec extends TableQspec {
   )
   private def testTakeRangeAcrossSlices = checkTableFun(
     fun      = _.takeRange(1, 6),
-    table    = fromSample(SampleData(jsonEightValues), Some(5)),
+    table    = fromSample(SampleData(jsonEightValues), 5),
     expected = jsonEightValues.slice(1, 7)
   )
   private def testTakeRangeSecondSlice = checkTableFun(
     fun      = _.takeRange(5, 2),
-    table    = fromSample(SampleData(jsonEightValues), Some(5)),
+    table    = fromSample(SampleData(jsonEightValues), 5),
     expected = jsonEightValues.slice(5, 7)
   )
   private def testTakeRangeFirstSliceOnly = checkTableFun(
     fun      = _.takeRange(0, 5),
-    table    = fromSample(SampleData(jsonEightValues), Some(5)),
+    table    = fromSample(SampleData(jsonEightValues), 5),
     expected = jsonEightValues.slice(0, 5)
   )
 }

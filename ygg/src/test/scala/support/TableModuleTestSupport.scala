@@ -31,13 +31,13 @@ abstract class TableQspec extends quasar.Qspec {
 
   import SampleData._
 
-  def emptyRep: TableRep[Table]                                            = Table.empty.asRep
-  def fromJson(values: Seq[JValue]): Table                                 = Table.fromJValues(values, None)
-  def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table      = Table.fromJValues(values, maxSliceSize)
-  def fromSample(sampleData: SampleData): Table                            = Table.fromJValues(sampleData.data, None)
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = Table.fromJValues(sampleData.data, maxBlockSize)
-  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
+  def emptyRep: TableRep[Table]                                 = Table.empty.asRep
+  def fromJson(values: Seq[JValue]): Table                      = Table.fromJValues(values)
+  def fromJson(values: Seq[JValue], sliceSize: Int): Table      = Table.fromJValues(values, sliceSize)
+  def fromSample(sampleData: SampleData): Table                 = Table.fromJValues(sampleData.data)
+  def fromSample(sampleData: SampleData, blockSize: Int): Table = Table.fromJValues(sampleData.data, blockSize)
+  def toJson(dataset: Table): Need[Stream[JValue]]              = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                      = toJson(table).copoint
 
   type ASD = Arbitrary[SampleData]
 

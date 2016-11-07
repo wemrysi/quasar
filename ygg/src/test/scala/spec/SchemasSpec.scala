@@ -35,7 +35,7 @@ class SchemasSpec extends TableQspec {
     val expected    = Set[JType](J.Object("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT))
     val trivialData = Stream.fill(100)(json"""{ "a": 1, "b": "x", "c": null }""")
     val sample      = SampleData(trivialData)
-    val table       = fromSample(sample, Some(10))
+    val table       = fromSample(sample, 10)
 
     table.schemas.copoint must_=== expected
   }
@@ -43,7 +43,7 @@ class SchemasSpec extends TableQspec {
   private def testHomogeneousArraySchema = {
     val expected = Set(JArrayHomogeneousT(JNumberT))
     val data     = Stream.fill(10)(json"""[1, 2, 3]""")
-    val table0   = fromSample(SampleData(data), Some(10))
+    val table0   = fromSample(SampleData(data), 10)
     val table    = table0.toArray[Long]
     table.schemas.copoint must_== expected
   }
@@ -58,7 +58,7 @@ class SchemasSpec extends TableQspec {
       { "a": "x", "b": 2 }
     """).flatten
 
-    val table = fromSample(SampleData(data), Some(10))
+    val table = fromSample(SampleData(data), 10)
     table.schemas.copoint must_== expected
   }
 
@@ -75,7 +75,7 @@ class SchemasSpec extends TableQspec {
     """).flatten
 
     data.length must_=== 30
-    val table = fromSample(SampleData(data), Some(10))
+    val table = fromSample(SampleData(data), 10)
     table.schemas.copoint must_== expected
   }
 
@@ -94,7 +94,7 @@ class SchemasSpec extends TableQspec {
       case _ => JObject()
     }
 
-    val table = fromSample(SampleData(data), Some(10))
+    val table = fromSample(SampleData(data), 10)
     table.schemas.copoint must_== expected
   }
 
@@ -133,7 +133,7 @@ class SchemasSpec extends TableQspec {
       J.Object("a" -> J.Object("b" -> J.Object("c" -> JNumberT)))
     )
 
-    val table: Table = fromSample(SampleData(data), Some(10))
+    val table: Table = fromSample(SampleData(data), 10)
     table.schemas.copoint must_=== expected
   }
 }
