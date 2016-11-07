@@ -2,7 +2,8 @@
   "name": "numeric field names",
 
   "backends": {
-    "marklogic": "pending"
+    "marklogic":  "pending",
+    "postgresql": "pending"
   },
 
   "data": "smallZips.data",

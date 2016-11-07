@@ -2,7 +2,9 @@
   "name": "generated field names",
 
   "backends": {
-    "marklogic": "pending"
+    "marklogic":         "pending",
+    "mongodb_read_only": "pending",
+    "postgresql":        "pending"
   },
 
   "data": "smallZips.data",
