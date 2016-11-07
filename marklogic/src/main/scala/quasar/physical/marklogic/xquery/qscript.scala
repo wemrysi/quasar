@@ -273,31 +273,6 @@ object qscript {
       mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
     })
 
-  // qscript:shifted-read($uri as xs:string, $include-id as xs:boolean) as element()*
-  def shiftedRead[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
-    qs.declare("shifted-read") flatMap (_(
-      $("uri")        as ST("xs:string"),
-      $("include-id") as ST("xs:boolean")
-    ).as(ST(s"element()*")) { (uri: XQuery, includeId: XQuery) =>
-      for {
-        d     <- freshVar[F]
-        c     <- freshVar[F]
-        b     <- freshVar[F]
-        xform <- json.transformFromJson[F](c.xqy)
-        incId <- ejson.seqToArray_[F](mkSeq_(
-                   fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, fn.documentUri(d.xqy))),
-                   b.xqy))
-      } yield {
-        for_(d -> cts.search(fn.doc(), cts.directoryQuery(uri, "1".xs)))
-          .let_(
-            c -> d.xqy `/` child.node(),
-            b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
-          .return_ {
-            if_ (includeId) then_ { incId } else_ { b.xqy }
-          }
-      }
-    })
-
   // qscript:timestamp-to-dateTime($millis as xs:integer) as xs:dateTime
   def timestampToDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timestamp-to-dateTime") map (_(
