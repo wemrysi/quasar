@@ -51,16 +51,6 @@ object ColumnIndices {
 
 final case class CSchema(columnRefs: Set[ColumnRef], columns: JType => Set[Column])
 
-trait CReducer[A] {
-  def reduce(schema: CSchema, range: Range): A
-}
-
-trait Scanner {
-  type A
-  def init: A
-  def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
-}
-
 final class GroupId(val id: Int) extends AnyVal {
   override def toString = s"$id"
 }

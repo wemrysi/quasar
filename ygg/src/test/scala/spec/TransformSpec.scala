@@ -1713,39 +1713,34 @@ class TransformSpec extends TableQspec {
     }
   }
 
-  private object sumScanner extends Scanner {
-    type A = BigDecimal
-    val init = BigDecimal(0)
-
-    def scan(a: BigDecimal, cols: ColumnMap, range: Range): A -> ColumnMap = {
-      val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
-      val prioritized = identityPath.map(_._2) filter {
-        case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
-        case _                                                => false
-      }
-
-      val mask = Bits.filteredRange(range.start, range.end) { i =>
-        prioritized exists { _ isDefinedAt i }
-      }
-
-      val (a2, arr) = mask.toList.foldLeft(a -> new Array[BigDecimal](range.end)) {
-        case ((acc, arr), i) => {
-          val col = prioritized find { _ isDefinedAt i }
-
-          val acc2 = col map {
-            case lc: LongColumn   => acc + lc(i)
-            case dc: DoubleColumn => acc + dc(i)
-            case nc: NumColumn    => acc + nc(i)
-            case _                => abort("unreachable")
-          }
-
-          acc2 foreach { arr(i) = _ }
-
-          (acc2 getOrElse acc, arr)
-        }
-      }
-
-      (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
+  private val sumScanner = Scanner(BigDecimal(0)) { (a, cols, range) =>
+    val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
+    val prioritized = identityPath.map(_._2) filter {
+      case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
+      case _                                                => false
     }
+
+    val mask = Bits.filteredRange(range.start, range.end) { i =>
+      prioritized exists { _ isDefinedAt i }
+    }
+
+    val (a2, arr) = mask.toList.foldLeft(a -> new Array[BigDecimal](range.end)) {
+      case ((acc, arr), i) => {
+        val col = prioritized find { _ isDefinedAt i }
+
+        val acc2 = col map {
+          case lc: LongColumn   => acc + lc(i)
+          case dc: DoubleColumn => acc + dc(i)
+          case nc: NumColumn    => acc + nc(i)
+          case _                => abort("unreachable")
+        }
+
+        acc2 foreach { arr(i) = _ }
+
+        (acc2 getOrElse acc, arr)
+      }
+    }
+
+    (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
   }
 }

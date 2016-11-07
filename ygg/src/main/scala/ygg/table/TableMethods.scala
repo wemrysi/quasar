@@ -21,16 +21,12 @@ import quasar._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
-private object addGlobalIdScanner extends Scanner {
-  type A = Long
-  val init = 0l
-  def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
+trait TableMethodsCompanion[Table] {
+  private lazy val addGlobalIdScanner = Scanner(0L) { (a, cols, range) =>
     val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
     (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
   }
-}
 
-trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
   lazy val sortMergeEngine = new MergeEngine
