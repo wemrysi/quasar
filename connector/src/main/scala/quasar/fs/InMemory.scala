@@ -224,7 +224,11 @@ object InMemory {
           case InvokeUnapply(Squash, Sized((_,src))) => src
           case Constant(data) => Vector(data).right
           case other =>
-            queryResponsesL.get(mem).mapKeys(optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))
+            queryResponsesL
+              .get(mem)
+              .mapKeys(optimizer.optimize)
+              .get(Fix(other.map(_._1)))
+              .toRightDisjunction(unsupported(optLp))
         }
       })
     }
