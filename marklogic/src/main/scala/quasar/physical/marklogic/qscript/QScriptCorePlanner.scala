@@ -36,7 +36,13 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
       for {
         x <- freshVar[F]
         g <- mapFuncXQuery(f, x.xqy)
-      } yield fn.map(func(x) { g }, src)
+      } yield src match {
+        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) =>
+          XQuery.Flwor(tuples, lets ::: IList((x, result)), filter, order, isStable, g)
+
+        case _ =>
+          for_(x -> src) return_ g
+      }
 
     case LeftShift(src, struct, repair) =>
       for {
@@ -96,8 +102,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         fm  <- rebaseXQuery(from, s.xqy)
         ct  <- rebaseXQuery(count, s.xqy)
       } yield let_(s -> src, f -> fm, c -> ct) return_ (sel match {
-        case Drop => fn.subsequence(f.xqy, c.xqy + 1.xqy)
-        case Take => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+        case Drop   => fn.subsequence(f.xqy, c.xqy + 1.xqy)
+        case Take   => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
         // TODO: Better sampling
         case Sample => fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
       })
