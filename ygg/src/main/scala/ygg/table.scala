@@ -37,7 +37,7 @@ package object table {
 
   implicit def tableMethods[T: TableRep](table: T): TableMethods[T] = companionOf[T] methodsOf table
 
-  def companionOf[T: TableRep] : TableMethodsCompanion[T] = TableRep[T].companion
+  def companionOf[T: TableRep] : TableCompanion[T] = TableRep[T].companion
 
   def lazyTable[T: TableRep](slices: Iterable[Slice], size: TableSize): T =
     lazyTable[T](StreamT fromStream Need(slices.toStream), size)

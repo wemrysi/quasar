@@ -20,13 +20,13 @@ import ygg._, common._, json._
 import trans._
 import scalaz._
 
-trait TableRep[T] {
-  def companion: TableMethodsCompanion[T]
-}
-object TableRep {
-  def apply[T](implicit z: TableRep[T]): TableRep[T] = z
-  def make[T](c: TableMethodsCompanion[T]): TableRep[T] = new TableRep[T] { def companion = c }
-}
+// trait TableRep[T] {
+//   def companion: TableCompanion[T]
+// }
+// object TableRep {
+//   def apply[T](implicit z: TableRep[T]): TableRep[T] = z
+//   def make[T](c: TableCompanion[T]): TableRep[T] = new TableRep[T] { def companion = c }
+// }
 
 sealed trait TableData extends Product with Serializable {
   def self: TableData           = this
@@ -40,7 +40,7 @@ sealed trait TableData extends Product with Serializable {
   override def toString = short_s + this.columns.column_s
 }
 
-object TableData extends TableMethodsCompanion[TableData] {
+object TableData extends TableCompanion[TableData] {
   implicit val TableRep: TableRep[TableData] = new TableRep[TableData] {
     def companion = TableData
   }

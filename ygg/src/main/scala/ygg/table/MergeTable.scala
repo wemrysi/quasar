@@ -30,7 +30,7 @@ object MergeTable {
     * Merge controls the iteration over the table of group key values.
     */
   def apply[T](grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = {
-    import grouping._, companion._
+    import grouping._
     import GroupKeySpec.{ dnf, toVector }
 
     def sources(spec: GroupKeySpec): Seq[GroupKeySpecSource] = (spec: @unchecked) match {
