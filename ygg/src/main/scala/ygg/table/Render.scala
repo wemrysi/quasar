@@ -21,8 +21,7 @@ import ygg._, common._, data._
 import java.lang.Character.{ codePointAt, forDigit }
 
 object Render {
-  def renderTable[T](rep: TableRep[T], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
-    import rep._
+  def renderTable[T: TableRep](table: T, prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
     val slices = table.slices
 
     def wrap(stream: StreamT[Need, CharBuffer]) = {

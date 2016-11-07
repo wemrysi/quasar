@@ -58,11 +58,11 @@ object GroupingSpec {
   * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
   */
 
-sealed trait GroupingSpec[T] {
-  val rep: TableRep[T]
+sealed abstract class GroupingSpec[T](implicit val tableRep: TableRep[T]) {
+  lazy val companion = companionOf[T]
 }
-final case class GroupingSource[T](
-  rep: TableRep[T],
+
+final case class GroupingSource[T: TableRep](
   table: T,
   idTrans: TransSpec1,
   targetTrans: Option[TransSpec1],
@@ -70,8 +70,7 @@ final case class GroupingSource[T](
   groupKeySpec: GroupKeySpec
 ) extends GroupingSpec[T]
 
-final case class GroupingAlignment[T](
-  rep: TableRep[T],
+final case class GroupingAlignment[T: TableRep](
   groupKeyLeftTrans: TransSpec1,
   groupKeyRightTrans: TransSpec1,
   left: GroupingSpec[T],
@@ -80,8 +79,8 @@ final case class GroupingAlignment[T](
 ) extends GroupingSpec[T]
 
 object GroupingAlignment {
-  def intersect[T](l: GroupingSpec[T], r: GroupingSpec[T]): GroupingAlignment[T] =
-    GroupingAlignment(l.rep, TransSpec1.Id, TransSpec1.Id, l, r, GroupingSpec.Intersection)
+  def intersect[T: TableRep](l: GroupingSpec[T], r: GroupingSpec[T]): GroupingAlignment[T] =
+    GroupingAlignment(TransSpec1.Id, TransSpec1.Id, l, r, GroupingSpec.Intersection)
 }
 
 sealed trait TableSize {

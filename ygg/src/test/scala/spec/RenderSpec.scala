@@ -58,7 +58,7 @@ class RenderSpec extends TableQspec {
 
     val table     = fromJson(xs.toVector)
     val expected  = JArray(xs.toVector)
-    val arrayM    = Render.renderTable(table.asRep, "[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
+    val arrayM    = Render.renderTable(table, "[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
     val minimized = minimize(expected) getOrElse jarray()
 
     arrayM.copoint mustEqual minimized

@@ -25,11 +25,11 @@ class IndicesSpec extends TableQspec {
 
   "a table index" should {
     "handle empty tables" in {
-      val table    = fromJson(Stream.empty[JValue])
+      val table    = fromJson(Stream())
       val keySpecs = Vector(groupkey("a"), groupkey("b"))
       val valSpec  = valuekey("c")
 
-      val index: TableIndex = TableIndex.createFromTable(table.asRep, keySpecs, valSpec).copoint
+      val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
       index.getUniqueKeys(0).size must_=== 0
       Table.getSubTable(index, Vector(0), Vector(CString("a"))).size must_=== ExactSize(0)
@@ -54,7 +54,7 @@ class IndicesSpec extends TableQspec {
     val table             = fromJson(json.toStream)
     val keySpecs          = Vector(groupkey("a"), groupkey("b"))
     val valSpec           = valuekey("c")
-    val index: TableIndex = TableIndex.createFromTable(table.asRep, keySpecs, valSpec).copoint
+    val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
     "determine unique groupkey values" in {
       index.getUniqueKeys(0) must_== Set[RValue](CLong(1), CLong(2), CLong(3), CString("foo"))
@@ -108,7 +108,7 @@ class IndicesSpec extends TableQspec {
 
     val index1 = TableIndex
       .createFromTable(
-        table.asRep,
+        table,
         Vector(groupkey("a")),
         valuekey("c")
       )
@@ -116,7 +116,7 @@ class IndicesSpec extends TableQspec {
 
     val index2 = TableIndex
       .createFromTable(
-        table.asRep,
+        table,
         Vector(groupkey("b")),
         valuekey("c")
       )
@@ -125,7 +125,7 @@ class IndicesSpec extends TableQspec {
     "efficiently combine to produce unions" in {
 
       def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
-        val table = TableIndex.joinSubTables(emptyRep, tpls.toList)
+        val table = TableIndex.joinSubTables[Table](tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }
 

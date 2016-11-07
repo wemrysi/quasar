@@ -52,8 +52,8 @@ object TableIndex {
     * Despite being in M, the TableIndex will be eagerly constructed
     * as soon as the underlying slices are available.
     */
-  def createFromTable[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
-    import rep._
+  def createFromTable[T: TableRep](table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
+
 
     def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[Need, SliceIndex]): Need[TableIndex] = stream.uncons flatMap {
       case None             => Need(new TableIndex(buf.toList))
@@ -83,9 +83,7 @@ object TableIndex {
     * the table, since it's assumed that all indices have the same
     * value spec.
     */
-  def joinSubTables[T](rep: TableRep[T], tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): T = {
-    import rep._
-
+  def joinSubTables[T: TableRep](tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): T = {
     // Filter out negative integers. This allows the caller to do
     // arbitrary remapping of their own Seq[RValue] by filtering
     // values they don't want.
@@ -100,12 +98,12 @@ object TableIndex {
 
     var size = 0L
     val slices: List[Slice] = orderedIndices.map { indices =>
-      val slice = companion.joinSubSlices(indices.zip(params))
+      val slice = companionOf[T].joinSubSlices(indices zip params)
       size += slice.size
       slice
     }
 
-    companion(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+    lazyTable[T](slices, ExactSize(size))
   }
 }
 
@@ -166,8 +164,7 @@ object SliceIndex {
     * Despite being in M, the SliceIndex will be eagerly constructed
     * as soon as the underlying Slice is available.
     */
-  def createFromTable[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[SliceIndex] = {
-    import rep._
+  def createFromTable[T: TableRep](table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[SliceIndex] = {
     val sts = groupKeys.map(composeSliceTransform).toArray
     val vt  = composeSliceTransform(valueSpec)
 

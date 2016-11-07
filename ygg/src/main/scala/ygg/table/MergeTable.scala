@@ -30,7 +30,7 @@ object MergeTable {
     * Merge controls the iteration over the table of group key values.
     */
   def apply[T](grouping: GroupingSpec[T])(body: (RValue, GroupId => M[T]) => M[T]): M[T] = {
-    import grouping.rep._
+    import grouping._, companion._
     import GroupKeySpec.{ dnf, toVector }
 
     def sources(spec: GroupKeySpec): Seq[GroupKeySpecSource] = (spec: @unchecked) match {
@@ -38,8 +38,8 @@ object MergeTable {
       case src: GroupKeySpecSource      => Vector(src)
     }
     def sourcesOf(gs: GroupingSpec[T]): Vector[GroupingSource[T]] = gs match {
-      case x: GroupingSource[T]                       => Vector(x)
-      case GroupingAlignment(_, _, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
+      case x: GroupingSource[T]                    => Vector(x)
+      case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
     }
 
     def mkProjections(spec: GroupKeySpec) =
@@ -49,9 +49,11 @@ object MergeTable {
       source              <- sourcesOf(grouping)
       groupKeyProjections <- mkProjections(source.groupKeySpec)
       disjunctGroupKeyTransSpecs = groupKeyProjections.map { case (key, spec) => spec }
-    } yield {
-      TableIndex.createFromTable[T](source.rep, disjunctGroupKeyTransSpecs, source.targetTrans.getOrElse(TransSpec1.Id)).map { index =>
-        IndexedSource(source.groupId, index, groupKeyProjections.map(_._1))
+    }
+    yield {
+      import source._
+      TableIndex.createFromTable[T](table, disjunctGroupKeyTransSpecs, targetTrans.getOrElse(TransSpec1.Id)).map { index =>
+        IndexedSource(groupId, index, groupKeyProjections.map(_._1))
       }
     }).sequence.flatMap { sourceKeys =>
       val fullSchema = sourceKeys.flatMap(_.keySchema).distinct
@@ -116,6 +118,7 @@ object MergeTable {
       // given a groupKey, return an M[Table] which represents running
       // the evaluator on that subgroup.
       def evaluateGroupKey(groupKey: Key): M[T] = {
+        import grouping._
         val groupKeyTable = jValueFromGroupKey(groupKey, fullSchema)
 
         def map(gid: GroupId): M[T] = {
@@ -128,7 +131,7 @@ object MergeTable {
             })
             .toList
 
-          Need(TableIndex.joinSubTables[T](grouping.rep, subTableProjections).normalize) // TODO: normalize necessary?
+          Need(TableIndex.joinSubTables[T](subTableProjections).normalize) // TODO: normalize necessary?
         }
 
         body(groupKeyTable, map)
@@ -141,7 +144,7 @@ object MergeTable {
         case Nil     => Need(None)
       }
 
-      Need(companion(tables flatMap (_.slices), UnknownSize))
+      Need(lazyTable(tables flatMap (_.slices), UnknownSize))
     }
   }
 }

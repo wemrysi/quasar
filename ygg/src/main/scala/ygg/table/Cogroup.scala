@@ -24,9 +24,8 @@ object CogroupTable {
     def +(n: Int): SliceId = SliceId(id + n)
   }
 
-  def apply[T](rep: TableRep[T], leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): T = {
-    val self = rep.table
-    import rep._
+  def apply[T: TableRep](self: T, leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): T = {
+    val companion = companionOf[T]
 
     //println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
     class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
@@ -94,13 +93,12 @@ object CogroupTable {
           "both: " + (leqbuf.toArray zip reqbuf.toArray).mkString("[", ",", "]")
       }
     }
-    def cogroup0[T, LK, RK, LR, RR, BR](rep: TableRep[T],
+    def cogroup0[LK, RK, LR, RR, BR](self: T,
                                      stlk: SliceTransform1[LK],
                                      strk: SliceTransform1[RK],
                                      stlr: SliceTransform1[LR],
                                      strr: SliceTransform1[RR],
                                      stbr: SliceTransform2[BR]): T = {
-      import rep.companion
       val stateAdt = new CogroupStateAdt[LK, RK, LR, RR, BR]
       import stateAdt._
 
@@ -438,7 +436,7 @@ object CogroupTable {
     }
 
     cogroup0(
-      rep,
+      self,
       composeSliceTransform(leftKey),
       composeSliceTransform(rightKey),
       composeSliceTransform(leftResultTrans),

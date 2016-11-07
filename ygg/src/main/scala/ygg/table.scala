@@ -35,6 +35,16 @@ package object table {
   implicit def s2PathNode(name: String): CPathField = CPathField(name)
   implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
 
+  implicit def tableMethods[T: TableRep](table: T): TableMethods[T] = companionOf[T] methodsOf table
+
+  def companionOf[T: TableRep] : TableMethodsCompanion[T] = TableRep[T].companion
+
+  def lazyTable[T: TableRep](slices: Iterable[Slice], size: TableSize): T =
+    lazyTable[T](StreamT fromStream Need(slices.toStream), size)
+
+  def lazyTable[T: TableRep](slices: StreamT[Need, Slice], size: TableSize): T =
+    companionOf[T].fromSlices(slices, size)
+
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] = StreamT.unfoldM[Need, Slice, A](start)(f)
   def columnMap(xs: ColumnKV*): EagerColumnMap                                          = EagerColumnMap(xs.toVector)
   def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap                              = LazyColumnMap(() => expr.toVector)

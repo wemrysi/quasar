@@ -52,11 +52,9 @@ class MergeSpec extends TableQspec {
 
       val grouping =
         GroupingAlignment(
-          emptyRep,
           TransSpec1.Id,
           TransSpec1.Id,
           GroupingSource(
-            bar.asRep,
             bar,
             dotKey,
             Some(InnerObjectConcat(root delete valueField, dotValue.c wrapObjectField "value")),
@@ -66,7 +64,6 @@ class MergeSpec extends TableQspec {
               GroupKeySpecSource(twoField, dotValue.b))
           ),
           GroupingSource(
-            foo.asRep,
             foo,
             dotKey,
             Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
@@ -127,14 +124,14 @@ class MergeSpec extends TableQspec {
         {"key":[5908438637678314378],"value":{"Edition":"2004","Gender":"Men"}}
         {"key":[5908438637678314379],"value":{"Edition":"1996","Gender":"Men"}}
         {"key":[5908438637678314380],"value":{"Edition":"2008","Gender":"Women"}}
-      """.toStream)
+      """)
 
       val resultJson = jsonMany"""
         {"key":[],"value":{"year":"1996","ratio":139.0}}
         {"key":[],"value":{"year":"2000","ratio":126.0}}
         {"key":[],"value":{"year":"2004","ratio":122.0}}
         {"key":[],"value":{"year":"2008","ratio":119.0}}
-      """.toStream
+      """
 
       val valueField = CPathField("value")
       val oneField   = CPathField("1")
@@ -145,7 +142,6 @@ class MergeSpec extends TableQspec {
         dotValue.dyn.Gender wrapObjectField "value"
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
-        medals.asRep,
         medals,
         dotKey,
         Some(targetTrans),

@@ -88,7 +88,7 @@ class GrouperSpec extends TableQspec {
     left: GroupingSpec[Table],
     right: GroupingSpec[Table],
     alignment: GroupingSpec.Alignment
-  ) = ygg.table.GroupingAlignment(left.rep, groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment)
+  ) = ygg.table.GroupingAlignment[Table](groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment)
 
   private def GroupingSource(
     table: Table,
@@ -96,7 +96,7 @@ class GrouperSpec extends TableQspec {
     targetTrans: Option[TransSpec1],
     groupId: GroupId,
     groupKeySpec: GroupKeySpec
-  ) = ygg.table.GroupingSource(table.asRep, table, idTrans, targetTrans, groupId, groupKeySpec)
+  ) = ygg.table.GroupingSource[Table](table, idTrans, targetTrans, groupId, groupKeySpec)
 
   private def augmentWithIdentities(json: Stream[JValue]) = json.zipWithIndex map {
     case (v, i) => JObject(JField("key", JArray(JNum(i) :: Nil)) :: JField("value", v) :: Nil)

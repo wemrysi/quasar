@@ -21,7 +21,7 @@ import quasar._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
-trait TableMethodsCompanion[Table] {
+trait TableConfig {
   def maxSliceSize: Int = 10
   // This is a slice size that we'd like our slices to be at least as large as.
   def minIdealSliceSize: Int = maxSliceSize / 4
@@ -29,6 +29,10 @@ trait TableMethodsCompanion[Table] {
   // we take proactive measures to prevent problems caused by small slices.
   def smallSliceSize: Int = 3
   def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+}
+
+trait TableMethodsCompanion[Table] extends TableConfig {
+  self =>
 
   def sizeOf(table: Table): TableSize
   def slicesOf(table: Table): StreamT[Need, Slice]
@@ -38,7 +42,7 @@ trait TableMethodsCompanion[Table] {
   def withProjections(table: Table, ps: ProjMap): Table
   def fromSlices(slices: NeedSlices, size: TableSize): Table
 
-  implicit def tableMethods(table: Table): TableMethods[Table] = methodsOf(table)
+  def thisRep = TableRep make self
 
   private lazy val addGlobalIdScanner = Scanner(0L) { (a, cols, range) =>
     val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
@@ -48,7 +52,6 @@ trait TableMethodsCompanion[Table] {
   implicit lazy val codec = DataCodec.Precise
 
   lazy val sortMergeEngine = new MergeEngine
-
 
   def empty: Table = fromSlices(emptyStreamT(), ExactSize(0))
 
@@ -121,7 +124,6 @@ trait TableMethodsCompanion[Table] {
     }
     rows
   }
-
   /**
     * For a list of slice indices, return a slice containing all the
     * rows for which any of the indices matches.
@@ -175,7 +177,7 @@ trait TableMethodsCompanion[Table] {
       )
     )
 
-    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
+    methodsOf(fromSlices(StreamT(Need(head)), ExactSize(totalCount))) transform TransSpec1.DerefArray1
   }
 
   /**
@@ -190,17 +192,17 @@ trait TableMethodsCompanion[Table] {
     * preserved
     */
   def groupByN[F[_]: Monad](table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[Table]] =
-    ().point[F] map (_ => WriteTable.groupByN(externalize(table).asRep, keys, values, order, unique).value)
+    ().point[F] map (_ => WriteTable.groupByN[Table](externalize(table), keys, values, order, unique)(thisRep).value)
 
   def load(table: Table, tpe: JType): Need[Table] = {
-    val reduced = table reduce new CReducer[Set[Path]] {
+    val reduced = methodsOf(table) reduce new CReducer[Set[Path]] {
       def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
         case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
         case _            => Set()
       }
     }
     reduced map { paths =>
-      val projs = paths.toList flatMap (table.projections get _)
+      val projs = paths.toList flatMap (projectionsOf(table) get _) // (table.projections get _)
       apply(
         projs foldMap (_ getBlockStreamForType tpe),
         ExactSize(projs.foldMap(_.length)(Monoid[Long]))
@@ -234,7 +236,7 @@ trait TableMethodsCompanion[Table] {
   def fromFile(file: jFile): Table        = fromJValues((JParser parseManyFromFile file).orThrow)
   def fromString(json: String): Table     = fromJValues(Seq(JParser parseUnsafe json))
 
-  def externalize(table: Table): Table             = fromSlices(table.slices, table.size)
+  def externalize(table: Table): Table = fromSlices(slicesOf(table), sizeOf(table))
 
   def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => Need[Table]) => Need[Table]): Need[Table] =
     MergeTable[Table](grouping)(body)
@@ -279,23 +281,25 @@ trait TableMethodsCompanion[Table] {
 }
 
 trait TableMethods[Table] {
-  type M[+X] = Need[X]
+  outer =>
 
-  private implicit def tableMethods(table: Table): TableMethods[Table]          = companion tableMethods table
-  private def makeTable(slices: NeedSlices, size: TableSize): Table             = companion.fromSlices(slices, size)
-  private def needTable(slices: => NeedSlices, size: => TableSize): Need[Table] = Need(makeTable(slices, size))
-  private def makeEmpty: Table                                                  = companion.empty
+  type M[+X] = Need[X]
 
   def self: Table
   def companion: TableMethodsCompanion[Table]
-  def asRep: TableRep[Table] = TableRep[Table](self, companion)
 
   def slices: NeedSlices                                = companion slicesOf self
   def size: TableSize                                   = companion sizeOf self
   def projections: Map[Path, Projection]                = companion projectionsOf self
   def withProjections(ps: Map[Path, Projection]): Table = companion.withProjections(self, ps)
 
-  def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(asRep, size, specs)
+  private implicit def thisTableRep: TableRep[Table]                   = companion.thisRep
+  private implicit def tableMethods(table: Table): TableMethods[Table] = companion methodsOf table
+
+  private def makeTable(slices: NeedSlices, size: TableSize): Table             = companion.fromSlices(slices, size)
+  private def needTable(slices: => NeedSlices, size: => TableSize): Need[Table] = Need(makeTable(slices, size))
+
+  def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(self, size, specs)
 
   /**
     * Sorts the KV table by ascending or descending order of a transformation
@@ -305,17 +309,17 @@ trait TableMethods[Table] {
     * @param order Whether to sort ascending or descending
     */
   def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] =
-    WriteTable.groupByN(companion.externalize(self).asRep, Seq(key), root.spec, order, unique = false) map (_.headOption getOrElse makeEmpty)
+    WriteTable.groupByN(companion.externalize(self), Seq(key), root.spec, order, unique = false) map (_.headOption getOrElse companion.empty)
 
   /**
     * Cogroups this table with another table, using equality on the specified
     * transformation on rows of the table.
     */
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    CogroupTable(self.asRep, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
+    CogroupTable(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
 
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
-    AlignTable(sourceL.asRep, alignL, sourceR, alignR)
+    AlignTable(sourceL, alignL, sourceR, alignR)
 
   def columns: ColumnMap          = slicesStream.head.columns
   def concat(t2: Table): Table    = makeTable(slices ++ t2.slices, size + t2.size)
@@ -751,7 +755,7 @@ trait TableMethods[Table] {
 
     this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {
       case Some((head, tail)) => makeTable(stepPartition(head, 0, tail), UnknownSize)
-      case None               => makeEmpty
+      case None               => companion.empty
     }
   }
 

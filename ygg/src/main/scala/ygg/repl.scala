@@ -61,7 +61,6 @@ object repl {
       dotValue.dyn.Gender wrapObjectField "value"
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
-      medals.asRep,
       medals,
       dotKey,
       Some(targetTrans),
@@ -95,11 +94,7 @@ object repl {
     }
   }
 
-  implicit class TableSelectionOps[T](val rep: TableRep[T]) {
-    import rep._
-
-    private implicit def nextOps(next: T): TableSelectionOps[T] = TableSelectionOps[T](TableRep(next, companion))
-
+  implicit class TableSelectionOps[T: TableRep](val table: T) {
     private type F1 = trans.TransSpec[trans.Source.type]
 
     def p(): Unit                = table.dump()

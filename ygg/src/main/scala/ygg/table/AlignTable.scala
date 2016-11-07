@@ -36,9 +36,9 @@ object AlignTable {
   final case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
   final case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
 
-  def apply[T](rep: TableRep[T], alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = {
-    val sourceL = rep.table
-    import rep.companion._
+  def apply[T: TableRep](sourceL: T, alignL: TransSpec1, sourceR: T, alignR: TransSpec1): PairOf[T] = {
+    val c = companionOf[T]
+    import c._
 
     // we need a custom row comparator that ignores the global ID introduced to prevent elimination of
     // duplicate rows in the write to JDBM

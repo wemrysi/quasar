@@ -20,8 +20,12 @@ import ygg._, common._, json._
 import trans._
 import scalaz._
 
-final case class TableRep[T](table: T, companion: TableMethodsCompanion[T]) {
-  implicit def tableMethods(table: T): TableMethods[T] = companion tableMethods table
+trait TableRep[T] {
+  def companion: TableMethodsCompanion[T]
+}
+object TableRep {
+  def apply[T](implicit z: TableRep[T]): TableRep[T] = z
+  def make[T](c: TableMethodsCompanion[T]): TableRep[T] = new TableRep[T] { def companion = c }
 }
 
 sealed trait TableData extends Product with Serializable {
@@ -37,6 +41,10 @@ sealed trait TableData extends Product with Serializable {
 }
 
 object TableData extends TableMethodsCompanion[TableData] {
+  implicit val TableRep: TableRep[TableData] = new TableRep[TableData] {
+    def companion = TableData
+  }
+
   private type V           = JValue
   private type T           = TableData
   private type Size        = TableSize

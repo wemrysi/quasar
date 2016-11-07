@@ -26,11 +26,8 @@ abstract class TableQspec extends quasar.Qspec {
   type Table = ygg.table.TableData
   def companion = Table
 
-  protected implicit def liftTableRep(t: Table): TableRep[Table] = t.asRep
-
   import SampleData._
 
-  def emptyRep: TableRep[Table]                                 = Table.empty.asRep
   def fromJson(values: Seq[JValue]): Table                      = Table.fromJValues(values)
   def fromJson(values: Seq[JValue], sliceSize: Int): Table      = Table.fromJValues(values, sliceSize)
   def fromSample(sampleData: SampleData): Table                 = Table.fromJValues(sampleData.data)
