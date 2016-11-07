@@ -17,8 +17,7 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg._, common._, json._, table._
-import trans.DerefObjectStatic
+import ygg._, common._, json._, table._, trans._
 
 abstract class TableQspec extends quasar.Qspec {
   outer =>
@@ -36,8 +35,10 @@ abstract class TableQspec extends quasar.Qspec {
   def fromJson(values: Seq[JValue], sliceSize: Int): Table      = Table.fromJValues(values, sliceSize)
   def fromSample(sampleData: SampleData): Table                 = Table.fromJValues(sampleData.data)
   def fromSample(sampleData: SampleData, blockSize: Int): Table = Table.fromJValues(sampleData.data, blockSize)
-  def toJson(dataset: Table): Need[Stream[JValue]]              = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]                      = toJson(table).copoint
+
+  /** Test compat */
+  def toJson(table: Table): Need[Stream[JValue]] = Need(table.toJValues)
+  def toJsonSeq(table: Table): Seq[JValue]       = table.toVector
 
   type ASD = Arbitrary[SampleData]
 
@@ -51,11 +52,11 @@ abstract class TableQspec extends quasar.Qspec {
     def checkR()(implicit za: Arbitrary[R], ze: Eq[R], zs: Show[R]): Prop = prop(checkOneR _)
   }
 
-  class TableCommuteTest(f: Seq[JValue] => Seq[JValue], g: Table => Table) extends CommuteTest[Seq[JValue], Table] {
+  class TableCommuteTest(f: EndoA[Seq[JValue]], g: EndoA[Table]) extends CommuteTest[Seq[JValue], Table] {
     def transformR(x: Seq[JValue])  = f(x)
     def transformS(x: Table)        = g(x)
     def rToS(x: Seq[JValue]): Table = fromJson(x)
-    def sToR(x: Table): Seq[JValue] = toJson(x).copoint
+    def sToR(x: Table): Seq[JValue] = x.toVector
   }
 
   implicit class SampleDataOps(private val sd: SampleData) {
@@ -71,10 +72,10 @@ abstract class TableQspec extends quasar.Qspec {
   }
 
   case class TableTestFun(table: Table, fun: Table => Table, expected: Seq[JValue]) {
-    def check(): MatchResult[Seq[JValue]] = (toJson(fun(table)).copoint: Seq[JValue]) must_=== expected
+    def check(): MatchResult[Seq[JValue]] = (fun(table).toVector: Seq[JValue]) must_=== expected
   }
   case class TableTest(table: Table, spec: TransSpec1, expected: Seq[JValue]) {
-    def check(): MatchResult[Seq[JValue]] = toJsonSeq(table transform spec) must_=== expected
+    def check(): MatchResult[Seq[JValue]] = ((table transform spec).toVector: Seq[JValue]) must_=== expected
   }
   case class TableProp(f: SampleData => TableTest) {
     def check()(implicit z: ASD): Prop = prop((sd: SampleData) => f(sd).check())
@@ -107,9 +108,7 @@ abstract class TableQspec extends quasar.Qspec {
   def checkSpecDataId(spec: TransSpec1, data: Seq[JValue]): Prop =
     checkSpecData(spec, data, data)
 
-  protected def defaultASD: ASD                                           = sample(schema)
-  protected def select[A](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))
-  protected def select(name: String): TransSpec1                          = select(Fn.source, name)
+  protected def defaultASD: ASD = sample(schema)
 
   def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
 }

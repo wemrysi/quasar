@@ -20,11 +20,6 @@ import ygg._, common._, json._, table._
 import scala.util.Random
 
 final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema]) {
-  override def toString = {
-    "SampleData: \ndata = " + data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
-      "\nschema: " + schema
-  }
-
   def sorted(implicit z: Ord[JValue]): SampleData     = transform(_.sorted(z.toScalaOrdering))
   def sortBy[B: Ord](f: JValue => B): SampleData      = transform(_ sortBy f)
   def transform(f: EndoA[Stream[JValue]]): SampleData = copy(data = f(data))

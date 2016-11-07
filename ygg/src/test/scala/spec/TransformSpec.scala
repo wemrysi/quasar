@@ -185,7 +185,7 @@ class TransformSpec extends TableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        select(sd.fieldHeadName),
+        root select sd.fieldHeadName,
         sd.data map (_ apply sd.fieldHead) filter (_.isDefined)
       )
     ).check()
@@ -271,12 +271,12 @@ class TransformSpec extends TableQspec {
     val table   = fromJson(data)
     val table2  = fromJson(data2)
 
-    val leftIdentitySpec    = select(rootLeft, "key")
-    val rightIdentitySpec   = select(rootRight, "key")
+    val leftIdentitySpec    = rootLeft.dyn.key
+    val rightIdentitySpec   = rootRight.dyn.key
     val newIdentitySpec     = OuterArrayConcat(leftIdentitySpec, rightIdentitySpec)
-    val wrappedIdentitySpec = trans.WrapObject(newIdentitySpec, "key")
-    val leftValueSpec       = select(rootLeft, "value")
-    val rightValueSpec      = select(rootRight, "value")
+    val wrappedIdentitySpec = newIdentitySpec wrapObjectField "key"
+    val leftValueSpec       = rootLeft select "value"
+    val rightValueSpec      = rootRight select "value"
     val wrappedValueSpec    = trans.WrapObject(Equal(leftValueSpec, rightValueSpec), "value")
 
     val results = toJson(table.cross(table2)(InnerObjectConcat(wrappedIdentitySpec, wrappedValueSpec)))
@@ -1674,7 +1674,8 @@ class TransformSpec extends TableQspec {
         Cond(
           Map1(root.value, cf.math.Mod.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(0))),
           root.value,
-          ConstLiteral(CBoolean(false), Leaf(Source)))
+          ConstLiteral(CBoolean(false), root)
+        )
       })
 
       val expected = sample.data flatMap { jv =>
@@ -1685,7 +1686,7 @@ class TransformSpec extends TableQspec {
       }
 
       results.copoint must_== expected
-    }.set(minTestsOk = 200)
+    }
   }
 
   private def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {

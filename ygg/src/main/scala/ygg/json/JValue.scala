@@ -28,6 +28,9 @@ import scala.{ collection => sc }
   * Data type for Json AST.
   */
 sealed trait JValue {
+  // def isEmpty: Boolean = this eq JUndefined
+  // def get: JValue      = this
+
   def typeIndex: Int = this match {
     case _: JUndefined.type => -1
     case _: JNull.type      => 0

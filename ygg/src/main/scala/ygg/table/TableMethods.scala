@@ -222,11 +222,10 @@ trait TableMethodsCompanion[Table] {
   def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
   def apply(json: String): Table                        = fromJValues(JParser.parseManyFromString(json).fold[Seq[JValue]](throw _, x => x))
 
-  def fromData(data: Vector[Data]): Table          = fromJValues(data map dataToJValue)
-  def fromFile(file: jFile): Table                 = fromJValues((JParser parseManyFromFile file).orThrow)
-  def fromString(json: String): Table              = fromJValues(Seq(JParser parseUnsafe json))
-  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
+  def fromData(data: Vector[Data]): Table = fromJValues(data map dataToJValue)
+  def fromFile(file: jFile): Table        = fromJValues((JParser parseManyFromFile file).orThrow)
+  def fromString(json: String): Table     = fromJValues(Seq(JParser parseUnsafe json))
+
   def externalize(table: Table): Table             = fromSlices(table.slices, table.size)
 
   def merge(grouping: GroupingSpec[Table])(body: (RValue, GroupId => Need[Table]) => Need[Table]): Need[Table] =
@@ -310,22 +309,18 @@ trait TableMethods[Table] {
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
     AlignTable(sourceL.asRep, alignL, sourceR, alignR)
 
-  def columns: ColumnMap              = slicesStream.head.columns
-  def concat(t2: Table): Table        = makeTable(slices ++ t2.slices, size + t2.size)
-  def dump(): Unit                    = toVector foreach println
-  def fields: Vector[JValue]          = toVector
-  def normalize: Table                = mapWithSameSize(_ filter (x => !x.isEmpty))
-  def slicesStream: Stream[Slice]     = slices.toStream.value
-  def toJValues: Stream[JValue]       = slicesStream flatMap (_.toJsonElements)
-  def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
-  def toJsonString: String            = toJValues mkString "\n"
-  def toStrings: Need[Stream[String]] = toEvents(_ toString _)
-  def toVector: Vector[JValue]        = toJValues.toVector
+  def columns: ColumnMap          = slicesStream.head.columns
+  def concat(t2: Table): Table    = makeTable(slices ++ t2.slices, size + t2.size)
+  def dump(): Unit                = toVector foreach println
+  def fields: Vector[JValue]      = toVector
+  def normalize: Table            = mapWithSameSize(_ filter (x => !x.isEmpty))
+  def slicesStream: Stream[Slice] = slices.toStream.value
+  def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJValues)
+  def toJsonString: String        = toJValues mkString "\n"
+  def toVector: Vector[JValue]    = toJValues.toVector
 
-  private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] =
-    compact(root.spec).slices.toStream map (stream =>
-      stream flatMap (slice => 0 until slice.size flatMap (f(slice, _)))
-    )
+  /** Test compat */
+  def toJson: Need[Stream[JValue]] = Need(toJValues)
 
   /**
     * Yields a new table with distinct rows. Assumes this table is sorted.
@@ -423,6 +418,8 @@ trait TableMethods[Table] {
     * Removes all rows in the table for which definedness is satisfied
     * Remaps the indicies.
     */
+
+  def compact(): Table                 = compact(root.spec)
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
     val transes   = root.spec -> spec mapBoth composeSliceTransform

@@ -827,12 +827,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
-  def toJson(row: RowId): Option[JValue] = toJValue(row) match {
-    case JUndefined => None
-    case jv         => Some(jv)
-  }
+  def toJson(row: RowId): JValue = toJValue(row)
 
-  def toJsonElements: Vector[JValue] = {
+  def toJValues: Vector[JValue] = {
     @tailrec def rec(i: Int, acc: Vector[JValue]): Vector[JValue] = {
       if (i < source.size) {
         toJValue(i) match {
