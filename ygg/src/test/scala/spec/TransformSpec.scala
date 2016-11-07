@@ -1728,7 +1728,7 @@ class TransformSpec extends TableQspec {
         prioritized exists { _ isDefinedAt i }
       }
 
-      val (a2, arr) = mask.toList.foldLeft((a, new Array[BigDecimal](range.end))) {
+      val (a2, arr) = mask.toList.foldLeft(a -> new Array[BigDecimal](range.end)) {
         case ((acc, arr), i) => {
           val col = prioritized find { _ isDefinedAt i }
 

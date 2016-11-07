@@ -93,6 +93,14 @@ sealed trait TableSize {
     case EstimateSize(min, max) if min < minSize => EstimateSize(minSize, max)
     case _                                       => this
   }
+
+  override def toString = s"TableSize($size_s)"
+  def size_s: String = this match {
+    case ExactSize(n)         => s"$n"
+    case EstimateSize(n1, n2) => s"$n1-$n2"
+    case UnknownSize          => "?"
+    case InfiniteSize         => "∞"
+  }
 }
 object TableSize {
   def apply(size: Int): TableSize            = apply(size.toLong)

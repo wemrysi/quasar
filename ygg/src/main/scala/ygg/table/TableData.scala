@@ -31,6 +31,13 @@ sealed trait TableData {
 
   def self: TableData           = this
   def companion: TableData.type = TableData
+
+  def short_s: String = this match {
+    case TableData.External(slices, size) => s"[${size.size_s}]"
+    case TableData.Internal(slice)        => s"[Singleton: ${slice.size}]"
+    case TableData.Projs(table, proj)     => s"[Projection: ${table.size.size_s}/${proj.size}]"
+  }
+  override def toString = short_s + this.columns.column_s
 }
 
 object TableData extends TableMethodsCompanion[TableData] {

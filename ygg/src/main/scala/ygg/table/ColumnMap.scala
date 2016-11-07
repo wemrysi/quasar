@@ -67,13 +67,15 @@ sealed trait ColumnMap {
     case n  => EagerColumnMap((fields take n) ++ Vector(key -> value) ++ (fields drop n + 1))
   }
 
-  override def toString = (
+  def column_s: String = (
     fields map {
       case (ColumnRef(path, tpe), column) =>
         "%10s: %-10s => %s".format(path, tpe, column)
-    } mkString ("Columns[\n  ", "\n  ", "\n]")
+    } mkString ("[\n  ", "\n  ", "\n]")
   )
+  override def toString = "Columns" + column_s
 }
+
 final case class EagerColumnMap(fields: Vector[ColumnKV]) extends ColumnMap {
   def ++(that: ColumnMap): EagerColumnMap         = EagerColumnMap(fields ++ that.fields)
   def +(kv: KV): EagerColumnMap                   = EagerColumnMap(fields :+ kv)

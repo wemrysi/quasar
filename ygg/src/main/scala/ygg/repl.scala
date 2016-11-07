@@ -22,6 +22,9 @@ import scalaz._
 import TableData.fromJValues
 
 object repl {
+  lazy val bigZips   = TableData.fromFile(new jFile("it/src/main/resources/tests/zips.data"))
+  lazy val smallZips = TableData.fromFile(new jFile("it/src/main/resources/tests/smallZips.data"))
+
   implicit final class JvalueInterpolator(sc: StringContext) {
     def json(args: Any*): JValue             = macro JValueMacros.jsonInterpolatorImpl
     def jsonMany(args: Any*): Vector[JValue] = macro JValueMacros.jsonManyInterpolatorImpl
