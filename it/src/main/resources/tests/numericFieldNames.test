@@ -1,0 +1,19 @@
+{
+  "name": "numeric field names",
+
+  "backends": {
+    "marklogic": "pending"
+  },
+
+  "data": "smallZips.data",
+
+  "query": "select city as `12`, pop as `42` from smallZips",
+
+  "predicate": "containsAtLeast",
+
+  "ignoreFieldOrder": true,
+
+  "expected": [
+    { "12": "NEW SALEM", "42": 14077 }
+  ]
+}
