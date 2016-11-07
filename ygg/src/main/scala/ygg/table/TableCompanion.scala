@@ -33,26 +33,22 @@ trait TableConfig {
 trait TableCompanion[Table] extends TableConfig {
   self =>
 
+  lazy val sortMergeEngine = new MergeEngine
+
+  private implicit def thisRep = TableRep make self
+
   def sizeOf(table: Table): TableSize
   def slicesOf(table: Table): StreamT[Need, Slice]
   def projectionsOf(table: Table): Map[Path, Projection]
-  def methodsOf(table: Table): TableMethods[Table]
-
   def withProjections(table: Table, ps: ProjMap): Table
-  def fromSlices(slices: NeedSlices, size: TableSize): Table
 
-  def thisRep = TableRep make self
+  def empty: Table
+  def fromSlices(slices: NeedSlices, size: TableSize): Table
 
   private lazy val addGlobalIdScanner = Scanner(0L) { (a, cols, range) =>
     val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
     (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
   }
-
-  implicit lazy val codec = DataCodec.Precise
-
-  lazy val sortMergeEngine = new MergeEngine
-
-  def empty: Table = fromSlices(emptyStreamT(), ExactSize(0))
 
   /**
     * Return the subtable where each group key in keyIds is set to
@@ -75,7 +71,7 @@ trait TableCompanion[Table] extends TableConfig {
       slice
     }
 
-    fromSlices(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
+    lazyTable(slices, ExactSize(size))
   }
 
   /**
@@ -176,7 +172,7 @@ trait TableCompanion[Table] extends TableConfig {
       )
     )
 
-    methodsOf(fromSlices(StreamT(Need(head)), ExactSize(totalCount))) transform TransSpec1.DerefArray1
+    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
   }
 
   /**
@@ -194,7 +190,7 @@ trait TableCompanion[Table] extends TableConfig {
     ().point[F] map (_ => WriteTable.groupByN[Table](externalize(table), keys, values, order, unique)(thisRep).value)
 
   def load(table: Table, tpe: JType): Need[Table] = {
-    val reduced = methodsOf(table) reduce new CReducer[Set[Path]] {
+    val reduced = table reduce new CReducer[Set[Path]] {
       def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
         case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
         case _            => Set()

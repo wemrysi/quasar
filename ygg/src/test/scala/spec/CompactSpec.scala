@@ -38,24 +38,23 @@ class CompactSpec extends TableQspec {
     "have no empty key slices"                 in testCompactSlicesKey
   }
 
-  private def tableStats(table: Table): List[Int -> Int] = table match {
-    case cTable =>
-      val slices = cTable.slices.toStream.copoint
-      val sizes  = slices.map(_.size).toList
-      val undefined = slices.map { slice =>
-        (0 until slice.size).foldLeft(0) {
-          case (acc, i) => if (!slice.columns.values.exists(_.isDefinedAt(i))) acc + 1 else acc
-        }
-      }.toList
+  private def tableStats(cTable: Table): List[Int -> Int] = {
+    val slices = cTable.slicesStream
+    val sizes  = slices.map(_.size).toList
+    val undefined = slices.map { slice =>
+      (0 until slice.size).foldLeft(0) {
+        case (acc, i) => if (!slice.columns.values.exists(_.isDefinedAt(i))) acc + 1 else acc
+      }
+    }.toList
 
-      sizes zip undefined
+    sizes zip undefined
   }
 
   private def mkDeref(path: CPath): TransSpec1 = {
     def mkDeref0(nodes: Seq[CPathNode]): TransSpec1 = nodes match {
       case (f: CPathField) +: rest => DerefObjectStatic(mkDeref0(rest), f)
       case (i: CPathIndex) +: rest => DerefArrayStatic(mkDeref0(rest), i)
-      case _                       => Leaf(Source)
+      case _                       => root
     }
 
     mkDeref0(path.nodes)
@@ -69,58 +68,55 @@ class CompactSpec extends TableQspec {
     case _                                   => None
   }
 
-  private def chooseColumn(table: Table): TransSpec1 = table match {
-    case cTable =>
-      cTable.slices.toStream.copoint.headOption.map { slice =>
-        val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
-        mkDeref(chosenPath)
-      } getOrElse (mkDeref(CPath.Identity))
+  private def chooseColumn(cTable: Table): TransSpec1 = {
+    cTable.slicesStream.headOption.map { slice =>
+      val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
+      mkDeref(chosenPath)
+    } getOrElse (mkDeref(CPath.Identity))
   }
 
-  private def undefineTable(fullTable: Table): Table = fullTable match {
-    case cTable =>
-      val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
-      val numSlices = slices.size
+  private def undefineTable(cTable: Table): Table = {
+    val slices    = cTable.slicesStream // fuzzing must be done strictly otherwise sadness will ensue
+    val numSlices = slices.size
 
-      val maskedSlices = slices map { slice =>
-        val sz = slice.size
-        val bs =
-          (
-            if (numSlices > 1 && randomDouble < 0.25)
-              Bits()
-            else
-              Bits(0 until sz filter (_ => randomDouble < 0.75))
-          )
-        Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
-      }
-      Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
+    val maskedSlices = slices map { slice =>
+      val sz = slice.size
+      val bs =
+        (
+          if (numSlices > 1 && randomDouble < 0.25)
+            Bits()
+          else
+            Bits(0 until sz filter (_ => randomDouble < 0.75))
+        )
+      Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
+    }
+    lazyTable[Table](maskedSlices, UnknownSize)
   }
 
-  private def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
-    case cTable =>
-      val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
-      val numSlices = slices.size
+  private def undefineColumn(cTable: Table, path: CPath): Table = {
+    val slices    = cTable.slicesStream // fuzzing must be done strictly otherwise sadness will ensue
+    val numSlices = slices.size
 
-      val maskedSlices = slices.map { slice =>
-        val colRef = slice.columns.keys.find(_.selector == path)
-        val maskedSlice = colRef.map { colRef =>
-          val col = slice.columns(colRef)
-          val maskedCol =
-            if (numSlices > 1 && randomDouble < 0.25)
-              (col |> cf.filter(0, slice.size, new BitSet)).get
-            else {
-              val retained = (0 until slice.size).map { (x: Int) =>
-                if (randomDouble < 0.75) Some(x) else None
-              }.flatten
-              (col |> cf.filter(0, slice.size, Bits(retained))).get
-            }
+    val maskedSlices = slices.map { slice =>
+      val colRef = slice.columns.keys.find(_.selector == path)
+      val maskedSlice = colRef.map { colRef =>
+        val col = slice.columns(colRef)
+        val maskedCol =
+          if (numSlices > 1 && randomDouble < 0.25)
+            (col |> cf.filter(0, slice.size, new BitSet)).get
+          else {
+            val retained = (0 until slice.size).map { (x: Int) =>
+              if (randomDouble < 0.75) Some(x) else None
+            }.flatten
+            (col |> cf.filter(0, slice.size, Bits(retained))).get
+          }
 
-          Slice(slice.size, slice.columns.updated(colRef, maskedCol))
-        }
-        maskedSlice.getOrElse(slice)
+        Slice(slice.size, slice.columns.updated(colRef, maskedCol))
       }
+      maskedSlice.getOrElse(slice)
+    }
 
-      Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
+    lazyTable[Table](maskedSlices, UnknownSize)
   }
 
   private def testCompactIdentity = {

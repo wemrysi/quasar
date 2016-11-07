@@ -57,9 +57,8 @@ object TableData extends TableCompanion[TableData] {
   final case class Internal(slice: Slice)                    extends TableData
   final case class Projections(underlying: T, proj: ProjMap) extends TableData
 
-  override def empty: T                                  = new Internal(Slice.empty)
+  def empty: T                                      = new Internal(Slice.empty)
   def fromSlices(slices: NeedSlices, size: Size): T = new External(slices, size)
-  def methodsOf(table: T): TableMethods[T]               = new Impl(table)
 
   def sizeOf(table: T): Size = table match {
     case External(_, size)          => size
@@ -76,8 +75,4 @@ object TableData extends TableCompanion[TableData] {
     case _                           => Map()
   }
   def withProjections(table: TableData, ps: ProjMap): TableData = Projections(table, ps)
-
-  private class Impl(val self: TableData) extends TableMethods[TableData] {
-    def companion = TableData
-  }
 }

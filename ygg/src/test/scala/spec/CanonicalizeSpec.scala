@@ -132,7 +132,7 @@ class CanonicalizeSpec extends TableQspec {
         Stream(Slice.empty) ++ tableTakeRange(table, 9, 5) ++
         Stream(Slice.empty)
 
-    val newTable     = Table(StreamT.fromStream(Need(slices)), table.size)
+    val newTable     = lazyTable[Table](slices, table.size)
     val result       = newTable.canonicalize(4)
     val resultSlices = result.slices.toStream.copoint
     val resultSizes  = resultSlices.map(_.size)

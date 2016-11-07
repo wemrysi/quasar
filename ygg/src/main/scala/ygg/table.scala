@@ -35,7 +35,7 @@ package object table {
   implicit def s2PathNode(name: String): CPathField = CPathField(name)
   implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
 
-  implicit def tableMethods[T: TableRep](table: T): TableMethods[T] = companionOf[T] methodsOf table
+  implicit def tableMethods[T: TableRep](table: T): TableMethods[T] = new TableMethods[T](table)
 
   def companionOf[T: TableRep] : TableCompanion[T] = TableRep[T].companion
 

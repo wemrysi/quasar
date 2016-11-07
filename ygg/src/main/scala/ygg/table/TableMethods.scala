@@ -20,21 +20,14 @@ import ygg._, common._, json._, trans._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
-trait TableMethods[Table] {
-  outer =>
-
+class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
   type M[+X] = Need[X]
 
-  def self: Table
-  def companion: TableCompanion[Table]
-
+  def companion                                         = z.companion
   def slices: NeedSlices                                = companion slicesOf self
   def size: TableSize                                   = companion sizeOf self
   def projections: Map[Path, Projection]                = companion projectionsOf self
   def withProjections(ps: Map[Path, Projection]): Table = companion.withProjections(self, ps)
-
-  private implicit def thisTableRep: TableRep[Table]                   = companion.thisRep
-  private implicit def tableMethods(table: Table): TableMethods[Table] = companion methodsOf table
 
   private def makeTable(slices: NeedSlices, size: TableSize): Table             = companion.fromSlices(slices, size)
   private def needTable(slices: => NeedSlices, size: => TableSize): Need[Table] = Need(makeTable(slices, size))
