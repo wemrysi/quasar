@@ -73,12 +73,17 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
 
     case Sort(src, bucket, order) =>
       for {
-        x           <- freshVar[F]
-        xQueryOrder <- order.traverse { case (func, sortDir) =>
-                         mapFuncXQuery(func, x.xqy).strengthR(SortDirection.fromQScript(sortDir))
-                       }
-        bucketOrder <- mapFuncXQuery(bucket, x.xqy).strengthR(SortDirection.Ascending)
-      } yield for_(x -> src) orderBy (bucketOrder, xQueryOrder: _*) return_ x.xqy
+        x        <- freshVar[F]
+        xqyOrder <- NonEmptyList((bucket, SortDir.Ascending), order: _*).traverse { case (func, sortDir) =>
+                      mapFuncXQuery(func, x.xqy) strengthR SortDirection.fromQScript(sortDir)
+                    }
+      } yield src match {
+        case XQuery.Flwor(tuples, lets, filter, _, _, result) =>
+          XQuery.Flwor(tuples, lets ::: IList((x, result)), filter, xqyOrder.list, false, x.xqy)
+
+        case _ =>
+          for_(x -> src) orderBy (xqyOrder.head, xqyOrder.tail.toList: _*) return_ x.xqy
+      }
 
     case Union(src, lBranch, rBranch) =>
       for {
