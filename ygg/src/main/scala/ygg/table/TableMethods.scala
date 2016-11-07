@@ -30,6 +30,16 @@ trait TableMethodsCompanion[Table] {
   def smallSliceSize: Int = 3
   def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
 
+  def sizeOf(table: Table): TableSize
+  def slicesOf(table: Table): StreamT[Need, Slice]
+  def projectionsOf(table: Table): Map[Path, Projection]
+  def methodsOf(table: Table): TableMethods[Table]
+
+  def withProjections(table: Table, ps: ProjMap): Table
+  def fromSlices(slices: NeedSlices, size: TableSize): Table
+
+  implicit def tableMethods(table: Table): TableMethods[Table] = methodsOf(table)
+
   private lazy val addGlobalIdScanner = Scanner(0L) { (a, cols, range) =>
     val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
     (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
@@ -39,8 +49,6 @@ trait TableMethodsCompanion[Table] {
 
   lazy val sortMergeEngine = new MergeEngine
 
-  def fromSlices(slices: NeedSlices, size: TableSize): Table
-  implicit def tableMethods(table: Table): TableMethods[Table]
 
   def empty: Table = fromSlices(emptyStreamT(), ExactSize(0))
 
@@ -278,14 +286,14 @@ trait TableMethods[Table] {
   private def needTable(slices: => NeedSlices, size: => TableSize): Need[Table] = Need(makeTable(slices, size))
   private def makeEmpty: Table                                                  = companion.empty
 
-  def slices: NeedSlices
-  def size: TableSize
-  def projections: Map[Path, Projection]
-
   def self: Table
-  def asRep: TableRep[Table] = TableRep[Table](self, companion)
   def companion: TableMethodsCompanion[Table]
-  def withProjections(ps: Map[Path, Projection]): Table
+  def asRep: TableRep[Table] = TableRep[Table](self, companion)
+
+  def slices: NeedSlices                                = companion slicesOf self
+  def size: TableSize                                   = companion sizeOf self
+  def projections: Map[Path, Projection]                = companion projectionsOf self
+  def withProjections(ps: Map[Path, Projection]): Table = companion.withProjections(self, ps)
 
   def sample(size: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = Sampling.sample(asRep, size, specs)
 

@@ -30,6 +30,7 @@ package object table {
   type Identities     = Array[Identity]
   type ColumnKV       = ColumnRef -> Column
   type ArrayColumnMap = Map[ColumnRef, ArrayColumn[_]]
+  type ProjMap        = Map[Path, Projection]
 
   implicit def s2PathNode(name: String): CPathField = CPathField(name)
   implicit def i2PathNode(index: Int): CPathIndex   = CPathIndex(index)
