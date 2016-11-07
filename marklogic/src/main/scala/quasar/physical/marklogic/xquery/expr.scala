@@ -26,7 +26,6 @@ import scalaz.std.iterable._
 import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
-import scalaz.syntax.std.boolean._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object expr {
@@ -42,8 +41,8 @@ object expr {
   def every(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
     QuantifiedExpr(Quantifier.Every, NonEmptyList(ts, tss: _*))
 
-  def for_(ts: (String, XQuery), tss: (String, XQuery)*): Flwor =
-    Flwor(ts :: IList.fromList(tss.toList), IList.empty, None, IList.empty, false)
+  def for_(ts: (String, XQuery), tss: (String, XQuery)*): FlworExpr =
+    FlworExpr(ts :: IList.fromList(tss.toList), IList.empty, None, IList.empty, false)
 
   def func(args: String*)(body: XQuery): XQuery =
     XQuery(s"function${mkSeq(args map (XQuery(_)))} { $body }")
@@ -51,8 +50,8 @@ object expr {
   def if_(cond: XQuery): IfExpr =
     IfExpr(cond)
 
-  def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
-    Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
+  def let_(b: (String, XQuery), bs: (String, XQuery)*): FlworExpr =
+    FlworExpr(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
   def isCastable(x: XQuery, tpe: SequenceType): XQuery =
     XQuery(s"$x castable as $tpe")
@@ -63,57 +62,33 @@ object expr {
   def typeswitch(on: XQuery)(cases: TypeswitchCaseClause*): TypeswitchExpr =
     TypeswitchExpr(on, cases.toList)
 
-  final case class Flwor(
+  final case class FlworExpr(
     tupleStreams: IList[(String, XQuery)],
     letDefs: IList[(String, XQuery)],
     filterExpr: Option[XQuery],
     orderSpecs: IList[(XQuery, SortDirection)],
     orderIsStable: Boolean
   ) {
-    def let_(d: (String, XQuery), ds: (String, XQuery)*): Flwor =
+    def let_(d: (String, XQuery), ds: (String, XQuery)*): FlworExpr =
       copy(letDefs = d :: IList.fromList(ds.toList))
 
-    def where_(expr: XQuery): Flwor =
+    def where_(expr: XQuery): FlworExpr =
       copy(filterExpr = Some(expr))
 
-    def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
+    def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
       copy(orderSpecs = s :: IList.fromList(ss.toList))
 
-    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
+    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
       orderBy(s, ss: _*).copy(orderIsStable = true)
 
-    def return_(expr: XQuery): XQuery = {
-      val forClause = {
-        val bindings = tupleStreams map {
-          case (v, xqy) => s"$v in $xqy"
-        } intercalate ", "
-
-        if (tupleStreams.isEmpty) "" else s"for $bindings "
-      }
-
-      val letClause = {
-        val bindings = letDefs map {
-          case (v, xqy) => s"$v := $xqy"
-        } intercalate ", "
-
-        if (letDefs.isEmpty) "" else s"let $bindings "
-      }
-
-      val whereClause =
-        filterExpr.map(expr => s"where $expr ").orZero
-
-      val orderClause = {
-        val specs = orderSpecs map {
-          case (xqy, sortDir) => s"$xqy ${sortDir.asOrderModifier}"
-        } intercalate ", "
-
-        val orderKeyword = orderIsStable.fold("stable order", "order")
-
-        if (orderSpecs.isEmpty) "" else s"$orderKeyword by $specs "
-      }
-
-      XQuery(s"${forClause}${letClause}${whereClause}${orderClause}return $expr")
-    }
+    def return_(expr: XQuery): XQuery =
+      XQuery.Flwor(
+        tupleStreams,
+        letDefs,
+        filterExpr,
+        orderSpecs,
+        orderIsStable,
+        expr)
   }
 
   final case class IfExpr(cond: XQuery) {
