@@ -40,12 +40,17 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
 
   // TODO: Move datetime handling out of generated N1QL once enriched N1QL representation is available
 
-  def extract(expr: N1QL, part: String): M[N1QL] = {
+  def unwrap(expr: N1QL): N1QL = {
     val exprN1ql = n1ql(expr)
     partialQueryString(
-      s"""date_part_str(ifmissing($exprN1ql.["$DateKey"], $exprN1ql.["$TimeKey"], $exprN1ql.["$TimestampKey"], $exprN1ql), "$part")"""
-    ).point[M]
+      s"""ifmissing($exprN1ql.["$DateKey"], $exprN1ql.["$TimeKey"], $exprN1ql.["$TimestampKey"], $exprN1ql)"""
+    )
   }
+
+  def extract(expr: N1QL, part: String): M[N1QL] =
+    partialQueryString(
+      s"""date_part_str(${n1ql(unwrap(expr))}, "$part")"""
+    ).point[M]
 
   def datetime(expr: N1QL, key: String, regex: String): M[N1QL] = {
     val exprN1ql = n1ql(expr)
@@ -61,21 +66,14 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   def rel(a1: N1QL, a2: N1QL, op: String): M[N1QL] = {
     val a1N1ql = n1ql(a1)
     val a2N1ql = n1ql(a2)
-    def unwrap(expr: String) = s"""
-      (case
-       when $expr.["$DateKey"]      is not null then $expr.["$DateKey"]
-       when $expr.["$TimeKey"]      is not null then $expr.["$TimeKey"]
-       when $expr.["$TimestampKey"] is not null then $expr.["$TimestampKey"]
-       else $expr
-       end)"""
     def trunc(v: String) = s"""
       (case
        when ifmissing($a1N1ql.["$DateKey"], $a2N1ql.["$DateKey"]) is not null
        then date_trunc_millis(millis($v), "day")
        else $v
        end)"""
-    val lTrunc = trunc(unwrap(a1N1ql))
-    val rTrunc = trunc(unwrap(a2N1ql))
+    val lTrunc = trunc(n1ql(unwrap(a1)))
+    val rTrunc = trunc(n1ql(unwrap(a2)))
 
     partialQueryString(s"""$lTrunc $op $rTrunc""").point[M]
   }
