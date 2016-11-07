@@ -16,7 +16,7 @@
 
 package ygg.table
 
-import ygg._, common._, json._
+import ygg._, common._
 
 sealed trait CFId extends Product with Serializable
 final case class LeafCFId(identity: String)            extends CFId
@@ -105,10 +105,4 @@ object CF2P {
     def apply(c1: Column, c2: Column) = f.lift((c1, c2))
     val identity                      = id
   }
-}
-
-final case class CSchema(columnRefs: Set[ColumnRef], columns: JType => Set[Column])
-
-trait CReducer[A] {
-  def reduce(schema: CSchema, range: Range): A
 }

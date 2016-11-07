@@ -16,15 +16,14 @@
 
 package ygg.table
 
-import scalaz.{ =?> => _, _ }, Ordering._
-import ygg._, common._, json._, data._
+import ygg._, common._, data._
 import NumericComparisons._
+import scalaz._, Ordering._
 
 trait Column {
   val tpe: CType
 
   def isDefinedAt(row: RowId): Boolean
-  def jValue(row: RowId): JValue
   def cValue(row: RowId): CValue
   def strValue(row: RowId): String
   def rowCompare(row1: RowId, row2: RowId): Int
@@ -51,7 +50,6 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with
     loop(tpe)
   }
 
-  override def jValue(row: Int)   = CArray(apply(row), tpe).toJValue
   override def cValue(row: Int)   = tpe(this(row))
   override def strValue(row: Int) = this(row) mkString ("[", ",", "]")
 
@@ -63,6 +61,8 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with
 }
 
 object HomogeneousArrayColumn {
+  import quasar.Predef.=?>
+
   def apply[A: CValueType](f: Int =?> Array[A]): HomogeneousArrayColumn[A] = new HomogeneousArrayColumn[A] {
     val tpe: CArrayType[A]    = implicitly
     def isDefinedAt(row: Int) = f isDefinedAt row
@@ -145,7 +145,6 @@ trait BoolColumn extends Column with (Int => Boolean) {
   }
 
   override val tpe                        = CBoolean
-  override def jValue(row: Int)           = JBool(this(row))
   override def cValue(row: Int)           = CBoolean(this(row))
   override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "BoolColumn"
@@ -170,7 +169,6 @@ trait LongColumn extends Column with (Int => Long) {
   def rowCompare(row1: Int, row2: Int): Int = compare(apply(row1), apply(row2))
 
   override val tpe                        = CLong
-  override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CLong(this(row))
   override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "LongColumn"
@@ -181,7 +179,6 @@ trait DoubleColumn extends Column with (Int => Double) {
   def rowCompare(row1: Int, row2: Int): Int = compare(apply(row1), apply(row2))
 
   override val tpe                        = CDouble
-  override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CDouble(this(row))
   override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "DoubleColumn"
@@ -192,7 +189,6 @@ trait NumColumn extends Column with (Int => BigDecimal) {
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
   override val tpe                        = CNum
-  override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CNum(this(row))
   override def strValue(row: Int): String = this(row).toString
   override def toString                   = "NumColumn"
@@ -204,7 +200,6 @@ trait StrColumn extends Column with (Int => String) {
     apply(row1) compareTo apply(row2)
 
   override val tpe                        = CString
-  override def jValue(row: Int)           = JString(this(row))
   override def cValue(row: Int)           = CString(this(row))
   override def strValue(row: Int): String = this(row)
   override def toString                   = "StrColumn"
@@ -216,7 +211,6 @@ trait DateColumn extends Column with (Int => DateTime) {
     apply(row1) compareTo apply(row2)
 
   override val tpe                        = CDate
-  override def jValue(row: Int)           = JString(this(row).toString)
   override def cValue(row: Int)           = CDate(this(row))
   override def strValue(row: Int): String = this(row).toString
   override def toString                   = "DateColumn"
@@ -227,7 +221,6 @@ trait PeriodColumn extends Column with (Int => Period) {
   def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare periods.")
 
   override val tpe                        = CPeriod
-  override def jValue(row: Int)           = JString(this(row).toString)
   override def cValue(row: Int)           = CPeriod(this(row))
   override def strValue(row: Int): String = this(row).toString
   override def toString                   = "PeriodColumn"
@@ -236,7 +229,6 @@ trait PeriodColumn extends Column with (Int => Period) {
 trait EmptyArrayColumn extends Column {
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyArray
-  override def jValue(row: Int)             = jarray()
   override def cValue(row: Int)             = CEmptyArray
   override def strValue(row: Int): String   = "[]"
   override def toString                     = "EmptyArrayColumn"
@@ -248,7 +240,6 @@ object EmptyArrayColumn {
 trait EmptyObjectColumn extends Column {
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyObject
-  override def jValue(row: Int)             = jobject()
   override def cValue(row: Int)             = CEmptyObject
   override def strValue(row: Int): String   = "{}"
   override def toString                     = "EmptyObjectColumn"
@@ -261,7 +252,6 @@ object EmptyObjectColumn {
 trait NullColumn extends Column {
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CNull
-  override def jValue(row: Int)             = JNull
   override def cValue(row: Int)             = CNull
   override def strValue(row: Int): String   = "null"
   override def toString                     = "NullColumn"
@@ -279,7 +269,6 @@ object UndefinedColumn {
     val tpe                                   = col.tpe
     def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare undefined values.")
     def isDefinedAt(row: Int)                 = false
-    def jValue(row: Int)                      = fail()
     def cValue(row: Int)                      = CUndefined
     def strValue(row: Int)                    = fail()
   }
@@ -288,7 +277,6 @@ object UndefinedColumn {
     val tpe                                   = CUndefined
     def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare undefined values.")
     def isDefinedAt(row: Int)                 = false
-    def jValue(row: Int)                      = fail()
     def cValue(row: Int)                      = CUndefined
     def strValue(row: Int)                    = fail()
   }

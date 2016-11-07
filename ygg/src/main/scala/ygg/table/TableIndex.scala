@@ -55,11 +55,10 @@ object TableIndex {
   def createFromTable[T](rep: TableRep[T], groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): Need[TableIndex] = {
     import rep._
 
-    def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[Need, SliceIndex]): Need[TableIndex] =
-      stream.uncons flatMap {
-        case None             => Need(new TableIndex(buf.toList))
-        case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
-      }
+    def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[Need, SliceIndex]): Need[TableIndex] = stream.uncons flatMap {
+      case None             => Need(new TableIndex(buf.toList))
+      case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
+    }
 
     // We are given TransSpec1s; to apply these to slices we need to
     // create SliceTransforms from them.
@@ -283,17 +282,12 @@ object SliceIndex {
       k += 1
     }
 
-    val back = (0 until keys.length).foldLeft(Need(Vector.fill[Array[RValue]](numKeys)(null))) {
-      case (accM, i) => {
-        val arrM = keys(i)
+    val zero = Need(Vector.fill[Array[RValue]](numKeys)(null))
+    val back = (0 until keys.length).foldLeft(zero)((accM, i) =>
+      Monad[Need].apply2(accM, keys(i))((acc, arr) => acc.updated(i, arr))
+    )
 
-        Need.need.apply2(accM, arrM) { (acc, arr) =>
-          acc.updated(i, arr)
-        }
-      }
-    }
-
-    back map { _.toArray }
+    back map (_.toArray)
   }
 }
 

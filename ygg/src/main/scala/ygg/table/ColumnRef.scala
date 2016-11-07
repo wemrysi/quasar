@@ -19,7 +19,9 @@ package ygg.table
 import ygg.common._
 import scalaz.Scalaz._
 
-final case class ColumnRef(selector: CPath, ctype: CType)
+final case class ColumnRef(selector: CPath, ctype: CType) {
+  def toTuple = selector -> ctype
+}
 
 object ColumnRef {
   object id {

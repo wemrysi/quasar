@@ -16,9 +16,8 @@
 
 package ygg.table
 
+import ygg._, common._, data._, json._
 import scalaz._, Scalaz._
-import ygg.common._
-import ygg.data._
 
 /**
   * Represents the column headers we have. We track three things:
@@ -48,6 +47,12 @@ class ColumnIndices private (val paths: Vector[String]) {
 }
 object ColumnIndices {
   def fromPaths(ps: scTraversable[String]): ColumnIndices = new ColumnIndices(ps.toVector.sorted)
+}
+
+final case class CSchema(columnRefs: Set[ColumnRef], columns: JType => Set[Column])
+
+trait CReducer[A] {
+  def reduce(schema: CSchema, range: Range): A
 }
 
 trait Scanner {
@@ -222,7 +227,6 @@ abstract class ArraySetColumn[T <: Column](val tpe: CType, protected val backing
     if (i != backing.length) i else -1
   }
   def isDefinedAt(row: Int) = firstDefinedIndexAt(row) != -1
-  def jValue(row: Int)      = backing(firstDefinedIndexAt(row)).jValue(row)
   def cValue(row: Int)      = backing(firstDefinedIndexAt(row)).cValue(row)
   def strValue(row: Int)    = backing(firstDefinedIndexAt(row)).strValue(row)
 }

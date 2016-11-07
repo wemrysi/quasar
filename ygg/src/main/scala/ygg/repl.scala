@@ -17,18 +17,17 @@
 package ygg
 
 import common._, macros._
-import json._, table._, trans.{ TransSpec => _, _ }
-import scalaz.{ Source => _, _ }
+import json._, table._, trans._
+import scalaz._
+import TableData.fromJValues
 
 object repl {
-  import TableData.{ fromJValues => fromJson }
-
   implicit final class JvalueInterpolator(sc: StringContext) {
     def json(args: Any*): JValue             = macro JValueMacros.jsonInterpolatorImpl
     def jsonMany(args: Any*): Vector[JValue] = macro JValueMacros.jsonManyInterpolatorImpl
   }
 
-  def medals      = fromJson(medalsIn)
+  def medals      = fromJValues(medalsIn)
   def medalsMerge = MergeTable(grouping)(evaluator)
 
   def medalsIn = jsonMany"""
@@ -77,10 +76,10 @@ object repl {
     val K2 = RValue.fromJValue(json"""{"1":"2004","extra0":true,"extra1":true}""")
     val K3 = RValue.fromJValue(json"""{"1":"2008","extra0":true,"extra1":true}""")
 
-    val r0 = fromJson(jsonMany"""{"key":[],"value":{"year":"1996","ratio":139.0}}""")
-    val r1 = fromJson(jsonMany"""{"key":[],"value":{"year":"2000","ratio":126.0}}""")
-    val r2 = fromJson(jsonMany"""{"key":[],"value":{"year":"2004","ratio":122.0}}""")
-    val r3 = fromJson(jsonMany"""{"key":[],"value":{"year":"2008","ratio":119.0}}""")
+    val r0 = fromJValues(jsonMany"""{"key":[],"value":{"year":"1996","ratio":139.0}}""")
+    val r1 = fromJValues(jsonMany"""{"key":[],"value":{"year":"2000","ratio":126.0}}""")
+    val r2 = fromJValues(jsonMany"""{"key":[],"value":{"year":"2004","ratio":122.0}}""")
+    val r3 = fromJValues(jsonMany"""{"key":[],"value":{"year":"2008","ratio":119.0}}""")
 
     Need {
       key match {
@@ -96,9 +95,9 @@ object repl {
   implicit class TableSelectionOps[T](val rep: TableRep[T]) {
     import rep._
 
-    private implicit def nextOps(next: T): TableSelectionOps[T] = TableSelectionOps[T](rep.copy(table = next))
+    private implicit def nextOps(next: T): TableSelectionOps[T] = TableSelectionOps[T](TableRep(next, companion))
 
-    private type F1 = TransSpec[Source.type]
+    private type F1 = trans.TransSpec[trans.Source.type]
 
     def p(): Unit                = table.dump()
     def map(f: TransSpec1): T    = table transform f

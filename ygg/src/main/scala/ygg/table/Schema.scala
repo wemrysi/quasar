@@ -19,6 +19,11 @@ package ygg.table
 import ygg._, common._, json._, data._
 
 object Schema {
+  /** Better signatures **/
+  def includes(jtpe: JType, ref: ColumnRef): Boolean       = includes(jtpe, ref.selector, ref.ctype)
+  def subsumes(jtpe: JType, refs: Seq[ColumnRef]): Boolean = subsumes(refs map (_.toTuple), jtpe)
+  def requiredBy(jtpe: JType, ref: ColumnRef): Boolean     = requiredBy(jtpe, ref.selector, ref.ctype)
+
   def ctypes(jtype: JType): Set[CType] = jtype match {
     case JArrayFixedT(indices) if indices.isEmpty => Set(CEmptyArray)
     case JObjectFixedT(fields) if fields.isEmpty  => Set(CEmptyObject)
@@ -56,7 +61,7 @@ object Schema {
   }
 
   def sample(jtype: JType, size: Int): Option[JType] = {
-    val paths                          = flatten(jtype, Vec()) groupBy { _.selector } toVector
+    val paths                        = flatten(jtype, Vec()) groupBy { _.selector } toVector
     val sampledPaths: Seq[ColumnRef] = paths.shuffle take size flatMap (_._2)
 
     mkType(sampledPaths)
@@ -315,25 +320,16 @@ object Schema {
     * This is strict, so a JArrayFixedT(_) cannot include a CPathArray/CArrayType(_).
     */
   def includes(jtpe: JType, path: CPath, ctpe: CType): Boolean = (jtpe, (path, ctpe)) match {
-    case (JNumberT, (CPath.Identity, CLong | CDouble | CNum)) => true
-
-    case (JTextT, (CPath.Identity, CString)) => true
-
-    case (JBooleanT, (CPath.Identity, CBoolean)) => true
-
-    case (JNullT, (CPath.Identity, CNull)) => true
-
-    case (JDateT, (CPath.Identity, CDate))     => true
-    case (JPeriodT, (CPath.Identity, CPeriod)) => true
-
-    case (JObjectUnfixedT, (CPath.Identity, CEmptyObject))                         => true
-    case (JObjectUnfixedT, (CPath(CPathField(_), _ *), _))                         => true
-    case (JObjectFixedT(fields), (CPath.Identity, CEmptyObject)) if fields.isEmpty => true
-
-    case (JObjectFixedT(fields), (CPath(CPathField(head), tail @ _ *), ctpe)) => {
-      fields.get(head).map(includes(_, CPath(tail: _*), ctpe)).getOrElse(false)
-    }
-
+    case (JNumberT, (CPath.Identity, CLong | CDouble | CNum))                        => true
+    case (JTextT, (CPath.Identity, CString))                                         => true
+    case (JBooleanT, (CPath.Identity, CBoolean))                                     => true
+    case (JNullT, (CPath.Identity, CNull))                                           => true
+    case (JDateT, (CPath.Identity, CDate))                                           => true
+    case (JPeriodT, (CPath.Identity, CPeriod))                                       => true
+    case (JObjectUnfixedT, (CPath.Identity, CEmptyObject))                           => true
+    case (JObjectUnfixedT, (CPath(CPathField(_), _ *), _))                           => true
+    case (JObjectFixedT(fields), (CPath.Identity, CEmptyObject)) if fields.isEmpty   => true
+    case (JObjectFixedT(fields), (CPath(CPathField(head), tail @ _ *), ctpe))        => fields.get(head).map(includes(_, CPath(tail: _*), ctpe)).getOrElse(false)
     case (JArrayUnfixedT, (CPath.Identity, CEmptyArray))                             => true
     case (JArrayUnfixedT, (CPath(CPathArray, _ *), CArrayType(_)))                   => true
     case (JArrayUnfixedT, (CPath(CPathIndex(_), _ *), _))                            => true

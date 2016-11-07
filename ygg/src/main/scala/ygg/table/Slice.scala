@@ -375,12 +375,11 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(size, source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) })
 
   def typedSubsumes(jtpe: JType): Slice = {
-    val tuples: Seq[CPath -> CType] = source.columns.fields map { case (ColumnRef(path, ctpe), _) => path -> ctpe }
     val columns = EagerColumnMap(
-      if (Schema.subsumes(tuples, jtpe)) {
-        source.columns.fields filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
-      }
-      else Vector()
+      source.columns.fields |> (kvs =>
+        if (Schema.subsumes(jtpe, kvs map (_._1))) kvs filter (kv => Schema.requiredBy(jtpe, kv._1))
+        else Vector()
+      )
     )
 
     Slice(source.size, columns)
