@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerError}
 import quasar.common.PhaseResult.detail
-import quasar.common.PhaseResultT
 import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._, eitherT._
@@ -50,7 +49,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
             case key =>
               EitherT(
                 (InternalError(s"Unsupported object key: ${key.shows}"): PlannerError)
-                  .left[String].point[PhaseResultT[F, ?]])
+                  .left[String].point[PR])
           },
           v => processFreeMapDefault(v.fromCoEnv, tmpName)
         )) ∘ (m =>
