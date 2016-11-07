@@ -80,7 +80,7 @@ object Sampling {
               val len = length min sampleSize
 
               (  inserter map (_ toSlice len)
-                   map (slice => companion.fromSlices(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize))
+                   map (slice => companion.fromSlices(singleStreamT(slice), ExactSize(len)).paged(companion.maxSliceSize))
                    getOrElse companion.empty
               )
             }

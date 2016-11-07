@@ -22,6 +22,14 @@ import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
 trait TableMethodsCompanion[Table] {
+  def maxSliceSize: Int = 10
+  // This is a slice size that we'd like our slices to be at least as large as.
+  def minIdealSliceSize: Int = maxSliceSize / 4
+  // This is what we consider a "small" slice. This may affect points where
+  // we take proactive measures to prevent problems caused by small slices.
+  def smallSliceSize: Int = 3
+  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+
   private lazy val addGlobalIdScanner = Scanner(0L) { (a, cols, range) =>
     val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a + row }
     (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
@@ -83,7 +91,7 @@ trait TableMethodsCompanion[Table] {
       sliceIndex.valueSlice.remap(rows)
 
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
-    val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
+    val sliceSize = maxSliceSize.getOrElse(this.maxSliceSize)
 
     def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
       data splitAt sliceSize leftMap (Slice fromRValues _)
@@ -245,7 +253,7 @@ trait TableMethodsCompanion[Table] {
 
   def fromJValues(values: Seq[JValue]): Table = fromJValues(values, None)
   def fromJValues(values: Seq[JValue], maxSliceSize: Option[Int]): Table = {
-    val sliceSize = maxSliceSize getOrElse yggConfig.maxSliceSize
+    val sliceSize = maxSliceSize getOrElse this.maxSliceSize
     def makeSlice(data: Stream[JValue]): Slice -> Stream[JValue] = {
       @tailrec def buildColArrays(from: Stream[JValue], into: ArrayColumnMap, sliceIndex: Int): ArrayColumnMap -> Int = from match {
         case jv #:: xs => buildColArrays(xs, Slice.withIdsAndValues(jv, into, sliceIndex, sliceSize), sliceIndex + 1)
@@ -470,7 +478,7 @@ trait TableMethods[Table] {
         // We try to fill out the slices as much as possible, so we work with
         // several rows from the left at a time.
 
-        val lrowsPerSlice = max(1, yggConfig.maxSliceSize / rhead.size)
+        val lrowsPerSlice = max(1, companion.maxSliceSize / rhead.size)
         val sliceSize     = lrowsPerSlice * rhead.size
 
         // Note that this is still memory efficient, as the columns are re-used
@@ -553,8 +561,8 @@ trait TableMethods[Table] {
       }
 
       // We canonicalize the tables so that no slices are too small.
-      val left  = this.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
-      val right = that.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
+      val left  = this.canonicalize(companion.minIdealSliceSize, maxLength = companion.maxSliceSize)
+      val right = that.canonicalize(companion.minIdealSliceSize, maxLength = companion.maxSliceSize)
 
       val ss = left.slices.uncons
 
@@ -604,7 +612,7 @@ trait TableMethods[Table] {
       case _                  => None
     }
 
-    val sizeCheck = for (resultSize <- newSizeM) yield resultSize < yggConfig.maxSaneCrossSize && resultSize >= 0
+    val sizeCheck = for (resultSize <- newSizeM) yield resultSize < companion.maxSaneCrossSize && resultSize >= 0
 
     sizeCheck match {
       case Some(false) => abort(s"cannot evaluate cartesian of sets with size $size and ${that.size}")
@@ -628,7 +636,7 @@ trait TableMethods[Table] {
       case slice :: Nil => slice
       case all          =>
         val result      = Slice concat all
-        val materialize = all.size > (result.size / yggConfig.smallSliceSize)
+        val materialize = all.size > (result.size / companion.smallSliceSize)
         // Deal w/ lots of small slices by materializing them.
         materialize.fold(result, result.materialized)
     }

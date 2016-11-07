@@ -72,7 +72,7 @@ class CrossSpec extends TableQspec {
     val dataset1 = fromJson(sample, Some(3))
 
     dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
-      case Some((head, _)) => head.size must beLessThanOrEqualTo(yggConfig.maxSliceSize)
+      case Some((head, _)) => head.size must beLessThanOrEqualTo(companion.maxSliceSize)
     }
   }
 

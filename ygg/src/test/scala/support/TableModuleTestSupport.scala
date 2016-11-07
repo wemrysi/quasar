@@ -25,6 +25,7 @@ abstract class TableQspec extends quasar.Qspec {
 
   val Table  = ygg.table.TableData
   type Table = ygg.table.TableData
+  def companion = Table
 
   protected implicit def liftTableRep(t: Table): TableRep[Table] = t.asRep
 
