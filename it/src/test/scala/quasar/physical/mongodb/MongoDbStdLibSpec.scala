@@ -120,7 +120,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          rez must beSingleResult(closeTo(massage(expected)))
+          rez must beSingleResult(beCloseTo(massage(expected)))
         }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
     val runner = new StdLibTestRunner with MongoDbDomain {

@@ -73,7 +73,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
   def run(lp: Fix[LP], expected: Data): Result =
     lpf.ensureCorrectTypes(lp).disjunction match {
-      case  \/-(Embed(Constant(d))) => (d must closeTo(expected)).toResult
+      case  \/-(Embed(Constant(d))) => (d must beCloseTo(expected)).toResult
       case  \/-(v) => Failure("not a constant", v.render.shows)
       case -\/ (err) => Failure("simplification failed", err.toString)
     }

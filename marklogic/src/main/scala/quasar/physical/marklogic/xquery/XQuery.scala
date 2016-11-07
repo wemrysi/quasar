@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
+import monocle.Prism
 import scalaz._
 import scalaz.std.iterable._
 
@@ -106,6 +107,14 @@ object XQuery {
 
   def apply(expr: String): XQuery =
     Expression(expr)
+
+  val stringLit = Prism.partial[XQuery, String] {
+    case StringLit(s) => s
+  } (StringLit)
+
+  val step = Prism.partial[XQuery, String] {
+    case Step(s) => s
+  } (Step)
 
   implicit val show: Show[XQuery] =
     Show.showFromToString

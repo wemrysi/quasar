@@ -3,12 +3,11 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "couchbase":         "skip"
     },
     "data": "zips.data",
-    "query": "select distinct length(meh), meh.mep, length(meh.mep) from zips",
+    "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",
     "predicate": "containsExactly",
     "expected": [
-        { "0": { "$na": null }, "mep": { "$na": null }, "2": { "$na": null } }]
+        { "meh_len": { "$na": null }, "mep": { "$na": null }, "mep_len": { "$na": null } }]
 }

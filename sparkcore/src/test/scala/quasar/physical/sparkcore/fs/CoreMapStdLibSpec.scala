@@ -23,16 +23,14 @@ import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Free => _}
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner}, MapFuncs._
 import quasar.std._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
 import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
-import shapeless.Sized
 
-// TODO: pull out MapFunc translation as MapFuncStdLibSpec
 class CoreMapStdLibSpec extends StdLibSpec {
   import quasar.frontend.fixpoint.lpf
 
@@ -41,29 +39,12 @@ class CoreMapStdLibSpec extends StdLibSpec {
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
     case ExtractIsoYear(_) => TODO
-    case Power(_, _) => Skipped("TODO: handle large value").left
-    case _ => ().right
+    case ExtractWeek(_)    => TODO
+    case Power(_, _)       => Skipped("TODO: handle large value").left
+    case _                 => ().right
   }
 
-  /** Translate to MapFunc (common to all QScript backends). */
-  def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
-    prg.cata[Free[MapFunc[Fix, ?], A]] {
-      case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
-          if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateUnaryMapping(func)(a1))
-
-      case lp.InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2))
-          if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateBinaryMapping(func)(a1, a2))
-
-      case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
-          if func.effect ≟ Mapping =>
-        Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
-
-      case lp.Free(sym) => Free.pure(args(sym))
-    }
-
-  // TODO: figure out how to pass the args to shortCircuit tso they can be inspected
+  // TODO: figure out how to pass the args to shortCircuit so they can be inspected
   def check[A](fm: Free[MapFunc[Fix, ?], A], args: List[Data]): Option[Result] =
     freeCataM(fm)(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](κ(().right), shortCircuit)).swap.toOption
 
@@ -72,10 +53,10 @@ class CoreMapStdLibSpec extends StdLibSpec {
   def run[A](fm: Free[MapFunc[Fix, ?], A], args: A => Data, expected: Data): Result = {
     val run = freeCataM(fm)(interpretM[PlannerError \/ ?, MapFunc[Fix, ?], A, Data => Data](
       a => κ(args(a)).right, CoreMap.change))
-    (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must closeTo(expected) }).toResult
+    (run.map(_(Data.NA)) must beRightDisjunction.like { case d => d must beCloseTo(expected) }).toResult
   }
 
-  val runner = new StdLibTestRunner {
+  val runner = new MapFuncStdLibTestRunner {
     def nullary(prg: Fix[LP], expected: Data) =
       failure
 
