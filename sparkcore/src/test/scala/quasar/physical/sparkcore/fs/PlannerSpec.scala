@@ -62,10 +62,10 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           case rdd =>
             val results = rdd.collect
             results.size must_== 1
-            results(0) must_== Data.Arr(List(Data.Int(0), Data.Obj(ListMap(
+            results(0) must_== Data.Obj(ListMap(
               "name" -> Data.Str("tom"),
               "age" -> Data.Int(28)
-            ))))
+            ))
         }
         sc.stop
       }).run.unsafePerformSync
