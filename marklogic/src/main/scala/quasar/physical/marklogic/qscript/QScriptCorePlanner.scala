@@ -25,6 +25,14 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
+// TODO: We assume a FLWOR expression emits single values if at least one tuple
+//       stream is defined. This isn't required by XQuery as emitted sequences
+//       will automatically be flattened. We don't emit any of these in the
+//       QScript planner, but we also have no way of ensuring this.
+//
+//       Without this contract, we cannot safely fuse expressions by binding the
+//       return expression to a variable as, if it is a sequence, the results will
+//       will also be sequences, in the best case, and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]
   extends MarkLogicPlanner[F, QScriptCore[T, ?]] {
 
@@ -37,7 +45,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         x <- freshVar[F]
         g <- mapFuncXQuery(f, x.xqy)
       } yield src match {
-        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) =>
+        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) if tuples.nonEmpty =>
           XQuery.Flwor(tuples, lets ::: IList((x, result)), filter, order, isStable, g)
 
         case _ =>
@@ -47,13 +55,11 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
     case LeftShift(src, struct, repair) =>
       for {
         l       <- freshVar[F]
-        v       <- freshVar[F]
-        rs      <- freshVar[F]
         r       <- freshVar[F]
         extract <- mapFuncXQuery(struct, l.xqy)
-        lshift  <- qscript.elementLeftShift[F] apply (v.xqy)
+        lshift  <- qscript.elementLeftShift[F] apply (extract)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
-      } yield for_ (l -> src) let_ (v -> extract, rs -> lshift) return_ fn.map(func(r)(merge), rs.xqy)
+      } yield for_ (l -> src, r -> lshift) return_ merge
 
     // TODO: Start leveraging the cts:* aggregation functions when possible
     case Reduce(src, bucket, reducers, repair) =>
@@ -78,7 +84,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
                       mapFuncXQuery(func, x.xqy) strengthR SortDirection.fromQScript(sortDir)
                     }
       } yield src match {
-        case XQuery.Flwor(tuples, lets, filter, _, _, result) =>
+        case XQuery.Flwor(tuples, lets, filter, _, _, result) if tuples.nonEmpty =>
           XQuery.Flwor(tuples, lets ::: IList((x, result)), filter, xqyOrder.list, false, x.xqy)
 
         case _ =>
@@ -98,7 +104,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         // FIXME: This cast shouldn't be necessary once projecting produces typed values.
         p <- mapFuncXQuery(f, x.xqy) map (xs.boolean)
       } yield src match {
-        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) =>
+        case XQuery.Flwor(tuples, lets, filter, order, isStable, result) if tuples.nonEmpty =>
           XQuery.Flwor(tuples, lets ::: IList((x, result)), Some(filter.fold(p)(_ and p)), order, isStable, x.xqy)
 
         case _ =>

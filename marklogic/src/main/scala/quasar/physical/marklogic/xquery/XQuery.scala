@@ -162,6 +162,10 @@ object XQuery {
     case Step(s) => s
   } (Step)
 
+  val flwor = Prism.partial[XQuery, (IList[(String, XQuery)], IList[(String, XQuery)], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] {
+    case Flwor(tuples, lets, filter, order, isStable, result) => (tuples, lets, filter, order, isStable, result)
+  } (Flwor.tupled)
+
   implicit val show: Show[XQuery] =
     Show.showFromToString
 }

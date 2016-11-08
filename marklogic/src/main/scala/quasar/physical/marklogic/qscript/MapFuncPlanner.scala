@@ -26,12 +26,12 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
-import scalaz.{Apply, EitherT}
+import scalaz.{Applicative, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
 
 object MapFuncPlanner {
-  import expr.{emptySeq, if_, let_}, axes._
+  import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
 
   def apply[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
@@ -142,7 +142,10 @@ object MapFuncPlanner {
 
         case XQuery.StringLit(s) =>
           (asQName[F](s) |@| freshVar[F])((qn, m) =>
-            let_(m -> src) return_ (m.xqy `/` child(qn)))
+            if (flwor.isMatching(src))
+              let_(m -> src) return_ (m.xqy `/` child(qn))
+            else
+              src `/` child(qn))
 
         case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
@@ -175,11 +178,17 @@ object MapFuncPlanner {
 
   ////
 
-  private def binOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F])((vx, vy) =>
-      mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
+  private def binOp[F[_]: NameGenerator: Applicative](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y))
+      (freshVar[F] |@| freshVar[F])((vx, vy) =>
+        mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
+    else
+      op(x, y).point[F]
 
-  private def ternOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
-      mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
+  private def ternOp[F[_]: NameGenerator: Applicative](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
+      (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
+        mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
+    else
+      op(x, y, z).point[F]
 }
