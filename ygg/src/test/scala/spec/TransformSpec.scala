@@ -1547,18 +1547,17 @@ class TransformSpec extends TableQspec {
 
     val sample  = SampleData(data)
     val table   = fromSample(sample)
-    val results = toJson(table transform Scan(root.value, sumScanner))
+    val results = (table transform Scan(dotValue, Scanner.Sum)).toVector
 
-    val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
-      case ((a, s), jv) => {
-        (jv \ "value") match {
+    val (_, expected) = sample.data.foldLeft(BigDecimal(0) -> Vector[JValue]()) {
+      case ((a, s), jv) =>
+        jv \ "value" match {
           case JNum(i) => (a + i, s :+ JNum(a + i))
           case _       => (a, s)
         }
-      }
     }
 
-    results.copoint must_== expected.toStream
+    results must_=== expected
   }
 
   private def testHetScan = {
@@ -1570,7 +1569,7 @@ class TransformSpec extends TableQspec {
 
     val sample  = SampleData(data)
     val table   = fromSample(sample)
-    val results = toJson(table transform Scan(root.value, sumScanner))
+    val results = toJson(table transform Scan(root.value, Scanner.Sum))
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
@@ -1589,7 +1588,7 @@ class TransformSpec extends TableQspec {
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
-        Scan(root.value, sumScanner)
+        Scan(root.value, Scanner.Sum)
       })
 
       val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
@@ -1716,36 +1715,5 @@ class TransformSpec extends TableQspec {
 
       unflatten(filtered)
     }
-  }
-
-  private val sumScanner = Scanner(BigDecimal(0)) { (a, cols, range) =>
-    val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
-    val prioritized = identityPath.map(_._2) filter {
-      case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
-      case _                                                => false
-    }
-
-    val mask = Bits.filteredRange(range.start, range.end) { i =>
-      prioritized exists { _ isDefinedAt i }
-    }
-
-    val (a2, arr) = mask.toList.foldLeft(a -> new Array[BigDecimal](range.end)) {
-      case ((acc, arr), i) => {
-        val col = prioritized find { _ isDefinedAt i }
-
-        val acc2 = col map {
-          case lc: LongColumn   => acc + lc(i)
-          case dc: DoubleColumn => acc + dc(i)
-          case nc: NumColumn    => acc + nc(i)
-          case _                => abort("unreachable")
-        }
-
-        acc2 foreach { arr(i) = _ }
-
-        (acc2 getOrElse acc, arr)
-      }
-    }
-
-    (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
   }
 }

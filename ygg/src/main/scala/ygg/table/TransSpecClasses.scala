@@ -31,6 +31,8 @@ package object trans {
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
+
+  val `.` = root
 }
 
 package trans {
@@ -79,7 +81,7 @@ package trans {
     def inner_++(x: This, xs: This*) = InnerObjectConcat[A](spec +: x +: xs: _*)
     def outer_++(x: This, xs: This*) = OuterObjectConcat[A](spec +: x +: xs: _*)
 
-    def mapLeaves(f: A => This)   = deepMap({ case Leaf(x) => f(x) })
+    def mapLeaves(f: A => This)         = deepMap({ case Leaf(x) => f(x) })
     def deepMap(pf: MaybeSelf[This])    = TransSpec.deepMap(spec)(pf)
     def deepMap1(fn: CF1)               = DeepMap1(spec, fn)
     def deepEquals(that: This)          = Equal(spec, that)
@@ -88,6 +90,7 @@ package trans {
     def filter(p: This)                 = Filter(spec, p)
     def isType(tp: JType)               = IsType(spec, tp)
     def map1(fn: CF1)                   = Map1(spec, fn)
+    def scan(scanner: Scanner)          = Scan(spec, scanner)
     def select(field: CPathField): This = DerefObjectStatic(spec, field)
     def select(name: String): This      = select(CPathField(name))
     def wrapArrayValue()                = WrapArray(spec)

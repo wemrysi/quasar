@@ -63,7 +63,7 @@ abstract class TableQspec extends quasar.Qspec {
     def optSchemaElem: Option[JSchemaElem]   = sd.schema map (_._2) flatMap (_.headOption)
     def optSchemaPath: Option[JPath]         = optSchemaElem map (_._1)
     def optSchemaPathNode: Option[JPathNode] = optSchemaPath flatMap (_.nodes.headOption)
-    def optSchemaType: Option[JType]         = optSchemaElem map (_._2)
+    def optSchemaType: Option[CType]         = optSchemaElem map (_._2)
 
     def fieldHead: JPathNode = optSchemaPathNode.get
     def fieldHeadName: String = optSchemaPathNode match {
