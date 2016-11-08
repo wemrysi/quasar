@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
-import quasar.fs.mount.MountConfig
+import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig.FileSystemConfig
 
 import argonaut._
 import pathy.Path._
@@ -44,15 +44,24 @@ object TestConfig {
   val MONGO_3_0       = BackendName("mongodb_3_0")
   val MONGO_3_2       = BackendName("mongodb_3_2")
   val MONGO_READ_ONLY = BackendName("mongodb_read_only")
-  val SKELETON = BackendName("skeleton")
-  val POSTGRESQL = BackendName("postgresql")
-  val SPARK_LOCAL = BackendName("spark_local")
-  val SPARK_HDFS = BackendName("spark_hdfs")
+  val SKELETON        = BackendName("skeleton")
+  val POSTGRESQL      = BackendName("postgresql")
+  val SPARK_LOCAL     = BackendName("spark_local")
+  val SPARK_HDFS      = BackendName("spark_hdfs")
   val MARKLOGIC       = BackendName("marklogic")
   val COUCHBASE       = BackendName("couchbase")
 
-  lazy val backendNames: List[BackendName] =
-    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL, SPARK_HDFS, MARKLOGIC, COUCHBASE)
+  lazy val backendNames: List[BackendName] = List(
+    MONGO_2_6      ,
+    MONGO_3_0      ,
+    MONGO_3_2      ,
+    MONGO_READ_ONLY,
+    SKELETON       ,
+    POSTGRESQL     ,
+    SPARK_LOCAL    ,
+    SPARK_HDFS     ,
+    MARKLOGIC      ,
+    COUCHBASE      )
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
@@ -124,6 +133,12 @@ object TestConfig {
         .flatMap(uts => if (uts.isEmpty) Task.fail(noBackendsFound) else Task.now(uts))
     }
   }
+
+  /** Loads all the configurations for a particular type of FileSystem. */
+  def fileSystemConfigs(tpe: FileSystemType): Task[List[(BackendName, ConnectionUri, ConnectionUri)]] =
+    backendNames.foldMapM(n => TestConfig.loadConfigPair(n).run map (_.toList collect {
+      case (FileSystemConfig(`tpe`, testUri), FileSystemConfig(`tpe`, setupUri)) => (n, testUri, setupUri)
+    }))
 
   /** Load backend config from environment variable.
     *
