@@ -502,92 +502,10 @@ package object json {
       rec(NoJPath, self)
     }
 
-    /** Return a new JValue resulting from applying the given function <code>f</code>
-      * to each element, moving from the top-down.
-      */
-    def mapDown(f: JValue => JValue): JValue = mapDownWithPath((p, j) => f(j))
-
-    /** Return a new JValue resulting from applying the given function <code>f</code>
-      * to each element and its path, moving from the top-down.
-      */
-    def mapDownWithPath(f: (JPath, JValue) => JValue): JValue = {
-      def rec(p: JPath, v: JValue): JValue = {
-        f(p, v) match {
-          case JObject(l) =>
-            JObject(l.flatMap {
-              case (k, v) =>
-                val v2 = rec(p \ k, v)
-                if (v2 == JUndefined) Nil else JField(k, v2) +: Nil
-            })
-
-          case JArray(l) =>
-            JArray(l.zipWithIndex flatMap {
-              case (e, idx) =>
-                rec(p \ idx, e) match {
-                  case JUndefined => Nil
-                  case x          => x +: Nil
-                }
-            })
-
-          case x => x
-        }
-      }
-
-      rec(NoJPath, self)
-    }
-
     /** Return a new JValue resulting from applying the given partial function <code>f</code>
       * to each element in JSON.
       */
     def transform(f: MaybeSelf[JValue]): JValue = mapUp (x => if (f isDefinedAt x) f(x) else x)
-
-    /** Replaces the matched path values with the result of calling the
-      * replacer function on the matches. If the path has no values, the
-      * method has no effect -- i.e. it is not an error to specify paths
-      * which do not exist.
-      */
-    def replace(target: JPath, replacer: JValue => JValue): JValue = {
-      def replace0(target: JPath, j: JValue): JValue = target.nodes match {
-        case Seq() => replacer(j)
-
-        case head +: tail =>
-          head match {
-            case JPathField(name1) =>
-              j match {
-                case JObject.Fields(fields) =>
-                  JObject(fields.map {
-                    case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
-
-                    case field => field
-                  })
-
-                case jvalue => jvalue
-              }
-
-            case JPathIndex(index) =>
-              j match {
-                case JArray(elements) =>
-                  val split  = elements.splitAt(index)
-                  val prefix = split._1
-                  val middle = replace0(JPath(tail: _*), split._2.head)
-                  val suffix = split._2.drop(1)
-
-                  JArray(prefix ++ (middle +: suffix))
-
-                case jvalue => jvalue
-              }
-          }
-      }
-
-      target.expand(self).foldLeft(self) { (jvalue, expansion) =>
-        replace0(expansion, jvalue)
-      }
-    }
-
-    /** A shorthand for the other replacement in the case that the replacement
-      * does not depend on the value being replaced.
-      */
-    def replace(target: JPath, replacement: JValue): JValue = replace(target, r => replacement)
 
     /** Return the first element from JSON which matches the given predicate.
       */
