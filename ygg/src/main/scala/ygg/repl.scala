@@ -94,23 +94,49 @@ object repl {
     }
   }
 
+  implicit def liftCNum(n: Int): CNum = CNum(BigDecimal(n))
+
   implicit class TableSelectionOps[T: TableRep](val table: T) {
     private type F1 = trans.TransSpec[trans.Source.type]
 
-    def p(): Unit                = table.dump()
-    def map(f: TransSpec1): T    = table transform f
-    def filter(p: F1): T         = map(root filter p)
-    def delete(p: JPathField): T = map(root delete CPathField(p.name))
+    def p(): Unit                  = table.dump()
+    def apply(f: TransSpec1): Unit = map(f).p()
 
-    def filterAt[A: CValueType](select: F1, literal: A): T = filter(EqualLiteral(select, literal, invert = false))
+    def map(f: TransSpec1): T = table transform f
+    def filter(p: F1): T      = map(root filter p)
 
-    def \(path: JPath): T  = path.nodes.foldLeft(table)(_ \ _)
-    def \(path: String): T = this \ JPath(path)
-    def \(node: JPathNode): T = node match {
-      case JPathField(name) => map(root select name)
-      case JPathIndex(idx)  => map(root apply idx)
-    }
+    // def \(path: JPath): T  = path.nodes.foldLeft(table)(_ \ _)
+    // def \(path: String): T = this \ JPath(path)
+    // def \(path: Int): T    = this \ JPathIndex(path)
 
-    def --(fields: Iterable[JPathField]): T = fields.foldLeft(table)(_ delete _)
+    // def \(node: JPathNode): T = node match {
+    //   case JPathField(name) => map(root \ name)
+    //   case JPathIndex(idx)  => map(root \ idx)
+    // }
+
+    // def where(name: String): WhereOps1 = new WhereOps1(name)
+
+    // class WhereOps1(name: String) {
+    //   def is(value: CValue): T = filter(EqualLiteral(root select name, value, invert = false))
+
+    //   // map(root select name isEqual value)
+    //   // def <(value: CNum): T = select(name) isLess value
+    // }
+
+
+    // def filterAt[A: CValueType](select: F1, literal: A): T = filter(EqualLiteral(select, literal, invert = false))
+
+    // def --(fields: Iterable[JPathField]): T = fields.foldLeft(table)(_ delete _)
   }
 }
+
+//     def deepMap(pf: MaybeSelf[F1]): T = map(root deepMap pf)
+//     def deepMap1(fn: CF1): T          = map(root deepMap1 fn)
+//     def delete(p: JPathField): T      = map(root delete CPathField(p.name))
+//     def filter(p: F1): T              = map(root filter p)
+//     def isEqual(that: CValue)         = map(root isEqual that)
+//     def isType(tp: JType)             = map(root isType tp)
+//     def map(f: TransSpec1): T         = table transform f
+//     def map1(fn: CF1)                 = map(root map1 fn)
+//     def select(field: CPathField): T  = map(root select field)
+//     def select(name: String): T       = select(CPathField(name))

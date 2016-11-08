@@ -203,10 +203,10 @@ object WriteTable {
   }
 
   def writeSortedNonUnique[T: TableRep](table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
-    val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1")))
+    val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root \ 0 } spec, "0"), WrapObject(root \ 1, "1")))
     writeTables[T](
       table transform table.companion.addGlobalId(root.spec) slices,
-      composeSliceTransform(valueSpec deepMap { case Leaf(_) => TransSpec1.DerefArray0 } spec),
+      composeSliceTransform(valueSpec deepMap { case Leaf(_) => root \ 0 } spec),
       keys1 map composeSliceTransform,
       order
     )

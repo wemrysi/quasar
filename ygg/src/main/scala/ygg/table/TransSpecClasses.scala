@@ -22,6 +22,12 @@ package object trans {
   type TransSpec1 = TransSpec[Source1]
   type TransSpec2 = TransSpec[Source2]
 
+  def where(name: String): WhereOps1 = new WhereOps1(CPathField(name))
+
+  class WhereOps1(field: CPathField) {
+    def is(value: CValue) = Filter(root \ field, EqualLiteral(root.spec, value, invert = false))
+  }
+
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
@@ -73,6 +79,7 @@ package trans {
     def inner_++(x: This, xs: This*) = InnerObjectConcat[A](spec +: x +: xs: _*)
     def outer_++(x: This, xs: This*) = OuterObjectConcat[A](spec +: x +: xs: _*)
 
+    def mapLeaves(f: A => This)   = deepMap({ case Leaf(x) => f(x) })
     def deepMap(pf: MaybeSelf[This])    = TransSpec.deepMap(spec)(pf)
     def deepMap1(fn: CF1)               = DeepMap1(spec, fn)
     def deepEquals(that: This)          = Equal(spec, that)
@@ -87,15 +94,17 @@ package trans {
     def wrapObjectField(name: String)   = WrapObject(spec, name)
     def metadata(name: String)          = DerefMetadataStatic(spec, CPathMeta(name))
 
-    def apply(index: Int): This = DerefArrayStatic(spec, CPathIndex(index))
-    def apply(node: CPathNode): This = node match {
-      case CPathField(name) => select(name)
-      case CPathIndex(idx)  => apply(idx)
-      case CPathMeta(meta)  => metadata(meta)
+    def apply(index: Int): This = this \ index
+    def \(index: Int): This     = DerefArrayStatic(spec, CPathIndex(index))
+    def \(name: String): This   = DerefObjectStatic(spec, CPathField(name))
+    def \(path: CPath): This    = path.nodes.foldLeft(spec)(_ \ _)
+
+    def \(node: CPathNode): This = node match {
+      case CPathField(name) => this \ name
+      case CPathIndex(idx)  => this \ idx
+      case CPathMeta(meta)  => ???
       case CPathArray       => ???
     }
-
-    def \(path: CPath): This = path.nodes.foldLeft(spec)(_ apply _)
   }
 
   sealed trait TransSpec[+A]  extends AnyRef
@@ -161,7 +170,7 @@ package trans {
         case node @ RootNode(seq)                  => concatChildren(node, leaf)
         case node @ FieldNode(CPathField(name), _) => concatChildren(node, leaf) wrapObjectField name
         case node @ IndexNode(CPathIndex(_), _)    => concatChildren(node, leaf).wrapArrayValue() //assuming that indices received in order
-        case LeafNode(idx)                         => leaf(idx)
+        case LeafNode(idx)                         => leaf \ idx
       }
       val initialSpecs = tree match {
         case RootNode(children)     => children map createSpec
@@ -263,9 +272,9 @@ package trans {
     import constants._
 
     val Id              = root.spec
-    val DerefArray0     = root(0)
-    val DerefArray1     = root(1)
-    val DerefArray2     = root(2)
+    val DerefArray0     = root \ 0
+    val DerefArray1     = root \ 1
+    val DerefArray2     = root \ 2
     val PruneToKeyValue = WrapObject(SourceKey.Single, Key.name) inner_++ WrapObject(SourceValue.Single, Value.name)
     val DeleteKeyValue  = Id.delete(Key, Value)
   }
@@ -281,9 +290,9 @@ package trans {
       case SourceRight => SourceLeft
     }
 
-    def DerefArray0(source: Source2) = root(0)
-    def DerefArray1(source: Source2) = root(1)
-    def DerefArray2(source: Source2) = root(2)
+    def DerefArray0(source: Source2) = root \ 0
+    def DerefArray1(source: Source2) = root \ 1
+    def DerefArray2(source: Source2) = root \ 2
 
     val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(Key, Value)
     val DeleteKeyValueRight = Leaf(SourceRight).delete(Key, Value)

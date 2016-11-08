@@ -206,6 +206,9 @@ object RArray {
 object CWrappedValue {
   def unapply[A](x: CWrappedValue[A]): Some[A] = Some(x.value)
 }
+object CNumericValue {
+  def unapply(x: CNumericValue[_]): Some[CNum] = Some(x.toCNum)
+}
 
 object CValue {
   def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
