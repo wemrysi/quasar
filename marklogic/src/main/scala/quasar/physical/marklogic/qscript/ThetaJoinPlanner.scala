@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
 import quasar.NameGenerator
-import quasar.contrib.matryoshka.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -26,7 +25,7 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
+private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]
   extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
   import expr.{for_, let_}
 
@@ -39,8 +38,8 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
         s      <- freshVar[F]
         lhs    <- rebaseXQuery(lBranch, s.xqy)
         rhs    <- rebaseXQuery(rBranch, s.xqy)
-        filter <- planMapFunc(on)      { case LeftSide => l.xqy case RightSide => r.xqy }
-        body   <- planMapFunc(combine) { case LeftSide => l.xqy case RightSide => r.xqy }
+        filter <- mergeXQuery(on, l.xqy, r.xqy)
+        body   <- mergeXQuery(combine, l.xqy, r.xqy)
       } yield let_(s -> src) return_ (for_(l -> lhs, r -> rhs) where_ filter return_ body)
   }
 }

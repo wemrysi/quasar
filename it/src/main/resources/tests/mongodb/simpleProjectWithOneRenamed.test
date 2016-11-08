@@ -6,14 +6,14 @@
     "mongodb_3_0":       "pending",
     "mongodb_read_only": "pending",
     "mongodb_3_2":       "pending",
-    "postgresql":        "pending",
+    "postgresql":        "skip",
     "marklogic":         "skip",
     "couchbase":         "skip"
   },
 
-  "data": "zips.data",
+  "data": "../zips.data",
 
-  "query": "select _id as zip, city from zips where pop = 18174",
+  "query": "select _id as zip, city from `../zips` where pop = 18174",
 
   "predicate": "equalsInitial",
   "expected": [

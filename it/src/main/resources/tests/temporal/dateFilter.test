@@ -2,8 +2,7 @@
   "name": "filter on date part",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "../days.data",
