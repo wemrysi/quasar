@@ -38,10 +38,13 @@ package object trans {
   val `<.` = rootLeft
   val `.>` = rootRight
 
-  def wrapLeft(name: String): TransSpec2              = wrapLeft(name, name)
-  def wrapLeft(name: String, as: String): TransSpec2  = WrapObject(`<.` \ name, as)
-  def wrapRight(name: String): TransSpec2             = wrapRight(name, name)
-  def wrapRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
+  def wrapField(name: String): TransSpec1                  = wrapField(name, name)
+  def wrapField(name: String, as: String): TransSpec1      = WrapObject(`.` \ name, as)
+  def wrapFieldLeft(name: String): TransSpec2              = wrapFieldLeft(name, name)
+  def wrapFieldLeft(name: String, as: String): TransSpec2  = WrapObject(`<.` \ name, as)
+  def wrapFieldRight(name: String): TransSpec2             = wrapFieldRight(name, name)
+  def wrapFieldRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
+  def wrapFieldBoth(name: String): TransSpec2              = WrapObject(OuterObjectConcat(`<.` \ name, `.>` \ name), name)
 }
 
 package trans {

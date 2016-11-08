@@ -74,7 +74,7 @@ class CogroupSpec extends TableQspec {
       `.`,
       `.`,
       OuterObjectConcat(
-        wrapLeft("key"),
+        wrapFieldLeft("key"),
         OuterObjectConcat(specs: _*)
       )
     )
@@ -93,8 +93,8 @@ class CogroupSpec extends TableQspec {
     }
 
     val result: Table = cogroupKV(ltable, rtable)(
-      wrapLeft("value", as = "valueLeft"),
-      wrapRight("value", as = "valueRight")
+      wrapFieldLeft("value", as = "valueLeft"),
+      wrapFieldRight("value", as = "valueRight")
     )
 
     result.toSeq must_=== expected
@@ -104,15 +104,12 @@ class CogroupSpec extends TableQspec {
     def recl = toRecord(Array(0L), JArray(JNum(12) :: Nil))
     def recr = toRecord(Array(0L), JArray(JUndefined :: JNum(13) :: Nil))
 
-    val ltable = fromSample(SampleData(Stream(recl)))
-    val rtable = fromSample(SampleData(Stream(recr)))
-
+    val ltable   = fromSample(SampleData(Stream(recl)))
+    val rtable   = fromSample(SampleData(Stream(recr)))
     val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      `.`,
-      `.`,
-      OuterObjectConcat(wrapLeft("key"), WrapObject(OuterArrayConcat(`<.` \ "value", SourceValue.Right), "value"))
+    val result: Table = cogroupKV(ltable, rtable)(
+      WrapObject(OuterArrayConcat(`<.` \ "value", SourceValue.Right), "value")
     )
 
     toJsonSeq(f(result)) must_=== expected
@@ -143,11 +140,7 @@ class CogroupSpec extends TableQspec {
       recBoth(8)
     )
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      `.`,
-      `.`,
-      OuterObjectConcat(wrapLeft("key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
-    )
+    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
 
     toJsonSeq(f(result)) must_=== expected
   }
@@ -172,10 +165,7 @@ class CogroupSpec extends TableQspec {
       recr(10, 77)
     )
 
-    val result: Table = cogroupKV(ltable, rtable)(
-      WrapObject(OuterObjectConcat(`<.` \ "value", `.>` \ "value"), "value")
-    )
-
+    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
     toJsonSeq(result) must_=== expected
   }
 
@@ -198,12 +188,7 @@ class CogroupSpec extends TableQspec {
       recBoth(7)
     )
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      `.`,
-      `.`,
-      OuterObjectConcat(wrapLeft("key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
-    )
-
+    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
     toJsonSeq(result) must_=== expected
   }
 
@@ -226,12 +211,7 @@ class CogroupSpec extends TableQspec {
       recBoth(7)
     )
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      `.`,
-      `.`,
-      OuterObjectConcat(wrapLeft("key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
-    )
-
+    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
     toJsonSeq(result) must_=== expected
   }
 
@@ -242,12 +222,9 @@ class CogroupSpec extends TableQspec {
     val ltable = fromSample(SampleData(Stream(recl(0), recl(1))))
     val rtable = fromSample(SampleData(Stream(recr(1), recr(0))))
 
-    toJson(
-      ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-        `.`,
-        `.`,
-        OuterObjectConcat(wrapLeft("key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
-      )).copoint must throwAn[Exception]
+    def result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
+
+    result.toVector must throwAn[Exception]
   }
 
   private def testCogroupPathology1 = {
@@ -382,31 +359,25 @@ class CogroupSpec extends TableQspec {
   private def testPartialUndefinedCogroup = {
     val ltable = fromJson(
       jsonMany"""
-        { "id" : "foo", "val" : 4 }
+        { "key" : "foo", "val" : 4 }
       """
     )
     val rtable = fromJson(
       jsonMany"""
-        { "id" : "foo", "val" : 2 }
+        { "key" : "foo", "val" : 2 }
         { "val" : 3 }
-        { "id" : "foo", "val" : 4 }
+        { "key" : "foo", "val" : 4 }
       """
     )
     val expected = jsonMany"""
-      { "id": "foo", "left": 4, "right": 2 }
-      { "id": "foo", "left": 4, "right": 4 }
+      { "key": "foo", "left": 4, "right": 2 }
+      { "key": "foo", "left": 4, "right": 4 }
     """
 
-    val result = ltable.cogroup(`.` \ "id", `.` \ "id", rtable)(
-      `.`,
-      `.`,
-      OuterObjectConcat(
-        WrapObject(`<.` \ "id", "id"),
-        WrapObject(`<.` \ "val", "left"),
-        WrapObject(`.>` \ "val", "right")
-      )
+    val result = cogroupKV(ltable, rtable)(
+      wrapFieldLeft("val", as = "left"),
+      wrapFieldRight("val", as = "right")
     )
-
     toJsonSeq(result) must_=== expected
   }
 

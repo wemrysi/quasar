@@ -52,11 +52,6 @@ package object json {
     }
   }
 
-  def toRecord(ids: Array[Long], jv: JValue): JValue = jobject(
-    "key"   -> jarray(ids map (x => JNum(x)): _*),
-    "value" -> jv
-  )
-
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
     type R = AsyncParse[A] -> AsyncParser[A]
 

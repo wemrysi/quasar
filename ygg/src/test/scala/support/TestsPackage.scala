@@ -16,10 +16,14 @@
 
 package ygg.tests.pkg
 
-import ygg.common._
-import ygg.data._
+import ygg._, common._, data._, json._
 
 trait TestsPackage extends quasar.pkg.TestsPackage {
+  def toRecord(ids: Array[Long], jv: JValue): JValue = jobject(
+    "key"   -> jarray(ids map (x => JNum(x)): _*),
+    "value" -> jv
+  )
+
   def genBitSet(size: Int): Gen[BitSet] = {
     genBool * size ^^ { bools =>
       doto(new BitSet) { bs =>
