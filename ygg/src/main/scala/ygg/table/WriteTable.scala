@@ -23,15 +23,15 @@ import JDBM._
 object WriteTable {
   final case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
-  def groupByN[T: TableRep](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[T]] = {
+  def groupByN[T: TableRep](table: T, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): Seq[T] = {
     val c = companionOf[T]
     import c._
 
-    writeSorted(table, keys, values, order, unique) map {
+    (writeSorted(table, keys, values, order, unique) map {
       case (streamIds, indices) =>
         val streams = indices.groupBy(_._1.streamId)
         streamIds.toStream map (id => (streams get id).fold(empty)(loadTable(sortMergeEngine, _, order)))
-    }
+    }).value
   }
 
   def writeTables[T: TableRep](

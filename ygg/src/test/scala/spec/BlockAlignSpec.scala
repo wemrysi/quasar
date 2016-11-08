@@ -373,18 +373,12 @@ class BlockAlignSpec extends TableQspec {
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList
 
-    val cSortKeys = sortKeys map { CPath(_) }
+    val cSortKeys   = sortKeys map (CPath(_))
+    val resultTable = fromSample(sample).sort(sortTransspec(cSortKeys: _*), sortOrder)
+    val result      = resultTable.toJson
 
-    val resultM = for {
-      sorted <- fromSample(sample).sort(sortTransspec(cSortKeys: _*), sortOrder)
-      json   <- sorted.toJson
-    } yield (json, sorted)
-
-    val (result, resultTable) = resultM.copoint
-
-    result.toList must_== sorted
-
-    resultTable.size mustEqual ExactSize(sorted.size)
+    resultTable.toSeq must_=== sorted
+    resultTable.size must_=== ExactSize(sorted.size)
   }
 
   private def checkSortDense(sortOrder: DesiredSortOrder) = {

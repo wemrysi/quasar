@@ -41,8 +41,11 @@ class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
     * @param key The transspec to use to obtain the values to sort on
     * @param order Whether to sort ascending or descending
     */
-  def sort(key: TransSpec1, order: DesiredSortOrder): M[Table] =
-    WriteTable.groupByN(companion.externalize(self), Seq(key), root.spec, order, unique = false) map (_.headOption getOrElse companion.empty)
+  def sort(key: TransSpec1, order: DesiredSortOrder): Table =
+    WriteTable.groupByN(self, Seq(key), root.spec, order, unique = false).headOption getOrElse companion.empty
+
+  def sort(key: TransSpec1): Table =
+    sort(key, SortAscending)
 
   /**
     * Cogroups this table with another table, using equality on the specified
@@ -63,6 +66,7 @@ class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
   def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJValues)
   def toJsonString: String        = toJValues mkString "\n"
   def toVector: Vector[JValue]    = toJValues.toVector
+  def toSeq: Seq[JValue]          = toVector
 
   /** Test compat */
   def toJson: Need[Stream[JValue]] = Need(toJValues)

@@ -186,8 +186,8 @@ trait TableCompanion[Table] extends TableConfig {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN[F[_]: Monad](table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): F[Seq[Table]] =
-    ().point[F] map (_ => WriteTable.groupByN[Table](externalize(table), keys, values, order, unique)(thisRep).value)
+  def groupByN(table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): Seq[Table] =
+    WriteTable.groupByN[Table](externalize(table), keys, values, order, unique)
 
   def load(table: Table, tpe: JType): Need[Table] = {
     val reduced = table reduce new CReducer[Set[Path]] {
