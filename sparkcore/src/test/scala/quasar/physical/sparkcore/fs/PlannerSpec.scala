@@ -101,7 +101,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
       }
 
       "reduce" should {
-        "count" in {
+        "calculate count" in {
           newSc.map ( sc => {
             val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -129,7 +129,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           ok
         }
 
-        "sum" in {
+        "calculate sum" in {
           newSc.map ( sc => {
             val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -157,7 +157,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           ok
         }
 
-        "arbitrary" in {
+        "calculate arbitrary" in {
           newSc.map ( sc => {
             val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -185,7 +185,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           ok
         }
 
-        "max" in {
+        "calculate max" in {
           newSc.map ( sc => {
             val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -213,8 +213,8 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           ok
         }
 
-        "avg" should {
-          "int values" in {
+        "for avg" should {
+          "calculate int values" in {
             newSc.map ( sc => {
               val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
 
@@ -237,6 +237,34 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
                   results.size must_== 2
                   results(1) must_== Data.Dec(28)
                   results(0) must_== Data.Dec(23)
+              }
+              sc.stop
+            }).run.unsafePerformSync
+            ok
+          }
+
+          "calculate dec values" in {
+            newSc.map ( sc => {
+              val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+
+              val src: RDD[Data] = sc.parallelize(List(
+                Data.Obj(ListMap(("height" -> Data.Dec(1.56)),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(1.86)),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(1.23)),("country" -> Data.Str("US"))))
+              ))
+
+              def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+              def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+              val reduce = Reduce(src, bucket, reducers, repair)
+
+              val state: SparkState[RDD[Data]] = alg(reduce)
+              state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+                case rdd =>
+                  val results = rdd.collect
+                  results.size must_== 2
+                  results(1) must_== Data.Dec(1.71)
+                  results(0) must_== Data.Dec(1.23)
               }
               sc.stop
             }).run.unsafePerformSync
