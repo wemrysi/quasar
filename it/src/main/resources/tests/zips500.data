@@ -1,0 +1,500 @@
+{ "_id": "01002", "city": "CUSHMAN", "loc": [ -72.51565, 42.377017 ], "pop": 36963, "state": "MA" }
+{ "_id": "01020", "city": "CHICOPEE", "loc": [ -72.576142, 42.176443 ], "pop": 31495, "state": "MA" }
+{ "_id": "01040", "city": "HOLYOKE", "loc": [ -72.626193, 42.202007 ], "pop": 43704, "state": "MA" }
+{ "_id": "01060", "city": "FLORENCE", "loc": [ -72.654245, 42.324662 ], "pop": 27939, "state": "MA" }
+{ "_id": "01085", "city": "MONTGOMERY", "loc": [ -72.754318, 42.129484 ], "pop": 40117, "state": "MA" }
+{ "_id": "01089", "city": "WEST SPRINGFIELD", "loc": [ -72.641109, 42.115066 ], "pop": 27537, "state": "MA" }
+{ "_id": "01108", "city": "SPRINGFIELD", "loc": [ -72.558432, 42.085314 ], "pop": 25519, "state": "MA" }
+{ "_id": "01109", "city": "SPRINGFIELD", "loc": [ -72.554349, 42.114455 ], "pop": 32635, "state": "MA" }
+{ "_id": "01201", "city": "PITTSFIELD", "loc": [ -73.247088, 42.453086 ], "pop": 50655, "state": "MA" }
+{ "_id": "01420", "city": "FITCHBURG", "loc": [ -71.803133, 42.579563 ], "pop": 41194, "state": "MA" }
+{ "_id": "01453", "city": "LEOMINSTER", "loc": [ -71.756308, 42.52744 ], "pop": 38145, "state": "MA" }
+{ "_id": "01604", "city": "WORCESTER", "loc": [ -71.774626, 42.254084 ], "pop": 29036, "state": "MA" }
+{ "_id": "01605", "city": "WORCESTER", "loc": [ -71.788795, 42.289391 ], "pop": 25695, "state": "MA" }
+{ "_id": "01701", "city": "FRAMINGHAM", "loc": [ -71.425486, 42.300665 ], "pop": 65046, "state": "MA" }
+{ "_id": "01752", "city": "MARLBOROUGH", "loc": [ -71.543355, 42.350861 ], "pop": 31813, "state": "MA" }
+{ "_id": "01757", "city": "MILFORD", "loc": [ -71.527402, 42.151142 ], "pop": 25372, "state": "MA" }
+{ "_id": "01760", "city": "NATICK", "loc": [ -71.35741, 42.287476 ], "pop": 30432, "state": "MA" }
+{ "_id": "01801", "city": "WOBURN", "loc": [ -71.157404, 42.482894 ], "pop": 36152, "state": "MA" }
+{ "_id": "01810", "city": "ANDOVER", "loc": [ -71.156481, 42.64956 ], "pop": 29161, "state": "MA" }
+{ "_id": "01821", "city": "BILLERICA", "loc": [ -71.251754, 42.551874 ], "pop": 28899, "state": "MA" }
+{ "_id": "01826", "city": "DRACUT", "loc": [ -71.318592, 42.676422 ], "pop": 25594, "state": "MA" }
+{ "_id": "01841", "city": "LAWRENCE", "loc": [ -71.166997, 42.711545 ], "pop": 45555, "state": "MA" }
+{ "_id": "01844", "city": "METHUEN", "loc": [ -71.181031, 42.728019 ], "pop": 39664, "state": "MA" }
+{ "_id": "01851", "city": "LOWELL", "loc": [ -71.332882, 42.631548 ], "pop": 28154, "state": "MA" }
+{ "_id": "01852", "city": "LOWELL", "loc": [ -71.298331, 42.634413 ], "pop": 33379, "state": "MA" }
+{ "_id": "01854", "city": "LOWELL", "loc": [ -71.335464, 42.649254 ], "pop": 26472, "state": "MA" }
+{ "_id": "01876", "city": "TEWKSBURY", "loc": [ -71.223224, 42.60283 ], "pop": 27269, "state": "MA" }
+{ "_id": "01902", "city": "LYNN", "loc": [ -70.941989, 42.469814 ], "pop": 41625, "state": "MA" }
+{ "_id": "01906", "city": "SAUGUS", "loc": [ -71.011093, 42.463344 ], "pop": 25487, "state": "MA" }
+{ "_id": "01915", "city": "BEVERLY", "loc": [ -70.875939, 42.560825 ], "pop": 38259, "state": "MA" }
+{ "_id": "01930", "city": "GLOUCESTER", "loc": [ -70.672149, 42.620836 ], "pop": 28716, "state": "MA" }
+{ "_id": "01960", "city": "PEABODY", "loc": [ -70.961194, 42.532579 ], "pop": 47685, "state": "MA" }
+{ "_id": "01970", "city": "SALEM", "loc": [ -70.900343, 42.515114 ], "pop": 37642, "state": "MA" }
+{ "_id": "02062", "city": "NORWOOD", "loc": [ -71.203313, 42.186843 ], "pop": 28700, "state": "MA" }
+{ "_id": "02072", "city": "STOUGHTON", "loc": [ -71.107357, 42.125279 ], "pop": 26777, "state": "MA" }
+{ "_id": "02115", "city": "BOSTON", "loc": [ -71.092215, 42.342706 ], "pop": 25597, "state": "MA" }
+{ "_id": "02119", "city": "ROXBURY", "loc": [ -71.086923, 42.322414 ], "pop": 25207, "state": "MA" }
+{ "_id": "02121", "city": "DORCHESTER", "loc": [ -71.08305, 42.307503 ], "pop": 25602, "state": "MA" }
+{ "_id": "02124", "city": "DORCHESTER", "loc": [ -71.072898, 42.287984 ], "pop": 48560, "state": "MA" }
+{ "_id": "02125", "city": "DORCHESTER", "loc": [ -71.061924, 42.315305 ], "pop": 31393, "state": "MA" }
+{ "_id": "02148", "city": "MALDEN", "loc": [ -71.060507, 42.42911 ], "pop": 54114, "state": "MA" }
+{ "_id": "02126", "city": "MATTAPAN", "loc": [ -71.093871, 42.273889 ], "pop": 27808, "state": "MA" }
+{ "_id": "02127", "city": "SOUTH BOSTON", "loc": [ -71.043792, 42.333454 ], "pop": 29170, "state": "MA" }
+{ "_id": "02128", "city": "EAST BOSTON", "loc": [ -71.028682, 42.378137 ], "pop": 32941, "state": "MA" }
+{ "_id": "02130", "city": "JAMAICA PLAIN", "loc": [ -71.111495, 42.312596 ], "pop": 36571, "state": "MA" }
+{ "_id": "02131", "city": "ROSLINDALE", "loc": [ -71.129543, 42.283615 ], "pop": 32677, "state": "MA" }
+{ "_id": "02132", "city": "WEST ROXBURY", "loc": [ -71.158868, 42.27868 ], "pop": 26366, "state": "MA" }
+{ "_id": "02135", "city": "BRIGHTON", "loc": [ -71.156599, 42.34779 ], "pop": 35011, "state": "MA" }
+{ "_id": "02138", "city": "CAMBRIDGE", "loc": [ -71.125611, 42.377045 ], "pop": 33841, "state": "MA" }
+{ "_id": "02139", "city": "CAMBRIDGE", "loc": [ -71.104155, 42.364688 ], "pop": 33149, "state": "MA" }
+{ "_id": "02143", "city": "SOMERVILLE", "loc": [ -71.102814, 42.382945 ], "pop": 25597, "state": "MA" }
+{ "_id": "02144", "city": "SOMERVILLE", "loc": [ -71.122059, 42.40032 ], "pop": 26374, "state": "MA" }
+{ "_id": "02146", "city": "BROOKLINE", "loc": [ -71.128917, 42.339158 ], "pop": 56614, "state": "MA" }
+{ "_id": "02149", "city": "EVERETT", "loc": [ -71.051448, 42.411199 ], "pop": 35493, "state": "MA" }
+{ "_id": "02150", "city": "CHELSEA", "loc": [ -71.032521, 42.396252 ], "pop": 28790, "state": "MA" }
+{ "_id": "02151", "city": "REVERE", "loc": [ -71.005165, 42.413767 ], "pop": 42766, "state": "MA" }
+{ "_id": "02154", "city": "NORTH WALTHAM", "loc": [ -71.236497, 42.382492 ], "pop": 57871, "state": "MA" }
+{ "_id": "02155", "city": "MEDFORD", "loc": [ -71.108686, 42.417335 ], "pop": 57338, "state": "MA" }
+{ "_id": "02169", "city": "QUINCY", "loc": [ -70.997816, 42.249133 ], "pop": 48920, "state": "MA" }
+{ "_id": "02172", "city": "EAST WATERTOWN", "loc": [ -71.180266, 42.371497 ], "pop": 33930, "state": "MA" }
+{ "_id": "02173", "city": "LEXINGTON", "loc": [ -71.225916, 42.445384 ], "pop": 28994, "state": "MA" }
+{ "_id": "02174", "city": "ARLINGTON", "loc": [ -71.162517, 42.417098 ], "pop": 44539, "state": "MA" }
+{ "_id": "02176", "city": "MELROSE", "loc": [ -71.063191, 42.458066 ], "pop": 28228, "state": "MA" }
+{ "_id": "02181", "city": "WELLESLEY", "loc": [ -71.287966, 42.305593 ], "pop": 26615, "state": "MA" }
+{ "_id": "02184", "city": "BRAINTREE", "loc": [ -70.996304, 42.209284 ], "pop": 33836, "state": "MA" }
+{ "_id": "02186", "city": "MILTON", "loc": [ -71.077051, 42.253663 ], "pop": 25558, "state": "MA" }
+{ "_id": "02324", "city": "BRIDGEWATER", "loc": [ -70.97234, 41.977341 ], "pop": 21198, "state": "MA" }
+{ "_id": "02360", "city": "PLYMOUTH", "loc": [ -70.642004, 41.910404 ], "pop": 45629, "state": "MA" }
+{ "_id": "02368", "city": "RANDOLPH", "loc": [ -71.051392, 42.173587 ], "pop": 30057, "state": "MA" }
+{ "_id": "02401", "city": "BROCKTON", "loc": [ -71.034348, 42.081571 ], "pop": 59498, "state": "MA" }
+{ "_id": "02402", "city": "BROCKTON", "loc": [ -71.001947, 42.088396 ], "pop": 33290, "state": "MA" }
+{ "_id": "02631", "city": "BREWSTER", "loc": [ -70.069868, 41.749179 ], "pop": 8535, "state": "MA" }
+{ "_id": "02664", "city": "BASS RIVER", "loc": [ -70.19731, 41.672805 ], "pop": 8514, "state": "MA" }
+{ "_id": "02703", "city": "ATTLEBORO", "loc": [ -71.30092, 41.929599 ], "pop": 38528, "state": "MA" }
+{ "_id": "02720", "city": "FALL RIVER", "loc": [ -71.139991, 41.718221 ], "pop": 30600, "state": "MA" }
+{ "_id": "02721", "city": "FALL RIVER", "loc": [ -71.157424, 41.688305 ], "pop": 26884, "state": "MA" }
+{ "_id": "02740", "city": "NEW BEDFORD", "loc": [ -70.9372, 41.634749 ], "pop": 46426, "state": "MA" }
+{ "_id": "02780", "city": "TAUNTON", "loc": [ -71.10261, 41.905007 ], "pop": 44894, "state": "MA" }
+{ "_id": "02816", "city": "COVENTRY", "loc": [ -71.576794, 41.69143 ], "pop": 29842, "state": "RI" }
+{ "_id": "02840", "city": "MIDDLETOWN", "loc": [ -71.30348, 41.504502 ], "pop": 47687, "state": "RI" }
+{ "_id": "02860", "city": "PAWTUCKET", "loc": [ -71.390713, 41.872873 ], "pop": 45442, "state": "RI" }
+{ "_id": "02861", "city": "PAWTUCKET", "loc": [ -71.356001, 41.881384 ], "pop": 27013, "state": "RI" }
+{ "_id": "02864", "city": "CUMBERLAND", "loc": [ -71.415419, 41.948352 ], "pop": 29327, "state": "RI" }
+{ "_id": "02886", "city": "WARWICK", "loc": [ -71.447591, 41.702601 ], "pop": 40845, "state": "RI" }
+{ "_id": "02893", "city": "WEST WARWICK", "loc": [ -71.518349, 41.700433 ], "pop": 27821, "state": "RI" }
+{ "_id": "02895", "city": "NORTH SMITHFIELD", "loc": [ -71.513683, 41.99948 ], "pop": 53733, "state": "RI" }
+{ "_id": "02904", "city": "CENTREDALE", "loc": [ -71.438102, 41.860461 ], "pop": 28119, "state": "RI" }
+{ "_id": "02906", "city": "PROVIDENCE", "loc": [ -71.397065, 41.835104 ], "pop": 31069, "state": "RI" }
+{ "_id": "02907", "city": "CRANSTON", "loc": [ -71.424039, 41.800842 ], "pop": 25668, "state": "RI" }
+{ "_id": "02908", "city": "PROVIDENCE", "loc": [ -71.437684, 41.838294 ], "pop": 35933, "state": "RI" }
+{ "_id": "02909", "city": "CRANSTON", "loc": [ -71.448165, 41.816777 ], "pop": 34261, "state": "RI" }
+{ "_id": "02919", "city": "CRANSTON", "loc": [ -71.497646, 41.826431 ], "pop": 26575, "state": "RI" }
+{ "_id": "02920", "city": "CRANSTON", "loc": [ -71.465889, 41.77157 ], "pop": 37385, "state": "RI" }
+{ "_id": "03038", "city": "DERRY", "loc": [ -71.301971, 42.887404 ], "pop": 29556, "state": "NH" }
+{ "_id": "03051", "city": "HUDSON", "loc": [ -71.412144, 42.769038 ], "pop": 26489, "state": "NH" }
+{ "_id": "03060", "city": "NASHUA", "loc": [ -71.466684, 42.756395 ], "pop": 41438, "state": "NH" }
+{ "_id": "03079", "city": "SALEM", "loc": [ -71.21761, 42.78465 ], "pop": 25746, "state": "NH" }
+{ "_id": "03102", "city": "MANCHESTER", "loc": [ -71.488433, 42.99442 ], "pop": 29308, "state": "NH" }
+{ "_id": "03103", "city": "MANCHESTER", "loc": [ -71.449325, 42.965563 ], "pop": 36613, "state": "NH" }
+{ "_id": "03104", "city": "MANCHESTER", "loc": [ -71.448233, 43.007307 ], "pop": 29950, "state": "NH" }
+{ "_id": "03223", "city": "BEEBE RIVER", "loc": [ -71.636142, 43.888507 ], "pop": 2802, "state": "NH" }
+{ "_id": "03301", "city": "CONCORD", "loc": [ -71.527734, 43.218525 ], "pop": 34035, "state": "NH" }
+{ "_id": "03801", "city": "NEWINGTON", "loc": [ -70.780412, 43.066524 ], "pop": 27430, "state": "NH" }
+{ "_id": "03820", "city": "MADBURY", "loc": [ -70.884881, 43.190006 ], "pop": 27182, "state": "NH" }
+{ "_id": "04103", "city": "PORTLAND", "loc": [ -70.2876, 43.687568 ], "pop": 28461, "state": "ME" }
+{ "_id": "04240", "city": "LEWISTON", "loc": [ -70.191619, 44.098538 ], "pop": 40173, "state": "ME" }
+{ "_id": "04330", "city": "AUGUSTA", "loc": [ -69.766548, 44.323228 ], "pop": 25195, "state": "ME" }
+{ "_id": "04401", "city": "BANGOR", "loc": [ -68.791839, 44.824199 ], "pop": 40434, "state": "ME" }
+{ "_id": "04412", "city": "BREWER", "loc": [ -68.753896, 44.787433 ], "pop": 9021, "state": "ME" }
+{ "_id": "04735", "city": "BRIDGEWATER", "loc": [ -67.841469, 46.422154 ], "pop": 652, "state": "ME" }
+{ "_id": "05034", "city": "BRIDGEWATER", "loc": [ -72.646704, 43.580428 ], "pop": 130, "state": "VT" }
+{ "_id": "05401", "city": "BURLINGTON", "loc": [ -73.219875, 44.484023 ], "pop": 39127, "state": "VT" }
+{ "_id": "06010", "city": "BRISTOL", "loc": [ -72.930193, 41.682293 ], "pop": 60670, "state": "CT" }
+{ "_id": "06040", "city": "MANCHESTER", "loc": [ -72.52444, 41.777732 ], "pop": 51618, "state": "CT" }
+{ "_id": "06051", "city": "NEW BRITAIN", "loc": [ -72.772208, 41.666683 ], "pop": 28705, "state": "CT" }
+{ "_id": "06053", "city": "NEW BRITAIN", "loc": [ -72.790835, 41.686667 ], "pop": 37995, "state": "CT" }
+{ "_id": "06066", "city": "VERNON ROCKVILLE", "loc": [ -72.464855, 41.850073 ], "pop": 31966, "state": "CT" }
+{ "_id": "06082", "city": "ENFIELD", "loc": [ -72.565218, 41.989016 ], "pop": 45558, "state": "CT" }
+{ "_id": "06095", "city": "WINDSOR", "loc": [ -72.663893, 41.856122 ], "pop": 27815, "state": "CT" }
+{ "_id": "06106", "city": "HARTFORD", "loc": [ -72.694734, 41.749841 ], "pop": 47841, "state": "CT" }
+{ "_id": "06109", "city": "WETHERSFIELD", "loc": [ -72.676308, 41.701332 ], "pop": 25583, "state": "CT" }
+{ "_id": "06111", "city": "MAPLE HILL", "loc": [ -72.729747, 41.686402 ], "pop": 29192, "state": "CT" }
+{ "_id": "06112", "city": "HARTFORD", "loc": [ -72.69641, 41.79053 ], "pop": 29714, "state": "CT" }
+{ "_id": "06118", "city": "EAST HARTFORD", "loc": [ -72.610265, 41.747211 ], "pop": 26754, "state": "CT" }
+{ "_id": "06320", "city": "NEW LONDON", "loc": [ -72.106245, 41.350718 ], "pop": 28367, "state": "CT" }
+{ "_id": "06340", "city": "GROTON", "loc": [ -72.057947, 41.357171 ], "pop": 32435, "state": "CT" }
+{ "_id": "06360", "city": "NORWICH", "loc": [ -72.08494, 41.537055 ], "pop": 30145, "state": "CT" }
+{ "_id": "06405", "city": "BRANFORD", "loc": [ -72.810643, 41.279991 ], "pop": 27726, "state": "CT" }
+{ "_id": "06410", "city": "CHESHIRE", "loc": [ -72.908127, 41.505473 ], "pop": 25684, "state": "CT" }
+{ "_id": "06430", "city": "FAIRFIELD", "loc": [ -73.257109, 41.166442 ], "pop": 40889, "state": "CT" }
+{ "_id": "06450", "city": "MERIDEN", "loc": [ -72.799734, 41.533396 ], "pop": 59441, "state": "CT" }
+{ "_id": "06457", "city": "MIDDLETOWN", "loc": [ -72.665225, 41.556895 ], "pop": 42846, "state": "CT" }
+{ "_id": "06460", "city": "MILFORD", "loc": [ -73.054948, 41.217466 ], "pop": 49940, "state": "CT" }
+{ "_id": "06484", "city": "SHELTON", "loc": [ -73.129439, 41.304689 ], "pop": 35447, "state": "CT" }
+{ "_id": "06489", "city": "SOUTHINGTON", "loc": [ -72.872681, 41.605221 ], "pop": 28567, "state": "CT" }
+{ "_id": "06492", "city": "WALLINGFORD", "loc": [ -72.822179, 41.459997 ], "pop": 40838, "state": "CT" }
+{ "_id": "06497", "city": "STRATFORD", "loc": [ -73.135594, 41.2044 ], "pop": 49495, "state": "CT" }
+{ "_id": "06511", "city": "NEW HAVEN", "loc": [ -72.931771, 41.318364 ], "pop": 54142, "state": "CT" }
+{ "_id": "06512", "city": "EAST HAVEN", "loc": [ -72.874144, 41.280522 ], "pop": 28963, "state": "CT" }
+{ "_id": "06513", "city": "EAST HAVEN", "loc": [ -72.882554, 41.314215 ], "pop": 31342, "state": "CT" }
+{ "_id": "06516", "city": "WEST HAVEN", "loc": [ -72.963842, 41.270079 ], "pop": 53642, "state": "CT" }
+{ "_id": "06604", "city": "BRIDGEPORT", "loc": [ -73.201859, 41.179574 ], "pop": 28219, "state": "CT" }
+{ "_id": "06606", "city": "BRIDGEPORT", "loc": [ -73.208619, 41.20907 ], "pop": 41879, "state": "CT" }
+{ "_id": "06611", "city": "TRUMBULL", "loc": [ -73.211063, 41.25641 ], "pop": 32213, "state": "CT" }
+{ "_id": "06704", "city": "WATERBURY", "loc": [ -73.031805, 41.575435 ], "pop": 26018, "state": "CT" }
+{ "_id": "06705", "city": "WATERBURY", "loc": [ -72.996268, 41.550328 ], "pop": 25128, "state": "CT" }
+{ "_id": "06708", "city": "WATERBURY", "loc": [ -73.064495, 41.551102 ], "pop": 27661, "state": "CT" }
+{ "_id": "06752", "city": "BRIDGEWATER", "loc": [ -73.360936, 41.528684 ], "pop": 1654, "state": "CT" }
+{ "_id": "06770", "city": "NAUGATUCK", "loc": [ -73.049342, 41.492039 ], "pop": 30625, "state": "CT" }
+{ "_id": "06790", "city": "TORRINGTON", "loc": [ -73.115579, 41.813065 ], "pop": 33969, "state": "CT" }
+{ "_id": "06810", "city": "DANBURY", "loc": [ -73.453165, 41.391663 ], "pop": 37764, "state": "CT" }
+{ "_id": "06811", "city": "DANBURY", "loc": [ -73.471587, 41.423983 ], "pop": 27609, "state": "CT" }
+{ "_id": "06854", "city": "NORWALK", "loc": [ -73.428485, 41.095722 ], "pop": 25358, "state": "CT" }
+{ "_id": "06902", "city": "STAMFORD", "loc": [ -73.537428, 41.052552 ], "pop": 54605, "state": "CT" }
+{ "_id": "07002", "city": "BAYONNE", "loc": [ -74.119169, 40.666399 ], "pop": 61444, "state": "NJ" }
+{ "_id": "07003", "city": "BLOOMFIELD", "loc": [ -74.189074, 40.803456 ], "pop": 46131, "state": "NJ" }
+{ "_id": "07011", "city": "CLIFTON", "loc": [ -74.142459, 40.878876 ], "pop": 31569, "state": "NJ" }
+{ "_id": "07013", "city": "CLIFTON", "loc": [ -74.171144, 40.869334 ], "pop": 25503, "state": "NJ" }
+{ "_id": "07017", "city": "EAST ORANGE", "loc": [ -74.207723, 40.769614 ], "pop": 41737, "state": "NJ" }
+{ "_id": "07018", "city": "EAST ORANGE", "loc": [ -74.219822, 40.755799 ], "pop": 32618, "state": "NJ" }
+{ "_id": "07024", "city": "FORT LEE", "loc": [ -73.974455, 40.850312 ], "pop": 32030, "state": "NJ" }
+{ "_id": "07026", "city": "GARFIELD", "loc": [ -74.108141, 40.878886 ], "pop": 26727, "state": "NJ" }
+{ "_id": "07030", "city": "HOBOKEN", "loc": [ -74.032863, 40.7445 ], "pop": 33397, "state": "NJ" }
+{ "_id": "07032", "city": "KEARNY", "loc": [ -74.147108, 40.76466 ], "pop": 34869, "state": "NJ" }
+{ "_id": "07036", "city": "LINDEN", "loc": [ -74.255567, 40.635366 ], "pop": 37859, "state": "NJ" }
+{ "_id": "07039", "city": "LIVINGSTON", "loc": [ -74.3202, 40.789633 ], "pop": 26677, "state": "NJ" }
+{ "_id": "07047", "city": "NORTH BERGEN", "loc": [ -74.017715, 40.793019 ], "pop": 50823, "state": "NJ" }
+{ "_id": "07050", "city": "ORANGE", "loc": [ -74.2355, 40.769223 ], "pop": 28789, "state": "NJ" }
+{ "_id": "07052", "city": "WEST ORANGE", "loc": [ -74.256765, 40.785926 ], "pop": 38639, "state": "NJ" }
+{ "_id": "07054", "city": "PARSIPPANY", "loc": [ -74.411663, 40.862106 ], "pop": 27179, "state": "NJ" }
+{ "_id": "07055", "city": "PASSAIC", "loc": [ -74.128348, 40.860132 ], "pop": 58325, "state": "NJ" }
+{ "_id": "07060", "city": "NORTH PLAINFIELD", "loc": [ -74.425298, 40.61978 ], "pop": 43471, "state": "NJ" }
+{ "_id": "07065", "city": "RAHWAY", "loc": [ -74.281881, 40.608668 ], "pop": 25296, "state": "NJ" }
+{ "_id": "07083", "city": "UNION", "loc": [ -74.267653, 40.695184 ], "pop": 46608, "state": "NJ" }
+{ "_id": "07087", "city": "WEEHAWKEN", "loc": [ -74.030558, 40.768153 ], "pop": 69646, "state": "NJ" }
+{ "_id": "07090", "city": "WESTFIELD", "loc": [ -74.345056, 40.647851 ], "pop": 31885, "state": "NJ" }
+{ "_id": "07093", "city": "GUTTENBERG", "loc": [ -74.012859, 40.788192 ], "pop": 44735, "state": "NJ" }
+{ "_id": "07103", "city": "NEWARK", "loc": [ -74.196364, 40.736975 ], "pop": 36949, "state": "NJ" }
+{ "_id": "07104", "city": "NEWARK", "loc": [ -74.1695, 40.766446 ], "pop": 47183, "state": "NJ" }
+{ "_id": "07105", "city": "NEWARK", "loc": [ -74.156346, 40.727086 ], "pop": 38104, "state": "NJ" }
+{ "_id": "07106", "city": "NEWARK", "loc": [ -74.233023, 40.741485 ], "pop": 35013, "state": "NJ" }
+{ "_id": "07107", "city": "NEWARK", "loc": [ -74.18816, 40.760656 ], "pop": 36649, "state": "NJ" }
+{ "_id": "07108", "city": "NEWARK", "loc": [ -74.201538, 40.723647 ], "pop": 29730, "state": "NJ" }
+{ "_id": "07109", "city": "BELLEVILLE", "loc": [ -74.163119, 40.79458 ], "pop": 34924, "state": "NJ" }
+{ "_id": "07110", "city": "NUTLEY", "loc": [ -74.158934, 40.818548 ], "pop": 26441, "state": "NJ" }
+{ "_id": "07111", "city": "IRVINGTON", "loc": [ -74.231271, 40.7261 ], "pop": 60986, "state": "NJ" }
+{ "_id": "07112", "city": "NEWARK", "loc": [ -74.213073, 40.71071 ], "pop": 30356, "state": "NJ" }
+{ "_id": "07201", "city": "ELIZABETH", "loc": [ -74.204335, 40.67169 ], "pop": 25826, "state": "NJ" }
+{ "_id": "07202", "city": "ELIZABETH", "loc": [ -74.221544, 40.65652 ], "pop": 33981, "state": "NJ" }
+{ "_id": "07208", "city": "ELIZABETH", "loc": [ -74.22392, 40.674659 ], "pop": 26609, "state": "NJ" }
+{ "_id": "07302", "city": "JERSEY CITY", "loc": [ -74.046878, 40.722126 ], "pop": 32876, "state": "NJ" }
+{ "_id": "07470", "city": "WAYNE", "loc": [ -74.246565, 40.947112 ], "pop": 46815, "state": "NJ" }
+{ "_id": "07304", "city": "JERSEY CITY", "loc": [ -74.075358, 40.717973 ], "pop": 42101, "state": "NJ" }
+{ "_id": "07305", "city": "JERSEY CITY", "loc": [ -74.088998, 40.702007 ], "pop": 58655, "state": "NJ" }
+{ "_id": "07306", "city": "JERSEY CITY", "loc": [ -74.066038, 40.732125 ], "pop": 53257, "state": "NJ" }
+{ "_id": "07307", "city": "JERSEY CITY", "loc": [ -74.049752, 40.748167 ], "pop": 40704, "state": "NJ" }
+{ "_id": "07410", "city": "FAIR LAWN", "loc": [ -74.1166, 40.934297 ], "pop": 30522, "state": "NJ" }
+{ "_id": "07501", "city": "PATERSON", "loc": [ -74.167141, 40.914273 ], "pop": 33364, "state": "NJ" }
+{ "_id": "07601", "city": "HACKENSACK", "loc": [ -74.050301, 40.888191 ], "pop": 36963, "state": "NJ" }
+{ "_id": "07652", "city": "PARAMUS", "loc": [ -74.06724, 40.947683 ], "pop": 25085, "state": "NJ" }
+{ "_id": "07666", "city": "TEANECK", "loc": [ -74.011928, 40.89148 ], "pop": 37822, "state": "NJ" }
+{ "_id": "07675", "city": "OLD TAPPAN", "loc": [ -74.032586, 41.001696 ], "pop": 39036, "state": "NJ" }
+{ "_id": "07712", "city": "OCEAN", "loc": [ -74.029486, 40.235571 ], "pop": 35939, "state": "NJ" }
+{ "_id": "07726", "city": "MANALAPAN", "loc": [ -74.330613, 40.306274 ], "pop": 28928, "state": "NJ" }
+{ "_id": "07728", "city": "FREEHOLD", "loc": [ -74.276822, 40.245776 ], "pop": 42567, "state": "NJ" }
+{ "_id": "07731", "city": "HOWELL", "loc": [ -74.213683, 40.148096 ], "pop": 31114, "state": "NJ" }
+{ "_id": "07740", "city": "LONG BRANCH", "loc": [ -73.991176, 40.299204 ], "pop": 29053, "state": "NJ" }
+{ "_id": "07747", "city": "MATAWAN", "loc": [ -74.237955, 40.410876 ], "pop": 26130, "state": "NJ" }
+{ "_id": "07753", "city": "NEPTUNE CITY", "loc": [ -74.054045, 40.211153 ], "pop": 32147, "state": "NJ" }
+{ "_id": "07801", "city": "MINE HILL", "loc": [ -74.559702, 40.887218 ], "pop": 25588, "state": "NJ" }
+{ "_id": "07860", "city": "FREDON TOWNSHIP", "loc": [ -74.780191, 41.058275 ], "pop": 25022, "state": "NJ" }
+{ "_id": "07921", "city": "BEDMINSTER", "loc": [ -74.643236, 40.657109 ], "pop": 6515, "state": "NJ" }
+{ "_id": "07960", "city": "MORRISTOWN", "loc": [ -74.487288, 40.795236 ], "pop": 38516, "state": "NJ" }
+{ "_id": "08003", "city": "CHERRY HILL", "loc": [ -74.970568, 39.880453 ], "pop": 29058, "state": "NJ" }
+{ "_id": "08012", "city": "WASHINGTON", "loc": [ -75.058747, 39.774104 ], "pop": 35874, "state": "NJ" }
+{ "_id": "08016", "city": "BURLINGTON", "loc": [ -74.845353, 40.068015 ], "pop": 25065, "state": "NJ" }
+{ "_id": "08021", "city": "LAUREL SPRINGS", "loc": [ -75.003997, 39.80703 ], "pop": 48953, "state": "NJ" }
+{ "_id": "08046", "city": "WILLINGBORO", "loc": [ -74.883482, 40.028959 ], "pop": 36471, "state": "NJ" }
+{ "_id": "08053", "city": "MARLTON", "loc": [ -74.90674, 39.884517 ], "pop": 33299, "state": "NJ" }
+{ "_id": "08054", "city": "MOUNT LAUREL", "loc": [ -74.903588, 39.947808 ], "pop": 29805, "state": "NJ" }
+{ "_id": "08055", "city": "MEDFORD LAKES", "loc": [ -74.823384, 39.868099 ], "pop": 25033, "state": "NJ" }
+{ "_id": "08060", "city": "EASTAMPTON TWP", "loc": [ -74.795522, 39.993028 ], "pop": 31606, "state": "NJ" }
+{ "_id": "08081", "city": "SICKLERVILLE", "loc": [ -74.986385, 39.735385 ], "pop": 29949, "state": "NJ" }
+{ "_id": "08088", "city": "SOUTHAMPTON", "loc": [ -74.711025, 39.867631 ], "pop": 25480, "state": "NJ" }
+{ "_id": "08094", "city": "WILLIAMSTOWN", "loc": [ -74.971027, 39.665006 ], "pop": 30978, "state": "NJ" }
+{ "_id": "08096", "city": "DEPTFORD", "loc": [ -75.137966, 39.829477 ], "pop": 34147, "state": "NJ" }
+{ "_id": "08104", "city": "CAMDEN", "loc": [ -75.107835, 39.918575 ], "pop": 26375, "state": "NJ" }
+{ "_id": "08105", "city": "CAMDEN", "loc": [ -75.086382, 39.948417 ], "pop": 34450, "state": "NJ" }
+{ "_id": "08201", "city": "SMITHVILLE", "loc": [ -74.503106, 39.462368 ], "pop": 26645, "state": "NJ" }
+{ "_id": "08232", "city": "PLEASANTVILLE", "loc": [ -74.552365, 39.401518 ], "pop": 30292, "state": "NJ" }
+{ "_id": "08302", "city": "SEABROOK", "loc": [ -75.226728, 39.445294 ], "pop": 45485, "state": "NJ" }
+{ "_id": "08332", "city": "MILLVILLE", "loc": [ -75.029311, 39.367313 ], "pop": 36591, "state": "NJ" }
+{ "_id": "08360", "city": "VINELAND", "loc": [ -75.009087, 39.48177 ], "pop": 56319, "state": "NJ" }
+{ "_id": "08401", "city": "ATLANTIC CITY", "loc": [ -74.431727, 39.366411 ], "pop": 31907, "state": "NJ" }
+{ "_id": "08520", "city": "HIGHTSTOWN", "loc": [ -74.524993, 40.266885 ], "pop": 25674, "state": "NJ" }
+{ "_id": "08527", "city": "JACKSON", "loc": [ -74.301709, 40.120964 ], "pop": 33075, "state": "NJ" }
+{ "_id": "08540", "city": "PRINCETON", "loc": [ -74.640832, 40.366633 ], "pop": 33831, "state": "NJ" }
+{ "_id": "08610", "city": "HAMILTON", "loc": [ -74.717205, 40.19894 ], "pop": 29852, "state": "NJ" }
+{ "_id": "08611", "city": "HAMILTON", "loc": [ -74.751997, 40.207297 ], "pop": 25084, "state": "NJ" }
+{ "_id": "08618", "city": "TRENTON", "loc": [ -74.782062, 40.237687 ], "pop": 40280, "state": "NJ" }
+{ "_id": "08638", "city": "TRENTON", "loc": [ -74.762699, 40.251006 ], "pop": 26982, "state": "NJ" }
+{ "_id": "08648", "city": "LAWRENCEVILLE", "loc": [ -74.723956, 40.277646 ], "pop": 25497, "state": "NJ" }
+{ "_id": "08701", "city": "LAKEWOOD", "loc": [ -74.204199, 40.085043 ], "pop": 47458, "state": "NJ" }
+{ "_id": "08723", "city": "OSBORNSVILLE", "loc": [ -74.12686, 40.040817 ], "pop": 28128, "state": "NJ" }
+{ "_id": "08724", "city": "BRICK", "loc": [ -74.115237, 40.087432 ], "pop": 34507, "state": "NJ" }
+{ "_id": "08742", "city": "BAY HEAD", "loc": [ -74.065719, 40.080226 ], "pop": 25071, "state": "NJ" }
+{ "_id": "08753", "city": "TOMS RIVER", "loc": [ -74.156508, 39.977083 ], "pop": 58001, "state": "NJ" }
+{ "_id": "08757", "city": "TOMS RIVER", "loc": [ -74.251168, 39.971471 ], "pop": 29794, "state": "NJ" }
+{ "_id": "08807", "city": "BRIDGEWATER", "loc": [ -74.626741, 40.590388 ], "pop": 26496, "state": "NJ" }
+{ "_id": "08816", "city": "EAST BRUNSWICK", "loc": [ -74.406381, 40.428395 ], "pop": 42319, "state": "NJ" }
+{ "_id": "08817", "city": "EDISON", "loc": [ -74.397286, 40.517079 ], "pop": 41245, "state": "NJ" }
+{ "_id": "08820", "city": "EDISON", "loc": [ -74.358863, 40.57804 ], "pop": 33581, "state": "NJ" }
+{ "_id": "08854", "city": "PISCATAWAY", "loc": [ -74.458996, 40.55152 ], "pop": 47038, "state": "NJ" }
+{ "_id": "08857", "city": "OLD BRIDGE", "loc": [ -74.323553, 40.398045 ], "pop": 33884, "state": "NJ" }
+{ "_id": "08861", "city": "PERTH AMBOY", "loc": [ -74.275427, 40.517551 ], "pop": 43920, "state": "NJ" }
+{ "_id": "08865", "city": "ALPHA", "loc": [ -75.1741, 40.692819 ], "pop": 28782, "state": "NJ" }
+{ "_id": "08873", "city": "SOMERSET", "loc": [ -74.50126, 40.500743 ], "pop": 36850, "state": "NJ" }
+{ "_id": "08876", "city": "NORTH BRANCH", "loc": [ -74.645926, 40.549393 ], "pop": 34212, "state": "NJ" }
+{ "_id": "08901", "city": "NEW BRUNSWICK", "loc": [ -74.448193, 40.489073 ], "pop": 41710, "state": "NJ" }
+{ "_id": "08902", "city": "NORTH BRUNSWICK", "loc": [ -74.482285, 40.453767 ], "pop": 31071, "state": "NJ" }
+{ "_id": "10002", "city": "NEW YORK", "loc": [ -73.987681, 40.715231 ], "pop": 84143, "state": "NY" }
+{ "_id": "10003", "city": "NEW YORK", "loc": [ -73.989223, 40.731253 ], "pop": 51224, "state": "NY" }
+{ "_id": "10009", "city": "NEW YORK", "loc": [ -73.979591, 40.726188 ], "pop": 57426, "state": "NY" }
+{ "_id": "10011", "city": "NEW YORK", "loc": [ -73.99963, 40.740225 ], "pop": 46560, "state": "NY" }
+{ "_id": "10012", "city": "NEW YORK", "loc": [ -73.998284, 40.72553 ], "pop": 26365, "state": "NY" }
+{ "_id": "10014", "city": "NEW YORK", "loc": [ -74.005421, 40.73393 ], "pop": 31147, "state": "NY" }
+{ "_id": "10016", "city": "NEW YORK", "loc": [ -73.978134, 40.744281 ], "pop": 51561, "state": "NY" }
+{ "_id": "10019", "city": "NEW YORK", "loc": [ -73.985834, 40.765069 ], "pop": 36602, "state": "NY" }
+{ "_id": "10021", "city": "NEW YORK", "loc": [ -73.958805, 40.768476 ], "pop": 106564, "state": "NY" }
+{ "_id": "10022", "city": "NEW YORK", "loc": [ -73.965703, 40.757091 ], "pop": 31870, "state": "NY" }
+{ "_id": "10023", "city": "NEW YORK", "loc": [ -73.982652, 40.77638 ], "pop": 57385, "state": "NY" }
+{ "_id": "10024", "city": "NEW YORK", "loc": [ -73.976385, 40.786446 ], "pop": 65141, "state": "NY" }
+{ "_id": "10025", "city": "NEW YORK", "loc": [ -73.968312, 40.797466 ], "pop": 100027, "state": "NY" }
+{ "_id": "10026", "city": "NEW YORK", "loc": [ -73.953069, 40.801942 ], "pop": 28453, "state": "NY" }
+{ "_id": "10027", "city": "NEW YORK", "loc": [ -73.954978, 40.811556 ], "pop": 54631, "state": "NY" }
+{ "_id": "10028", "city": "NEW YORK", "loc": [ -73.952866, 40.776267 ], "pop": 42757, "state": "NY" }
+{ "_id": "10029", "city": "NEW YORK", "loc": [ -73.94475, 40.791817 ], "pop": 74643, "state": "NY" }
+{ "_id": "10031", "city": "NEW YORK", "loc": [ -73.950712, 40.82455 ], "pop": 55989, "state": "NY" }
+{ "_id": "10032", "city": "NEW YORK", "loc": [ -73.941978, 40.83819 ], "pop": 61332, "state": "NY" }
+{ "_id": "10033", "city": "NEW YORK", "loc": [ -73.935649, 40.84955 ], "pop": 58648, "state": "NY" }
+{ "_id": "10034", "city": "NEW YORK", "loc": [ -73.922077, 40.866222 ], "pop": 41131, "state": "NY" }
+{ "_id": "10035", "city": "NEW YORK", "loc": [ -73.937098, 40.801116 ], "pop": 28099, "state": "NY" }
+{ "_id": "10039", "city": "NEW YORK", "loc": [ -73.938266, 40.826458 ], "pop": 25293, "state": "NY" }
+{ "_id": "10040", "city": "NEW YORK", "loc": [ -73.929601, 40.858308 ], "pop": 39780, "state": "NY" }
+{ "_id": "10128", "city": "NEW YORK", "loc": [ -73.951112, 40.781618 ], "pop": 52311, "state": "NY" }
+{ "_id": "10301", "city": "STATEN ISLAND", "loc": [ -74.092663, 40.631602 ], "pop": 35314, "state": "NY" }
+{ "_id": "10304", "city": "STATEN ISLAND", "loc": [ -74.087836, 40.610249 ], "pop": 33028, "state": "NY" }
+{ "_id": "10305", "city": "STATEN ISLAND", "loc": [ -74.076795, 40.597296 ], "pop": 30513, "state": "NY" }
+{ "_id": "10306", "city": "STATEN ISLAND", "loc": [ -74.118386, 40.568183 ], "pop": 49849, "state": "NY" }
+{ "_id": "10312", "city": "STATEN ISLAND", "loc": [ -74.179165, 40.545745 ], "pop": 49584, "state": "NY" }
+{ "_id": "10314", "city": "STATEN ISLAND", "loc": [ -74.147218, 40.603915 ], "pop": 78118, "state": "NY" }
+{ "_id": "10451", "city": "BRONX", "loc": [ -73.921735, 40.8222 ], "pop": 42854, "state": "NY" }
+{ "_id": "10452", "city": "BRONX", "loc": [ -73.921555, 40.837594 ], "pop": 55890, "state": "NY" }
+{ "_id": "10453", "city": "BRONX", "loc": [ -73.912937, 40.852047 ], "pop": 70544, "state": "NY" }
+{ "_id": "10454", "city": "BRONX", "loc": [ -73.919821, 40.808549 ], "pop": 35994, "state": "NY" }
+{ "_id": "10455", "city": "BRONX", "loc": [ -73.907172, 40.815309 ], "pop": 31882, "state": "NY" }
+{ "_id": "10456", "city": "BRONX", "loc": [ -73.909893, 40.831557 ], "pop": 70157, "state": "NY" }
+{ "_id": "10457", "city": "BRONX", "loc": [ -73.899907, 40.848635 ], "pop": 62133, "state": "NY" }
+{ "_id": "10458", "city": "BRONX", "loc": [ -73.889464, 40.863307 ], "pop": 70612, "state": "NY" }
+{ "_id": "10459", "city": "BRONX", "loc": [ -73.894047, 40.824699 ], "pop": 30983, "state": "NY" }
+{ "_id": "10460", "city": "BRONX", "loc": [ -73.879409, 40.840949 ], "pop": 47250, "state": "NY" }
+{ "_id": "10461", "city": "BRONX", "loc": [ -73.840953, 40.846506 ], "pop": 45273, "state": "NY" }
+{ "_id": "10462", "city": "BRONX", "loc": [ -73.860185, 40.843369 ], "pop": 61478, "state": "NY" }
+{ "_id": "10463", "city": "BRONX", "loc": [ -73.906737, 40.879812 ], "pop": 67435, "state": "NY" }
+{ "_id": "10465", "city": "BRONX", "loc": [ -73.819581, 40.826065 ], "pop": 37457, "state": "NY" }
+{ "_id": "10466", "city": "BRONX", "loc": [ -73.850333, 40.890375 ], "pop": 58394, "state": "NY" }
+{ "_id": "10467", "city": "BRONX", "loc": [ -73.871242, 40.873671 ], "pop": 85710, "state": "NY" }
+{ "_id": "10468", "city": "BRONX", "loc": [ -73.900259, 40.866231 ], "pop": 65854, "state": "NY" }
+{ "_id": "10469", "city": "BRONX", "loc": [ -73.849465, 40.870193 ], "pop": 53962, "state": "NY" }
+{ "_id": "10472", "city": "BRONX", "loc": [ -73.871557, 40.829464 ], "pop": 61122, "state": "NY" }
+{ "_id": "10473", "city": "BRONX", "loc": [ -73.860626, 40.819364 ], "pop": 53981, "state": "NY" }
+{ "_id": "10475", "city": "BRONX", "loc": [ -73.827817, 40.872903 ], "pop": 37045, "state": "NY" }
+{ "_id": "10509", "city": "BREWSTER", "loc": [ -73.599179, 41.409704 ], "pop": 15852, "state": "NY" }
+{ "_id": "10550", "city": "MOUNT VERNON", "loc": [ -73.837961, 40.907863 ], "pop": 37889, "state": "NY" }
+{ "_id": "10562", "city": "OSSINING", "loc": [ -73.853791, 41.167344 ], "pop": 29926, "state": "NY" }
+{ "_id": "10566", "city": "CORTLANDT MANOR", "loc": [ -73.902562, 41.293722 ], "pop": 37431, "state": "NY" }
+{ "_id": "10573", "city": "RYE BROOK", "loc": [ -73.672045, 41.007755 ], "pop": 32552, "state": "NY" }
+{ "_id": "10583", "city": "HEATHCOTE", "loc": [ -73.797566, 40.988365 ], "pop": 35302, "state": "NY" }
+{ "_id": "10598", "city": "YORKTOWN HEIGHTS", "loc": [ -73.792398, 41.299947 ], "pop": 28501, "state": "NY" }
+{ "_id": "10701", "city": "YONKERS", "loc": [ -73.888317, 40.940716 ], "pop": 59476, "state": "NY" }
+{ "_id": "10704", "city": "YONKERS", "loc": [ -73.859347, 40.917633 ], "pop": 31604, "state": "NY" }
+{ "_id": "10705", "city": "YONKERS", "loc": [ -73.895041, 40.917665 ], "pop": 36141, "state": "NY" }
+{ "_id": "10801", "city": "NEW ROCHELLE", "loc": [ -73.787729, 40.916628 ], "pop": 30929, "state": "NY" }
+{ "_id": "10940", "city": "SCOTCHTOWN", "loc": [ -74.412023, 41.457222 ], "pop": 51211, "state": "NY" }
+{ "_id": "10950", "city": "MONROE", "loc": [ -74.188521, 41.328578 ], "pop": 30829, "state": "NY" }
+{ "_id": "10952", "city": "MONSEY", "loc": [ -74.0736, 41.116255 ], "pop": 25251, "state": "NY" }
+{ "_id": "10956", "city": "NEW CITY", "loc": [ -73.996206, 41.147247 ], "pop": 33340, "state": "NY" }
+{ "_id": "10977", "city": "CHESTNUT RIDGE", "loc": [ -74.046253, 41.117977 ], "pop": 43435, "state": "NY" }
+{ "_id": "11001", "city": "FLORAL PARK", "loc": [ -73.70576, 40.723586 ], "pop": 26498, "state": "NY" }
+{ "_id": "11003", "city": "ALDEN MANOR", "loc": [ -73.705751, 40.699615 ], "pop": 34741, "state": "NY" }
+{ "_id": "11040", "city": "HILLSIDE MANOR", "loc": [ -73.68042, 40.743926 ], "pop": 37695, "state": "NY" }
+{ "_id": "11050", "city": "PORT WASHINGTON", "loc": [ -73.696356, 40.834995 ], "pop": 28264, "state": "NY" }
+{ "_id": "11102", "city": "ASTORIA", "loc": [ -73.926462, 40.77063 ], "pop": 30078, "state": "NY" }
+{ "_id": "11103", "city": "ASTORIA", "loc": [ -73.914886, 40.762651 ], "pop": 38597, "state": "NY" }
+{ "_id": "11104", "city": "SUNNYSIDE", "loc": [ -73.921556, 40.743641 ], "pop": 25898, "state": "NY" }
+{ "_id": "11105", "city": "ASTORIA", "loc": [ -73.910965, 40.77627 ], "pop": 37297, "state": "NY" }
+{ "_id": "11106", "city": "ASTORIA", "loc": [ -73.929527, 40.760813 ], "pop": 36515, "state": "NY" }
+{ "_id": "11201", "city": "BROOKLYN", "loc": [ -73.99034, 40.694021 ], "pop": 46980, "state": "NY" }
+{ "_id": "11203", "city": "BROOKLYN", "loc": [ -73.934888, 40.650496 ], "pop": 80566, "state": "NY" }
+{ "_id": "11204", "city": "BROOKLYN", "loc": [ -73.985623, 40.617871 ], "pop": 64780, "state": "NY" }
+{ "_id": "11205", "city": "BROOKLYN", "loc": [ -73.96662, 40.692433 ], "pop": 36852, "state": "NY" }
+{ "_id": "11206", "city": "BROOKLYN", "loc": [ -73.943617, 40.701195 ], "pop": 74825, "state": "NY" }
+{ "_id": "11207", "city": "BROOKLYN", "loc": [ -73.893957, 40.670486 ], "pop": 83158, "state": "NY" }
+{ "_id": "11208", "city": "BROOKLYN", "loc": [ -73.873649, 40.676191 ], "pop": 78322, "state": "NY" }
+{ "_id": "11209", "city": "BROOKLYN", "loc": [ -74.030304, 40.625106 ], "pop": 62346, "state": "NY" }
+{ "_id": "11210", "city": "BROOKLYN", "loc": [ -73.946682, 40.628064 ], "pop": 62445, "state": "NY" }
+{ "_id": "11211", "city": "BROOKLYN", "loc": [ -73.956283, 40.709476 ], "pop": 78338, "state": "NY" }
+{ "_id": "11212", "city": "BROOKLYN", "loc": [ -73.914483, 40.662474 ], "pop": 87079, "state": "NY" }
+{ "_id": "11213", "city": "BROOKLYN", "loc": [ -73.93665, 40.669961 ], "pop": 62607, "state": "NY" }
+{ "_id": "11214", "city": "BROOKLYN", "loc": [ -73.99681, 40.601563 ], "pop": 73076, "state": "NY" }
+{ "_id": "11215", "city": "BROOKLYN", "loc": [ -73.982783, 40.666863 ], "pop": 63338, "state": "NY" }
+{ "_id": "11216", "city": "BROOKLYN", "loc": [ -73.949639, 40.67943 ], "pop": 58862, "state": "NY" }
+{ "_id": "11217", "city": "BROOKLYN", "loc": [ -73.979797, 40.68165 ], "pop": 36232, "state": "NY" }
+{ "_id": "11218", "city": "BROOKLYN", "loc": [ -73.975806, 40.642373 ], "pop": 66569, "state": "NY" }
+{ "_id": "11219", "city": "BROOKLYN", "loc": [ -73.996011, 40.633568 ], "pop": 73527, "state": "NY" }
+{ "_id": "11220", "city": "BROOKLYN", "loc": [ -74.013287, 40.641165 ], "pop": 76923, "state": "NY" }
+{ "_id": "11221", "city": "BROOKLYN", "loc": [ -73.927373, 40.690695 ], "pop": 70583, "state": "NY" }
+{ "_id": "11222", "city": "BROOKLYN", "loc": [ -73.949846, 40.727164 ], "pop": 38158, "state": "NY" }
+{ "_id": "11223", "city": "BROOKLYN", "loc": [ -73.974291, 40.597874 ], "pop": 70904, "state": "NY" }
+{ "_id": "11224", "city": "BROOKLYN", "loc": [ -73.988395, 40.576729 ], "pop": 52480, "state": "NY" }
+{ "_id": "11225", "city": "BROOKLYN", "loc": [ -73.954588, 40.662776 ], "pop": 66752, "state": "NY" }
+{ "_id": "11226", "city": "BROOKLYN", "loc": [ -73.956985, 40.646694 ], "pop": 111396, "state": "NY" }
+{ "_id": "11228", "city": "BROOKLYN", "loc": [ -74.012067, 40.617441 ], "pop": 39220, "state": "NY" }
+{ "_id": "11229", "city": "BROOKLYN", "loc": [ -73.94749, 40.601094 ], "pop": 72660, "state": "NY" }
+{ "_id": "11230", "city": "BROOKLYN", "loc": [ -73.965007, 40.622493 ], "pop": 72733, "state": "NY" }
+{ "_id": "11231", "city": "BROOKLYN", "loc": [ -74.00141, 40.679437 ], "pop": 32101, "state": "NY" }
+{ "_id": "11233", "city": "BROOKLYN", "loc": [ -73.921104, 40.678415 ], "pop": 58827, "state": "NY" }
+{ "_id": "11234", "city": "BROOKLYN", "loc": [ -73.923915, 40.620475 ], "pop": 74953, "state": "NY" }
+{ "_id": "11235", "city": "BROOKLYN", "loc": [ -73.953599, 40.583898 ], "pop": 67088, "state": "NY" }
+{ "_id": "11236", "city": "BROOKLYN", "loc": [ -73.902764, 40.640685 ], "pop": 77253, "state": "NY" }
+{ "_id": "11237", "city": "BROOKLYN", "loc": [ -73.917979, 40.700616 ], "pop": 48339, "state": "NY" }
+{ "_id": "11238", "city": "BROOKLYN", "loc": [ -73.964387, 40.679015 ], "pop": 42507, "state": "NY" }
+{ "_id": "11354", "city": "FLUSHING", "loc": [ -73.824142, 40.766722 ], "pop": 51947, "state": "NY" }
+{ "_id": "11355", "city": "FLUSHING", "loc": [ -73.822609, 40.753573 ], "pop": 69164, "state": "NY" }
+{ "_id": "11357", "city": "WHITESTONE", "loc": [ -73.809594, 40.785147 ], "pop": 39093, "state": "NY" }
+{ "_id": "11358", "city": "FLUSHING", "loc": [ -73.796788, 40.760636 ], "pop": 34045, "state": "NY" }
+{ "_id": "11361", "city": "BAYSIDE", "loc": [ -73.774457, 40.76268 ], "pop": 25529, "state": "NY" }
+{ "_id": "11364", "city": "FLUSHING", "loc": [ -73.758646, 40.745847 ], "pop": 32080, "state": "NY" }
+{ "_id": "11365", "city": "FRESH MEADOWS", "loc": [ -73.79506, 40.737424 ], "pop": 34087, "state": "NY" }
+{ "_id": "11367", "city": "FLUSHING", "loc": [ -73.81953, 40.727966 ], "pop": 36877, "state": "NY" }
+{ "_id": "11368", "city": "CORONA", "loc": [ -73.861069, 40.745288 ], "pop": 75746, "state": "NY" }
+{ "_id": "11369", "city": "EAST ELMHURST", "loc": [ -73.873902, 40.761254 ], "pop": 28106, "state": "NY" }
+{ "_id": "11372", "city": "JACKSON HEIGHTS", "loc": [ -73.882975, 40.751329 ], "pop": 57726, "state": "NY" }
+{ "_id": "11373", "city": "JACKSON HEIGHTS", "loc": [ -73.878551, 40.740388 ], "pop": 88241, "state": "NY" }
+{ "_id": "11374", "city": "REGO PARK", "loc": [ -73.860191, 40.72775 ], "pop": 40024, "state": "NY" }
+{ "_id": "11375", "city": "FOREST HILLS", "loc": [ -73.847306, 40.722854 ], "pop": 65180, "state": "NY" }
+{ "_id": "11377", "city": "WOODSIDE", "loc": [ -73.906911, 40.744972 ], "pop": 75894, "state": "NY" }
+{ "_id": "11378", "city": "MASPETH", "loc": [ -73.899682, 40.723865 ], "pop": 31292, "state": "NY" }
+{ "_id": "11379", "city": "MIDDLE VILLAGE", "loc": [ -73.879228, 40.717286 ], "pop": 28981, "state": "NY" }
+{ "_id": "11385", "city": "RIDGEWOOD", "loc": [ -73.896122, 40.703613 ], "pop": 85732, "state": "NY" }
+{ "_id": "11412", "city": "KEW GARDENS", "loc": [ -73.758641, 40.698097 ], "pop": 32003, "state": "NY" }
+{ "_id": "11413", "city": "SPRINGFIELD GARD", "loc": [ -73.75071, 40.67295 ], "pop": 36679, "state": "NY" }
+{ "_id": "11414", "city": "KEW GARDENS", "loc": [ -73.845041, 40.660603 ], "pop": 27256, "state": "NY" }
+{ "_id": "11418", "city": "RICHMOND HILL", "loc": [ -73.834484, 40.698171 ], "pop": 29382, "state": "NY" }
+{ "_id": "11419", "city": "S RICHMOND HILL", "loc": [ -73.823871, 40.688113 ], "pop": 37530, "state": "NY" }
+{ "_id": "11420", "city": "S OZONE PARK", "loc": [ -73.815773, 40.675379 ], "pop": 38096, "state": "NY" }
+{ "_id": "11421", "city": "WOODHAVEN", "loc": [ -73.858514, 40.691345 ], "pop": 29442, "state": "NY" }
+{ "_id": "11422", "city": "ROSEDALE", "loc": [ -73.735265, 40.662141 ], "pop": 26674, "state": "NY" }
+{ "_id": "11423", "city": "HOLLIS", "loc": [ -73.767685, 40.714156 ], "pop": 29102, "state": "NY" }
+{ "_id": "11432", "city": "JAMAICA", "loc": [ -73.79442, 40.711867 ], "pop": 53011, "state": "NY" }
+{ "_id": "11433", "city": "JAMAICA", "loc": [ -73.787669, 40.69691 ], "pop": 26325, "state": "NY" }
+{ "_id": "11434", "city": "JAMAICA", "loc": [ -73.77584, 40.677483 ], "pop": 50464, "state": "NY" }
+{ "_id": "11435", "city": "JAMAICA", "loc": [ -73.811121, 40.702934 ], "pop": 47987, "state": "NY" }
+{ "_id": "11510", "city": "BALDWIN", "loc": [ -73.609688, 40.654755 ], "pop": 30959, "state": "NY" }
+{ "_id": "11520", "city": "FREEPORT", "loc": [ -73.586615, 40.65359 ], "pop": 40662, "state": "NY" }
+{ "_id": "11530", "city": "GARDEN CITY", "loc": [ -73.648718, 40.72452 ], "pop": 27951, "state": "NY" }
+{ "_id": "11550", "city": "HEMPSTEAD", "loc": [ -73.617641, 40.70492 ], "pop": 50933, "state": "NY" }
+{ "_id": "11554", "city": "EAST MEADOW", "loc": [ -73.556088, 40.714915 ], "pop": 36692, "state": "NY" }
+{ "_id": "11561", "city": "LONG BEACH", "loc": [ -73.659467, 40.587697 ], "pop": 39066, "state": "NY" }
+{ "_id": "11566", "city": "NORTH MERRICK", "loc": [ -73.555001, 40.668312 ], "pop": 36427, "state": "NY" }
+{ "_id": "11570", "city": "ROCKVILLE CENTRE", "loc": [ -73.638, 40.663745 ], "pop": 27127, "state": "NY" }
+{ "_id": "11572", "city": "OCEANSIDE", "loc": [ -73.637533, 40.636199 ], "pop": 31406, "state": "NY" }
+{ "_id": "11580", "city": "VALLEY STREAM", "loc": [ -73.705738, 40.674184 ], "pop": 34327, "state": "NY" }
+{ "_id": "11590", "city": "WESTBURY", "loc": [ -73.57226, 40.755749 ], "pop": 38026, "state": "NY" }
+{ "_id": "11691", "city": "FAR ROCKAWAY", "loc": [ -73.757971, 40.600645 ], "pop": 52162, "state": "NY" }
+{ "_id": "11701", "city": "AMITYVILLE", "loc": [ -73.417106, 40.684197 ], "pop": 29047, "state": "NY" }
+{ "_id": "11704", "city": "WEST BABYLON", "loc": [ -73.354591, 40.713476 ], "pop": 45519, "state": "NY" }
+{ "_id": "11710", "city": "NORTH BELLMORE", "loc": [ -73.534517, 40.677028 ], "pop": 34237, "state": "NY" }
+{ "_id": "11717", "city": "WEST BRENTWOOD", "loc": [ -73.248189, 40.777918 ], "pop": 60425, "state": "NY" }
+{ "_id": "11720", "city": "CENTEREACH", "loc": [ -73.082163, 40.870508 ], "pop": 27519, "state": "NY" }
+{ "_id": "11722", "city": "CENTRAL ISLIP", "loc": [ -73.196145, 40.786618 ], "pop": 29418, "state": "NY" }
+{ "_id": "11725", "city": "COMMACK", "loc": [ -73.279924, 40.843032 ], "pop": 29847, "state": "NY" }
+{ "_id": "11727", "city": "CORAM", "loc": [ -73.006881, 40.884988 ], "pop": 25002, "state": "NY" }
+{ "_id": "11729", "city": "DEER PARK", "loc": [ -73.32572, 40.759083 ], "pop": 32146, "state": "NY" }
+{ "_id": "11731", "city": "ELWOOD", "loc": [ -73.319506, 40.867066 ], "pop": 30333, "state": "NY" }
+{ "_id": "11735", "city": "SOUTH FARMINGDAL", "loc": [ -73.445055, 40.725061 ], "pop": 31358, "state": "NY" }
+{ "_id": "11741", "city": "HOLBROOK", "loc": [ -73.071789, 40.796426 ], "pop": 25964, "state": "NY" }
+{ "_id": "11743", "city": "HALESITE", "loc": [ -73.410924, 40.866945 ], "pop": 41511, "state": "NY" }
+{ "_id": "11746", "city": "DIX HILLS", "loc": [ -73.375472, 40.821754 ], "pop": 62162, "state": "NY" }
+{ "_id": "11756", "city": "LEVITTOWN", "loc": [ -73.516578, 40.725428 ], "pop": 44967, "state": "NY" }
+{ "_id": "11757", "city": "LINDENHURST", "loc": [ -73.374493, 40.688373 ], "pop": 44726, "state": "NY" }
+{ "_id": "11758", "city": "NORTH MASSAPEQUA", "loc": [ -73.469727, 40.685738 ], "pop": 42863, "state": "NY" }
+{ "_id": "11762", "city": "MASSAPEQUA PARK", "loc": [ -73.444447, 40.680673 ], "pop": 31693, "state": "NY" }
+{ "_id": "11772", "city": "DAVIS PARK", "loc": [ -72.998108, 40.773501 ], "pop": 40962, "state": "NY" }
+{ "_id": "11779", "city": "LAKE RONKONKOMA", "loc": [ -73.1208, 40.820763 ], "pop": 43424, "state": "NY" }
+{ "_id": "11787", "city": "SMITHTOWN", "loc": [ -73.213816, 40.854186 ], "pop": 29932, "state": "NY" }
+{ "_id": "11793", "city": "WANTAGH", "loc": [ -73.51033, 40.684998 ], "pop": 31972, "state": "NY" }
+{ "_id": "11795", "city": "WEST ISLIP", "loc": [ -73.30072, 40.711734 ], "pop": 39344, "state": "NY" }
+{ "_id": "11801", "city": "HICKSVILLE", "loc": [ -73.52297, 40.762305 ], "pop": 38307, "state": "NY" }
+{ "_id": "11803", "city": "PLAINVIEW", "loc": [ -73.481638, 40.778099 ], "pop": 28207, "state": "NY" }
+{ "_id": "12010", "city": "WEST CHARLTON", "loc": [ -74.18393, 42.948822 ], "pop": 32028, "state": "NY" }
+{ "_id": "12020", "city": "BALLSTON SPA", "loc": [ -73.84858, 43.004956 ], "pop": 25126, "state": "NY" }
+{ "_id": "12065", "city": "CLIFTON PARK", "loc": [ -73.785094, 42.849865 ], "pop": 31352, "state": "NY" }
+{ "_id": "12078", "city": "GLOVERSVILLE", "loc": [ -74.337526, 43.061603 ], "pop": 25292, "state": "NY" }
+{ "_id": "12180", "city": "TROY", "loc": [ -73.668263, 42.728748 ], "pop": 56849, "state": "NY" }
+{ "_id": "12203", "city": "MC KOWNVILLE", "loc": [ -73.821988, 42.676757 ], "pop": 33356, "state": "NY" }
+{ "_id": "12205", "city": "ROESSLEVILLE", "loc": [ -73.820174, 42.713116 ], "pop": 26008, "state": "NY" }
+{ "_id": "12302", "city": "MAYFAIR", "loc": [ -73.955051, 42.858839 ], "pop": 27516, "state": "NY" }
+{ "_id": "12303", "city": "ROTTERDAM", "loc": [ -73.938776, 42.769645 ], "pop": 28448, "state": "NY" }
+{ "_id": "12309", "city": "NISKAYUNA", "loc": [ -73.878268, 42.796168 ], "pop": 27928, "state": "NY" }
+{ "_id": "12401", "city": "EDDYVILLE", "loc": [ -74.023575, 41.930126 ], "pop": 32883, "state": "NY" }
+{ "_id": "12550", "city": "MIDDLE HOPE", "loc": [ -74.03598, 41.517833 ], "pop": 47939, "state": "NY" }
+{ "_id": "12590", "city": "NEW HAMBURG", "loc": [ -73.890588, 41.592199 ], "pop": 31950, "state": "NY" }
+{ "_id": "12601", "city": "SOUTH ROAD", "loc": [ -73.9218, 41.702082 ], "pop": 38212, "state": "NY" }
+{ "_id": "12603", "city": "ARLINGTON", "loc": [ -73.885217, 41.676775 ], "pop": 40724, "state": "NY" }
+{ "_id": "12866", "city": "WILTON", "loc": [ -73.780644, 43.080094 ], "pop": 30086, "state": "NY" }
+{ "_id": "12901", "city": "PLATTSBURGH", "loc": [ -73.465969, 44.692715 ], "pop": 40905, "state": "NY" }
+{ "_id": "13021", "city": "AUBURN", "loc": [ -76.562605, 42.929958 ], "pop": 43447, "state": "NY" }
+{ "_id": "13027", "city": "BALDWINSVILLE", "loc": [ -76.323718, 43.162039 ], "pop": 28132, "state": "NY" }
+{ "_id": "13045", "city": "CORTLAND", "loc": [ -76.185675, 42.595175 ], "pop": 29180, "state": "NY" }
+{ "_id": "13090", "city": "BAYBERRY", "loc": [ -76.223269, 43.148048 ], "pop": 31387, "state": "NY" }
+{ "_id": "13126", "city": "OSWEGO", "loc": [ -76.497489, 43.443836 ], "pop": 38426, "state": "NY" }
+{ "_id": "13204", "city": "SYRACUSE", "loc": [ -76.175767, 43.044398 ], "pop": 25414, "state": "NY" }
+{ "_id": "13210", "city": "SYRACUSE", "loc": [ -76.128166, 43.035414 ], "pop": 31197, "state": "NY" }
+{ "_id": "13367", "city": "BEAVER RIVER", "loc": [ -75.475378, 43.801055 ], "pop": 8238, "state": "NY" }
+{ "_id": "13440", "city": "ROME", "loc": [ -75.449758, 43.219349 ], "pop": 56424, "state": "NY" }
+{ "_id": "13501", "city": "UTICA", "loc": [ -75.231463, 43.087112 ], "pop": 40223, "state": "NY" }
+{ "_id": "13502", "city": "UTICA", "loc": [ -75.231383, 43.106723 ], "pop": 36632, "state": "NY" }
+{ "_id": "13601", "city": "WATERTOWN", "loc": [ -75.912212, 43.974258 ], "pop": 39515, "state": "NY" }
+{ "_id": "13612", "city": "BLACK RIVER", "loc": [ -75.795777, 44.004156 ], "pop": 3651, "state": "NY" }
+{ "_id": "13740", "city": "BOVINA CENTER", "loc": [ -74.766112, 42.27094 ], "pop": 492, "state": "NY" }
+{ "_id": "13760", "city": "ENDWELL", "loc": [ -76.056927, 42.114089 ], "pop": 46236, "state": "NY" }
+{ "_id": "13850", "city": "VESTAL", "loc": [ -76.011757, 42.077106 ], "pop": 27686, "state": "NY" }
+{ "_id": "13905", "city": "BINGHAMTON", "loc": [ -75.930865, 42.115051 ], "pop": 30741, "state": "NY" }
+{ "_id": "14012", "city": "BARKER", "loc": [ -78.542004, 43.336779 ], "pop": 2441, "state": "NY" }
+{ "_id": "14043", "city": "DEPEW", "loc": [ -78.704052, 42.904973 ], "pop": 26460, "state": "NY" }
+{ "_id": "14075", "city": "HAMBURG", "loc": [ -78.838853, 42.733404 ], "pop": 38851, "state": "NY" }
+{ "_id": "14094", "city": "LOCKPORT", "loc": [ -78.692344, 43.159987 ], "pop": 48398, "state": "NY" }
+{ "_id": "14120", "city": "NORTH TONAWANDA", "loc": [ -78.850997, 43.049828 ], "pop": 51399, "state": "NY" }
+{ "_id": "14127", "city": "ORCHARD PARK", "loc": [ -78.751834, 42.763891 ], "pop": 26554, "state": "NY" }
+{ "_id": "14150", "city": "TONAWANDA", "loc": [ -78.85472, 43.002837 ], "pop": 53410, "state": "NY" }
+{ "_id": "14206", "city": "BUFFALO", "loc": [ -78.810375, 42.881132 ], "pop": 25496, "state": "NY" }
+{ "_id": "14211", "city": "BUFFALO", "loc": [ -78.822477, 42.908153 ], "pop": 38411, "state": "NY" }
+{ "_id": "14213", "city": "BUFFALO", "loc": [ -78.889461, 42.916675 ], "pop": 32876, "state": "NY" }
+{ "_id": "14215", "city": "BUFFALO", "loc": [ -78.811504, 42.933536 ], "pop": 46789, "state": "NY" }
+{ "_id": "14217", "city": "KENMORE", "loc": [ -78.872948, 42.968618 ], "pop": 25547, "state": "NY" }
+{ "_id": "14220", "city": "BUFFALO", "loc": [ -78.818205, 42.844138 ], "pop": 28994, "state": "NY" }
+{ "_id": "14221", "city": "WILLIAMSVILLE", "loc": [ -78.738044, 42.985621 ], "pop": 54703, "state": "NY" }
+{ "_id": "14223", "city": "BUFFALO", "loc": [ -78.845, 42.973088 ], "pop": 25995, "state": "NY" }
+{ "_id": "14224", "city": "WEST SENECA", "loc": [ -78.75109, 42.836162 ], "pop": 41539, "state": "NY" }
+{ "_id": "14225", "city": "CHEEKTOWAGA", "loc": [ -78.760855, 42.928642 ], "pop": 37707, "state": "NY" }
+{ "_id": "14226", "city": "AMHERST", "loc": [ -78.799849, 42.967232 ], "pop": 31912, "state": "NY" }
+{ "_id": "14227", "city": "CHEEKTOWAGA", "loc": [ -78.741936, 42.877467 ], "pop": 25240, "state": "NY" }
+{ "_id": "14304", "city": "NIAGARA FALLS", "loc": [ -78.964375, 43.090844 ], "pop": 30527, "state": "NY" }
+{ "_id": "14450", "city": "FAIRPORT", "loc": [ -77.435956, 43.089198 ], "pop": 37337, "state": "NY" }
+{ "_id": "14534", "city": "PITTSFORD", "loc": [ -77.514067, 43.069511 ], "pop": 27413, "state": "NY" }
+{ "_id": "14580", "city": "WEBSTER", "loc": [ -77.461587, 43.219563 ], "pop": 35072, "state": "NY" }
+{ "_id": "14606", "city": "ROCHESTER", "loc": [ -77.684488, 43.168455 ], "pop": 29822, "state": "NY" }
+{ "_id": "14609", "city": "ROCHESTER", "loc": [ -77.563701, 43.174001 ], "pop": 45805, "state": "NY" }
+{ "_id": "14612", "city": "ROCHESTER", "loc": [ -77.665228, 43.256576 ], "pop": 35820, "state": "NY" }

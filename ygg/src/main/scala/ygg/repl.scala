@@ -22,8 +22,10 @@ import scalaz._
 import TableData.fromJValues
 
 object repl {
-  lazy val bigZips   = TableData.fromFile(new jFile("it/src/main/resources/tests/zips.data"))
-  lazy val smallZips = TableData.fromFile(new jFile("it/src/main/resources/tests/smallZips.data"))
+  lazy val zips100   = TableData.fromFile(new jFile("it/src/main/resources/tests/smallZips.data"))
+  lazy val zips500   = TableData.fromFile(new jFile("it/src/main/resources/tests/zips500.data"))
+  lazy val zips3669  = TableData.fromFile(new jFile("it/src/main/resources/tests/largeZips.data"))
+  lazy val zips29353 = TableData.fromFile(new jFile("it/src/main/resources/tests/zips.data"))
 
   def moduloN(n: Long) = cf.math.Mod applyr CLong(n)
   def equalsN(n: Long) = cf.std.Eq applyr CLong(n)
