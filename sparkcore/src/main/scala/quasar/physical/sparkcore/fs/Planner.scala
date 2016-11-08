@@ -24,6 +24,10 @@ import quasar.fp.ski._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._
+import quasar.qscript.SortDir._
+
+import scala.math.{Ordering => SOrdering}
+import SOrdering.Implicits._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -38,7 +42,37 @@ import simulacrum.typeclass
   def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
 }
 
+// TODO divide planner instances into separate files
 object Planner {
+
+  // TODO consider moving to data.scala (conflicts with existing code)
+  implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
+    def order(d1: Data, d2: Data) = (d1, d2) match {
+      case Data.Null -> Data.Null                 => Ordering.EQ
+      case Data.Str(a) -> Data.Str(b)             => a cmp b
+      case Data.Bool(a) -> Data.Bool(b)           => a cmp b
+      case Data.Number(a) -> Data.Number(b)       => a cmp b
+      case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
+      case Data.Arr(a) -> Data.Arr(b)             => a cmp b
+      case Data.Set(a) -> Data.Set(b)             => a cmp b
+      case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
+      case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
+      case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
+      case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
+      case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
+      case Data.Id(a) -> Data.Id(b)               => a cmp b
+      case Data.NA -> Data.NA                 => Ordering.EQ
+      case a -> b                       => a.getClass.## cmp b.getClass.##
+    }
+  }
+
+  /*
+   * Copy-paste from scalaz's `toScalaOrdering`
+   * Copied because scalaz's ListInstances are not Serializable
+   */
+  implicit val ord: SOrdering[Data] = new SOrdering[Data] {
+    def compare(x: Data, y: Data) = dataOrder.order(x, y).toInt
+  }
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
@@ -226,8 +260,24 @@ object Planner {
                 }
             }).map((sc, _)).point[Task])
           )
-        case Sort(src, bucket, order) =>
-          unimplemented("sort")
+        case Sort(src, bucket, orders) =>
+
+          val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
+            orders.traverse {
+              case (freemap, sdir) =>
+                freeCataM(freemap)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
+            }
+
+          val maybeBucket =
+            freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+          
+          EitherT((maybeBucket |@| maybeSortBys) {
+            case (bucket, sortBys) =>
+              val asc = sortBys(0)._2 === Ascending
+              val keys = bucket :: sortBys.map(_._1)
+              src.sortBy(d => keys.map(_(d)), asc)
+          }.point[Task]).liftM[SparkStateT]
+
         case Filter(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {

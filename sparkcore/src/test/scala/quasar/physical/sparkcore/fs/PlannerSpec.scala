@@ -100,6 +100,35 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         ok
       }
 
+      "sort" in {
+        newSc.map ( sc => {
+          val alg: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+
+          val src: RDD[Data] = sc.parallelize(List(
+            Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
+            Data.Obj(ListMap() + ("age" -> Data.Int(32)) + ("country" -> Data.Str("Austria"))),
+            Data.Obj(ListMap() + ("age" -> Data.Int(23)) + ("country" -> Data.Str("US")))
+          ))
+
+          def bucket = ProjectFieldR(HoleF, StrLit("country"))
+          def order = List((bucket, SortDir.Ascending))
+          val sort = quasar.qscript.Sort(src, bucket, order)
+
+          val state: SparkState[RDD[Data]] = alg(sort)
+          state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{
+            case rdd =>
+              val results = rdd.collect
+              results must_== Array(
+                Data.Obj(ListMap("age" -> Data.Int(32), "country" -> Data.Str("Austria"))),
+                Data.Obj(ListMap("age" -> Data.Int(24), "country" -> Data.Str("Poland"))),
+                Data.Obj(ListMap("age" -> Data.Int(23), "country" -> Data.Str("US")))
+              )
+          }
+          sc.stop
+        }).run.unsafePerformSync
+        ok
+      }
+
       "reduce" should {
         "calculate count" in {
           newSc.map ( sc => {
