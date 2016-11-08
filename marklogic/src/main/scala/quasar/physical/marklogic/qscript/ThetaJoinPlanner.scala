@@ -30,8 +30,8 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
   import expr.{for_, let_}
 
   // FIXME: Handle `JoinType`
-  // TODO:  If it is possible in certain situations to eliminate the outer `let` and inline the `src`
-  //        there would be opportunities for fusion here.
+  // TODO:  When `src` is unreferenced, should be able to elide the outer `let`,
+  //        may also be able to fuse into a single FLWOR depending on branches.
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {

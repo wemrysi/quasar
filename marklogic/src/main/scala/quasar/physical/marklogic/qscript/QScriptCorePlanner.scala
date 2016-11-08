@@ -30,13 +30,13 @@ import scalaz._, Scalaz._
 //       will automatically be flattened. We don't emit any of these in the
 //       QScript planner, but we also have no way of ensuring this.
 //
-//       Without this contract, we cannot safely fuse expressions by binding the
-//       return expression to a variable as, if it is a sequence, the results will
-//       will also be sequences, in the best case, and exceptions in the worst.
+//       Without this contract we cannot safely fuse expressions by binding the
+//       return expression to a variable as, if it is a sequence, the results will,
+//       in the best case, also be sequences and exceptions in the worst.
 private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]
   extends MarkLogicPlanner[F, QScriptCore[T, ?]] {
 
-  import expr.{func, for_, let_}
+  import expr.{func, for_, if_, let_}
   import ReduceFuncs._
 
   val plan: AlgebraM[F, QScriptCore[T, ?], XQuery] = {
@@ -164,8 +164,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
     case Avg(fm)              => combiner(fm)(qscript.incAvg[F].apply(_, _))
     case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
-    case Max(fm)              => combiner(fm)((x, y) => fn.max(mkSeq_(x, y)).point[F])
-    case Min(fm)              => combiner(fm)((x, y) => fn.min(mkSeq_(x, y)).point[F])
+    case Max(fm)              => combiner(fm)((x, y) => (if_ (y gt x) then_ y else_ x).point[F])
+    case Min(fm)              => combiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
     case Sum(fm)              => combiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
     case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
     case UnshiftArray(fm)     => combiner(fm)(ejson.arrayAppend[F].apply(_, _))
