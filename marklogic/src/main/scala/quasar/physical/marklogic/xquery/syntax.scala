@@ -48,9 +48,9 @@ object syntax {
   def $(bindingName: String Refined IsNCName): BindingName =
     BindingName(QName.local(NCName(bindingName)))
 
-  final implicit class TypedBindingOps(val tb: TypedBinding) extends scala.AnyVal {
+  final implicit class TypedBindingNameOps(val tb: TypedBindingName) extends scala.AnyVal {
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
-      result(tb.name.xqy) map (TypeswitchCaseClause(tb.left, _))
+      result(tb.ref) map (TypeswitchCaseClause(tb.left, _))
 
     def return_(result: XQuery => XQuery): TypeswitchCaseClause =
       return_[Id.Id](result)

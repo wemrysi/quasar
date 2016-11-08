@@ -24,7 +24,6 @@ import scalaz._
 import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.syntax.foldable._
-import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -105,7 +104,7 @@ object expr {
       default(TypeswitchDefaultClause(None, xqy))
 
     def default(binding: BindingName, f: XQuery => XQuery): XQuery =
-      default(TypeswitchDefaultClause(Some(binding), f(binding.xqy)))
+      default(TypeswitchDefaultClause(Some(binding), f(binding.ref)))
 
     def default(dc: TypeswitchDefaultClause): XQuery = {
       val body = (cases.map(_.render) :+ dc.render).map("  " + _).mkString("\n")
@@ -113,14 +112,14 @@ object expr {
     }
   }
 
-  final case class TypeswitchCaseClause(matching: TypedBinding \/ SequenceType, result: XQuery) {
+  final case class TypeswitchCaseClause(matching: TypedBindingName \/ SequenceType, result: XQuery) {
     def render: String =
       s"case ${matching.fold(_.render, _.toString)} return $result"
   }
 
   final case class TypeswitchDefaultClause(binding: Option[BindingName], result: XQuery) {
     def render: String = {
-      val bind = binding.map(_.xqy.shows + " ")
+      val bind = binding.map(_.render + " ")
       s"default ${~bind}return $result"
     }
   }
