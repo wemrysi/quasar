@@ -127,7 +127,8 @@ package trans {
    *  InnerObjectConcat: Perform the specified transformation on the all sources, and then create a new set of columns containing all the resulting columns.
    *  WrapObject: Take the output of the specified TransSpec and prefix all of the resulting selectors with the specified field.
    *  Typed: Filter out all the source columns whose selector and CType are not specified by the supplied JType
-   *  TypedSubsumes: Filter out all the source columns whose selector and CType are not specified by the supplied JType. If the set of columns does not cover the JType specified, this will return the empty slice.
+   *  TypedSubsumes: Filter out all the source columns whose selector and CType are not specified by the supplied JType.
+   *     If the set of columns does not cover the JType specified, this will return the empty slice.
    *  IsType: return a Boolean column. returns true for a given row when all of the columns specified by the supplied JType are defined
    */
   final case class DeepMap1[+A](source: TransSpec[A], f: CF1)                      extends TransSpec[A]
@@ -274,33 +275,7 @@ package trans {
   }
 
   object TransSpec1 {
-    import constants._
-
-    val Id              = root.spec
-    val DerefArray0     = `.` \ 0
-    val DerefArray1     = `.` \ 1
-    val DerefArray2     = `.` \ 2
-    val PruneToKeyValue = WrapObject(SourceKey.Single, Key.name) inner_++ WrapObject(SourceValue.Single, Value.name)
-    val DeleteKeyValue  = Id.delete(Key, Value)
-  }
-
-  object TransSpec2 {
-    import constants._
-
-    val LeftId = rootLeft.spec
-
-    /** Flips all `SourceLeft`s to `SourceRight`s and vice versa. */
-    def flip(spec: TransSpec2): TransSpec2 = TransSpec.mapSources(spec) {
-      case SourceLeft  => SourceRight
-      case SourceRight => SourceLeft
-    }
-
-    def DerefArray0(source: Source2) = `.` \ 0
-    def DerefArray1(source: Source2) = `.` \ 1
-    def DerefArray2(source: Source2) = `.` \ 2
-
-    val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(Key, Value)
-    val DeleteKeyValueRight = Leaf(SourceRight).delete(Key, Value)
+    val Id = root.spec
   }
 
   sealed trait GroupKeySpec {
@@ -350,20 +325,18 @@ package trans {
   }
 
   object constants {
-    val Key     = CPathField("key")
-    val Value   = CPathField("value")
-    val Group   = CPathField("group")
-    val SortKey = CPathField("sortkey")
+    val Key   = CPathField("key")
+    val Value = CPathField("value")
 
     object SourceKey {
-      val Single = dotKey.spec
-      val Left   = rootLeft.key
-      val Right  = rootRight.key
+      val Single =  `.` \ Key
+      val Left   = `<.` \ Key
+      val Right  = `.>` \ Key
     }
     object SourceValue {
-      val Single = dotValue.spec
-      val Left   = rootLeft.value
-      val Right  = rootRight.value
+      val Single =  `.` \ Value
+      val Left   = `<.` \ Value
+      val Right  = `.>` \ Value
     }
   }
 }

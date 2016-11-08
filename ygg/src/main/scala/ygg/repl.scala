@@ -25,6 +25,10 @@ object repl {
   lazy val bigZips   = TableData.fromFile(new jFile("it/src/main/resources/tests/zips.data"))
   lazy val smallZips = TableData.fromFile(new jFile("it/src/main/resources/tests/smallZips.data"))
 
+  def moduloN(n: Long) = cf.math.Mod applyr CLong(n)
+  def equalsN(n: Long) = cf.std.Eq applyr CLong(n)
+  def divisibleBy(n: Long) = moduloN(n) andThen equalsN(0)
+
   implicit final class JvalueInterpolator(sc: StringContext) {
     def json(args: Any*): JValue             = macro JValueMacros.jsonInterpolatorImpl
     def jsonMany(args: Any*): Vector[JValue] = macro JValueMacros.jsonManyInterpolatorImpl

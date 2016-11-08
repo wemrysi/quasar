@@ -18,7 +18,7 @@ package ygg.tests
 
 import scala.Predef.$conforms
 import scalaz._, Scalaz._
-import ygg._, common._, data._, table._, json._
+import ygg._, common._, table._, json._
 import scala.util.Random
 import scala.Predef.identity
 

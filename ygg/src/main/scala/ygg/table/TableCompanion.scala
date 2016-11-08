@@ -172,7 +172,7 @@ trait TableCompanion[Table] extends TableConfig {
       )
     )
 
-    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform TransSpec1.DerefArray1
+    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform (`.` \ 1)
   }
 
   /**
