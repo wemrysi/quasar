@@ -121,6 +121,11 @@ object MapFunc {
       }
   }
 
+  object EmptyArray {
+    def apply[T[_[_]]: Corecursive, A]: Constant[T, A] =
+      Constant[T, A](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))
+  }
+
   // TODO: subtyping is preventing embedding of MapFuncs
   /** This returns the set of expressions that are concatenated together. It can
     * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
@@ -138,7 +143,7 @@ object MapFunc {
         CoMapFuncR[T, A] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => coMapFuncR[T, A]((ConcatArrays(a, b): MapFunc[T, TCoMapFunc[T, A]]).right).embed).project
-        case Nil    => coMapFuncR[T, A](\/-(Constant[T, TCoMapFunc[T, A]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case Nil    => coMapFuncR[T, A](\/-(EmptyArray[T, TCoMapFunc[T, A]]))
       }
     }
 
@@ -884,11 +889,14 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](i: BigInt): FreeMapA[T, A] =
       Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T].apply(ejson.Int[T[EJson]](i))))
 
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] = mf.resume.fold ({
-      case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
+    def unapplyEJson[T[_[_]]: Recursive](ej: T[EJson]): Option[BigInt] =
+      ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None
       }
+
+    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] = mf.resume.fold ({
+      case Constant(ej) => unapplyEJson(ej)
       case _ => None
     }, _ => None)
   }

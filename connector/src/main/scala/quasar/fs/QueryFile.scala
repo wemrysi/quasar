@@ -77,14 +77,16 @@ object QueryFile {
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
     (implicit
-      CI:  Coalesce.Aux[T, IQS, IQS],
+      CI: Coalesce.Aux[T, IQS, IQS],
+      CQ: Coalesce.Aux[T, QS, QS],
       SP: SimplifyProjection.Aux[IQS, QS],
-      CQ:  Coalesce.Aux[T, QS, QS],
-      QC:  QScriptCore[T, ?] :<: QS,
-      TJ:    ThetaJoin[T, ?] :<: QS,
+      PA: PruneArrays.Aux[T, QS, QS],
+      QC: QScriptCore[T, ?] :<: QS,
+      TJ:   ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val rewrite = new Rewrite[T]
+    val pa = new PAFindReplace[T, QS]
 
     // TODO: This would be `transHylo` if there were such a thing.
     _.transAna(SP.simplifyProjection)
@@ -92,6 +94,7 @@ object QueryFile {
       //       repeatedly until unchanged.
       .transAna(rewrite.normalize)
       .transAna(rewrite.normalize)
+      .hyloM(pa.remapIndices, pa.findIndices).run(None)._2
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -113,6 +116,7 @@ object QueryFile {
     (lp: T[LogicalPlan])
     (implicit
       CQ:  Coalesce.Aux[T, QS, QS],
+      PA: PruneArrays.Aux[T, QS, QS],
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
@@ -140,6 +144,7 @@ object QueryFile {
       merr: MonadError[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
+      PA: PruneArrays.Aux[T, QS, QS],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,

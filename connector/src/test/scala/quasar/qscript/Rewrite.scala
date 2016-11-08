@@ -81,7 +81,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
     }
 
     "coalesce a Map into a subsequent LeftShift" in {
-      val exp =
+      val exp: QScriptCore[Fix[QScriptCore]] =
         LeftShift(
           Map(
             Unreferenced[Fix, Fix[QScriptCore]]().embed,
