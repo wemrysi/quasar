@@ -20,7 +20,9 @@ import scala.Predef.$conforms
 import ygg.common._
 
 object ColumnMap {
-  implicit def liftMap(x: Map[ColumnRef, Column]): ColumnMap = EagerColumnMap(x.toVector)
+  type Raw = Map[ColumnRef, Column]
+
+  implicit def liftMap(x:Raw): ColumnMap = EagerColumnMap(x.toVector)
 
   def unapply(x: ColumnMap) = Some(x.fields)
 }
