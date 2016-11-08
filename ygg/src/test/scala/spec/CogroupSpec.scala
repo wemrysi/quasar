@@ -77,16 +77,16 @@ class CogroupSpec extends TableQspec {
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
       case Left3(jv)           => jv
-      case Middle3((jv1, jv2)) => JObject(JField("key", jv1 \ "key"), JField("valueLeft", jv1 \ "value"), JField("valueRight", jv2 \ "value"))
+      case Middle3((jv1, jv2)) => jobject("key" -> (jv1 \ "key"), "valueLeft" -> (jv1 \ "value"), "valueRight" -> (jv2 \ "value"))
       case Right3(jv)          => jv
     }
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
+      `.`,
+      `.`,
       OuterObjectConcat(
-        WrapObject(SourceKey.Left, "key"),
-        OuterObjectConcat(WrapObject(SourceValue.Left, "valueLeft"), WrapObject(SourceValue.Right, "valueRight"))))
+        WrapObject(`<.` \ "key", "key"),
+        OuterObjectConcat(WrapObject(`<.` \ "value", "valueLeft"), WrapObject(SourceValue.Right, "valueRight"))))
 
     toJsonSeq(result) must_=== expected
   }
@@ -101,9 +101,9 @@ class CogroupSpec extends TableQspec {
     val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
-      OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterArrayConcat(SourceValue.Left, SourceValue.Right), "value"))
+      `.`,
+      `.`,
+      OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterArrayConcat(`<.` \ "value", SourceValue.Right), "value"))
     )
 
     toJsonSeq(f(result)) must_=== expected
@@ -135,9 +135,9 @@ class CogroupSpec extends TableQspec {
     )
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
-      OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
+      `.`,
+      `.`,
+      OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
     )
 
     toJsonSeq(f(result)) must_=== expected
@@ -164,9 +164,9 @@ class CogroupSpec extends TableQspec {
     )
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
-      OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
+      `.`,
+      `.`,
+      OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
     )
 
     toJsonSeq(result) must_=== expected
@@ -192,9 +192,9 @@ class CogroupSpec extends TableQspec {
     )
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
-      OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
+      `.`,
+      `.`,
+      OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
     )
 
     toJsonSeq(result) must_=== expected
@@ -220,9 +220,9 @@ class CogroupSpec extends TableQspec {
     )
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      Leaf(Source),
-      Leaf(Source),
-      OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
+      `.`,
+      `.`,
+      OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
     )
 
     toJsonSeq(result) must_=== expected
@@ -237,9 +237,9 @@ class CogroupSpec extends TableQspec {
 
     toJson(
       ltable.cogroup(dotKey, dotKey, rtable)(
-        Leaf(Source),
-        Leaf(Source),
-        OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
+        `.`,
+        `.`,
+        OuterObjectConcat(WrapObject(`<.` \ "key", "key"), WrapObject(OuterObjectConcat(`<.` \ "value", SourceValue.Right), "value"))
       )).copoint must throwAn[Exception]
   }
 
@@ -390,13 +390,13 @@ class CogroupSpec extends TableQspec {
       { "id": "foo", "left": 4, "right": 4 }
     """
 
-    val result = ltable.cogroup(root.id, root.id, rtable)(
-      root,
-      root,
+    val result = ltable.cogroup(`.` \ "id", `.` \ "id", rtable)(
+      `.`,
+      `.`,
       OuterObjectConcat(
-        WrapObject(rootLeft.id, "id"),
-        WrapObject(rootLeft.dyn.`val`, "left"),
-        WrapObject(rootRight.dyn.`val`, "right")
+        WrapObject(`<.` \ "id", "id"),
+        WrapObject(`<.` \ "val", "left"),
+        WrapObject(`.>` \ "val", "right")
       )
     )
 
@@ -410,9 +410,9 @@ class CogroupSpec extends TableQspec {
     val expected = Stream.tabulate(22)(JNum(_))
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      WrapObject(Leaf(Source), "blah!"),
-      WrapObject(Leaf(Source), "argh!"),
-      rootRight.value
+      WrapObject(`.`, "blah!"),
+      WrapObject(`.`, "argh!"),
+      `.>` \ "value"
     )
 
     toJsonSeq(result) must_=== expected
@@ -425,9 +425,9 @@ class CogroupSpec extends TableQspec {
     val expected = Stream.tabulate(22)(JNum(_))
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      WrapObject(Leaf(Source), "blah!"),
-      WrapObject(Leaf(Source), "argh!"),
-      rootLeft.value
+      WrapObject(`.`, "blah!"),
+      WrapObject(`.`, "argh!"),
+      `<.` \ "value"
     )
 
     toJsonSeq(result) must_=== expected
@@ -438,11 +438,11 @@ class CogroupSpec extends TableQspec {
     val expected = ( for (l  <- 0 until 22; r <- 0 until 22) yield json"""{ "left": $l, "right": $r }""" ).toStream
 
     val result: Table = table.cogroup(dotKey, dotKey, table)(
-      WrapObject(Leaf(Source), "blah!"),
-      WrapObject(Leaf(Source), "argh!"),
+      WrapObject(`.`, "blah!"),
+      WrapObject(`.`, "argh!"),
       InnerObjectConcat(
-        WrapObject(rootRight.value, "right"),
-        WrapObject(rootLeft.value, "left")
+        WrapObject(`.>` \ "value", "right"),
+        WrapObject(`<.` \ "value", "left")
       )
     )
 
@@ -455,11 +455,11 @@ class CogroupSpec extends TableQspec {
     val expected = Seq.tabulate(12)(i => json"""{ "left": $i, "right": 50 }""") :+ json"""{ "right": 60 }"""
 
     val result: Table = ltable.cogroup(dotKey, dotKey, rtable)(
-      WrapObject(dotValue, "left"),
-      WrapObject(dotValue, "right"),
+      WrapObject(`.` \ "value", "left"),
+      WrapObject(`.` \ "value", "right"),
       InnerObjectConcat(
-        WrapObject(rootRight.value, "right"),
-        WrapObject(rootLeft.value, "left")
+        WrapObject(`.>` \ "value", "right"),
+        WrapObject(`<.` \ "value", "left")
       )
     )
 

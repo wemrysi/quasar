@@ -136,14 +136,12 @@ class BlockAlignSpec extends TableQspec {
   }
 
   private def testAlign(sample: SampleData) = {
-    import trans.constants._
-
     val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
     val rstream  = sample.data.zipWithIndex collect { case (v, i) if i % 3 == 0 => v }
     val expected = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 && i % 3 == 0 => v }
 
     val finalResults = for {
-      results     <- Need(AlignTable(fromJson(lstream), SourceKey.Single, fromJson(rstream), SourceKey.Single))
+      results     <- Need(AlignTable(fromJson(lstream), 'key, fromJson(rstream), 'key))
       leftResult  <- results._1.toJson
       rightResult <- results._2.toJson
       leftResult2 <- results._1.toJson

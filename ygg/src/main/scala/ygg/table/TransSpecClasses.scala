@@ -28,8 +28,10 @@ package object trans {
     def is(value: CValue) = Filter(`.` \ field, EqualLiteral(`.`, value, invert = false))
   }
 
+  implicit def liftSymbolToSelection(x: scala.Symbol): TransSpec1               = `.` \ x.name
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
+  implicit def transSpecOps[A](x: TransSpec[A]): TransSpecOps[A]                = new TransSpecOps(x)
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
 
   val `.`  = root
@@ -49,8 +51,8 @@ package trans {
   object rootLeft extends KVTransSpecBuilder(Leaf(SourceLeft))
   object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
 
-  object dotValue extends KVTransSpecBuilder(`.` \ "value")
-  object dotKey extends KVTransSpecBuilder(`.` \ "key")
+  object dotValue extends KVTransSpecBuilder('value)
+  object dotKey extends KVTransSpecBuilder('key)
 
   class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
     def emptyArray() = ConstLiteral(CEmptyArray, spec0)
@@ -68,6 +70,9 @@ package trans {
     def value  = spec \ "value"
     def value1 = spec \ "value1"
     def value2 = spec \ "value2"
+  }
+  class TransSpecOps[A](spec: TransSpec[A]) {
+    def mapSources[B](f: A => B): TransSpec[B] = TransSpec.mapSources(spec)(f)
   }
   class TransSpecDynamic[A](spec: TransSpec[A]) extends Dynamic {
     def selectDynamic(name: String) = spec \ name
@@ -98,6 +103,9 @@ package trans {
     def wrapArrayValue()                = WrapArray(spec)
     def wrapObjectField(name: String)   = WrapObject(spec, name)
     def metadata(name: String)          = DerefMetadataStatic(spec, CPathMeta(name))
+
+    def fromLeft  = spec mapSources (_ => SourceLeft)
+    def fromRight = spec mapSources (_ => SourceRight)
 
     def apply(index: Int): This = this \ index
     def \(index: Int): This     = DerefArrayStatic(spec, CPathIndex(index))
@@ -329,14 +337,14 @@ package trans {
     val Value = CPathField("value")
 
     object SourceKey {
-      val Single =  `.` \ Key
-      val Left   = `<.` \ Key
-      val Right  = `.>` \ Key
+      val Single = ('key: TransSpec1)
+      val Left   = Single.fromLeft
+      val Right  = Single.fromRight
     }
     object SourceValue {
-      val Single =  `.` \ Value
-      val Left   = `<.` \ Value
-      val Right  = `.>` \ Value
+      val Single = ('value: TransSpec1)
+      val Left   = Single.fromLeft
+      val Right  = Single.fromRight
     }
   }
 }
