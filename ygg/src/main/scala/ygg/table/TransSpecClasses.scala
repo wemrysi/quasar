@@ -25,14 +25,16 @@ package object trans {
   def where(name: String): WhereOps1 = new WhereOps1(CPathField(name))
 
   class WhereOps1(field: CPathField) {
-    def is(value: CValue) = Filter(root \ field, EqualLiteral(root.spec, value, invert = false))
+    def is(value: CValue) = Filter(`.` \ field, EqualLiteral(`.`, value, invert = false))
   }
 
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
 
-  val `.` = root
+  val `.`  = root
+  val `<.` = rootLeft
+  val `.>` = rootRight
 }
 
 package trans {
@@ -47,28 +49,28 @@ package trans {
   object rootLeft extends KVTransSpecBuilder(Leaf(SourceLeft))
   object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
 
-  object dotValue extends KVTransSpecBuilder(root select "value")
-  object dotKey extends KVTransSpecBuilder(root select "key")
+  object dotValue extends KVTransSpecBuilder(`.` \ "value")
+  object dotKey extends KVTransSpecBuilder(`.` \ "key")
 
   class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
     def emptyArray() = ConstLiteral(CEmptyArray, spec0)
 
-    def value  = select("value")
-    def key    = select("key")
-    def value1 = select("value1")
-    def value2 = select("value2")
-    def id     = select("id")
-    def a      = select("a")
-    def b      = select("b")
-    def c      = select("c")
-    def foo    = select("foo")
-    def bar    = select("bar")
-    def foobar = select("foobar")
-    def ref    = select("ref")
-    def field  = select("field")
+    def a      = spec \ "a"
+    def b      = spec \ "b"
+    def bar    = spec \ "bar"
+    def c      = spec \ "c"
+    def field  = spec \ "field"
+    def foo    = spec \ "foo"
+    def foobar = spec \ "foobar"
+    def id     = spec \ "id"
+    def key    = spec \ "key"
+    def ref    = spec \ "ref"
+    def value  = spec \ "value"
+    def value1 = spec \ "value1"
+    def value2 = spec \ "value2"
   }
   class TransSpecDynamic[A](spec: TransSpec[A]) extends Dynamic {
-    def selectDynamic(name: String) = spec select name
+    def selectDynamic(name: String) = spec \ name
   }
   class TransSpecBuilder[A](val spec: TransSpec[A]) {
     type This    = TransSpec[A]
@@ -91,8 +93,8 @@ package trans {
     def isType(tp: JType)               = IsType(spec, tp)
     def map1(fn: CF1)                   = Map1(spec, fn)
     def scan(scanner: Scanner)          = Scan(spec, scanner)
-    def select(field: CPathField): This = DerefObjectStatic(spec, field)
-    def select(name: String): This      = select(CPathField(name))
+    def select(field: CPathField): This = this \ field.name
+    def select(name: String): This      = this \ name
     def wrapArrayValue()                = WrapArray(spec)
     def wrapObjectField(name: String)   = WrapObject(spec, name)
     def metadata(name: String)          = DerefMetadataStatic(spec, CPathMeta(name))
@@ -275,9 +277,9 @@ package trans {
     import constants._
 
     val Id              = root.spec
-    val DerefArray0     = root \ 0
-    val DerefArray1     = root \ 1
-    val DerefArray2     = root \ 2
+    val DerefArray0     = `.` \ 0
+    val DerefArray1     = `.` \ 1
+    val DerefArray2     = `.` \ 2
     val PruneToKeyValue = WrapObject(SourceKey.Single, Key.name) inner_++ WrapObject(SourceValue.Single, Value.name)
     val DeleteKeyValue  = Id.delete(Key, Value)
   }
@@ -293,9 +295,9 @@ package trans {
       case SourceRight => SourceLeft
     }
 
-    def DerefArray0(source: Source2) = root \ 0
-    def DerefArray1(source: Source2) = root \ 1
-    def DerefArray2(source: Source2) = root \ 2
+    def DerefArray0(source: Source2) = `.` \ 0
+    def DerefArray1(source: Source2) = `.` \ 1
+    def DerefArray2(source: Source2) = `.` \ 2
 
     val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(Key, Value)
     val DeleteKeyValueRight = Leaf(SourceRight).delete(Key, Value)

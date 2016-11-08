@@ -20,6 +20,25 @@ import ygg.common._
 
 sealed trait JType {
   def |(jtype: JType): JType = JUnionT(this, jtype)
+
+  override def toString = to_s
+
+  private def map_s[A](tps: Seq[A -> JType]): String = tps map (_._2.to_s) mkString ", "
+
+  def to_s: String = this match {
+    case JArrayHomogeneousT(el) => s"$el[]"
+    case JArrayFixedT(map)      => "[ " + map_s(map.toVector sortBy (_._1)) + " ]"
+    case JArrayUnfixedT         => "T[]"
+    case JObjectFixedT(map)     => "{ " + (map_s(map.toVector sortBy (_._1))) + " }"
+    case JObjectUnfixedT        => s"{?}"
+    case JUnionT(l, r)          => s"$l | $r"
+    case JBooleanT              => "Bool"
+    case JTextT                 => "Str"
+    case JNumberT               => "Num"
+    case JDateT                 => "Date"
+    case JPeriodT               => "Period"
+    case JNullT                 => "Null"
+  }
 }
 
 sealed trait JPrimitiveType extends JType
