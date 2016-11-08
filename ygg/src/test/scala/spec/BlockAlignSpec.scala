@@ -391,13 +391,8 @@ class BlockAlignSpec extends TableQspec {
 
   private def checkSortDense(sortOrder: DesiredSortOrder) = {
     implicit val gen = sample(objectSchema(_, 3))
-    prop { (sample: SampleData) =>
-      {
-        val Some((_, schema)) = sample.schema
 
-        testSortDense(sample, sortOrder, false, schema.map(_._1).head)
-      }
-    }
+    prop((s: SampleData) => testSortDense(s, sortOrder, unique = false, s.optSchemaPath.get))
   }
 
   // Simple test of sorting on homogeneous data
@@ -674,9 +669,9 @@ class BlockAlignSpec extends TableQspec {
     InnerObjectConcat(sortKeys.zipWithIndex.map {
       case (sortKey, idx) =>
         WrapObject(
-          sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
-            case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
-            case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
+          sortKey.nodes.foldLeft[TransSpec1](root \ "value") {
+            case (innerSpec, CPathField(name))  => innerSpec \ name
+            case (innerSpec, CPathIndex(index)) => innerSpec \ index
             case x                              => abort(s"Unexpected arg $x")
           },
           "%09d".format(idx)

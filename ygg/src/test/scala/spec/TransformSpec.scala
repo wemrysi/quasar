@@ -126,6 +126,12 @@ class TransformSpec extends TableQspec {
   private def checkMetaDeref     = checkSpecDefault(Fn.source metadata "foo")(_ => Nil)
   private def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
 
+  private def sampleObject     = sample(objectSchema(_, 3))
+  private def sampleArray      = sample(arraySchema(_, 3))
+  private def sampleLongLong   = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
+  private def sampleDoubleLong = sample(_ => Seq(JPath("value1") -> CDouble, JPath("value2") -> CLong))
+
+
   private def testMap1IntLeaf: Prop = checkSpecData(
     spec     = Map1(Fn.source, F1Expr.negate),
     data     = -10 to 10 map (n => json"$n"),
@@ -181,7 +187,7 @@ class TransformSpec extends TableQspec {
   )
 
   private def checkObjectDeref: Prop = {
-    implicit val gen = sample(objectSchema(_, 3))
+    implicit val gen = sampleObject
     TableProp(sd =>
       TableTest(
         fromSample(sd),
@@ -192,7 +198,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkArrayDeref: Prop = {
-    implicit val gen = sample(arraySchema(_, 3))
+    implicit val gen = sampleArray
     TableProp(sd =>
       TableTest(
         fromSample(sd),
@@ -203,7 +209,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkMap2Eq: Prop = {
-    implicit val gen = sample(_ => Seq(JPath("value1") -> CDouble, JPath("value2") -> CLong))
+    implicit val gen = sampleDoubleLong
     TableProp(sd =>
       TableTest(
         fromSample(sd),
@@ -219,7 +225,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkMap2Add = {
-    implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
+    implicit val gen = sampleLongLong
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
@@ -289,25 +295,23 @@ class TransformSpec extends TableQspec {
   }
 
   private def testSimpleEqual = {
-    val elements = jsonMany"""
-      {
-        "value":{
-          "value2":-2874857152017741205
-        },
-        "key":[2.0,1.0,2.0]
-      }
-      {
-        "value":{
-          "value1":2354405013357379940,
-          "value2":2354405013357379940
-        },
-        "key":[2.0,2.0,1.0]
-      }
-    """
+    val data = jsonMany"""{
+      "value":{
+        "value2":-2874857152017741205
+      },
+      "key":[2.0,1.0,2.0]
+    }
+    {
+      "value":{
+        "value1":2354405013357379940,
+        "value2":2354405013357379940
+      },
+      "key":[2.0,2.0,1.0]
+    }""".toVector
 
-    val table    = fromJson(elements)
-    val results  = toJson(table transform Equal(dotValue.value1, dotValue.value2))
-    val expected = elements flatMap (jv =>
+    val table    = fromJson(data)
+    val result   = table transform Equal(dotValue.value1, dotValue.value2)
+    val expected = data flatMap (jv =>
       ((jv \ "value" \ "value1") -> (jv \ "value" \ "value2")) match {
         case (_, JUndefined) => None
         case (JUndefined, _) => None
@@ -315,7 +319,7 @@ class TransformSpec extends TableQspec {
       }
     )
 
-    results.copoint mustEqual expected
+    result.toVector must_=== expected
   }
 
   private def testAnotherSimpleEqual = {
@@ -410,7 +414,7 @@ class TransformSpec extends TableQspec {
   private def checkEqual = {
     def hasVal1Val2(jv: JValue): Boolean = (jv \? ".value.value1").nonEmpty && (jv \? ".value.value2").nonEmpty
 
-    val genBase: Gen[SampleData] = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong)).arbitrary
+    val genBase: Gen[SampleData] = sampleLongLong.arbitrary
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
@@ -700,7 +704,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkObjectConcat = {
-    implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
+    implicit val gen = sampleLongLong
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
@@ -736,7 +740,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkObjectConcatOverwrite = {
-    implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
+    implicit val gen = sampleLongLong
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
@@ -1005,7 +1009,7 @@ class TransformSpec extends TableQspec {
   )
 
   private def checkObjectDelete = {
-    implicit val gen = sample(objectSchema(_, 3))
+    implicit val gen = sampleObject
 
     def randomDeletionMask(schema: JSchema): Option[JPathField] = {
       Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) +: _), _) => x })
@@ -1614,7 +1618,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkArraySwap = {
-    implicit val gen = sample(arraySchema(_, 3))
+    implicit val gen = sampleArray
     prop { (sample0: SampleData) =>
       /***
       important note:

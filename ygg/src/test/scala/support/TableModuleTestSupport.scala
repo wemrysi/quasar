@@ -57,14 +57,22 @@ abstract class TableQspec extends quasar.Qspec {
   }
 
   implicit class SampleDataOps(private val sd: SampleData) {
-    def fieldHead = sd.schema.get._2.head._1.head.get
-    def fieldHeadName: String = fieldHead match {
-      case JPathField(s) => s
-      case _             => abort("non-field reached")
+    // type JSchema = Seq[JSchemaElem]
+    // type JSchemaElem = ygg.json.JPath -> ygg.table.CType
+
+    def optSchemaElem: Option[JSchemaElem]   = sd.schema map (_._2) flatMap (_.headOption)
+    def optSchemaPath: Option[JPath]         = optSchemaElem map (_._1)
+    def optSchemaPathNode: Option[JPathNode] = optSchemaPath flatMap (_.nodes.headOption)
+    def optSchemaType: Option[JType]         = optSchemaElem map (_._2)
+
+    def fieldHead: JPathNode = optSchemaPathNode.get
+    def fieldHeadName: String = optSchemaPathNode match {
+      case Some(JPathField(s)) => s
+      case _                   => abort("non-field reached")
     }
-    def fieldHeadIndex: Int = fieldHead match {
-      case JPathIndex(s) => s
-      case _             => abort("non-index reached")
+    def fieldHeadIndex: Int = optSchemaPathNode match {
+      case Some(JPathIndex(s)) => s
+      case _                   => abort("non-index reached")
     }
   }
 
