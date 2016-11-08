@@ -18,16 +18,18 @@ package ygg.table
 
 import ygg._, common._, data._, trans._
 import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
+import CogroupTable._
 
-object CogroupTable {
-  final case class SliceId(id: Int) {
-    def +(n: Int): SliceId = SliceId(id + n)
-  }
+class CogroupTable[T: TableRep] {
+  val companion = companionOf[T]
 
-  def apply[T: TableRep](self: T, leftKey: TransSpec1, rightKey: TransSpec1, that: T)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): T = {
-    val companion = companionOf[T]
+  def cogroup(left: CogroupSide[T], right: CogroupSide[T], both: TransSpec2): T = {
+    val CogroupSide(self, leftKey, leftResultTrans)   = left
+    val CogroupSide(that, rightKey, rightResultTrans) = right
+    val bothResultTrans                               = both
 
     //println("Cogrouping with respect to\nleftKey: " + leftKey + "\nrightKey: " + rightKey)
+
     class IndexBuffers(lInitialSize: Int, rInitialSize: Int) {
       val lbuf   = new ArrayIntList(lInitialSize)
       val rbuf   = new ArrayIntList(rInitialSize)
@@ -442,6 +444,16 @@ object CogroupTable {
       composeSliceTransform(leftResultTrans),
       composeSliceTransform(rightResultTrans),
       composeSliceTransform2(bothResultTrans))
+  }
+}
+
+object CogroupTable {
+  def apply[T: TableRep]: CogroupTable[T] = new CogroupTable[T]
+
+  final case class CogroupSide[T](table: T, spec: TransSpec1, resultSpec: TransSpec1)
+
+  final case class SliceId(id: Int) {
+    def +(n: Int): SliceId = SliceId(id + n)
   }
 
   final case class SlicePosition[K](

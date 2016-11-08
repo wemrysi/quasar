@@ -142,7 +142,7 @@ trait TableCompanion[Table] extends TableConfig {
   def addGlobalId(spec: TransSpec1): TransSpec1 = Scan(WrapArray(spec), addGlobalIdScanner)
 
   def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) =
-    WriteTable.writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
+    WriteTable[Table].writeAlignedSlices(kslice, vslice, jdbmState, indexNamePrefix, sortOrder)
 
   import JDBM.{ IndexMap, SortedSlice }
   def loadTable(mergeEngine: MergeEngine, indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
@@ -187,7 +187,7 @@ trait TableCompanion[Table] extends TableConfig {
     * preserved
     */
   def groupByN(table: Table, keys: Seq[TransSpec1], values: TransSpec1, order: DesiredSortOrder, unique: Boolean): Seq[Table] =
-    WriteTable.groupByN[Table](externalize(table), keys, values, order, unique)
+    WriteTable[Table].groupByN(externalize(table), keys, values, order, unique)
 
   def load(table: Table, tpe: JType): Need[Table] = {
     val reduced = table reduce new CReducer[Set[Path]] {

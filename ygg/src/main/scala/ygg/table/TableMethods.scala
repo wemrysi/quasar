@@ -20,10 +20,10 @@ import ygg._, common._, json._, trans._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
-class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
+class TableMethods[Table: TableRep](val self: Table) {
   type M[+X] = Need[X]
 
-  def companion                                         = z.companion
+  def companion                                         = companionOf[Table]
   def slices: NeedSlices                                = companion slicesOf self
   def size: TableSize                                   = companion sizeOf self
   def projections: Map[Path, Projection]                = companion projectionsOf self
@@ -42,7 +42,7 @@ class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
     * @param order Whether to sort ascending or descending
     */
   def sort(key: TransSpec1, order: DesiredSortOrder): Table =
-    WriteTable.groupByN(self, Seq(key), root.spec, order, unique = false).headOption getOrElse companion.empty
+    WriteTable[Table].groupByN(self, Seq(key), `.`, order, unique = false).headOption getOrElse companion.empty
 
   def sort(key: TransSpec1): Table =
     sort(key, SortAscending)
@@ -52,7 +52,11 @@ class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
     * transformation on rows of the table.
     */
   def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(leftResultTrans: TransSpec1, rightResultTrans: TransSpec1, bothResultTrans: TransSpec2): Table =
-    CogroupTable(self, leftKey, rightKey, that)(leftResultTrans, rightResultTrans, bothResultTrans)
+    CogroupTable[Table].cogroup(
+      CogroupTable.CogroupSide(self, leftKey, leftResultTrans),
+      CogroupTable.CogroupSide(that, rightKey, rightResultTrans),
+      bothResultTrans
+    )
 
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
     AlignTable(sourceL, alignL, sourceR, alignR)
@@ -168,7 +172,7 @@ class TableMethods[Table](val self: Table)(implicit z: TableRep[Table]) {
     * Remaps the indicies.
     */
 
-  def compact(): Table                 = compact(root.spec)
+  def compact(): Table                 = compact(`.`)
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
     val transes   = root.spec -> spec mapBoth composeSliceTransform
