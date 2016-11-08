@@ -37,6 +37,11 @@ package object trans {
   val `.`  = root
   val `<.` = rootLeft
   val `.>` = rootRight
+
+  def wrapLeft(name: String): TransSpec2              = wrapLeft(name, name)
+  def wrapLeft(name: String, as: String): TransSpec2  = WrapObject(`<.` \ name, as)
+  def wrapRight(name: String): TransSpec2             = wrapRight(name, name)
+  def wrapRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
 }
 
 package trans {
