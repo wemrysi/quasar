@@ -139,14 +139,10 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
     def &(other: BitSet)  = doto(bs.copy)(_ and other)
     def &~(other: BitSet) = doto(bs.copy)(_ andNot other)
     def |(other: BitSet)  = doto(bs.copy)(_ or other)
+    def isEmpty: Boolean  = minBit < 0
+    def min(): Int        = if (isEmpty) abort("can't take min of empty set") else minBit
 
-    def isEmpty(): Boolean =
-      bs.nextSetBit(0) < 0
-
-    def min(): Int = {
-      val n = bs.nextSetBit(0)
-      if (n < 0) abort("can't take min of empty set") else n
-    }
+    private def minBit: Int = bs nextSetBit 0
 
     def max(): Int = {
       @tailrec
@@ -164,35 +160,37 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
       abort("can't find max of empty set")
     }
 
-    def foreach(f: Int => Unit) = {
-      var b = bs.nextSetBit(0)
-      while (b >= 0) {
-        f(b)
-        b = bs.nextSetBit(b + 1)
-      }
-    }
+    def toList = toVector.toList
+    def toVector: Vector[Int] = {
+      val buf   = Vector.newBuilder[Int]
+      val longs = bs.getBits
+      var index = bs.getBitsLength - 1
+      def base  = index * 64
 
-    def toList: List[Int] = {
-      @tailrec
-      def loopBits(long: Long, bit: Int, base: Int, sofar: List[Int]): List[Int] = {
-        if (bit < 0)
-          sofar
-        else if (((long >> bit) & 1) == 1)
-          loopBits(long, bit - 1, base, (base + bit) :: sofar)
-        else
-          loopBits(long, bit - 1, base, sofar)
+      @tailrec def loopBits(long: Long, bit: Int): Unit = {
+        if (bit >= 0) {
+          if (((long >> bit) & 1) != 0)
+            buf += (base + bit)
+
+          loopBits(long, bit - 1)
+        }
       }
 
-      @tailrec
-      def loopLongs(i: Int, longs: Array[Long], base: Int, sofar: List[Int]): List[Int] = {
-        if (i < 0)
-          sofar
-        else
-          loopLongs(i - 1, longs, base - 64, loopBits(longs(i), 63, base, sofar))
+      while (index >= 0) {
+        loopBits(longs(index), 63)
+        index -= 1
       }
 
-      val last = bs.getBitsLength - 1
-      loopLongs(last, bs.getBits, last * 64, Nil)
+      @tailrec def loopLongs(): Unit = {
+        if (index >= 0) {
+          loopBits(longs(index), 63)
+          index -= 1
+          loopLongs()
+        }
+      }
+
+      loopLongs()
+      buf.result.reverse
     }
   }
 }
