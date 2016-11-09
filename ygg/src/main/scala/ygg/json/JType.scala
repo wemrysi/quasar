@@ -23,21 +23,31 @@ sealed trait JType {
 
   override def toString = to_s
 
-  private def map_s[A](tps: Seq[A -> JType]): String = tps map (_._2.to_s) mkString ", "
+  private def map_s[A](ldelim: String, rdelim: String, tps: Seq[String]): String = (
+    if (tps.map(_.length).sum < 50)
+      tps.mkString(ldelim + " ", ", ", " " + rdelim)
+    else
+      ldelim + "\n" + indent(4, tps mkString ",\n") + "\n" + rdelim
+  )
+
+  def cpaths: Vector[ygg.table.CPath] = ygg.table.Schema cpath this
 
   def to_s: String = this match {
-    case JArrayUnfixedT         => "[?]"
-    case JObjectUnfixedT        => s"{?}"
-    case JArrayHomogeneousT(el) => s"$el[]"
-    case JArrayFixedT(map)      => "[ " + map_s(map.toVector sortBy (_._1)) + " ]"
-    case JObjectFixedT(map)     => "{ " + map_s(map.toVector sortBy (_._1)) + " }"
-    case JUnionT(l, r)          => s"$l | $r"
-    case JBooleanT              => "Bool"
-    case JTextT                 => "Str"
-    case JNumberT               => "Num"
-    case JDateT                 => "Date"
-    case JPeriodT               => "Period"
-    case JNullT                 => "Null"
+    case JArrayUnfixedT                    => "[?]"
+    case JObjectUnfixedT                   => s"{?}"
+    case JArrayHomogeneousT(JNullT)        => "[*]"
+    case JArrayHomogeneousT(el)            => el.to_s + "[*]"
+    case JArrayFixedT(map) if map.isEmpty  => "[]"
+    case JObjectFixedT(map) if map.isEmpty => "{}"
+    case JArrayFixedT(map)                 => map_s("[", "]", map.toVector sortBy (_._1) map (_._2.to_s))
+    case JObjectFixedT(map)                => map_s("{", "}", map.toVector sortBy (_._1) map { case (k, v) => s"$k: ${v.to_s}" })
+    case JUnionT(l, r)                     => s"$l | $r"
+    case JBooleanT                         => "Bool"
+    case JTextT                            => "Str"
+    case JNumberT                          => "Num"
+    case JDateT                            => "Date"
+    case JPeriodT                          => "Period"
+    case JNullT                            => "Null"
   }
 }
 

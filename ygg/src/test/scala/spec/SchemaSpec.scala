@@ -21,17 +21,22 @@ import ygg._, common._, json._, table._
 class SchemaSpec extends quasar.Qspec {
   "cpath" should {
     "return the correct sequence of CPath" in {
-      val jtype = JObjectFixedT(
-        Map("foo" -> JNumberT, "bar" -> JArrayFixedT(Map(0 -> JBooleanT, 1 -> JObjectFixedT(Map("baz" -> JArrayHomogeneousT(JNullT))), 2 -> JTextT))))
+      val jtype = JType.Object(
+        "foo" -> JNumberT,
+        "bar" -> JType.Array(
+          JBooleanT,
+          JType.Object("baz" -> JArrayHomogeneousT(JNullT)),
+          JTextT
+        )
+      )
+      val expected = Vector[CPath](
+        "foo",
+        "bar[0]",
+        "bar[1].baz[*]",
+        "bar[2]"
+      )
 
-      val result = Schema.cpath(jtype)
-      val expected = Seq(
-        CPath(CPathField("foo")),
-        CPath(CPathField("bar"), CPathIndex(0)),
-        CPath(CPathField("bar"), CPathIndex(1), CPathField("baz"), CPathArray),
-        CPath(CPathField("bar"), CPathIndex(2))) sorted
-
-      result mustEqual expected
+      jtype.cpaths must_=== expected.sorted
     }
   }
 }

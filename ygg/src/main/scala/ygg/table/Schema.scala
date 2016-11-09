@@ -50,14 +50,13 @@ object Schema {
 
   def cpath(jtype: JType): Vec[CPath] = {
     val cpaths = jtype match {
-      case JArrayFixedT(indices)                           => indices flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) } toSeq
-      case JObjectFixedT(fields)                           => fields flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) } toSeq
-      case JArrayHomogeneousT(elemType)                    => Seq(CPath(CPathArray))
-      case JNumberT | JTextT | JBooleanT | JNullT | JDateT => Nil
-      case _                                               => Nil
+      case JArrayFixedT(indices)                           => indices flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) } toVector
+      case JObjectFixedT(fields)                           => fields flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) } toVector
+      case JArrayHomogeneousT(elemType)                    => Vector(CPath(CPathArray))
+      case JNumberT | JTextT | JBooleanT | JNullT | JDateT => Vector()
+      case _                                               => Vector()
     }
-
-    cpaths.sorted.toVector
+    cpaths.sorted
   }
 
   def sample(jtype: JType, size: Int): Option[JType] = {
