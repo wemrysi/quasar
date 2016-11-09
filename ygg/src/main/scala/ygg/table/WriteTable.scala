@@ -41,7 +41,7 @@ class WriteTable[T: TableRep]() {
     }).value
   }
 
-  def writeTables(slices: NeedSlices,
+  def writeTables(table: T,
                   valueTrans: SliceTransform1[_],
                   keyTrans: Seq[SliceTransform1[_]],
                   sortOrder: DesiredSortOrder): Need[List[String] -> IndexMap] = {
@@ -59,7 +59,7 @@ class WriteTable[T: TableRep]() {
       }
     }
     val identifiedKeyTrans = keyTrans.zipWithIndex map { case (kt, i) => kt -> i.toString }
-    write0(companion.reduceSlices(slices), WriteState(JDBMState.empty("writeSortedSpace"), valueTrans, identifiedKeyTrans.toList))
+    write0(companion.reduceSlices(table.slices), WriteState(JDBMState.empty("writeSortedSpace"), valueTrans, identifiedKeyTrans.toList))
   }
 
   def writeSlice(slice: Slice, state: WriteState, sortOrder: DesiredSortOrder, source: String): Need[WriteState] = {
@@ -188,7 +188,7 @@ class WriteTable[T: TableRep]() {
 
   def writeSortedUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
     writeTables(
-      table transform `.` slices,
+      table transform `.`,
       composeSliceTransform(valueSpec),
       groupKeys map composeSliceTransform,
       order
@@ -196,10 +196,10 @@ class WriteTable[T: TableRep]() {
   }
 
   def writeSortedNonUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
-    val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root \ 0 } spec, "0"), WrapObject(root \ 1, "1")))
+    val keys1 = groupKeys map (kt => wrapOuterConcat("0" -> kt.mapLeaves(_ => root \ 0), "1" -> (root \ 1)))
     writeTables(
-      table transform table.companion.addGlobalId(`.`) slices,
-      composeSliceTransform(valueSpec deepMap { case Leaf(_) => root \ 0 } spec),
+      table transform table.companion.addGlobalId(`.`),
+      composeSliceTransform(valueSpec mapLeaves (_ => root \ 0)),
       keys1 map composeSliceTransform,
       order
     )

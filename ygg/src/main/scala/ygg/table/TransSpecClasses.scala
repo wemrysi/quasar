@@ -45,6 +45,9 @@ package object trans {
   def wrapFieldRight(name: String): TransSpec2             = wrapFieldRight(name, name)
   def wrapFieldRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
   def wrapFieldBoth(name: String): TransSpec2              = WrapObject(OuterObjectConcat(`<.` \ name, `.>` \ name), name)
+
+  def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
+    OuterObjectConcat(xs map { case (name, spec) => WrapObject(spec, name) }: _*)
 }
 
 package trans {
