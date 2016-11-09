@@ -26,11 +26,11 @@ sealed trait JType {
   private def map_s[A](tps: Seq[A -> JType]): String = tps map (_._2.to_s) mkString ", "
 
   def to_s: String = this match {
+    case JArrayUnfixedT         => "[?]"
+    case JObjectUnfixedT        => s"{?}"
     case JArrayHomogeneousT(el) => s"$el[]"
     case JArrayFixedT(map)      => "[ " + map_s(map.toVector sortBy (_._1)) + " ]"
-    case JArrayUnfixedT         => "T[]"
-    case JObjectFixedT(map)     => "{ " + (map_s(map.toVector sortBy (_._1))) + " }"
-    case JObjectUnfixedT        => s"{?}"
+    case JObjectFixedT(map)     => "{ " + map_s(map.toVector sortBy (_._1)) + " }"
     case JUnionT(l, r)          => s"$l | $r"
     case JBooleanT              => "Bool"
     case JTextT                 => "Str"
@@ -62,5 +62,5 @@ final case class JUnionT(left: JType, right: JType)        extends JType
 object JType {
   def Indexed(tps: (Int -> JType)*): JArrayFixedT    = JArrayFixedT(tps.toMap)
   def Object(tps: (String -> JType)*): JObjectFixedT = JObjectFixedT(tps.toMap)
-  def Array(tps: JType*): JArrayFixedT               = JArrayFixedT(tps.zipWithIndex.map(x => x._2 -> x._1).toMap)
+  def Array(tps: JType*): JArrayFixedT               = JArrayFixedT(tps.zipWithIndex.map(_.swap).toMap)
 }

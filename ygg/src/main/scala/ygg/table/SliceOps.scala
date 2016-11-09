@@ -568,14 +568,14 @@ class SliceOps(private val source: Slice) extends AnyVal {
     * then on a row-by-row basis, using a BitSet, we use `Schema.findTypes(...)` to determine the Boolean values
     */
   def isType(jtpe: JType): Slice = {
-    val pathsAndTypes: Seq[CPath -> CType] = columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
+    val pathsAndTypes = columns.keys map (_.toTuple)
     // we cannot just use subsumes because there could be rows with undefineds in them
     val subsumes    = Schema.subsumes(pathsAndTypes, jtpe)
-    val definedBits = (columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
+    val definedBits = columns.values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
 
     def mapValue = (
       if (subsumes) {
-        val cols         = columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
+        val cols         = columns filterKeys (Schema.requiredBy(jtpe, _))
         val included     = Schema.findTypes(jtpe, CPath.Identity, cols, size)
         val includedBits = Bits.filteredRange(0, size)(included)
 
@@ -586,13 +586,11 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(source.size, Map(ColumnRef.id(CBoolean) -> mapValue))
   }
 
-  def arraySwap(index: Int): Slice =
-    Slice(
-      source.size,
-      ColumnMap.Eager(columns.fields collect {
-      case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
-        (ColumnRef(cPath, cType), new HomogeneousArrayColumn[a] {
-          val tpe                   = col.tpe
+  def arraySwap(index: Int): Slice = {
+    val collector: MaybeSelf[ColumnRef -> Column] = {
+      case (ref @ ColumnRef.head(CPathArray)) -> (col: HomogeneousArrayColumn[a]) =>
+        ref -> new HomogeneousArrayColumn[a] {
+          val tpe                     = col.tpe
           def isDefinedAt(row: RowId) = col.isDefinedAt(row)
           def apply(row: RowId) = {
             val xs = col(row)
@@ -611,16 +609,19 @@ class SliceOps(private val source: Slice) extends AnyVal {
               ys
             }
           }
-        })
+        }
+      case ColumnRef.cons(CPathIndex(0), xs, ctype) -> col =>
+        ColumnRef(CPath(CPathIndex(index) +: xs: _*), ctype) -> col
 
-      case (ColumnRef(CPath(CPathIndex(0), xs @ _ *), ctype), col) =>
-        (ColumnRef(CPath(CPathIndex(index) +: xs: _*), ctype), col)
+      case ColumnRef.cons(CPathIndex(`index`), xs, ctype) -> col =>
+        ColumnRef(CPath(CPathIndex(0) +: xs: _*), ctype) -> col
 
-      case (ColumnRef(CPath(CPathIndex(`index`), xs @ _ *), ctype), col) =>
-        (ColumnRef(CPath(CPathIndex(0) +: xs: _*), ctype), col)
+      case (ref @ ColumnRef.head(CPathIndex(_))) -> col =>
+        ref -> col
+    }
 
-      case c @ (ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => c
-    }))
+    Slice(source.size, columns collectFields collector)
+  }
 
   // Takes an array where the indices correspond to indices in this slice,
   // and the values give the indices in the sparsened slice.

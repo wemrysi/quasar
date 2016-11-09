@@ -52,6 +52,7 @@ sealed trait ColumnMap {
   def map(f: EndoA[KV])                            = mapFields(_ map f)
   def apply(key: K): V                             = asMap(key)
   def collect[A](pf: KV =?> A): Vector[A]          = fields collect pf
+  def collectFields(pf: MaybeSelf[KV]): ColumnMap  = mapFields(_ filter pf.isDefinedAt map pf)
   def exists(p: KV => Boolean): Boolean            = fields exists p
   def flatMap(f: KV => Traversable[KV]): ColumnMap = Eager(fields flatMap f)
   def foldLeft[A](zero: A)(f: (A, KV) => A): A     = fields.foldLeft(zero)(f)
