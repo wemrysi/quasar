@@ -59,7 +59,14 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
         extract <- mapFuncXQuery(struct, ~l)
         lshift  <- qscript.elementLeftShift[F] apply (extract)
         merge   <- mergeXQuery(repair, ~l, ~r)
-      } yield for_ (l in src, r in lshift) return_ merge
+      } yield  src match {
+        case IterativeFlwor(bindings, filter, order, isStable, result) =>
+          val addlBindings = IList(BindingClause.let_(l := result), BindingClause.for_(r in lshift))
+          XQuery.Flwor(bindings :::> addlBindings, filter, order, isStable, merge)
+
+        case _ =>
+          for_ (l in src, r in lshift) return_ merge
+      }
 
     // TODO: Start leveraging the cts:* aggregation functions when possible
     case Reduce(src, bucket, reducers, repair) =>
