@@ -122,9 +122,11 @@ object KeyValueStore {
           case Keys() => Task.delay(state.keys.toVector)
           case Get(k) => Task.delay(state.get(k))
           case Put(k, v) => Task.delay(state.update(k, v))
-          case CompareAndPut(k, expect, v) => Task.delay(expect.cata(
-            e => state.replace(k, e, v),
-            state.putIfAbsent(k, v).isEmpty))
+          case CompareAndPut(k, expect, v) =>
+            // Beware, type-checking does not work properly in this block as of scala 2.11.8
+            Task.delay(expect.cata(
+              e => state.replace(k, e, v),
+              state.putIfAbsent(k, v).isEmpty))
           case Delete(k) => Task.delay(state.remove(k)).void
         }
       }
