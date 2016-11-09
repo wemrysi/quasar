@@ -45,10 +45,43 @@ object syntax {
       qn map (_.xs)
   }
 
+  final case class PositionalBuilder(name: BindingName \/ TypedBindingName, at: BindingName) {
+    def := (expression: XQuery): PositionalBinding =
+      PositionalBinding(Binding(name, expression), Some(at))
+
+    def in(expression: XQuery): PositionalBinding =
+      this := expression
+  }
+
   def $(bindingName: String Refined IsNCName): BindingName =
     BindingName(QName.local(NCName(bindingName)))
 
+  // NB: Not ideal, but only used for syntatic purposes. A proper encoding of
+  //     the XQuery AST should obviate this.
+  implicit def bindingAsPositional(binding: Binding): PositionalBinding =
+    PositionalBinding(binding, None)
+
+  final implicit class BindingNameOps(val bn: BindingName) extends scala.AnyVal {
+    def := (expression: XQuery): Binding =
+      Binding(bn.left, expression)
+
+    def at(pos: BindingName): PositionalBuilder =
+      PositionalBuilder(bn.left, pos)
+
+    def in(expression: XQuery): Binding =
+      this := expression
+  }
+
   final implicit class TypedBindingNameOps(val tb: TypedBindingName) extends scala.AnyVal {
+    def := (expression: XQuery): Binding =
+      Binding(tb.right, expression)
+
+    def at(pos: BindingName): PositionalBuilder =
+      PositionalBuilder(tb.right, pos)
+
+    def in(expression: XQuery): Binding =
+      this := expression
+
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
       result(tb.ref) map (TypeswitchCaseClause(tb.left, _))
 

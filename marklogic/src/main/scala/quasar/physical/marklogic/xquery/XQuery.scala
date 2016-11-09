@@ -108,29 +108,15 @@ object XQuery {
   final case class Step(override val toString: String) extends XQuery
 
   final case class Flwor(
-    tupleStreams: IList[(String, XQuery)],
-    letDefs: IList[(String, XQuery)],
+    bindingClauses: NonEmptyList[BindingClause],
     filterExpr: Option[XQuery],
     orderSpecs: IList[(XQuery, SortDirection)],
     orderIsStable: Boolean,
     resultExpr: XQuery
   ) extends XQuery {
     override def toString: String = {
-      val forClause = {
-        val bindings = tupleStreams map {
-          case (v, xqy) => s"$v in $xqy"
-        } intercalate ", "
-
-        if (tupleStreams.isEmpty) "" else s"for $bindings "
-      }
-
-      val letClause = {
-        val bindings = letDefs map {
-          case (v, xqy) => s"$v := $xqy"
-        } intercalate ", "
-
-        if (letDefs.isEmpty) "" else s"let $bindings "
-      }
+      val bindings =
+        bindingClauses map (_.render) intercalate " "
 
       val whereClause =
         filterExpr.map(expr => s"where $expr ").orZero
@@ -145,7 +131,7 @@ object XQuery {
         if (orderSpecs.isEmpty) "" else s"$orderKeyword by $specs "
       }
 
-      s"${forClause}${letClause}${whereClause}${orderClause}return $resultExpr"
+      s"$bindings ${whereClause}${orderClause}return $resultExpr"
     }
   }
 
@@ -162,8 +148,8 @@ object XQuery {
     case Step(s) => s
   } (Step)
 
-  val flwor = Prism.partial[XQuery, (IList[(String, XQuery)], IList[(String, XQuery)], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] {
-    case Flwor(tuples, lets, filter, order, isStable, result) => (tuples, lets, filter, order, isStable, result)
+  val flwor = Prism.partial[XQuery, (NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] {
+    case Flwor(bindings, filter, order, isStable, result) => (bindings, filter, order, isStable, result)
   } (Flwor.tupled)
 
   implicit val show: Show[XQuery] =

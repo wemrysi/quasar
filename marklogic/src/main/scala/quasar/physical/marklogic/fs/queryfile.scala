@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.{Data, Planner => QPlanner}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.matryoshka._
@@ -114,35 +113,36 @@ object queryfile {
         $("length")  as SequenceType("xs:integer"),
         $("str")     as SequenceType("xs:string")
       ).as(SequenceType("xs:string")) { (padchar, length, str) =>
-        val (slen, padct, prefix) = ("$slen", "$padct", "$prefix")
+        val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
         let_(
-          slen   -> fn.stringLength(str),
-          padct  -> fn.max(mkSeq_("0".xqy, length - slen.xqy)),
-          prefix -> fn.stringJoin(for_("$_" -> (1.xqy to padct.xqy)) return_ padchar, "".xs)
-        ) return_ fn.concat(prefix.xqy, str)
+          slen   := fn.stringLength(str),
+          padct  := fn.max(mkSeq_("0".xqy, length - slen.ref)),
+          prefix := fn.stringJoin(for_($("_") in (1.xqy to padct.ref)) return_ padchar, "".xs))
+        .return_(
+          fn.concat(prefix.ref, str))
       }
 
-    def saveTo[F[_]: NameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
+    def saveTo[F[_]: QNameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
       val dstDirUri = pathUri(asDir(dst))
 
       for {
-        ts     <- freshVar[F]
-        i      <- freshVar[F]
-        result <- freshVar[F]
-        fname  <- freshVar[F]
+        ts     <- freshName[F]
+        i      <- freshName[F]
+        result <- freshName[F]
+        fname  <- freshName[F]
         now    <- qscript.secondsSinceEpoch[F].apply(fn.currentDateTime)
-        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(i.xqy))
+        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(i.ref))
       } yield {
         let_(
-          ts   -> xdmp.integerToHex(xs.integer(now * 1000.xqy)),
-          "$_" -> xdmp.directoryCreate(dstDirUri.xs)
-        ) return_ {
+          ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
+          $("_") := xdmp.directoryCreate(dstDirUri.xs))
+        .return_ {
           for_(
-            // FIXME: Need to properly add positional variables to FLWOR
-            s"$result at $i" -> mkSeq_(results))
+            result at i in mkSeq_(results))
           .let_(
-            fname -> fn.concat(dstDirUri.xs, ts.xqy, dpart))
-          .return_(xdmp.documentInsert(fname.xqy, result.xqy))
+            fname := fn.concat(dstDirUri.xs, ts.ref, dpart))
+          .return_(
+            xdmp.documentInsert(fname.ref, result.ref))
         }
       }
     }

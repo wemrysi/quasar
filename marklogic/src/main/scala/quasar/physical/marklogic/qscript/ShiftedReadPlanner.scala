@@ -16,8 +16,6 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
-import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -26,7 +24,7 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
+private[qscript] final class ShiftedReadPlanner[F[_]: QNameGenerator: PrologW]
   extends MarkLogicPlanner[F, Const[ShiftedRead, ?]] {
 
   import expr._, axes.child
@@ -34,23 +32,23 @@ private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
   val plan: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       for {
-        d     <- freshVar[F]
-        c     <- freshVar[F]
-        b     <- freshVar[F]
+        d     <- freshName[F]
+        c     <- freshName[F]
+        b     <- freshName[F]
         uri   =  posixCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
-        xform <- json.transformFromJson[F](c.xqy)
+        xform <- json.transformFromJson[F](~c)
         incId <- ejson.seqToArray_[F](mkSeq_(
-                   fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, fn.documentUri(d.xqy))),
-                   b.xqy))
+                   fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, fn.documentUri(~d))),
+                   ~b))
       } yield {
         for_(
-          d -> cts.search(fn.doc(), cts.directoryQuery(uri.xs, "1".xs)))
+          d in cts.search(fn.doc(), cts.directoryQuery(uri.xs, "1".xs)))
         .let_(
-          c -> d.xqy `/` child.node(),
-          b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
+          c := ~d `/` child.node(),
+          b := (if_ (json.isObject(~c)) then_ xform else_ ~c))
         .return_(idStatus match {
           case IncludeId => incId
-          case ExcludeId => b.xqy
+          case ExcludeId => ~b
         })
       }
   }

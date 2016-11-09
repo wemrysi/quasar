@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.{Data, NameGenerator}
+import quasar.Data
 import quasar.{ejson => ejs}
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs_}
 import quasar.physical.marklogic.prisms._
@@ -41,7 +41,7 @@ object EncodeXQuery {
         _.run.fold(F.encodeXQuery, G.encodeXQuery)
     }
 
-  implicit def commonEncodeXQuery[M[_]: NameGenerator: PrologW]: EncodeXQuery[M, ejs.Common] =
+  implicit def commonEncodeXQuery[M[_]: PrologW]: EncodeXQuery[M, ejs.Common] =
     new EncodeXQuery[M, ejs.Common] {
       val encodeXQuery: AlgebraM[M, ejs.Common, XQuery] = {
         case ejs.Arr(xs) => ejson.seqToArray_[M](mkSeq(xs))

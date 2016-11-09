@@ -17,7 +17,6 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -28,6 +27,7 @@ import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
@@ -56,8 +56,23 @@ package object xquery {
     }
   }
 
+  final case class Binding(name: BindingName \/ TypedBindingName, expression: XQuery) {
+    def render(relation: String): String =
+      s"${name.fold(_.render, _.render)} $relation ${expression}"
+  }
+
+  final case class PositionalBinding(binding: Binding, at: Option[BindingName]) {
+    def render(relation: String): String = {
+      val renderedAt = ~at.map(bn => s" at ${bn.render}")
+      s"${binding.name.fold(_.render, _.render)}$renderedAt $relation ${binding.expression}"
+    }
+  }
+
   final case class BindingName(value: QName) {
+    def unary_~ : XQuery = ref
     def as(tpe: SequenceType): TypedBindingName = TypedBindingName(this, tpe)
+    // TODO: Other ideas for syntax here are `~`, which would require parens in
+    //       certain cases but be much more terse in others.
     def ref: XQuery = XQuery(render)
     def render: String = s"$$${value}"
   }
@@ -83,6 +98,7 @@ package object xquery {
   }
 
   final case class TypedBindingName(name: BindingName, tpe: SequenceType) {
+    def unary_~ : XQuery = ref
     def ref: XQuery = name.ref
     def render: String = s"${name.render} as $tpe"
   }
@@ -104,8 +120,8 @@ package object xquery {
   def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
     declare(NSPrefix.local(fname))
 
-  def freshVar[F[_]: NameGenerator: Functor]: F[String] =
-    NameGenerator[F].prefixedName("$v")
+  def freshName[F[_]: QNameGenerator: Functor]: F[BindingName] =
+    QNameGenerator[F].freshQName map (BindingName(_))
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
     XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
