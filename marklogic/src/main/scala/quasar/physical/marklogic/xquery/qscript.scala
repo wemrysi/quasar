@@ -90,8 +90,8 @@ object qscript {
     qs.declare("combine-apply") map (_(
       $("fns") as ST("(function(item()) as item())*")
     ).as(ST("function(item()) as item()*")) { fns =>
-      val (f, x) = ("$f", "$x")
-      func(x) { fn.map(func(f) { f.xqy fnapply x.xqy }, fns) }
+      val (f, x) = ($("f"), $("x"))
+      func(x.render) { fn.map(func(f.render) { (~f) fnapply ~x }, fns) }
     })
 
   // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
@@ -99,13 +99,11 @@ object qscript {
     qs.declare("combine-n") map (_(
       $("combiners") as ST("(function(item()*, item()) as item()*)*")
     ).as(ST("function(item()*, item()) as item()*")) { combiners =>
-      val (len, acc, i, x) = ($("len"), $("acc"), $("i"), $("x"))
+      val (f, i, acc, x) = ($("f"), $("i"), $("acc"), $("x"))
 
-      let_ (len := fn.count(combiners)) return_ {
-        func(acc.render, x.render) {
-          for_ (i in (1.xqy to ~len)) return_ {
-            combiners(~i) fnapply ((~acc)(~i), ~x)
-          }
+      func(acc.render, x.render) {
+        for_ (f at i in combiners) return_ {
+          (~f) fnapply ((~acc)(~i), ~x)
         }
       }
     })
@@ -309,13 +307,11 @@ object qscript {
     qs.declare("zip-apply") map (_(
       $("fns") as ST("(function(item()*) as item()*)*")
     ).as(ST("function(item()*) as item()*")) { fns =>
-      val (len, i, x) = ($("len"), $("i"), $("x"))
+      val (f, i, x) = ($("f"), $("i"), $("x"))
 
-      let_ (len := fn.count(fns)) return_ {
-        func(x.render) {
-          for_ (i in (1.xqy to ~len)) return_ {
-            fns(~i) fnapply ((~x)(~i))
-          }
+      func(x.render) {
+        for_ (f at i in fns) return_ {
+          (~f) fnapply ((~x)(~i))
         }
       }
     })

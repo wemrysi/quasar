@@ -75,12 +75,10 @@ object ejson {
       declare(fname)(
         $("arr") as ST("element()")
       ).as(ST("element()")) { arr: XQuery =>
-        val elts = $("elts")
-        seqToArray[F].apply(fn.nodeName(arr), 0.xqy to mkSeq_(fn.count(~elts) - 1.xqy)) map { inner =>
-          let_(elts := (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(~elts)) then_ arr else_ inner
-          }
-        }
+        val i = $("i")
+        seqToArray[F].apply(
+          fn.nodeName(arr),
+          for_ ($("_") at i in (arr `/` child(aelt))) return_ (~i - 1.xqy))
       }
     }.join
 
@@ -90,23 +88,15 @@ object ejson {
       declare(fname)(
         $("arr") as ST("element()")
       ).as(ST("element()")) { arr: XQuery =>
-        val (i, elts, zelts) = ($("i"), $("elts"), $("zelts"))
+        val (i, elt) = ($("i"), $("elt"))
 
         for {
-          ixelt <- mkArrayElt[F](~i)
-          pair  <- mkArray_[F](mkSeq_(ixelt, (~elts)(~i)))
+          ixelt <- mkArrayElt[F](~i - 1.xqy)
+          pair  <- mkArray_[F](mkSeq_(ixelt, ~elt))
           zpair <- mkArrayElt[F](pair)
-          zarr  <- mkArray[F] apply (fn.nodeName(arr), ~zelts)
-        } yield {
-          let_(elts := (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(~elts))
-            .then_ { arr }
-            .else_ {
-              let_(zelts := for_(i in (1.xqy to fn.count(~elts))).return_(zpair))
-              .return_(zarr)
-            }
-          }
-        }
+          zelts =  for_(elt at i in (arr `/` child(aelt))) return_ zpair
+          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts)
+        } yield zarr
       }
     }.join
 
