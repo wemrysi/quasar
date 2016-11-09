@@ -518,8 +518,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def deleteFields(prefixes: Set[CPathField]): Slice = {
     val (removed, withoutPrefixes) = columns partition {
-      case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
-      case _                                                      => false
+      case (ColumnRef.head(hd: CPathField), _) => prefixes contains hd
+      case _                                   => false
     }
 
     val becomeEmpty = Bits.filteredRange(0, source.size) { i =>
@@ -547,7 +547,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   }
 
   def typed(jtpe: JType): Slice =
-    Slice(size, columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) })
+    Slice(size, columns filterKeys (Schema.requiredBy(jtpe, _)))
 
   def typedSubsumes(jtpe: JType): Slice = {
     val columns = ColumnMap.Eager(

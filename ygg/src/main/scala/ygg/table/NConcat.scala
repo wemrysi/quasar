@@ -25,27 +25,24 @@ object ConcatHelpers {
     (definedBits, emptyBits)
   }
 
-  def buildOuterBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet): BitSet = {
-    (rightEmptyBits & leftEmptyBits) |
-      (rightEmptyBits &~ leftDefinedBits) |
-      (leftEmptyBits &~ rightDefinedBits)
+  def buildOuterBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet): BitSet = (
+      (rightEmptyBits & leftEmptyBits)
+    | (rightEmptyBits &~ leftDefinedBits)
+    | (leftEmptyBits &~ rightDefinedBits)
+  )
+
+  def buildInnerBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet) =
+    (rightEmptyBits & leftEmptyBits, leftDefinedBits & rightDefinedBits)
+
+  def filterArrays(columns: ColumnMap) = columns filterKeys {
+    case ColumnRef.head(CPathIndex(_)) => true
+    case ColumnRef.id(CEmptyArray)     => true
+    case _                             => false
   }
 
-  def buildInnerBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet) = {
-    val emptyBits    = rightEmptyBits & leftEmptyBits
-    val nonemptyBits = leftDefinedBits & rightDefinedBits
-    (emptyBits, nonemptyBits)
-  }
-
-  def filterArrays(columns: ColumnMap) = columns filter {
-    case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
-    case (ColumnRef.id(CEmptyArray), _)                  => true
-    case _                                               => false
-  }
-
-  def filterEmptyArrays(columns: ColumnMap) = columns filter {
-    case (ColumnRef.id(CEmptyArray), _) => true
-    case _                              => false
+  def filterEmptyArrays(columns: ColumnMap) = columns filterKeys {
+    case ColumnRef.id(CEmptyArray) => true
+    case _                         => false
   }
 
   def collectIndices(columns: ColumnMap) = columns.fields.collect {
@@ -67,24 +64,24 @@ object ConcatHelpers {
     newCols.toMap
   }
 
-  def filterObjects(columns: ColumnMap) = columns.filter {
-    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
-    case (ColumnRef.id(CEmptyObject), _)                 => true
-    case _                                               => false
+  def filterObjects(columns: ColumnMap) = columns filterKeys {
+    case ColumnRef.head(CPathField(_)) => true
+    case ColumnRef.id(CEmptyObject)    => true
+    case _                             => false
   }
 
-  def filterEmptyObjects(columns: ColumnMap) = columns.filter {
-    case (ColumnRef.id(CEmptyObject), _) => true
-    case _                               => false
+  def filterEmptyObjects(columns: ColumnMap) = columns filterKeys {
+    case ColumnRef.id(CEmptyObject) => true
+    case _                          => false
   }
 
-  def filterFields(columns: ColumnMap) = columns.filter {
-    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
-    case _                                               => false
+  def filterFields(columns: ColumnMap) = columns filterKeys {
+    case ColumnRef.head(CPathField(_)) => true
+    case _                             => false
   }
 
   def buildFields(leftColumns: ColumnMap, rightColumns: ColumnMap) =
-    (filterFields(leftColumns), filterFields(rightColumns))
+    filterFields(leftColumns) -> filterFields(rightColumns)
 
   def buildEmptyObjects(emptyBits: BitSet) = (
     if (emptyBits.isEmpty) Map()
@@ -102,25 +99,24 @@ object ConcatHelpers {
         leftFields exists { case (ColumnRef(path2, _), _) => path == path2 }
     }
 
-    val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
+    val innerPaths = leftInner.keys.map(_.selector).toSet
 
     val mergedPairs: Set[ColumnRef -> Column] = innerPaths flatMap { path =>
-      val rightSelection = rightInner filter {
-        case (ColumnRef(path2, _), _) => path == path2
+      val rightSelection = rightInner filterKeys {
+        case ColumnRef(`path`, _) => true
+        case _                    => false
       }
-
-      val leftSelection = leftInner filter {
-        case (ref @ ColumnRef(path2, _), _) =>
-          path == path2 && !rightSelection.contains(ref)
+      val leftSelection = leftInner filterKeys {
+        case ref @ ColumnRef(`path`, _) => !(rightSelection contains ref)
+        case _                          => false
       }
-
-      val rightMerged = rightSelection map {
-        case (ref, col) => {
-          if (leftInner contains ref)
-            ref -> cf.UnionRight(leftInner(ref), col).get
-          else
-            ref -> col
-        }
+      val rightMerged = rightSelection map { case (ref, col) =>
+        ref -> (
+          leftInner get ref match {
+            case Some(v) => cf.UnionRight(v, col).get
+            case _       => col
+          }
+        )
       }
 
       rightMerged ++ leftSelection
@@ -132,11 +128,8 @@ object ConcatHelpers {
 
 final object NConcat {
   // Closest thing we can get to casting an array. This is completely unsafe.
-  private def copyCastArray[A: CTag](as: Array[_]): Array[A] = {
-    val bs = new Array[A](as.length)
-    systemArraycopy(as, 0, bs, 0, as.length)
-    bs
-  }
+  private def copyCastArray[A: CTag](as: Array[_]): Array[A] =
+    doto(new Array[A](as.length))(bs => systemArraycopy(as, 0, bs, 0, as.length))
 
   def apply(cols: List[Int -> Column]) = {
     val sortedCols             = cols.sortBy(_._1)

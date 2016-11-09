@@ -31,6 +31,12 @@ object ColumnRef {
       case _                             => None
     }
   }
+  object head {
+    def unapply(x: ColumnRef) = x match {
+      case ColumnRef(CPath(head, _*), _) => Some(head)
+      case _                             => None
+    }
+  }
 
   implicit val columnRefOrder: Ord[ColumnRef] = Ord.orderBy(r => r.selector -> r.ctype)
 }
