@@ -86,45 +86,6 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
     checkRoundTrips(RowFormat.forValues(_))
   }
 
-  private def identityCols(len: Int): Vec[ColumnRef] =
-    (0 until len).map({ i =>
-      ColumnRef(CPath(CPathIndex(i)), CLong)
-    })(breakOut)
-
-  "IdentitiesRowFormat" should {
-    "round-trip CLongs" in {
-      prop { id: Vec[Long] =>
-        val rowFormat         = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
-        val cId: Vec[CValue] = id map (CLong(_))
-        rowFormat.decode(rowFormat.encode(cId)) must_== cId
-      }
-    }
-
-    "encodeIdentities matches encode format" in {
-      prop { id: Vec[Long] =>
-        val rowFormat         = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
-        val cId: Vec[CValue] = id map (CLong(_))
-        rowFormat.decode(rowFormat.encodeIdentities(id.toArray)) must_== cId
-      }
-    }
-
-    "round-trip CLongs -> Column -> CLongs" in {
-      prop { id: Vec[Long] =>
-        val columns       = arrayColumnsFor(1, identityCols(id.size))
-        val rowFormat     = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
-        val columnDecoder = rowFormat.ColumnDecoder(columns)
-        val columnEncoder = rowFormat.ColumnEncoder(columns)
-
-        val cId: Vec[CValue] = id map (CLong(_))
-        columnDecoder.decodeToRow(0, rowFormat.encode(cId), offset = 0)
-
-        verify(Vec(cId), columns)
-
-        rowFormat.decode(columnEncoder.encodeFromRow(0)) must_== cId
-      }
-    }
-  }
-
   private def order[A](f: (A, A) => Int): Ordering[A] = new Ordering[A] {
     def compare(a: A, b: A): Int = f(a, b)
   }

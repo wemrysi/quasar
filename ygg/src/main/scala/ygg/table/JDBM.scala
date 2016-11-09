@@ -79,7 +79,7 @@ object JDBM {
                          valRefs: Array[ColumnRef],
                          count: Long) extends SliceSorter
 
-  final case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
+  final case class IndexKey(streamId: String, keyRefs: Vector[ColumnRef], valRefs: Vector[ColumnRef]) {
     val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
   }
 

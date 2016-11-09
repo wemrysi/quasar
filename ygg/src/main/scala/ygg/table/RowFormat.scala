@@ -76,7 +76,6 @@ object RowFormat {
   final case class SortingKeyRowFormatV1(columnRefs: Seq[ColumnRef]) extends RowFormatCodecs with SortingRowFormat {
     def pool = byteBufferPool
   }
-  final case class IdentitiesRowFormatV1(columnRefs: Seq[ColumnRef]) extends IdentitiesRowFormat
 }
 
 trait RowFormatSupport { self: StdCodecs =>

@@ -67,12 +67,6 @@ class WriteTable[T: TableRep]() {
 
     valueTrans.advance(slice) flatMap {
       case (valueTrans0, vslice) => {
-        val kvs               = vslice.columns.toList.sortBy(_._1)
-        val vColumnRefs       = kvs map (_._1)
-        val vColumns          = kvs map (_._2)
-        val dataRowFormat     = RowFormat.forValues(vColumnRefs)
-        val dataColumnEncoder = dataRowFormat.ColumnEncoder(vColumns)
-
         def storeTransformed(jdbmState: JDBMState,
                              transforms: List[SliceTransform1[_] -> String],
                              updatedTransforms: List[SliceTransform1[_] -> String]): Need[JDBMState -> List[SliceTransform1[_] -> String]] = transforms match {
@@ -83,7 +77,7 @@ class WriteTable[T: TableRep]() {
 
                 kslice.columns.toList.sortBy(_._1) match {
                   case Seq() => Need(jdbmState -> thing)
-                  case _     => writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
+                  case _     => writeRawSlices(kslice, sortOrder, vslice, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
                 }
             }
 
@@ -99,24 +93,18 @@ class WriteTable[T: TableRep]() {
     }
   }
 
-  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder) = {
-    val kvs         = vslice.columns.toList.sortBy(_._1)
-    val vColumnRefs = kvs map (_._1)
-    val vColumns    = kvs map (_._2)
-
-    val dataRowFormat     = RowFormat.forValues(vColumnRefs)
-    val dataColumnEncoder = dataRowFormat.ColumnEncoder(vColumns)
-
-    writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, indexNamePrefix, jdbmState)
-  }
+  def writeAlignedSlices(kslice: Slice, vslice: Slice, jdbmState: JDBMState, indexNamePrefix: String, sortOrder: DesiredSortOrder): Need[JDBMState] =
+    writeRawSlices(kslice, sortOrder, vslice, indexNamePrefix, jdbmState)
 
   protected def writeRawSlices(kslice: Slice,
                                sortOrder: DesiredSortOrder,
                                vslice: Slice,
-                               vrefs: List[ColumnRef],
-                               vEncoder: ColumnEncoder,
                                indexNamePrefix: String,
                                jdbmState: JDBMState): Need[JDBMState] = Need {
+
+    val vrefs    = vslice.columns.keys.sorted
+    val vEncoder = (RowFormat forValues vrefs) ColumnEncoder (vrefs map vslice.columns.apply)
+
     // Iterate over the slice, storing each row
     // FIXME: Determine whether undefined sort keys are valid
     def storeRows(kslice: Slice, vslice: Slice, keyRowFormat: RowFormat, vEncoder: ColumnEncoder, storage: IndexStore, insertCount: Long): Long = {
@@ -142,7 +130,7 @@ class WriteTable[T: TableRep]() {
       storeRow(0, insertCount)
     }
 
-    val krefs       = kslice.columns.keys.toList.sorted
+    val krefs       = kslice.columns.keys.sorted
     val indexMapKey = IndexKey(indexNamePrefix, krefs, vrefs)
 
     // There are 3 cases:
