@@ -69,11 +69,8 @@ package object xquery {
   }
 
   final case class BindingName(value: QName) {
-    def unary_~ : XQuery = ref
+    def unary_~ : XQuery = XQuery(render)
     def as(tpe: SequenceType): TypedBindingName = TypedBindingName(this, tpe)
-    // TODO: Other ideas for syntax here are `~`, which would require parens in
-    //       certain cases but be much more terse in others.
-    def ref: XQuery = XQuery(render)
     def render: String = s"$$${value}"
   }
 
@@ -98,8 +95,7 @@ package object xquery {
   }
 
   final case class TypedBindingName(name: BindingName, tpe: SequenceType) {
-    def unary_~ : XQuery = ref
-    def ref: XQuery = name.ref
+    def unary_~ : XQuery = ~name
     def render: String = s"${name.render} as $tpe"
   }
 

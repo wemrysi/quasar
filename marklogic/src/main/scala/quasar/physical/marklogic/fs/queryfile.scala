@@ -116,10 +116,10 @@ object queryfile {
         val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
         let_(
           slen   := fn.stringLength(str),
-          padct  := fn.max(mkSeq_("0".xqy, length - slen.ref)),
-          prefix := fn.stringJoin(for_($("_") in (1.xqy to padct.ref)) return_ padchar, "".xs))
+          padct  := fn.max(mkSeq_("0".xqy, length - (~slen))),
+          prefix := fn.stringJoin(for_($("_") in (1.xqy to ~padct)) return_ padchar, "".xs))
         .return_(
-          fn.concat(prefix.ref, str))
+          fn.concat(~prefix, str))
       }
 
     def saveTo[F[_]: QNameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
@@ -131,7 +131,7 @@ object queryfile {
         result <- freshName[F]
         fname  <- freshName[F]
         now    <- qscript.secondsSinceEpoch[F].apply(fn.currentDateTime)
-        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(i.ref))
+        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
       } yield {
         let_(
           ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
@@ -140,9 +140,9 @@ object queryfile {
           for_(
             result at i in mkSeq_(results))
           .let_(
-            fname := fn.concat(dstDirUri.xs, ts.ref, dpart))
+            fname := fn.concat(dstDirUri.xs, ~ts, dpart))
           .return_(
-            xdmp.documentInsert(fname.ref, result.ref))
+            xdmp.documentInsert(~fname, ~result))
         }
       }
     }

@@ -112,7 +112,7 @@ object expr {
       default(TypeswitchDefaultClause(None, xqy))
 
     def default(binding: BindingName, f: XQuery => XQuery): XQuery =
-      default(TypeswitchDefaultClause(Some(binding), f(binding.ref)))
+      default(TypeswitchDefaultClause(Some(binding), f(~binding)))
 
     def default(dc: TypeswitchDefaultClause): XQuery = {
       val body = (cases.map(_.render) :+ dc.render).map("  " + _).mkString("\n")

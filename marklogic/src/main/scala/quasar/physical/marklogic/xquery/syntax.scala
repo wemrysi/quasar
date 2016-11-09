@@ -83,7 +83,7 @@ object syntax {
       this := expression
 
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
-      result(tb.ref) map (TypeswitchCaseClause(tb.left, _))
+      result(~tb) map (TypeswitchCaseClause(tb.left, _))
 
     def return_(result: XQuery => XQuery): TypeswitchCaseClause =
       return_[Id.Id](result)

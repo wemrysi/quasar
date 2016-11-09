@@ -124,7 +124,7 @@ object FunctionDecl {
     def as(rType: SequenceType): FunctionDecl1Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: XQuery => F[XQuery]): F[FunctionDecl1] =
-      body(p1.ref) map (FunctionDecl1(fn, p1, rt, _))
+      body(~p1) map (FunctionDecl1(fn, p1, rt, _))
 
     def apply(body: XQuery => XQuery): FunctionDecl1 =
       apply[Id](body)
@@ -134,7 +134,7 @@ object FunctionDecl {
     def as(rType: SequenceType): FunctionDecl2Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery) => F[XQuery]): F[FunctionDecl2] =
-      body(p1.ref, p2.ref) map (FunctionDecl2(fn, p1, p2, rt, _))
+      body(~p1, ~p2) map (FunctionDecl2(fn, p1, p2, rt, _))
 
     def apply(body: (XQuery, XQuery) => XQuery): FunctionDecl2 =
       apply[Id](body)
@@ -144,7 +144,7 @@ object FunctionDecl {
     def as(rType: SequenceType): FunctionDecl3Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl3] =
-      body(p1.ref, p2.ref, p3.ref) map (FunctionDecl3(fn, p1, p2, p3, rt, _))
+      body(~p1, ~p2, ~p3) map (FunctionDecl3(fn, p1, p2, p3, rt, _))
 
     def apply(body: (XQuery, XQuery, XQuery) => XQuery): FunctionDecl3 =
       apply[Id](body)
@@ -154,7 +154,7 @@ object FunctionDecl {
     def as(rType: SequenceType): FunctionDecl4Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl4] =
-      body(p1.ref, p2.ref, p3.ref, p4.ref) map (FunctionDecl4(fn, p1, p2, p3, p4, rt, _))
+      body(~p1, ~p2, ~p3, ~p4) map (FunctionDecl4(fn, p1, p2, p3, p4, rt, _))
 
     def apply(body: (XQuery, XQuery, XQuery, XQuery) => XQuery): FunctionDecl4 =
       apply[Id](body)
@@ -164,7 +164,7 @@ object FunctionDecl {
     def as(rType: SequenceType): FunctionDecl5Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl5] =
-      body(p1.ref, p2.ref, p3.ref, p4.ref, p5.ref) map (FunctionDecl5(fn, p1, p2, p3, p4, p5, rt, _))
+      body(~p1, ~p2, ~p3, ~p4, ~p5) map (FunctionDecl5(fn, p1, p2, p3, p4, p5, rt, _))
 
     def apply(body: (XQuery, XQuery, XQuery, XQuery, XQuery) => XQuery): FunctionDecl5 =
       apply[Id](body)

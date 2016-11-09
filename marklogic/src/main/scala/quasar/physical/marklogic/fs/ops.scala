@@ -158,8 +158,8 @@ object ops {
       val hasChildMLDirs =
         fn.exists(
           for_(d in xdmp.directory(pathUri, "1".xs))
-          .where_(d.ref("property::directory".xqy))
-          .return_(d.ref))
+          .where_((~d)("property::directory".xqy))
+          .return_(~d))
 
       fn.not(isMLDir(pathUri)) or hasChildMLDirs
     }
@@ -169,8 +169,8 @@ object ops {
 
       fn.exists(
         for_(d in xdmp.directory(pathUri, "1".xs))
-        .where_(d.ref(fn.not("property::directory".xqy)))
-        .return_(d.ref))
+        .where_((~d)(fn.not("property::directory".xqy)))
+        .return_(~d))
     }
 
     def filesXqy(dirUris: XQuery) =
@@ -182,11 +182,11 @@ object ops {
 
     val xqy = let_(
       pathUris      := prefixPathsXqy,
-      childPathUris := childPathsXqy(pathUris.ref),
-      dirUris       := fn.filter(func("$u") { isDirXqy("$u".xqy) }, childPathUris.ref),
-      fileUris      := filesXqy(childPathUris.ref)
+      childPathUris := childPathsXqy(~pathUris),
+      dirUris       := fn.filter(func("$u") { isDirXqy("$u".xqy) }, ~childPathUris),
+      fileUris      := filesXqy(~childPathUris)
     ) return_ (
-      mkSeq_(dirUris.ref, fileUris.ref)
+      mkSeq_(~dirUris, ~fileUris)
     )
 
     def parseDir(s: String): Option[PathSegment] =
@@ -212,7 +212,7 @@ object ops {
         if_(fn.exists(xdmp.documentProperties(dstUri.xs)("/prop:properties/prop:directory".xqy)))
           .then_ {
             for_(d in xdmp.directory(dstUri.xs, "1".xs))
-            .return_(xdmp.documentDelete(xdmp.nodeUri(d.ref)))
+            .return_(xdmp.documentDelete(xdmp.nodeUri(~d)))
           } else_ {
             xdmp.directoryCreate(dstUri.xs)
           },
@@ -220,11 +220,11 @@ object ops {
         for_(
           d in xdmp.directory(srcUri.xs, "1".xs))
         .let_(
-          oldName := xdmp.nodeUri(d.ref),
-          newName := fn.concat(dstUri.xs, fn.tokenize(oldName.ref, "/".xs)(fn.last)))
+          oldName := xdmp.nodeUri(~d),
+          newName := fn.concat(dstUri.xs, fn.tokenize(~oldName, "/".xs)(fn.last)))
         .return_(mkSeq_(
-          xdmp.documentInsert(newName.ref, fn.doc(oldName.ref)),
-          xdmp.documentDelete(oldName.ref)))))
+          xdmp.documentInsert(~newName, fn.doc(~oldName)),
+          xdmp.documentDelete(~oldName)))))
     }
 
     def deleteSrcIfEmpty =

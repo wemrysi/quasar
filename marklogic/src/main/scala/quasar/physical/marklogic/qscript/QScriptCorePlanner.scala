@@ -79,7 +79,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
         fnl   <- qscript.zipApply[F] apply (mkSeq(fnls))
         y     <- freshName[F]
         rpr   <- planMapFunc(repair)(r => (~y)((r.idx + 1).xqy))
-        rfnl  <- fx(x => let_(y in fnl.fnapply(x)).return_(rpr).point[F])
+        rfnl  <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
         bckt  <- fx(mapFuncXQuery[T, F](bucket, _))
         red   <- qscript.reduceWith[F] apply (init, cmb, rfnl, bckt, src)
       } yield red
