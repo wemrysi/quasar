@@ -158,8 +158,14 @@ object MapFuncPlanner {
           for {
             qn <- asQName(s)
             m  <- freshName[F]
-            n  <- mem.nodeDelete[F](~m)
-          } yield let_(m := src) return_ n
+            n1 <- mem.nodeDelete[F](~m `/` child(qn))
+            n2 <- mem.nodeDelete[F](src `/` child(qn))
+          } yield {
+            if (flwor.isMatching(src))
+              let_(m := src) return_ n1
+            else
+              n2
+          }
 
         case _ => qscript.deleteField[F] apply (src, xs.QName(field))
       }
