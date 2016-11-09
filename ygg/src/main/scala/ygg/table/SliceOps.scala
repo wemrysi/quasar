@@ -49,7 +49,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       case _ => forwardIndex get node
     }
 
-    EagerColumnMap(columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
+    ColumnMap.Eager(columns.keySet.foldLeft(Map.empty[ColumnRef, Column]) {
       case (acc, ColumnRef(CPath(_, xs @ _ *), ctype)) =>
         val resultRef = ColumnRef(CPath(xs: _*), ctype)
 
@@ -245,7 +245,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def mapColumns(f: CF1): Slice =
     Slice(
       source.size,
-      EagerColumnMap({
+      ColumnMap.Eager({
         val resultColumns = columns.fields flatMap {
           case (ref, col) => f(col) map (result => ref.copy(ctype = result.tpe) -> result)
         }
@@ -392,7 +392,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def deref(node: CPathNode): Slice = Slice(
     source.size,
-    EagerColumnMap(node match {
+    ColumnMap.Eager(node match {
       case CPathIndex(i) =>
         columns.fields collect {
           case (ColumnRef(CPath(CPathArray, xs @ _ *), CArrayType(elemType)), col: HomogeneousArrayColumn[_]) =>
@@ -417,7 +417,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     // This is a little weird; CPathArray actually wraps in CPathIndex(0).
     // Unfortunately, CArrayType(_) cannot wrap CNullTypes, so we can't just
     // arbitrarily wrap everything in a CPathArray.
-    EagerColumnMap(wrapper match {
+    ColumnMap.Eager(wrapper match {
       case CPathArray =>
         columns.fields map {
           case (ColumnRef(CPath(nodes @ _ *), ctype), col) =>
@@ -550,7 +550,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(size, columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) })
 
   def typedSubsumes(jtpe: JType): Slice = {
-    val columns = EagerColumnMap(
+    val columns = ColumnMap.Eager(
       source.columns.fields |> (kvs =>
         if (Schema.subsumes(jtpe, kvs map (_._1))) kvs filter (kv => Schema.requiredBy(jtpe, kv._1))
         else Vector()
@@ -589,7 +589,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def arraySwap(index: Int): Slice =
     Slice(
       source.size,
-      EagerColumnMap(columns.fields collect {
+      ColumnMap.Eager(columns.fields collect {
       case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
         (ColumnRef(cPath, cType), new HomogeneousArrayColumn[a] {
           val tpe                   = col.tpe
@@ -855,7 +855,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     // TODO This is slow... Faster would require a prefix map or something... argh.
     val keySlice = Slice(
       source.size,
-      EagerColumnMap(prefixes.zipWithIndex.flatMap({
+      ColumnMap.Eager(prefixes.zipWithIndex.flatMap({
         case (prefix, i) =>
           columns.fields collect {
             case (ColumnRef(path, tpe), col) if path hasPrefix prefix =>

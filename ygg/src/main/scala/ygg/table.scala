@@ -46,8 +46,8 @@ package object table {
     companionOf[T].fromSlices(slices, size)
 
   def unfoldStream[A](start: A)(f: A => Need[Option[Slice -> A]]): StreamT[Need, Slice] = StreamT.unfoldM[Need, Slice, A](start)(f)
-  def columnMap(xs: ColumnKV*): EagerColumnMap                                          = EagerColumnMap(xs.toVector)
-  def lazyColumnMap(expr: => Seq[ColumnKV]): LazyColumnMap                              = LazyColumnMap(() => expr.toVector)
+  def columnMap(xs: ColumnKV*): ColumnMap.Eager                                         = ColumnMap.Eager(xs.toVector)
+  def lazyColumnMap(expr: => Seq[ColumnKV]): ColumnMap.Lazy                             = ColumnMap.Lazy(() => expr.toVector)
 
   def composeSliceTransform(spec: TransSpec1): SliceTransform1[_]             = SliceTransform.composeSliceTransform(spec)
   def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = SliceTransform.composeSliceTransform2(spec)

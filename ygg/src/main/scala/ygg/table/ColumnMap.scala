@@ -18,13 +18,22 @@ package ygg.table
 
 import scala.Predef.$conforms
 import ygg.common._
+import ColumnMap._
 
 object ColumnMap {
   type Raw = Map[ColumnRef, Column]
+  implicit def liftMap(x: Raw): ColumnMap = apply(x.toVector)
 
-  implicit def liftMap(x:Raw): ColumnMap = EagerColumnMap(x.toVector)
+  def apply(fields: Vector[ColumnRef -> Column]): Eager = Eager(fields)
+  def unapply(x: ColumnMap)                             = Some(x.fields)
 
-  def unapply(x: ColumnMap) = Some(x.fields)
+  final case class Eager(fields: Vector[ColumnKV]) extends ColumnMap {
+    def mapFields(f: EndoA[Vector[KV]]): Eager = Eager(f(fields))
+  }
+  final case class Lazy(fieldsFn: () => Vector[ColumnKV]) extends ColumnMap {
+    def fields: Vector[KV]                    = fieldsFn()
+    def mapFields(f: EndoA[Vector[KV]]): Lazy = Lazy(() => f(fieldsFn()))
+  }
 }
 sealed trait ColumnMap {
   type K  = ColumnRef
@@ -32,30 +41,31 @@ sealed trait ColumnMap {
   type KV = K -> V
 
   def fields: Vector[KV]
-  def ++(that: ColumnMap): ColumnMap
-  def +(kv: KV): ColumnMap
-  def filter(p: KV => Boolean): ColumnMap
-  def filterKeys(p: K => Boolean): ColumnMap
-  def map(f: KV => KV): ColumnMap
+  def mapFields(f: EndoA[Vector[KV]]): ColumnMap
 
   lazy val asMap: Map[K, V] = fields.toMap
 
+  def ++(that: ColumnMap)                          = mapFields(_ ++ that.fields)
+  def +(kv: KV)                                    = mapFields(_ :+ kv)
+  def filter(p: KV => Boolean)                     = mapFields(_ filter p)
+  def filterKeys(p: K => Boolean)                  = mapFields(_ filter (kv => p(kv._1)))
+  def map(f: EndoA[KV])                            = mapFields(_ map f)
   def apply(key: K): V                             = asMap(key)
   def collect[A](pf: KV =?> A): Vector[A]          = fields collect pf
   def exists(p: KV => Boolean): Boolean            = fields exists p
-  def flatMap(f: KV => Traversable[KV]): ColumnMap = EagerColumnMap(fields flatMap f)
+  def flatMap(f: KV => Traversable[KV]): ColumnMap = Eager(fields flatMap f)
   def foldLeft[A](zero: A)(f: (A, KV) => A): A     = fields.foldLeft(zero)(f)
   def foreach(f: KV => Any): Unit                  = fields foreach f
   def get(key: K): Option[V]                       = asMap get key
   def getOrElse(key: K, alt: => V): V              = asMap.getOrElse(key, alt)
-  def groupBy[A](f: KV => A): Map[A, ColumnMap]    = fields groupBy f mapValues (vs => EagerColumnMap(vs))
+  def groupBy[A](f: KV => A): Map[A, ColumnMap]    = fields groupBy f mapValues (vs => Eager(vs))
   def head: KV                                     = fields.head
   def headOption: Option[KV]                       = fields.headOption
   def isEmpty: Boolean                             = fields.isEmpty
   def keySet: Set[K]                               = keys.toSet
   def keys: Vector[K]                              = fields map (_._1)
-  def lazyMapValues(f: V => V): LazyColumnMap      = lazyColumnMap(fields map { case (k, v) => k -> f(v) })
-  def mapValues(f: V => V): EagerColumnMap         = columnMap(fields map { case (k, v) => k -> f(v) }: _*)
+  def lazyMapValues(f: V => V): Lazy               = lazyColumnMap(fields map { case (k, v) => k -> f(v) })
+  def mapValues(f: V => V): Eager                  = columnMap(fields map { case (k, v) => k -> f(v) }: _*)
   def partition(p: KV => Boolean)                  = asMap partition p
   def size: Int                                    = fields.length
   def toArray: Array[KV]                           = fields.toArray
@@ -65,8 +75,8 @@ sealed trait ColumnMap {
   def values: Vector[V]                            = fields map (_._2)
 
   def updated(key: K, value: V): ColumnMap = fields indexWhere (kv => key == kv._1) match {
-    case -1 => EagerColumnMap(fields :+ (key -> value))
-    case n  => EagerColumnMap((fields take n) ++ Vector(key -> value) ++ (fields drop n + 1))
+    case -1 => this + (key -> value)
+    case n  => mapFields(fs => (fs take n) ++ Vector(key -> value) ++ (fs drop n + 1))
   }
 
   def column_s: String = (
@@ -76,21 +86,4 @@ sealed trait ColumnMap {
     } mkString ("[\n  ", "\n  ", "\n]")
   )
   override def toString = "Columns" + column_s
-}
-
-final case class EagerColumnMap(fields: Vector[ColumnKV]) extends ColumnMap {
-  def ++(that: ColumnMap): EagerColumnMap         = EagerColumnMap(fields ++ that.fields)
-  def +(kv: KV): EagerColumnMap                   = EagerColumnMap(fields :+ kv)
-  def filter(p: KV => Boolean): EagerColumnMap    = EagerColumnMap(fields filter p)
-  def filterKeys(p: K => Boolean): EagerColumnMap = EagerColumnMap(fields filter (kv => p(kv._1)))
-  def map(f: KV => KV): EagerColumnMap            = EagerColumnMap(fields map f)
-}
-final case class LazyColumnMap(fieldsFn: () => Vector[ColumnKV]) extends ColumnMap {
-  def fields: Vector[KV] = fieldsFn()
-
-  def ++(that: ColumnMap): LazyColumnMap         = lazyColumnMap(fields ++ that.fields)
-  def +(kv: KV): LazyColumnMap                   = lazyColumnMap(fields :+ kv)
-  def filter(p: KV => Boolean): LazyColumnMap    = lazyColumnMap(fields filter p)
-  def filterKeys(p: K => Boolean): LazyColumnMap = lazyColumnMap(fields filter (kv => p(kv._1)))
-  def map(f: KV => KV): LazyColumnMap            = lazyColumnMap(fields map f)
 }

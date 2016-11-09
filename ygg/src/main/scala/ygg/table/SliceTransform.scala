@@ -176,7 +176,7 @@ object SliceTransform {
               }
             }
 
-            val groupedNum = cogroup(stripTypes(EagerColumnMap(leftNum)), stripTypes(EagerColumnMap(rightNum)))
+            val groupedNum = cogroup(stripTypes(ColumnMap.Eager(leftNum)), stripTypes(ColumnMap.Eager(rightNum)))
             val simplifiedGroupedNum = groupedNum map {
               case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
               case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
@@ -464,7 +464,7 @@ object SliceTransform {
                   rightS.columns.asMap mapValues (s => List(s))
                 ).toVector
 
-                val joined = EagerColumnMap(grouped map {
+                val joined = ColumnMap.Eager(grouped map {
                   case (ref, Left3(col))  => ref -> cf.filter(0, size, leftMask)(col).get
                   case (ref, Right3(col)) => ref -> cf.filter(0, size, rightMask)(col).get
                   case (ref, Middle3((left :: Nil, right :: Nil))) => {

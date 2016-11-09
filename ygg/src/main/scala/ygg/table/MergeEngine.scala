@@ -179,7 +179,7 @@ class MergeEngine {
 
         val emission = Slice(
           finishedSize,
-          EagerColumnMap(
+          ColumnMap.Eager(
             (completeSlices.flatMap(_.columns.fields) ++ prefixes.flatMap(_.columns.fields)).groupBy(_._1).toVector map {
               case (ref, Seq(c)) => c
               case (ref, columns) => ref -> ArraySetColumn(ref.ctype, columns.map(_._2).toArray)

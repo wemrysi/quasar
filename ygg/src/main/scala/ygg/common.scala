@@ -16,12 +16,11 @@
 
 package ygg
 
-import scalaz._, Scalaz._, Ordering._
+import scalaz._
 import ygg.data._
 import java.io.{ ByteArrayOutputStream, BufferedInputStream }
 import java.nio.file._
 import java.lang.Comparable
-import java.math.MathContext.UNLIMITED
 
 package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases {
   private val InputStreamBufferSize = 8192
@@ -71,7 +70,7 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
     value
   }
 
-  object decimal extends DecimalConstructors(UNLIMITED)
+  object decimal extends DecimalConstructors(java.math.MathContext.UNLIMITED)
 
   implicit class PairOfOps[A](private val self: PairOf[A]) {
     def mapBoth[B](f: A => B): PairOf[B] = f(self._1) -> f(self._2)
@@ -110,6 +109,7 @@ package object common extends quasar.Predef with pkg.PackageTime with pkg.Packag
   implicit def bigDecimalOrder: Ord[BigDecimal]                             = Ord order ((x, y) => Cmp(x compare y))
 
   implicit class ScalazOrderOps[A](private val ord: Ord[A]) {
+    import Scalaz._, Ordering._
     private implicit def ordering: Ord[A] = ord
     def eqv(x: A, y: A): Boolean  = (x ?|? y) === EQ
     def lt(x: A, y: A): Boolean   = (x ?|? y) === LT

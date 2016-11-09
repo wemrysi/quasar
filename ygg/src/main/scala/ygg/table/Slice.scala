@@ -125,7 +125,7 @@ object Slice {
     }
 
     val (refs, size) = buildColArrays(values, Map(), 0)
-    Slice(size, EagerColumnMap(refs.toVector))
+    Slice(size, ColumnMap.Eager(refs.toVector))
   }
 
   /**
