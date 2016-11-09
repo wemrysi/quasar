@@ -92,7 +92,7 @@ trait TableCompanion[Table] extends TableConfig {
     */
   private[table] def buildSubSlice(sliceIndex: SliceIndex, rows: ArrayIntList): Slice =
     if (rows.isEmpty)
-      Slice.empty
+      Slice.empty()
     else
       sliceIndex.valueSlice.remap(rows)
 

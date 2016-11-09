@@ -57,7 +57,7 @@ object TableData extends TableCompanion[TableData] {
   final case class Internal(slice: Slice)                    extends TableData
   final case class Projections(underlying: T, proj: ProjMap) extends TableData
 
-  def empty: T                                      = new Internal(Slice.empty)
+  def empty: T                                      = new Internal(Slice.empty())
   def fromSlices(slices: NeedSlices, size: Size): T = new External(slices, size)
 
   def sizeOf(table: T): Size = table match {

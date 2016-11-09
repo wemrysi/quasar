@@ -83,7 +83,7 @@ class SliceSpec extends quasar.Qspec {
       implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))
 
       prop { fullSlices: List[Slice] =>
-        val slices = fullSlices map (s => if (randomBool) s else Slice.empty)
+        val slices = fullSlices map (s => if (randomBool) s else Slice.empty())
         val slice  = Slice.concat(slices)
 
         toCValues(slice) must_== fakeConcat(slices)

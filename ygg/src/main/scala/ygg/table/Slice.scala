@@ -29,14 +29,14 @@ final class DerefSlice(source: Slice, derefBy: Int =?> CPathNode) extends Slice 
   val columns = source dereferencedColumns derefBy
 }
 
-object EmptySlice {
-  def unapply(x: Slice): Boolean = x.size == 0
-}
-
 object Slice {
+  object empty {
+    def apply(): Slice             = Slice(0, columnMap())
+    def unapply(x: Slice): Boolean = x.size == 0
+  }
+
   implicit def sliceOps(s: Slice): SliceOps = new SliceOps(s)
 
-  def empty: Slice                                = apply(0, columnMap())
   def apply(size: Int, columns: ColumnMap): Slice = new DirectSlice(size, columns)
   def apply(pair: ColumnMap -> Int): Slice        = apply(pair._2, pair._1)
   def unapply(x: Slice)                           = Some(x.size -> x.columns)

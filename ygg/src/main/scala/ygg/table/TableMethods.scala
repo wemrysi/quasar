@@ -380,7 +380,7 @@ class TableMethods[Table: TableRep](val self: Table) {
     scala.Predef.assert(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
     def concat(rslices: List[Slice]): Slice = rslices.reverse match {
-      case Nil          => Slice.empty
+      case Nil          => Slice.empty()
       case slice :: Nil => slice
       case all          =>
         val result      = Slice concat all
@@ -396,7 +396,7 @@ class TableMethods[Table: TableRep](val self: Table) {
       stream.uncons flatMap {
         case None if sliceSize > 0                                   => mkYield(acc, emptyStreamT())
         case None                                                    => Need(StreamT.Done)
-        case Some((EmptySlice(), tail))                              => step(sliceSize, acc, tail) // Skip empty slices.
+        case Some((Slice.empty(), tail))                             => step(sliceSize, acc, tail) // Skip empty slices.
         case Some((head, tail)) if sliceSize + head.size < minLength => step(sliceSize + head.size, head :: acc, tail) // Keep accumulating.
         case Some((head, tail))                                      =>
           // We emit a slice, but the last slice added may fall on a stream boundary.

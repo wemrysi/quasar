@@ -153,7 +153,7 @@ object SliceIndex {
     scmMap[Int, scmSet[RValue]](),
     scmMap[(Int, RValue), ArrayIntList](),
     scmSet[Seq[RValue]](),
-    Slice.empty
+    Slice.empty()
   )
 
   /**
