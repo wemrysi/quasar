@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
 import quasar.std.StdLib._
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.mongodb.fs._
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
@@ -49,6 +50,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, _) => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
+    case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
 
     case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 

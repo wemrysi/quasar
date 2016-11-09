@@ -22,6 +22,7 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.{xs => xxs}
 
 import scala.math.Integral
+import scala.xml.Utility
 
 import eu.timepit.refined.api.Refined
 import scalaz._, Scalaz._
@@ -62,7 +63,7 @@ object syntax {
 
   final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
     def xqy: XQuery = XQuery(str)
-    def xs: XQuery = XQuery.StringLit(str)
+    def xs: XQuery = XQuery.StringLit(Utility.escape(str))
   }
 
   final implicit class XQueryIntegralOps[N](val num: N)(implicit N: Integral[N]) {

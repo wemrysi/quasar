@@ -17,7 +17,8 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Qspec, Type}, LogicalPlan._
+import quasar.{Data, Qspec, Type}
+import quasar.frontend.logicalplan._
 
 import matryoshka._
 import org.specs2.execute._
@@ -26,47 +27,11 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
 import scala.math.abs
 
-trait StdLibTestRunner {
-  def nullary(
-    prg: Fix[LogicalPlan],
-    expected: Data): Result
-
-  def unary(
-    prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-    arg: Data,
-    expected: Data): Result
-
-  def binary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data,
-    expected: Data): Result
-
-  def ternary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data, arg3: Data,
-    expected: Data): Result
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def intDomain: Gen[BigInt]
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def decDomain: Gen[BigDecimal]
-
-  /** Defines the domain of values for `Data.Str` for which the implementation is
-    * well-behaved.
-    */
-  def stringDomain: Gen[String]
-}
-
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
-  def closeTo(expected: Data): Matcher[Data] = new Matcher[Data] {
+  def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
       x == y || ((x - y).abs/(y.abs max err)).toDouble < err
 
@@ -229,12 +194,12 @@ abstract class StdLibSpec extends Qspec {
           unary(ToString(_).embed, Data.Int(x), Data.Str(x.toString))
         }
 
-        "dec" >> prop { (x: BigDecimal) =>
-          // TODO: re-parse and compare the resulting value approximately. It's
-          // not reasonable to expect a perfect match on formatted values,
-          // because of trailing zeros, round-off, and choive of notation.
-          unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
-        }
+        // TODO: re-parse and compare the resulting value approximately. It's
+        // not reasonable to expect a perfect match on formatted values,
+        // because of trailing zeros, round-off, and choive of notation.
+        // "dec" >> prop { (x: BigDecimal) =>
+        //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
+        // }
 
         // TODO: need `Arbitrary`s for all of these
         // "timestamp" >> prop { (x: Instant) =>
@@ -564,33 +529,29 @@ abstract class StdLibSpec extends Qspec {
       // TODO: ExtractTimezoneMinute
 
       "ExtractWeek" >> {
-        // NB: current implementation, which is not consistent with IsoYear
-
         "2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(0))
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(53))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(0))
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(53))
         }
-
-        // These examples illustrate the "correct", ISO-compliant behavior:
 
         "2001-02-16" >> {
           unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2001-02-16")), Data.Int(7))
-        }.pendingUntilFixed
+        }
 
         "midnight 2016-10-03" >> {
           unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
-        }.pendingUntilFixed
+        }
 
         "2005-01-01" >> {
           unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2005-01-01")), Data.Int(53))
-        }.pendingUntilFixed
+        }
 
         "midnight 2005-01-01" >> {
           unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
-        }.pendingUntilFixed
+        }
       }
 
       "ExtractYear" >> {

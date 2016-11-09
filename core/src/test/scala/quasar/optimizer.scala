@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.LogicalPlan._
+import quasar.frontend.logicalplan._
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.set._, StdLib.structural._
 
@@ -29,21 +29,21 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
 class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
-  import quasar.frontend.fixpoint.lpf
+  import quasar.frontend.fixpoint._
 
   "simplify" should {
 
     "inline trivial binding" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"), lpf.free('tmp0))) must
-        beTree(read("foo"))
+      optimizer.simplify(lpf.let('tmp0, read("foo"), lpf.free('tmp0))) must
+        beTreeEqual(read("foo"))
     }
 
     "not inline binding that's used twice" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+      optimizer.simplify(lpf.let('tmp0, read("foo"),
         makeObj(
           "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
           "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))) must
-        beTree(
+        beTreeEqual(
           lpf.let('tmp0, read("foo"),
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
@@ -51,27 +51,27 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     }
 
     "completely inline stupid lets" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"), lpf.let('tmp1, lpf.free('tmp0), lpf.free('tmp1)))) must
-        beTree(read("foo"))
+      optimizer.simplify(lpf.let('tmp0, read("foo"), lpf.let('tmp1, lpf.free('tmp0), lpf.free('tmp1)))) must
+        beTreeEqual(read("foo"))
     }
 
     "inline correct value for shadowed binding" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+      optimizer.simplify(lpf.let('tmp0, read("foo"),
         lpf.let('tmp0, read("bar"),
           makeObj(
             "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))))))) must
-        beTree(
+        beTreeEqual(
           makeObj(
             "bar" -> ObjectProject(read("bar"), lpf.constant(Data.Str("bar")))))
     }
 
     "inline a binding used once, then shadowed once" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+      optimizer.simplify(lpf.let('tmp0, read("foo"),
         ObjectProject(lpf.free('tmp0),
           lpf.let('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))))))) must
-        beTree(
+        beTreeEqual(
           lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
             makeObj(
@@ -79,13 +79,13 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     }
 
     "inline a binding used once, then shadowed twice" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("foo"),
+      optimizer.simplify(lpf.let('tmp0, read("foo"),
         ObjectProject(lpf.free('tmp0),
           lpf.let('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
               "baz" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz")))))))) must
-        beTree(
+        beTreeEqual(
           lpf.invoke(ObjectProject, Func.Input2(
             read("foo"),
             lpf.let('tmp0, read("bar"),
@@ -95,7 +95,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     }
 
     "partially inline a more interesting case" in {
-      Optimizer.simplify[Fix](lpf.let('tmp0, read("person"),
+      optimizer.simplify(lpf.let('tmp0, read("person"),
         lpf.let('tmp1,
           makeObj(
             "name" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("name")))),
@@ -106,7 +106,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
                 ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
               lpf.constant(Data.Str("foobar"))),
             lpf.free('tmp2))))) must
-        beTree(
+        beTreeEqual(
           lpf.let('tmp1,
             makeObj(
               "name" ->
@@ -121,23 +121,23 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
 
   "preferProjections" should {
     "ignore a delete with unknown shape" in {
-      Optimizer.preferProjections(
+      optimizer.preferProjections(
         DeleteField(lpf.read(file("zips")),
           lpf.constant(Data.Str("pop")))) must
-        beTree[Fix[LogicalPlan]](
+        beTreeEqual[Fix[LogicalPlan]](
           DeleteField(lpf.read(file("zips")),
             lpf.constant(Data.Str("pop"))))
     }
 
     "convert a delete after a projection" in {
-      Optimizer.preferProjections(
+      optimizer.preferProjections(
         lpf.let('meh, lpf.read(file("zips")),
           DeleteField[FLP](
             makeObj(
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
               "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
             lpf.constant(Data.Str("pop"))))) must
-      beTree(
+      beTreeEqual(
         lpf.let('meh, lpf.read(file("zips")),
           makeObj(
             "city" ->
@@ -150,8 +150,8 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
                 lpf.constant(Data.Str("city"))))))
     }
 
-    "convert a delete when the shape is hidden by a lpf.free" in {
-      Optimizer.preferProjections(
+    "convert a delete when the shape is hidden by a Free" in {
+      optimizer.preferProjections(
         lpf.let('meh, lpf.read(file("zips")),
           lpf.let('meh2,
             makeObj(
@@ -161,7 +161,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
               "orig" -> lpf.free('meh2),
               "cleaned" ->
                 DeleteField(lpf.free('meh2), lpf.constant(Data.Str("pop"))))))) must
-      beTree(
+      beTreeEqual(
         lpf.let('meh, lpf.read(file("zips")),
           lpf.let('meh2,
             makeObj(
@@ -177,23 +177,23 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
   }
 
   "Component" should {
-    implicit def componentArbitrary[A: Arbitrary]: Arbitrary[Optimizer.Component[A]] =
-      Arbitrary(Arbitrary.arbitrary[A]) ∘ (Optimizer.NeitherCond(_))
+    implicit def componentArbitrary[A: Arbitrary]: Arbitrary[Component[Fix, A]] =
+      Arbitrary(Arbitrary.arbitrary[A]) ∘ (NeitherCond(_))
 
-    implicit def ArbComponentInt: Arbitrary[Optimizer.Component[Int]] =
+    implicit def ArbComponentInt: Arbitrary[Component[Fix, Int]] =
       componentArbitrary[Int]
 
-    implicit def ArbComponentInt2Int: Arbitrary[Optimizer.Component[Int => Int]] =
+    implicit def ArbComponentInt2Int: Arbitrary[Component[Fix, Int => Int]] =
       componentArbitrary[Int => Int]
 
     // FIXME this test isn't really testing much at this point because
     // we cannot test the equality of two functions
-    implicit def EqualComponent: Equal[Optimizer.Component[Int]] = new Equal[Optimizer.Component[Int]] {
-      def equal(a1: Optimizer.Component[Int], a2: Optimizer.Component[Int]): Boolean = true
+    implicit def EqualComponent: Equal[Component[Fix, Int]] = new Equal[Component[Fix, Int]] {
+      def equal(a1: Component[Fix, Int], a2: Component[Fix, Int]): Boolean = true
     }
 
     "obey applicative laws" in {
-      applicative.laws[Optimizer.Component]
+      applicative.laws[Component[Fix, ?]]
     }
   }
 }
