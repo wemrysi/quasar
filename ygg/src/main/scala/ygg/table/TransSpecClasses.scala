@@ -38,6 +38,10 @@ package object trans {
   val `<.` = rootLeft
   val `.>` = rootRight
 
+  implicit class RootInterpolation(val sc: StringContext) {
+    def root(): TransSpec1 = `.` \ sc.parts.mkString("")
+  }
+
   def wrapField(name: String): TransSpec1                  = wrapField(name, name)
   def wrapField(name: String, as: String): TransSpec1      = WrapObject(`.` \ name, as)
   def wrapFieldLeft(name: String): TransSpec2              = wrapFieldLeft(name, name)
@@ -48,6 +52,12 @@ package object trans {
 
   def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
     OuterObjectConcat(xs map { case (name, spec) => WrapObject(spec, name) }: _*)
+
+  def equalAtField(name: String) =
+    WrapObject(Equal(`<.` \ name, `.>` \ name), name)
+
+  def concatArraysAtField(name: String) =
+    WrapObject(OuterArrayConcat(`<.` \ name, `.>` \ name), name)
 }
 
 package trans {
@@ -74,7 +84,6 @@ package trans {
     def c      = spec \ "c"
     def field  = spec \ "field"
     def foo    = spec \ "foo"
-    def foobar = spec \ "foobar"
     def id     = spec \ "id"
     def key    = spec \ "key"
     def ref    = spec \ "ref"
@@ -96,9 +105,6 @@ package trans {
 
     protected def next[A](x: This): Builder = new TransSpecBuilder(x)
 
-    def inner_++(x: This, xs: This*) = InnerObjectConcat[A](spec +: x +: xs: _*)
-    def outer_++(x: This, xs: This*) = OuterObjectConcat[A](spec +: x +: xs: _*)
-
     def mapLeaves(f: A => This)         = deepMap({ case Leaf(x) => f(x) })
     def deepMap(pf: MaybeSelf[This])    = TransSpec.deepMap(spec)(pf)
     def deepMap1(fn: CF1)               = DeepMap1(spec, fn)
@@ -119,12 +125,13 @@ package trans {
     def fromRight = spec mapSources (_ => SourceRight)
 
     def apply(index: Int): This = this \ index
-    def \(index: Int): This     = DerefArrayStatic(spec, CPathIndex(index))
-    def \(name: String): This   = DerefObjectStatic(spec, CPathField(name))
-    def \(path: CPath): This    = path.nodes.foldLeft(spec)(_ \ _)
+
+    def \(index: Int): This   = DerefArrayStatic(spec, CPathIndex(index))
+    def \(name: String): This = this \ CPath(name)
+    def \(path: CPath): This  = path.nodes.foldLeft(spec)(_ \ _)
 
     def \(node: CPathNode): This = node match {
-      case CPathField(name) => this \ name
+      case CPathField(name) => DerefObjectStatic(spec, CPathField(name))
       case CPathIndex(idx)  => this \ idx
       case CPathMeta(meta)  => ???
       case CPathArray       => ???
