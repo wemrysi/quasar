@@ -16,30 +16,34 @@
 
 package ygg.tests
 
-import ygg._, common._
+import ygg._, common._, json._
 
 class PspSpec extends TableQspec {
-  val TD = fromJson(
-    Seq(json"""{
-      "Prices": [
-        { "Product": "Potatoes", "Price": 3 },
-        { "Product": "Avocadoes", "Price": 4 },
-        { "Product": "Kiwis", "Price": 2 },
-        { "Product": "Onions", "Price": 1 },
-        { "Product": "Melons", "Price": 5 },
-        { "Product": "Oranges", "Price": 5 },
-        { "Product": "Tomatoes", "Price": 6 }
-      ],
-      "Quantities": [
-        { "Product": "Potatoes", "Quantity": 45 },
-        { "Product": "Avocadoes", "Quantity": 63 },
-        { "Product": "Kiwis", "Quantity": 19 },
-        { "Product": "Onions", "Quantity": 20 },
-        { "Product": "Melons", "Quantity": 66 },
-        { "Product": "Broccoli", "Quantity": 27 },
-        { "Product": "Squash", "Quantity": 92 }
-      ]
-    }""")
+  val Prices = fromJson(
+    jsonMany"""
+      { "Product": "Potatoes", "Price": 3 }
+      { "Product": "Avocadoes", "Price": 4 }
+      { "Product": "Kiwis", "Price": 2 }
+      { "Product": "Onions", "Price": 1 }
+      { "Product": "Melons", "Price": 5 }
+      { "Product": "Oranges", "Price": 5 }
+      { "Product": "Tomatoes", "Price": 6 }
+    """
+  )
+  val Quantities = fromJson(
+    jsonMany"""
+      { "Product": "Potatoes", "Quantity": 45 }
+      { "Product": "Avocadoes", "Quantity": 63 }
+      { "Product": "Kiwis", "Quantity": 19 }
+      { "Product": "Onions", "Quantity": 20 }
+      { "Product": "Melons", "Quantity": 66 }
+      { "Product": "Broccoli", "Quantity": 27 }
+      { "Product": "Squash", "Quantity": 92 }
+    """
+  )
+  val TD = jobject(
+    "Prices"     -> jarray(Prices.toSeq: _*),
+    "Quantities" -> jarray(Quantities.toSeq: _*)
   )
 
   // "in psp" >> {

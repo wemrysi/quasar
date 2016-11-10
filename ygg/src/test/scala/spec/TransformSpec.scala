@@ -1486,7 +1486,7 @@ class TransformSpec extends TableQspec {
 
     val sample  = SampleData(data)
     val table   = fromSample(sample)
-    val results = (table transform Scan(ID \ 'value, Scanner.Sum)).toVector
+    val results = (table transform Scan('value, Scanner.Sum)).toVector
 
     val (_, expected) = sample.data.foldLeft(BigDecimal(0) -> Vector[JValue]()) {
       case ((a, s), jv) =>

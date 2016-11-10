@@ -24,7 +24,7 @@ object Ygg {
   )
 
   def imports = """
-    import quasar._, Predef._
+    import quasar._
     import java.nio.file._
     import java.time._
     import scalaz._, Scalaz._
@@ -32,7 +32,9 @@ object Ygg {
   """.trim
 
   def yggImports = imports + "\n" + """
-    import ygg._, ygg.common._, json._, table._, trans._
+    import ygg._
+    import ygg.common.{ quasarExtensionOps => _, _ }
+    import json._, table._, trans._
     import quasar._, sql._, SemanticAnalysis._
     import ygg.repl._
     import TableData.{ fromJValues => fromJson }

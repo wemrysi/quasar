@@ -102,7 +102,7 @@ object repl {
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
       medals,
-      ID \ 'key,
+      'key,
       Some(targetTrans),
       groupId = groupId,
       GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> ID \ 'value \ 'Edition)
@@ -140,32 +140,17 @@ object repl {
     def p(): Unit                = table.dump()
     def apply(f: TransSpec1): T  = map(f)
     def map(f: TransSpec1): T    = table transform f
-    def filter(p: TransSpec1): T = map(root filter p)
-    def take(n: Long): T         = if (n <= 0L) table.companion.empty else table.takeRange(0L, n)
-    def drop(n: Long): T         = if (n <= 0L) table else table.takeRange(n, Long.MaxValue)
 
-    // def \(path: JPath): T  = path.nodes.foldLeft(table)(_ \ _)
-    // def \(path: String): T = this \ JPath(path)
-    // def \(path: Int): T    = this \ JPathIndex(path)
+    def take(n: Long): T = if (n <= 0L) table.companion.empty else table.takeRange(0L, n)
+    def drop(n: Long): T = if (n <= 0L) table else table.takeRange(n, Long.MaxValue)
 
-    // def \(node: JPathNode): T = node match {
-    //   case JPathField(name) => map(root \ name)
-    //   case JPathIndex(idx)  => map(root \ idx)
-    // }
-
-    // def where(name: String): WhereOps1 = new WhereOps1(name)
-
-    // class WhereOps1(name: String) {
-    //   def is(value: CValue): T = filter(EqualLiteral(root select name, value, invert = false))
-
-    //   // map(root select name isEqual value)
-    //   // def <(value: CNum): T = select(name) isLess value
-    // }
-
-
-    // def filterAt[A: CValueType](select: F1, literal: A): T = filter(EqualLiteral(select, literal, invert = false))
-
-    // def --(fields: Iterable[JPathField]): T = fields.foldLeft(table)(_ delete _)
+    def filterConst(spec: TransSpec1, value: CValue) = map(
+      Cond(
+        trans.Equal(spec, ConstLiteral(value, ID)),
+        ID,
+        ID \ 'ConstantFalse // XXX FIXME
+      )
+    )
   }
 }
 

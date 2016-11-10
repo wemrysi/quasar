@@ -56,7 +56,6 @@ solve 'a, 'b
 
 class GrouperSpec extends TableQspec {
   import trans._
-  import constants._
 
   private val idGen               = new AtomicIntIdSource(new GroupId(_))
   private def newGroupId: GroupId = idGen.nextId()
@@ -107,7 +106,7 @@ class GrouperSpec extends TableQspec {
     val groupId    = newGroupId
     val tab: Table = fromJson(data)
 
-    val spec = GroupingSource(tab, ID \ 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, 'value))
+    val spec = GroupingSource(tab, 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, 'value))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -157,13 +156,11 @@ class GrouperSpec extends TableQspec {
         }
     }
 
-    val groupId = newGroupId
-
-    val valueTrans =
-      InnerObjectConcat(WrapObject(ID \ 'key, Key.name), WrapObject(Map1('value, doubleF1), Value.name))
+    val groupId    = newGroupId
+    val valueTrans = InnerObjectConcat('key as "key", Map1('value, doubleF1) as "value")
 
     val tab  = fromJson(data)
-    val spec = GroupingSource(tab, ID \ 'key, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, 'value))
+    val spec = GroupingSource(tab, 'key, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, 'value))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -214,7 +211,7 @@ class GrouperSpec extends TableQspec {
     val groupId = newGroupId
 
     val tab  = fromJson(data)
-    val spec = GroupingSource(tab, ID \ 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, Map1('value, mod2)))
+    val spec = GroupingSource(tab, 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, Map1('value, mod2)))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -275,7 +272,7 @@ class GrouperSpec extends TableQspec {
 
     val spec = GroupingSource(
       table,
-      ID \ 'key,
+      'key,
       Some(ID),
       groupId,
       (    GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a")))
@@ -312,7 +309,7 @@ class GrouperSpec extends TableQspec {
 
     val spec = GroupingSource(
       table,
-      ID \ 'key,
+      'key,
       Some(ID),
       groupId,
       GroupKeySpecOr(
@@ -383,7 +380,7 @@ class GrouperSpec extends TableQspec {
 
     val spec = GroupingSource(
       table,
-      ID \ 'key,
+      'key,
       Some(ID),
       groupId,
       GroupKeySpecAnd(
@@ -424,7 +421,7 @@ class GrouperSpec extends TableQspec {
     // data where data.b = 'b | data.a = 12
     val spec = GroupingSource(
       table,
-      ID \ 'key,
+      'key,
       Some('value),
       groupId,
       GroupKeySpecOr(
@@ -480,10 +477,10 @@ class GrouperSpec extends TableQspec {
     val groupId2 = newGroupId
 
     // t1 where t1 = 'a
-    val spec1 = GroupingSource(table1, ID \ 'key, Some('value), groupId1, GroupKeySpecSource(tic_a, 'value))
+    val spec1 = GroupingSource(table1, 'key, Some('value), groupId1, GroupKeySpecSource(tic_a, 'value))
 
     // t2 where t2 = 'a
-    val spec2 = GroupingSource(table2, ID \ 'key, Some('value), groupId2, GroupKeySpecSource(tic_a, 'value))
+    val spec2 = GroupingSource(table2, 'key, Some('value), groupId2, GroupKeySpecSource(tic_a, 'value))
 
     val intersect = GroupingAlignment(DerefObjectStatic(Leaf(Source), tic_a), DerefObjectStatic(Leaf(Source), tic_a), spec1, spec2, GroupingSpec.Intersection)
 
@@ -540,7 +537,7 @@ class GrouperSpec extends TableQspec {
 
     val spec1 = GroupingSource(
       table1,
-      ID \ 'key,
+      'key,
       Some('value),
       groupId1,
       GroupKeySpecAnd(
@@ -549,7 +546,7 @@ class GrouperSpec extends TableQspec {
 
     val spec2 = GroupingSource(
       table2,
-      ID \ 'key,
+      'key,
       Some('value),
       groupId2,
       GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
@@ -633,7 +630,7 @@ class GrouperSpec extends TableQspec {
     // spec2' := spec2 where spec2.a = 'a
     val spec1 = GroupingSource(
       table1,
-      ID \ 'key,
+      'key,
       Some('value),
       groupId1,
       GroupKeySpecOr(
@@ -642,7 +639,7 @@ class GrouperSpec extends TableQspec {
 
     val spec2 = GroupingSource(
       table2,
-      ID \ 'key,
+      'key,
       Some('value),
       groupId2,
       GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
@@ -770,7 +767,7 @@ class GrouperSpec extends TableQspec {
 
     val fooSpec = GroupingSource(
       fromJson(foo.toStream),
-      ID \ 'key,
+      'key,
       Some('value),
       fooGroup,
       GroupKeySpecAnd(
@@ -779,14 +776,14 @@ class GrouperSpec extends TableQspec {
 
     val barSpec = GroupingSource(
       fromJson(bar.toStream),
-      ID \ 'key,
+      'key,
       Some('value),
       barGroup,
       GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
 
     val bazSpec = GroupingSource(
       fromJson(baz.toStream),
-      ID \ 'key,
+      'key,
       Some('value),
       bazGroup,
       GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b"))))

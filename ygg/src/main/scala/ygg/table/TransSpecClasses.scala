@@ -54,7 +54,7 @@ package object trans {
     def >>(as: String): TransSpec2 = >>() as as
   }
 
-  implicit def liftSelect1(x: Sym): TransSpec1        = ID \ x.name
+  implicit def liftSelect1(x: Sym): TransSpec1 = ID \ x.name
 
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
@@ -332,10 +332,6 @@ package trans {
     }
   }
 
-  object TransSpec1 {
-    val Id = root.spec
-  }
-
   sealed trait GroupKeySpec {
     def &&(rhs: GroupKeySpec): GroupKeySpec = GroupKeySpecAnd(this, rhs)
     def ||(rhs: GroupKeySpec): GroupKeySpec = GroupKeySpecOr(this, rhs)
@@ -379,22 +375,6 @@ package trans {
         case GroupKeySpecOr(left, right) => toVector(left) ++ toVector(right)
         case x                           => Vector(x)
       }
-    }
-  }
-
-  object constants {
-    val Key   = CPathField("key")
-    val Value = CPathField("value")
-
-    object SourceKey {
-      val Single = ('key: TransSpec1)
-      val Left   = Single.fromLeft
-      val Right  = Single.fromRight
-    }
-    object SourceValue {
-      val Single = ('value: TransSpec1)
-      val Left   = Single.fromLeft
-      val Right  = Single.fromRight
     }
   }
 }

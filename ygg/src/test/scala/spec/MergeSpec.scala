@@ -56,7 +56,7 @@ class MergeSpec extends TableQspec {
           ID,
           GroupingSource(
             bar,
-            ID \ 'key,
+            'key,
             Some(InnerObjectConcat(root delete valueField, ID \ 'value \ 'c as "value")),
             0,
             GroupKeySpecOr(
@@ -65,7 +65,7 @@ class MergeSpec extends TableQspec {
           ),
           GroupingSource(
             foo,
-            ID \ 'key,
+            'key,
             Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
             3,
             GroupKeySpecAnd(
@@ -143,7 +143,7 @@ class MergeSpec extends TableQspec {
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
         medals,
-        ID \ 'key,
+        'key,
         Some(targetTrans),
         groupId = groupId,
         GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> ID \ 'value \ 'Edition)
