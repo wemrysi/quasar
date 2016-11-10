@@ -17,10 +17,19 @@
 package ygg.table
 
 import ygg._, common._, json._
+import scala.{ Symbol => Sym }
 
 package object trans {
   type TransSpec1 = TransSpec[Source1]
   type TransSpec2 = TransSpec[Source2]
+  // type UnarySpec  = TransSpec[Source1]
+  // type BinarySpec = TransSpec[Source2]
+
+  val root      = new KVTransSpecBuilder[Source1](Leaf(Source))
+  val rootLeft  = new KVTransSpecBuilder[Source2](Leaf(SourceLeft))
+  val rootRight = new KVTransSpecBuilder[Source2](Leaf(SourceRight))
+  val dotValue  = new KVTransSpecBuilder[Source1](DerefObjectStatic(root.spec, "value"))
+  val dotKey    = new KVTransSpecBuilder[Source1](DerefObjectStatic(root.spec, "key"))
 
   def where(name: String): WhereOps1 = new WhereOps1(CPathField(name))
 
@@ -28,7 +37,14 @@ package object trans {
     def is(value: CValue) = Filter(`.` \ field, EqualLiteral(`.`, value, invert = false))
   }
 
-  implicit def liftSymbolToSelection(x: scala.Symbol): TransSpec1               = `.` \ x.name
+  def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
+    OuterObjectConcat(xs map { case (name, spec) => WrapObject(spec, name) }: _*)
+
+  def filterObject(names: String*) = OuterObjectConcat(names map (n => wrapField(n)): _*)
+
+  implicit def liftSelect1(x: Sym): TransSpec1        = `.` \ x.name
+  implicit def liftSelect2(x: (Sym, Sym)): TransSpec1 = filterObject(x._1.name, x._2.name)
+
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
   implicit def transSpecOps[A](x: TransSpec[A]): TransSpecOps[A]                = new TransSpecOps(x)
@@ -39,7 +55,11 @@ package object trans {
   val `.>` = rootRight
 
   implicit class RootInterpolation(val sc: StringContext) {
-    def root(): TransSpec1 = `.` \ sc.parts.mkString("")
+    private def str = sc.parts.mkString("")
+
+    def root(): TransSpec1      = `.` \ str
+    def rootLeft(): TransSpec2  = `<.` \ str
+    def rootRight(): TransSpec2 = `.>` \ str
   }
 
   def wrapField(name: String): TransSpec1                  = wrapField(name, name)
@@ -50,14 +70,35 @@ package object trans {
   def wrapFieldRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
   def wrapFieldBoth(name: String): TransSpec2              = WrapObject(OuterObjectConcat(`<.` \ name, `.>` \ name), name)
 
-  def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
-    OuterObjectConcat(xs map { case (name, spec) => WrapObject(spec, name) }: _*)
-
   def equalAtField(name: String) =
     WrapObject(Equal(`<.` \ name, `.>` \ name), name)
 
   def concatArraysAtField(name: String) =
     WrapObject(OuterArrayConcat(`<.` \ name, `.>` \ name), name)
+
+
+  sealed trait Selector {
+    def run: TransSpec1 = `.` \ this
+    def toVector: Vector[Selector.Atom] = this match {
+      case x: Selector.Atom   => Vector(x)
+      case Selector.Multi(xs) => xs flatMap (_.toVector)
+    }
+  }
+  object Selector {
+    sealed trait Atom extends Selector
+    final case class Index(index: Int)             extends Atom
+    final case class Field(name: String)           extends Atom
+    final case class Var(sym: Sym)                 extends Atom
+    final case class Path(cpath: CPath)            extends Atom
+    final case class Multi(sels: Vector[Selector]) extends Selector
+
+    def apply(sels: Selector*): Selector = new Multi(sels.toVector)
+  }
+
+  implicit def liftIndex(index: Int): Selector   = Selector.Index(index)
+  implicit def liftField(name: String): Selector = Selector.Field(name)
+  implicit def liftVar(sym: Sym): Selector       = Selector.Var(sym)
+  implicit def liftPath(cpath: CPath): Selector  = Selector.Path(cpath)
 }
 
 package trans {
@@ -68,15 +109,8 @@ package trans {
   final case object SourceLeft  extends Source2
   final case object SourceRight extends Source2
 
-  object root extends KVTransSpecBuilder(Leaf(Source))
-  object rootLeft extends KVTransSpecBuilder(Leaf(SourceLeft))
-  object rootRight extends KVTransSpecBuilder(Leaf(SourceRight))
-
-  object dotValue extends KVTransSpecBuilder('value)
-  object dotKey extends KVTransSpecBuilder('key)
-
-  class KVTransSpecBuilder[A](spec0: TransSpec[A]) extends TransSpecBuilder[A](spec0) {
-    def emptyArray() = ConstLiteral(CEmptyArray, spec0)
+  class KVTransSpecBuilder[A](spec: TransSpec[A]) extends TransSpecBuilder[A](spec) {
+    def emptyArray() = ConstLiteral(CEmptyArray, spec)
 
     def a      = spec \ "a"
     def b      = spec \ "b"
@@ -119,22 +153,29 @@ package trans {
     def select(name: String): This      = this \ name
     def wrapArrayValue()                = WrapArray(spec)
     def wrapObjectField(name: String)   = WrapObject(spec, name)
-    def metadata(name: String)          = DerefMetadataStatic(spec, CPathMeta(name))
+
+    def \(sel: Selector): This = sel.toVector.foldLeft(spec) {
+      case (spec, Selector.Index(index)) => DerefArrayStatic(spec, index)
+      case (spec, Selector.Field(name))  => DerefObjectStatic(spec, name)
+      case (spec, Selector.Var(sym))     => ???
+      case (spec, Selector.Path(cpath))  => cpath.nodes.foldLeft(spec)(_ \ _)
+    }
 
     def fromLeft  = spec mapSources (_ => SourceLeft)
     def fromRight = spec mapSources (_ => SourceRight)
 
     def apply(index: Int): This = this \ index
 
-    def \(index: Int): This   = DerefArrayStatic(spec, CPathIndex(index))
-    def \(name: String): This = this \ CPath(name)
-    def \(path: CPath): This  = path.nodes.foldLeft(spec)(_ \ _)
+    def @:(meta: String): This = this \ CPathMeta(meta)
+    def \(index: Int): This    = this \ CPathIndex(index)
+    def \(name: String): This  = this \ CPath(name)
+    def \(path: CPath): This   = path.nodes.foldLeft(spec)(_ \ _)
 
-    def \(node: CPathNode): This = node match {
-      case CPathField(name) => DerefObjectStatic(spec, CPathField(name))
-      case CPathIndex(idx)  => this \ idx
-      case CPathMeta(meta)  => ???
-      case CPathArray       => ???
+    def \(node: CPathNode): TransSpec[A] = node match {
+      case x: CPathField => DerefObjectStatic(spec, x)
+      case x: CPathIndex => DerefArrayStatic(spec, x)
+      case x: CPathMeta  => DerefMetadataStatic(spec, x)
+      case CPathArray    => InnerArrayConcat(spec)
     }
   }
 

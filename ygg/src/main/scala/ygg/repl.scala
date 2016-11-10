@@ -16,16 +16,50 @@
 
 package ygg
 
-import common._, macros._
-import json._, table._, trans._
+import common._, json._, table._, trans._
 import scalaz._
 import TableData.fromJValues
+import quasar.sql._
+import matryoshka.Fix
+import ygg.macros.JValueMacros
 
 object repl {
   lazy val zips100   = TableData.fromFile(new jFile("it/src/main/resources/tests/smallZips.data"))
   lazy val zips500   = TableData.fromFile(new jFile("it/src/main/resources/tests/zips500.data"))
   lazy val zips3669  = TableData.fromFile(new jFile("it/src/main/resources/tests/largeZips.data"))
   lazy val zips29353 = TableData.fromFile(new jFile("it/src/main/resources/tests/zips.data"))
+  lazy val patients  = TableData.fromJValues(
+    JParser.parseUnsafe(new jFile("macros/src/test/resources/patients-mini.json") slurpString).asArray.elements
+  )
+
+  // case Select[A](
+  //   isDistinct:  IsDistinct,
+  //   projections: List[Proj[A]],
+  //   relations:   Option[SqlRelation[A]],
+  //   filter:      Option[A],
+  //   groupBy:     Option[GroupBy[A]],
+  //   orderBy:     Option[OrderBy[A]]
+  // )
+  // case Vari[A](symbol: String)                                     =>
+  // case SetLiteral[A](exprs: List[A])                               =>
+  // case ArrayLiteral[A](exprs: List[A])                             =>
+  // case MapLiteral[A](exprs: List[(A, A)])                          =>
+  // case Splice[A](expr: Option[A])                                  =>
+  // case Binop[A](lhs: A, rhs: A, op: BinaryOperator)                =>
+  // case Unop[A](expr: A, op: UnaryOperator)                         =>
+  // case Ident[A](name: String)                                      =>
+  // case InvokeFunction[A](name: String, args: List[A])              =>
+  // case Match[A](expr: A, cases: List[Case[A]], default: Option[A]) =>
+  // case Switch[A](cases: List[Case[A]], default: Option[A])         =>
+  // case Let[A](name: String, form: A, body: A)                      =>
+  // case IntLiteral[A](v: Long)                                      =>
+  // case FloatLiteral[A](v: Double)                                  =>
+  // case StringLiteral[A](v: String)                                 =>
+  // case NullLiteral[A]()                                            =>
+  // case BoolLiteral[A](value: Boolean)                              =>
+
+  def sqlQuery(query: String): Fix[Sql] = fixParser.parse(Query(query)).toOption.get
+  def query1 = sqlQuery("SELECT owner.name, car.name from owners as owner join cars as car on car._id = owner.carId")
 
   def moduloN(n: Long) = cf.math.Mod applyr CLong(n)
   def equalsN(n: Long) = cf.std.Eq applyr CLong(n)
@@ -103,13 +137,12 @@ object repl {
   implicit def liftCNum(n: Int): CNum = CNum(BigDecimal(n))
 
   implicit class TableSelectionOps[T: TableRep](val table: T) {
-    private type F1 = trans.TransSpec[trans.Source.type]
-
-    def p(): Unit                  = table.dump()
-    def apply(f: TransSpec1): Unit = map(f).p()
-
-    def map(f: TransSpec1): T = table transform f
-    def filter(p: F1): T      = map(root filter p)
+    def p(): Unit                = table.dump()
+    def apply(f: TransSpec1): T  = map(f)
+    def map(f: TransSpec1): T    = table transform f
+    def filter(p: TransSpec1): T = map(root filter p)
+    def take(n: Long): T         = if (n <= 0L) table.companion.empty else table.takeRange(0L, n)
+    def drop(n: Long): T         = if (n <= 0L) table else table.takeRange(n, Long.MaxValue)
 
     // def \(path: JPath): T  = path.nodes.foldLeft(table)(_ \ _)
     // def \(path: String): T = this \ JPath(path)

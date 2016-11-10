@@ -227,8 +227,8 @@ trait TableCompanion[Table] extends TableConfig {
   def apply(slices: NeedSlices, size: TableSize): Table = fromSlices(slices, size)
   def apply(json: String): Table                        = fromJValues(JParser.parseManyFromString(json).fold[Seq[JValue]](throw _, x => x))
 
+  def fromFile(file: jFile): Table        = apply(file)
   def fromData(data: Vector[Data]): Table = fromJValues(data map dataToJValue)
-  def fromFile(file: jFile): Table        = fromJValues((JParser parseManyFromFile file).orThrow)
   def fromString(json: String): Table     = fromJValues(Seq(JParser parseUnsafe json))
 
   def externalize(table: Table): Table = fromSlices(slicesOf(table), sizeOf(table))

@@ -123,7 +123,7 @@ class TransformSpec extends TableQspec {
 
   private def checkTransformLeaf = checkSpecDefault(Fn.source)(identity)
   private def checkMap1          = checkSpecDefault(Fn.valueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
-  private def checkMetaDeref     = checkSpecDefault(Fn.source metadata "foo")(_ => Nil)
+  private def checkMetaDeref     = checkSpecDefault("foo" @: Fn.source)(_ => Nil)
   private def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
 
   private def sampleObject     = sample(objectSchema(_, 3))
@@ -157,7 +157,7 @@ class TransformSpec extends TableQspec {
       {"key":[3],"value":"foo"}
       {"key":[4],"value":20}
     """,
-    expected = json"""[ 12, 34.5, 31.9, { "baz": 31 }, 20 ]""".asArray.elements
+    expected = jsonMany"""12 34.5 31.9 { "baz": 31 } 20"""
   )
 
   private def testMap1CoerceToDouble: Prop = checkSpecData(
@@ -170,7 +170,7 @@ class TransformSpec extends TableQspec {
       {"key":[3],"value":"foo"}
       {"key":[4],"value":20}
     """,
-    expected = json"""[ 12, 34.5, 31.9, 20 ]""".asArray.elements
+    expected = jsonMany"""12 34.5 31.9 20"""
   )
 
   private def checkFilter = {
@@ -817,131 +817,91 @@ class TransformSpec extends TableQspec {
     }
   }
 
-  private def testInnerArrayConcatUndefined = {
-    val elements = jsonMany"""
+  private def testInnerArrayConcatUndefined: Prop = checkSpecData(
+    spec = InnerArrayConcat(WrapArray('foo), WrapArray('bar)),
+    data = jsonMany"""
       {"foo": 4, "bar": 12}
       {"foo": 5}
       {"bar": 45}
       {"foo": 7, "bar" :23, "baz": 24}
-    """
+    """,
+    expected = jsonMany"[4,12] [7,23]"
+  )
 
-    val sample   = SampleData(elements.toStream)
-    val table    = fromSample(sample)
-    val spec     = InnerArrayConcat(WrapArray('foo), WrapArray('bar))
-    val results  = toJson(table transform spec)
-    val expected = Stream(JArray(JNum(4) :: JNum(12) :: Nil), JArray(JNum(7) :: JNum(23) :: Nil))
-
-    results.copoint must_=== expected
-  }
-
-  private def testOuterArrayConcatUndefined = {
-    val data = jsonMany"""
+  private def testOuterArrayConcatUndefined: Prop = checkSpecData(
+    spec = OuterArrayConcat(WrapArray('foo), WrapArray('bar)),
+    data = jsonMany"""
       {"foo": 4, "bar": 12}
       {"foo": 5}
       {"bar": 45}
       {"foo": 7, "bar" :23, "baz": 24}
+    """,
+    expected = jsonMany"""
+      [4, 12]
+      [5]
+      [ $undef, 45 ]
+      [7, 23]
     """
-    val expected = Seq(
-      jarray(JNum(4), JNum(12)),
-      jarray(JNum(5)),
-      jarray(JUndefined, JNum(45)),
-      jarray(JNum(7), JNum(23))
-    )
-    val table = fromJson(data)
-    val spec  = OuterArrayConcat(WrapArray('foo), WrapArray('bar))
+  )
 
-    toJsonSeq(table transform spec) mustEqual expected
-  }
-
-  private def testInnerArrayConcatEmptyArray = {
-    val JArray(elements) = json"""[
-      {"foo": [], "bar": [12]},
-      {"foo": [], "bar": [12, 13]},
-      {"foo": [99], "bar": []},
-      {"foo": [99], "bar": [100, 101]},
-      {"foo": [99, 100], "bar": []},
-      {"foo": [99, 100], "bar": [102]},
-      {"foo": [], "bar": []},
-      {"foo": [88]},
-      {"foo": []},
-      {"bar": []},
-      {"bar": [77]},
-      {"foo": [7], "bar": [], "baz": 24},
-      {"foo": [3], "bar": [9], "baz": 18},
-      {"foo": [], "bar": [0], "baz": 18}
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val spec = InnerArrayConcat('foo, 'bar)
-
-    val results = toJson(table.transform(spec))
-
+  private def arrayConcatJson = jsonMany"""
+    {"foo": [], "bar": [12]}
+    {"foo": [], "bar": [12, 13]}
+    {"foo": [99], "bar": []}
+    {"foo": [99], "bar": [100, 101]}
+    {"foo": [99, 100], "bar": []}
+    {"foo": [99, 100], "bar": [102]}
+    {"foo": [], "bar": []}
+    {"foo": [88]}
+    {"foo": []}
+    {"bar": []}
+    {"bar": [77]}
+    {"foo": [7], "bar": [], "baz": 24}
+    {"foo": [3], "bar": [9], "baz": 18}
+    {"foo": [], "bar": [0], "baz": 18}
+  """
+  private def testInnerArrayConcatEmptyArray = checkSpecData(
+    spec = InnerArrayConcat('foo, 'bar),
+    data = arrayConcatJson,
     // note: slice size is 10
     // the first index of the rhs array is one after the max of the ones seen
     // in the current slice on the lhs
-    val expected: Stream[JValue] = Stream(
-      JArray(JUndefined :: JUndefined :: JNum(12) :: Nil),
-      JArray(JUndefined :: JUndefined :: JNum(12) :: JNum(13) :: Nil),
-      JArray(JNum(99) :: Nil),
-      JArray(JNum(99) :: JUndefined :: JNum(100) :: JNum(101) :: Nil),
-      JArray(JNum(99) :: JNum(100) :: Nil),
-      JArray(JNum(99) :: JNum(100) :: JNum(102) :: Nil),
-      jarray(),
-      JArray(JNum(7) :: Nil),
-      JArray(JNum(3) :: JNum(9) :: Nil),
-      JArray(JUndefined :: JNum(0) :: Nil))
-
-    results.copoint mustEqual expected
-  }
-
-  private def testOuterArrayConcatEmptyArray = {
-    val JArray(elements) = json"""[
-      {"foo": [], "bar": [12]},
-      {"foo": [], "bar": [12, 13]},
-      {"foo": [99], "bar": []},
-      {"foo": [99], "bar": [100, 101]},
-      {"foo": [99, 100], "bar": []},
-      {"foo": [99, 100], "bar": [102]},
-      {"foo": [], "bar": []},
-      {"foo": [88]},
-      {"foo": []},
-      {"bar": []},
-      {"bar": [77]},
-      {"foo": [7], "bar": [], "baz": 24},
-      {"foo": [3], "bar": [9], "baz": 18},
-      {"foo": [], "bar": [0], "baz": 18}
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val spec = OuterArrayConcat('foo, 'bar)
-
-    val results = toJson(table.transform(spec))
-
+    expected = jsonMany"""
+      [$undef,$undef,12]
+      [$undef,$undef,12,13]
+      [99]
+      [99,$undef,100,101]
+      [99,100]
+      [99,100,102]
+      []
+      [7]
+      [3,9]
+      [$undef,0]
+    """
+  )
+  private def testOuterArrayConcatEmptyArray = checkSpecData(
+    spec = OuterArrayConcat('foo, 'bar),
+    data = arrayConcatJson,
     // note: slice size is 10
     // the first index of the rhs array is one after the max of the ones seen
     // in the current slice on the lhs
-    val expected: Stream[JValue] = Stream(
-      JArray(JUndefined :: JUndefined :: JNum(12) :: Nil),
-      JArray(JUndefined :: JUndefined :: JNum(12) :: JNum(13) :: Nil),
-      JArray(JNum(99) :: Nil),
-      JArray(JNum(99) :: JUndefined :: JNum(100) :: JNum(101) :: Nil),
-      JArray(JNum(99) :: JNum(100) :: Nil),
-      JArray(JNum(99) :: JNum(100) :: JNum(102) :: Nil),
-      jarray(),
-      JArray(JNum(88) :: Nil),
-      jarray(),
-      jarray(),
-      JArray(JUndefined :: JNum(77) :: Nil),
-      JArray(JNum(7) :: Nil),
-      JArray(JNum(3) :: JNum(9) :: Nil),
-      JArray(JUndefined :: JNum(0) :: Nil))
-
-    results.copoint mustEqual expected
-  }
+    expected = jsonMany"""
+      [$undef,$undef,12]
+      [$undef,$undef,12,13]
+      [99]
+      [99,$undef,100,101]
+      [99,100]
+      [99,100,102]
+      []
+      [88]
+      []
+      []
+      [$undef,77]
+      [7]
+      [3,9]
+      [$undef,0]
+    """
+  )
 
   private def testInnerArrayConcatLeftEmpty = {
     val JArray(elements) = json"""[

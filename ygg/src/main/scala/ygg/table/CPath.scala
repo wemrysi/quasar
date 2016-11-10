@@ -27,10 +27,11 @@ private[table] final case class CPathClass(nodes: Vec[CPathNode]) extends CPath 
 }
 
 object CPath {
-  private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
-  private val IndexPattern = """^\[(\d+)\]$""".r
+  private val PathPattern      = """\.|(?=\[\d+\])|(?=\[\*\])""".r
+  private val IndexPattern     = """^\[(\d+)\]$""".r
+  private val ArrayDerefSyntax = "[*]"
 
-  val Identity = CPath()
+  val Identity  = CPath()
 
   type AndValue = CPath -> CValue
 
@@ -45,7 +46,7 @@ object CPath {
     def parse0(segments: Vec[String], acc: Vec[CPathNode]): Vec[CPathNode] = segments match {
       case Vec()                             => acc
       case head +: tail if head.trim.isEmpty => parse0(tail, acc)
-      case "[*]" +: tail                     => parse0(tail, CPathArray +: acc)
+      case ArrayDerefSyntax +: tail          => parse0(tail, CPathArray +: acc)
       case IndexPattern(index) +: tail       => parse0(tail, CPathIndex(index.toInt) +: acc)
       case name +: tail                      => parse0(tail, CPathField(name) +: acc)
     }

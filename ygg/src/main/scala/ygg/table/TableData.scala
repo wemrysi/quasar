@@ -20,14 +20,6 @@ import ygg._, common._, json._
 import trans._
 import scalaz._
 
-// trait TableRep[T] {
-//   def companion: TableCompanion[T]
-// }
-// object TableRep {
-//   def apply[T](implicit z: TableRep[T]): TableRep[T] = z
-//   def make[T](c: TableCompanion[T]): TableRep[T] = new TableRep[T] { def companion = c }
-// }
-
 sealed trait TableData extends Product with Serializable {
   def self: TableData           = this
   def companion: TableData.type = TableData
