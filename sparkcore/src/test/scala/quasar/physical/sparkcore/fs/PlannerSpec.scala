@@ -516,7 +516,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
                   JoinDir.Left.name ->  Data.Null,
-                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(40)), ("country" -> Data.Str("US"))))
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
