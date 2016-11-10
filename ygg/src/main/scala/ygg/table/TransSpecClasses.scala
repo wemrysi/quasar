@@ -42,12 +42,14 @@ package object trans {
     OuterObjectConcat(names map (ID \ _): _*)
 
   implicit class TransSymOps(private val self: Sym) {
-    def as(as: String): TransSpec1 = ID \ self.name as as
-    def at(idx: Int): TransSpec1   = ID \ self.name at idx
+    def as(as: String): TransSpec1 = <> as as
+    def at(idx: Int): TransSpec1   = <> at idx
 
+    def <>(): TransSpec1 = ID \ self.name
     def <<(): TransSpec2 = ID_L \ self.name
     def >>(): TransSpec2 = ID_R \ self.name
 
+    def <>(as: String): TransSpec1 = <>() as as
     def <<(as: String): TransSpec2 = <<() as as
     def >>(as: String): TransSpec2 = >>() as as
   }
@@ -119,6 +121,8 @@ package trans {
   class TransSpecBuilder[A](val spec: TransSpec[A]) {
     type This    = TransSpec[A]
     type Builder = TransSpecBuilder[A]
+
+    def unapply(x: TransSpec[_]): Boolean = x == spec
 
     def dyn: TransSpecDynamic[A] = new TransSpecDynamic[A](spec)
 

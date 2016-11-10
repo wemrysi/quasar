@@ -44,7 +44,7 @@ class SampleSpec extends TableQspec {
     val data  = SampleData(simpleData)
     val table = fromSample(data)
 
-    table.sample(15, Seq(TransSpec1.Id, TransSpec1.Id)).copoint.toList must beLike {
+    table.sample(15, Seq(ID, ID)).copoint.toList must beLike {
       case s1 :: s2 :: Nil =>
         val result1 = toJson(s1).copoint
         val result2 = toJson(s2).copoint
@@ -82,7 +82,7 @@ class SampleSpec extends TableQspec {
 
   private def testLargeSampleSize = {
     val data = SampleData(simpleData)
-    fromSample(data).sample(1000, Seq(TransSpec1.Id)).copoint.toList must beLike {
+    fromSample(data).sample(1000, Seq(ID)).copoint.toList must beLike {
       case s :: Nil =>
         val result = toJson(s).copoint
         result must have size (100)
@@ -91,7 +91,7 @@ class SampleSpec extends TableQspec {
 
   private def test0SampleSize = {
     val data = SampleData(simpleData)
-    fromSample(data).sample(0, Seq(TransSpec1.Id)).copoint.toList must beLike {
+    fromSample(data).sample(0, Seq(ID)).copoint.toList must beLike {
       case s :: Nil =>
         val result = toJson(s).copoint
         result must have size (0)

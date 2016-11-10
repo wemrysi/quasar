@@ -52,7 +52,7 @@ object MergeTable {
     }
     yield {
       import source._
-      TableIndex.createFromTable[T](table, disjunctGroupKeyTransSpecs, targetTrans.getOrElse(TransSpec1.Id)).map { index =>
+      TableIndex.createFromTable[T](table, disjunctGroupKeyTransSpecs, targetTrans.getOrElse(ID)).map { index =>
         IndexedSource(groupId, index, groupKeyProjections.map(_._1))
       }
     }).sequence.flatMap { sourceKeys =>

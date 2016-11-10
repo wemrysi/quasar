@@ -77,7 +77,7 @@ class CogroupSpec extends TableQspec {
       ID,
       ID,
       OuterObjectConcat(
-        'key.<<,
+        'key << "key",
         OuterObjectConcat(specs: _*)
       )
     )

@@ -75,7 +75,7 @@ final case class GroupingAlignment[T: TableRep](
 
 object GroupingAlignment {
   def intersect[T: TableRep](l: GroupingSpec[T], r: GroupingSpec[T]): GroupingAlignment[T] =
-    GroupingAlignment(TransSpec1.Id, TransSpec1.Id, l, r, GroupingSpec.Intersection)
+    GroupingAlignment(ID, ID, l, r, GroupingSpec.Intersection)
 }
 
 sealed trait TableSize {

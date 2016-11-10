@@ -52,8 +52,8 @@ class MergeSpec extends TableQspec {
 
       val grouping =
         GroupingAlignment(
-          TransSpec1.Id,
-          TransSpec1.Id,
+          ID,
+          ID,
           GroupingSource(
             bar,
             ID \ 'key,

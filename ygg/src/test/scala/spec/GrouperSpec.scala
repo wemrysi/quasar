@@ -107,7 +107,7 @@ class GrouperSpec extends TableQspec {
     val groupId    = newGroupId
     val tab: Table = fromJson(data)
 
-    val spec = GroupingSource(tab, ID \ 'key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, 'value))
+    val spec = GroupingSource(tab, ID \ 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, 'value))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -214,7 +214,7 @@ class GrouperSpec extends TableQspec {
     val groupId = newGroupId
 
     val tab  = fromJson(data)
-    val spec = GroupingSource(tab, ID \ 'key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1('value, mod2)))
+    val spec = GroupingSource(tab, ID \ 'key, Some(ID), groupId, GroupKeySpecSource(tic_a, Map1('value, mod2)))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -276,7 +276,7 @@ class GrouperSpec extends TableQspec {
     val spec = GroupingSource(
       table,
       ID \ 'key,
-      Some(TransSpec1.Id),
+      Some(ID),
       groupId,
       (    GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a")))
         && GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))
@@ -313,7 +313,7 @@ class GrouperSpec extends TableQspec {
     val spec = GroupingSource(
       table,
       ID \ 'key,
-      Some(TransSpec1.Id),
+      Some(ID),
       groupId,
       GroupKeySpecOr(
         GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))),
@@ -384,7 +384,7 @@ class GrouperSpec extends TableQspec {
     val spec = GroupingSource(
       table,
       ID \ 'key,
-      Some(TransSpec1.Id),
+      Some(ID),
       groupId,
       GroupKeySpecAnd(
         GroupKeySpecSource(

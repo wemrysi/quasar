@@ -494,7 +494,7 @@ class TableMethods[Table: TableRep](val self: Table) {
       WrapObject(root, "1")
     )
 
-    this.transform(keyTrans).compact(TransSpec1.Id).slices.uncons map {
+    this.transform(keyTrans).compact(ID).slices.uncons map {
       case Some((head, tail)) => makeTable(stepPartition(head, 0, tail), UnknownSize)
       case None               => companion.empty
     }

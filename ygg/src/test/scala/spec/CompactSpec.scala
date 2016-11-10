@@ -61,11 +61,11 @@ class CompactSpec extends TableQspec {
   }
 
   private def extractPath(spec: TransSpec1): Option[CPath] = spec match {
-    case DerefObjectStatic(TransSpec1.Id, f) => Some(f)
-    case DerefObjectStatic(lhs, f)           => extractPath(lhs).map(_ \ f)
-    case DerefArrayStatic(TransSpec1.Id, i)  => Some(i)
-    case DerefArrayStatic(lhs, f)            => extractPath(lhs).map(_ \ f)
-    case _                                   => None
+    case DerefObjectStatic(ID(), f) => Some(f)
+    case DerefObjectStatic(lhs, f)  => extractPath(lhs).map(_ \ f)
+    case DerefArrayStatic(ID(), i)  => Some(i)
+    case DerefArrayStatic(lhs, f)   => extractPath(lhs).map(_ \ f)
+    case _                          => None
   }
 
   private def chooseColumn(cTable: Table): TransSpec1 = {

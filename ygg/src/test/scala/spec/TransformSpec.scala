@@ -257,7 +257,7 @@ class TransformSpec extends TableQspec {
       {"value1":{"foo":-188},"value2":77}
       {"value1":3,"value2":77}
     """,
-    expected = Seq(JNum(80))
+    expected = jsonMany"80"
   )
 
   private def checkEqualSelf = {
@@ -516,10 +516,8 @@ class TransformSpec extends TableQspec {
     }
 
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        EqualLiteral(ID \ 'value \ 'value1, CLong(0), true)
-      })
+      val table   = fromSample(sample)
+      val results = toJson(table transform EqualLiteral(ID \ 'value \ 'value1, CLong(0), true))
 
       val expected = sample.data flatMap { jv =>
         jv \ "value" \ "value1" match {

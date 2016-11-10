@@ -42,27 +42,31 @@ class ConcatSpec extends TableQspec {
     val tree: CPathTree[Int] = RootNode(
       Seq(
         FieldNode(
-          CPathField("bar"),
+          "bar",
           Seq(
-            IndexNode(CPathIndex(0), Seq(LeafNode(4))),
-            IndexNode(CPathIndex(1), Seq(FieldNode(CPathField("baz"), Seq(LeafNode(6))))),
-            IndexNode(CPathIndex(2), Seq(LeafNode(2))))),
-        FieldNode(CPathField("foo"), Seq(LeafNode(0)))))
+            IndexNode(0, Seq(LeafNode(4))),
+            IndexNode(1, Seq(FieldNode("baz", Seq(LeafNode(6))))),
+            IndexNode(2, Seq(LeafNode(2)))
+          )
+        ),
+        FieldNode("foo", Seq(LeafNode(0)))
+      )
+    )
 
-    val result = TransSpec.concatChildren(tree, Leaf(Source))
+    val result = TransSpec.concatChildren(tree, ID)
 
     val expected = InnerObjectConcat(
       WrapObject(
         InnerArrayConcat(
           InnerArrayConcat(
-            ID at 4,
-            ID at 6 as "baz" asArray
+            WrapArray(ID \ 4),
+            WrapArray(ID \ 6 as "baz")
           ),
-          WrapArray(root(2))
+          WrapArray(ID \ 2)
         ),
         "bar"
       ),
-      WrapObject(root(0), "foo")
+      ID \ 0 as "foo"
     )
 
     result mustEqual expected
