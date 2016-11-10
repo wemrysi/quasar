@@ -31,7 +31,7 @@ object CValueGenerators {
 }
 
 trait CValueGenerators {
-  def genCogroupData: Gen[CogroupData] = (
+  def genCogroupData: Gen[PairOf[Seq[JValue]]] = (
     for {
       depth           <- choose(1, 2)
       cschema         <- Gen.oneOf(arraySchema(depth, 2), objectSchema(depth, 2))
@@ -44,7 +44,7 @@ trait CValueGenerators {
           (toRecord(ids, assemble(d1)), toRecord(ids, assemble(d2)))
       } unzip
 
-      (SampleData(l.sortBy(_ \ "key").toStream), SampleData(r.sortBy(_ \ "key").toStream))
+      (l.sortBy(_ \ "key"), r.sortBy(_ \ "key"))
     }
   )
 

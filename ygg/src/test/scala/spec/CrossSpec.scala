@@ -16,25 +16,25 @@
 
 package ygg.tests
 
-import scalaz._, Scalaz._
+import scalaz._
 import ygg._, common._, json._, table._
 
 class CrossSpec extends TableQspec {
   import SampleData._
   import trans._
 
-  private implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
+  private implicit def cogroupData = Arbitrary(genCogroupData)
 
   "in cross" >> {
     "perform a simple cartesian"                              in testSimpleCross
     "split a cross that would exceed maxSliceSize boundaries" in testCrossLarge
     "cross across slice boundaries on one side"               in testCrossSingles
-    "survive scalacheck"                                      in prop((cd: CogroupData) => testCross(cd._1, cd._2))
+    "survive scalacheck"                                      in prop((cd: PairOf[Seq[JValue]]) => testCross(cd._1, cd._2))
   }
 
-  private def testCross(l: SampleData, r: SampleData) = {
-    val ltable = fromSample(l)
-    val rtable = fromSample(r)
+  private def testCross(l: Seq[JValue], r: Seq[JValue]) = {
+    val ltable = fromJson(l)
+    val rtable = fromJson(r)
 
     def removeUndefined(jv: JValue): JValue = jv match {
       case JObject.Fields(jfields) => JObject(jfields collect { case JField(s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
@@ -42,20 +42,20 @@ class CrossSpec extends TableQspec {
       case v                       => v
     }
 
-    val expected: Stream[JValue] = (
-      for (lv <- l.data; rv <- r.data) yield
+    val expected: Seq[JValue] = (
+      for (lv <- l; rv <- r) yield
         jobject("left" -> removeUndefined(lv), "right" -> removeUndefined(rv))
     )
     val result = ltable.cross(rtable)(
       InnerObjectConcat(WrapObject(Leaf(SourceLeft), "left"), WrapObject(Leaf(SourceRight), "right"))
     )
 
-    toJson(result).copoint must_=== expected
+    result.toSeq must_=== expected
   }
 
   private def testSimpleCross = {
-    val s1 = SampleData(Stream(toRecord(Array(1), json"""{"a":[]}"""), toRecord(Array(2), json"""{"a":[]}""")))
-    val s2 = SampleData(Stream(toRecord(Array(1), json"""{"b":0}"""), toRecord(Array(2), json"""{"b":1}""")))
+    val s1 = Stream(toRecord(Array(1), json"""{"a":[]}"""), toRecord(Array(2), json"""{"a":[]}"""))
+    val s2 = Stream(toRecord(Array(1), json"""{"b":0}"""), toRecord(Array(2), json"""{"b":1}"""))
 
     testCross(s1, s2)
   }
@@ -75,22 +75,21 @@ class CrossSpec extends TableQspec {
   }
 
   private def testCrossSingles = {
-    val s1 = SampleData(
-      Stream(
-        toRecord(Array(1), json"""{ "a": 1 }"""),
-        toRecord(Array(2), json"""{ "a": 2 }"""),
-        toRecord(Array(3), json"""{ "a": 3 }"""),
-        toRecord(Array(4), json"""{ "a": 4 }"""),
-        toRecord(Array(5), json"""{ "a": 5 }"""),
-        toRecord(Array(6), json"""{ "a": 6 }"""),
-        toRecord(Array(7), json"""{ "a": 7 }"""),
-        toRecord(Array(8), json"""{ "a": 8 }"""),
-        toRecord(Array(9), json"""{ "a": 9 }"""),
-        toRecord(Array(10), json"""{ "a": 10 }"""),
-        toRecord(Array(11), json"""{ "a": 11 }""")
-        ))
+    val s1 = Stream(
+      toRecord(Array(1), json"""{ "a": 1 }"""),
+      toRecord(Array(2), json"""{ "a": 2 }"""),
+      toRecord(Array(3), json"""{ "a": 3 }"""),
+      toRecord(Array(4), json"""{ "a": 4 }"""),
+      toRecord(Array(5), json"""{ "a": 5 }"""),
+      toRecord(Array(6), json"""{ "a": 6 }"""),
+      toRecord(Array(7), json"""{ "a": 7 }"""),
+      toRecord(Array(8), json"""{ "a": 8 }"""),
+      toRecord(Array(9), json"""{ "a": 9 }"""),
+      toRecord(Array(10), json"""{ "a": 10 }"""),
+      toRecord(Array(11), json"""{ "a": 11 }""")
+    )
 
-    val s2 = SampleData(Stream(toRecord(Array(1), json"""{"b":1}"""), toRecord(Array(2), json"""{"b":2}""")))
+    val s2 = Stream(toRecord(Array(1), json"""{"b":1}"""), toRecord(Array(2), json"""{"b":2}"""))
 
     testCross(s1, s2)
     testCross(s2, s1)

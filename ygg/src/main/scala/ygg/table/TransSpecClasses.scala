@@ -42,6 +42,16 @@ package object trans {
 
   def filterObject(names: String*) = OuterObjectConcat(names map (n => wrapField(n)): _*)
 
+  implicit class TransSymOps(private val self: Sym) {
+    def as(as: String): TransSpec1 = wrapField(self.name, as)
+
+    def <<(): TransSpec2 = rootLeft \ self.name
+    def >>(): TransSpec2 = rootRight \ self.name
+
+    def <<(as: String): TransSpec2 = wrapFieldLeft(self.name, as)
+    def >>(as: String): TransSpec2 = wrapFieldRight(self.name, as)
+  }
+
   implicit def liftSelect1(x: Sym): TransSpec1        = `.` \ x.name
   implicit def liftSelect2(x: (Sym, Sym)): TransSpec1 = filterObject(x._1.name, x._2.name)
 
@@ -53,6 +63,7 @@ package object trans {
   val `.`  = root
   val `<.` = rootLeft
   val `.>` = rootRight
+  val ID   = root
 
   implicit class RootInterpolation(val sc: StringContext) {
     private def str = sc.parts.mkString("")
@@ -154,6 +165,8 @@ package trans {
     def wrapArrayValue()                = WrapArray(spec)
     def wrapObjectField(name: String)   = WrapObject(spec, name)
 
+    def as(name: String) = WrapObject(spec, name)
+
     def \(sel: Selector): This = sel.toVector.foldLeft(spec) {
       case (spec, Selector.Index(index)) => DerefArrayStatic(spec, index)
       case (spec, Selector.Field(name))  => DerefObjectStatic(spec, name)
@@ -171,7 +184,7 @@ package trans {
     def \(name: String): This  = this \ CPath(name)
     def \(path: CPath): This   = path.nodes.foldLeft(spec)(_ \ _)
 
-    def \(node: CPathNode): TransSpec[A] = node match {
+    def \(node: CPathNode): This = node match {
       case x: CPathField => DerefObjectStatic(spec, x)
       case x: CPathIndex => DerefArrayStatic(spec, x)
       case x: CPathMeta  => DerefMetadataStatic(spec, x)

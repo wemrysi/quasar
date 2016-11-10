@@ -25,7 +25,7 @@ class CogroupSpec extends TableQspec {
   import trans._, constants._
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
-  implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
+  private implicit def cogroupData = Arbitrary(genCogroupData)
 
   "in cogroup" >> {
     "perform a trivial cogroup"                                                in testTrivialCogroup(identity[Table])
@@ -70,7 +70,7 @@ class CogroupSpec extends TableQspec {
   }
 
   private def cogroupKV(left: Table, right: Table)(specs: TransSpec2*): Table = {
-    left.cogroup(`.` \ "key", `.` \ "key", right)(
+    left.cogroup('key, 'key, right)(
       `.`,
       `.`,
       OuterObjectConcat(
@@ -80,21 +80,21 @@ class CogroupSpec extends TableQspec {
     )
   }
 
-  private def testCogroup(pair: CogroupData) = {
+  private def testCogroup(pair: PairOf[Seq[JValue]]) = {
     val (l, r)   = pair
-    val ltable   = fromSample(l)
-    val rtable   = fromSample(r)
+    val ltable   = fromJson(l)
+    val rtable   = fromJson(r)
     val keyOrder = Ord[JValue].contramap((_: JValue) \ "key")
 
-    val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
+    val expected = computeCogroup(l.toStream, r.toStream, Stream())(keyOrder) map {
       case Left3(jv)           => jv
       case Middle3((jv1, jv2)) => jobject("key" -> (jv1 \ "key"), "valueLeft" -> (jv1 \ "value"), "valueRight" -> (jv2 \ "value"))
       case Right3(jv)          => jv
     }
 
     val result: Table = cogroupKV(ltable, rtable)(
-      wrapFieldLeft("value", as = "valueLeft"),
-      wrapFieldRight("value", as = "valueRight")
+      'value << "valueLeft",
+      'value >> "valueRight"
     )
 
     result.toSeq must_=== expected
@@ -109,7 +109,7 @@ class CogroupSpec extends TableQspec {
     val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
     val result: Table = cogroupKV(ltable, rtable)(
-      WrapObject(OuterArrayConcat(`<.` \ "value", SourceValue.Right), "value")
+      WrapObject(OuterArrayConcat('value.<<, SourceValue.Right), "value")
     )
 
     toJsonSeq(f(result)) must_=== expected
@@ -228,102 +228,97 @@ class CogroupSpec extends TableQspec {
   }
 
   private def testCogroupPathology1 = {
-    val s1 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "a":[] }""")))
-    val s2 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "b":0 }""")))
+    val s1 = jsonMany"""{"key":[1,1,1],"value":{"a":[]}}"""
+    val s2 = jsonMany"""{"key":[1,1,1],"value":{"b":0}}"""
 
     testCogroup(s1 -> s2)
   }
 
   private def testCogroupSliceBoundaries = {
-    val s1 = SampleData(
-      Stream(
-        toRecord(Array(1), json"""{ "ruoh5A25Jaxa":-1.0 }"""),
-        toRecord(Array(2), json"""{ "ruoh5A25Jaxa":-2.735023101944097E37 }"""),
-        toRecord(Array(3), json"""{ "ruoh5A25Jaxa":2.12274644226519E38 }"""),
-        toRecord(Array(4), json"""{ "ruoh5A25Jaxa":1.085656944502855E38 }"""),
-        toRecord(Array(5), json"""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }"""),
-        toRecord(Array(6), json"""{ "ruoh5A25Jaxa":-1.0 }"""),
-        toRecord(Array(7), json"""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }"""),
-        toRecord(Array(8), json"""{ "ruoh5A25Jaxa":2.4225587899613125E38 }"""),
-        toRecord(Array(9), json"""{ "ruoh5A25Jaxa":-3.078101074510345E38 }"""),
-        toRecord(Array(10), json"""{ "ruoh5A25Jaxa":0.0 }"""),
-        toRecord(Array(11), json"""{ "ruoh5A25Jaxa":-2.049657967962047E38 }""")
-      ))
-
-    val s2 = SampleData(
-      Stream(
-        toRecord(Array(1), json"""{ "mbsn8ya":-629648309198725501 }"""),
-        toRecord(Array(2), json"""{ "mbsn8ya":-1642079669762657762 }"""),
-        toRecord(Array(3), json"""{ "mbsn8ya":-75462980385303464 }"""),
-        toRecord(Array(4), json"""{ "mbsn8ya":-4407493923710190330 }"""),
-        toRecord(Array(5), json"""{ "mbsn8ya":4611686018427387903 }"""),
-        toRecord(Array(6), json"""{ "mbsn8ya":-4374327062386862583 }"""),
-        toRecord(Array(7), json"""{ "mbsn8ya":1920642186250198767 }"""),
-        toRecord(Array(8), json"""{ "mbsn8ya":1 }"""),
-        toRecord(Array(9), json"""{ "mbsn8ya":0 }"""),
-        toRecord(Array(10), json"""{ "mbsn8ya":1 }"""),
-        toRecord(Array(11), json"""{ "mbsn8ya":758880641626989193 }""")
-      ))
+    val s1 = jsonMany"""
+      {"key":[1],"value":{"ruoh5A25Jaxa":-1.0}}
+      {"key":[2],"value":{"ruoh5A25Jaxa":-2.735023101944097E+37}}
+      {"key":[3],"value":{"ruoh5A25Jaxa":2.12274644226519E+38}}
+      {"key":[4],"value":{"ruoh5A25Jaxa":1.085656944502855E+38}}
+      {"key":[5],"value":{"ruoh5A25Jaxa":-3.4028234663852886E+38}}
+      {"key":[6],"value":{"ruoh5A25Jaxa":-1.0}}
+      {"key":[7],"value":{"ruoh5A25Jaxa":-3.4028234663852886E+38}}
+      {"key":[8],"value":{"ruoh5A25Jaxa":2.4225587899613125E+38}}
+      {"key":[9],"value":{"ruoh5A25Jaxa":-3.078101074510345E+38}}
+      {"key":[10],"value":{"ruoh5A25Jaxa":0.0}}
+      {"key":[11],"value":{"ruoh5A25Jaxa":-2.049657967962047E+38}}
+    """
+    val s2 = jsonMany"""
+      {"key":[1],"value":{"mbsn8ya":-629648309198725501}}
+      {"key":[2],"value":{"mbsn8ya":-1642079669762657762}}
+      {"key":[3],"value":{"mbsn8ya":-75462980385303464}}
+      {"key":[4],"value":{"mbsn8ya":-4407493923710190330}}
+      {"key":[5],"value":{"mbsn8ya":4611686018427387903}}
+      {"key":[6],"value":{"mbsn8ya":-4374327062386862583}}
+      {"key":[7],"value":{"mbsn8ya":1920642186250198767}}
+      {"key":[8],"value":{"mbsn8ya":1}}
+      {"key":[9],"value":{"mbsn8ya":0}}
+      {"key":[10],"value":{"mbsn8ya":1}}
+      {"key":[11],"value":{"mbsn8ya":758880641626989193}}
+    """
 
     testCogroup(s1 -> s2)
   }
 
   private def testCogroupPathology2 = {
-    val s1 = SampleData(
-      Stream(
-        toRecord(Array(19, 49, 71), JArray(JNum(-4611686018427387904l) :: Nil)),
-        toRecord(Array(28, 15, 27), JArray(JNum(-4611686018427387904l) :: Nil)),
-        toRecord(Array(33, 11, 79), JArray(JNum(-1330862996622233403l) :: Nil)),
-        toRecord(Array(38, 9, 3), JArray(JNum(483746605685223474l) :: Nil)),
-        toRecord(Array(44, 75, 87), JArray(JNum(4611686018427387903l) :: Nil)),
-        toRecord(Array(46, 47, 10), JArray(JNum(-4611686018427387904l) :: Nil)),
-        toRecord(Array(47, 17, 78), JArray(JNum(3385965380985908250l) :: Nil)),
-        toRecord(Array(47, 89, 84), JArray(JNum(-3713232335731560170l) :: Nil)),
-        toRecord(Array(48, 47, 76), JArray(JNum(4611686018427387903l) :: Nil)),
-        toRecord(Array(49, 66, 33), JArray(JNum(-1592288472435607010l) :: Nil)),
-        toRecord(Array(50, 9, 89), JArray(JNum(-3610518022153967388l) :: Nil)),
-        toRecord(Array(59, 54, 72), JArray(JNum(4178019033671378504l) :: Nil)),
-        toRecord(Array(59, 80, 38), JArray(JNum(0) :: Nil)),
-        toRecord(Array(61, 59, 15), JArray(JNum(1056424478602208129l) :: Nil)),
-        toRecord(Array(65, 34, 89), JArray(JNum(4611686018427387903l) :: Nil)),
-        toRecord(Array(73, 52, 67), JArray(JNum(-4611686018427387904l) :: Nil)),
-        toRecord(Array(74, 60, 85), JArray(JNum(-4477191148386604184l) :: Nil)),
-        toRecord(Array(76, 41, 86), JArray(JNum(-2686421995147680512l) :: Nil)),
-        toRecord(Array(77, 46, 75), JArray(JNum(-1) :: Nil)),
-        toRecord(Array(77, 65, 58), JArray(JNum(-4032275398385636682l) :: Nil)),
-        toRecord(Array(86, 50, 9), JArray(JNum(4163435383002324073l) :: Nil))
-      ))
+    val s1 = jsonMany"""
+      {"key":[19,49,71],"value":[-4611686018427387904]}
+      {"key":[28,15,27],"value":[-4611686018427387904]}
+      {"key":[33,11,79],"value":[-1330862996622233403]}
+      {"key":[38,9,3],"value":[483746605685223474]}
+      {"key":[44,75,87],"value":[4611686018427387903]}
+      {"key":[46,47,10],"value":[-4611686018427387904]}
+      {"key":[47,17,78],"value":[3385965380985908250]}
+      {"key":[47,89,84],"value":[-3713232335731560170]}
+      {"key":[48,47,76],"value":[4611686018427387903]}
+      {"key":[49,66,33],"value":[-1592288472435607010]}
+      {"key":[50,9,89],"value":[-3610518022153967388]}
+      {"key":[59,54,72],"value":[4178019033671378504]}
+      {"key":[59,80,38],"value":[0]}
+      {"key":[61,59,15],"value":[1056424478602208129]}
+      {"key":[65,34,89],"value":[4611686018427387903]}
+      {"key":[73,52,67],"value":[-4611686018427387904]}
+      {"key":[74,60,85],"value":[-4477191148386604184]}
+      {"key":[76,41,86],"value":[-2686421995147680512]}
+      {"key":[77,46,75],"value":[-1]}
+      {"key":[77,65,58],"value":[-4032275398385636682]}
+      {"key":[86,50,9],"value":[4163435383002324073]}
+    """
 
-    val s2 = SampleData(
-      Stream(
-        toRecord(Array(19, 49, 71), JArray(JUndefined :: JNum(2.2447601450142614E38) :: Nil)),
-        toRecord(Array(28, 15, 27), JArray(JUndefined :: JNum(-1.0) :: Nil)),
-        toRecord(Array(33, 11, 79), JArray(JUndefined :: JNum(-3.4028234663852886E38) :: Nil)),
-        toRecord(Array(38, 9, 3), JArray(JUndefined :: JNum(3.4028234663852886E38) :: Nil)),
-        toRecord(Array(44, 75, 87), JArray(JUndefined :: JNum(3.4028234663852886E38) :: Nil)),
-        toRecord(Array(46, 47, 10), JArray(JUndefined :: JNum(-7.090379511750481E37) :: Nil)),
-        toRecord(Array(47, 17, 78), JArray(JUndefined :: JNum(2.646265046453461E38) :: Nil)),
-        toRecord(Array(47, 89, 84), JArray(JUndefined :: JNum(0.0) :: Nil)),
-        toRecord(Array(48, 47, 76), JArray(JUndefined :: JNum(1.3605700991092947E38) :: Nil)),
-        toRecord(Array(49, 66, 33), JArray(JUndefined :: JNum(-1.4787158449349019E38) :: Nil)),
-        toRecord(Array(50, 9, 89), JArray(JUndefined :: JNum(-1.0) :: Nil)),
-        toRecord(Array(59, 54, 72), JArray(JUndefined :: JNum(-3.4028234663852886E38) :: Nil)),
-        toRecord(Array(59, 80, 38), JArray(JUndefined :: JNum(8.51654525599509E37) :: Nil)),
-        toRecord(Array(61, 59, 15), JArray(JUndefined :: JNum(3.4028234663852886E38) :: Nil)),
-        toRecord(Array(65, 34, 89), JArray(JUndefined :: JNum(-1.0) :: Nil)),
-        toRecord(Array(73, 52, 67), JArray(JUndefined :: JNum(5.692401753312787E37) :: Nil)),
-        toRecord(Array(74, 60, 85), JArray(JUndefined :: JNum(2.5390881291535566E38) :: Nil)),
-        toRecord(Array(76, 41, 86), JArray(JUndefined :: JNum(-6.05866505535721E37) :: Nil)),
-        toRecord(Array(77, 46, 75), JArray(JUndefined :: JNum(0.0) :: Nil)),
-        toRecord(Array(77, 65, 58), JArray(JUndefined :: JNum(1.0) :: Nil)),
-        toRecord(Array(86, 50, 9), JArray(JUndefined :: JNum(-3.4028234663852886E38) :: Nil))
-      ))
+    val s2 = jsonMany"""
+      {"key":[19,49,71],"value":[$undef,2.2447601450142614E+38]}
+      {"key":[28,15,27],"value":[$undef,-1.0]}
+      {"key":[33,11,79],"value":[$undef,-3.4028234663852886E+38]}
+      {"key":[38,9,3],"value":[$undef,3.4028234663852886E+38]}
+      {"key":[44,75,87],"value":[$undef,3.4028234663852886E+38]}
+      {"key":[46,47,10],"value":[$undef,-7.090379511750481E+37]}
+      {"key":[47,17,78],"value":[$undef,2.646265046453461E+38]}
+      {"key":[47,89,84],"value":[$undef,0.0]}
+      {"key":[48,47,76],"value":[$undef,1.3605700991092947E+38]}
+      {"key":[49,66,33],"value":[$undef,-1.4787158449349019E+38]}
+      {"key":[50,9,89],"value":[$undef,-1.0]}
+      {"key":[59,54,72],"value":[$undef,-3.4028234663852886E+38]}
+      {"key":[59,80,38],"value":[$undef,8.51654525599509E+37]}
+      {"key":[61,59,15],"value":[$undef,3.4028234663852886E+38]}
+      {"key":[65,34,89],"value":[$undef,-1.0]}
+      {"key":[73,52,67],"value":[$undef,5.692401753312787E+37]}
+      {"key":[74,60,85],"value":[$undef,2.5390881291535566E+38]}
+      {"key":[76,41,86],"value":[$undef,-6.05866505535721E+37]}
+      {"key":[77,46,75],"value":[$undef,0.0]}
+      {"key":[77,65,58],"value":[$undef,1.0]}
+      {"key":[86,50,9],"value":[$undef,-3.4028234663852886E+38]}
+    """
 
     testCogroup(s1 -> s2)
   }
 
   private def testCogroupPathology3 = {
-    val s1 = SampleData(jsonMany"""
+    val s1 = jsonMany"""
       { "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }
       { "value":{ "ugsrry":0.0 }, "key":[3.0] }
       { "value":{ "ugsrry":3.323617580854415E+307 }, "key":[5.0] }
@@ -336,9 +331,9 @@ class CogroupSpec extends TableQspec {
       { "value":{ "ugsrry":-5.567237049482096E+307 }, "key":[17.0] }
       { "value":{ "ugsrry":-8.988465674311579E+307 }, "key":[18.0] }
       { "value":{ "ugsrry":2.5882896341488965E+307 }, "key":[22.0] }
-    """.toStream)
+    """
 
-    val s2 = SampleData(jsonMany"""
+    val s2 = jsonMany"""
       { "value":{ "fzqJh5csbfsZqgkoi":[-1E-40146] }, "key":[2.0] }
       { "value":{ "fzqJh5csbfsZqgkoi":[-9.44770762864723688E-39073] }, "key":[3.0] }
       { "value":{ "fzqJh5csbfsZqgkoi":[2.894611552200768372E+19] }, "key":[5.0] }
@@ -351,7 +346,7 @@ class CogroupSpec extends TableQspec {
       { "value":{ "fzqJh5csbfsZqgkoi":[4.611686018427387903E+50018] }, "key":[17.0] }
       { "value":{ "fzqJh5csbfsZqgkoi":[0E+48881] }, "key":[18.0] }
       { "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }
-    """.toStream)
+    """
 
     testCogroup(s1 -> s2)
   }
@@ -375,8 +370,8 @@ class CogroupSpec extends TableQspec {
     """
 
     val result = cogroupKV(ltable, rtable)(
-      wrapFieldLeft("val", as = "left"),
-      wrapFieldRight("val", as = "right")
+      'val << "left",
+      'val >> "right"
     )
     toJsonSeq(result) must_=== expected
   }
@@ -387,10 +382,10 @@ class CogroupSpec extends TableQspec {
     val rtable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = Stream.tabulate(22)(JNum(_))
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      WrapObject(`.`, "blah!"),
-      WrapObject(`.`, "argh!"),
-      `.>` \ "value"
+    val result: Table = ltable.cogroup('key, 'key, rtable)(
+      ID as "blah!",
+      ID as "argh!",
+      'value.>>
     )
 
     toJsonSeq(result) must_=== expected
@@ -402,10 +397,10 @@ class CogroupSpec extends TableQspec {
     val rtable   = fromSample(SampleData(Stream(record)))
     val expected = Stream.tabulate(22)(JNum(_))
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      WrapObject(`.`, "blah!"),
-      WrapObject(`.`, "argh!"),
-      `<.` \ "value"
+    val result: Table = ltable.cogroup('key, 'key, rtable)(
+      ID as "blah!",
+      ID as "argh!",
+      'value.<<
     )
 
     toJsonSeq(result) must_=== expected
@@ -415,12 +410,12 @@ class CogroupSpec extends TableQspec {
     val table    = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = ( for (l  <- 0 until 22; r <- 0 until 22) yield json"""{ "left": $l, "right": $r }""" ).toStream
 
-    val result: Table = table.cogroup(`.` \ "key", `.` \ "key", table)(
-      WrapObject(`.`, "blah!"),
-      WrapObject(`.`, "argh!"),
+    val result: Table = table.cogroup('key, 'key, table)(
+      ID as "blah!",
+      ID as "argh!",
       InnerObjectConcat(
-        WrapObject(`.>` \ "value", "right"),
-        WrapObject(`<.` \ "value", "left")
+        'value >> "right",
+        'value << "left"
       )
     )
 
@@ -432,12 +427,12 @@ class CogroupSpec extends TableQspec {
     val rtable   = fromJson(jsonMany"""{"key":"Bob", "value":50} {"key":"Charlie", "value":60}""")
     val expected = Seq.tabulate(12)(i => json"""{ "left": $i, "right": 50 }""") :+ json"""{ "right": 60 }"""
 
-    val result: Table = ltable.cogroup(`.` \ "key", `.` \ "key", rtable)(
-      WrapObject(`.` \ "value", "left"),
-      WrapObject(`.` \ "value", "right"),
+    val result: Table = ltable.cogroup('key, 'key, rtable)(
+      'value as "left",
+      'value as "right",
       InnerObjectConcat(
-        WrapObject(`.>` \ "value", "right"),
-        WrapObject(`<.` \ "value", "left")
+        'value >> "right",
+        'value << "left"
       )
     )
 
