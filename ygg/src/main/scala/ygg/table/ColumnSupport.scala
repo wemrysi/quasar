@@ -77,6 +77,27 @@ class Map1Column(c: Column) { this: Column =>
 class Map2ColumnZZZ(c1: BoolColumn, c2: BoolColumn, f: (Boolean, Boolean) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
   def apply(row: Int): Boolean = f(c1(row), c2(row))
 }
+class Map2ColumnJJZ(c1: LongColumn, c2: LongColumn)(f: (Long, Long) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnDDZ(c1: DoubleColumn, c2: DoubleColumn)(f: (Double, Double) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnNNZ(c1: NumColumn, c2: NumColumn)(f: (BigDecimal, BigDecimal) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnNLZ(c1: NumColumn, c2: LongColumn)(f: (BigDecimal, Long) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnNDZ(c1: NumColumn, c2: DoubleColumn)(f: (BigDecimal, Double) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnLNZ(c1: LongColumn, c2: NumColumn)(f: (Long, BigDecimal) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+class Map2ColumnDNZ(c1: DoubleColumn, c2: NumColumn)(f: (Double, BigDecimal) => Boolean) extends Map2Column(c1, c2) with BoolColumn {
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
 
 class Map2Column(c1: Column, c2: Column) { this: Column =>
   def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)

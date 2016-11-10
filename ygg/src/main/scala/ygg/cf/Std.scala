@@ -20,6 +20,16 @@ import ygg.common._
 import ygg.table._
 
 object std {
+  val Lt = CF2P("builtin::ct::lt") {
+    case (c1: LongColumn, c2: LongColumn)     => new Map2ColumnJJZ(c1, c2)(_ < _)
+    case (c1: DoubleColumn, c2: DoubleColumn) => new Map2ColumnDDZ(c1, c2)(_ < _)
+    case (c1: NumColumn, c2: LongColumn)      => new Map2ColumnNLZ(c1, c2)(_ < _)
+    case (c1: LongColumn, c2: NumColumn)      => new Map2ColumnLNZ(c1, c2)(_ < _)
+    case (c1: NumColumn, c2: DoubleColumn)    => new Map2ColumnNDZ(c1, c2)(_ < _)
+    case (c1: DoubleColumn, c2: NumColumn)    => new Map2ColumnDNZ(c1, c2)(_ < _)
+    case (c1: NumColumn, c2: NumColumn)       => new Map2ColumnNNZ(c1, c2)(_ < _)
+  }
+
   val Eq = CF2P("builtin::ct::eq") {
     case (c1: BoolColumn, c2: BoolColumn) => new Map2ColumnZZZ(c1, c2, _ == _)
     case (c1: LongColumn, c2: LongColumn) =>

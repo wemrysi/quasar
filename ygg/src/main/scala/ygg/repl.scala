@@ -144,6 +144,17 @@ object repl {
     def take(n: Long): T = if (n <= 0L) table.companion.empty else table.takeRange(0L, n)
     def drop(n: Long): T = if (n <= 0L) table else table.takeRange(n, Long.MaxValue)
 
+    // Map2(ID \ 'value \ 'value1, ID \ 'value \ 'value2, cf.std.Eq),
+    // cf.std.Lt applyr value
+
+    def filterLess(spec: TransSpec1, value: CValue) = map(
+      Cond(
+        spec map1 (cf.std.Lt applyr value),
+        ID,
+        ID \ 'ConstantFalse // XXX FIXME
+      )
+    )
+
     def filterConst(spec: TransSpec1, value: CValue) = map(
       Cond(
         trans.Equal(spec, ConstLiteral(value, ID)),
