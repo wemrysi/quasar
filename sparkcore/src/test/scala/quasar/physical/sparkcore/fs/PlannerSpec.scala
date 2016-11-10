@@ -27,6 +27,7 @@ import quasar.Data
 import quasar.DataCodec
 import quasar.qscript._
 import quasar.sql.JoinDir
+import quasar.fp.ski.ι
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -34,6 +35,7 @@ import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
 import matryoshka.{Hole => _, _}
+import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers
 
 class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
@@ -84,7 +86,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   "Planner" should {
 
     "shiftedread" in {
-      newSc.map ( sc => {
+      withSpark(sc => {
         val fromFile: (SparkContext, AFile) => Task[RDD[String]] =
           (sc: SparkContext, file: AFile) => Task.delay {
             sc.parallelize(List("""{"name" : "tom", "age" : 28}"""))
@@ -102,9 +104,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
               "age" -> Data.Int(28)
             ))
         }
-        sc.stop
-      }).run.unsafePerformSync
-      ok
+      })
     }
 
     "core" should {
@@ -568,12 +568,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     }
   }
 
-  private def withSpark[T](run: SparkContext => T) = {
+  private def withSpark[T](run: SparkContext => MatchResult[Any]): MatchResult[Any] = {
     newSc.map(sc => {
-      run(sc)
+      val r = run(sc)
       sc.stop
-    }).run.unsafePerformSync
-    ok
+      r
+    }).run.unsafePerformSync.fold(ok("skip because QUASAR_SPARK_LOCAL is not set"))(ι)
   }
 
   private def constFreeQS(v: Int): FreeQS =
