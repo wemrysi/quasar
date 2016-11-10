@@ -25,11 +25,6 @@ object F1Expr {
   def equalsZero     = cf.std.Eq applyr CLong(0)
   def isEven         = moduloTwo andThen equalsZero
 }
-object Fn {
-  def source: TransSpec1        = root
-  def valueIsEven(name: String) = root select name map1 F1Expr.isEven
-  def constantTrue              = Filter(source, trans.Equal(source, source))
-}
 trait CF1Like {
   def compose(f1: CF1): CF1
   def andThen(f1: CF1): CF1

@@ -95,17 +95,17 @@ object repl {
 
 
   def grouping = {
-    def genderFilter(str: String) = Filter(EqualLiteral(dotValue.dyn.Gender, CString(str), false))
+    def genderFilter(str: String) = Filter(EqualLiteral(ID \ 'value \ 'Gender, CString(str), false))
     def targetTrans = InnerObjectConcat(
       root delete "value",
-      dotValue.dyn.Gender wrapObjectField "value"
+      ID \ 'value \ 'Gender as "value"
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
       medals,
-      dotKey,
+      ID \ 'key,
       Some(targetTrans),
       groupId = groupId,
-      GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.dyn.Edition)
+      GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> ID \ 'value \ 'Edition)
     )
     GroupingAlignment.intersect(
       mkSource(0, "extra0", "Men"),

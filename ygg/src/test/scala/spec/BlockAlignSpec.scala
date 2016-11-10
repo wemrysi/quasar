@@ -239,8 +239,8 @@ class BlockAlignSpec extends TableQspec {
     }
 
     def test0 = {
-      val lsortedOn = `.` \ 1
-      val rsortedOn = `.` \ 1
+      val lsortedOn = ID \ 1
+      val rsortedOn = ID \ 1
       val ljson     = jsonMany"""
         [[3],{"000000":-1},-1]
         [[4],{"000000":0},0]
@@ -283,12 +283,12 @@ class BlockAlignSpec extends TableQspec {
 
       val lsortedOn = wrapOuterConcat(
         "000000" -> wrapOuterConcat(
-          "000000" -> (`.` \ 1 \ "000001"),
-          "000001" -> (`.` \ 1 \ "000000")
+          "000000" -> (ID \ 1 \ "000001"),
+          "000001" -> (ID \ 1 \ "000000")
         )
       )
 
-      val rsortedOn = `.` \ 1
+      val rsortedOn = ID \ 1
       test(fromJson(ljson), lsortedOn, fromJson(rjson), rsortedOn)
     }
 
@@ -319,11 +319,11 @@ class BlockAlignSpec extends TableQspec {
 
       val lsortedOn = wrapOuterConcat(
         "000000" -> wrapOuterConcat(
-          "000000" -> (`.` \ 1 \ "000000"),
-          "000001" -> (`.` \ 1 \ "000001")
+          "000000" -> (ID \ 1 \ "000000"),
+          "000001" -> (ID \ 1 \ "000001")
         )
       )
-      val rsortedOn = `.` \ 1
+      val rsortedOn = ID \ 1
       val ltable    = Table(fromJson(ljson).slices ++ fromJson(ljson2).slices, UnknownSize)
       val rtable    = Table(fromJson(rjson).slices ++ fromJson(rjson2).slices, UnknownSize)
 

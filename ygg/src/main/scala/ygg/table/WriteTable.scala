@@ -188,7 +188,7 @@ class WriteTable[T: TableRep]() {
 
   def writeSortedUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
     writeTables(
-      table transform `.`,
+      table transform ID,
       composeSliceTransform(valueSpec),
       groupKeys map composeSliceTransform,
       order
@@ -196,10 +196,10 @@ class WriteTable[T: TableRep]() {
   }
 
   def writeSortedNonUnique(table: T, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[Seq[String] -> IndexMap] = {
-    val keys1 = groupKeys map (kt => wrapOuterConcat("0" -> kt.mapLeaves(_ => root \ 0), "1" -> (root \ 1)))
+    val keys1 = groupKeys map (kt => wrapOuterConcat("0" -> kt.mapLeaves(_ => ID \ 0), "1" -> (ID \ 1)))
     writeTables(
-      table transform table.companion.addGlobalId(`.`),
-      composeSliceTransform(valueSpec mapLeaves (_ => root \ 0)),
+      table transform table.companion.addGlobalId(ID),
+      composeSliceTransform(valueSpec mapLeaves (_ => ID \ 0)),
       keys1 map composeSliceTransform,
       order
     )

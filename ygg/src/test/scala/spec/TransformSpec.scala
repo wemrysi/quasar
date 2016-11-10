@@ -121,19 +121,20 @@ class TransformSpec extends TableQspec {
     "check cond" in checkCond.pendingUntilFixed
   }
 
-  private def checkTransformLeaf = checkSpecDefault(Fn.source)(identity)
-  private def checkMap1          = checkSpecDefault(Fn.valueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
-  private def checkMetaDeref     = checkSpecDefault("foo" @: Fn.source)(_ => Nil)
-  private def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
+  private def checkTransformLeaf = checkSpecDefault(ID)(identity)
+  private def checkMap1          = checkSpecDefault(valueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
+  private def checkMetaDeref     = checkSpecDefault("foo" @: ID)(_ => Nil)
+  private def checkTrueFilter    = checkSpecDefault(Filter(ID, Equal(ID, ID)))(identity)
 
   private def sampleObject     = sample(objectSchema(_, 3))
   private def sampleArray      = sample(arraySchema(_, 3))
   private def sampleLongLong   = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
   private def sampleDoubleLong = sample(_ => Seq(JPath("value1") -> CDouble, JPath("value2") -> CLong))
 
+  private def valueIsEven(name: String) = ID \ name map1 F1Expr.isEven
 
   private def testMap1IntLeaf: Prop = checkSpecData(
-    spec     = Map1(Fn.source, F1Expr.negate),
+    spec     = Map1(ID, F1Expr.negate),
     data     = -10 to 10 map (n => json"$n"),
     expected = -10 to 10 map (n => json"${-n}")
   )
@@ -174,12 +175,12 @@ class TransformSpec extends TableQspec {
   )
 
   private def checkFilter = {
-    val spec = Filter(Fn.source, Fn.valueIsEven("value"))
+    val spec = Filter(ID, valueIsEven("value"))
     checkSpecDefault(spec)(_ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false })
   }
 
   private def testMod2Filter = checkSpecDataId(
-    spec = Filter(Fn.source, Fn.valueIsEven("value")),
+    spec = Filter(ID, valueIsEven("value")),
     data = jsonMany"""
       { "value":-6.846973248137671E+307, "key":[7.0] }
       { "value":-4611686018427387904, "key":[5.0] }
@@ -202,7 +203,7 @@ class TransformSpec extends TableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        DerefArrayStatic(Fn.source, CPathIndex(sd.fieldHeadIndex)),
+        DerefArrayStatic(ID, CPathIndex(sd.fieldHeadIndex)),
         sd.data map (_ apply sd.fieldHeadIndex) filter (_.isDefined)
       )
     ).check()
@@ -213,7 +214,7 @@ class TransformSpec extends TableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        Map2(root".value.value1", root".value.value2", cf.std.Eq),
+        Map2(ID \ 'value \ 'value1, ID \ 'value \ 'value2, cf.std.Eq),
         sd.data flatMap { jv =>
           ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
             case (JNum(x), JNum(y)) => Some(JBool(x == y))
@@ -230,8 +231,8 @@ class TransformSpec extends TableQspec {
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Map2(
-          root".value.value1",
-          root".value.value2",
+          ID \ 'value \ 'value1,
+          ID \ 'value \ 'value2,
           cf.math.Add
         )
       })
@@ -263,7 +264,7 @@ class TransformSpec extends TableQspec {
     implicit val gen = defaultASD
     prop { (sample: SampleData) =>
       val table    = fromSample(sample)
-      val results  = toJson(table transform Equal(Fn.source, Fn.source))
+      val results  = toJson(table transform Equal(ID, ID))
       val expected = Stream.fill(sample.data.size)(JBool(true))
 
       results.copoint must_=== expected
@@ -308,7 +309,7 @@ class TransformSpec extends TableQspec {
     }""".toVector
 
     val table    = fromJson(data)
-    val result   = table transform Equal(root".value.value1", root".value.value2")
+    val result   = table transform Equal(ID \ 'value \ 'value1, ID \ 'value \ 'value2)
     val expected = data flatMap (jv =>
       ((jv \ "value" \ "value1") -> (jv \ "value" \ "value2")) match {
         case (_, JUndefined) => None
@@ -335,7 +336,7 @@ class TransformSpec extends TableQspec {
     """
 
     val table   = fromJson(elements)
-    val results = toJson(table transform Equal(root".value.value1", root".value.value2"))
+    val results = toJson(table transform Equal(ID \ 'value \ 'value1, ID \ 'value \ 'value2))
     val expected = elements flatMap { jv =>
       ((jv \ "value" \ "value1") -> (jv \ "value" \ "value2")) match {
         case (_, JUndefined) => None
@@ -369,8 +370,8 @@ class TransformSpec extends TableQspec {
 
     val results = toJson(table.transform {
       Equal(
-        root".value.value1",
-        root".value.value2"
+        ID \ 'value \ 'value1,
+        ID \ 'value \ 'value2
       )
     })
 
@@ -386,19 +387,19 @@ class TransformSpec extends TableQspec {
   }
 
   private def testASimpleNonEqual = checkSpecData(
-    spec     = Equal(root".value.value1", root".value.value2"),
+    spec     = Equal(ID \ 'value \ 'value1, ID \ 'value \ 'value2),
     data     = jsonMany"""{ "key":[2.0,1.0],"value":{"value1": -72,"value2": 72} }""",
     expected = Seq(JFalse)
   )
   private def testASimpleIsEqual = checkSpecData(
-    spec     = Equal(root".value.value1", root".value.value2"),
+    spec     = Equal(ID \ 'value \ 'value1, ID \ 'value \ 'value2),
     data     = jsonMany"""{ "key":[2.0,1.0],"value":{"value1": 72,"value2": 72} }""",
     expected = Seq(JTrue)
   )
 
   private def testEqual(sample: SampleData) = {
     val table    = fromSample(sample)
-    val results  = toJson(table transform Equal(root".value.value1", root".value.value2"))
+    val results  = toJson(table transform Equal(ID \ 'value \ 'value1, ID \ 'value \ 'value2))
     val expected = sample.data flatMap { jv =>
       ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
         case (JUndefined, JUndefined) => None
@@ -481,7 +482,7 @@ class TransformSpec extends TableQspec {
 
     prop { (sample: SampleData) =>
       val table    = fromSample(sample)
-      val Trans    = EqualLiteral(root".value.value1", CLong(0), invert = false)
+      val Trans    = EqualLiteral(ID \ 'value \ 'value1, CLong(0), invert = false)
       val results  = toJson(table transform Trans)
       val expected = sample.data map (_ \ "value" \ "value1") filter (_.isDefined) map (x => JBool(x == JNum(0)))
 
@@ -517,7 +518,7 @@ class TransformSpec extends TableQspec {
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
-        EqualLiteral(root".value.value1", CLong(0), true)
+        EqualLiteral(ID \ 'value \ 'value1, CLong(0), true)
       })
 
       val expected = sample.data flatMap { jv =>
@@ -532,18 +533,18 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkWrapObject =
-    checkSpec(WrapObject(`.`, "foo"))(_ map (jv =>  jobject("foo" -> jv)))(defaultASD)
+    checkSpec(ID as "foo")(_ map (jv => jobject("foo" -> jv)))(defaultASD)
 
   private def checkObjectConcatSelf = {
     implicit val gen = defaultASD
-    checkSpec(InnerObjectConcat(`.`, `.`))(identity)
-    checkSpec(OuterObjectConcat(`.`, `.`))(identity)
+    checkSpec(InnerObjectConcat(ID, ID))(identity)
+    checkSpec(OuterObjectConcat(ID, ID))(identity)
   }
 
   private def testObjectConcatSingletonNonObject = {
     val table        = fromJson(Seq(JTrue))
-    val resultsInner = toJsonSeq(table transform InnerObjectConcat(`.`))
-    val resultsOuter = toJsonSeq(table transform OuterObjectConcat(`.`))
+    val resultsInner = toJsonSeq(table transform InnerObjectConcat(ID))
+    val resultsOuter = toJsonSeq(table transform OuterObjectConcat(ID))
 
     resultsInner must beEmpty
     resultsOuter must beEmpty
@@ -551,8 +552,8 @@ class TransformSpec extends TableQspec {
 
   private def testObjectConcatTrivial = {
     val table        = fromJson(jsonMany"true {}")
-    val resultsInner = (table transform InnerObjectConcat(`.`)).toSeq
-    val resultsOuter = (table transform OuterObjectConcat(`.`)).toSeq
+    val resultsInner = (table transform InnerObjectConcat(ID)).toSeq
+    val resultsOuter = (table transform OuterObjectConcat(ID)).toSeq
 
     resultsInner must_=== Seq(jobject())
     resultsOuter must_=== Seq(jobject())
@@ -668,14 +669,10 @@ class TransformSpec extends TableQspec {
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
+    val spec   = InnerObjectConcat('foobar, 'bar as "ack")
+    val result = table transform spec
 
-    val spec = InnerObjectConcat('foobar, WrapObject('bar, "ack"))
-
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] = Stream()
-
-    results.copoint mustEqual expected
+    result.toSeq must_=== Seq()
   }
 
   private def testOuterObjectConcatLeftEmpty = {
@@ -692,7 +689,7 @@ class TransformSpec extends TableQspec {
     """
 
     val table = fromJson(data)
-    val spec  = OuterObjectConcat('foobar, WrapObject('bar, "ack"))
+    val spec  = OuterObjectConcat('foobar, 'bar as "ack")
 
     toJsonSeq(table transform spec) must_=== expected
   }
@@ -701,19 +698,18 @@ class TransformSpec extends TableQspec {
     implicit val gen = sampleLongLong
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
-      val resultsInner = toJson(table.transform {
+      val resultsInner = toJson(table transform
         InnerObjectConcat(
-          WrapObject(WrapObject(root".value.value1", "value1"), "value"),
-          WrapObject(WrapObject(root".value.value2", "value2"), "value")
+          ID \ 'value \ 'value1 as "value1" as "value",
+          ID \ 'value \ 'value2 as "value2" as "value"
         )
-      })
-
-      val resultsOuter = toJson(table.transform {
+      )
+      val resultsOuter = toJson(table transform
         OuterObjectConcat(
-          WrapObject(WrapObject(root".value.value1", "value1"), "value"),
-          WrapObject(WrapObject(root".value.value2", "value2"), "value")
+          ID \ 'value \ 'value1 as "value1" as "value",
+          ID \ 'value \ 'value2 as "value2" as "value"
         )
-      })
+      )
 
       def isOk(results: Need[Stream[JValue]]) =
         results.copoint must_== (sample.data flatMap {
@@ -1492,7 +1488,7 @@ class TransformSpec extends TableQspec {
 
     val sample  = SampleData(data)
     val table   = fromSample(sample)
-    val results = (table transform Scan(dotValue, Scanner.Sum)).toVector
+    val results = (table transform Scan(ID \ 'value, Scanner.Sum)).toVector
 
     val (_, expected) = sample.data.foldLeft(BigDecimal(0) -> Vector[JValue]()) {
       case ((a, s), jv) =>
@@ -1555,7 +1551,7 @@ class TransformSpec extends TableQspec {
           JObject(JField("baz", JNum(3)) :: JField("ref", JString("baz")) :: Nil) #:: Stream.empty[JValue]
 
     val table    = fromSample(SampleData(data))
-    val results  = toJson(table transform DerefObjectDynamic(`.`, 'ref))
+    val results  = toJson(table transform DerefObjectDynamic(ID, 'ref))
     val expected = JNum(1) #:: JNum(2) #:: JNum(3) #:: Stream.empty[JValue]
 
     results.copoint must_== expected
@@ -1601,7 +1597,7 @@ class TransformSpec extends TableQspec {
 
     prop { (sample: SampleData) =>
       val table   = fromSample(sample)
-      val results = toJson(table transform ConstLiteral(CString("foo"), dotValue.field))
+      val results = toJson(table transform ConstLiteral(CString("foo"), ID \ 'value \ 'field))
 
       val expected = sample.data flatMap {
         case jv if jv \ "value" \ "field" == JUndefined => None

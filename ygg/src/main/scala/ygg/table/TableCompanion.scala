@@ -172,7 +172,7 @@ trait TableCompanion[Table] extends TableConfig {
       )
     )
 
-    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform (`.` \ 1)
+    fromSlices(StreamT(Need(head)), ExactSize(totalCount)) transform (ID \ 1)
   }
 
   /**

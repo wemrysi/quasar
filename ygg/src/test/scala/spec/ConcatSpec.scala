@@ -55,8 +55,8 @@ class ConcatSpec extends TableQspec {
       WrapObject(
         InnerArrayConcat(
           InnerArrayConcat(
-            WrapArray(root(4)),
-            WrapArray(WrapObject(root(6), "baz"))
+            ID at 4,
+            ID at 6 as "baz" asArray
           ),
           WrapArray(root(2))
         ),

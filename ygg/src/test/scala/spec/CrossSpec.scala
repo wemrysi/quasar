@@ -70,7 +70,7 @@ class CrossSpec extends TableQspec {
       """,
       sliceSize = 3
     )
-    data.cross(data)(InnerObjectConcat(rootLeft, rootRight)).slicesStream.forall(_.size <= companion.maxSliceSize) must_=== true
+    data.cross(data)(InnerObjectConcat(ID_L, ID_R)).slicesStream.forall(_.size <= companion.maxSliceSize) must_=== true
   }
 
   private def testCrossSingles = {

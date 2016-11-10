@@ -56,21 +56,21 @@ class MergeSpec extends TableQspec {
           TransSpec1.Id,
           GroupingSource(
             bar,
-            dotKey,
-            Some(InnerObjectConcat(root delete valueField, dotValue.c wrapObjectField "value")),
+            ID \ 'key,
+            Some(InnerObjectConcat(root delete valueField, ID \ 'value \ 'c as "value")),
             0,
             GroupKeySpecOr(
-              GroupKeySpecSource(oneField, dotValue.a),
-              GroupKeySpecSource(twoField, dotValue.b))
+              GroupKeySpecSource(oneField, ID \ 'value \ 'a),
+              GroupKeySpecSource(twoField, ID \ 'value \ 'b))
           ),
           GroupingSource(
             foo,
-            dotKey,
+            ID \ 'key,
             Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
             3,
             GroupKeySpecAnd(
-              GroupKeySpecSource(oneField, dotValue.a),
-              GroupKeySpecSource(twoField, dotValue.b))
+              GroupKeySpecSource(oneField, ID \ 'value \ 'a),
+              GroupKeySpecSource(twoField, ID \ 'value \ 'b))
           ),
           GroupingSpec.Intersection)
 
@@ -136,17 +136,17 @@ class MergeSpec extends TableQspec {
       val valueField = CPathField("value")
       val oneField   = CPathField("1")
 
-      def genderFilter(str: String) = Filter(EqualLiteral(dotValue.dyn.Gender, CString(str), false))
+      def genderFilter(str: String) = Filter(EqualLiteral(ID \ 'value \ 'Gender, CString(str), false))
       def targetTrans = InnerObjectConcat(
         root delete valueField,
-        dotValue.dyn.Gender wrapObjectField "value"
+        ID \ 'value \ 'Gender as "value"
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
         medals,
-        dotKey,
+        ID \ 'key,
         Some(targetTrans),
         groupId = groupId,
-        GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> dotValue.dyn.Edition)
+        GroupKeySpecSource(key, genderFilter(value)) && GroupKeySpecSource("1" -> ID \ 'value \ 'Edition)
       )
 
       val grouping = GroupingAlignment.intersect(

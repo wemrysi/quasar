@@ -25,73 +25,44 @@ package object trans {
   // type UnarySpec  = TransSpec[Source1]
   // type BinarySpec = TransSpec[Source2]
 
-  val root      = new KVTransSpecBuilder[Source1](Leaf(Source))
-  val rootLeft  = new KVTransSpecBuilder[Source2](Leaf(SourceLeft))
-  val rootRight = new KVTransSpecBuilder[Source2](Leaf(SourceRight))
-  val dotValue  = new KVTransSpecBuilder[Source1](DerefObjectStatic(root.spec, "value"))
-  val dotKey    = new KVTransSpecBuilder[Source1](DerefObjectStatic(root.spec, "key"))
+  val ID   = new KVTransSpecBuilder[Source1](Leaf(Source))
+  val ID_L = new KVTransSpecBuilder[Source2](Leaf(SourceLeft))
+  val ID_R = new KVTransSpecBuilder[Source2](Leaf(SourceRight))
 
   def where(name: String): WhereOps1 = new WhereOps1(CPathField(name))
 
   class WhereOps1(field: CPathField) {
-    def is(value: CValue) = Filter(`.` \ field, EqualLiteral(`.`, value, invert = false))
+    def is(value: CValue) = Filter(ID \ field, EqualLiteral(ID, value, invert = false))
   }
 
   def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
-    OuterObjectConcat(xs map { case (name, spec) => WrapObject(spec, name) }: _*)
+    OuterObjectConcat(xs map (kv => kv._2 as kv._1): _*)
 
-  def filterObject(names: String*) = OuterObjectConcat(names map (n => wrapField(n)): _*)
+  def filterObject(names: String*) =
+    OuterObjectConcat(names map (ID \ _): _*)
 
   implicit class TransSymOps(private val self: Sym) {
-    def as(as: String): TransSpec1 = wrapField(self.name, as)
-    def at(idx: Int): TransSpec1   = root \ self.name at idx
+    def as(as: String): TransSpec1 = ID \ self.name as as
+    def at(idx: Int): TransSpec1   = ID \ self.name at idx
 
-    def <<(): TransSpec2 = rootLeft \ self.name
-    def >>(): TransSpec2 = rootRight \ self.name
+    def <<(): TransSpec2 = ID_L \ self.name
+    def >>(): TransSpec2 = ID_R \ self.name
 
-    def <<(as: String): TransSpec2 = wrapFieldLeft(self.name, as)
-    def >>(as: String): TransSpec2 = wrapFieldRight(self.name, as)
+    def <<(as: String): TransSpec2 = <<() as as
+    def >>(as: String): TransSpec2 = >>() as as
   }
 
-  implicit def liftSelect1(x: Sym): TransSpec1        = `.` \ x.name
-  implicit def liftSelect2(x: (Sym, Sym)): TransSpec1 = filterObject(x._1.name, x._2.name)
+  implicit def liftSelect1(x: Sym): TransSpec1        = ID \ x.name
 
   implicit def transSpecBuilder[A](x: TransSpec[A]): TransSpecBuilder[A]        = new TransSpecBuilder(x)
   implicit def transSpecBuilderResult[A](x: TransSpecBuilder[A]): TransSpec[A]  = x.spec
   implicit def transSpecOps[A](x: TransSpec[A]): TransSpecOps[A]                = new TransSpecOps(x)
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
 
-  val `.`  = root
-  val `<.` = rootLeft
-  val `.>` = rootRight
-  val ID   = root
-  val ID_L = rootLeft
-  val ID_R = rootRight
-
-  implicit class RootInterpolation(val sc: StringContext) {
-    private def str = sc.parts.mkString("")
-
-    def root(): TransSpec1      = `.` \ str
-    def rootLeft(): TransSpec2  = `<.` \ str
-    def rootRight(): TransSpec2 = `.>` \ str
-  }
-
-  def wrapField(name: String): TransSpec1                  = wrapField(name, name)
-  def wrapField(name: String, as: String): TransSpec1      = WrapObject(`.` \ name, as)
-  def wrapFieldLeft(name: String): TransSpec2              = wrapFieldLeft(name, name)
-  def wrapFieldLeft(name: String, as: String): TransSpec2  = WrapObject(`<.` \ name, as)
-  def wrapFieldRight(name: String): TransSpec2             = wrapFieldRight(name, name)
-  def wrapFieldRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
-
-  def equalAtField(name: String) =
-    WrapObject(Equal(`<.` \ name, `.>` \ name), name)
-
-  def concatArraysAtField(name: String) =
-    WrapObject(OuterArrayConcat(`<.` \ name, `.>` \ name), name)
-
+  val root = ID
 
   sealed trait Selector {
-    def run: TransSpec1 = `.` \ this
+    def run: TransSpec1 = ID \ this
     def toVector: Vector[Selector.Atom] = this match {
       case x: Selector.Atom   => Vector(x)
       case Selector.Multi(xs) => xs flatMap (_.toVector)
@@ -165,7 +136,6 @@ package trans {
     def scan(scanner: Scanner)          = Scan(spec, scanner)
     def select(field: CPathField): This = this \ field.name
     def select(name: String): This      = this \ name
-    def wrapObjectField(name: String)   = WrapObject(spec, name)
 
     def at(idx: Int)     = WrapArray(this \ idx)
     def as(name: String) = WrapObject(spec, name)

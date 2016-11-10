@@ -42,7 +42,7 @@ class TableMethods[Table: TableRep](val self: Table) {
     * @param order Whether to sort ascending or descending
     */
   def sort(key: TransSpec1, order: DesiredSortOrder): Table =
-    WriteTable[Table].groupByN(self, Seq(key), `.`, order, unique = false).headOption getOrElse companion.empty
+    WriteTable[Table].groupByN(self, Seq(key), ID, order, unique = false).headOption getOrElse companion.empty
 
   def sort(key: TransSpec1): Table =
     sort(key, SortAscending)
@@ -172,7 +172,7 @@ class TableMethods[Table: TableRep](val self: Table) {
     * Remaps the indicies.
     */
 
-  def compact(): Table                 = compact(`.`)
+  def compact(): Table                 = compact(ID)
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
     val transes   = root.spec -> spec mapBoth composeSliceTransform
