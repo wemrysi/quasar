@@ -27,7 +27,6 @@ import quasar.Data
 import quasar.DataCodec
 import quasar.qscript._
 import quasar.sql.JoinDir
-import quasar.fp.ski.ι
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -516,7 +515,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
                   JoinDir.Left.name ->  Data.Null,
-                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(40)), ("country" -> Data.Str("US"))))
                 )),
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -569,23 +568,17 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   }
 
   private def withSpark[T](run: SparkContext => MatchResult[Any]): MatchResult[Any] = {
-    newSc.map(sc => {
-      val r = run(sc)
-      sc.stop
-      r
-    }).run.unsafePerformSync.fold(ok("skip because QUASAR_SPARK_LOCAL is not set"))(ι)
+    newSc.flatMap {
+      case Some(sc) =>
+        Task.delay(run(sc))
+            .onFinish(κ(Task.delay {
+              sc.stop()
+            }))
+      case None => Task.now(ok("skip because QUASAR_SPARK_LOCAL is not set"))
+    }.unsafePerformSync
   }
 
-  private def constFreeQS(v: Int): FreeQS =
-    Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
-
-
-  private val emptyFF: (SparkContext, AFile) => Task[RDD[String]] =
-    (sc: SparkContext, file: AFile) => Task.delay {
-      sc.parallelize(List())
-    }
-
-  private def newSc(): OptionT[Task, SparkContext] = for {
+  private def newSc(): Task[Option[SparkContext]] = (for {
     uriStr <- console.readEnv("QUASAR_SPARK_LOCAL")
     uriData <- OptionT(Task.now(DataCodec.parse(uriStr)(DataCodec.Precise).toOption))
     slData <- uriData match {
@@ -604,5 +597,13 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     val master = masterAndRoot.split('|')(0)
     val config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
     new SparkContext(config)
-  }
+  }).run
+
+  private def constFreeQS(v: Int): FreeQS =
+    Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
+
+  private val emptyFF: (SparkContext, AFile) => Task[RDD[String]] =
+    (sc: SparkContext, file: AFile) => Task.delay {
+      sc.parallelize(List())
+    }
 }
