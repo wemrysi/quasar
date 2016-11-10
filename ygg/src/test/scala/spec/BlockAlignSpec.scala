@@ -648,7 +648,7 @@ class BlockAlignSpec extends TableQspec {
     InnerObjectConcat(sortKeys.zipWithIndex.map {
       case (sortKey, idx) =>
         WrapObject(
-          sortKey.nodes.foldLeft[TransSpec1](root \ "value") {
+          sortKey.nodes.foldLeft[TransSpec1]('value) {
             case (innerSpec, CPathField(name))  => innerSpec \ name
             case (innerSpec, CPathIndex(index)) => innerSpec \ index
             case x                              => abort(s"Unexpected arg $x")

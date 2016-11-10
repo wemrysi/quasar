@@ -29,6 +29,11 @@ sealed trait TableData extends Product with Serializable {
     case TableData.Internal(slice)          => s"[Singleton: ${slice.size}]"
     case TableData.Projections(table, proj) => s"[Projection: ${table.size.size_s}/${proj.size}]"
   }
+  override def hashCode = this.toVector.##
+  override def equals(that: Any) = that match {
+    case x: TableData => this.toVector == x.toVector
+    case _            => super.equals(that)
+  }
   override def toString = short_s + this.columns.column_s
 }
 

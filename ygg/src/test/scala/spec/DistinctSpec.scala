@@ -32,7 +32,7 @@ class DistinctSpec extends TableQspec {
 
     prop { (sample: SampleData) =>
       val table  = fromSample(sample)
-      toJsonSeq(table distinct root) must_=== sample.data
+      toJsonSeq(table distinct ID) must_=== sample.data
     }
   }
 
@@ -46,7 +46,7 @@ class DistinctSpec extends TableQspec {
       {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
     """
     val table = fromJson(data, sliceSize = 5)
-    toJsonSeq(table distinct root) must_=== data.distinct.toStream
+    toJsonSeq(table distinct ID) must_=== data.distinct.toStream
   }
 
   def testDistinctAcrossSlices2 = {
@@ -67,14 +67,14 @@ class DistinctSpec extends TableQspec {
     """
     val table = fromJson(data, sliceSize = 5)
 
-    toJsonSeq(table distinct root) must_=== data.distinct
+    toJsonSeq(table distinct ID) must_=== data.distinct
   }
 
   def testDistinct = {
     implicit val gen = SampleData.sort(duplicateRows(sample(schema)))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
-      toJsonSeq(table distinct root) must_=== sample.data.distinct
+      toJsonSeq(table distinct ID) must_=== sample.data.distinct
     }
   }
 }

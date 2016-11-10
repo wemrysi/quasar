@@ -20,201 +20,99 @@ import scala.Predef.$conforms
 import ygg.cf
 import ygg.common._
 import scala.util.Random
-import scalaz._, Scalaz._
 import ygg.table._
 import ygg.data._
+
+final case class TableStats[T: TableRep](val table: T) {
+  val slices    = table.slicesStream.toVector
+
+  def stats: Vector[Int -> Int] = slices map { slice =>
+    val size  = slice.size
+    val undef = 0 until size count (i => !slice.columns.values.exists(_ isDefinedAt i))
+
+    size -> undef
+  }
+  def sliceSizes  = stats map (_._1)
+  def undefCounts = stats map (_._2)
+  def summary     = undefCounts.sum -> sliceSizes.count(_ == 0)
+}
 
 class CompactSpec extends TableQspec {
   import SampleData._
   import trans._
 
+  implicit val tableGen: Arbitrary[Table] = sample(schema) ^^ fromSample
+
   "in compact" >> {
-    "be the identity on fully defined tables"  in testCompactIdentity
-    "preserve all defined rows"                in testCompactPreserve
-    "have no undefined rows"                   in testCompactRows
-    "have no empty slices"                     in testCompactSlices
-    "preserve all defined key rows"            in testCompactPreserveKey
-    "have no undefined key rows"               in testCompactRowsKey
-    "have no empty key slices"                 in testCompactSlicesKey
+    "be the identity on fully defined tables"    in prop(testIdentity _)
+    "preserve all defined rows"                  in prop(testCompactIdentity _)
+    "preserve all defined key rows"              in prop(testCompactPreserveKey _)
+    "have no undefined rows or empty slices"     in prop(testCompactRows _)
+    "have no undefined key rows or empty slices" in prop(testCompactKeyRows _)
   }
 
-  private def tableStats(cTable: Table): List[Int -> Int] = {
-    val slices = cTable.slicesStream
-    val sizes  = slices.map(_.size).toList
-    val undefined = slices.map { slice =>
-      (0 until slice.size).foldLeft(0) {
-        case (acc, i) => if (!slice.columns.values.exists(_.isDefinedAt(i))) acc + 1 else acc
-      }
-    }.toList
+  private def chooseColumn(cTable: Table): TransSpec1 =
+    cTable.slicesStream.headOption.fold(ID: TransSpec1)(slice =>
+      ID \ Random.shuffle(slice.columns.keys.map(_.selector)).head
+    )
 
-    sizes zip undefined
+  // fuzzing must be done strictly otherwise sadness will ensue (???)
+  private def fuzzSlices(table: Table)(f: Slice => Slice): Table =
+    lazyTable[Table](table.slicesStream map f, UnknownSize)
+
+  private def testTableInvariant[A](table: Table)(f1: Table => A, f2: Table => A) =
+    f1(table) must_=== f2(table)
+
+  private def testSliceInvariant(table: Table)(fuzz: Slice => Slice) =
+    table.toVector must_=== fuzzSlices(table)(fuzz).toVector
+
+  private def undefineTable(cTable: Table): Table = fuzzSlices(cTable) { slice =>
+    val sz = slice.size
+    val bs =
+      (
+        if (cTable.slicesCount > 1 && randomDouble < 0.25)
+          Bits()
+        else
+          Bits(0 until sz filter (_ => randomDouble < 0.75))
+      )
+    Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
   }
 
-  private def mkDeref(path: CPath): TransSpec1 = {
-    def mkDeref0(nodes: Seq[CPathNode]): TransSpec1 = nodes match {
-      case (f: CPathField) +: rest => DerefObjectStatic(mkDeref0(rest), f)
-      case (i: CPathIndex) +: rest => DerefArrayStatic(mkDeref0(rest), i)
-      case _                       => root
+  private def undefineColumn(cTable: Table, path: CPath): Table = fuzzSlices(cTable) { slice =>
+    val colRef = slice.columns.keys.find(_.selector == path)
+    val maskedSlice = colRef.map { colRef =>
+      val col = slice.columns(colRef)
+      val maskedCol =
+        if (cTable.slicesCount > 1 && randomDouble < 0.25)
+          (col |> cf.filter(0, slice.size, new BitSet)).get
+        else {
+          val retained = (0 until slice.size).map { (x: Int) =>
+            if (randomDouble < 0.75) Some(x) else None
+          }.flatten
+          (col |> cf.filter(0, slice.size, Bits(retained))).get
+        }
+
+      Slice(slice.size, slice.columns.updated(colRef, maskedCol))
     }
-
-    mkDeref0(path.nodes)
+    maskedSlice.getOrElse(slice)
   }
 
-  private def extractPath(spec: TransSpec1): Option[CPath] = spec match {
-    case DerefObjectStatic(ID(), f) => Some(f)
-    case DerefObjectStatic(lhs, f)  => extractPath(lhs).map(_ \ f)
-    case DerefArrayStatic(ID(), i)  => Some(i)
-    case DerefArrayStatic(lhs, f)   => extractPath(lhs).map(_ \ f)
-    case _                          => None
-  }
-
-  private def chooseColumn(cTable: Table): TransSpec1 = {
-    cTable.slicesStream.headOption.map { slice =>
-      val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
-      mkDeref(chosenPath)
-    } getOrElse (mkDeref(CPath.Identity))
-  }
-
-  private def undefineTable(cTable: Table): Table = {
-    val slices    = cTable.slicesStream // fuzzing must be done strictly otherwise sadness will ensue
-    val numSlices = slices.size
-
-    val maskedSlices = slices map { slice =>
-      val sz = slice.size
-      val bs =
-        (
-          if (numSlices > 1 && randomDouble < 0.25)
-            Bits()
-          else
-            Bits(0 until sz filter (_ => randomDouble < 0.75))
-        )
-      Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
-    }
-    lazyTable[Table](maskedSlices, UnknownSize)
-  }
-
-  private def undefineColumn(cTable: Table, path: CPath): Table = {
-    val slices    = cTable.slicesStream // fuzzing must be done strictly otherwise sadness will ensue
-    val numSlices = slices.size
-
-    val maskedSlices = slices.map { slice =>
-      val colRef = slice.columns.keys.find(_.selector == path)
-      val maskedSlice = colRef.map { colRef =>
-        val col = slice.columns(colRef)
-        val maskedCol =
-          if (numSlices > 1 && randomDouble < 0.25)
-            (col |> cf.filter(0, slice.size, new BitSet)).get
-          else {
-            val retained = (0 until slice.size).map { (x: Int) =>
-              if (randomDouble < 0.75) Some(x) else None
-            }.flatten
-            (col |> cf.filter(0, slice.size, Bits(retained))).get
-          }
-
-        Slice(slice.size, slice.columns.updated(colRef, maskedCol))
-      }
-      maskedSlice.getOrElse(slice)
-    }
-
-    lazyTable[Table](maskedSlices, UnknownSize)
-  }
-
-  private def testCompactIdentity = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val table        = fromSample(sample)
-      val compactTable = table.compact(Leaf(Source))
-
-      val results = toJson(compactTable)
-
-      results.copoint must_== sample.data
-    }
-  }
-
-  private def testCompactPreserve = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val sampleTable = undefineTable(fromSample(sample))
-      val sampleJson  = toJson(sampleTable)
-
-      val compactTable = sampleTable.compact(Leaf(Source))
-      val results      = toJson(compactTable)
-
-      results.copoint must_== sampleJson.copoint
-    }
-  }
-
-  private def testCompactRows = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val sampleTable = undefineTable(fromSample(sample))
-
-      val compactTable = sampleTable.compact(Leaf(Source))
-      val compactStats = tableStats(compactTable)
-
-      compactStats.map(_._2).foldLeft(0)(_ + _) must_== 0
-    }
-  }
-
-  private def testCompactSlices = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val sampleTable = undefineTable(fromSample(sample))
-
-      val compactTable = sampleTable.compact(Leaf(Source))
-      val compactStats = tableStats(compactTable)
-
-      compactStats.map(_._1).count(_ == 0) must_== 0
-    }
-  }
-
-  private def testCompactPreserveKey = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val baseTable = fromSample(sample)
-      val key       = chooseColumn(baseTable)
-
-      val sampleTable   = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
-      val sampleKey     = sampleTable.transform(key)
-      val sampleKeyJson = toJson(sampleKey)
-
-      val compactTable  = sampleTable.compact(key)
-      val resultKey     = compactTable.transform(key)
-      val resultKeyJson = toJson(resultKey)
-
-      resultKeyJson.copoint must_== sampleKeyJson.copoint
-    }
-  }
-
-  private def testCompactRowsKey = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val baseTable = fromSample(sample)
-      val key       = chooseColumn(baseTable)
-
-      val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
-
-      val compactTable   = sampleTable.compact(key)
-      val resultKey      = compactTable.transform(key)
-      val resultKeyStats = tableStats(resultKey)
-
-      resultKeyStats.map(_._2).foldLeft(0)(_ + _) must_== 0
-    }
-  }
-
-  private def testCompactSlicesKey = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val baseTable = fromSample(sample)
-      val key       = chooseColumn(baseTable)
-
-      val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
-
-      val compactTable   = sampleTable.compact(key)
-      val resultKey      = compactTable.transform(key)
-      val resultKeyStats = tableStats(resultKey)
-
-      resultKeyStats.map(_._1).count(_ == 0) must_== 0
-    }
-  }
+  private def testIdentity(table: Table)           = testTableInvariant(table)(x => x, _ compact ID)
+  private def testCompactIdentity(table: Table)    = testTableInvariant(undefineTable(table))(x => x, _ compact ID)
+  private def testCompactPreserveKey(table: Table) = chooseColumn(table) |> (key =>
+    testTableInvariant(undefineColumn(table, key.extractPath))(
+      _ transform key,
+      _ compact key transform key
+    )
+  )
+  private def testCompactRows(table: Table) = testTableInvariant(undefineTable(table))(
+    t => TableStats(t compact ID).summary,
+    _ => ((0, 0))
+  )
+  private def testCompactKeyRows(table: Table) = chooseColumn(table) |> (key =>
+    testTableInvariant(undefineColumn(table, key.extractPath))(
+      t => TableStats(t compact key transform key).summary,
+      _ => ((0, 0))
+    )
+  )
 }

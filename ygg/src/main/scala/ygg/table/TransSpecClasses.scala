@@ -168,6 +168,14 @@ package trans {
       case x: CPathMeta  => DerefMetadataStatic(spec, x)
       case CPathArray    => InnerArrayConcat(spec)
     }
+
+    def extractPath: CPath = spec match {
+      case DerefObjectStatic(ID(), f) => f
+      case DerefObjectStatic(lhs, f)  => lhs.extractPath \ f
+      case DerefArrayStatic(ID(), i)  => i
+      case DerefArrayStatic(lhs, f)   => lhs.extractPath \ f
+      case _                          => CPath()
+    }
   }
 
   sealed trait TransSpec[+A]  extends AnyRef

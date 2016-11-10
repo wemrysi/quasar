@@ -67,6 +67,7 @@ class TableMethods[Table: TableRep](val self: Table) {
   def fields: Vector[JValue]      = toVector
   def normalize: Table            = mapWithSameSize(_ filter (x => !x.isEmpty))
   def slicesStream: Stream[Slice] = slices.toStream.value
+  def slicesCount: Int            = slicesStream.size
   def toJValues: Stream[JValue]   = slicesStream flatMap (_.toJValues)
   def toJsonString: String        = toJValues mkString "\n"
   def toVector: Vector[JValue]    = toJValues.toVector
