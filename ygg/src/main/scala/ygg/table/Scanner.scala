@@ -57,7 +57,6 @@ object Scanner {
 
     (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
   }
-
 }
 
 trait CReducer[A] {

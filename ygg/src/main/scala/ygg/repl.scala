@@ -97,7 +97,7 @@ object repl {
   def grouping = {
     def genderFilter(str: String) = Filter(EqualLiteral(ID \ 'value \ 'Gender, CString(str), false))
     def targetTrans = InnerObjectConcat(
-      root delete "value",
+      ID delete "value",
       ID \ 'value \ 'Gender as "value"
     )
     def mkSource(groupId: Int, key: String, value: String) = GroupingSource(
@@ -165,13 +165,13 @@ object repl {
   }
 }
 
-//     def deepMap(pf: MaybeSelf[F1]): T = map(root deepMap pf)
-//     def deepMap1(fn: CF1): T          = map(root deepMap1 fn)
-//     def delete(p: JPathField): T      = map(root delete CPathField(p.name))
-//     def filter(p: F1): T              = map(root filter p)
-//     def isEqual(that: CValue)         = map(root isEqual that)
-//     def isType(tp: JType)             = map(root isType tp)
+//     def deepMap(pf: MaybeSelf[F1]): T = map(ID deepMap pf)
+//     def deepMap1(fn: CF1): T          = map(ID deepMap1 fn)
+//     def delete(p: JPathField): T      = map(ID delete CPathField(p.name))
+//     def filter(p: F1): T              = map(ID filter p)
+//     def isEqual(that: CValue)         = map(ID isEqual that)
+//     def isType(tp: JType)             = map(ID isType tp)
 //     def map(f: TransSpec1): T         = table transform f
-//     def map1(fn: CF1)                 = map(root map1 fn)
-//     def select(field: CPathField): T  = map(root select field)
+//     def map1(fn: CF1)                 = map(ID map1 fn)
+//     def select(field: CPathField): T  = map(ID select field)
 //     def select(name: String): T       = select(CPathField(name))

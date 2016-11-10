@@ -24,8 +24,9 @@ object ColumnMap {
   type Raw = Map[ColumnRef, Column]
   implicit def liftMap(x: Raw): ColumnMap = apply(x.toVector)
 
-  def apply(fields: Vector[ColumnRef -> Column]): Eager = Eager(fields)
-  def unapply(x: ColumnMap)                             = Some(x.fields)
+  def empty: ColumnMap                                      = Eager(Vector())
+  def apply(fields: Vector[ColumnRef -> Column]): ColumnMap = Eager(fields)
+  def unapply(x: ColumnMap)                                 = Some(x.fields)
 
   final case class Eager(fields: Vector[ColumnKV]) extends ColumnMap {
     def mapFields(f: EndoA[Vector[KV]]): Eager = Eager(f(fields))

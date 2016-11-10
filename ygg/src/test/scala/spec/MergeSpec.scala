@@ -57,7 +57,7 @@ class MergeSpec extends TableQspec {
           GroupingSource(
             bar,
             'key,
-            Some(InnerObjectConcat(root delete valueField, ID \ 'value \ 'c as "value")),
+            Some(InnerObjectConcat(ID delete valueField, ID \ 'value \ 'c as "value")),
             0,
             GroupKeySpecOr(
               GroupKeySpecSource(oneField, ID \ 'value \ 'a),
@@ -66,7 +66,7 @@ class MergeSpec extends TableQspec {
           GroupingSource(
             foo,
             'key,
-            Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
+            Some(InnerObjectConcat(ID delete valueField, 'value as "value")),
             3,
             GroupKeySpecAnd(
               GroupKeySpecSource(oneField, ID \ 'value \ 'a),
@@ -138,7 +138,7 @@ class MergeSpec extends TableQspec {
 
       def genderFilter(str: String) = Filter(EqualLiteral(ID \ 'value \ 'Gender, CString(str), false))
       def targetTrans = InnerObjectConcat(
-        root delete valueField,
+        ID delete valueField,
         ID \ 'value \ 'Gender as "value"
       )
       def mkSource(groupId: Int, key: String, value: String) = GroupingSource(

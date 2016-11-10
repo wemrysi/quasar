@@ -64,7 +64,7 @@ class SampleSpec extends TableQspec {
   private def testSampleTransSpecs = {
     val data  = SampleData(simpleData2)
     val table = fromSample(data)
-    val specs = Seq[TransSpec1](root.id, root.value)
+    val specs = Seq[TransSpec1]('id, 'value)
 
     table.sample(15, specs).copoint.toList must beLike {
       case s1 :: s2 :: Nil =>
@@ -73,8 +73,8 @@ class SampleSpec extends TableQspec {
         result1 must have size (15)
         result2 must have size (15)
 
-        val expected1 = toJson(table.transform(root.id)).copoint
-        val expected2 = toJson(table.transform(root.value)).copoint
+        val expected1 = (table transform 'id).toVector
+        val expected2 = (table transform 'value).toVector
         expected1 must containAllOf(result1)
         expected2 must containAllOf(result2)
     }

@@ -61,7 +61,7 @@ class TableMethods[Table: TableRep](val self: Table) {
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): PairOf[Table] =
     AlignTable(sourceL, alignL, sourceR, alignR)
 
-  def columns: ColumnMap          = slicesStream.head.columns
+  def columns: ColumnMap          = slicesStream.headOption.fold[ColumnMap](ColumnMap.empty)(_.columns)
   def concat(t2: Table): Table    = makeTable(slices ++ t2.slices, size + t2.size)
   def dump(): Unit                = toVector foreach println
   def fields: Vector[JValue]      = toVector
@@ -176,7 +176,7 @@ class TableMethods[Table: TableRep](val self: Table) {
   def compact(): Table                 = compact(ID)
   def compact(spec: TransSpec1): Table = compact(spec, AnyDefined)
   def compact(spec: TransSpec1, definedness: Definedness): Table = {
-    val transes   = root.spec -> spec mapBoth composeSliceTransform
+    val transes   = ID.spec -> spec mapBoth composeSliceTransform
     val compacted = transes.fold((t1, t2) => (t1 zip t2)((s1, s2) => s1.compact(s2, definedness)))
 
     mapWithSameSize(transformStream(compacted, _)).normalize
@@ -484,15 +484,15 @@ class TableMethods[Table: TableRep](val self: Table) {
       }
 
       val groupTable                = subTable(comparatorGen, head.drop(spanStart) :: tail)
-      val groupedM                  = groupTable.map(_ transform root.dyn.`1`).flatMap(f)
+      val groupedM                  = groupTable.map(_ transform ID \ "1").flatMap(f)
       val groupedStream: NeedSlices = StreamT.wrapEffect(groupedM.map(_.slices))
 
       groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)
     }
 
     val keyTrans = OuterObjectConcat(
-      WrapObject(partitionBy, "0"),
-      WrapObject(root, "1")
+      partitionBy as "0",
+      ID as "1"
     )
 
     this.transform(keyTrans).compact(ID).slices.uncons map {

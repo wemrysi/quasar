@@ -192,7 +192,7 @@ class TransformSpec extends TableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        root select sd.fieldHeadName,
+        ID \ sd.fieldHeadName,
         sd.data map (_ apply sd.fieldHead) filter (_.isDefined)
       )
     ).check()
@@ -962,7 +962,7 @@ class TransformSpec extends TableQspec {
       toDelete.isDefined ==> {
         val table       = fromSample(sample)
         val Some(field) = toDelete
-        val spec        = root.value delete CPathField(field.name)
+        val spec        = ID \ 'value delete CPathField(field.name)
         val result      = toJson(table transform spec)
         val expected    = sample.data flatMap (jv => jv \ "value" delete JPath(field))
 
@@ -972,7 +972,7 @@ class TransformSpec extends TableQspec {
   }
 
   private def testIsTypeNumeric = checkSpecData(
-    spec     = root isType JNumberT,
+    spec     = ID isType JNumberT,
     expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue),
     data     = jsonMany"""
       {"key":[1], "value": "value1"}
@@ -990,7 +990,7 @@ class TransformSpec extends TableQspec {
   )
 
   private def testIsTypeUnionTrivial = checkSpecData(
-    spec     = root isType JUnionT(JNumberT, JNullT),
+    spec     = ID isType JUnionT(JNumberT, JNullT),
     expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue),
     data     = jsonMany"""
       {"key":[1], "value": "value1"}
@@ -1016,7 +1016,7 @@ class TransformSpec extends TableQspec {
       "key" -> JArrayUnfixedT
     )
     checkSpecData(
-      spec     = root isType jtpe,
+      spec     = ID isType jtpe,
       expected = Seq(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JFalse),
       data     = jsonMany"""
         {"key":[1], "value": 23}
@@ -1040,7 +1040,7 @@ class TransformSpec extends TableQspec {
       "key"   -> JArrayUnfixedT
     )
     checkSpecData(
-      spec     = root isType jtpe,
+      spec     = ID isType jtpe,
       expected = Seq(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JFalse, JFalse, JFalse),
       data     = jsonMany"""
         {"key":[1], "value": 23}
@@ -1061,7 +1061,7 @@ class TransformSpec extends TableQspec {
   private def testIsTypeObject = {
     val jtpe = JType.Object("value" -> JNumberT, "key" -> JArrayUnfixedT)
     checkSpecData(
-      spec     = root isType jtpe,
+      spec     = ID isType jtpe,
       expected = Seq(JTrue, JTrue, JFalse, JFalse, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse),
       data     = jsonMany"""
         {"key":[1], "value": 23}
@@ -1190,7 +1190,7 @@ class TransformSpec extends TableQspec {
       ))
 
     val table                           = fromSample(sample)
-    val results                         = toJson(table transform (root isType jtpe))
+    val results                         = toJson(table transform (ID isType jtpe))
     val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(Seq(_))
     val schemas0                        = schemasSeq map CValueGenerators.inferSchema
     val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
@@ -1393,7 +1393,7 @@ class TransformSpec extends TableQspec {
 
     val jtpe = JObjectFixedT(Map("value" -> JArrayFixedT(Map(0 -> JArrayFixedT(Map()), 1 -> JArrayFixedT(Map()), 2 -> JNullT)), "key" -> JArrayUnfixedT))
 
-    val results = toJson(table transform Typed(root, jtpe))
+    val results = toJson(table transform Typed(ID, jtpe))
 
     val included: Map[JPath, Set[CType]] = Map(
       JPath(0) -> Set[CType](CEmptyArray),
@@ -1614,7 +1614,7 @@ class TransformSpec extends TableQspec {
         Cond(
           Map1('value, cf.math.Mod.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(0))),
           'value,
-          ConstLiteral(CBoolean(false), root)
+          ConstLiteral(CBoolean(false), ID)
         )
       })
 

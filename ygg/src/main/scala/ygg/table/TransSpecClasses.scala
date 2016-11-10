@@ -29,17 +29,8 @@ package object trans {
   val ID_L = new KVTransSpecBuilder[Source2](Leaf(SourceLeft))
   val ID_R = new KVTransSpecBuilder[Source2](Leaf(SourceRight))
 
-  def where(name: String): WhereOps1 = new WhereOps1(CPathField(name))
-
-  class WhereOps1(field: CPathField) {
-    def is(value: CValue) = Filter(ID \ field, EqualLiteral(ID, value, invert = false))
-  }
-
   def wrapOuterConcat[A](xs: (String -> TransSpec[A])*): OuterObjectConcat[A] =
     OuterObjectConcat(xs map (kv => kv._2 as kv._1): _*)
-
-  def filterObject(names: String*) =
-    OuterObjectConcat(names map (ID \ _): _*)
 
   implicit class TransSymOps(private val self: Sym) {
     def as(as: String): TransSpec1 = <> as as
@@ -61,8 +52,6 @@ package object trans {
   implicit def transSpecOps[A](x: TransSpec[A]): TransSpecOps[A]                = new TransSpecOps(x)
   implicit def liftCValue[A](a: A)(implicit C: CValueType[A]): CWrappedValue[A] = C(a)
 
-  val root = ID
-
   sealed trait Selector {
     def run: TransSpec1 = ID \ this
     def toVector: Vector[Selector.Atom] = this match {
@@ -74,7 +63,6 @@ package object trans {
     sealed trait Atom extends Selector
     final case class Index(index: Int)             extends Atom
     final case class Field(name: String)           extends Atom
-    // final case class Var(sym: Sym)                 extends Atom
     final case class Path(cpath: CPath)            extends Atom
     final case class Multi(sels: Vector[Selector]) extends Selector
 
@@ -84,7 +72,6 @@ package object trans {
   implicit def liftIndex(index: Int): Selector   = Selector.Index(index)
   implicit def liftField(name: String): Selector = Selector.Field(name)
   implicit def liftFieldSym(sym: Sym): Selector  = Selector.Field(sym.name)
-  // implicit def liftVar(sym: Sym): Selector    = Selector.Var(sym)
   implicit def liftPath(cpath: CPath): Selector  = Selector.Path(cpath)
 }
 
@@ -96,66 +83,38 @@ package trans {
   final case object SourceLeft  extends Source2
   final case object SourceRight extends Source2
 
-  class KVTransSpecBuilder[A](spec: TransSpec[A]) extends TransSpecBuilder[A](spec) {
-    def emptyArray() = ConstLiteral(CEmptyArray, spec)
+  class KVTransSpecBuilder[A](spec: TransSpec[A]) extends TransSpecBuilder[A](spec)
 
-    def a      = spec \ "a"
-    def b      = spec \ "b"
-    def bar    = spec \ "bar"
-    def c      = spec \ "c"
-    def field  = spec \ "field"
-    def foo    = spec \ "foo"
-    def id     = spec \ "id"
-    def key    = spec \ "key"
-    def ref    = spec \ "ref"
-    def value  = spec \ "value"
-    def value1 = spec \ "value1"
-    def value2 = spec \ "value2"
-  }
   class TransSpecOps[A](spec: TransSpec[A]) {
     def mapSources[B](f: A => B): TransSpec[B] = TransSpec.mapSources(spec)(f)
   }
-  class TransSpecDynamic[A](spec: TransSpec[A]) extends Dynamic {
-    def selectDynamic(name: String) = spec \ name
-  }
   class TransSpecBuilder[A](val spec: TransSpec[A]) {
     type This    = TransSpec[A]
-    type Builder = TransSpecBuilder[A]
 
+    def apply(): This                     = spec
     def unapply(x: TransSpec[_]): Boolean = x == spec
 
-    def dyn: TransSpecDynamic[A] = new TransSpecDynamic[A](spec)
-
-    protected def next[A](x: This): Builder = new TransSpecBuilder(x)
-
-    def mapLeaves(f: A => This)         = deepMap({ case Leaf(x) => f(x) })
+    def as(name: String)                = WrapObject(spec, name)
+    def asArray()                       = WrapArray(spec)
+    def at(idx: Int): This              = WrapArray(this \ idx)
+    def deepEquals(that: This)          = Equal(spec, that)
     def deepMap(pf: MaybeSelf[This])    = TransSpec.deepMap(spec)(pf)
     def deepMap1(fn: CF1)               = DeepMap1(spec, fn)
-    def deepEquals(that: This)          = Equal(spec, that)
-    def isEqual(that: CValue)           = EqualLiteral(spec, right = that, invert = false)
     def delete(fields: CPathField*)     = ObjectDelete(spec, fields.toSet)
     def filter(p: This)                 = Filter(spec, p)
+    def isEqual(that: CValue)           = EqualLiteral(spec, right = that, invert = false)
     def isType(tp: JType)               = IsType(spec, tp)
     def map1(fn: CF1)                   = Map1(spec, fn)
+    def mapLeaves(f: A => This)         = deepMap({ case Leaf(x) => f(x) })
     def scan(scanner: Scanner)          = Scan(spec, scanner)
     def select(field: CPathField): This = this \ field.name
     def select(name: String): This      = this \ name
 
-    def at(idx: Int)     = WrapArray(this \ idx)
-    def as(name: String) = WrapObject(spec, name)
-    def asArray()        = WrapArray(spec)
-
     def \(sel: Selector): This = sel.toVector.foldLeft(spec) {
       case (spec, Selector.Index(index)) => DerefArrayStatic(spec, index)
       case (spec, Selector.Field(name))  => DerefObjectStatic(spec, name)
-      // case (spec, Selector.Var(sym))     => ???
       case (spec, Selector.Path(cpath))  => cpath.nodes.foldLeft(spec)(_ \ _)
     }
-
-    def fromLeft  = spec mapSources (_ => SourceLeft)
-    def fromRight = spec mapSources (_ => SourceRight)
-
-    def apply(index: Int): This = this \ index
 
     def @:(meta: String): This = this \ CPathMeta(meta)
     def \(index: Int): This    = this \ CPathIndex(index)
