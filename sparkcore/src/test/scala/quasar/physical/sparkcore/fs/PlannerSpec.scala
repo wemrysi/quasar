@@ -27,6 +27,7 @@ import quasar.Data
 import quasar.DataCodec
 import quasar.qscript._
 import quasar.sql.JoinDir
+import quasar.fp.ski.κ
 
 import org.apache.spark._
 import org.apache.spark.rdd._
