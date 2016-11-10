@@ -22,7 +22,7 @@ import scala.Predef.identity
 
 class CogroupSpec extends TableQspec {
   import SampleData._
-  import trans._, constants._
+  import trans._
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
   private implicit def cogroupData = Arbitrary(genCogroupData)
@@ -40,13 +40,16 @@ class CogroupSpec extends TableQspec {
     "survive pathology 1"                                                      in testCogroupPathology1
     "survive pathology 2"                                                      in testCogroupPathology2
     "survive pathology 3"                                                      in testCogroupPathology3
-    "survive scalacheck"                                                       in prop(testCogroup _)
+    "survive scalacheck"                                                       in prop((pair: PairOf[Seq[JValue]]) => testCogroup(pair._1, pair._2))
 
     "not truncate cogroup when right side has long equal spans"                in testLongEqualSpansOnRight
     "not truncate cogroup when left side has long equal spans"                 in testLongEqualSpansOnLeft
     "not truncate cogroup when both sides have long equal spans"               in testLongEqualSpansOnBoth
     "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
   }
+
+  private def wrapBoth(name: String): TransSpec2 =
+    OuterObjectConcat(ID_L \ name, ID_R \ name) as name
 
   @tailrec private def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Ord[A]): CogroupResult[A] = (l, r) match {
     case (Seq(), _)             => acc ++ (r map right3)
@@ -71,17 +74,16 @@ class CogroupSpec extends TableQspec {
 
   private def cogroupKV(left: Table, right: Table)(specs: TransSpec2*): Table = {
     left.cogroup('key, 'key, right)(
-      `.`,
-      `.`,
+      ID,
+      ID,
       OuterObjectConcat(
-        wrapFieldLeft("key"),
+        'key.<<,
         OuterObjectConcat(specs: _*)
       )
     )
   }
 
-  private def testCogroup(pair: PairOf[Seq[JValue]]) = {
-    val (l, r)   = pair
+  private def testCogroup(l: Seq[JValue], r: Seq[JValue]) = {
     val ltable   = fromJson(l)
     val rtable   = fromJson(r)
     val keyOrder = Ord[JValue].contramap((_: JValue) \ "key")
@@ -104,15 +106,15 @@ class CogroupSpec extends TableQspec {
     def recl = toRecord(Array(0L), JArray(JNum(12) :: Nil))
     def recr = toRecord(Array(0L), JArray(JUndefined :: JNum(13) :: Nil))
 
-    val ltable   = fromSample(SampleData(Stream(recl)))
-    val rtable   = fromSample(SampleData(Stream(recr)))
+    val ltable   = fromJson(recl :: Nil)
+    val rtable   = fromJson(recr :: Nil)
     val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
     val result: Table = cogroupKV(ltable, rtable)(
-      WrapObject(OuterArrayConcat('value.<<, SourceValue.Right), "value")
+      OuterArrayConcat('value.<<, 'value.>>) as "value"
     )
 
-    toJsonSeq(f(result)) must_=== expected
+    f(result).toVector must_=== expected
   }
 
   private def testSimpleCogroup(f: Table => Table) = {
@@ -120,8 +122,8 @@ class CogroupSpec extends TableQspec {
     def recr(i: Long)    = toRecord(Array(i), json"""{ "right": ${i.toString} }""")
     def recBoth(i: Long) = toRecord(Array(i), json"""{ "left": ${i.toString}, "right": ${i.toString} }""")
 
-    val ltable = fromSample(SampleData(Stream(recl(0), recl(1), recl(3), recl(3), recl(5), recl(7), recl(8), recl(8))))
-    val rtable = fromSample(SampleData(Stream(recr(0), recr(2), recr(3), recr(4), recr(5), recr(5), recr(6), recr(8), recr(8))))
+    val ltable = fromJson(Seq(recl(0), recl(1), recl(3), recl(3), recl(5), recl(7), recl(8), recl(8)))
+    val rtable = fromJson(Seq(recr(0), recr(2), recr(3), recr(4), recr(5), recr(5), recr(6), recr(8), recr(8)))
 
     val expected = Vector(
       recBoth(0),
@@ -140,7 +142,7 @@ class CogroupSpec extends TableQspec {
       recBoth(8)
     )
 
-    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
+    val result: Table = cogroupKV(ltable, rtable)(wrapBoth("value"))
 
     toJsonSeq(f(result)) must_=== expected
   }
@@ -165,7 +167,7 @@ class CogroupSpec extends TableQspec {
       recr(10, 77)
     )
 
-    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
+    val result: Table = cogroupKV(ltable, rtable)(wrapBoth("value"))
     toJsonSeq(result) must_=== expected
   }
 
@@ -187,9 +189,9 @@ class CogroupSpec extends TableQspec {
       recBoth(6),
       recBoth(7)
     )
+    val result = cogroupKV(ltable, rtable)(wrapBoth("value"))
 
-    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
-    toJsonSeq(result) must_=== expected
+    result.toVector must_=== expected
   }
 
   private def testAnotherSimpleCogroupSwitched = {
@@ -210,9 +212,9 @@ class CogroupSpec extends TableQspec {
       recBoth(6),
       recBoth(7)
     )
+    val result = cogroupKV(ltable, rtable)(wrapBoth("value"))
 
-    val result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
-    toJsonSeq(result) must_=== expected
+    result.toVector must_=== expected
   }
 
   private def testUnsortedInputs = {
@@ -222,17 +224,15 @@ class CogroupSpec extends TableQspec {
     val ltable = fromSample(SampleData(Stream(recl(0), recl(1))))
     val rtable = fromSample(SampleData(Stream(recr(1), recr(0))))
 
-    def result: Table = cogroupKV(ltable, rtable)(wrapFieldBoth("value"))
+    def result: Table = cogroupKV(ltable, rtable)(wrapBoth("value"))
 
     result.toVector must throwAn[Exception]
   }
 
-  private def testCogroupPathology1 = {
-    val s1 = jsonMany"""{"key":[1,1,1],"value":{"a":[]}}"""
-    val s2 = jsonMany"""{"key":[1,1,1],"value":{"b":0}}"""
-
-    testCogroup(s1 -> s2)
-  }
+  private def testCogroupPathology1 = testCogroup(
+    jsonMany"""{"key":[1,1,1],"value":{"a":[]}}""",
+    jsonMany"""{"key":[1,1,1],"value":{"b":0}}"""
+  )
 
   private def testCogroupSliceBoundaries = {
     val s1 = jsonMany"""
@@ -262,7 +262,7 @@ class CogroupSpec extends TableQspec {
       {"key":[11],"value":{"mbsn8ya":758880641626989193}}
     """
 
-    testCogroup(s1 -> s2)
+    testCogroup(s1, s2)
   }
 
   private def testCogroupPathology2 = {
@@ -314,7 +314,7 @@ class CogroupSpec extends TableQspec {
       {"key":[86,50,9],"value":[$undef,-3.4028234663852886E+38]}
     """
 
-    testCogroup(s1 -> s2)
+    testCogroup(s1, s2)
   }
 
   private def testCogroupPathology3 = {
@@ -348,7 +348,7 @@ class CogroupSpec extends TableQspec {
       { "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }
     """
 
-    testCogroup(s1 -> s2)
+    testCogroup(s1, s2)
   }
 
   private def testPartialUndefinedCogroup = {

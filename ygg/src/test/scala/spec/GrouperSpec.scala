@@ -107,7 +107,7 @@ class GrouperSpec extends TableQspec {
     val groupId    = newGroupId
     val tab: Table = fromJson(data)
 
-    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, 'value))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -160,10 +160,10 @@ class GrouperSpec extends TableQspec {
     val groupId = newGroupId
 
     val valueTrans =
-      InnerObjectConcat(WrapObject(dotKey, Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), Value.name))
+      InnerObjectConcat(WrapObject(dotKey, Key.name), WrapObject(Map1('value, doubleF1), Value.name))
 
     val tab  = fromJson(data)
-    val spec = GroupingSource(tab, dotKey, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource(tab, dotKey, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, 'value))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -214,7 +214,7 @@ class GrouperSpec extends TableQspec {
     val groupId = newGroupId
 
     val tab  = fromJson(data)
-    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
+    val spec = GroupingSource(tab, dotKey, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1('value, mod2)))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -278,8 +278,8 @@ class GrouperSpec extends TableQspec {
       dotKey,
       Some(TransSpec1.Id),
       groupId,
-      (    GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a")))
-        && GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))
+      (    GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a")))
+        && GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))
       )
     )
 
@@ -316,8 +316,8 @@ class GrouperSpec extends TableQspec {
       Some(TransSpec1.Id),
       groupId,
       GroupKeySpecOr(
-        GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+        GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -389,8 +389,8 @@ class GrouperSpec extends TableQspec {
       GroupKeySpecAnd(
         GroupKeySpecSource(
           CPathField("extra"),
-          Filter(Map1(DerefObjectStatic(SourceValue.Single, CPathField("a")), eq12F1), Map1(DerefObjectStatic(SourceValue.Single, CPathField("a")), eq12F1))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+          Filter(Map1(DerefObjectStatic('value, CPathField("a")), eq12F1), Map1(DerefObjectStatic('value, CPathField("a")), eq12F1))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -425,13 +425,13 @@ class GrouperSpec extends TableQspec {
     val spec = GroupingSource(
       table,
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       groupId,
       GroupKeySpecOr(
         GroupKeySpecSource(
           CPathField("extra"),
-          Filter(Map1(DerefObjectStatic(SourceValue.Single, CPathField("a")), eq12F1), Map1(DerefObjectStatic(SourceValue.Single, CPathField("a")), eq12F1))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+          Filter(Map1(DerefObjectStatic('value, CPathField("a")), eq12F1), Map1(DerefObjectStatic('value, CPathField("a")), eq12F1))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val result = Table.merge(spec) { (key, map) =>
       for {
@@ -480,10 +480,10 @@ class GrouperSpec extends TableQspec {
     val groupId2 = newGroupId
 
     // t1 where t1 = 'a
-    val spec1 = GroupingSource(table1, dotKey, Some(SourceValue.Single), groupId1, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec1 = GroupingSource(table1, dotKey, Some('value), groupId1, GroupKeySpecSource(tic_a, 'value))
 
     // t2 where t2 = 'a
-    val spec2 = GroupingSource(table2, dotKey, Some(SourceValue.Single), groupId2, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec2 = GroupingSource(table2, dotKey, Some('value), groupId2, GroupKeySpecSource(tic_a, 'value))
 
     val intersect = GroupingAlignment(DerefObjectStatic(Leaf(Source), tic_a), DerefObjectStatic(Leaf(Source), tic_a), spec1, spec2, GroupingSpec.Intersection)
 
@@ -541,18 +541,18 @@ class GrouperSpec extends TableQspec {
     val spec1 = GroupingSource(
       table1,
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       groupId1,
       GroupKeySpecAnd(
-        GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+        GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val spec2 = GroupingSource(
       table2,
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       groupId2,
-      GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
+      GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
 
     val intersection =
       GroupingAlignment(DerefObjectStatic(Leaf(Source), tic_a), DerefObjectStatic(Leaf(Source), tic_a), spec1, spec2, GroupingSpec.Intersection)
@@ -634,18 +634,18 @@ class GrouperSpec extends TableQspec {
     val spec1 = GroupingSource(
       table1,
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       groupId1,
       GroupKeySpecOr(
-        GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+        GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val spec2 = GroupingSource(
       table2,
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       groupId2,
-      GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
+      GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
 
     val intersection =
       GroupingAlignment(DerefObjectStatic(Leaf(Source), tic_a), DerefObjectStatic(Leaf(Source), tic_a), spec1, spec2, GroupingSpec.Intersection)
@@ -771,25 +771,25 @@ class GrouperSpec extends TableQspec {
     val fooSpec = GroupingSource(
       fromJson(foo.toStream),
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       fooGroup,
       GroupKeySpecAnd(
-        GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+        GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))),
+        GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b")))))
 
     val barSpec = GroupingSource(
       fromJson(bar.toStream),
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       barGroup,
-      GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
+      GroupKeySpecSource(tic_a, DerefObjectStatic('value, CPathField("a"))))
 
     val bazSpec = GroupingSource(
       fromJson(baz.toStream),
       dotKey,
-      Some(SourceValue.Single),
+      Some('value),
       bazGroup,
-      GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b"))))
+      GroupKeySpecSource(tic_b, DerefObjectStatic('value, CPathField("b"))))
 
     val spec = GroupingAlignment(
       DerefObjectStatic(Leaf(Source), tic_b),

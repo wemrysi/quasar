@@ -44,6 +44,7 @@ package object trans {
 
   implicit class TransSymOps(private val self: Sym) {
     def as(as: String): TransSpec1 = wrapField(self.name, as)
+    def at(idx: Int): TransSpec1   = root \ self.name at idx
 
     def <<(): TransSpec2 = rootLeft \ self.name
     def >>(): TransSpec2 = rootRight \ self.name
@@ -64,6 +65,8 @@ package object trans {
   val `<.` = rootLeft
   val `.>` = rootRight
   val ID   = root
+  val ID_L = rootLeft
+  val ID_R = rootRight
 
   implicit class RootInterpolation(val sc: StringContext) {
     private def str = sc.parts.mkString("")
@@ -79,7 +82,6 @@ package object trans {
   def wrapFieldLeft(name: String, as: String): TransSpec2  = WrapObject(`<.` \ name, as)
   def wrapFieldRight(name: String): TransSpec2             = wrapFieldRight(name, name)
   def wrapFieldRight(name: String, as: String): TransSpec2 = WrapObject(`.>` \ name, as)
-  def wrapFieldBoth(name: String): TransSpec2              = WrapObject(OuterObjectConcat(`<.` \ name, `.>` \ name), name)
 
   def equalAtField(name: String) =
     WrapObject(Equal(`<.` \ name, `.>` \ name), name)
@@ -99,7 +101,7 @@ package object trans {
     sealed trait Atom extends Selector
     final case class Index(index: Int)             extends Atom
     final case class Field(name: String)           extends Atom
-    final case class Var(sym: Sym)                 extends Atom
+    // final case class Var(sym: Sym)                 extends Atom
     final case class Path(cpath: CPath)            extends Atom
     final case class Multi(sels: Vector[Selector]) extends Selector
 
@@ -108,7 +110,8 @@ package object trans {
 
   implicit def liftIndex(index: Int): Selector   = Selector.Index(index)
   implicit def liftField(name: String): Selector = Selector.Field(name)
-  implicit def liftVar(sym: Sym): Selector       = Selector.Var(sym)
+  implicit def liftFieldSym(sym: Sym): Selector  = Selector.Field(sym.name)
+  // implicit def liftVar(sym: Sym): Selector    = Selector.Var(sym)
   implicit def liftPath(cpath: CPath): Selector  = Selector.Path(cpath)
 }
 
@@ -162,15 +165,16 @@ package trans {
     def scan(scanner: Scanner)          = Scan(spec, scanner)
     def select(field: CPathField): This = this \ field.name
     def select(name: String): This      = this \ name
-    def wrapArrayValue()                = WrapArray(spec)
     def wrapObjectField(name: String)   = WrapObject(spec, name)
 
+    def at(idx: Int)     = WrapArray(this \ idx)
     def as(name: String) = WrapObject(spec, name)
+    def asArray()        = WrapArray(spec)
 
     def \(sel: Selector): This = sel.toVector.foldLeft(spec) {
       case (spec, Selector.Index(index)) => DerefArrayStatic(spec, index)
       case (spec, Selector.Field(name))  => DerefObjectStatic(spec, name)
-      case (spec, Selector.Var(sym))     => ???
+      // case (spec, Selector.Var(sym))     => ???
       case (spec, Selector.Path(cpath))  => cpath.nodes.foldLeft(spec)(_ \ _)
     }
 
@@ -254,8 +258,8 @@ package trans {
     def concatChildren[A](tree: CPathTree[Int], leaf: TransSpec[A]): TransSpec[A] = {
       def createSpec(tree: CPathTree[Int]): TransSpec[A] = tree match {
         case node @ RootNode(seq)                  => concatChildren(node, leaf)
-        case node @ FieldNode(CPathField(name), _) => concatChildren(node, leaf) wrapObjectField name
-        case node @ IndexNode(CPathIndex(_), _)    => concatChildren(node, leaf).wrapArrayValue() //assuming that indices received in order
+        case node @ FieldNode(CPathField(name), _) => concatChildren(node, leaf) as name
+        case node @ IndexNode(CPathIndex(_), _)    => concatChildren(node, leaf).asArray() //assuming that indices received in order
         case LeafNode(idx)                         => leaf \ idx
       }
       val initialSpecs = tree match {

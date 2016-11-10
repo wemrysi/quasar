@@ -16,7 +16,6 @@
 
 package ygg.tests
 
-import scalaz._
 import ygg._, common._, json._, table._
 
 class CrossSpec extends TableQspec {

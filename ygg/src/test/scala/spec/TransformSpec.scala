@@ -271,19 +271,25 @@ class TransformSpec extends TableQspec {
   }
 
   private def checkEqualSelfArray = {
-    val data: Seq[JValue]  = json"""[[9,10,11]]""".asArray.elements map (k => json"""{ "key": [0], "value": $k }""")
-    val data2: Seq[JValue] = List(json"""{"key":[],"value":[9,10,11]}""")
+    val data: Seq[JValue]  = Seq(9, 10, 11) map (k => json"""{ "key": [0], "value": $k }""")
+    val data2: Seq[JValue] = jsonMany"""{"key":[],"value":[9,10,11]}"""
 
     val table   = fromJson(data)
     val table2  = fromJson(data2)
-    val results = toJson(table.cross(table2)(InnerObjectConcat(concatArraysAtField("key"), equalAtField("value"))))
+
+    val result = (table cross table2)(
+      InnerObjectConcat(
+        OuterArrayConcat('key.<<, 'key.>>) as "key",
+        Equal('value.<<, 'value.>>) as "value"
+      )
+    )
 
     val expected = data map {
       case jo @ JObject(fields) => jo.set("value", JBool(fields("value") == json"[ 9, 10, 11 ]"))
       case x                    => abort(s"$x")
     }
 
-    results.copoint must_=== expected.toStream
+    result.toSeq must_=== expected
   }
 
   private def testSimpleEqual = {
@@ -544,9 +550,9 @@ class TransformSpec extends TableQspec {
   }
 
   private def testObjectConcatTrivial = {
-    val table        = fromJson(Seq(JTrue, jobject()))
-    val resultsInner = toJsonSeq(table transform InnerObjectConcat(`.`))
-    val resultsOuter = toJsonSeq(table transform OuterObjectConcat(`.`))
+    val table        = fromJson(jsonMany"true {}")
+    val resultsInner = (table transform InnerObjectConcat(`.`)).toSeq
+    val resultsOuter = (table transform OuterObjectConcat(`.`)).toSeq
 
     resultsInner must_=== Seq(jobject())
     resultsOuter must_=== Seq(jobject())
@@ -568,11 +574,9 @@ class TransformSpec extends TableQspec {
       {"bar":{},"baz":24,"foo":{"ook":7}}
       {"bar":{"ack":9},"baz":18,"foo":{"ook":3}}
       {"bar":{"ack":0},"baz":18,"foo":{}}
-    """.toStream
+    """
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-    toJson(table transform spec).copoint
+    (fromJson(data) transform spec).toSeq
   }
 
 
@@ -589,14 +593,14 @@ class TransformSpec extends TableQspec {
       {"ook":7}
       {"ack":9,"ook":3}
       {"ack":0}
-    """.toStream
+    """
 
     result must_=== expected
   }
 
   private def testOuterObjectConcatEmptyObject = {
     val result = testConcatEmptyObject(OuterObjectConcat('foo, 'bar))
-    val expected: Stream[JValue] = jsonMany"""
+    val expected = jsonMany"""
       {"ack":12}
       {"ack":12,"bak":13}
       {"ook":99}
@@ -611,7 +615,7 @@ class TransformSpec extends TableQspec {
       {"ook":7}
       {"ack":9,"ook":3}
       {"ack":0}
-    """.toStream
+    """
 
     result must_=== expected
   }
@@ -622,17 +626,14 @@ class TransformSpec extends TableQspec {
       {"foo": {"baz": 5}}
       {"bar": {"ack": 45}}
       {"foo": {"baz": 7}, "bar" : {"ack": 23}, "baz": {"foobar": 24}}
-    """.toStream
-
-    val table    = fromSample(SampleData(data))
-    val spec     = InnerObjectConcat('foo, 'bar)
-    val results  = toJson(table transform spec)
+    """
     val expected = jsonMany"""
       {"ack":12,"baz":4}
       {"ack":23,"baz":7}
-    """.toStream
+    """
 
-    results.copoint must_=== expected
+    val result = fromJson(data) transform InnerObjectConcat('foo, 'bar)
+    result.toSeq must_=== expected
   }
 
   private def testOuterObjectConcatUndefined = {
@@ -738,15 +739,15 @@ class TransformSpec extends TableQspec {
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
         InnerObjectConcat(
-          WrapObject(root".value.value1", "value1"),
-          WrapObject(root".value.value2", "value1")
+          ID \ 'value \ 'value1 as "value1",
+          ID \ 'value \ 'value2 as "value1"
         )
       })
 
       val resultsOuter = toJson(table.transform {
         OuterObjectConcat(
-          WrapObject(root".value.value1", "value1"),
-          WrapObject(root".value.value2", "value1")
+          ID \ 'value \ 'value1 as "value1",
+          ID \ 'value \ 'value2 as "value1"
         )
       })
 
@@ -767,14 +768,12 @@ class TransformSpec extends TableQspec {
     val table  = fromSample(sample)
 
     val spec = InnerObjectConcat(
-      Leaf(Source),
-      WrapObject(
-        Filter('a, ConstLiteral(CBoolean(false), `.`)), // undefined
-        "b"))
+      ID,
+      Filter('a, ConstLiteral(CBoolean(false), ID)) as "b"
+    )
+    val result = table transform spec
 
-    val results = toJson(table transform spec)
-
-    results.copoint mustEqual Stream()
+    result.toSeq must_=== Seq()
   }
 
   private def checkArrayConcat = {
@@ -793,15 +792,10 @@ class TransformSpec extends TableQspec {
           case z              => Some(z)
         }
       })
-      val table = fromSample(sample)
-      val innerSpec = WrapObject(
-        InnerArrayConcat(WrapArray(root value 0), WrapArray(root value 1)),
-        "value"
-      )
-      val outerSpec = WrapObject(
-        OuterArrayConcat(WrapArray(root value 0), WrapArray(root value 1)),
-        "value"
-      )
+      val table     = fromSample(sample)
+      val innerSpec = InnerArrayConcat('value at 0, 'value at 1) as "value"
+      val outerSpec = OuterArrayConcat('value at 0, 'value at 1) as "value"
+
       def isOk(results: Need[Stream[JValue]]) = {
         val found = sample.data collect {
           case obj @ JObject(fields) =>
