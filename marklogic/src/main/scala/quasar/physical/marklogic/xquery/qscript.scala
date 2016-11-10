@@ -125,19 +125,6 @@ object qscript {
       }
     })
 
-  // qscript:element-dup-keys($elt as element()) as element()
-  def elementDupKeys[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-dup-keys") map (_(
-      $("elt") as ST("element()")
-    ).as(ST("element()")) { elt: XQuery =>
-      val (c, n) = ("$c", "$n")
-      element { fn.nodeName(elt) } {
-        for_    (c -> (elt `/` child.element()))
-        .let_   (n -> fn.nodeName(c.xqy))
-        .return_(element { n.xqy } { n.xqy })
-      }
-    })
-
   // qscript:element-left-shift($elt as element()) as item()*
   def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("element-left-shift") flatMap (_(
@@ -340,24 +327,5 @@ object qscript {
           }
         }
       }
-    })
-
-  // qscript:zip-map-element-keys($elt as element()) as element()
-  def zipMapElementKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
-    qs.declare("zip-map-element-keys") flatMap (_(
-      $("elt") as ST("element()")
-    ).as(ST(s"element()")) { elt =>
-      val (c, n) = ("$child", "$name")
-
-      for {
-        kelt    <- ejson.mkArrayElt[F](n.xqy)
-        velt    <- ejson.mkArrayElt[F](c.xqy)
-        kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
-        kvEnt   <- ejson.renameOrWrap[F] apply (n.xqy, kvArr)
-        entries =  for_ (c -> elt `/` child.element())
-                   .let_(n -> fn.nodeName(c.xqy))
-                   .return_(kvEnt)
-        zMap    <- ejson.mkObject[F] apply entries
-      } yield zMap
     })
 }

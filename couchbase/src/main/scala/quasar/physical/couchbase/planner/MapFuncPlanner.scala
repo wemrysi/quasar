@@ -389,17 +389,6 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       partialQueryString(s"object_remove(${n1ql(a1)}, ${n1ql(a2)})").point[M]
 
     // helpers & QScript-specific
-    case DupMapKeys(a1)                   => unimplementedP("DupMapKeys")
-    case DupArrayIndices(a1)              => unimplementedP("DupArrayIndices")
-    case ZipMapKeys(a1)                   =>
-      val a1N1ql = n1ql(a1)
-      prtell[M](Vector(detail(
-        "N1QL ZipMapKeys",
-        s"""  a1:   $a1N1ql
-           |  n1ql: ???""".stripMargin('|')
-      ))) *>
-      unimplementedP("ZipMapKeys")
-    case ZipArrayIndices(a1)              => unimplementedP("ZipArrayIndices")
     case Range(a1, a2)                    =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)

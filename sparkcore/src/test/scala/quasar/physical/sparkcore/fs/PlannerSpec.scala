@@ -319,7 +319,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
         def struct: FreeMap = ProjectFieldR(HoleF, StrLit("countries"))
         def repair: JoinFunc = Free.point(RightSide)
 
-        val leftShift = quasar.qscript.LeftShift(src, struct, repair)
+        val leftShift = quasar.qscript.LeftShift(src, struct, ExcludeId, repair)
 
         val state: SparkState[RDD[Data]] = alg(leftShift)
         state.eval(sc).run.unsafePerformSync  must beRightDisjunction.like{

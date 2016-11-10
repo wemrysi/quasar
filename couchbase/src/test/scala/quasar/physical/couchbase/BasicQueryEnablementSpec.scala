@@ -117,10 +117,11 @@ class BasicQueryEnablementSpec
       // select * from foo
       val qs =
         chain[Fix, QST](
-           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-           QCT.inj(LeftShift((),
-             HoleF,
-             Free.point(RightSide))))
+          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          QCT.inj(LeftShift((),
+            HoleF,
+            ExcludeId,
+            Free.point(RightSide))))
 
       val n1ql = n1qlFromQS(qs)
 
@@ -134,6 +135,7 @@ class BasicQueryEnablementSpec
           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
           QCT.inj(LeftShift((),
             HoleF,
+            ExcludeId,
             ProjectFieldR(Free.point(RightSide), StrLit("zed")))))
 
       val n1ql = n1qlFromQS(qs)
@@ -146,8 +148,7 @@ class BasicQueryEnablementSpec
       val qs =
         chain[Fix, QST](
           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(qscript.Map(
-            (),
+          QCT.inj(qscript.Map((),
             Free.roll(Add(
               ProjectFieldR(HoleF, StrLit("a")),
               ProjectFieldR(HoleF, StrLit("b")))))))
@@ -164,11 +165,11 @@ class BasicQueryEnablementSpec
           SRT.inj(Const(ShiftedRead(rootDir </> file("person"), ExcludeId))),
           QCT.inj(LeftShift((),
             HoleF,
+            ExcludeId,
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("height")))),
-          QCT.inj(Reduce(
-            (),
+          QCT.inj(Reduce((),
             NullLit(), // reduce on a constant bucket, which is normalized to Null
             List(ReduceFuncs.Sum[FreeMap](HoleF)),
             Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))))
@@ -185,11 +186,13 @@ class BasicQueryEnablementSpec
           SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
           QCT.inj(LeftShift((),
             HoleF,
+            ExcludeId,
             ProjectFieldR(
               Free.point(RightSide),
               StrLit("loc")))),
           QCT.inj(LeftShift((),
             HoleF,
+            ExcludeId,
             Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))))
 
       val n1ql = n1qlFromQS(qs)

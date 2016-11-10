@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, emptySeq, every, for_, func, if_, let_, typeswitch}, axes.child
+  import syntax._, expr.{attribute, element, emptySeq, every, func, if_, let_, typeswitch}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -68,47 +68,6 @@ object ejson {
         arr `/` child(aelt)(idx)
       }
     }
-
-  // ejson:array-dup-indices($arr as element()) as element()
-  def arrayDupIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("array-dup-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
-      declare(fname)(
-        $("arr") as ST("element()")
-      ).as(ST("element()")) { arr: XQuery =>
-        val elts = "$elts"
-        seqToArray[F].apply(fn.nodeName(arr), 0.xqy to mkSeq_(fn.count(elts.xqy) - 1.xqy)) map { inner =>
-          let_(elts -> (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(elts.xqy)) then_ arr else_ inner
-          }
-        }
-      }
-    }.join
-
-  // ejson:array-zip-indices($arr as element()) as element()
-  def arrayZipIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("array-zip-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
-      declare(fname)(
-        $("arr") as ST("element()")
-      ).as(ST("element()")) { arr: XQuery =>
-        val (i, elts, zelts) = ("$i", "$elts", "$zelts")
-
-        for {
-          ixelt <- mkArrayElt[F](i.xqy)
-          pair  <- mkArray_[F](mkSeq_(ixelt, elts.xqy(i.xqy)))
-          zpair <- mkArrayElt[F](pair)
-          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts.xqy)
-        } yield {
-          let_(elts -> (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(elts.xqy))
-            .then_ { arr }
-            .else_ {
-              let_(zelts -> for_(i -> (1.xqy to fn.count(elts.xqy))).return_(zpair))
-              .return_(zarr)
-            }
-          }
-        }
-      }
-    }.join
 
   // ejson:ascribed-type($elt as element()) as xs:string?
   def ascribedType[F[_]: PrologW]: F[FunctionDecl1] =

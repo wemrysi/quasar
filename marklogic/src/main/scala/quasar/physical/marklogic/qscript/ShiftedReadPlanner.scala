@@ -36,6 +36,8 @@ private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
       val includeId = idStatus match {
         case IncludeId => fn.True
         case ExcludeId => fn.False
+        // FIXME: This ain’t right.
+        case IdOnly    => fn.False
       }
 
       qscript.shiftedRead apply (dirRepr.xs, includeId)

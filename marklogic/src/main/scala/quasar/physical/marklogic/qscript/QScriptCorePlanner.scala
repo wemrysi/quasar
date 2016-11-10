@@ -38,7 +38,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         g <- mapFuncXQuery(f, x.xqy)
       } yield fn.map(func(x) { g }, src)
 
-    case LeftShift(src, struct, repair) =>
+    // FIXME: Need to handle `id` parameter.
+    case LeftShift(src, struct, id, repair) =>
       for {
         l       <- freshVar[F]
         v       <- freshVar[F]

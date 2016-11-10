@@ -88,7 +88,8 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                           |  n1ql: $rN1qlStr""".stripMargin('|'))))
       } yield rN1ql
 
-    case LeftShift(src, struct, repair) =>
+    // FIXME: Need to handle `id` parameter
+    case LeftShift(src, struct, id, repair) =>
       for {
         tmpName1 <- genName[M]
         tmpName2 <- genName[M]
