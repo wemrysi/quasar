@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, emptySeq, every, for_, func, if_, let_, typeswitch}, axes.child
+  import syntax._, expr._, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -109,6 +109,44 @@ object ejson {
         elt `/` axes.attribute(tname)
       }
     }
+
+  // ejson:cast-as-ascribed($item as item()) as item()
+  def castAsAscribed[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.declare("cast-as-ascribed") flatMap (_(
+      $("item") as ST("item()")
+    ).as(ST("item()")) { (item: XQuery) =>
+      val (elt, tpe) = ($("elt"), $("tpe"))
+
+      ascribedType[F].apply(~elt) map { atpe =>
+        typeswitch(item)(
+          elt as ST("element()") return_ { e =>
+            let_(tpe := atpe) return_ {
+              if_(~tpe eq "boolean".xs)
+              .then_(xs.boolean(e))
+              .else_(if_(~tpe eq "timestamp".xs)
+              .then_(xs.dateTime(e))
+              .else_(if_(~tpe eq "date".xs)
+              .then_(xs.date(e))
+              .else_(if_(~tpe eq "time".xs)
+              .then_(xs.time(e))
+              .else_(if_(~tpe eq "interval".xs)
+              .then_(xs.duration(fn.concat("PT".xs, e, "S".xs)))
+              .else_(if_(~tpe eq "integer".xs)
+              .then_(xs.integer(e))
+              .else_(if_(~tpe eq "decimal".xs)
+              .then_(xs.double(e))
+              .else_(if_(~tpe eq "binary".xs)
+              .then_ {
+                if_(isCastable(e, ST("xs:hexBinary")))
+                .then_(xs.base64Binary(xs.hexBinary(e)))
+                .else_(xs.base64Binary(e))
+              }
+              .else_(e))))))))
+            }
+          }
+        ) default item
+      }
+    })
 
   // TODO: DRY up these predicates, they have the same impl.
   // ejson:is-array($node as node()) as xs:boolean
@@ -281,6 +319,8 @@ object ejson {
             ST("element()")       return_ aType,
             ST("xs:boolean")      return_ "boolean".xs,
             ST("xs:dateTime")     return_ "timestamp".xs,
+            ST("xs:date")         return_ "date".xs,
+            ST("xs:time")         return_ "time".xs,
             ST("xs:integer")      return_ "integer".xs,
             ST("xs:decimal")      return_ "decimal".xs,
             ST("xs:double")       return_ "decimal".xs,
