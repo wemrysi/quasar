@@ -382,6 +382,14 @@ package object json {
       }
     }
 
+    def containsField(name: String) = self match {
+      case JObject(map) => map contains name
+      case _            => false
+    }
+    def containsIndex(idx: Int) = self match {
+      case JArray(xs) => xs.indices contains idx
+      case _          => false
+    }
     def delete(path: JPath): Option[JValue] = path.nodes match {
       case JPathField(name) +: xs =>
         self match {

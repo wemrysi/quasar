@@ -1003,6 +1003,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
+  def firstRow(): JValue         = toJson(0)
+  def lastRow(): JValue          = toJson(size - 1)
   def toJson(row: RowId): JValue = toJValue(row)
 
   def toJValues: Vector[JValue] = {

@@ -17,13 +17,11 @@
 package ygg.table
 
 import ygg._, common._, json._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ ToIdOps => _, _ }
 
 final case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 
 final case class Projection(data: Stream[JValue]) {
-  type Key = JArray
-
   private val slices            = TableData.fromJValues(data).slices.toStream.copoint // XXX FiXME
   val length: Long              = data.length.toLong
   val structure: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
@@ -31,11 +29,8 @@ final case class Projection(data: Stream[JValue]) {
   def getBlockStreamForType(tpe: JType): NeedSlices =
     getBlockStream(Some(Schema.flatten(tpe, structure.toVector).toSet))
 
-  def getBlockStream(columns: Option[Set[ColumnRef]]): NeedSlices = unfoldStream(none[Key])(key =>
-    getBlockAfter(key, columns) map (
-      _ collect { case BlockProjectionData(_, max, block) => block -> some(max) }
-    )
-  )
+  def getBlockStream(columns: Option[Set[ColumnRef]]): NeedSlices =
+    unfoldStream(none[JArray])(key => getBlockAfter(key, columns) map (_ map (bpd => bpd.data -> some(bpd.maxKey))))
 
   /**
     * Get a block of data beginning with the first record with a key greater than
@@ -46,29 +41,23 @@ final case class Projection(data: Stream[JValue]) {
   def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
     @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
       blocks.filterNot(_.isEmpty) match {
-        case x #:: xs => if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
+        case x #:: xs => if ((x.lastRow \ "key") > id) Some(x) else findBlockAfter(id, xs)
         case _        => None
       }
     }
 
-    val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
-
-    slice map { s =>
-      val s0 = Slice(s.size, {
-        colSelection.map { reqCols =>
-          s.columns.filter {
-            case (ref @ ColumnRef(jpath, ctype), _) =>
-              jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
-                (CPathField("value") \ ref.selector) == jpath && ref.ctype == ctype
-              }
-          }
-        }.getOrElse(s.columns)
-      })
-
-      BlockProjectionData[JArray](
-        s0.toJson(0).getOrElse(JUndefined) \ "key" asArray,
-        s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" asArray,
-        s0)
+    def isMatch(reqCols: Set[ColumnRef]): ColumnRef => Boolean = {
+      case ColumnRef(CPath(CPathField("key"), _*), _) => true
+      case ColumnRef(path, tpe)                       =>
+        reqCols exists (r => (CPathField("value") \ r.selector) == path && r.ctype == tpe)
     }
+
+    val slice: Option[Slice] = id.fold(slices.headOption)(findBlockAfter(_, slices))
+
+    slice map (s =>
+      Slice(s.size, colSelection.fold(s.columns)(req => s.columns filterKeys isMatch(req))) |> (s0 =>
+        BlockProjectionData[JArray](s0.firstRow \ "key" asArray, s0.lastRow \ "key" asArray, s0)
+      )
+    )
   }
 }
