@@ -190,14 +190,9 @@ trait TableCompanion[Table] extends TableConfig {
     WriteTable[Table].groupByN(externalize(table), keys, values, order, unique)
 
   def load(table: Table, tpe: JType): Need[Table] = {
-    val reduced = table reduce new CReducer[Set[Path]] {
-      def reduce(schema: CSchema, range: Range): Set[Path] = schema columns JTextT flatMap {
-        case s: StrColumn => range collect { case i if s isDefinedAt i => Path(s(i)) }
-        case _            => Set()
-      }
-    }
-    reduced map { paths =>
-      val projs = paths.toList flatMap (projectionsOf(table) get _)
+    table reduce CReducer.Strings map { strings =>
+      val paths = strings map (s => Path(s))
+      val projs = paths flatMap (projectionsOf(table) get _)
       apply(
         projs foldMap (_ getBlockStreamForType tpe),
         ExactSize(projs.foldMap(_.length)(Monoid[Long]))

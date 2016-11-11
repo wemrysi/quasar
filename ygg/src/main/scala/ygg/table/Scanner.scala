@@ -61,4 +61,19 @@ object Scanner {
 
 trait CReducer[A] {
   def reduce(schema: CSchema, range: Range): A
+  def map[B](f: A => B): CReducer[B] = CReducer.make[B]((c, r) => f(reduce(c, r)))
+}
+object CReducer {
+  import ygg.json.JTextT
+
+  def make[A](f: (CSchema, Range) => A): CReducer[A] = new CReducer[A] {
+    def reduce(schema: CSchema, range: Range): A = f(schema, range)
+  }
+
+  val Strings = make[Vector[String]]((schema, range) =>
+    (schema columns JTextT).toVector flatMap {
+      case s: StrColumn => range collect { case i if s isDefinedAt i => s(i) }
+      case _            => Seq()
+    }
+  )
 }
