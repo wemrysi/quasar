@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
-import quasar.NameGenerator
+import quasar.{NameGenerator, Type}
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
 import quasar.common.PhaseResult.detail
 import quasar.contrib.matryoshka._
@@ -78,6 +78,9 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     partialQueryString(s"""$lTrunc $op $rTrunc""").point[M]
   }
 
+  def proj(a1: N1QL, a2: N1QL): N1QL =
+    partialQueryString(s"""${n1ql(a1)}.[${n1ql(a2)}]""")
+
   def plan: AlgebraM[M, MapFunc[T, ?], N1QL] = {
     // nullary
     case Constant(v) =>
@@ -93,7 +96,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     // array
     case Length(a1) =>
       val a1N1ql = n1ql(a1)
-      partialQueryString(s"ifnull(length($a1N1ql), array_length($a1N1ql))").point[M]
+      partialQueryString(s"ifnull(length($a1N1ql), array_length($a1N1ql), object_length($a1N1ql))").point[M]
 
     // date
     case Date(a1) =>
@@ -297,17 +300,27 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         partialQueryString(n1qlStr)
       )
     case MakeMap(a1, a2)                          =>
-      val a1N1ql  = n1ql(a1)
-      val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"""object_add({}, $a1N1ql, $a2N1ql)"""
-      prtell[M](Vector(detail(
-        "N1QL MakeMap",
-        s"""  a1:   $a1N1ql
-           |  a2:   $a2N1ql
-           |  n1ql: $n1qlStr""".stripMargin('|')
-      ))).as(
-        partialQueryString(n1qlStr)
-      )
+      for {
+        tmpName1 <- genName[M]
+        a1N1ql   =  n1ql(a1)
+        a2N1ql   =  n1ql(a2)
+        sel      =  select(
+                      value         = true,
+                      resultExprs   = s"{ to_string($a1N1ql): ifnull($tmpName1, $naStr) }".wrapNel,
+                      keyspace      = a2,
+                      keyspaceAlias = tmpName1)
+        objAdd   =  partialQueryString(s"""object_add({}, $a1N1ql, $a2N1ql)""")
+        rN1ql    =  a2 match {
+                      case _: Select => sel
+                      case _         => objAdd
+                    }
+        _        <- prtell[M](Vector(detail(
+                      "N1QL MakeMap",
+                      s"""  a1:   $a1N1ql
+                         |  a2:   $a2N1ql
+                         |  n1ql: ${n1ql(rN1ql)}""".stripMargin('|')
+                    )))
+      } yield rN1ql
     case ConcatArrays(a1, a2)                     =>
       val a1N1ql  = n1ql(a1)
       val a2N1ql  = n1ql(a2)
@@ -332,16 +345,15 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       ))).as(
         partialQueryString(n1qlStr)
       )
-    case ProjectField(PartialQueryString(a1), a2) =>
-      val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1.[$a2N1ql]"
+    case ProjectField(a1N1ql @ PartialQueryString(a1), a2) =>
+      val r = proj(a1N1ql, a2)
       prtell[M](Vector(detail(
         "N1QL ProjectField(PartialQueryString(_), _)",
         s"""  a1:   $a1
-           |  a2:   $a2N1ql
-           |  n1ql: $n1qlStr""".stripMargin('|')
+           |  a2:   ${n1ql(a2)}
+           |  n1ql: ${n1ql(r)}""".stripMargin('|')
       ))).as(
-        partialQueryString(n1qlStr)
+        r
       )
     case ProjectField(a1, a2) =>
       for {
@@ -350,7 +362,7 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
         a2N1ql   =  n1ql(a2)
         s        =  select(
                       value         = true,
-                      resultExprs   = s"$tempName.[$a2N1ql]".wrapNel,
+                      resultExprs   = n1ql(proj(partialQueryString(tempName), a2)).wrapNel,
                       keyspace      = a1,
                       keyspaceAlias = tempName)
         sN1ql    =  n1ql(s)
@@ -389,11 +401,37 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
       partialQueryString(s"object_remove(${n1ql(a1)}, ${n1ql(a2)})").point[M]
 
     // helpers & QScript-specific
-    case Range(a1, a2)                    =>
+    case Range(a1, a2)             =>
       val a1N1ql = n1ql(a1)
       val a2N1ql = n1ql(a2)
       partialQueryString(s"[$a2N1ql:($a1N1ql + 1)]").point[M]
-    case Guard(expr, typ, cont, fallback) =>
-      cont.point[M]
+    case Guard(expr, typ, cont, _) =>
+      val exprN1ql     = n1ql(expr)
+      val contN1ql     = n1ql(cont)
+      def grd(f: String, e: String, c: String) =
+        partialQueryString(s"(case when $f($e) then $c else $naStr end)")
+      def grdSel(f: String) = genName[M] ∘ (n =>
+        select(
+          value         = true,
+          resultExprs   = n1ql(grd(f, n, n)).wrapNel,
+          keyspace      = cont,
+          keyspaceAlias = n))
+      ((cont, typ) match {
+        case (_: Select, _: Type.FlexArr) => grdSel("isarray")
+        case (_: Select, _: Type.Obj)     => grdSel("isobject")
+        case (_        , _: Type.FlexArr) => grd("isarray", exprN1ql, contN1ql).point[M]
+        case (_        , _: Type.Obj)     => grd("isobject", exprN1ql, contN1ql).point[M]
+        case _                            => cont.point[M]
+      }) >>= (r =>
+        prtell[M](Vector(detail(
+         "N1QL Guard",
+         s"""  expr:     $exprN1ql
+            |  typ:      $typ
+            |  cont:     $contN1ql
+            |  n1ql:     ${n1ql(r)}""".stripMargin('|')
+        ))).as(
+         r
+        )
+      )
   }
 }
