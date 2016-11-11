@@ -20,6 +20,15 @@ import ygg._, common._, json._, trans._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
 
+class TablePairMethods[T: TableRep](val pair: (T, T)) {
+  def companion                          = companionOf[T]
+  def zip(): T                           = ???
+  def join(): T                          = ???
+  def cross(f: TransSpec2): T            = ???
+  def concat(): T                        = ???
+  def cogroup(by: PairOf[TransSpec1]): T = ???
+}
+
 class TableMethods[Table: TableRep](val self: Table) {
   type M[+X] = Need[X]
 
@@ -44,8 +53,9 @@ class TableMethods[Table: TableRep](val self: Table) {
   def sort(key: TransSpec1, order: DesiredSortOrder): Table =
     WriteTable[Table].groupByN(self, Seq(key), ID, order, unique = false).headOption getOrElse companion.empty
 
-  def sort(key: TransSpec1): Table =
-    sort(key, SortAscending)
+  def sort(key: TransSpec1): Table = sort(key, SortAscending)
+  def sort(): Table                = sort(ID)
+
 
   /**
     * Cogroups this table with another table, using equality on the specified
@@ -79,6 +89,7 @@ class TableMethods[Table: TableRep](val self: Table) {
   /**
     * Yields a new table with distinct rows. Assumes this table is sorted.
     */
+  def distinct(): Table = distinct(ID)
   def distinct(spec: TransSpec1): Table = {
     def distinct0[T](id: SliceTransform1[Option[Slice]], filter: SliceTransform1[T]): Table = {
       def stream(state: (Option[Slice], T), slices: NeedSlices): NeedSlices = StreamT(
