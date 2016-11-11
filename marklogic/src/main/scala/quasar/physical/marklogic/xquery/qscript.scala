@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.fp.ski.ι
 import quasar.physical.marklogic.xml.namespaces._
 
@@ -91,8 +90,8 @@ object qscript {
     qs.declare("combine-apply") map (_(
       $("fns") as ST("(function(item()) as item())*")
     ).as(ST("function(item()) as item()*")) { fns =>
-      val (f, x) = ("$f", "$x")
-      func(x) { fn.map(func(f) { f.xqy fnapply x.xqy }, fns) }
+      val (f, x) = ($("f"), $("x"))
+      func(x.render) { fn.map(func(f.render) { (~f) fnapply ~x }, fns) }
     })
 
   // qscript:combine-n($combiners as (function(item()*, item()) as item()*)*) as function(item()*, item()) as item()*
@@ -100,13 +99,11 @@ object qscript {
     qs.declare("combine-n") map (_(
       $("combiners") as ST("(function(item()*, item()) as item()*)*")
     ).as(ST("function(item()*, item()) as item()*")) { combiners =>
-      val (len, acc, i, x) = ("$len", "$acc", "$i", "$x")
+      val (f, i, acc, x) = ($("f"), $("i"), $("acc"), $("x"))
 
-      let_ (len -> fn.count(combiners)) return_ {
-        func(acc, x) {
-          for_ (i -> (1.xqy to len.xqy)) return_ {
-            combiners(i.xqy) fnapply (acc.xqy(i.xqy), x.xqy)
-          }
+      func(acc.render, x.render) {
+        for_ (f at i in combiners) return_ {
+          (~f) fnapply ((~acc)(~i), ~x)
         }
       }
     })
@@ -117,11 +114,11 @@ object qscript {
       $("src")   as ST("element()"),
       $("field") as ST("xs:QName")
     ).as(ST("element()")) { (src: XQuery, field: XQuery) =>
-      val n = "$n"
+      val n = $("n")
       element { fn.nodeName(src) } {
-        for_    (n -> (src `/` child.element()))
-        .where_ (fn.nodeName(n.xqy) ne field)
-        .return_(n.xqy)
+        for_    (n in (src `/` child.element()))
+        .where_ (fn.nodeName(~n) ne field)
+        .return_(~n)
       }
     })
 
@@ -130,11 +127,11 @@ object qscript {
     qs.declare("element-dup-keys") map (_(
       $("elt") as ST("element()")
     ).as(ST("element()")) { elt: XQuery =>
-      val (c, n) = ("$c", "$n")
+      val (c, n) = ($("c"), $("n"))
       element { fn.nodeName(elt) } {
-        for_    (c -> (elt `/` child.element()))
-        .let_   (n -> fn.nodeName(c.xqy))
-        .return_(element { n.xqy } { n.xqy })
+        for_    (c in (elt `/` child.element()))
+        .let_   (n := fn.nodeName(~c))
+        .return_(element { ~n } { ~n })
       }
     })
 
@@ -175,12 +172,12 @@ object qscript {
       $("st") as ST("map:map"),
       $("x")  as ST.Top
     ).as(ST("map:map")) { (st: XQuery, x: XQuery) =>
-      val (c, a, y) = ("$c", "$a", "$y")
-      incAvgState[F].apply(c.xqy, y.xqy) map { nextSt =>
+      val (c, a, y) = ($("c"), $("a"), $("y"))
+      incAvgState[F].apply(~c, ~y) map { nextSt =>
         let_(
-          c -> (map.get(st, "cnt".xs) + 1.xqy),
-          a -> map.get(st, "avg".xs),
-          y -> (a.xqy + mkSeq_(mkSeq_(x - a.xqy) div c.xqy)))
+          c := (map.get(st, "cnt".xs) + 1.xqy),
+          a := map.get(st, "avg".xs),
+          y := (~a + mkSeq_(mkSeq_(x - (~a)) div ~c)))
         .return_(nextSt)
       }
     })
@@ -204,11 +201,12 @@ object qscript {
       declare(fname)(
         $("arrOrStr") as ST("item()")
       ).as(ST("xs:integer?")) { arrOrStr: XQuery =>
+        val ct = $("ct")
         typeswitch(arrOrStr)(
           $("arr") as ST("element()") return_ { arr =>
-            let_("$ct" -> fn.count(arr `/` child.element())) return_ {
-              if_("$ct".xqy gt 0.xqy)
-              .then_ { "$ct".xqy }
+            let_(ct := fn.count(arr `/` child.element())) return_ {
+              if_(~ct gt 0.xqy)
+              .then_ { ~ct }
               .else_ { fname(fn.string(arr)) }
             }
           },
@@ -224,7 +222,8 @@ object qscript {
       $("src")   as ST("element()"),
       $("field") as ST("xs:QName")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      fn.filter(func("$n")(fn.nodeName("$n".xqy) eq field), src `/` child.element())
+      val n = $("n")
+      fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
     })
 
   def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
@@ -245,21 +244,23 @@ object qscript {
       $("bucket")   as ST("function(item()*) as item()"),
       $("seq")      as ST("item()*")
     ).as(ST("item()*")) { (initial: XQuery, combine: XQuery, finalize: XQuery, bucket: XQuery, xs: XQuery) =>
-      val (m, x, k, v, o) = ("$m", "$x", "$k", "$v", "$_")
+      val (m, x, k, v, o) = ($("m"), $("x"), $("k"), $("v"), $("_"))
 
-      asMapKey[F].apply(bucket fnapply (x.xqy)) map { theKey =>
+      asMapKey[F].apply(bucket fnapply (~x)) map { theKey =>
         let_(
-          m -> map.map(),
-          o -> for_ (x -> xs) .let_ (
-                 k -> theKey,
-                 v -> if_(map.contains(m.xqy, k.xqy))
-                      .then_(combine fnapply (map.get(m.xqy, k.xqy), x.xqy))
-                      .else_(initial fnapply (x.xqy)),
-                 o -> map.put(m.xqy, k.xqy, v.xqy)
-               ) .return_ (emptySeq)
-        ) .return_ {
-          for_ (k -> map.keys(m.xqy)) .return_ {
-            finalize fnapply (map.get(m.xqy, k.xqy))
+          m := map.map(),
+          o := for_(
+                 x in xs)
+               .let_(
+                 k := theKey,
+                 v := if_(map.contains(~m, ~k))
+                      .then_(combine fnapply (map.get(~m, ~k), ~x))
+                      .else_(initial fnapply (~x)),
+                 o := map.put(~m, ~k, ~v))
+               .return_(emptySeq))
+        .return_ {
+          for_ (k in map.keys(~m)) .return_ {
+            finalize fnapply (map.get(~m, ~k))
           }
         }
       }
@@ -271,31 +272,6 @@ object qscript {
       $("dt") as ST("xs:dateTime")
     ).as(ST("xs:double")) { dt =>
       mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
-    })
-
-  // qscript:shifted-read($uri as xs:string, $include-id as xs:boolean) as element()*
-  def shiftedRead[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
-    qs.declare("shifted-read") flatMap (_(
-      $("uri")        as ST("xs:string"),
-      $("include-id") as ST("xs:boolean")
-    ).as(ST(s"element()*")) { (uri: XQuery, includeId: XQuery) =>
-      for {
-        d     <- freshVar[F]
-        c     <- freshVar[F]
-        b     <- freshVar[F]
-        xform <- json.transformFromJson[F](c.xqy)
-        incId <- ejson.seqToArray_[F](mkSeq_(
-                   fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, fn.documentUri(d.xqy))),
-                   b.xqy))
-      } yield {
-        for_(d -> cts.search(fn.doc(), cts.directoryQuery(uri, "1".xs)))
-          .let_(
-            c -> d.xqy `/` child.node(),
-            b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
-          .return_ {
-            if_ (includeId) then_ { incId } else_ { b.xqy }
-          }
-      }
     })
 
   // qscript:timestamp-to-dateTime($millis as xs:integer) as xs:dateTime
@@ -331,31 +307,29 @@ object qscript {
     qs.declare("zip-apply") map (_(
       $("fns") as ST("(function(item()*) as item()*)*")
     ).as(ST("function(item()*) as item()*")) { fns =>
-      val (len, i, x) = ("$len", "$i", "$x")
+      val (f, i, x) = ($("f"), $("i"), $("x"))
 
-      let_ (len -> fn.count(fns)) return_ {
-        func(x) {
-          for_ (i -> (1.xqy to len.xqy)) return_ {
-            fns(i.xqy) fnapply (x.xqy(i.xqy))
-          }
+      func(x.render) {
+        for_ (f at i in fns) return_ {
+          (~f) fnapply ((~x)(~i))
         }
       }
     })
 
   // qscript:zip-map-element-keys($elt as element()) as element()
-  def zipMapElementKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
+  def zipMapElementKeys[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("zip-map-element-keys") flatMap (_(
       $("elt") as ST("element()")
     ).as(ST(s"element()")) { elt =>
-      val (c, n) = ("$child", "$name")
+      val (c, n) = ($("child"), $("name"))
 
       for {
-        kelt    <- ejson.mkArrayElt[F](n.xqy)
-        velt    <- ejson.mkArrayElt[F](c.xqy)
+        kelt    <- ejson.mkArrayElt[F](~n)
+        velt    <- ejson.mkArrayElt[F](~c)
         kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
-        kvEnt   <- ejson.renameOrWrap[F] apply (n.xqy, kvArr)
-        entries =  for_ (c -> elt `/` child.element())
-                   .let_(n -> fn.nodeName(c.xqy))
+        kvEnt   <- ejson.renameOrWrap[F] apply (~n, kvArr)
+        entries =  for_ (c in elt `/` child.element())
+                   .let_(n := fn.nodeName(~c))
                    .return_(kvEnt)
         zMap    <- ejson.mkObject[F] apply entries
       } yield zMap

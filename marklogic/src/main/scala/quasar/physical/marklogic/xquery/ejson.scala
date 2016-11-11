@@ -75,12 +75,10 @@ object ejson {
       declare(fname)(
         $("arr") as ST("element()")
       ).as(ST("element()")) { arr: XQuery =>
-        val elts = "$elts"
-        seqToArray[F].apply(fn.nodeName(arr), 0.xqy to mkSeq_(fn.count(elts.xqy) - 1.xqy)) map { inner =>
-          let_(elts -> (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(elts.xqy)) then_ arr else_ inner
-          }
-        }
+        val i = $("i")
+        seqToArray[F].apply(
+          fn.nodeName(arr),
+          for_ ($("_") at i in (arr `/` child(aelt))) return_ (~i - 1.xqy))
       }
     }.join
 
@@ -90,23 +88,15 @@ object ejson {
       declare(fname)(
         $("arr") as ST("element()")
       ).as(ST("element()")) { arr: XQuery =>
-        val (i, elts, zelts) = ("$i", "$elts", "$zelts")
+        val (i, elt) = ($("i"), $("elt"))
 
         for {
-          ixelt <- mkArrayElt[F](i.xqy)
-          pair  <- mkArray_[F](mkSeq_(ixelt, elts.xqy(i.xqy)))
+          ixelt <- mkArrayElt[F](~i - 1.xqy)
+          pair  <- mkArray_[F](mkSeq_(ixelt, ~elt))
           zpair <- mkArrayElt[F](pair)
-          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts.xqy)
-        } yield {
-          let_(elts -> (arr `/` child(aelt))) return_ {
-            if_ (fn.empty(elts.xqy))
-            .then_ { arr }
-            .else_ {
-              let_(zelts -> for_(i -> (1.xqy to fn.count(elts.xqy))).return_(zpair))
-              .return_(zarr)
-            }
-          }
-        }
+          zelts =  for_(elt at i in (arr `/` child(aelt))) return_ zpair
+          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts)
+        } yield zarr
       }
     }.join
 
@@ -187,16 +177,16 @@ object ejson {
         $("obj1") as ST("element()"),
         $("obj2") as ST("element()")
       ).as(ST(s"element($ename)")) { (obj1: XQuery, obj2: XQuery) =>
-        val (xs, ys, names, e, n1, n2) = ("$xs", "$ys", "$names", "$e", "$n1", "$n2")
+        val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
 
         mkObject[F] apply {
           let_(
-            xs    -> (obj2 `/` child.element()),
-            names -> fn.map("fn:node-name#1".xqy, xs.xqy),
-            ys    -> fn.filter(func(e) {
-                       every(n1 -> fn.nodeName(e.xqy), n2 -> names.xqy) satisfies (n1.xqy ne n2.xqy)
+            xs    := (obj2 `/` child.element()),
+            names := fn.map("fn:node-name#1".xqy, ~xs),
+            ys    := fn.filter(func(e.render) {
+                       every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2)
                      }, obj1 `/` child.element()))
-          .return_(mkSeq_(ys.xqy, xs.xqy))
+          .return_(mkSeq_(~ys, ~xs))
         }
       }
     }.join

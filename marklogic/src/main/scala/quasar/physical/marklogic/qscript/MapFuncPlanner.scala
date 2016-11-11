@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.ErrorMessages
@@ -26,14 +25,14 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
-import scalaz.{Apply, EitherT}
+import scalaz.{Applicative, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
 
 object MapFuncPlanner {
-  import expr.{emptySeq, if_, let_}, axes._
+  import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
 
-  def apply[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  def apply[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
       ejson.cataM(EncodeXQuery[EitherT[F, ErrorMessages, ?], EJson].encodeXQuery).run.flatMap(_.fold(
         msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
@@ -141,8 +140,11 @@ object MapFuncPlanner {
           (src `/` field).point[F]
 
         case XQuery.StringLit(s) =>
-          (asQName[F](s) |@| freshVar[F])((qn, m) =>
-            let_(m -> src) return_ (m.xqy `/` child(qn)))
+          (asQName[F](s) |@| freshName[F])((qn, m) =>
+            if (flwor.isMatching(src))
+              let_(m := src) return_ (~m `/` child(qn))
+            else
+              src `/` child(qn))
 
         case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
@@ -155,9 +157,15 @@ object MapFuncPlanner {
         case XQuery.StringLit(s) =>
           for {
             qn <- asQName(s)
-            m  <- freshVar[F]
-            n  <- mem.nodeDelete[F](m.xqy)
-          } yield let_(m -> src) return_ n
+            m  <- freshName[F]
+            n1 <- mem.nodeDelete[F](~m `/` child(qn))
+            n2 <- mem.nodeDelete[F](src `/` child(qn))
+          } yield {
+            if (flwor.isMatching(src))
+              let_(m := src) return_ n1
+            else
+              n2
+          }
 
         case _ => qscript.deleteField[F] apply (src, xs.QName(field))
       }
@@ -175,11 +183,17 @@ object MapFuncPlanner {
 
   ////
 
-  private def binOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F])((vx, vy) =>
-      mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
+  private def binOp[F[_]: QNameGenerator: Applicative](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y))
+      (freshName[F] |@| freshName[F])((vx, vy) =>
+        mkSeq_(let_(vx := x, vy := y) return_ op(~vx, ~vy)))
+    else
+      op(x, y).point[F]
 
-  private def ternOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
-      mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
+  private def ternOp[F[_]: QNameGenerator: Applicative](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
+      (freshName[F] |@| freshName[F] |@| freshName[F])((vx, vy, vz) =>
+        mkSeq_(let_(vx := x, vy := y, vz := z) return_ op(~vx, ~vy, ~vz)))
+    else
+      op(x, y, z).point[F]
 }
