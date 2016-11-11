@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.ejson.EJson
+import quasar.Data
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.xquery._
@@ -25,7 +25,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
-import scalaz.{EitherT, Monad}
+import scalaz.{Const, EitherT, Monad}
 import scalaz.std.option._
 import scalaz.syntax.monad._
 
@@ -34,9 +34,10 @@ object MapFuncPlanner {
 
   def apply[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
-      ejson.cataM(EncodeXQuery[EitherT[F, ErrorMessages, ?], EJson].encodeXQuery).run.flatMap(_.fold(
-        msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
-        _.point[F]))
+      EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
+        .encodeXQuery(Const(ejson.cata(Data.fromEJson))).run.flatMap(_.fold(
+          msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
+          _.point[F]))
 
     case Undefined()                  => emptySeq.point[F]
 
