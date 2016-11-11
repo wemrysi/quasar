@@ -112,7 +112,7 @@ abstract class QueryRegressionTest[S[_]](
     def runTest: Result = {
       val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
 
-      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run))
+      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run, backendName))
         .timed(5.minutes)
         .unsafePerformSync
     }
@@ -150,7 +150,8 @@ abstract class QueryRegressionTest[S[_]](
   def verifyResults(
     exp: ExpectedResult,
     act: Process[CompExecM, Data],
-    run: Run
+    run: Run,
+    backendName: BackendName
   ): Task[Result] = {
 
     type H1[A] = PhaseResultT[Task, A]
@@ -171,7 +172,7 @@ abstract class QueryRegressionTest[S[_]](
     exp.predicate(
       exp.rows.toVector,
       act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
-      exp.fieldOrder)
+      exp.ignoreFieldOrder.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved))
   }
 
   /** Parse and execute the given query, returning a stream of results. */

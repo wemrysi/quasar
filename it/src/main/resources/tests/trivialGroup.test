@@ -7,6 +7,6 @@
     "data": "largeZips.data",
     "query": "select city, sum(pop) as totalPop from largeZips group by city",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": true,
+    "ignoreFieldOrder": [ "couchbase" ],
     "expected": [{ "totalPop": 110948, "city": "BOULDER" }]
 }
