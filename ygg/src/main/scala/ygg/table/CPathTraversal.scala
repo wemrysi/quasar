@@ -29,7 +29,7 @@ sealed trait CPathTraversal extends Product with Serializable { self =>
   import MaybeOrdering._
   import CPathTraversal._
 
-  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]]): Ord[Int] =
+  def rowOrder(cpaths: Seq[CPath], left: Map[CPath, Set[Column]]): Ord[Int] =
     rowOrder(cpaths, left, None)
 
   /**
@@ -37,7 +37,7 @@ sealed trait CPathTraversal extends Product with Serializable { self =>
     * 2 column sets for the 1st and 2nd paramters of the Order. This order will
     * not allocate any objects or arrays, but it is also not threadsafe.
     */
-  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]]): Ord[Int] = {
+  def rowOrder(cpaths: Seq[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]]): Ord[Int] = {
     val right = optRight getOrElse left
 
     def plan0(t: CPathTraversal, paths: List[List[CPathNode] -> List[CPathNode]], idx: Int): CPathComparator = t match {
@@ -181,7 +181,7 @@ object CPathTraversal {
     * create the traversal in sorted order of the paths, regardless of the order
     * given.
     */
-  def apply(paths: List[CPath]): CPathTraversal = {
+  def apply(paths: Seq[CPath]): CPathTraversal = {
 
     // Basically does a mix of collect, takeWhile and dropWhile all in one go.
     def collectWhile[A, B](xs: List[A])(f: PartialFunction[A, B]): (List[B], List[A]) = {
@@ -214,7 +214,7 @@ object CPathTraversal {
         }
     }
 
-    val ordered = CPathPosition.disjointOrder(paths) map (fromPositioned(_))
+    val ordered = CPathPosition.disjointOrder(paths.toList) map (fromPositioned(_))
     join(ordered, Nil)
   }
 

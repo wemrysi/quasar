@@ -17,7 +17,7 @@
 package ygg.table
 
 import ygg._, common._, json._, data._
-import scalaz.{ =?> => _, _ }, Ordering._
+import scalaz.{ =?> => _, _ }, Scalaz.{ ToIdOps => _, _}, Ordering._
 import scala.math.min
 
 class SliceOps(private val source: Slice) extends AnyVal {
@@ -773,61 +773,14 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(retained.size, lazyMapColumns(_ |> cf.RemapIndices(retained) get))
   }
 
-  def order: Ord[Int] =
-    if (columns.size == 1) {
-      val col = columns.head._2
-      Column.rowOrder(col)
-    } else {
-
-      // The 2 cases are handled differently. In the first case, we don't have
-      // any pesky homogeneous arrays and only 1 column per path. In this case,
-      // we don't need to use the CPathTraversal machinery.
-
-      type GroupedCols = Either[Map[CPath, Column], Map[CPath, Set[Column]]]
-
-      val grouped = columns.foldLeft(Left(Map.empty): GroupedCols) {
-        case (Left(acc), (ColumnRef(path, CArrayType(_)), col)) =>
-          val acc0 = acc.map { case (k, v) => (k, Set(v)) }
-          Right(acc0 + (path -> Set(col)))
-
-        case (Left(acc), (ColumnRef(path, _), col)) =>
-          (acc get path).fold[GroupedCols](Left(acc + (path -> col))) { col0 =>
-            val acc0 = acc.map { case (k, v) => (k, Set(v)) }
-            Right(acc0 + (path         -> Set(col0, col)))
-          }
-
-        case (Right(acc), (ColumnRef(path, _), col)) =>
-          Right(acc + (path -> (acc.getOrElse(path, Set.empty[Column]) + col)))
-      }
-
-      grouped match {
-        case Left(cols0) =>
-          val cols = cols0.toList
-            .sortBy(_._1)
-            .map {
-              case (_, col) =>
-                Column.rowOrder(col)
-            }
-            .toArray
-
-          def cmp(i: Int, j: Int): Ordering = {
-            var k = 0
-            while (k < cols.length) {
-              Order(cols(k)).order(i, j) match {
-                case EQ  => k += 1
-                case cmp => return cmp
-              }
-            }
-            EQ
-          }
-          scalaz.Order.order(cmp _)
-
-        case Right(cols) =>
-          val paths     = cols.keys.toSeq
-          val traversal = CPathTraversal(paths.toList)
-          traversal.rowOrder(paths.toList, cols)
-      }
-    }
+  def order: Ord[Int] = columns match {
+    case ColumnMap(Vector((_, col)))                          =>
+      Column rowOrder col
+    case cs if cs.isOnePathPerColumn && !cs.containsHomoArray =>
+      cs.sortedFields map (x => Column rowOrder x._2) reduceLeft (_ |+| _)
+    case cs                                                   =>
+      CPathTraversal(cs.selectors).rowOrder(cs.selectors, cs.groupedByPath)
+  }
 
   def sortWith(keySlice: Slice, sortOrder: DesiredSortOrder): (Slice, Slice) = {
 
@@ -1003,8 +956,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
-  def firstRow(): JValue         = toJson(0)
-  def lastRow(): JValue          = toJson(size - 1)
+  def firstRow(): JValue         = toJValue(0)
+  def lastRow(): JValue          = toJValue(size - 1)
   def toJson(row: RowId): JValue = toJValue(row)
 
   def toJValues: Vector[JValue] = {

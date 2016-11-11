@@ -76,6 +76,15 @@ sealed trait ColumnMap {
   def unzip: (Vector[K], Vector[V])                = fields.unzip
   def values: Vector[V]                            = fields map (_._2)
 
+  def sortedFields: Vector[KV] = fields sortBy (_._1)
+  def pathTraversal            = CPathTraversal(selectors)
+  def selectors: Vector[CPath] = keys map (_.selector)
+  def types: Vector[CType]     = keys map (_.ctype)
+  def isOnePathPerColumn       = selectors.distinct.size == selectors.size
+  def containsHomoArray        = types exists { case CArrayType(_) => true ; case _ => false }
+
+  def groupedByPath: Map[CPath, Set[V]] = keys groupBy (_.selector) mapValues (refs => refs.map(apply).toSet) toMap
+
   def updated(key: K, value: V): ColumnMap = fields indexWhere (kv => key == kv._1) match {
     case -1 => this + (key -> value)
     case n  => mapFields(fs => (fs take n) ++ Vector(key -> value) ++ (fs drop n + 1))
