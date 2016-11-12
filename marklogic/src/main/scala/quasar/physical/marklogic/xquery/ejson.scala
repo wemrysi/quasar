@@ -148,36 +148,17 @@ object ejson {
       }
     })
 
-  // TODO: DRY up these predicates, they have the same impl.
-  // ejson:is-array($node as node()) as xs:boolean
-  def isArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("is-array").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
-      declare(fname)(
-        $("node") as ST("node()")
-      ).as(ST("xs:boolean")) { node =>
-        fn.not(fn.empty(node(axes.attribute(tname) === "array".xs)))
-      }
-    }
+  // ejson:has-ascribed-type($tpe as xs:string, $node as node()) as xs:boolean
+  def hasAscribedType[F[_]: PrologW]: F[FunctionDecl2] =
+    ejs.declare("has-ascribed-type") flatMap (_(
+      $("tpe")  as ST("xs:string"),
+      $("node") as ST("node()")
+    ).as(ST("xs:boolean")) { (tpe: XQuery, node: XQuery) =>
+      ascribedType[F].apply(node) map (_ eq tpe)
+    })
 
-  // ejson:is-null($node as node()) as xs:boolean
-  def isNull[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("is-null").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
-      declare(fname)(
-        $("node") as ST("node()")
-      ).as(ST("xs:boolean")) { node =>
-        fn.not(fn.empty(node(axes.attribute(tname) === "null".xs)))
-      }
-    }
-
-  // ejson:is-object($node as node()) as xs:boolean
-  def isObject[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("is-object").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
-      declare(fname)(
-        $("node") as ST("node()")
-      ).as(ST("xs:boolean")) { node =>
-        fn.not(fn.empty(node(axes.attribute(tname) === "object".xs)))
-      }
-    }
+  def isArray[F[_]: PrologW](node: XQuery): F[XQuery] =
+    hasAscribedType[F].apply("array".xs, node)
 
   // ejson:make-array($name as xs:QName, $elements as element(ejson:array-element)*) as element()
   def mkArray[F[_]: PrologW]: F[FunctionDecl2] =

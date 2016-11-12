@@ -165,7 +165,7 @@ object qscript {
     qs.declare("element-left-shift") flatMap (_(
       $("elt") as ST("element()")
     ).as(ST("item()*")) { elt =>
-      (ejson.arrayEltN.qn[F] |@| ejson.isArray[F].apply(elt))((aelt, eltIsArray) =>
+      (ejson.arrayEltN.qn[F] |@| ejson.isArray[F](elt))((aelt, eltIsArray) =>
         if_ (eltIsArray)
         .then_ { elt `/` child(aelt)  }
         .else_ { elt `/` child.node() })
