@@ -3,7 +3,6 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "couchbase":         "skip"
     },
     "data": "largeZips.data",
@@ -12,6 +11,7 @@
                 where state != \"MI\"
                 group by length(city)",
     "predicate": "containsExactly",
+    "ignoreFieldOrder": true,
     "expected": [{ "cnt":   2, "len":  3 },
                  { "cnt":  65, "len":  4 },
                  { "cnt": 206, "len":  5 },

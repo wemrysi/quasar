@@ -33,7 +33,7 @@ object MapFuncPlanner {
   import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
 
   def apply[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
-    case Constant(ejson) =>
+    case Constant(ejson)              =>
       EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
         .encodeXQuery(Const(ejson.cata(Data.fromEJson))).run.flatMap(_.fold(
           msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
@@ -92,12 +92,12 @@ object MapFuncPlanner {
 
     // relations
     case Not(x)                       => ejson.castAsAscribed[F].apply(x) map (fn.not)
-    case MapFuncs.Eq(x, y)            => binOp[F](x, y)(_ eq _)
-    case Neq(x, y)                    => binOp[F](x, y)(_ ne _)
-    case Lt(x, y)                     => castedBinOp[F](x, y)(_ lt _)
-    case Lte(x, y)                    => castedBinOp[F](x, y)(_ le _)
-    case Gt(x, y)                     => castedBinOp[F](x, y)(_ gt _)
-    case Gte(x, y)                    => castedBinOp[F](x, y)(_ ge _)
+    case MapFuncs.Eq(x, y)            => castedBinOpF[F](x, y)(qscript.compEq[F].apply(_, _))
+    case Neq(x, y)                    => castedBinOpF[F](x, y)(qscript.compNe[F].apply(_, _))
+    case Lt(x, y)                     => castedBinOpF[F](x, y)(qscript.compLt[F].apply(_, _))
+    case Lte(x, y)                    => castedBinOpF[F](x, y)(qscript.compLe[F].apply(_, _))
+    case Gt(x, y)                     => castedBinOpF[F](x, y)(qscript.compGt[F].apply(_, _))
+    case Gte(x, y)                    => castedBinOpF[F](x, y)(qscript.compGe[F].apply(_, _))
     case IfUndefined(x, alternate)    => if_(fn.empty(x)).then_(alternate).else_(x).point[F]
     case And(x, y)                    => castedBinOp[F](x, y)(_ and _)
     case Or(x, y)                     => castedBinOp[F](x, y)(_ or _)
@@ -131,6 +131,7 @@ object MapFuncPlanner {
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
+    // FIXME: Also needs to handle strings, and arrays + strings?
     case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
     case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
@@ -184,7 +185,7 @@ object MapFuncPlanner {
 
   ////
 
-  private def binOp0[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
+  private def binOpF[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
     if (flwor.isMatching(x) || flwor.isMatching(y))
       for {
         vx <- freshName[F]
@@ -194,13 +195,13 @@ object MapFuncPlanner {
     else
       op(x, y)
 
-  private def binOp[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
-    binOp0(x, y)(op(_, _).point[F])
+  private def castedBinOpF[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
+    binOpF(x, y)((vx, vy) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy))(op).join)
 
   private def castedBinOp[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
-    binOp0(x, y)((vx, vy) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy))(op))
+    castedBinOpF[F](x, y)((a, b) => op(a, b).point[F])
 
-  private def ternOp0[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => F[XQuery]): F[XQuery] =
+  private def ternOpF[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => F[XQuery]): F[XQuery] =
     if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
       for {
         vx <- freshName[F]
@@ -212,5 +213,5 @@ object MapFuncPlanner {
       op(x, y, z)
 
   private def castedTernOp[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
-    ternOp0(x, y, z)((vx, vy, vz) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy) |@| ejson.castAsAscribed[F].apply(vz))(op))
+    ternOpF(x, y, z)((vx, vy, vz) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy) |@| ejson.castAsAscribed[F].apply(vz))(op))
 }
