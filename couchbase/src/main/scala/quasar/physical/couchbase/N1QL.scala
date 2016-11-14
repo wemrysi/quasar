@@ -89,16 +89,17 @@ object N1QL {
     val let = sel.let.map(_.map { case (k, v) => s"$k = $v" }.mkString(" let ", ", ", ""))
 
     // TODO: Workaround for the moment. Lift "null" into a N1QL type?
-    val groupBy = sel.groupBy.flatMap(v => (v === "null").fold(None, v.some))
+    val groupBy = sel.groupBy.flatMap(g => (g ≠ "null").option(
+      s" group by $g having $g is not null"))
 
-    val unnest = sel.unnest .map(u => s" unnest ifnull(${u._1}, $naStr) ${u._2}")
+    val unnest = sel.unnest.map(u => s" unnest ifnull(${u._1}, $naStr) ${u._2}")
 
     "("                                              |+|
     s"select $value$resultExprs"                     |+|
     ks         .map(k => s" from $k$ksAlias").orZero |+|
     sel.filter .map(f => s" where $f"       ).orZero |+|
     let                                      .orZero |+|
-    groupBy    .map(g => s" group by $g"    ).orZero |+|
+    groupBy                                  .orZero |+|
     unnest                                   .orZero |+|
     sel.orderBy.map(o => s" order by $o"    ).orZero |+|
     ")"

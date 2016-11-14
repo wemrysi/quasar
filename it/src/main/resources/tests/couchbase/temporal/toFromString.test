@@ -1,0 +1,26 @@
+{
+    "name": "convert dates to/from strings (Couchbase)",
+
+    "NB": "Couchbase's millis_to_utc doesn't show fractional part when milliseconds are zero",
+
+    "backends": {
+        "mongodb_2_6":       "skip",
+        "mongodb_3_0":       "skip",
+        "mongodb_read_only": "skip",
+        "mongodb_3_2":       "skip",
+        "postgresql":        "skip",
+        "marklogic":         "skip"
+    },
+    "data": "../../days.data",
+    "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 19)), timestamp(str), to_string(ts) from `../../days`",
+    "predicate": "containsExactly",
+    "expected": [
+        { "0": { "$date": "2014-08-17" }, "1": { "$time": "06:00" }, "2": { "$timestamp": "2014-08-17T06:00:00Z" }, "3": "2014-08-17T06:00:00Z" },
+        { "0": { "$date": "2014-08-18" }, "1": { "$time": "07:00" }, "2": { "$timestamp": "2014-08-18T07:00:00Z" }, "3": "2014-08-18T07:00:00Z" },
+        { "0": { "$date": "2014-08-19" }, "1": { "$time": "08:00" }, "2": { "$timestamp": "2014-08-19T08:00:00Z" }, "3": "2014-08-19T08:00:00Z" },
+        { "0": { "$date": "2014-08-20" }, "1": { "$time": "09:00" }, "2": { "$timestamp": "2014-08-20T09:00:00Z" }, "3": "2014-08-20T09:00:00Z" },
+        { "0": { "$date": "2014-08-21" }, "1": { "$time": "10:00" }, "2": { "$timestamp": "2014-08-21T10:00:00Z" }, "3": "2014-08-21T10:00:00Z" },
+        { "0": { "$date": "2014-08-22" }, "1": { "$time": "11:00" }, "2": { "$timestamp": "2014-08-22T11:00:00Z" }, "3": "2014-08-22T11:00:00Z" },
+        { "0": { "$date": "2014-08-23" }, "1": { "$time": "12:00" }, "2": { "$timestamp": "2014-08-23T12:00:00Z" }, "3": "2014-08-23T12:00:00Z" }
+    ]
+}
