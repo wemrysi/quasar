@@ -47,6 +47,7 @@ object ejson {
       mkArrayElt[F](item) flatMap (mem.nodeInsertChild(arr, _))
     })
 
+  // FIXME: This needs to work with any element, not just those with ejson types
   // ejson:array-concat($arr1 as element(), $arr2 as element()) as element(ejson:ejson)
   def arrayConcat[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-concat").qn[F] |@| ejsonN.qn |@| arrayEltN.qn) { (fname, ename, aelt) =>

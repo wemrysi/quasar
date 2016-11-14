@@ -131,8 +131,7 @@ object MapFuncPlanner {
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
-    // FIXME: Also needs to handle strings, and arrays + strings?
-    case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
+    case ConcatArrays(x, y)           => qscript.concat[F] apply (x, y)
     case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 

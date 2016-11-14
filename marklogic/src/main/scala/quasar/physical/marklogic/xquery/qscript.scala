@@ -133,6 +133,39 @@ object qscript {
   def compGe[F[_]: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("ge", _ ge _, emptySeq)
 
+  // FIXME: This needs to work with any element, not just those with ejson types
+  // qscript:concat($x as item()?, $y as item()?) as item()?
+  def concat[F[_]: PrologW]: F[FunctionDecl2] =
+    qs.declare("concat") flatMap (_(
+      $("x") as ST("item()?"),
+      $("y") as ST("item()?")
+    ).as(ST("item()?")) { (x: XQuery, y: XQuery) =>
+      val (xType, yType) = ($("xType"), $("yType"))
+      for {
+        xt    <- ejson.typeOf[F].apply(x)
+        yt    <- ejson.typeOf[F].apply(y)
+        xcs   <- toCharArray[F].apply(x) flatMap (ejson.seqToArray_[F])
+        ycs   <- toCharArray[F].apply(y) flatMap (ejson.seqToArray_[F])
+        arrXY <- ejson.arrayConcat[F].apply(x, y)
+        xArrY <- ejson.arrayConcat[F].apply(xcs, y)
+        yArrX <- ejson.arrayConcat[F].apply(x, ycs)
+      } yield {
+        let_(
+          xType := xt,
+          yType := yt)
+        .return_(
+          if_(~xType eq "array".xs and ~yType eq "array".xs)
+          .then_(arrXY)
+          .else_(if_(fn.empty(~xType) and ~yType eq "array".xs)
+          .then_(xArrY)
+          .else_(if_(~xType eq "array".xs and fn.empty(~yType))
+          .then_(yArrX)
+          .else_(if_(fn.empty(~xType) and fn.empty(~yType))
+          .then_(fn.concat(x, y))
+          .else_(emptySeq)))))
+      }
+    })
+
   // qscript:delete-field($src as element(), $field as xs:QName) as element()
   def deleteField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
@@ -313,6 +346,14 @@ object qscript {
       $("dt") as ST("xs:dateTime")
     ).as(ST("xs:integer")) { dt =>
       fn.timezoneFromDateTime(dt) div xs.dayTimeDuration("PT1S".xs)
+    })
+
+  // qscript:to-char-array($s as xs:string?) as element()?
+  def toCharArray[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.declare("to-char-array") map (_(
+      $("s") as ST("xs:string?")
+    ).as(ST("xs:string*")) { s: XQuery =>
+      fn.map("fn:codepoints-to-string#1".xqy, fn.stringToCodepoints(s))
     })
 
   // qscript:to-string($item as item()) as xs:string?
