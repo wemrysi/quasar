@@ -133,17 +133,16 @@ object qscript {
   def compGe[F[_]: PrologW]: F[FunctionDecl2] =
     mkComparisonFunction[F]("ge", _ ge _, emptySeq)
 
-  // FIXME: This needs to work with any element, not just those with ejson types
   // qscript:concat($x as item()?, $y as item()?) as item()?
   def concat[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("concat") flatMap (_(
       $("x") as ST("item()?"),
       $("y") as ST("item()?")
     ).as(ST("item()?")) { (x: XQuery, y: XQuery) =>
-      val (xType, yType) = ($("xType"), $("yType"))
+      val (xArr, yArr) = ($("xArr"), $("yArr"))
       for {
-        xt    <- ejson.typeOf[F].apply(x)
-        yt    <- ejson.typeOf[F].apply(y)
+        xt    <- ejson.isArray[F] apply x
+        yt    <- ejson.isArray[F] apply y
         xcs   <- toCharArray[F].apply(x) flatMap (ejson.seqToArray_[F])
         ycs   <- toCharArray[F].apply(y) flatMap (ejson.seqToArray_[F])
         arrXY <- ejson.arrayConcat[F].apply(x, y)
@@ -151,18 +150,16 @@ object qscript {
         yArrX <- ejson.arrayConcat[F].apply(x, ycs)
       } yield {
         let_(
-          xType := xt,
-          yType := yt)
+          xArr := xt,
+          yArr := yt)
         .return_(
-          if_(~xType eq "array".xs and ~yType eq "array".xs)
+          if_(~xArr and ~yArr)
           .then_(arrXY)
-          .else_(if_(fn.empty(~xType) and ~yType eq "array".xs)
+          .else_(if_(~yArr)
           .then_(xArrY)
-          .else_(if_(~xType eq "array".xs and fn.empty(~yType))
+          .else_(if_(~xArr)
           .then_(yArrX)
-          .else_(if_(fn.empty(~xType) and fn.empty(~yType))
-          .then_(fn.concat(x, y))
-          .else_(emptySeq)))))
+          .else_(fn.concat(x, y)))))
       }
     })
 
@@ -193,15 +190,12 @@ object qscript {
       }
     })
 
-  // qscript:element-left-shift($elt as element()) as item()*
+  // qscript:element-left-shift($elt as element()?) as item()*
   def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-left-shift") flatMap (_(
-      $("elt") as ST("element()")
+    qs.declare("element-left-shift") map (_(
+      $("elt") as ST("element()?")
     ).as(ST("item()*")) { elt =>
-      (ejson.arrayEltN.qn[F] |@| ejson.isArray[F](elt))((aelt, eltIsArray) =>
-        if_ (eltIsArray)
-        .then_ { elt `/` child(aelt)  }
-        .else_ { elt `/` child.node() })
+      elt `/` child.element()
     })
 
   // qscript:isoyear-from-dateTime($dt as xs:dateTime) as xs:integer

@@ -47,59 +47,50 @@ object ejson {
       mkArrayElt[F](item) flatMap (mem.nodeInsertChild(arr, _))
     })
 
-  // FIXME: This needs to work with any element, not just those with ejson types
-  // ejson:array-concat($arr1 as element(), $arr2 as element()) as element(ejson:ejson)
+  // ejson:array-concat($arr1 as element()?, $arr2 as element()?) as element()
   def arrayConcat[F[_]: PrologW]: F[FunctionDecl2] =
-    (ejs.name("array-concat").qn[F] |@| ejsonN.qn |@| arrayEltN.qn) { (fname, ename, aelt) =>
-      declare(fname)(
-        $("arr1") as ST("element()"),
-        $("arr2") as ST("element()")
-      ).as(ST(s"element($ename)")) { (arr1: XQuery, arr2: XQuery) =>
-        mkArray[F] apply (ename.xqy, mkSeq_(arr1 `/` child(aelt), arr2 `/` child(aelt)))
-      }
-    }.join
+    ejs.declare("array-concat") flatMap (_(
+      $("arr1") as ST("element()?"),
+      $("arr2") as ST("element()?")
+    ).as(ST(s"element()")) { (arr1: XQuery, arr2: XQuery) =>
+      mkArray_[F](mkSeq_(arr1 `/` child.element(), arr2 `/` child.element()))
+    })
 
-  // ejson:array-element-at($arr as element(), $idx as xs:integer) as element(ejson:array-element)?
+  // ejson:array-element-at($arr as element()?, $idx as xs:integer) as element()?
   def arrayElementAt[F[_]: PrologW]: F[FunctionDecl2] =
-    (ejs.name("array-element-at").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
-      declare(fname)(
-        $("arr") as ST("element()"),
-        $("idx") as ST("xs:integer")
-      ).as(ST(s"element($aelt)?")) { (arr: XQuery, idx: XQuery) =>
-        arr `/` child(aelt)(idx)
-      }
-    }
+    ejs.declare("array-element-at") map (_(
+      $("arr") as ST("element()?"),
+      $("idx") as ST("xs:integer")
+    ).as(ST(s"element()?")) { (arr: XQuery, idx: XQuery) =>
+      arr `/` child.element()(idx)
+    })
 
-  // ejson:array-dup-indices($arr as element()) as element()
+  // ejson:array-dup-indices($arr as element()?) as element()?
   def arrayDupIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("array-dup-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
-      declare(fname)(
-        $("arr") as ST("element()")
-      ).as(ST("element()")) { arr: XQuery =>
-        val i = $("i")
-        seqToArray[F].apply(
-          fn.nodeName(arr),
-          for_ ($("_") at i in (arr `/` child(aelt))) return_ (~i - 1.xqy))
-      }
-    }.join
+    ejs.declare("array-dup-indices") flatMap (_(
+      $("arr") as ST("element()?")
+    ).as(ST("element()?")) { arr: XQuery =>
+      val i = $("i")
+      seqToArray[F].apply(
+        fn.nodeName(arr),
+        for_ ($("_") at i in (arr `/` child.element())) return_ (~i - 1.xqy))
+    })
 
-  // ejson:array-zip-indices($arr as element()) as element()
+  // ejson:array-zip-indices($arr as element()?) as element()?
   def arrayZipIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("array-zip-indices").qn[F] |@| arrayEltN.qn) { (fname, aelt) =>
-      declare(fname)(
-        $("arr") as ST("element()")
-      ).as(ST("element()")) { arr: XQuery =>
-        val (i, elt) = ($("i"), $("elt"))
+    ejs.declare("array-zip-indices") flatMap (_(
+      $("arr") as ST("element()?")
+    ).as(ST("element()?")) { arr: XQuery =>
+      val (i, elt) = ($("i"), $("elt"))
 
-        for {
-          ixelt <- mkArrayElt[F](~i - 1.xqy)
-          pair  <- mkArray_[F](mkSeq_(ixelt, ~elt))
-          zpair <- mkArrayElt[F](pair)
-          zelts =  for_(elt at i in (arr `/` child(aelt))) return_ zpair
-          zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts)
-        } yield zarr
-      }
-    }.join
+      for {
+        ixelt <- mkArrayElt[F](~i - 1.xqy)
+        pair  <- mkArray_[F](mkSeq_(ixelt, ~elt))
+        zpair <- mkArrayElt[F](pair)
+        zelts =  for_(elt at i in (arr `/` child.element())) return_ zpair
+        zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts)
+      } yield zarr
+    })
 
   // ejson:ascribed-type($elt as element()) as xs:string?
   def ascribedType[F[_]: PrologW]: F[FunctionDecl1] =
@@ -149,17 +140,17 @@ object ejson {
       }
     })
 
-  // ejson:has-ascribed-type($tpe as xs:string, $node as node()) as xs:boolean
-  def hasAscribedType[F[_]: PrologW]: F[FunctionDecl2] =
-    ejs.declare("has-ascribed-type") flatMap (_(
-      $("tpe")  as ST("xs:string"),
-      $("node") as ST("node()")
-    ).as(ST("xs:boolean")) { (tpe: XQuery, node: XQuery) =>
-      ascribedType[F].apply(node) map (_ eq tpe)
+  // ejson:is-array($item as item()?) as xs:boolean
+  def isArray[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.declare("is-array") map (_(
+      $("item") as ST("item()?")
+    ).as(ST("xs:boolean")) { item: XQuery =>
+      typeswitch(item)(
+        $("elt") as ST("element()") return_ (elt =>
+          fn.empty(elt `/` child.node()) or
+          fn.not(fn.empty(elt `/` child.element())))
+      ) default fn.False
     })
-
-  def isArray[F[_]: PrologW](node: XQuery): F[XQuery] =
-    hasAscribedType[F].apply("array".xs, node)
 
   // ejson:make-array($name as xs:QName, $elements as element(ejson:array-element)*) as element()
   def mkArray[F[_]: PrologW]: F[FunctionDecl2] =
@@ -178,38 +169,36 @@ object ejson {
   def mkArrayElt[F[_]: PrologW](value: XQuery): F[XQuery] =
     arrayEltN.qn[F] flatMap (name => renameOrWrap[F].apply(name.xqy, value))
 
-  // ejson:make-object($entries as element()*) as element(ejson:ejson)
+  // ejson:make-object($entries as element()*) as element()
   def mkObject[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("make-object").qn[F] |@| ejsonN.qn |@| ejsonN.xs |@| typeAttrN.xs) {
-      (fname, ename, ejsxs, tpexs) =>
+    (ejs.name("make-object").qn[F] |@| ejsonN.xs |@| typeAttrN.xs) {
+      (fname, ejsxs, tpexs) =>
 
       declare(fname)(
         $("entries") as ST(s"element()*")
-      ).as(ST(s"element($ename)")) { entries =>
+      ).as(ST(s"element()")) { entries =>
         element { ejsxs } { mkSeq_(attribute { tpexs } { "object".xs }, entries) }
       }
     }
 
-  // ejson:object-concat($obj1 as element(), $obj2 as element()) as element()
+  // ejson:object-concat($obj1 as element()?, $obj2 as element()?) as element()
   def objectConcat[F[_]: PrologW]: F[FunctionDecl2] =
-    (ejs.name("object-concat").qn[F] |@| ejsonN.qn) { (fname, ename) =>
-      declare(fname)(
-        $("obj1") as ST("element()"),
-        $("obj2") as ST("element()")
-      ).as(ST(s"element($ename)")) { (obj1: XQuery, obj2: XQuery) =>
-        val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
+    ejs.declare("object-concat") flatMap (_(
+      $("obj1") as ST("element()?"),
+      $("obj2") as ST("element()?")
+    ).as(ST(s"element()")) { (obj1: XQuery, obj2: XQuery) =>
+      val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
 
-        mkObject[F] apply {
-          let_(
-            xs    := (obj2 `/` child.element()),
-            names := fn.map("fn:node-name#1".xqy, ~xs),
-            ys    := fn.filter(func(e.render) {
-                       every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2)
-                     }, obj1 `/` child.element()))
-          .return_(mkSeq_(~ys, ~xs))
-        }
+      mkObject[F] apply {
+        let_(
+          xs    := (obj2 `/` child.element()),
+          names := fn.map("fn:node-name#1".xqy, ~xs),
+          ys    := fn.filter(func(e.render) {
+                     every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2)
+                   }, obj1 `/` child.element()))
+        .return_(mkSeq_(~ys, ~xs))
       }
-    }.join
+    })
 
   // ejson:object-insert($obj as element(), $key as xs:string, $value as item()*) as element()
   //
