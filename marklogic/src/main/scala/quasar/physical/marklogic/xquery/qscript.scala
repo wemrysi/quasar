@@ -38,10 +38,10 @@ object qscript {
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
-  // qscript:as-date($item as item()) as xs:date?
+  // qscript:as-date($item as item()?) as xs:date?
   def asDate[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("as-date") map (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:date?")) { item =>
       if_(isCastable(item, ST("xs:date")))
       .then_ { xs.date(item) }
@@ -52,10 +52,10 @@ object qscript {
       }
     })
 
-  // qscript:as-dateTime($item as item()) as xs:dateTime?
+  // qscript:as-dateTime($item as item()?) as xs:dateTime?
   def asDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("as-dateTime") map (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:dateTime?")) { item =>
       if_(isCastable(item, ST("xs:dateTime")))
       .then_ { xs.dateTime(item) }
@@ -66,11 +66,11 @@ object qscript {
       }
     })
 
-  // qscript:as-map-key($item as item()) as xs:string
+  // qscript:as-map-key($item as item()?) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>
       declare(fname)(
-        $("item") as ST("item()")
+        $("item") as ST("item()?")
       ).as(ST("xs:string")) { item =>
         typeswitch(item)(
           ($("a") as ST("attribute()")) return_ (a =>
@@ -198,11 +198,11 @@ object qscript {
       elt `/` child.element()
     })
 
-  // qscript:isoyear-from-dateTime($dt as xs:dateTime) as xs:integer
+  // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
   def isoyearFromDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:integer")) { dt: XQuery =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:integer?")) { dt: XQuery =>
       if_((fn.monthFromDateTime(dt) eq 1.xqy) and (xdmp.weekFromDate(xs.date(dt)) ge 52.xqy))
       .then_ { fn.yearFromDateTime(dt) - 1.xqy }
       .else_ {
@@ -248,10 +248,11 @@ object qscript {
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
 
+  // qscript:length($arrOrStr as item()?) as xs:integer?
   def length[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("length").qn[F] map { fname =>
       declare(fname)(
-        $("arrOrStr") as ST("item()")
+        $("arrOrStr") as ST("item()?")
       ).as(ST("xs:integer?")) { arrOrStr: XQuery =>
         val ct = $("ct")
         typeswitch(arrOrStr)(
@@ -268,11 +269,11 @@ object qscript {
       }
     }
 
-  // qscript:project-field($src as element(), $field as xs:QName) as item()*
+  // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
   def projectField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("project-field") map (_(
-      $("src")   as ST("element()"),
-      $("field") as ST("xs:QName")
+      $("src")   as ST("element()?"),
+      $("field") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
       fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
@@ -318,27 +319,27 @@ object qscript {
       }
     })
 
-  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:double
+  // qscript:seconds-since-epoch($dt as xs:dateTime?) as xs:double?
   def secondsSinceEpoch[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("seconds-since-epoch") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:double")) { dt =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:double?")) { dt =>
       mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
     })
 
-  // qscript:timestamp-to-dateTime($millis as xs:integer) as xs:dateTime
+  // qscript:timestamp-to-dateTime($millis as xs:integer?) as xs:dateTime?
   def timestampToDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timestamp-to-dateTime") map (_(
-      $("millis") as ST("xs:integer")
-    ).as(ST("xs:dateTime")) { millis =>
+      $("millis") as ST("xs:integer?")
+    ).as(ST("xs:dateTime?")) { millis =>
       epoch + xs.dayTimeDuration(fn.concat("PT".xs, xs.string(millis div 1000.xqy), "S".xs))
     })
 
-  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:integer
+  // qscript:timezone-offset-seconds($dt as xs:dateTime?) as xs:integer?
   def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timezone-offset-seconds") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:integer")) { dt =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:integer?")) { dt =>
       fn.timezoneFromDateTime(dt) div xs.dayTimeDuration("PT1S".xs)
     })
 
@@ -350,10 +351,10 @@ object qscript {
       fn.map("fn:codepoints-to-string#1".xqy, fn.stringToCodepoints(s))
     })
 
-  // qscript:to-string($item as item()) as xs:string?
+  // qscript:to-string($item as item()?) as xs:string
   def toString[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("to-string") flatMap (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:string")) { item: XQuery =>
       ejson.typeOf[F].apply(item) map { tpe =>
         if_(tpe eq "null".xs)
@@ -376,10 +377,10 @@ object qscript {
       }
     })
 
-  // qscript:zip-map-element-keys($elt as element()) as element()
+  // qscript:zip-map-element-keys($elt as element()?) as element()
   def zipMapElementKeys[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("zip-map-element-keys") flatMap (_(
-      $("elt") as ST("element()")
+      $("elt") as ST("element()?")
     ).as(ST(s"element()")) { elt =>
       val (c, n) = ($("child"), $("name"))
 
