@@ -17,11 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.RenderTree
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -73,8 +73,21 @@ object EquiJoin {
       }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
-    RenderTree.delayFromShow
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
+    new Delay[RenderTree, EquiJoin[T, ?]] {
+      val nt = List("EquiJoin")
+      def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {
+          case EquiJoin(src, lBr, rBr, lKey, rKey, tpe, combine) =>
+            NonTerminal(nt, None, List(
+              r.render(src),
+              lBr.render,
+              rBr.render,
+              lKey.render,
+              rKey.render,
+              tpe.render,
+              combine.render))
+        }
+      }
 
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {
@@ -85,7 +98,8 @@ object EquiJoin {
           (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
     }
 
-  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, EquiJoin[T, ?]] =
+  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+      : Mergeable.Aux[T, EquiJoin[T, ?]] =
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
@@ -93,10 +107,20 @@ object EquiJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) = None
-    }
+        p1: EquiJoin[IT, ExternallyManaged],
+        p2: EquiJoin[IT, ExternallyManaged]) =
+        (p1, p2) match {
+          case (EquiJoin(s1, l1, r1, lk1, rk1, f1, c1),
+                EquiJoin(_, l2, r2, lk2, rk2, f2, c2)) =>
+            val left1 = rebaseBranch(l1, left)
+            val right1 = rebaseBranch(r1, left)
+            val left2 = rebaseBranch(l2, right)
+            val right2 = rebaseBranch(r2, right)
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[EquiJoin[T, ?]] =
-    TTypes.normalizable[T].EquiJoin
+            (left1 ≟ left2 && right1 ≟ right2 && lk1 ≟ lk2 && rk1 ≟ rk2 && f1 ≟ f2).option {
+              val (merged, left, right) = concat(c1, c2)
+              SrcMerge(EquiJoin(s1, left1, right1, lk1, rk1, f1, merged), left, right)
+            }
+        }
+    }
 }

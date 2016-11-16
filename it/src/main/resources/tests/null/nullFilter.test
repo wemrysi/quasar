@@ -1,7 +1,10 @@
 {
   "name": "filter on is null",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "couchbase":  "skip"
+  },
 
   "description": "expression with `is null` should be true whenever the same filter is satisfied",
 

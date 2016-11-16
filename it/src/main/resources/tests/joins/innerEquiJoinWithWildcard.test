@@ -2,7 +2,9 @@
     "name": "perform inner equi-join with wildcard",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "skip",
+        "couchbase":         "skip"
     },
     "data": "../largeZips.data",
     "query": "select * from `../largeZips` join `../largeZips` as z2 on largeZips._id = z2._id",

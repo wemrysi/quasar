@@ -1,0 +1,4 @@
+- handle the `Ann#values` pointer more consistently
+- implement Distinct => QScript
+- fix union conversion
+- in Mongo-QScript, identify arrays and maps with statically-known indices/keys to take advantage of ArrayBuilder and DocBuilder

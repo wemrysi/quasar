@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp.free.lift
 import quasar.fs._, FileSystemError._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.physical.marklogic.uuid.GenUUID
+import quasar.effect.uuid.GenUUID
 import quasar.physical.marklogic.xcc.SessionIO
 
 import scalaz._, Scalaz._
@@ -37,8 +37,7 @@ object writefile {
     def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
       case WriteFile.Open(file) =>
         for {
-          id <- seq.next
-          writeHandle = WriteFile.WriteHandle(file, id)
+          writeHandle <- seq.next ∘ (WriteFile.WriteHandle(file, _))
           _  <- cursors.put(writeHandle, ())
           r  <- lift(ops.exists(file).ifM(
                   ().right[PathError].point[SessionIO],

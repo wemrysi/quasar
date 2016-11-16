@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.optimize.pipeline._
@@ -82,8 +83,7 @@ package object workflow {
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type here, so they're immediately injected into ExprOp.
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna(normalize)
@@ -135,7 +135,7 @@ package object workflow {
         I.inj($SortF(src, sort2 ⊹ sort1)).some
       case $limit(src, count) => src.project match {
         case $limit(src0, count0) =>
-          I.inj($LimitF(src0, count0 min count)).some
+          I.inj($LimitF(src0, scala.math.min(count0, count))).some
         case $skip(src0, count0) =>
           I.inj($SkipF(I.inj($LimitF(src0, count0 + count)).embed, count0)).some
         case _ => None
@@ -639,7 +639,7 @@ package object workflow {
         }
 
         val finished =
-          deleteUnusedFields(reorderOps(op.transCata(orOriginal(simplifyGroupƒ[F]))))
+          deleteUnusedFields(reorderOps(simplifyGroup[F](op)))
 
         def fixShape(wf: Fix[F]) =
           simpleShape(wf).fold(

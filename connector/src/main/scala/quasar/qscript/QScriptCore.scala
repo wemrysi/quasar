@@ -17,11 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
-import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -37,14 +37,14 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 }
 
 object ReduceIndex {
-  implicit def equal: Equal[ReduceIndex] =
+  val Empty = ReduceIndex(-1)
+
+  implicit val equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
 
-  implicit def show: Show[ReduceIndex] =
-    Show.show {
-      case ReduceIndex(idx) =>
-        Cord("ReduceIndex(") ++ idx.show ++ Cord(")")
-    }
+  implicit val renderTree: RenderTree[ReduceIndex] =
+    RenderTree.simple(List("ReduceIndex"), _.idx.shows.some)
+  implicit val show: Show[ReduceIndex] = RenderTree.toShow
 }
 
 /** Flattens nested structure, converting each value into a data set, which are
@@ -74,7 +74,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
-  * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
+  * result of the bucket MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
   * `bucket` partitions the values into buckets based on the result of the
   * expression, `reducers` applies the provided reduction to each expression,
@@ -87,7 +87,7 @@ object ReduceIndex {
   src: A,
   bucket: FreeMap[T],
   reducers: List[ReduceFunc[FreeMap[T]]],
-  repair: Free[MapFunc[T, ?], ReduceIndex])
+  repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
@@ -119,10 +119,9 @@ object ReduceIndex {
 @Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class Take[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
-    extends QScriptCore[T, A]
-
-@Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
+/** Chooses a subset of values from a dataset, given a count. */
+@Lenses final case class Subset[T[_[_]], A]
+  (src: A, from: FreeQS[T], op: SelectionOp, count: FreeQS[T])
     extends QScriptCore[T, A]
 
 /** A placeholder value that can appear in plans, but will never be referenced
@@ -148,8 +147,7 @@ object QScriptCore {
           case (Union(a1, l1, r1), Union(a2, l2, r2)) =>
             eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
-          case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
-          case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
+          case (Subset(a1, f1, s1, c1), Subset(a2, f2, s2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && s1 ≟ s2 && c1 ≟ c2
           case (Unreferenced(), Unreferenced()) => true
           case (_, _) => false
         }
@@ -167,14 +165,15 @@ object QScriptCore {
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Union(a, l, r)             => f(a) ∘ (Union(_, l, r))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
-          case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
-          case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
+          case Subset(a, from, sel, c)    => f(a) ∘ (Subset(_, from, sel, c))
           case Unreferenced()             => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
         }
     }
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
+      val f1: Show[JoinFunc[T]] = implicitly
+
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++
@@ -200,21 +199,68 @@ object QScriptCore {
           case Filter(a, func) => Cord("Filter(") ++
             s.show(a) ++ Cord(",") ++
             func.show ++ Cord(")")
-          case Take(a, f, c) => Cord("Take(") ++
+          case Subset(a, f, sel, c) => Cord("Subset(") ++
             s.show(a) ++ Cord(",") ++
             f.show ++ Cord(",") ++
-            c.show ++ Cord(")")
-          case Drop(a, f, c) => Cord("Drop(") ++
-            s.show(a) ++ Cord(",") ++
-            f.show ++ Cord(",") ++
+            sel.show ++ Cord(",") ++
             c.show ++ Cord(")")
           case Unreferenced() => Cord("Unreferenced")
         }
     }
 
-  implicit def renderTree[T[_[_]]: ShowT]:
-      Delay[RenderTree, QScriptCore[T, ?]] =
-    RenderTree.delayFromShow
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
+      : Delay[RenderTree, QScriptCore[T, ?]] =
+    new Delay[RenderTree, QScriptCore[T, ?]] {
+      def apply[A](RA: RenderTree[A]): RenderTree[QScriptCore[T, A]] =
+        new RenderTree[QScriptCore[T, A]] {
+          val nt = List("QScriptCore")
+
+          def nested[A: RenderTree](label: String, a: A) =
+            NonTerminal(label :: nt, None, a.render :: Nil)
+
+          def render(v: QScriptCore[T, A]) =
+            v match {
+              case Map(src, f) =>
+                NonTerminal("Map" :: nt, None,
+                  RA.render(src) :: f.render :: Nil)
+              case LeftShift(src, struct, repair) =>
+                NonTerminal("LeftShift" :: nt, None,
+                  RA.render(src) ::
+                    nested("Struct", struct) ::
+                    nested("Repair", repair) ::
+                    Nil)
+              case Reduce(src, bucket, reducers, repair) =>
+                NonTerminal("Reduce" :: nt, None,
+                  RA.render(src) ::
+                    nested("Bucket", bucket) ::
+                    NonTerminal("Reducers" :: nt, None, reducers.map(_.render)) ::
+                    nested("Repair", repair) ::
+                    Nil)
+              case Sort(src, bucket, order) =>
+                NonTerminal("Sort" :: nt, None,
+                  RA.render(src) :: nested("Bucket", bucket) ::
+                    NonTerminal("Order" :: "Sort" :: nt, None, order.map { case (x, dir) =>
+                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }) ::
+                    Nil)
+              case Union(src, lBranch, rBranch) =>
+                NonTerminal("Union" :: nt, None, List(
+                  RA.render(src),
+                  nested("LeftBranch", lBranch),
+                  nested("RightBranch", rBranch)))
+              case Filter(src, func) =>
+                NonTerminal("Filter" :: nt, None, List(
+                  RA.render(src),
+                  func.render))
+              case Subset(src, from, sel, count) =>
+                NonTerminal("Subset" :: nt, sel.shows.some, List(
+                  RA.render(src),
+                  nested("From", from),
+                  nested("Count", count)))
+              case Unreferenced()             =>
+                Terminal("Unreferenced" :: nt, None)
+            }
+        }
+    }
 
   implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
@@ -224,53 +270,45 @@ object QScriptCore {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged]) =
-        (p1, p2) match {
-          case (EnvT((Ann(b1, v1), Map(_, m1))),
-                EnvT((Ann(_,  v2), Map(_, m2)))) =>
-            // TODO: optimize cases where one side is a subset of the other
-            val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
-            concatBuckets(b1.map(_ >> m1)) match {
-              case Some((buck, newBuckets)) => {
-                val (full, buckAccess, valAccess) = concat(buck, mf)
-                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                  EnvT((
-                    Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
-                    Map(Extern, full))),
-                  lv,
-                  rv).some
-              }
-              case None =>
-                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                  EnvT((EmptyAnn[T], Map(Extern, mf))),
-                  lv,
-                  rv).some
-            }
+        p1: QScriptCore[IT, ExternallyManaged],
+        p2: QScriptCore[IT, ExternallyManaged]) = {
+        val norm = Normalizable.normalizable[T]
 
-          case (EnvT((Ann(b1, _), Reduce(_, bucket1, func1, rep1))),
-                EnvT((Ann(_,  _), Reduce(_, bucket2, func2, rep2)))) =>
-            val mapL = bucket1 >> left
-            val mapR = bucket2 >> right
+        (p1, p2) match {
+          case (Unreferenced(), Unreferenced()) =>
+            SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+              Unreferenced(),
+              HoleF,
+              HoleF).some
+          case (Map(_, m1), Map(_, m2)) =>
+            // TODO: optimize cases where one side is a subset of the other
+            val (mf, lv, rv) = concat(m1 >> left, m2 >> right)
+            SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+              Map(Extern, mf),
+              lv,
+              rv).some
+          case (
+            Reduce(_, bucket1, func1, rep1),
+            Reduce(_, bucket2, func2, rep2)) =>
+            val mapL = norm.freeMF(bucket1 >> left)
+            val mapR = norm.freeMF(bucket2 >> right)
 
             (mapL ≟ mapR).option {
-              val funcL = func1.map(_.map(_ >> left))
-              val funcR = func1.map(_.map(_ >> right))
-              val (newRep, lrep, rrep) = concat(rep1, rep2.map(_.incr(func1.length)))
+              val funcL = func1 ∘ (_ ∘ (_ >> left))
+              val funcR = func2 ∘ (_ ∘ (_ >> right))
+              val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
 
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                EnvT((
-                  Ann(b1, HoleF),
-                  Reduce(Extern, mapL, funcL ++ funcR, newRep))),
+              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                Reduce(Extern, mapL, funcL ++ funcR, newRep),
                 lrep,
                 rrep)
             }
 
-          case (EnvT((Ann(b1, _), LeftShift(_, struct1, repair1))),
-                EnvT((Ann(_,  _), LeftShift(_, struct2, repair2)))) =>
+          case (
+            LeftShift(_, struct1, repair1),
+            LeftShift(_, struct2, repair2)) =>
             val (repair, repL, repR) = concat(repair1, repair2)
 
-            val norm = TTypes.normalizable[T]
             val lFunc: FreeMap[IT] = norm.freeMF(struct1 >> left)
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
@@ -283,10 +321,8 @@ object QScriptCore {
               struct: FreeMap[IT],
               projL: Option[FreeMap[IT]],
               projR: Option[FreeMap[IT]]) =
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                EnvT((
-                  Ann(b1, HoleF),
-                  LeftShift(Extern, struct, repair))),
+              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                LeftShift(Extern, struct, repair),
                 projL.fold(repL)(repL >> _),
                 projR.fold(repR)(repR >> _)).some
 
@@ -311,10 +347,37 @@ object QScriptCore {
                   case (_, _) => None
                 }
             }
+          case (Filter(s1, c1), Filter(_, c2)) =>
+            val lCond = norm.freeMF(c1 >> left)
+            val rCond = norm.freeMF(c2 >> right)
+            (lCond ≟ rCond).option(SrcMerge(Filter(s1, lCond), left, right))
+
+          case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
+            val lBucket = norm.freeMF(b1 >> left)
+            val rBucket = norm.freeMF(b2 >> right)
+            val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> left)))
+            val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> right)))
+            (lBucket ≟ rBucket && lOrder ≟ rOrder).option(
+              SrcMerge(Sort(s1, lBucket, lOrder), left, right))
+
+          case (Subset(s1, f1, o1, c1), Subset(_, f2, o2, c2)) =>
+            val from1 = rebaseBranch(f1, left)
+            val from2 = rebaseBranch(f2, right)
+            val count1 = rebaseBranch(c1, left)
+            val count2 = rebaseBranch(c2, right)
+            (from1 ≟ from2 && o1 ≟ o2 && count1 ≟ count2).option(
+              SrcMerge(Subset(s1, from1, o1, count1), HoleF, HoleF))
+
+          case (Union(s1, l1, r1), Union(_, l2, r2)) =>
+            val left1 = rebaseBranch(l1, left)
+            val left2 = rebaseBranch(l2, right)
+            val right1 = rebaseBranch(r1, left)
+            val right2 = rebaseBranch(r2, right)
+            (left1 ≟ left2 && right1 ≟ right2).option(
+              SrcMerge(Union(s1, left1, right1), HoleF, HoleF))
+
           case (_, _) => None
         }
+      }
     }
-
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[QScriptCore[T, ?]] =
-    TTypes.normalizable[T].QScriptCore
 }

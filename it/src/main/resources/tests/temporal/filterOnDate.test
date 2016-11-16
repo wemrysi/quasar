@@ -1,6 +1,9 @@
 {
     "name": "filter with date literals",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip"
+    },
     "data": "../days.data",
     "query": "select day from `../days`
               where ((ts > date(\"2014-08-17\") and ts <= date(\"2014-08-20\")) and ts != date(\"2014-08-19\"))

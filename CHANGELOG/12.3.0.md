@@ -1,0 +1,1 @@
+- Add Read/Write/Manage/Query-File for spark-hdfs

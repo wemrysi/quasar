@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
@@ -123,7 +124,7 @@ trait FileSystemFixture {
     interpretTerm = hoistTask compose Mem.interpretTerm
   ) {
     def runLogEmpty[A](p: Process[FileSystemErrT[F,?],A]): Task[FileSystemError \/ IndexedSeq[A]] =
-      runLog(p).run.eval(emptyMem)
+      runLogE(p).run.eval(emptyMem)
   }
 
   val hoistFix: ReadWriteT[InMemoryFs,?] ~> MemStateFix =
@@ -142,7 +143,7 @@ trait FileSystemFixture {
     interpretTerm = hoistFix compose readWrite
   ) {
     def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
-      EitherT(runLog(p).run.eval((rs, ws)))
+      EitherT(runLogE(p).run.eval((rs, ws)))
 
     def runLogWithReads[E,A](rs: Reads, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       runLogWithRW(rs, List(), p)

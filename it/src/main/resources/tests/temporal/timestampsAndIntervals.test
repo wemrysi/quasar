@@ -1,7 +1,11 @@
 {
   "name": "timestamp and interval syntax",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "skip",
+    "couchbase":  "skip"
+  },
 
   "data": "../days.data",
 

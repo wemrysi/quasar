@@ -16,6 +16,7 @@
 
 package quasar.api.services
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
@@ -60,7 +61,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
     (TaskRef(Set.empty[MR]) |@| TaskRef(Map.empty[APath, MountConfig]))
       .tupled.flatMap { case (mountedRef, configsRef) =>
 
-      val mounter: Mounting ~> Free[MEff, ?] = Mounter[Task, MEff](
+      val mounter: Mounting ~> Free[MEff, ?] = Mounter.kvs[Task, MEff](
         {
           case MR.MountFileSystem(_, typ, `invalidUri`) =>
             MountingError.invalidConfig(
@@ -192,7 +193,9 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
 
       def destination(p: pathy.Path[_, _, Sandboxed]) = Header(Destination.name.value, UriPathCodec.printPath(p))
 
-      "succeed with filesystem mount" >> prop { (srcHead: String, srcTail: RDir, dstHead: String, dstTail: RDir) =>
+      "succeed with filesystem mount" >> prop { (srcHead: String, srcTail: RDir, dstHead: String, dstTail: RDir, view: RFile) =>
+        val (expr, vars) = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+
         // NB: distinct first segments means no possible conflict, but doesn't
         // hit every possible scenario.
         (srcHead != "" && dstHead != "" && srcHead != dstHead) ==> {
@@ -201,6 +204,42 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             val dst = rootDir </> dir(dstHead) </> dstTail
             for {
               _        <- M.mountFileSystem(src, StubFs, fooUri)
+              _        <- M.mountView(src </> view, expr, vars)
+
+              r        <- service(Request(
+                            method = MOVE,
+                            uri = pathUri(src),
+                            headers = Headers(destination(dst))))
+
+              (res, mntd) = r
+              body     <- lift(res.as[String]).into[Eff]
+
+              srcAfter <- M.lookupConfig(src).run
+              dstAfter <- M.lookupConfig(dst).run
+              srcViewAfter <- M.lookupConfig(src </> view).run
+              dstViewAfter <- M.lookupConfig(dst </> view).run
+            } yield {
+              (body must_== s"moved ${printPath(src)} to ${printPath(dst)}")       and
+              (res.status must_== Ok)                                              and
+              (mntd must_== Set(
+                MR.mountFileSystem(dst, StubFs, fooUri),
+                MR.mountView(dst </> view, expr, vars)))                           and
+              (srcAfter must beNone)                                               and
+              (dstAfter must beSome(MountConfig.fileSystemConfig(StubFs, fooUri))) and
+              (srcViewAfter must beNone)                                           and
+              (dstViewAfter must beSome(MountConfig.viewConfig(expr, vars)))
+            }
+          }
+        }
+      }
+
+      "succeed with view mount" >> prop { (src: AFile, dst: AFile) =>
+        val (expr, vars) = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+
+        (src ≠ dst) ==> {
+          runTest { service =>
+            for {
+              _        <- M.mountView(src, expr, vars)
 
               r        <- service(Request(
                             method = MOVE,
@@ -215,9 +254,9 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
               (res.status must_== Ok)                                        and
-              (mntd must_== Set(MR.mountFileSystem(dst, StubFs, fooUri)))    and
+              (mntd must_== Set(MR.mountView(dst, expr, vars)))              and
               (srcAfter must beNone)                                         and
-              (dstAfter must beSome(MountConfig.fileSystemConfig(StubFs, fooUri)))
+              (dstAfter must beSome(MountConfig.viewConfig(expr, vars)))
             }
           }
         }
@@ -618,6 +657,30 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         runTest { service =>
           for {
             _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+
+            r     <- service(Request(
+                       method = DELETE,
+                       uri = pathUri(d)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+
+            after <- M.lookupConfig(d).run
+          } yield {
+            (body must_== s"deleted ${printPath(d)}") and
+            (res.status must_== Ok)                   and
+            (mntd must beEmpty)                       and
+            (after must beNone)
+          }
+        }
+      }
+
+      "succeed with filesystem path and nested view" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+
+          for {
+            _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
+            _     <- M.mountView(d </> f, cfg._1, cfg._2)
 
             r     <- service(Request(
                        method = DELETE,

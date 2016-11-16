@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.jscore._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
@@ -28,8 +29,7 @@ import scalaz._, Scalaz._
 
 package object optimize {
   object pipeline {
-    private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
-    import exprCoreFp._
+    import fixExprOp._
 
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {
@@ -84,7 +84,7 @@ package object optimize {
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    def simplifyGroupƒ[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F):
+    private def simplifyGroupƒ[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F):
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case $group(src, Grouped(cont), id) =>
         val (newCont, proj) =
@@ -119,6 +119,9 @@ package object optimize {
               IgnoreId)).unFix.some
       case _ => None
     }
+
+    def simplifyGroup[F[_]: Coalesce: Functor](op: Fix[F])(implicit ev: WorkflowOpCoreF :<: F): Fix[F] =
+      op.transCata(orOriginal(simplifyGroupƒ[F]))
 
     private def reorderOpsƒ[F[_]: Coalesce](implicit I: WorkflowOpCoreF :<: F)
         : F[Fix[F]] => Option[F[Fix[F]]] = {

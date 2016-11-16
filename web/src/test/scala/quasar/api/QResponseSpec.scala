@@ -18,16 +18,16 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.fp._, free._
+import quasar.fp.ski._
 
 import org.http4s.dsl._
 import org.http4s.headers.Host
 import scalaz._
-import scalaz.std.anyVal._
 import scalaz.syntax.applicative._
-import scalaz.syntax.order._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
+import scala.math.max
 
 class QResponseSpec extends quasar.Qspec {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
@@ -97,14 +97,14 @@ class QResponseSpec extends quasar.Qspec {
       }
 
       "responds with alternate response when a small amount of data before first effect" >> {
-        val pad = Process.emit(ByteVector.low(0L max (PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
+        val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
         val padStream = failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
         padStream.toHttpResponse(evalStr("one")).as[String].unsafePerformSync must_== "FAIL"
       }
 
       "responds with alternate response when other internal effects before first effect" >> {
         val hi  = ByteVector.high(1)
-        val pad = Process.emit(ByteVector.low(0L max (PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
+        val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
         val stm = pad.append[StrIOM, ByteVector](failStream.body intersperse hi)
 
         failStream.copy(body = stm).toHttpResponse(evalStr("one"))

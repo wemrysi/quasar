@@ -1,6 +1,10 @@
 {
     "name": "LIKE with constant-foldable pattern",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "variables": { "substr": "\"ULDER\"" },
     "query": "select * from zips where city like (\"%\" || :substr || \"%\")",

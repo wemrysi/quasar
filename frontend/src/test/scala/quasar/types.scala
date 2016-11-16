@@ -16,8 +16,10 @@
 
 package quasar
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.specs2._, QuasarMatchers._
 
 import scala.Right
@@ -399,15 +401,15 @@ class TypesSpec extends quasar.Qspec {
     }
 
     "be Bottom with no args" in {
-      Coproduct(Nil) should_== Bottom
+      Coproduct.fromSeq(Nil) should_== Bottom
     }
 
     "return single arg" in {
-      Coproduct(Int :: Nil) should_== Int
+      Coproduct.fromSeq(Int :: Nil) should_== Int
     }
 
     "wrap two args" in {
-      Coproduct(Int :: Str :: Nil) should_== Int ⨿ Str
+      Coproduct.fromSeq(Int :: Str :: Nil) should_== Int ⨿ Str
     }
 
     "have lub of Top for mixed types" in {

@@ -16,19 +16,26 @@
 
 package quasar.qscript
 
+import quasar.Predef._
+import quasar.Data
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.contrib.pathy.APath
 import quasar.qscript.MapFuncs._
+import quasar.std.StdLib._
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
+  import quasar.frontend.fixpoint.lpf
+
+  val rewrite = new Rewrite[Fix]
+
   "shiftRead" should {
     "eliminate Read nodes from a simple query" in {
       val sampleFile = rootDir </> file("bar")
-      val optimize = new Optimize[Fix]
 
       val qScript =
         chain(
@@ -37,11 +44,27 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
 
       val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
 
-      // TODO: Optimize away the `IncludeId`.
-      newQScript.transCata(optimize.applyAll) must_=
-      Fix(QS.inject(QC.inj(Map(
-        Fix(SR.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
-        Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
+      // TODO: Rewrite away the `IncludeId`.
+      newQScript.transCata(rewrite.normalize) must_=
+      Fix(QCT.inj(Map(
+        Fix(SRT.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
+        Free.roll(ProjectIndex(HoleF, IntLit(1))))))
     }
+  }
+
+  "shift a simple aggregated read" in {
+    convert(lc.some,
+      structural.MakeObject(
+        lpf.constant(Data.Str("0")),
+        agg.Count(lpRead("/foo/bar")).embed).embed).map(
+      transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
+        .transCata(rewrite.normalize[QST])) must
+    equal(chain(
+      SRT.inj(Const[ShiftedRead[APath], Fix[QST]](
+        ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
+      QCT.inj(Reduce((),
+        NullLit(),
+        List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
+        Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
   }
 }

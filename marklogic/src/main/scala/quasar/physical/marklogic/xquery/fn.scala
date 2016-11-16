@@ -22,14 +22,26 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def avg(seq: XQuery): XQuery =
+    XQuery(s"fn:avg($seq)")
+
   def baseUri(node: XQuery): XQuery =
     XQuery(s"fn:base-uri($node)")
+
+  def ceiling(n: XQuery): XQuery =
+    XQuery(s"fn:ceiling($n)")
 
   def concat(x: XQuery, xs: XQuery*): XQuery =
     XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
 
   def count(xs: XQuery, max: Option[XQuery] = None): XQuery =
     XQuery(s"fn:count(${xs}${asArg(max)})")
+
+  val currentDateTime: XQuery =
+    XQuery("fn:current-dateTime()")
+
+  def dayFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:day-from-dateTime($dt)")
 
   def distinctValues(seq: XQuery): XQuery =
     XQuery(s"fn:distinct-values($seq)")
@@ -58,6 +70,21 @@ object fn {
   def filter(p: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:filter($p, $seq)")
 
+  def floor(n: XQuery): XQuery =
+    XQuery(s"fn:floor($n)")
+
+  def head(seq: XQuery): XQuery =
+    XQuery(s"fn:head($seq)")
+
+  def hoursFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:hours-from-dateTime($dt)")
+
+  def hoursFromDuration(dur: XQuery): XQuery =
+    XQuery(s"fn:hours-from-duration($dur)")
+
+  def indexOf(seq: XQuery, elt: XQuery): XQuery =
+    XQuery(s"fn:index-of($seq, $elt)")
+
   val last: XQuery =
     XQuery("fn:last()")
 
@@ -66,6 +93,24 @@ object fn {
 
   def map(f: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:map($f, $seq)")
+
+  def matches(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
+    XQuery(s"fn:matches($input, ${pattern}${asArg(flags)})")
+
+  def max(seq: XQuery): XQuery =
+    XQuery(s"fn:max($seq)")
+
+  def min(seq: XQuery): XQuery =
+    XQuery(s"fn:min($seq)")
+
+  def minutesFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:minutes-from-dateTime($dt)")
+
+  def minutesFromDuration(dur: XQuery): XQuery =
+    XQuery(s"fn:minutes-from-duration($dur)")
+
+  def monthFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:month-from-dateTime($dt)")
 
   def nodeName(node: XQuery): XQuery =
     XQuery(s"fn:node-name($node)")
@@ -79,6 +124,9 @@ object fn {
   def QName(namespace: XQuery, localPart: XQuery): XQuery =
     XQuery(s"fn:QName($namespace, $localPart)")
 
+  def secondsFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:seconds-from-dateTime($dt)")
+
   def startsWith(str: XQuery, prefix: XQuery, collation: Option[XQuery] = None): XQuery =
     XQuery(s"fn:starts-with($str, ${prefix}${asArg(collation)})")
 
@@ -88,6 +136,9 @@ object fn {
   def stringLength(str: XQuery): XQuery =
     XQuery(s"fn:string-length($str)")
 
+  def stringJoin(strs: XQuery, sep: XQuery): XQuery =
+    XQuery(s"fn:string-join($strs, $sep)")
+
   def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:substring($str, ${startLoc}${asArg(length)})")
 
@@ -96,6 +147,12 @@ object fn {
 
   def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")
+
+  def sum(seq: XQuery): XQuery =
+    XQuery(s"fn:sum($seq)")
+
+  def timezoneFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:timezone-from-dateTime($dt)")
 
   def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
     XQuery(s"fn:tokenize($input, ${pattern}${asArg(flags)})")
@@ -108,4 +165,7 @@ object fn {
 
   def upperCase(str: XQuery): XQuery =
     XQuery(s"fn:upper-case($str)")
+
+  def yearFromDateTime(dt: XQuery): XQuery =
+    XQuery(s"fn:year-from-dateTime($dt)")
 }

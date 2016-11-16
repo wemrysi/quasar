@@ -1,7 +1,10 @@
 {
     "name": "handle nested let binding and selects",
 
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "couchbase":  "skip"
+    },
 
     "data": "zips.data",
 

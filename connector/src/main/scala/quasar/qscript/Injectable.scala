@@ -17,7 +17,6 @@
 package quasar.qscript
 
 import quasar.Predef._
-
 import scalaz._, Scalaz._
 
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
@@ -30,40 +29,30 @@ import scalaz._, Scalaz._
 trait Injectable[IN[_]] {
   type OUT[A]
   def inject: IN ~> OUT
-  def project[A]: OUT[A] => Option[IN[A]]
+  def project: OUT ~> λ[A => Option[IN[A]]]
 }
 
-object Injectable extends Injectable0 {
+object Injectable {
   type Aux[IN[_], F[_]] = Injectable[IN] { type OUT[A] = F[A] }
+
+  def make[F[_], G[_]](inj: F ~> G, prj: G ~> λ[A => Option[F[A]]]): Aux[F, G] = new Injectable[F] {
+    type OUT[A] = G[A]
+    val inject  = inj
+    val project = prj
+  }
 
   /** Note: you'd like this to be implicit, but that makes implicit search
     * quadratic, so instead this is provided so that you can manually construct
     * instances where they're needed. */
-  def coproduct[F[_], G[_], H[_]]
-    (implicit F: Injectable.Aux[F, H], G: Injectable.Aux[G, H])
-      : Injectable.Aux[Coproduct[F, G, ?], H] =
-    new Injectable[Coproduct[F, G, ?]] {
-      type OUT[A] = H[A]
-      def inject = new (Coproduct[F, G, ?] ~> OUT) {
-        def apply[A](fa: Coproduct[F, G, A]) =
-          fa.run.fold(F.inject, G.inject)
-      }
+  def coproduct[F[_], G[_], H[_]](implicit F: Aux[F, H], G: Aux[G, H]): Aux[Coproduct[F, G, ?], H] = make(
+    λ[Coproduct[F, G, ?] ~> H](_.run.fold(F.inject, G.inject)),
+    λ[H ~> λ[A => Option[Coproduct[F, G, A]]]](out =>
+      F.project(out).cata(
+        f => Coproduct(f.left).some,
+        G.project(out) ∘ (g => Coproduct(g.right))
+      )
+    )
+  )
 
-      def project[A] =
-        out => F.project[A](out).fold[Option[Coproduct[F, G, A]]](
-          G.project[A](out) ∘ (g => Coproduct(\/-(g))))(
-          f => Coproduct(-\/(f)).some)
-    }
-}
-
-abstract class Injectable0 {
-  implicit def inject[IN[_], F[_]](implicit IN: IN :<: F)
-      : Injectable.Aux[IN, F] =
-    new Injectable[IN] {
-      type OUT[A] = F[A]
-
-      def inject = IN
-
-      def project[A] = IN.prj[A]
-    }
+  implicit def inject[F[_], G[_]](implicit IN: F :<: G) = make[F, G](IN, λ[G ~> λ[A => Option[F[A]]]](IN prj _))
 }

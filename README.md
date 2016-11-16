@@ -173,6 +173,20 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
+To connect to Couchbase use the following `connectionUri` format:
+
+`couchbase://<host>[:<port>]?username=<username>&password=<password>`
+
+To connect to HDFS using Apache Spark use the following `connectionUri` format:
+
+`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+
+e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+
+`xcc://<username>:<password>@<host>:<port>/<database>`
+
 #### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
@@ -191,6 +205,22 @@ For example, given the above MongoDB mount, an additional view could be defined 
 ```
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+#### Build Quasar for Apache Spark
+
+Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
+
+1. Assemble Quasar for Spark
+
+```sbt web/assembly -Dquasar4Spark=yes```
+
+2. Build sparkcore.jar
+
+```sbt sparkcore/assembly -DbuildSparkCore=yes```
+
+3. Set environment variable QUASAR_HOME
+
+QUASAR_HOME must point to a folder holding `sparkcore.jar`
 
 ## REPL Usage
 
@@ -467,11 +497,11 @@ Creates a new mount point or replaces an existing mount point using the JSON con
 
 ### DELETE /mount/fs/[path]
 
-Deletes an existing mount point, if any exists at the given path. If no such mount exists, the request succeeds but the response has no content.
+Deletes an existing mount point, if any exists at the given path. If no such mount exists, the request succeeds but the response has no content. Mounts that are nested within the mount being deleted (i.e. views) are also deleted.
 
 ### MOVE /mount/fs/[path]
 
-Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount.
+Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount. Mounts that are nested within the mount being moved (i.e. views) are moved along with it.
 
 ### PUT /server/port
 
@@ -633,7 +663,7 @@ You can also discuss issues on Gitter: [quasar-analytics/quasar](https://gitter.
 
 ## Legal
 
-Copyright &copy; 2014 - 2015 SlamData Inc.
+Copyright &copy; 2014 - 2016 SlamData Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

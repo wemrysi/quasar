@@ -16,6 +16,8 @@
 
 package quasar.qscript
 
+import quasar.Predef._
+import quasar.fp._
 import quasar.RenderTree
 import quasar.contrib.pathy.APath
 import quasar.fp._
@@ -31,9 +33,7 @@ import scalaz._, Scalaz._
 
 object Read {
   implicit def equal[A: Equal]: Equal[Read[A]] = Equal.equalBy(_.path)
-  implicit def show[A <: APath]: Show[Read[A]] =
-    Show.show(r => Cord("Read(") ++ posixCodec.printPath(r.path) ++ Cord(")"))
-
   implicit def renderTree[A <: APath]: RenderTree[Read[A]] =
-    RenderTree.fromShow("Read")
+    RenderTree.simple(List("Read"), r => posixCodec.printPath(r.path).some)
+  implicit def show[A <: APath]: Show[Read[A]] = RenderTree.toShow
 }

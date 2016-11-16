@@ -78,13 +78,9 @@ object writefile {
             .leftMap(e => pathErr(pathNotFound(f)))
       })
 
-      val pwProgram: Free[S, FileSystemError \/ PrintWriter] = injectFT[Task, S].apply{
-        (for {
-          _ <- mkParents
-          pw <- printWriter
-        } yield pw).run
-      }
-        
+      val pwProgram: Free[S, FileSystemError \/ PrintWriter] =
+        injectFT[Task, S].apply((mkParents *> printWriter).run)
+
       EitherT(pwProgram)
     }
 
@@ -129,12 +125,9 @@ object writefile {
     )
   }
 
-  def close[S[_]](h: WriteHandle)(implicit
-    writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S]
-  ): Free[S, Unit] = (for {
-    pw <- writers.get(h)
-    _ <- writers.delete(h).liftM[OptionT]
-  } yield {
-    pw.close
-  }).run.void
+  def close[S[_]]
+    (h: WriteHandle)
+    (implicit writers: KeyValueStore.Ops[WriteHandle, PrintWriter, S])
+      : Free[S, Unit] =
+    ((writers.get(h) <* writers.delete(h).liftM[OptionT]) ∘ (_.close)).run.void
 }

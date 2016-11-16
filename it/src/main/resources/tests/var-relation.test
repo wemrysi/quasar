@@ -1,7 +1,10 @@
 {
   "name": "select from a table named by a variable",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "couchbase":  "skip"
+  },
 
   "data": "smallZips.data",
 
@@ -9,11 +12,11 @@
     "table": "`smallZips`"
   },
 
-  "query": "select count(*) from :table where pop < 1000",
+  "query": "select count(*) as cnt from :table where pop < 1000",
 
   "predicate": "equalsExactly",
 
   "expected": [
-    { "0": 19 }
+    { "cnt": 19 }
   ]
 }

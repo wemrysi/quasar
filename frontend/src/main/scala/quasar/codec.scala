@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-
+import quasar.fp.ski._
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 
@@ -124,7 +124,7 @@ object DataCodec {
             case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
             case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
             case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
-              \/.fromTryCatchNonFatal(Data.Binary(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
+              \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
             case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
             case (`NAKey`, _) :: Nil            => \/-(Data.NA)

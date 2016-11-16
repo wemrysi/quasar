@@ -17,10 +17,12 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.fp._
+import quasar.qscript.{provenance => prov}
 
-import matryoshka._
+import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
@@ -66,46 +68,45 @@ package object qscript {
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  implicit def qScriptToQscriptTotal[T[_[_]]]: Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-        Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]]))
+  implicit def qScriptToQscriptTotal[T[_[_]]]
+      : Injectable.Aux[QScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[DeadEnd, ?]])
 
   /** QScript that has gone through Read conversion. */
-  type QScriptRead[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
+  type QScriptRead[T[_[_]], P, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[P], ?])#M[A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-        Injectable.inject[Const[Read[APath], ?], QScriptTotal[T, ?]]))
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, APath, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read[APath], ?]])
 
-  type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
-  type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]
-  type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
+  /** QScript that has gone through Read conversion and shifted conversion */
+  type QScriptShiftRead[T[_[_]], P, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead[P], ?])#M[A]
 
-  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptShiftRead[T, APath, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead[APath], ?]])
 
-  object Ann {
-    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
-      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
-
-    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
-      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
-  }
+  type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
+  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
+  type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
+  type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
-  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
+  def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
+  def LeftSideF[T[_[_]]]: JoinFunc[T] =
+    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
+  def RightSideF[T[_[_]]]: JoinFunc[T] =
+    Free.point[MapFunc[T, ?], JoinSide](RightSide)
+  def ReduceIndexF[T[_[_]]](i: Int): FreeMapA[T, ReduceIndex] =
+    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
-  final case class SrcMerge[A, B](src: A, left: B, right: B)
+  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
   import MapFunc._
   import MapFuncs._
-
-  def EquiJF[T[_[_]]]: JoinFunc[T] =
-    Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
       Option[(FreeMap[T], NEL[FreeMap[T]])] =
@@ -119,48 +120,149 @@ package object qscript {
               IntLit[T, Hole](p._2))))).some
     }
 
-  def concat[T[_[_]]: Corecursive, A](
-    l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
-      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T]) =
-    (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal](
+    l: FreeMapA[T, A], r: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    // NB: Might be better to do this later, after some normalization, part of
+    //     array compaction, but this helps us avoid some autojoins.
+    (norm.freeMF(l) ≟ norm.freeMF(r)).fold(
+      (norm.freeMF(l), HoleF[T], HoleF[T]),
+      (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+        Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+  }
 
   def concat3[T[_[_]]: Corecursive, A](
-    l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
-      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
-  // TODO: move to matryoshka
+  def concat4[T[_[_]]: Corecursive, A](
+    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
+      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
 
-  implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
-      Delay[Equal, EnvT[E, F, ?]] =
-    new Delay[Equal, EnvT[E, F, ?]] {
-      def apply[A](eq: Equal[A]) =
-        Equal.equal {
-          case (env1, env2) =>
-            env1.ask ≟ env2.ask && F(eq).equal(env1.lower, env2.lower)
-        }
+  def rebaseBranch[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+    (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
+    val rewrite = new Rewrite[T]
+
+    freeTransCata(
+      br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))(
+      liftCo(rewrite.normalizeCoEnv))
+  }
+
+  def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
+    (struct: FreeMap[T], repair0: JoinFunc[T])
+      : Option[(FreeMap[T], JoinFunc[T])] = {
+    def rewrite(elem: FreeMap[T], dup: FreeMap[T] => Unary[T, FreeMap[T]])
+        : Option[(FreeMap[T], JoinFunc[T])] = {
+      val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = repair0.toCoEnv[T]
+
+      val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = RightSideF.toCoEnv[T]
+
+      def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+        Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(RightSideF, IntLit(idx))).toCoEnv[T]
+
+      val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+      val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
+      val rightCount: Int = repair.para(count(rightSide))
+
+      if (repair.para(count(oneRef)) ≟ rightCount)
+        // all `RightSide` access is through `oneRef`
+        (elem, transApoT(repair)(substitute(oneRef, rightSide)).fromCoEnv).some
+      else if (repair.para(count(zeroRef)) ≟ rightCount)
+        // all `RightSide` access is through `zeroRef`
+        (Free.roll[MapFunc[T, ?], Hole](dup(elem)),
+          transApoT(repair)(substitute(zeroRef, rightSide)).fromCoEnv).some
+      else
+        None
     }
 
-  implicit def envtShow[E: Show, F[_]](implicit F: Delay[Show, F]):
-      Delay[Show, EnvT[E, F, ?]] =
-    new Delay[Show, EnvT[E, F, ?]] {
-      def apply[A](sh: Show[A]) =
-        Show.show {
-          envt => Cord("EnvT(") ++ envt.ask.show ++ Cord(", ") ++ F(sh).show(envt.lower) ++ Cord(")")
-        }
+    struct.resume match {
+      case -\/(ZipArrayIndices(elem)) => rewrite(elem, DupArrayIndices(_))
+      case -\/(ZipMapKeys(elem)) => rewrite(elem, DupMapKeys(_))
+      case _ => None
     }
+  }
 
-  def envtHmap[F[_], G[_], E, A](f: F ~> G): EnvT[E, F, ?] ~> EnvT[E, G, ?] =
-    new (EnvT[E, F, ?] ~> EnvT[E, G, ?]) {
-      def apply[A](env: EnvT[E, F, A]) = EnvT((env.ask, f(env.lower)))
+  /** A variant of `repeatedly` that works with `Inject` instances. */
+  def injectRepeatedly[F [_], G[_], A]
+    (op: F[A] => Option[G[A]])
+    (implicit F: F :<: G)
+      : F[A] => G[A] =
+    fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
+
+  // TODO: Un-hardcode the coproduct, and make this simply a transform itself,
+  //       rather than a full traversal.
+  def shiftRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+    (qs: T[QScriptRead[T, APath, ?]])
+      : T[QScriptShiftRead[T, APath, ?]] = {
+    type FixedQScriptRead[A]      = QScriptRead[T, APath, A]
+    type FixedQScriptShiftRead[A] = QScriptShiftRead[T, APath, A]
+    val rewrite = new Rewrite[T]
+    transFutu(qs)(ShiftRead[T, FixedQScriptRead, FixedQScriptShiftRead].shiftRead(idPrism.reverseGet)(_: FixedQScriptRead[T[FixedQScriptRead]]))
+      .transCata(
+        rewrite.normalize[FixedQScriptShiftRead] ⋙
+          liftFG(injectRepeatedly(quasar.qscript.Coalesce[T, FixedQScriptShiftRead, FixedQScriptShiftRead].coalesceSR[FixedQScriptShiftRead, APath](idPrism))))
+  }
+
+  // Helpers for creating `Injectable` instances
+
+  object ::\:: {
+    def apply[F[_]] = new Aux[F]
+
+    final class Aux[F[_]] {
+      def apply[T[_[_]], G[_]]
+        (i: Injectable.Aux[G, QScriptTotal[T, ?]])
+        (implicit F: F :<: QScriptTotal[T, ?])
+          : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
+        Injectable.coproduct(Injectable.inject[F, QScriptTotal[T, ?]], i)
     }
+  }
 
-  def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
-    def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
+  def ::/::[T[_[_]], F[_], G[_]]
+    (implicit F: F :<: QScriptTotal[T, ?], G: G :<: QScriptTotal[T, ?])
+      : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(
+      Injectable.inject[F, QScriptTotal[T, ?]],
+      Injectable.inject[G, QScriptTotal[T, ?]])
+}
+
+package qscript {
+  final case class SrcMerge[A, B](src: A, left: B, right: B)
+
+  @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
+
+  object Ann {
+    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
+      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+
+    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
+      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
+  }
+
+  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
+
+  object Target {
+    implicit def equal[T[_[_]]: EqualT, F[_]: Functor]
+      (implicit F: Delay[Equal, F])
+        : Equal[Target[T, F]] =
+      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
+
+    implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])
+        : Show[Target[T, F]] =
+      Show.show(target =>
+        Cord("Target(") ++
+          target.ann.shows ++ Cord(", ") ++
+          target.value.shows ++ Cord(")"))
   }
 }

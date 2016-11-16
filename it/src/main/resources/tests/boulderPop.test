@@ -1,6 +1,9 @@
 {
     "name": "population of Boulder",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "select sum(pop) as Population from zips where city=\"BOULDER\" and state=\"CO\"",
     "predicate": "containsExactly",

@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -35,9 +36,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
 
   val builder = WorkflowBuilder.Ops[WorkflowF]
   import builder._
-
-  private val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprCoreFp._
+  import fixExprOp._
 
   val readZips = read(collection("db", "zips"))
   def pureInt(n: Int) = pure(Bson.Int32(n))
@@ -142,7 +141,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       } yield state2).evalZero
 
       op must beLeftDisjunction(UnsupportedFunction(
-        quasar.std.StdLib.structural.ArrayProject.name,
+        quasar.std.StdLib.structural.ArrayProject,
         Some("array does not contain index ‘2’.")))
     }
 

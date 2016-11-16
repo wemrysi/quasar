@@ -1,0 +1,1 @@
+- more lenient decoding of MongoDB indexes

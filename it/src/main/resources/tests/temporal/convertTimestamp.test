@@ -1,13 +1,17 @@
 {
   "name": "convert epoch milliseconds value to timestamp",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "marklogic":  "skip"
+  },
 
   "data": "../days.data",
 
   "query": "select day, ts, to_timestamp(epoch) as converted from `../days` where ts = to_timestamp(1408255200000) or to_timestamp(epoch) = timestamp(\"2014-08-18T07:00:00Z\")",
 
-  "predicate": "equalsExactly",
+  "predicate": "containsExactly",
+  "ignoreFieldOrder": true,
   "expected": [
     { "ts": { "$timestamp": "2014-08-17T06:00:00Z" }, "day": "Sunday", "converted": { "$timestamp": "2014-08-17T06:00:00Z" } },
     { "ts": { "$timestamp": "2014-08-18T07:00:00Z" }, "day": "Monday", "converted": { "$timestamp": "2014-08-18T07:00:00Z" } }

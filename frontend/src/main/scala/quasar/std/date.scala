@@ -17,8 +17,8 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, GenericFunc, Mapping, Type, SemanticError}, SemanticError._
-import quasar.fp._
+import quasar.{Data, Func, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar.fp.ski._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, Validation.success
@@ -58,19 +58,66 @@ trait DateLib extends Library {
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
-  val Extract = BinaryFunc(
-    Mapping,
-    "date_part",
-    "Pulls out a part of the date. The first argument is one of the strings defined for Postgres’ `date_type function. This is a partial function – using an unsupported string has undefined results.",
-    Type.Numeric,
-    Func.Input2(Type.Str, Type.Temporal),
-    noSimplification,
-    constTyper[nat._2](Type.Numeric),
-    basicUntyper)
+
+  private def extract(help: String) =
+    UnaryFunc(
+      Mapping, help,
+      Type.Numeric,
+      Func.Input1(Type.Temporal),
+      noSimplification,
+      constTyper[nat._1](Type.Numeric),
+      basicUntyper)
+
+  val ExtractCentury      = extract(
+    "Pulls out the century subfield from a date/time value (currently year/100).")
+  val ExtractDayOfMonth   = extract(
+    "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
+  val ExtractDecade       = extract(
+    "Pulls out the decade subfield from a date/time value (year/10).")
+  val ExtractDayOfWeek    = extract(
+    "Pulls out the day of week (`dow`) subfield from a date/time value " +
+    "(Sunday: 0 to Saturday: 7).")
+  val ExtractDayOfYear    = extract(
+    "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
+  val ExtractEpoch        = extract(
+    "Pulls out the epoch subfield from a date/time value. For dates and " +
+    "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
+    "For intervals, the number of seconds in the interval.")
+  val ExtractHour         = extract(
+    "Pulls out the hour subfield from a date/time value (0-23).")
+  val ExtractIsoDayOfWeek       = extract(
+    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
+    "(Monday: 1 to Sunday: 7).")
+  val ExtractIsoYear      = extract(
+    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
+    "on the first week containing Jan. 4).")
+  val ExtractMicroseconds = extract(
+    "Pulls out the microseconds subfield from a date/time value (including seconds).")
+  val ExtractMillennium    = extract(
+    "Pulls out the millennium subfield from a date/time value (currently year/1000).")
+  val ExtractMilliseconds = extract(
+    "Pulls out the milliseconds subfield from a date/time value (including seconds).")
+  val ExtractMinute       = extract(
+    "Pulls out the minute subfield from a date/time value (0-59).")
+  val ExtractMonth        = extract(
+    "Pulls out the month subfield from a date/time value (1-12).")
+  val ExtractQuarter      = extract(
+    "Pulls out the quarter subfield from a date/time value (1-4).")
+  val ExtractSecond = extract(
+    "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
+  val ExtractTimezone = extract(
+    "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
+  val ExtractTimezoneHour = extract(
+    "Pulls out the hour component of the timezone subfield from a date/time value.")
+  val ExtractTimezoneMinute = extract(
+    "Pulls out the minute component of the timezone subfield from a date/time value.")
+  val ExtractWeek = extract(
+    "Pulls out the week subfield from a date/time value (1-53).")
+  val ExtractYear = extract(
+    "Pulls out the year subfield from a date/time value.")
 
   val Date = UnaryFunc(
     Mapping,
-    "date",
     "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Date,
     Func.Input1(Type.Str),
@@ -83,7 +130,6 @@ trait DateLib extends Library {
 
   val Time = UnaryFunc(
     Mapping,
-    "time",
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Time,
     Func.Input1(Type.Str),
@@ -96,7 +142,6 @@ trait DateLib extends Library {
 
   val Timestamp = UnaryFunc(
     Mapping,
-    "timestamp",
     "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Timestamp,
     Func.Input1(Type.Str),
@@ -109,7 +154,6 @@ trait DateLib extends Library {
 
   val Interval = UnaryFunc(
     Mapping,
-    "interval",
     "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval,
     Func.Input1(Type.Str),
@@ -122,7 +166,6 @@ trait DateLib extends Library {
 
   val TimeOfDay = UnaryFunc(
     Mapping,
-    "time_of_day",
     "Extracts the time of day from a (UTC) timestamp value.",
     Type.Time,
     Func.Input1(Type.Timestamp),
@@ -135,7 +178,6 @@ trait DateLib extends Library {
 
   val ToTimestamp = UnaryFunc(
     Mapping,
-    "to_timestamp",
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
     Type.Timestamp,
     Func.Input1(Type.Int),
@@ -145,12 +187,6 @@ trait DateLib extends Library {
       case Sized(Type.Int) => Type.Timestamp
     },
     basicUntyper)
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Date :: Time :: Timestamp :: Interval :: TimeOfDay :: ToTimestamp :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] = Extract :: Nil
-  def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 }
 
 object DateLib extends DateLib

@@ -16,6 +16,7 @@
 
 package quasar.physical.mongodb.expression
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.fp._
 import quasar.physical.mongodb.{Bson, BsonField}
@@ -83,9 +84,7 @@ object ArbitraryExprOp {
 }
 
 class ExpressionSpec extends quasar.Qspec {
-
-  val fpCore = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import fpCore._
+  import fixExprOp._
   val fp3_0 = ExprOp3_0F.fixpoint[Fix, ExprOp]
   import fp3_0._
 

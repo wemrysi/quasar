@@ -17,9 +17,10 @@
 package quasar.jscore
 
 import quasar.Predef._
-import quasar.javascript.Js
-import quasar.fp._
+import quasar.RenderTree.ops._
 import quasar.TreeMatchers
+import quasar.fp._
+import quasar.javascript.Js
 
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
@@ -126,19 +127,19 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
   "RenderTree" should {
     "render flat expression" in {
       val expr = Select(ident("foo"), "bar")
-      expr.shows must_= "JsCore(foo.bar)"
+      expr.render.shows must_= "JsCore(foo.bar)"
     }
 
     "render obj as nested" in {
       val expr = Obj(ListMap(Name("foo") -> ident("bar")))
-      expr.shows must_==
+      expr.render.shows must_==
         """Obj
           |╰─ Key(foo: bar)""".stripMargin
     }
 
     "render mixed" in {
       val expr = Obj(ListMap(Name("foo") -> Call(Select(ident("bar"), "baz"), List())))
-      expr.shows must_==
+      expr.render.shows must_==
         """Obj
           |╰─ Key(foo: bar.baz())""".stripMargin
     }

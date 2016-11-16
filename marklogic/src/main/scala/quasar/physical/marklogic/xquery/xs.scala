@@ -19,15 +19,39 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object xs {
+  def base64Binary(xqy: XQuery): XQuery =
+    XQuery(s"xs:base64Binary($xqy)")
+
+  def boolean(xqy: XQuery): XQuery =
+    XQuery(s"xs:boolean($xqy)")
+
   def byte(xqy: XQuery): XQuery =
     XQuery(s"xs:byte($xqy)")
 
-  def decimal(xqy: XQuery): XQuery =
-    XQuery(s"xs:decimal($xqy)")
+  def date(xqy: XQuery): XQuery =
+    XQuery(s"xs:date($xqy)")
+
+  def dateTime(xqy: XQuery): XQuery =
+    XQuery(s"xs:dateTime($xqy)")
+
+  def dayTimeDuration(xqy: XQuery): XQuery =
+    XQuery(s"xs:dayTimeDuration($xqy)")
+
+  def double(xqy: XQuery): XQuery =
+    XQuery(s"xs:double($xqy)")
+
+  def duration(xqy: XQuery): XQuery =
+    XQuery(s"xs:duration($xqy)")
 
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")
 
+  def QName(xqy: XQuery): XQuery =
+    XQuery(s"xs:QName($xqy)")
+
   def string(xqy: XQuery): XQuery =
     XQuery(s"xs:string($xqy)")
+
+  def time(xqy: XQuery): XQuery =
+    XQuery(s"xs:time($xqy)")
 }

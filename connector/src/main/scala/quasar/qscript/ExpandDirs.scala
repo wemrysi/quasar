@@ -18,8 +18,10 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
@@ -157,10 +159,8 @@ abstract class ExpandDirsInstances {
         fa => (fa match {
           case Union(src, lb, rb) =>
             (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Union(src, _, _))
-          case Take(src, lb, rb) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Take(src, _, _))
-          case Drop(src, lb, rb) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Drop(src, _, _))
+          case Subset(src, lb, o, rb) =>
+            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Subset(src, _, o, _))
           case x => x.point[M]
         }) ∘ (OutToF.compose(QC))
     }

@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 import scala.util.{Success, Failure}
 import scala.xml.Elem
 
+import org.threeten.bp.format.DateTimeFormatter
 import com.marklogic.xcc.types._
 import org.threeten.bp._
 import scalaz._, Scalaz._
@@ -78,8 +79,8 @@ object xdmitem {
     case item: XSAnyURI                 => Data._str(item.asString).point[F]
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
-    case item: XSDate                   => Data.singletonObj("xs:date"      , Data._str(item.asString)).point[F]
-    case item: XSDateTime               => Data._timestamp(Instant.ofEpochMilli(item.asDate.getTime)).point[F]
+    case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
+    case item: XSDateTime               => Data._timestamp(DateTimeUtils.toInstant(item.asDate)).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]
@@ -93,8 +94,7 @@ object xdmitem {
     case item: XSInteger                => Data._int(item.asBigInteger).point[F]
     case item: XSQName                  => Data._str(item.asString).point[F]
     case item: XSString                 => Data._str(item.asString).point[F]
-                                           // NB: This can be represented with org.threeten.bp.OffsetTime
-    case item: XSTime                   => Data.singletonObj("xs:time"      , Data._str(item.asString)).point[F]
+    case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._time(_))
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
     case other                          => s"No Data representation for '$other'.".wrapNel.raiseError[F, Data]
   }
@@ -110,11 +110,22 @@ object xdmitem {
       case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
     }
 
+  private def parseLocalDate[F[_]: MonadErrMsgs](s: String): F[LocalDate] =
+    parseTemporal[F, LocalDate]("LocalDate", DateTimeFormatter.ISO_DATE.parse(_, LocalDate.FROM))(s)
+
+  private def parseLocalTime[F[_]: MonadErrMsgs](s: String): F[LocalTime] =
+    parseTemporal[F, LocalTime]("LocalTime", DateTimeFormatter.ISO_TIME.parse(_, LocalTime.FROM))(s)
+
+  private def parseTemporal[F[_]: MonadErrMsgs, A](name: String, parse: String => A)(str: String): F[A] =
+    \/.fromTryCatchNonFatal(parse(str)).fold(
+      err => s"Failed to parse '$str' as a $name: ${err.getMessage}".wrapNel.raiseError[F, A],
+      _.point[F])
+
   private def xmlToData[F[_]: MonadErrMsgs](xmlString: String): F[Data] = {
     val el = SecureXML.loadString(xmlString).fold(_.toString.wrapNel.raiseError[F, Elem], _.point[F])
 
     el flatMap { e =>
-      if (xml.qualifiedName(e) === xml.namespaces.ejsonEjson.shows)
+      if (Option(e.prefix) exists (_ === xml.namespaces.ejsonNs.prefix.shows))
         data.decodeXml[F](e)
       else
         xml.toData(e).point[F]

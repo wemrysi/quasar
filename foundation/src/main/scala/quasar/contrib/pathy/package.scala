@@ -17,7 +17,7 @@
 package quasar.contrib
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp.ski._
 
 import argonaut._
 import _root_.pathy.Path, Path._
@@ -40,6 +40,12 @@ package object pathy {
   type DPath = DirPath[scala.Any]
 
   type PathSegment = DirName \/ FileName
+
+  implicit def liftDirName(x: DirName): PathSegment = x.left
+  implicit def liftFileName(x: FileName): PathSegment = x.right
+
+  def pathName(p: APath): Option[PathSegment] =
+    refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
 
   implicit val DirNameOrder: Order[DirName] = Order.orderBy(_.value)
   implicit val FileNameOrder: Order[FileName] = Order.orderBy(_.value)

@@ -1,5 +1,7 @@
 package quasar.project
 
+import scala.Option
+import java.lang.System
 import scala.collection.Seq
 
 import sbt._, Keys._
@@ -21,6 +23,9 @@ object Dependencies {
   private val slcVersion        = "0.4"
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
+
+  private val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
+  private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
 
   def foundation = Seq(
     "org.threeten"               %  "threetenbp"                %     "1.3.2",
@@ -45,6 +50,9 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
+  def effect = Seq(
+    "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
+  )
   def core = Seq(
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
@@ -55,34 +63,58 @@ object Dependencies {
     "com.github.scopt" %% "scopt" % "3.5.0",
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
+
+  def nettyDepType = if(quasar4Spark == "yes") "provided" else "compile"
+
   def mongodb = Seq(
     "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
-    "io.netty"    % "netty-buffer"         % nettyVersion,
-    "io.netty"    % "netty-handler"        % nettyVersion
+    "io.netty"    % "netty-buffer"         % nettyVersion % nettyDepType,
+    "io.netty"    % "netty-handler"        % nettyVersion % nettyDepType
   )
+
   val postgresql = Seq(
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
-  def sparkcore = Seq(
-    "io.netty"          %  "netty-all"  % nettyVersion,
-    ("org.apache.spark" %% "spark-core" % "1.6.2")
-      .exclude("commons-beanutils", "commons-beanutils-core")
-      .exclude("commons-collections", "commons-collections")
-      .exclude("com.esotericsoftware.minlog", "minlog")
-      .exclude("org.spark-project.spark", "unused")
-      .exclude("io.netty", "netty-all")
-  )
+
+  def buildSparkScope = if(buildSparkCore == "yes") "provided" else "compile"
+
+  val sparkDepCore = ("org.apache.spark" %% "spark-core" % "2.0.1")
+    .exclude("aopalliance", "aopalliance")
+    .exclude("javax.inject", "javax.inject")
+    .exclude("commons-collections", "commons-collections")
+    .exclude("commons-beanutils", "commons-beanutils-core")
+    .exclude("commons-logging", "commons-logging")
+    .exclude("commons-logging", "commons-logging")
+    .exclude("com.esotericsoftware.minlog", "minlog")
+    .exclude("org.spark-project.spark", "unused")
+    .exclude("org.scalatest", "scalatest_2.11")
+
+  val sparkDep =
+    if(quasar4Spark == "yes")
+      sparkDepCore % buildSparkScope
+    else
+      sparkDepCore
+        .exclude("io.netty", "netty-all")
+        .exclude("io.netty", "netty")
+        .excludeAll(ExclusionRule(organization = "javax.servlet")) % buildSparkScope
+
+  def sparkcore = Seq(sparkDep)
+
   def marklogicValidation = Seq(
     "eu.timepit" %% "refined" %  refinedVersion
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
-    "com.fasterxml.uuid"         %  "java-uuid-generator" % "3.1.4",
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+  )
+  val couchbase = Seq(
+    "com.couchbase.client" %  "java-client" % "2.3.4",
+    "io.reactivex"         %% "rxscala"     % "0.26.3",
+    "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",

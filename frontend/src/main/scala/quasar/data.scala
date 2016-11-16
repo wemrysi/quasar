@@ -18,6 +18,7 @@ package quasar
 
 import quasar.ejson.{Common, EJson, Extension}
 import quasar.Predef._
+import quasar.fp.ski._
 import quasar.fp._
 import quasar.javascript.{Js}
 
@@ -60,8 +61,8 @@ object Data {
 
   sealed trait Number extends Data {
     override def equals(other: Any) = (this, other) match {
-      case (Int(v1), Number(v2)) => BigDecimal(v1) == v2
-      case (Dec(v1), Number(v2)) => v1 == v2
+      case (Int(v1), Number(v2)) => BigDecimal(v1) ≟ v2
+      case (Dec(v1), Number(v2)) => v1 ≟ v2
       case _                     => false
     }
   }
@@ -86,6 +87,11 @@ object Data {
   }
 
   val _int = Prism.partial[Data, BigInt] { case Data.Int(i) => i } (Data.Int(_))
+
+  object Obj {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
+    def apply(xs: (String -> Data)*): Obj = new Obj(ListMap(xs: _*))
+  }
 
   final case class Obj(value: ListMap[String, Data]) extends Data {
     def dataType = Type.Obj(value ∘ (Type.Const(_)), None)
@@ -156,6 +162,10 @@ object Data {
 
     override def toString = "Binary(Array[Byte](" + value.mkString(", ") + "))"
 
+    /**
+      * scala equality needs to remain for Spark to work
+      * @see Planner.qscriptCore
+      */
     override def equals(that: Any): Boolean = that match {
       case Binary(value2) => value ≟ value2
       case _ => false
@@ -163,7 +173,7 @@ object Data {
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
   object Binary {
-    def apply(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
+    def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
 
   val _binary =
@@ -326,7 +336,7 @@ object Data {
       }).fold[Data](NA)(pairs => Obj(ListMap(pairs: _*)))
     case ejson.Int(value)       => Int(value)
     // FIXME: cheating, but it’s what we’re already doing in the SQL parser
-    case ejson.Byte(value)      => Binary(Array[Byte](value))
+    case ejson.Byte(value)      => Binary.fromArray(Array[Byte](value))
     case ejson.Char(value)      => Str(value.toString)
   }
 

@@ -16,8 +16,10 @@
 
 package quasar.physical.mongodb
 
+import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._

@@ -1,7 +1,11 @@
 {
     "name": "skip and count",
 
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
 
     "data": "zips.data",
 

@@ -1,7 +1,10 @@
 {
     "name": "sort, project, and limit",
 
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip"
+    },
 
     "data": "zips.data",
 

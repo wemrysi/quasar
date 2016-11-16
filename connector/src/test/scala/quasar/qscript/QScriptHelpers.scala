@@ -17,10 +17,12 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
+import quasar.ejson, ejson.EJson
 import quasar.fp._, eitherT._
 import quasar.fs._
+import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._
 
 import scala.Predef.implicitly
@@ -29,46 +31,54 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait QScriptHelpers {
+trait QScriptHelpers extends TTypes[Fix] {
+  import quasar.frontend.fixpoint.lpf
+
   type QS[A] =
-    (QScriptCore[Fix, ?] :\:
-      ThetaJoin[Fix, ?] :\:
+    (QScriptCore :\:
+      ThetaJoin :\:
       Const[Read[APath], ?] :/: Const[DeadEnd, ?])#M[A]
 
-  type QST[A] = QScriptTotal[Fix, A]
+  implicit val QS: Injectable.Aux[QS, QST] =
+    ::\::[QScriptCore](
+      ::\::[ThetaJoin](
+        ::/::[Fix, Const[Read[APath], ?], Const[DeadEnd, ?]]))
 
-  val DE =            implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  =        implicitly[Const[Read[APath], ?] :<: QS]
-  val QC =          implicitly[QScriptCore[Fix, ?] :<: QS]
-  val TJ =            implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ =             implicitly[EquiJoin[Fix, ?] :<: QST]
-  val SR = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
-  implicit val QS: Injectable.Aux[QS, QScriptTotal[Fix, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-        Injectable.coproduct(Injectable.inject[Const[Read[APath], ?], QScriptTotal[Fix, ?]],
-          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[Fix, ?]])))
-  def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
+  val DE =     implicitly[Const[DeadEnd, ?] :<: QS]
+  val R  = implicitly[Const[Read[APath], ?] :<: QS]
+  val QC =           implicitly[QScriptCore :<: QS]
+  val TJ =             implicitly[ThetaJoin :<: QS]
+
+  type QST[A] = QScriptTotal[A]
+
+  def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
   def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
 
-  val DET =            implicitly[Const[DeadEnd, ?] :<: QST]
-  val RT  =        implicitly[Const[Read[AFile], ?] :<: QST]
-  val QCT =          implicitly[QScriptCore[Fix, ?] :<: QST]
-  val TJT =            implicitly[ThetaJoin[Fix, ?] :<: QST]
-  val EJT =             implicitly[EquiJoin[Fix, ?] :<: QST]
-  val PBT =        implicitly[ProjectBucket[Fix, ?] :<: QST]
-  val SRT = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
+  val DET  =            implicitly[Const[DeadEnd, ?] :<: QST]
+  val RTP  =        implicitly[Const[Read[APath], ?] :<: QST]
+  val RTF  =        implicitly[Const[Read[AFile], ?] :<: QST]
+  val QCT  =                  implicitly[QScriptCore :<: QST]
+  val TJT  =                    implicitly[ThetaJoin :<: QST]
+  val EJT  =                     implicitly[EquiJoin :<: QST]
+  val PBT  =                implicitly[ProjectBucket :<: QST]
+  val SRT  = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
+  val SRTF = implicitly[Const[ShiftedRead[AFile], ?] :<: QST]
 
-  def ProjectFieldR[A](
-    src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
-      Free[MapFunc[Fix, ?], A] =
+  def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
     Free.roll(ProjectField(src, field))
 
+  def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ProjectIndex(src, field))
+
   def lpRead(path: String): Fix[LP] =
-    LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+    lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+
+  val prov = new provenance.ProvenanceT[Fix]
 
   /** A helper when writing examples that allows them to be written in order of
     * execution.
@@ -118,4 +128,29 @@ trait QScriptHelpers {
       QueryFile.convertToQScript[Fix, QS](lp))(
       QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](_)(lp))
       .toOption.run.copoint
+
+  val ejsonNull =
+    ejson.CommonEJson(ejson.Null[Fix[EJson]]()).embed
+
+  def ejsonInt(int: Int) =
+    ejson.ExtEJson(ejson.Int[Fix[EJson]](int)).embed
+
+  def ejsonStr(str: String) =
+    ejson.CommonEJson(ejson.Str[Fix[EJson]](str)).embed
+
+  def ejsonArr(elems: Fix[EJson]*) =
+    ejson.CommonEJson(ejson.Arr(elems.toList)).embed
+
+  def ejsonMap(elems: (Fix[EJson], Fix[EJson])*) =
+    ejson.ExtEJson(ejson.Map(elems.toList)).embed
+
+  val ejsonNullArr =
+    ejsonArr(ejson.CommonEJson(ejson.Null[Fix[EJson]]()).embed)
+
+  def ejsonJoin(l: Fix[EJson], r: Fix[EJson]) =
+    ejsonMap((
+      ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
+      ejsonArr(l, r)))
+  def ejsonProjectField(field: Fix[EJson]) =
+    ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
 }

@@ -1,7 +1,10 @@
 {
   "name": "filter on date part, where the field isn't a timestamp",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "couchbase":  "skip"
+  },
 
   "data": "../days.data",
 

@@ -1,6 +1,9 @@
 {
     "name": "filter on `!= null`",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "couchbase":  "skip"
+    },
     "data": "nulls.data",
     "query": "select distinct (val != null) as expr from nulls where val != null",
     "predicate": "containsExactly",

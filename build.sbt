@@ -69,16 +69,16 @@ lazy val buildSettings = Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
   scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
-  // NB: `Wart.AsInstanceOf` is disabled in specific projects because it’s
-  //     triggered by GADT use. (see puffnfresh/wartremover#266)
+  // NB: Some warts are disabled in specific projects. Here’s why:
+  //   • AsInstanceOf   – puffnfresh/wartremover#266
+  //   • NoNeedForMonad – puffnfresh/wartremover#268
+  //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-    Wart.Any,
-    Wart.Equals,
+    Wart.Any,                   // - see puffnfresh/wartremover#263
+    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
     Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
-    Wart.ImplicitConversion,    // - see puffnfresh/wartremover#242
-    Wart.NoNeedForMonad,        // - see puffnfresh/wartremover#159
-    Wart.Nothing,               // - see puffnfresh/wartremover#263
-    Wart.Overloading),
+    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
+    Wart.Nothing),              // - see puffnfresh/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -194,17 +194,17 @@ lazy val root = project.in(file("."))
   .settings(aggregate in assembly := false)
   .aggregate(
         foundation,
-//     / / | | \ \
-//
-        ejson, js,  // NB: need to get dependencies to look like:
-//         \  /
-          frontend, //   frontend, connector,
-//           |            /    \  /     \
-    effect, sql,    //  sql,  core,    marklogic, mongodb, ...
-//     \     |             \    |     /
-        connector,  //      interface,
-//      / / | \ \
-  core, marklogic, mongodb, postgresql, skeleton, sparkcore,
+//     / / | | \ \    // NB: need to get dependencies to look like:
+//                    //         ┌ common ┐
+      ejson, js,      //  ┌ frontend ┬ connector ┬─────────┬──────┐
+//       \  /         // sql       core      marklogic  mongodb  ...
+        common,       //  └──────────┼───────────┴─────────┴──────┘
+//        |           //         interface
+    frontend, effect,
+//   |    \   |
+    sql, connector, marklogicValidation,
+//   |  /   | | \ \      |
+    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
 //        /  \
@@ -215,18 +215,27 @@ lazy val root = project.in(file("."))
 
 // common components
 
+/** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
+  * in other places yet. This also contains `contrib` packages for things we’d
+  * like to push to upstream libraries.
+  */
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(libraryDependencies ++= Dependencies.foundation,
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoPackage := "quasar.build",
+    exclusiveTestTag := "exclusive",
     isCIBuild := isTravis,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    exclusiveTestTag := "exclusive",
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
-    buildInfoPackage := "quasar.build")
+    libraryDependencies ++= Dependencies.foundation,
+    wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
+/** A fixed-point implementation of the EJson spec. This should probably become
+  * a standalone library.
+  */
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
@@ -236,21 +245,46 @@ lazy val ejson = project
 lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
+    Wart.AsInstanceOf,
+    Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
+  */
 lazy val js = project
   .settings(name := "quasar-js-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Quasar components shared by both frontend and connector. This includes
+  * things like data models, types, etc.
+  */
+lazy val common = project
+  .settings(name := "quasar-common-internal")
+  // TODO: The dependency on `js` is because `Data` encapsulates its `toJs`,
+  //       which should be extracted.
+  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
+  .enablePlugins(AutomateHeaderPlugin)
+
+/** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
+  * transformation, type checking, optimization, etc.
+  */
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(
-    frontend % BothScopes,
-    connector % BothScopes)
+  .dependsOn(frontend % BothScopes, connector % BothScopes, sql)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -262,47 +296,69 @@ lazy val core = project
 
 // frontends
 
-// TODO: This area is still tangled. It contains things that should be in `sql`,
-//       things that should be in `core`, and probably other things that should
-//       be elsewhere.
+/** Types and operations needed by query language implementations.
+  */
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
-  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
-  .settings(commonSettings)
-  .settings(publishTestsSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.core,
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val sql = project
-  .settings(name := "quasar-sql-internal")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
-  .enablePlugins(AutomateHeaderPlugin)
-
-// connectors
-
-lazy val connector = project
-  .settings(name := "quasar-connector-internal")
-  .dependsOn(
-    ejson % BothScopes,
-    effect % BothScopes,
-    js % BothScopes,
-    frontend % BothScopes,
-    sql % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Implementation of the SQL² query language.
+  */
+lazy val sql = project
+  .settings(name := "quasar-sql-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.Equals,
+      Wart.NoNeedForMonad))
+  .enablePlugins(AutomateHeaderPlugin)
 
+// connectors
+
+/** Types and operations needed by connector implementations.
+  */
+lazy val connector = project
+  .settings(name := "quasar-connector-internal")
+  .dependsOn(
+    common   % BothScopes,
+    effect   % BothScopes,
+    frontend % BothScopes,
+    sql      % "test->test")
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.NoNeedForMonad))
+  .enablePlugins(AutomateHeaderPlugin)
+
+/** Implementation of the Couchbase connector.
+  */
+lazy val couchbase = project
+  .settings(name := "quasar-couchbase-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.couchbase)
+  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .enablePlugins(AutomateHeaderPlugin)
+
+/** Implementation of the MarkLogic connector.
+  */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
   .dependsOn(connector % BothScopes, marklogicValidation)
@@ -310,7 +366,10 @@ lazy val marklogic = project
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(
     libraryDependencies ++= Dependencies.marklogic,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))
@@ -321,15 +380,26 @@ lazy val marklogicValidation = project.in(file("marklogic-validation"))
   //       as we don't want our headers applied to XMLChar.java
   //.enablePlugins(AutomateHeaderPlugin)
 
+/** Implementation of the MongoDB connector.
+  */
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    js        % BothScopes,
+    core      % "test->compile")
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Dependencies.mongodb,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.Equals,
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Implementation of the Postgresql connector.
+  */
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(connector % BothScopes)
@@ -339,27 +409,36 @@ lazy val postgresql = project
     wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** A connector outline, meant to be copied and incrementally filled in while
+  * implementing a new connector.
+  */
 lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Implementation of the Spark connector.
+  */
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
+  .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
 
+/** Types and operations needed by applications that embed Quasar.
+  */
 lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    couchbase,
     marklogic,
     mongodb,
     postgresql,
@@ -369,6 +448,8 @@ lazy val interface = project
   .settings(libraryDependencies ++= Dependencies.interface)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** An interactive REPL application for Quasar.
+  */
 lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(interface, foundation % BothScopes)
@@ -382,6 +463,8 @@ lazy val repl = project
     wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** An HTTP interface to Quasar.
+  */
 lazy val web = project
   .settings(name := "quasar-web")
   .dependsOn(interface, core % BothScopes)
@@ -390,11 +473,16 @@ lazy val web = project
   .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web)
+    libraryDependencies ++= Dependencies.web,
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests
 
+/** Integration tests that have some dependency on a running connector.
+  */
 lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(web, core % BothScopes)

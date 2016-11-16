@@ -3,7 +3,7 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "couchbase":         "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",

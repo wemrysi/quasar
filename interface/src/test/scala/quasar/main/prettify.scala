@@ -29,32 +29,32 @@ class PrettifySpecs extends quasar.Qspec {
     "find single field" in {
       val data = Data.Obj(ListMap("a" -> Data.Int(1)))
       flatten(data) must_== ListMap(
-        Path(FieldSeg("a")) -> Data.Int(1))
+        Path(List(FieldSeg("a"))) -> Data.Int(1))
     }
 
     "find multiple fields" in {
       val data = Data.Obj(ListMap(
         "a" -> Data.Null, "b" -> Data.True, "c" -> Data.False, "d" -> Data.Dec(1.0), "e" -> Data.Str("foo")))
       flatten(data) must_== ListMap(
-        Path(FieldSeg("a")) -> Data.Null,
-        Path(FieldSeg("b")) -> Data.True,
-        Path(FieldSeg("c")) -> Data.False,
-        Path(FieldSeg("d")) -> Data.Dec(1.0),
-        Path(FieldSeg("e")) -> Data.Str("foo"))
+        Path(List(FieldSeg("a"))) -> Data.Null,
+        Path(List(FieldSeg("b"))) -> Data.True,
+        Path(List(FieldSeg("c"))) -> Data.False,
+        Path(List(FieldSeg("d"))) -> Data.Dec(1.0),
+        Path(List(FieldSeg("e"))) -> Data.Str("foo"))
     }
 
     "find nested fields" in {
       val data = Data.Obj(ListMap("value" -> Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2)))))
       flatten(data) must_== ListMap(
-        Path(FieldSeg("value"), FieldSeg("a")) -> Data.Int(1),
-        Path(FieldSeg("value"), FieldSeg("b")) -> Data.Int(2))
+        Path(List(FieldSeg("value"), FieldSeg("a"))) -> Data.Int(1),
+        Path(List(FieldSeg("value"), FieldSeg("b"))) -> Data.Int(2))
     }
 
     "find array indices" in {
       val data = Data.Obj(ListMap("arr" -> Data.Arr(List(Data.Str("a"), Data.Str("b")))))
       flatten(data) must_== ListMap(
-        Path(FieldSeg("arr"), IndexSeg(0)) -> Data.Str("a"),
-        Path(FieldSeg("arr"), IndexSeg(1)) -> Data.Str("b"))
+        Path(List(FieldSeg("arr"), IndexSeg(0))) -> Data.Str("a"),
+        Path(List(FieldSeg("arr"), IndexSeg(1))) -> Data.Str("b"))
     }
 
     "find nested array indices" in {
@@ -63,16 +63,16 @@ class PrettifySpecs extends quasar.Qspec {
           Data.Obj(ListMap("a" -> Data.Str("foo"))),
           Data.Obj(ListMap("b" -> Data.Str("bar")))))))
       flatten(data) must_== ListMap(
-        Path(FieldSeg("arr"), IndexSeg(0), FieldSeg("a")) -> Data.Str("foo"),
-        Path(FieldSeg("arr"), IndexSeg(1), FieldSeg("b")) -> Data.Str("bar"))
+        Path(List(FieldSeg("arr"), IndexSeg(0), FieldSeg("a"))) -> Data.Str("foo"),
+        Path(List(FieldSeg("arr"), IndexSeg(1), FieldSeg("b"))) -> Data.Str("bar"))
     }
   }
 
   "unflatten" should {
     "construct flat fields" in {
       val flat = ListMap(
-        Path(FieldSeg("a")) -> Data.Int(1),
-        Path(FieldSeg("b")) -> Data.Int(2))
+        Path(List(FieldSeg("a"))) -> Data.Int(1),
+        Path(List(FieldSeg("b"))) -> Data.Int(2))
       unflatten(flat) must_== Data.Obj(ListMap(
         "a" -> Data.Int(1),
         "b" -> Data.Int(2)))
@@ -80,7 +80,7 @@ class PrettifySpecs extends quasar.Qspec {
 
     "construct single nested field" in {
       val flat = ListMap(
-        Path(FieldSeg("foo"), FieldSeg("bar")) -> Data.Int(1))
+        Path(List(FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(1))
       unflatten(flat) must_== Data.Obj(ListMap(
         "foo" -> Data.Obj(ListMap(
           "bar" -> Data.Int(1)))))
@@ -88,8 +88,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "construct array with missing elements" in {
       val flat = ListMap(
-        Path(FieldSeg("a"), IndexSeg(0)) -> Data.Int(1),
-        Path(FieldSeg("a"), IndexSeg(2)) -> Data.Int(3))
+        Path(List(FieldSeg("a"), IndexSeg(0))) -> Data.Int(1),
+        Path(List(FieldSeg("a"), IndexSeg(2))) -> Data.Int(3))
       unflatten(flat) must_==
         Data.Obj(ListMap(
           "a" -> Data.Arr(List(
@@ -98,9 +98,9 @@ class PrettifySpecs extends quasar.Qspec {
 
     "construct array with nested fields" in {
       val flat = ListMap(
-        Path(FieldSeg("a"), IndexSeg(0), FieldSeg("foo"), FieldSeg("bar")) -> Data.Int(1),
-        Path(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("bar")) -> Data.Int(3),
-        Path(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("baz")) -> Data.Int(4))
+        Path(List(FieldSeg("a"), IndexSeg(0), FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(1),
+        Path(List(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(3),
+        Path(List(FieldSeg("a"), IndexSeg(2), FieldSeg("foo"), FieldSeg("baz"))) -> Data.Int(4))
       unflatten(flat) must_==
         Data.Obj(ListMap(
           "a" -> Data.Arr(List(
@@ -116,8 +116,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "construct obj with populated contradictory paths" in {
       val flat = ListMap(
-        Path(FieldSeg("foo"), IndexSeg(0)) -> Data.Int(1),
-        Path(FieldSeg("foo"), FieldSeg("bar")) -> Data.Int(2))
+        Path(List(FieldSeg("foo"), IndexSeg(0))) -> Data.Int(1),
+        Path(List(FieldSeg("foo"), FieldSeg("bar"))) -> Data.Int(2))
       unflatten(flat) must_==
         Data.Obj(ListMap(
           "foo" -> Data.Arr(List(
@@ -127,45 +127,45 @@ class PrettifySpecs extends quasar.Qspec {
 
   "Path.label" should {
     "nested fields" in {
-      Path(FieldSeg("foo"), FieldSeg("bar")).label must_== "foo.bar"
+      Path(List(FieldSeg("foo"), FieldSeg("bar"))).label must_== "foo.bar"
     }
 
     "index at root" in {
-      Path(IndexSeg(0)).label must_== "[0]"
+      Path(List(IndexSeg(0))).label must_== "[0]"
     }
 
     "index in the middle" in {
-      Path(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar")).label must_== "foo[0].bar"
+      Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))).label must_== "foo[0].bar"
     }
 
     "nested indices" in {
-      Path(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1)).label must_== "matrix[0][1]"
+      Path(List(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1))).label must_== "matrix[0][1]"
     }
 
     "escape special chars" in {
-      Path(FieldSeg("foo1.2"), FieldSeg("1"), FieldSeg("[alt]")).label must_== ???
+      Path(List(FieldSeg("foo1.2"), FieldSeg("1"), FieldSeg("[alt]"))).label must_== ???
     }.pendingUntilFixed("it's not clear what we need here, if anything")
   }
 
   "Path.parse" should {
     "nested fields" in {
-      Path.parse("foo.bar") must_== \/-(Path(FieldSeg("foo"), FieldSeg("bar")))
+      Path.parse("foo.bar") must_== \/-(Path(List(FieldSeg("foo"), FieldSeg("bar"))))
     }
 
     "index at root" in {
-      Path.parse("[0]") must_== \/-(Path(IndexSeg(0)))
+      Path.parse("[0]") must_== \/-(Path(List(IndexSeg(0))))
     }
 
     "index in the middle" in {
-      Path.parse("foo[0].bar") must_== \/-(Path(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar")))
+      Path.parse("foo[0].bar") must_== \/-(Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
     }
 
     "field-style index" in {
-      Path.parse("foo.0.bar") must_== \/-(Path(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar")))
+      Path.parse("foo.0.bar") must_== \/-(Path(List(FieldSeg("foo"), IndexSeg(0), FieldSeg("bar"))))
     }
 
     "nested indices" in {
-      Path.parse("matrix[0][1]") must_== \/-(Path(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1)))
+      Path.parse("matrix[0][1]") must_== \/-(Path(List(FieldSeg("matrix"), IndexSeg(0), IndexSeg(1))))
     }
 
     "fail with unmatched brackets" in {
@@ -288,8 +288,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "format empty values" in {
       renderTable(List(
-        Data.Obj(ListMap()),
-        Data.Obj(ListMap()))) must_==
+        Data.Obj(),
+        Data.Obj())) must_==
         List(
           " <empty> |",
           "---------|",
@@ -311,8 +311,8 @@ class PrettifySpecs extends quasar.Qspec {
 
     "empty values" in {
       val values: Process[Task, Data] = Process.emitAll(List(
-        Data.Obj(ListMap()),
-        Data.Obj(ListMap())))
+        Data.Obj(),
+        Data.Obj()))
       val rows = renderStream(values, 100)
       rows.runLog.unsafePerformSync must_== Vector(
         List("<empty>"),

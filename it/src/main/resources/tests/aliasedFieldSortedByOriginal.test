@@ -1,6 +1,10 @@
 {
     "name": "select aliased field sorted by original name",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "SELECT state AS `Result Alias`, COUNT(*) FROM zips GROUP BY state ORDER BY state",
     "predicate": "containsAtLeast",

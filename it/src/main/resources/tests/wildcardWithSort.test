@@ -1,6 +1,10 @@
 {
     "name": "wildcard with sort",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",
     "predicate": "equalsExactly",

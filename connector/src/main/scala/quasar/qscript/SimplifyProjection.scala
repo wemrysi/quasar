@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import scalaz._
+import TTypes.simplifiableProjection
 
 /** This optional transformation changes the semantics of [[Read]]. The default
   * semantics return a single value, whereas the transformed version has an
@@ -32,103 +33,33 @@ trait SimplifyProjection[F[_]] {
 object SimplifyProjection {
   type Aux[F[_], G[_]] = SimplifyProjection[F] { type H[A] = G[A] }
 
-  def apply[F[_], G[_]](implicit ev: SimplifyProjection.Aux[F, G]) = ev
+  def apply[F[_], G[_]](implicit ev: Aux[F, G]): Aux[F, G]          = ev
+  def default[F[_]: Traverse, G[_]](implicit F: F :<: G): Aux[F, G] = make[F, G](F)
 
-  def applyToBranch[T[_[_]]](branch: FreeQS[T]): FreeQS[T] =
-    branch.mapSuspension(
-      SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection)
+  def make[F[_], G[_]](f: F ~> G): Aux[F, G] = new SimplifyProjection[F] {
+    type H[A] = G[A]
+    val simplifyProjection = f
+  }
 
-  implicit def projectBucket[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G):
-      SimplifyProjection.Aux[ProjectBucket[T, ?], G] =
-    new SimplifyProjection[ProjectBucket[T, ?]] {
-      type H[A] = G[A]
-      def simplifyProjection = new (ProjectBucket[T, ?] ~> G) {
-        def apply[A](fa: ProjectBucket[T, A]) = fa match {
-          case BucketField(src, value, field) =>
-            QC.inj(Map(src, Free.roll(MapFuncs.ProjectField(value, field))))
-          case BucketIndex(src, value, index) =>
-            QC.inj(Map(src, Free.roll(MapFuncs.ProjectIndex(value, index))))
-        }
-      }
-    }
-
-  implicit def qscriptCore[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G):
-      SimplifyProjection.Aux[QScriptCore[T, ?], G] =
-    new SimplifyProjection[QScriptCore[T, ?]] {
-      type H[A] = G[A]
-      def simplifyProjection = new (QScriptCore[T, ?] ~> G) {
-        def apply[A](fa: QScriptCore[T, A]) = QC.inj(fa match {
-          case Union(src, lb, rb) =>
-            Union(src, applyToBranch(lb), applyToBranch(rb))
-          case Drop(src, lb, rb) =>
-            Drop(src, applyToBranch(lb), applyToBranch(rb))
-          case Take(src, lb, rb) =>
-            Take(src, applyToBranch(lb), applyToBranch(rb))
-          case _ => fa
-        })
-      }
-    }
-
-  implicit def thetaJoin[T[_[_]], G[_]](implicit TJ: ThetaJoin[T, ?] :<: G):
-      SimplifyProjection.Aux[ThetaJoin[T, ?], G] =
-    new SimplifyProjection[ThetaJoin[T, ?]] {
-      type H[A] = G[A]
-      def simplifyProjection = new (ThetaJoin[T, ?] ~> G) {
-        def apply[A](tj: ThetaJoin[T, A]) =
-          TJ.inj(ThetaJoin(
-            tj.src,
-            applyToBranch(tj.lBranch),
-            applyToBranch(tj.rBranch),
-            tj.on,
-            tj.f,
-            tj.combine))
-      }
-    }
-
-  implicit def equiJoin[T[_[_]], G[_]](implicit EJ: EquiJoin[T, ?] :<: G):
-      SimplifyProjection.Aux[EquiJoin[T, ?], G] =
-    new SimplifyProjection[EquiJoin[T, ?]] {
-      type H[A] = G[A]
-      def simplifyProjection = new (EquiJoin[T, ?] ~> G) {
-        def apply[A](ej: EquiJoin[T, A]) =
-          EJ.inj(EquiJoin(
-            ej.src,
-            applyToBranch(ej.lBranch),
-            applyToBranch(ej.rBranch),
-            ej.lKey,
-            ej.rKey,
-            ej.f,
-            ej.combine))
-      }
-    }
-
-  implicit def coproduct[T[_[_]], G[_], I[_], J[_]]
-    (implicit I: SimplifyProjection.Aux[I, G], J: SimplifyProjection.Aux[J, G]):
-      SimplifyProjection.Aux[Coproduct[I, J, ?], G] =
-    new SimplifyProjection[Coproduct[I, J, ?]] {
-      type H[A] = G[A]
-      def simplifyProjection = new (Coproduct[I, J, ?] ~> G) {
-        def apply[A](fa: Coproduct[I, J, A]) =
-          fa.run.fold(I.simplifyProjection(_), J.simplifyProjection(_))
-      }
-    }
-
-  def default[F[_]: Traverse, G[_]](implicit F: F :<: G):
-      SimplifyProjection.Aux[F, G] =
-    new SimplifyProjection[F] {
-      type H[A] = G[A]
-      def simplifyProjection = F
-    }
-
-  implicit def deadEnd[F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
-      : SimplifyProjection.Aux[Const[DeadEnd, ?], F] =
+  // FIXME: if these are only used implicitly they should have names less likely to collide.
+  implicit def projectBucket[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[ProjectBucket[T, ?], G] =
+    simplifiableProjection[T].ProjectBucket[G]
+  implicit def qscriptCore[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[QScriptCore[T, ?], G] =
+    simplifiableProjection[T].QScriptCore[G]
+  implicit def thetaJoin[T[_[_]], G[_]](implicit QC: ThetaJoin[T, ?] :<: G): Aux[ThetaJoin[T, ?], G] =
+    simplifiableProjection[T].ThetaJoin[G]
+  implicit def equiJoin[T[_[_]], G[_]](implicit QC: EquiJoin[T, ?] :<: G): Aux[EquiJoin[T, ?], G] =
+    simplifiableProjection[T].EquiJoin[G]
+  implicit def deadEnd[F[_]](implicit DE: Const[DeadEnd, ?] :<: F) =
     default[Const[DeadEnd, ?], F]
-
-  implicit def read[F[_], A](implicit R: Const[Read[A], ?] :<: F)
-      : SimplifyProjection.Aux[Const[Read[A], ?], F] =
+  implicit def read[F[_], A](implicit R: Const[Read[A], ?] :<: F) =
     default[Const[Read[A], ?], F]
-
-  implicit def shiftedRead[F[_], A](implicit SR: Const[ShiftedRead[A], ?] :<: F)
-      : SimplifyProjection.Aux[Const[ShiftedRead[A], ?], F] =
+  implicit def shiftedRead[F[_], A](implicit SR: Const[ShiftedRead[A], ?] :<: F) =
     default[Const[ShiftedRead[A], ?], F]
+
+  implicit def coproduct[T[_[_]], G[_], I[_], J[_]](implicit I: Aux[I, G], J: Aux[J, G]) =
+    make(λ[Coproduct[I, J, ?] ~> G](fa => fa.run.fold(I.simplifyProjection, J.simplifyProjection)))
+
+  // This assembles the coproduct out of the individual implicits.
+  def simplifyQScriptTotal[T[_[_]]]: Aux[QScriptTotal[T, ?], QScriptTotal[T, ?]] = apply
 }

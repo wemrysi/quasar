@@ -18,7 +18,7 @@ package quasar.physical.mongodb.fs
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.SKI.κ
+import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs._
@@ -207,6 +207,7 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
+  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   private def freshName: MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask

@@ -17,53 +17,38 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Qspec}, LogicalPlan._
+import quasar.{Data, Qspec, Type}
+import quasar.frontend.logicalplan._
 
 import matryoshka._
 import org.specs2.execute._
+import org.specs2.matcher._
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Instant, ZoneOffset}
-
-trait StdLibTestRunner {
-  def nullary(
-    prg: Fix[LogicalPlan],
-    expected: Data): Result
-
-  def unary(
-    prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-    arg: Data,
-    expected: Data): Result
-
-  def binary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data,
-    expected: Data): Result
-
-  def ternary(
-    prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
-    arg1: Data, arg2: Data, arg3: Data,
-    expected: Data): Result
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def intDomain: Gen[BigInt]
-
-  /** Defines the domain of values for `Data.Int` for which the implementation is
-    * well-behaved.
-    */
-  def decDomain: Gen[BigDecimal]
-
-  /** Defines the domain of values for `Data.Str` for which the implementation is
-    * well-behaved.
-    */
-  def stringDomain: Gen[String]
-}
+import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
+import scala.math.abs
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
+  def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
+    def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
+      x == y || ((x - y).abs/(y.abs max err)).toDouble < err
+
+    def apply[S <: Data](s: Expectable[S]) = {
+      val v = s.value
+      (v, expected) match {
+        case (Data.Number(x), Data.Number(exp)) =>
+          result(isClose(x, exp, 1e-9),
+            s"$x is a Number and matches $exp",
+            s"$x is a Number but does not match $exp", s)
+        case _ =>
+          result(v == expected,
+            s"$v matches $expected",
+            s"$v does not match $expected", s)
+      }
+    }
+  }
 
   def tests(runner: StdLibTestRunner) = {
     import runner._
@@ -71,6 +56,19 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+    implicit val arbData = Arbitrary[Data] {
+      Gen.oneOf(
+        runner.intDomain.map(Data.Int(_)),
+        runner.decDomain.map(Data.Dec(_)),
+        runner.stringDomain.map(Data.Str(_)))
+    }
+
+    def commute(
+        prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        arg1: Data, arg2: Data,
+        expected: Data): Result =
+      binary(prg, arg1, arg2, expected) and
+        binary(prg, arg2, arg1, expected)
 
     "StringLib" >> {
       import StringLib._
@@ -196,9 +194,12 @@ abstract class StdLibSpec extends Qspec {
           unary(ToString(_).embed, Data.Int(x), Data.Str(x.toString))
         }
 
-        "dec" >> prop { (x: BigDecimal) =>
-          unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
-        }
+        // TODO: re-parse and compare the resulting value approximately. It's
+        // not reasonable to expect a perfect match on formatted values,
+        // because of trailing zeros, round-off, and choive of notation.
+        // "dec" >> prop { (x: BigDecimal) =>
+        //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
+        // }
 
         // TODO: need `Arbitrary`s for all of these
         // "timestamp" >> prop { (x: Instant) =>
@@ -222,11 +223,785 @@ abstract class StdLibSpec extends Qspec {
     "DateLib" >> {
       import DateLib._
 
+      "ExtractCentury" >> {
+        "0001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+        }
+
+        "2000-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(20))
+        }
+
+        "2001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(21))
+        }
+
+        "midnight 0001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "midnight 2000-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(20))
+        }
+
+        "midnight 2001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(21))
+        }
+      }
+
+      "ExtractDayOfMonth" >> {
+        "2016-01-01" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-02-29" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(29))
+        }
+
+        "midnight 2016-02-29" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(29))
+        }
+      }
+
+      "ExtractDecade" >> {
+        "1999-12-31" >> {
+          unary(ExtractDecade(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(199))
+        }
+
+        "midnight 1999-12-31" >> {
+          unary(ExtractDecade(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(199))
+        }
+      }
+
+      "ExtractDayOfWeek" >> {
+        "2016-09-28" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+        }
+
+        "midnight 2016-09-28" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+        }
+
+        "2016-10-02" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(0))
+        }
+
+        "midnight 2016-10-02" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(0))
+        }
+
+        "2016-10-08" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-08")), Data.Int(6))
+        }
+
+        "noon 2016-10-08" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-08T12:00:00.000Z")), Data.Int(6))
+        }
+      }
+
+      "ExtractDayOfYear" >> {
+        "2016-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2016-03-01")), Data.Int(61))
+        }
+
+        "midnight 2016-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(61))
+        }
+
+        "2017-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2017-03-01")), Data.Int(60))
+        }
+
+        "midnight 2017-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2017-03-01T00:00:00.000Z")), Data.Int(60))
+        }
+      }
+
+      "ExtractEpoch" >> {
+        "2016-09-29" >> {
+          unary(ExtractEpoch(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(1475107200.0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractEpoch(_).embed, Data.Timestamp(Instant.parse("2016-09-29T12:34:56.789Z")), Data.Dec(1475152496.789))
+        }
+      }
+
+      "ExtractHour" >> {
+        "2016-09-29" >> {
+          unary(ExtractHour(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(12))
+        }
+      }
+
+      "ExtractIsoDayOfWeek" >> {
+        "2016-09-28" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+        }
+
+        "midnight 2016-09-28" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+        }
+
+        "2016-10-02" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(7))
+        }
+
+        "midnight 2016-10-02" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(7))
+        }
+      }
+
+      "ExtractIsoYear" >> {
+        "2006-01-01" >> {
+          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-01")), Data.Int(2005))
+        }
+
+        "midnight 2006-01-01" >> {
+          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-01T00:00:00.000Z")), Data.Int(2005))
+        }
+
+        "2006-01-02" >> {
+          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-02")), Data.Int(2006))
+        }
+
+        "midnight 2006-01-02" >> {
+          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-02T00:00:00.000Z")), Data.Int(2006))
+        }
+      }
+
+      "ExtractMicroseconds" >> {
+        "2016-09-29" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e6))
+        }
+      }
+
+
+      "ExtractMillennium" >> {
+        "0001-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+        }
+
+        "2000-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
+        }
+
+        "2001-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
+        }
+
+        "midnight 0001-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "midnight 2000-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
+        }
+
+        "midnight 2001-01-01" >> {
+          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
+        }
+      }
+
+      "ExtractMilliseconds" >> {
+        "2016-09-29" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e3))
+        }
+      }
+
+      "ExtractMinute" >> {
+        "2016-09-29" >> {
+          unary(ExtractMinute(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(34))
+        }
+      }
+
+      "ExtractMonth" >> {
+        "2016-01-01" >> {
+          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-02-29" >> {
+          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(2))
+        }
+
+        "midnight 2016-02-29" >> {
+          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(2))
+        }
+      }
+
+      "ExtractQuarter" >> {
+        "2016-10-03" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-10-03")), Data.Int(4))
+        }
+
+        "midnight 2016-10-03" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-10-03T00:00:00.000Z")), Data.Int(4))
+        }
+
+        "2016-03-31 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-03-31")), Data.Int(1))
+        }
+
+        "midnight 2016-03-31 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-03-31T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-04-01 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-04-01")), Data.Int(2))
+        }
+
+        "midnight 2016-04-01 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-04-01T00:00:00.000Z")), Data.Int(2))
+        }
+
+        "2017-03-31" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-03-31")), Data.Int(1))
+        }
+
+        "midnight 2017-03-31" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-03-31T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2017-04-01" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-04-01")), Data.Int(2))
+        }
+
+        "midnight 2017-04-01" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-04-01T00:00:00.000Z")), Data.Int(2))
+        }
+      }
+
+      "ExtractSecond" >> {
+        "2016-09-29" >> {
+          unary(ExtractSecond(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789))
+        }
+      }
+
+      // TODO: ExtractTimezone
+      // TODO: ExtractTimezoneHour
+      // TODO: ExtractTimezoneMinute
+
+      "ExtractWeek" >> {
+        "2016-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(53))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(53))
+        }
+
+        "2001-02-16" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2001-02-16")), Data.Int(7))
+        }
+
+        "midnight 2016-10-03" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
+        }
+
+        "2005-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2005-01-01")), Data.Int(53))
+        }
+
+        "midnight 2005-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
+        }
+      }
+
+      "ExtractYear" >> {
+        "1999-12-31" >> {
+          unary(ExtractYear(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(1999))
+        }
+
+        "midnight 1999-12-31" >> {
+          unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+        }
+      }
+
       "TimeOfDay" >> {
         "timestamp" >> {
           val now = Instant.now
           val expected = now.atZone(ZoneOffset.UTC).toLocalTime
           unary(TimeOfDay(_).embed, Data.Timestamp(now), Data.Time(expected))
+        }
+      }
+    }
+
+    "MathLib" >> {
+      import MathLib._
+
+      // NB: testing only (32-bit) ints, to avoid overflowing 64-bit longs
+      // and the 53 bits of integer precision in a 64-bit double.
+
+      // TODO: BigDecimals (which can under/overflow)
+      // TODO: mixed BigInt/BigDecimal (which can explode)
+
+      "Add" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Add(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong + y.toLong))
+        }
+
+        "any doubles" >> prop { (x: Double, y: Double) =>
+          binary(Add(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x + y))
+        }
+
+        "mixed int/double" >> prop { (x: Int, y: Double) =>
+          commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
+        }
+
+        // TODO: Timestamp + Interval, Date + Interval, Time + Interval
+      }
+
+      "Multiply" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Multiply(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong * y.toLong))
+        }
+
+        // TODO: figure out what domain can be tested here (tends to overflow)
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Multiply(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x * y))
+        // }
+
+        // TODO: figure out what domain can be tested here
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
+        // }
+
+        // TODO: Interval * Int
+      }
+
+      "Power" >> {
+        "Int to 0" >> prop { (x: BigInt) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(0), Data.Int(1))
+        }
+
+        "Dec to 0" >> prop { (x: BigDecimal) =>
+          binary(Power(_, _).embed, Data.Dec(x), Data.Int(0), Data.Int(1))
+        }
+
+        "Int to 1" >> prop { (x: BigInt) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "Dec to 1" >> prop { (x: BigDecimal) =>
+          binary(Power(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x))
+        }
+
+        "0 to small positive int" >> prop { (y0: Int) =>
+          val y = abs(y0 % 10)
+          y != 0 ==>
+            binary(Power(_, _).embed, Data.Int(0), Data.Int(y), Data.Int(0))
+        }
+
+        // TODO: figure out what domain can be tested here (negatives?)
+        // "0 to Dec" >> prop { (y: BigDecimal) =>
+        //   y != 0 ==>
+        //     binary(Power(_, _).embed, Data.Int(0), Data.Dec(y), Data.Int(0))
+        // }
+
+        "Int squared" >> prop { (x: Int) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x.toLong * x.toLong))
+        }
+
+        // TODO: test as much of the domain as much sense
+      }
+
+      "Subtract" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Subtract(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong - y.toLong))
+        }
+
+        "any doubles" >> prop { (x: Double, y: Double) =>
+          binary(Subtract(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x - y))
+        }
+
+        "mixed int/double" >> prop { (x: Int, y: Double) =>
+          binary(Subtract(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x - y)) and
+            binary(Subtract(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(y - x))
+        }
+
+        // TODO:
+        // Timestamp - Timestamp, Timestamp - Interval,
+        // Date - Date, Date - Interval,
+        // Time - Time, Time + Interval
+      }
+
+      "Divide" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          y != 0 ==>
+            binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Dec(x.toDouble / y.toDouble))
+        }
+
+        // TODO: figure out what domain can be tested here
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Divide(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x / y))
+        // }
+
+        // TODO: figure out what domain can be tested here
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Divide(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x / y))
+        // }
+
+        // TODO: Interval * Int
+      }
+
+      "Negate" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Negate(_).embed, Data.Int(x), Data.Int(-x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Negate(_).embed, Data.Dec(x), Data.Dec(-x))
+        }
+
+        // TODO: Interval
+      }
+
+      "Modulo" >> {
+        "any int by 1" >> prop { (x: Int) =>
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
+        }
+
+        "any positive ints" >> prop { (x0: Int, y0: Int) =>
+          val x = abs(x0)
+          val y = abs(y0)
+          (x > 0 && y > 1) ==>
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
+        }
+
+        // TODO: figure out what domain can be tested here
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
+        // }
+
+        // TODO: figure out what domain can be tested here
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
+        // }
+      }
+    }
+
+    "RelationsLib" >> {
+      import RelationsLib._
+
+      "Eq" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Eq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x == y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Eq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Eq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x == y))
+        }
+
+        "any value with self" >> prop { (x: Data) =>
+          binary(Eq(_, _).embed, x, x, Data.Bool(true))
+        }
+
+        "any values with different types" >> prop { (x: Data, y: Data) =>
+          // ...provided they are not both Numeric (Int | Dec)
+          (x.dataType != y.dataType &&
+            !((Type.Numeric contains x.dataType) &&
+              (Type.Numeric contains y.dataType))) ==>
+            binary(Eq(_, _).embed, x, y, Data.Bool(false))
+        }
+
+        // TODO: the rest of the types
+      }
+
+      "Neq" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Neq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Neq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x != y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x != y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Neq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Neq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x != y))
+        }
+
+        "any value with self" >> prop { (x: Data) =>
+          binary(Neq(_, _).embed, x, x, Data.Bool(false))
+        }
+
+        "any values with different types" >> prop { (x: Data, y: Data) =>
+          // ...provided they are not both Numeric (Int | Dec)
+          (x.dataType != y.dataType &&
+            !((Type.Numeric contains x.dataType) &&
+              (Type.Numeric contains y.dataType))) ==>
+            binary(Neq(_, _).embed, x, y, Data.Bool(true))
+        }
+
+        // TODO: the rest of the types
+      }
+
+      "Lt" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Lt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Lt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x < y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x < y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Lt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Lte" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Lte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Lte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x <= y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x <= y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Lte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Gt" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Gt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Gt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x > y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x > y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Gt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Gte" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Gte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Gte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x >= y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x >= y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Gte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Between" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          ternary(Between(_, _, _).embed, Data.Int(x), Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any three Ints" >> prop { (x1: BigInt, x2: BigInt, x3: BigInt) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Int(xs(1)), Data.Int(xs(0)), Data.Int(xs(2)), Data.Bool(true))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          ternary(Between(_, _, _).embed, Data.Dec(x), Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any three Decs" >> prop { (x1: BigDecimal, x2: BigDecimal, x3: BigDecimal) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Dec(xs(1)), Data.Dec(xs(0)), Data.Dec(xs(2)), Data.Bool(true))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          ternary(Between(_, _, _).embed, Data.Str(x), Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any three Strs" >> prop { (x1: String, x2: String, x3: String) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Str(xs(1)), Data.Str(xs(0)), Data.Str(xs(2)), Data.Bool(true))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      // TODO: can this be tested?
+      // "IfUndefined" >> {
+      // }
+
+      "And" >> {
+        "false, false" >> {
+          binary(And(_, _).embed, Data.Bool(false), Data.Bool(false), Data.Bool(false))
+        }
+
+        "false, true" >> {
+          commute(And(_, _).embed, Data.Bool(false), Data.Bool(true), Data.Bool(false))
+        }
+
+        "true, true" >> {
+          binary(And(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
+        }
+      }
+
+      "Or" >> {
+        "false, false" >> {
+          binary(Or(_, _).embed, Data.Bool(false), Data.Bool(false), Data.Bool(false))
+        }
+
+        "false, true" >> {
+          commute(Or(_, _).embed, Data.Bool(false), Data.Bool(true), Data.Bool(true))
+        }
+
+        "true, true" >> {
+          binary(Or(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
+        }
+      }
+
+      "Not" >> {
+        "false" >> {
+          unary(Not(_).embed, Data.Bool(false), Data.Bool(true))
+        }
+
+        "true" >> {
+          unary(Not(_).embed, Data.Bool(true), Data.Bool(false))
+        }
+      }
+
+      "Cond" >> {
+        "true" >> prop { (x: Data, y: Data) =>
+          ternary(Cond(_, _, _).embed, Data.Bool(true), x, y, x)
+        }
+
+        "false" >> prop { (x: Data, y: Data) =>
+          ternary(Cond(_, _, _).embed, Data.Bool(false), x, y, y)
         }
       }
     }

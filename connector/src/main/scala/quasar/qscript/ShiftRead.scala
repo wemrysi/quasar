@@ -17,7 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._
@@ -48,11 +50,14 @@ object ShiftRead {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[T, F, G]) = ev
 
+  private def ShiftTotal[T[_[_]]: Recursive: Corecursive] =
+    ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]]
+
   def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T]):
       FreeQS[T] =
     freeTransFutu(branch)((co: CoEnv[Hole, QScriptTotal[T, ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]) => co.run.fold(
       κ(co.map(Free.point[CoEnv[Hole, QScriptTotal[T, ?], ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]])),
-      ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
+      ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
   implicit def read[T[_[_]]: Recursive: Corecursive, F[_], A]
     (implicit SR: Const[ShiftedRead[A], ?] :<: F, QC: QScriptCore[T, ?] :<: F)
@@ -80,10 +85,8 @@ object ShiftRead {
         GtoH(QC.inj(qc match {
           case Union(src, lb, rb) =>
             Union(Free.point(src), applyToBranch(lb), applyToBranch(rb))
-          case Drop(src, lb, rb) =>
-            Drop(Free.point(src), applyToBranch(lb), applyToBranch(rb))
-          case Take(src, lb, rb) =>
-            Take(Free.point(src), applyToBranch(lb), applyToBranch(rb))
+          case Subset(src, lb, sel, rb) =>
+            Subset(Free.point(src), applyToBranch(lb), sel, applyToBranch(rb))
           case _ => qc.map(Free.point)
         }))
       )

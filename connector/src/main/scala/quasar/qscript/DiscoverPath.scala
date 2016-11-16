@@ -18,9 +18,11 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
@@ -60,8 +62,8 @@ abstract class DiscoverPathInstances {
       : T[OUT] =
     elems.foldRight1(
       (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[OUT]]()).embed,
-        elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
-        acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
+        elem.cata[FreeQS[T]](g => Free.roll(FI.inject(g))),
+        acc.cata[FreeQS[T]](g => Free.roll(FI.inject(g))))).embed)
 
   private def makeRead[T[_[_]], F[_]](path: ADir)(implicit R: Const[Read[APath], ?] :<: F):
       F[T[F]] =
@@ -203,12 +205,9 @@ abstract class DiscoverPathInstances {
         case Union(src, lb, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Union(s, l, r)))
-        case Take(src, lb, rb) if !src.isThat =>
+        case Subset(src, lb, sel, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Take(s, l, r)))
-        case Drop(src, lb, rb) if !src.isThat =>
-          convertBranchingOp(src, lb, rb, g)((s, l, r) =>
-            QC.inj(Drop(s, l, r)))
+            QC.inj(Subset(s, l, sel, r)))
 
         case x => x.traverse(unionAll(g)) ∘ (in => \&/-(QC.inj(in).embed))
       }
@@ -231,6 +230,7 @@ abstract class DiscoverPathInstances {
         case ThetaJoin(src, lb, rb, on, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
+        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(TJ.inj(in).embed))
       }
     }
 
@@ -249,6 +249,7 @@ abstract class DiscoverPathInstances {
         case EquiJoin(src, lb, rb, lk, rk, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, lk, rk, jType, combine)))
+        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(EJ.inj(in).embed))
       }
     }
 

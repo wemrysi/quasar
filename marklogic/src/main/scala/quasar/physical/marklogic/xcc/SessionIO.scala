@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
 
 import java.net.URI
@@ -79,6 +79,9 @@ object SessionIO {
 
   def executeQuery_(query: XQuery): SessionIO[Executed] =
     executeQuery(query, new RequestOptions)
+
+  val currentServerPointInTime: SessionIO[BigInt] =
+    SessionIO(_.getCurrentServerPointInTime) map (BigInt(_))
 
   def insertContent[F[_]: Foldable](content: F[Content]): SessionIO[Executed] =
     SessionIO(_.insertContent(content.to[Array])).as(executed)

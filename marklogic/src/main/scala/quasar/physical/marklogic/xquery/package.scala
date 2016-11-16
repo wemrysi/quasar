@@ -17,7 +17,6 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -28,6 +27,7 @@ import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
@@ -38,7 +38,12 @@ package object xquery {
   type Prologs = ISet[Prolog]
   type PrologW[F[_]] = MonadTell[F, Prologs]
 
-  sealed abstract class SortDirection
+  sealed abstract class SortDirection {
+    def asOrderModifier: String = this match {
+      case SortDirection.Ascending  => "ascending"
+      case SortDirection.Descending => "descending"
+    }
+  }
 
   object SortDirection {
 
@@ -51,17 +56,30 @@ package object xquery {
     }
   }
 
-  final case class ParamName(value: QName) {
-    def as(tpe: SequenceType): FunctionParam = FunctionParam(this, tpe)
-    def xqy: XQuery = XQuery(s"$$${value}")
+  final case class Binding(name: BindingName \/ TypedBindingName, expression: XQuery) {
+    def render(relation: String): String =
+      s"${name.fold(_.render, _.render)} $relation ${expression}"
   }
 
-  object ParamName {
-    implicit val order: Order[ParamName] =
+  final case class PositionalBinding(binding: Binding, at: Option[BindingName]) {
+    def render(relation: String): String = {
+      val renderedAt = ~at.map(bn => s" at ${bn.render}")
+      s"${binding.name.fold(_.render, _.render)}$renderedAt $relation ${binding.expression}"
+    }
+  }
+
+  final case class BindingName(value: QName) {
+    def unary_~ : XQuery = XQuery(render)
+    def as(tpe: SequenceType): TypedBindingName = TypedBindingName(this, tpe)
+    def render: String = s"$$${value}"
+  }
+
+  object BindingName {
+    implicit val order: Order[BindingName] =
       Order.orderBy(_.value)
 
-    implicit val show: Show[ParamName] =
-      Show.shows(_.xqy.shows)
+    implicit val show: Show[BindingName] =
+      Show.shows(bn => s"BindingName(${bn.render})")
   }
 
   final case class SequenceType(override val toString: String) extends scala.AnyVal
@@ -76,16 +94,17 @@ package object xquery {
       Show.showFromToString
   }
 
-  final case class FunctionParam(name: ParamName, tpe: SequenceType) {
-    def render: String = s"${name.xqy} as $tpe"
+  final case class TypedBindingName(name: BindingName, tpe: SequenceType) {
+    def unary_~ : XQuery = ~name
+    def render: String = s"${name.render} as $tpe"
   }
 
-  object FunctionParam {
-    implicit val order: Order[FunctionParam] =
-      Order.orderBy(fp => (fp.name, fp.tpe))
+  object TypedBindingName {
+    implicit val order: Order[TypedBindingName] =
+      Order.orderBy(tn => (tn.name, tn.tpe))
 
-    implicit val show: Show[FunctionParam] =
-      Show.shows(fp => s"FunctionParam(${fp.render})")
+    implicit val show: Show[TypedBindingName] =
+      Show.shows(tn => s"TypedBindingName(${tn.render})")
   }
 
   def asArg(opt: Option[XQuery]): String =
@@ -97,8 +116,8 @@ package object xquery {
   def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
     declare(NSPrefix.local(fname))
 
-  def freshVar[F[_]: NameGenerator: Functor]: F[String] =
-    NameGenerator[F].prefixedName("$v")
+  def freshName[F[_]: QNameGenerator: Functor]: F[BindingName] =
+    QNameGenerator[F].freshQName map (BindingName(_))
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
     XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
@@ -111,7 +130,4 @@ package object xquery {
 
   def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =
     NamespaceDecl(Namespace(NSPrefix(NCName(prefix)), NSUri(uri)))
-
-  def xmlElement(name: String, content: String): String =
-    s"<$name>$content</$name>"
 }

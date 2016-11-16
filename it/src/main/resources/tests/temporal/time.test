@@ -2,7 +2,9 @@
   "name": "filter on time_of_day",
 
   "backends": {
-    "postgresql":        "pending"
+    "postgresql":        "pending",
+    "marklogic":         "skip",
+    "couchbase":         "skip"
   },
 
   "data": "../days.data",

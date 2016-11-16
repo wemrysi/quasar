@@ -17,10 +17,10 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError, EnvErrT}
-import quasar.{NameGenerator => QNameGenerator, _}
-import quasar.fp.kleisli._
+import quasar.{NameGenerator => QNameGenerator}
+import quasar.connector.{EnvironmentError, EnvErrT}
 import quasar.fp.eitherT._
+import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.execution._
@@ -358,10 +358,10 @@ object WorkflowExecutor {
     type WFExec  = WorkflowExecutor[MongoDbIO, BsonCursor]
 
     liftEnvErr(MongoDbIO.serverVersion) flatMap { v =>
-      if (v >= MinMongoDbVersion)
+      if (v >= ServerVersion.MongoDb2_6)
         (new MongoDbIOWorkflowExecutor: WFExec).point[M]
       else
-        unsupportedVersion("MongoDB", v).raiseError[M, WFExec]
+        unsupportedVersion("MongoDB", v.shows).raiseError[M, WFExec]
     }
   }
 

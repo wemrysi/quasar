@@ -1,7 +1,12 @@
 {
   "name": "filter with negated regex selector",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "couchbase":  "skip"
+  },
+
+  "data": "zips.data",
 
   "query": "select city, state from zips where city not like \"BOULD%\" and pop = 18174",
 

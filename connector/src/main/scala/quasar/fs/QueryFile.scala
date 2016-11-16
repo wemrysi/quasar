@@ -18,16 +18,21 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar._, Planner._, RenderTree.ops._
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
+import quasar.connector.CompileM
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fp.eitherT._
+import quasar.frontend.SemanticErrsT
+import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
-import matryoshka.patterns._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.iteratee._
 import scalaz.stream.Process
 
@@ -58,13 +63,13 @@ object QueryFile {
       show:           Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
+    val optimizer = new Optimizer[T]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata(orOriginal(Optimizer.elideLets[T]))
-      .transCataM(transform.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[T], QC.inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[T], QS, T[QS]]).lower) ⋙ eval))
+    lp.transCata[LogicalPlan](orOriginal(optimizer.elideLets))
+      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna(eval)))))
+      .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata(eval))
   }
 
   def simplifyAndNormalize
@@ -79,14 +84,14 @@ object QueryFile {
       TJ:    ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     // TODO: This would be `transHylo` if there were such a thing.
     _.transAna(SP.simplifyProjection)
       // TODO: Rather than explicitly applying multiple times, we should apply
       //       repeatedly until unchanged.
-      .transCata(optimize.applyAll)
-      .transCata(optimize.applyAll)
+      .transAna(rewrite.normalize)
+      .transAna(rewrite.normalize)
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -116,16 +121,14 @@ object QueryFile {
       RT:     Delay[RenderTree, QS])
       : EitherT[Writer[PhaseResults, ?], FileSystemError, T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
-      qs.fold(
-        κ(Vector()),
-        a => Vector(PhaseResult.Tree("QScript", a.cata(transform.linearize).reverse.render))),
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.tree("QScript", a))),
       qs))
   }
 
@@ -145,7 +148,7 @@ object QueryFile {
       RT:       Delay[RenderTree, QS])
       : M[T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
-    val optimize = new Optimize[T]
+    val rewrite = new Rewrite[T]
 
     type InterimQS[A] =
       (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
@@ -160,15 +163,14 @@ object QueryFile {
     val qs =
       merr.map(
         merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).fold(
+          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
             perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
             merr.point(_)))(
-          optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
+          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
         simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>
-      val renderedTree = qs.cata(transform.linearize).reverse.render
-      mtell.writer(Vector(PhaseResult.Tree("QScript", renderedTree)), qs)
+      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
     }
   }
 
@@ -245,7 +247,7 @@ object QueryFile {
       *
       * Execution of certain plans may return a result file other than the
       * requested file if it is more efficient to do so (i.e. to avoid copying
-      * lots of data for a plan consisting of a single `ReadF(...)`).
+      * lots of data for a plan consisting of a single `Read(...)`).
       */
     def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[AFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])
@@ -306,10 +308,6 @@ object QueryFile {
       */
     def ls(dir: ADir): M[Set[PathSegment]] =
       EitherT(lift(ListContents(dir)))
-
-    /** The children of the root directory. */
-    def ls: M[Set[PathSegment]] =
-      ls(rootDir)
 
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.

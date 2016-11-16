@@ -555,7 +555,7 @@ class SQLParserSpec extends quasar.Qspec {
       val parsed = parse(pprint(node))
 
       parsed.fold(
-        _ => println(node.shows + "\n" + pprint(node)),
+        _ => println(node.render.shows + "\n" + pprint(node)),
         p => if (p != node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)

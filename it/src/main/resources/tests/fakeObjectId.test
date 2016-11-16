@@ -3,7 +3,8 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "pending"
+        "marklogic":         "skip",
+        "couchbase":         "skip"
     },
     "data": "objectids.data",
     "query": "select oid(bar) from objectids",

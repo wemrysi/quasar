@@ -1,6 +1,9 @@
 {
     "name": "match like complement",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "select city from zips where city not like \"%E%\"",
     "predicate": "containsAtLeast",

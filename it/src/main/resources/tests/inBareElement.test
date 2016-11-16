@@ -1,6 +1,10 @@
 {
     "name": "filter field “in” a bare value",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "skip",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "select * from zips where state in \"ME\" and pop < 10",
     "predicate": "containsExactly",

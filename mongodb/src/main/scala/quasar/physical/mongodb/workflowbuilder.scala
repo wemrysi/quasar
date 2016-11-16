@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
@@ -52,8 +53,7 @@ object WorkflowBuilder {
     def render(x: Expr) = x.fold(_.render, _.render)
   }
 
-  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  import exprFp._
+  import fixExprOp._
 
   /**
    * Like ValueBuilder, this is a Leaf node which can be used to construct a more complicated WorkflowBuilder.
@@ -485,7 +485,7 @@ object WorkflowBuilder {
 
   private def toCollectionBuilder[F[_]: Coalesce]
     (wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : M[CollectionBuilderF[F]] =
     wb.unFix match {
       case cb @ CollectionBuilderF(_, _, _) => emit(cb)
@@ -498,7 +498,7 @@ object WorkflowBuilder {
             fields.traverse(f => (DocField(name) \\ f.toDocVar).deref).fold(
               scala.sys.error("prefixed ${name}, but still no field"))(
               op.lift(_).fold(
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
+                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
                 op =>
                 (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \/-($$ROOT))))) {
                   case (
@@ -523,7 +523,7 @@ object WorkflowBuilder {
               CollectionBuilderF(_, _, srcStruct),
               CollectionBuilderF(graph, base0, bothStruct)) =>
               op.lift(fields.map(f => base0.toDocVar.deref.map(_ \ f).getOrElse(f))).fold[M[CollectionBuilderF[F]]](
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter.name, Some("failed to build operation"))))(
+                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
                 { op =>
                   val g = chain(graph, op)
                   if (srcStruct ≟ bothStruct)
@@ -730,8 +730,8 @@ object WorkflowBuilder {
     }
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[(Fix[F], Base)] =
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+      : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
@@ -755,7 +755,7 @@ object WorkflowBuilder {
   }
 
   def build[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[Fix[F]] =
     toCollectionBuilder(wb).map {
       case CollectionBuilderF(graph, base, struct) =>
@@ -771,7 +771,7 @@ object WorkflowBuilder {
   }
 
   private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
     : Option[M[(WorkflowBuilder[F], List[Fix[ExprOp]])]] =
     builders match {
       case Nil             => None
@@ -793,7 +793,7 @@ object WorkflowBuilder {
     }
 
   private def foldBuilders[F[_]: Coalesce](src: WorkflowBuilder[F], others: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[(WorkflowBuilder[F], Base, List[Base])] =
     others.foldLeftM[M, (WorkflowBuilder[F], Base, List[Base])](
       (src, Root(), Nil)) {
@@ -917,7 +917,7 @@ object WorkflowBuilder {
   private def findSort[F[_]: Coalesce]
     (src: WorkflowBuilder[F])
     (distincting: WorkflowBuilder[F] => M[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
     : M[WorkflowBuilder[F]] = {
     @tailrec
     def loop(wb: WorkflowBuilder[F]): M[WorkflowBuilder[F]] =
@@ -945,7 +945,7 @@ object WorkflowBuilder {
   }
 
   private def merge[F[_]: Coalesce](left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
-    (implicit I: WorkflowOpCoreF :<: F, ev0: Show[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
+    (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
     : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
     def delegate =
       merge(right, left).map { case (r, l, merged) => (l, r, merged) }
@@ -1136,7 +1136,7 @@ object WorkflowBuilder {
       case (_, ArrayBuilderF(_, _)) => delegate
 
       case _ =>
-        fail(InternalError("failed to merge:\n" + left.show + "\n" + right.show))
+        fail(InternalError("failed to merge:\n" + left.render.show + "\n" + right.render.show))
     }
   }
 
@@ -1164,21 +1164,21 @@ object WorkflowBuilder {
     def expr1
       (wb: WorkflowBuilder[F])
       (f: Fix[ExprOp] => Fix[ExprOp])
-      (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]])
+      (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb)) { case List(e) => f(e) }
 
     def expr2
       (wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
       (f: (Fix[ExprOp], Fix[ExprOp]) => Fix[ExprOp])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       expr(List(wb1, wb2)) { case List(e1, e2) => f(e1, e2) }
 
     def expr
       (wbs: List[WorkflowBuilder[F]])
       (f: List[Fix[ExprOp]] => Fix[ExprOp])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1190,7 +1190,7 @@ object WorkflowBuilder {
       ExprBuilder(wb, -\/(js))
 
     def jsExpr(wbs: List[WorkflowBuilder[F]], f: List[JsCore] => JsCore)
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError("impossible – no arguments")))(
@@ -1242,19 +1242,19 @@ object WorkflowBuilder {
           projectField(src, name).map(ShapePreservingBuilder(_, inputs, op))
         case ValueBuilderF(Bson.Doc(fields)) =>
           fields.get(name).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("value does not contain a field ‘" + name + "’."))))(
             x => \/-(ValueBuilder(x)))
         case ValueBuilderF(_) =>
-          -\/(UnsupportedFunction(structural.ObjectProject.name, Some("value is not a document.")))
+          -\/(UnsupportedFunction(structural.ObjectProject, Some("value is not a document.")))
         case GroupBuilderF(wb0, key, Expr(\/-($var(dv)))) =>
           projectField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($var(dv)))))
         case GroupBuilderF(wb0, key, Doc(doc)) =>
           doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("group does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("group does not contain a field ‘" + name + "’."))))(
             x => \/-(GroupBuilder(wb0, key, Expr(x))))
         case DocBuilderF(wb, doc) =>
           doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject.name, Some("document does not contain a field ‘" + name + "’."))))(
+            -\/(UnsupportedFunction(structural.ObjectProject, Some("document does not contain a field ‘" + name + "’."))))(
             expr => \/-(ExprBuilder(wb, expr)))
         case ExprBuilderF(wb0,  -\/(js1)) =>
           \/-(ExprBuilder(wb0,
@@ -1271,22 +1271,22 @@ object WorkflowBuilder {
             \/-(ValueBuilder(elems(index)))
           else
             -\/(UnsupportedFunction(
-              structural.ArrayProject.name,
+              structural.ArrayProject,
               Some("value does not contain index ‘" + index + "’.")))
         case ArrayBuilderF(wb0, elems) =>
           if (index < elems.length) // UGH!
             \/-(ExprBuilder(wb0, elems(index)))
           else
             -\/(UnsupportedFunction(
-              structural.ArrayProject.name,
+              structural.ArrayProject,
               Some("array does not contain index ‘" + index + "’.")))
         case ValueBuilderF(_) =>
           -\/(UnsupportedFunction(
-            structural.ArrayProject.name,
+            structural.ArrayProject,
             Some("value is not an array.")))
         case DocBuilderF(_, _) =>
           -\/(UnsupportedFunction(
-            structural.ArrayProject.name,
+            structural.ArrayProject,
             Some("value is not an array.")))
         case _ =>
           jsExpr1(wb, JsFn(jsBase,
@@ -1301,7 +1301,7 @@ object WorkflowBuilder {
           \/-(ValueBuilder(Bson.Doc(fields - name)))
         case ValueBuilderF(_) =>
           -\/(UnsupportedFunction(
-            structural.DeleteField.name,
+            structural.DeleteField,
             Some("value is not a document.")))
         case GroupBuilderF(wb0, key, Expr(\/-($$ROOT))) =>
           deleteField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($$ROOT))))
@@ -1342,7 +1342,7 @@ object WorkflowBuilder {
         })
 
     def distinct(src: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findKeys(src).fold(
         lift(deleteField(src, "_id")).flatMap(del => distinctBy(del, List(del))))(
@@ -1365,13 +1365,13 @@ object WorkflowBuilder {
         })
 
     def distinctBy(src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       findSort(src)(s => reduce(groupBy(s, keys))($first(_)).point[M])
 
     // TODO: handle concating value, expr, or collection with group (#439)
     def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine): M[WorkflowBuilder[F]] = {
         def delegate = impl(wb2, wb1, combine.flip)
@@ -1605,8 +1605,8 @@ object WorkflowBuilder {
           case (GroupBuilderF(_, _, _), DocBuilderF(Fix(ArraySpliceBuilderF(_, _)), _)) => delegate
 
           case _ => fail(UnsupportedFunction(
-            structural.ObjectConcat.name,
-            Some("unrecognized shapes:\n" + wb1.show + "\n" + wb2.show)))
+            structural.ObjectConcat,
+            Some("unrecognized shapes:\n" + wb1.render.show + "\n" + wb2.render.show)))
         }
       }
 
@@ -1614,7 +1614,7 @@ object WorkflowBuilder {
     }
 
     def arrayConcat(left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: Show[WorkflowBuilder[F]])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine):
           M[WorkflowBuilder[F]] = {
@@ -1724,18 +1724,51 @@ object WorkflowBuilder {
 
           case _ =>
             fail(UnsupportedFunction(
-              structural.ArrayConcat.name,
+              structural.ArrayConcat,
               Some("values are not both arrays")))
         }
       }
 
       impl(left, right, unflipped)
     }
+
+    def unionAll
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            l,
+            chain(r,
+              $map($MapF.mapFresh, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
+
+    def union
+      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
+        : M[WorkflowBuilder[F]] =
+      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          $foldLeft(
+            chain(l, $map($MapF.mapValKey, ListMap())),
+            chain(r,
+              $map($MapF.mapValKey, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+          Root(),
+          None)
+      }
   }
   object Ops {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =
       new Ops[F]
   }
+
+  // FIXME: These implicits should not be here, because this is not a companion
+  //        object, and therefore not on the search path.
 
   implicit def WorkflowBuilderRenderTree[F[_]: Coalesce]
     (implicit
@@ -1756,9 +1789,7 @@ object WorkflowBuilder {
         case spb @ ShapePreservingBuilderF(src, inputs, op) =>
           val nt = "ShapePreservingBuilder" :: nodeType
           NonTerminal(nt, None,
-            render(src) ::
-              (inputs.map(render) :+
-                Terminal("Op" :: nt, Some(spb.dummyOp.shows))))
+            render(src) :: (inputs.map(render) :+ spb.dummyOp.render))
         case ValueBuilderF(value) =>
           Terminal("ValueBuilder" :: nodeType, Some(value.shows))
         case ExprBuilderF(src, expr) =>

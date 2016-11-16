@@ -22,7 +22,7 @@ import quasar.sql._
 import matryoshka._
 import monocle._
 import pathy.Path, Path._
-import scalaz._
+import scalaz._, Scalaz._
 import shapeless.{Prism => _, _}
 
 sealed trait SemanticError {
@@ -85,10 +85,13 @@ object SemanticError {
     def message = "Expected to find a compiled subtable with name \"" + name + "\""
   }
   final case class DateFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String]) extends SemanticError {
-    def message = "Date/time string could not be parsed as " + func.name + ": " + str + hint.map(" (" + _ + ")").getOrElse("")
+    def message = "Date/time string could not be parsed as " + func.shows + ": " + str + hint.map(" (" + _ + ")").getOrElse("")
   }
   final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
     def message = "Invalid path: " + posixCodec.unsafePrintPath(path) + hint.map(" (" + _ + ")").getOrElse("")
+  }
+  final case class UnexpectedDatePart(part: String) extends SemanticError {
+    def message = "Invalid selector for DATE_PART: " + part + " (expected \"century\", \"day\", etc.)"
   }
 
   // TODO: Add other prisms when necessary (unless we enable the "No Any" wart first)

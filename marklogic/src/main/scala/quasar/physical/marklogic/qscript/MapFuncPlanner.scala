@@ -17,148 +17,183 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.NameGenerator
 import quasar.ejson.EJson
-import quasar.fp.ShowT
 import quasar.fp.eitherT._
-import quasar.physical.marklogic.{ErrorMessages, MonadError_}
-import quasar.physical.marklogic.ejson.EncodeXQuery
-import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
-import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
-import scalaz.EitherT
+import scalaz.{Applicative, EitherT}
 import scalaz.std.option._
 import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
-  import expr.{if_, let_}, axes._
+  import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
 
-  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  def apply[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) =>
-      type M[A] = EitherT[F, ErrorMessages, A]
-      ejson.cataM(EncodeXQuery[M, EJson].encodeXQuery).run.flatMap(_.fold(
+      ejson.cataM(EncodeXQuery[EitherT[F, ErrorMessages, ?], EJson].encodeXQuery).run.flatMap(_.fold(
         msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
         _.point[F]))
 
+    case Undefined()                  => emptySeq.point[F]
+
+    case Length(arrOrstr)             => qscript.length[F] apply arrOrstr
+
+    // time
+    case Date(s)                      => qscript.asDate[F] apply s
+    case Time(s)                      => xs.time(s).point[F]
+    case Timestamp(s)                 => xs.dateTime(s).point[F]
+    case Interval(s)                  => xs.dayTimeDuration(s).point[F]
+    case TimeOfDay(dt)                => qscript.asDateTime[F] apply dt map xs.time
+    case ToTimestamp(millis)          => qscript.timestampToDateTime[F] apply millis
+    case Now()                        => fn.currentDateTime.point[F]
+
+    case ExtractCentury(time)         => qscript.asDateTime[F] apply time map (dt =>
+                                           fn.ceiling(fn.yearFromDateTime(dt) div 100.xqy))
+    case ExtractDayOfMonth(time)      => qscript.asDateTime[F] apply time map fn.dayFromDateTime
+    case ExtractDecade(time)          => qscript.asDateTime[F] apply time map (dt =>
+                                           fn.floor(fn.yearFromDateTime(dt) div 10.xqy))
+    case ExtractDayOfWeek(time)       => qscript.asDate[F].apply(time) map (d => mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
+    case ExtractDayOfYear(time)       => qscript.asDate[F].apply(time) map (xdmp.yeardayFromDate)
+    case ExtractEpoch(time)           => qscript.asDateTime[F] apply time flatMap (qscript.secondsSinceEpoch[F].apply(_))
+    case ExtractHour(time)            => qscript.asDateTime[F] apply time map fn.hoursFromDateTime
+    case ExtractIsoDayOfWeek(time)    => qscript.asDate[F].apply(time) map (xdmp.weekdayFromDate)
+    case ExtractIsoYear(time)         => qscript.asDateTime[F] apply time flatMap (qscript.isoyearFromDateTime[F].apply(_))
+    case ExtractMicroseconds(time)    => qscript.asDateTime[F] apply time map (dt =>
+                                           mkSeq_(fn.secondsFromDateTime(dt) * 1000000.xqy))
+    case ExtractMillennium(time)      => qscript.asDateTime[F] apply time map (dt =>
+                                           fn.ceiling(fn.yearFromDateTime(dt) div 1000.xqy))
+    case ExtractMilliseconds(time)    => qscript.asDateTime[F] apply time map (dt =>
+                                           mkSeq_(fn.secondsFromDateTime(dt) * 1000.xqy))
+    case ExtractMinute(time)          => qscript.asDateTime[F] apply time map fn.minutesFromDateTime
+    case ExtractMonth(time)           => qscript.asDateTime[F] apply time map fn.monthFromDateTime
+    case ExtractQuarter(time)         => qscript.asDate[F].apply(time) map (xdmp.quarterFromDate)
+    case ExtractSecond(time)          => qscript.asDateTime[F] apply time map fn.secondsFromDateTime
+    case ExtractTimezone(time)        => qscript.asDateTime[F] apply time flatMap (qscript.timezoneOffsetSeconds[F].apply(_))
+    case ExtractTimezoneHour(time)    => qscript.asDateTime[F] apply time map (dt =>
+                                           fn.hoursFromDuration(fn.timezoneFromDateTime(dt)))
+    case ExtractTimezoneMinute(time)  => qscript.asDateTime[F] apply time map (dt =>
+                                           fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
+    case ExtractWeek(time)            => qscript.asDate[F].apply(time) map (xdmp.weekFromDate)
+    case ExtractYear(time)            => qscript.asDateTime[F] apply time map fn.yearFromDateTime
+
     // math
-    case Negate(x) => (-x).point[F]
-    case Add(x, y) => (x + y).point[F]
-    case Multiply(x, y) => (x * y).point[F]
-    case Subtract(x, y) => (x - y).point[F]
-    case Divide(x, y) => (x div y).point[F]
-    case Modulo(x, y) => (x mod y).point[F]
-    case Power(b, e) => math.pow(b, e).point[F]
+    case Negate(x)                    => (-x).point[F]
+    case Add(x, y)                    => binOp[F](x, y)(_ + _)
+    case Multiply(x, y)               => binOp[F](x, y)(_ * _)
+    case Subtract(x, y)               => binOp[F](x, y)(_ - _)
+    case Divide(x, y)                 => binOp[F](x, y)(_ div _)
+    case Modulo(x, y)                 => binOp[F](x, y)(_ mod _)
+    case Power(b, e)                  => math.pow(b, e).point[F]
 
     // relations
-    // TODO: When to use value vs. general comparisons?
-    case Not(x) => fn.not(x).point[F]
-    case Eq(x, y) => (x eq y).point[F]
-    case Neq(x, y) => (x ne y).point[F]
-    case Lt(x, y) => (x lt y).point[F]
-    case Lte(x, y) => (x le y).point[F]
-    case Gt(x, y) => (x gt y).point[F]
-    case Gte(x, y) => (x ge y).point[F]
-    case And(x, y) => (x and y).point[F]
-    case Or(x, y) => (x or y).point[F]
+    case Not(x)                       => fn.not(x).point[F]
+    case MapFuncs.Eq(x, y)            => binOp[F](x, y)(_ eq _)
+    case Neq(x, y)                    => binOp[F](x, y)(_ ne _)
+    case Lt(x, y)                     => binOp[F](x, y)(_ lt _)
+    case Lte(x, y)                    => binOp[F](x, y)(_ le _)
+    case Gt(x, y)                     => binOp[F](x, y)(_ gt _)
+    case Gte(x, y)                    => binOp[F](x, y)(_ ge _)
+    case IfUndefined(x, alternate)    => if_(fn.empty(x)).then_(alternate).else_(x).point[F]
+    case And(x, y)                    => binOp[F](x, y)(_ and _)
+    case Or(x, y)                     => binOp[F](x, y)(_ or _)
+    case Between(v1, v2, v3)          => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
+    case Cond(p, t, f)                => if_(p).then_(t).else_(f).point[F]
 
-    case Cond(p, t, f) => if_(p).then_(t).else_(f).point[F]
+    // set
+    case Within(x, arr)               => qscript.elementLeftShift[F].apply(arr) map (xs => fn.exists(fn.indexOf(xs, x)))
 
     // string
-    case Lower(s) => fn.lowerCase(s).point[F]
-    case Upper(s) => fn.upperCase(s).point[F]
-    case ToString(x) => fn.string(x).point[F]
-    case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len)).point[F]
+    case Lower(s)                     => fn.lowerCase(s).point[F]
+    case Upper(s)                     => fn.upperCase(s).point[F]
+    case Bool(s)                      => xs.boolean(s).point[F]
+    case Integer(s)                   => xs.integer(s).point[F]
+    case Decimal(s)                   => xs.double(s).point[F]
+    case Null(s)                      => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
+                                           (n, e) => if_ (s eq "null".xs) then_ n else_ e)
+    case ToString(x)                  => qscript.toString[F] apply x
+    case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
+    case Substring(s, loc, len)       => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
-    case MakeArray(x) =>
-      ejson.singletonArray[F] apply x
+    case MakeArray(x)                 => ejson.singletonArray[F] apply x
 
-    case MakeMap(k, v) =>
-      def withLitKey(s: String): F[XQuery] =
-        refineV[IsNCName](s).disjunction map { ncname =>
-          val qn = QName.local(NCName(ncname))
-          ejson.singletonObject[F] apply (qn.xs, v)
-        } getOrElse invalidQName(s)
-
+    case MakeMap(k, v)                =>
       k match {
-        // Makes numeric strings valid QNames by prepending an underscore
-        case XQuery.StringLit(IntegralNumber(s)) =>
-          withLitKey("_" + s)
-
         case XQuery.StringLit(s) =>
-          withLitKey(s)
+          asQName(s) flatMap (qn =>
+            ejson.singletonObject[F] apply (xs.QName(qn.xs), v))
 
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
-    case ConcatArrays(x, y) =>
-      ejson.arrayConcat[F] apply (x, y)
+    case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
+    case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
+    case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
-    case ConcatMaps(x, y) =>
-      ejson.objectConcat[F] apply (x, y)
-
-    case ProjectField(src, field) =>
-      def projectLit(s: String): F[XQuery] =
-        refineV[IsNCName](s).disjunction map { ncname =>
-          freshVar[F] map { m =>
-            let_(m -> src) return_ {
-              m.xqy `/` child(QName.local(NCName(ncname)))
-            }
-          }
-        } getOrElse invalidQName(s)
-
+    case ProjectField(src, field)     =>
       field match {
         case XQuery.Step(_) =>
           (src `/` field).point[F]
 
-        // Makes numeric strings valid QNames by prepending an underscore
-        case XQuery.StringLit(IntegralNumber(s)) =>
-          projectLit("_" + s)
-
         case XQuery.StringLit(s) =>
-          projectLit(s)
+          (asQName[F](s) |@| freshName[F])((qn, m) =>
+            if (flwor.isMatching(src))
+              let_(m := src) return_ (~m `/` child(qn))
+            else
+              src `/` child(qn))
 
-        case _ =>
-          (freshVar[F] |@| freshVar[F]) { (m, k) =>
-            let_(m -> src, k -> field) return_ {
-              m.xqy `/` k.xqy
-            }
-          }
+        case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
 
-    // TODO: If we don't specify the element type, this should work for any element
-    case ProjectIndex(arr, idx) =>
-      (freshVar[F] |@| ejson.arrayEltN.qn[F]) { (i, arrElt) =>
-        let_(i -> idx) return_ {
-          arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
-        }
+    case DeleteField(src, field)      =>
+      field match {
+        case XQuery.Step(_) =>
+          mem.nodeDelete[F](src `/` field)
+
+        case XQuery.StringLit(s) =>
+          for {
+            qn <- asQName(s)
+            m  <- freshName[F]
+            n1 <- mem.nodeDelete[F](~m `/` child(qn))
+            n2 <- mem.nodeDelete[F](src `/` child(qn))
+          } yield {
+            if (flwor.isMatching(src))
+              let_(m := src) return_ n1
+            else
+              n2
+          }
+
+        case _ => qscript.deleteField[F] apply (src, xs.QName(field))
       }
 
     // other
-    case Range(x, y)   => (x to y).point[F]
-
-    case ZipMapKeys(m) => qscript.zipMapNodeKeys[F] apply m
+    case DupMapKeys(m)                => qscript.elementDupKeys[F]    apply m
+    case DupArrayIndices(a)           => ejson.arrayDupIndices[F]     apply a
+    case ZipMapKeys(m)                => qscript.zipMapElementKeys[F] apply m
+    case ZipArrayIndices(a)           => ejson.arrayZipIndices[F]     apply a
+    case Range(x, y)                  => (x to y).point[F]
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
-    case Guard(_, _, cont, _) =>
-      s"(: GUARD CONT :)$cont".xqy.point[F]
-
-    case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
+    case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
   }
 
   ////
 
-  // A string consisting only of digits.
-  private val IntegralNumber = "^(\\d+)$".r
+  private def binOp[F[_]: QNameGenerator: Applicative](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y))
+      (freshName[F] |@| freshName[F])((vx, vy) =>
+        mkSeq_(let_(vx := x, vy := y) return_ op(~vx, ~vy)))
+    else
+      op(x, y).point[F]
 
-  private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
-    MonadError_[F, MarkLogicPlannerError].raiseError(
-      MarkLogicPlannerError.invalidQName(s))
+  private def ternOp[F[_]: QNameGenerator: Applicative](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
+      (freshName[F] |@| freshName[F] |@| freshName[F])((vx, vy, vz) =>
+        mkSeq_(let_(vx := x, vy := y, vz := z) return_ op(~vx, ~vy, ~vz)))
+    else
+      op(x, y, z).point[F]
 }

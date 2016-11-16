@@ -1,6 +1,9 @@
 {
     "name": "match like pattern",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "couchbase":  "skip"
+    },
     "data": "zips.data",
     "query": "select city from zips where city like \"%OULD%CIT%\"",
     "predicate": "containsAtLeast",

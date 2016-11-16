@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.{Type, RenderTree, Terminal}, Type.⨿
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.Planner.{PlannerError, UnsupportedJS}
-import quasar.physical.mongodb.javascript._
 
 import matryoshka._, Recursive.ops._
 import monocle.Prism
@@ -38,6 +37,8 @@ package object expression {
   /** The type for expressions supporting the most advanced capabilities. */
   type ExprOp[A] = Expr3_2[A]
 
+  val fixExprOp = ExprOpCoreF.fixpoint[Fix, ExprOp]
+
   val DocField = Prism.partial[DocVar, BsonField] {
     case DocVar.ROOT(Some(tail)) => tail
   } (DocVar.ROOT(_))
@@ -51,6 +52,9 @@ package object expression {
       ev0: Equal[T[EX]],
       ev1: ExprOpOps.Uni[EX])
       : PartialFunction[T[EX], PlannerError \/ JsFn] = {
+    val mjs = quasar.physical.mongodb.javascript[Fix]
+    import mjs._
+
     def app(x: T[EX], tc: JsCore => JsCore): PlannerError \/ JsFn =
       Recursive[T].para(x)(toJs[T, EX]).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
 

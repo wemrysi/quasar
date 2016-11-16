@@ -17,7 +17,7 @@
 package quasar.effect
 
 import quasar.Predef._
-import quasar.SKI._
+import quasar.fp.ski._
 import quasar.fp.TaskRef
 import quasar.fp.free
 

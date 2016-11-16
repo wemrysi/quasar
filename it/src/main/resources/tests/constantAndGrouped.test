@@ -1,7 +1,10 @@
 {
   "name": "constant and a grouped value",
 
-  "backends": { "postgresql": "pending", "marklogic": "pending" },
+  "backends": {
+    "postgresql": "pending",
+    "couchbase":  "skip"
+  },
 
   "data": "zips.data",
 

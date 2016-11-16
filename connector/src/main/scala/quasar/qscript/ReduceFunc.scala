@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar._
 import quasar.std.StdLib._
 
@@ -56,8 +57,41 @@ object ReduceFunc {
       }
     }
 
-  implicit val traverse: Traverse[ReduceFunc] = new Traverse[ReduceFunc] {
-    def traverseImpl[G[_]: Applicative, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
+  implicit val renderTree: Delay[RenderTree, ReduceFunc] =
+    new Delay[RenderTree, ReduceFunc] {
+      val nt = "ReduceFunc" :: Nil
+
+      def apply[A](r: RenderTree[A]) = {
+        def nAry(typ: String, as: A*): RenderedTree =
+          NonTerminal(typ :: nt, None, as.toList.map(r.render(_)))
+
+        RenderTree.make {
+          case Count(a)           => nAry("Count", a)
+          case Sum(a)             => nAry("Sum", a)
+          case Min(a)             => nAry("Min", a)
+          case Max(a)             => nAry("Max", a)
+          case Avg(a)             => nAry("Avg", a)
+          case Arbitrary(a)       => nAry("Arbitrary", a)
+          case UnshiftArray(a)    => nAry("UnshiftArray", a)
+          case UnshiftMap(a1, a2) => nAry("UnshiftMap", a1, a2)
+        }
+      }
+    }
+
+  implicit val traverse1: Traverse1[ReduceFunc] = new Traverse1[ReduceFunc] {
+    def foldMapRight1[A, B](fa: ReduceFunc[A])(z: (A) ⇒ B)(f: (A, ⇒ B) ⇒ B): B =
+      fa match {
+        case Count(a)        => z(a)
+        case Sum(a)          => z(a)
+        case Min(a)          => z(a)
+        case Max(a)          => z(a)
+        case Avg(a)          => z(a)
+        case Arbitrary(a)    => z(a)
+        case UnshiftArray(a) => z(a)
+        case UnshiftMap(a1, a2) => f(a1, z(a2))
+      }
+
+    def traverse1Impl[G[_]: Apply, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
       fa match {
         case Count(a)        => f(a) ∘ (Count(_))
         case Sum(a)          => f(a) ∘ (Sum(_))

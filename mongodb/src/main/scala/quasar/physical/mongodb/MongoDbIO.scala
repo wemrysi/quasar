@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.effect.Failure
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 
 import java.lang.{Boolean => JBoolean}
@@ -72,6 +73,8 @@ object MongoDbIO {
   /** Returns the stream of results of aggregating documents according to the
     * given aggregation pipeline.
     */
+  // FIXME: I don’t know why this triggers here.
+  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def aggregated(
     src: Collection,
     pipeline: List[Bson.Doc],
@@ -257,22 +260,23 @@ object MongoDbIO {
   }
 
   /** Returns the version of the MongoDB server the client is connected to. */
-  def serverVersion: MongoDbIO[List[Int]] = {
-    def lookupVersion(dbName: DatabaseName): MongoDbIO[PhysicalError \/ List[Int]] = {
+  def serverVersion: MongoDbIO[ServerVersion] = {
+    def lookupVersion(dbName: DatabaseName): MongoDbIO[String \/ ServerVersion] = {
       val cmd = Bson.Doc(ListMap("buildinfo" -> Bson.Int32(1)))
 
-      runCommand(dbName, cmd).attemptMongo.run map (_ flatMap (doc =>
-        Option(doc getString "version")
-          // FIXME: Shouldn’t be creating fresh MongoExceptions
-          .toRightDisjunction(UnhandledFSError(new MongoException("Unable to determine server version, buildInfo response is missing the 'version' field")))
-          .map(_.getValue.split('.').toList.map(_.toInt))))
+      runCommand(dbName, cmd).attemptMongo.run.map(
+        _.leftMap(_.cause.getMessage)
+          .flatMap(doc =>
+            Option(doc getString "version")
+              .toRightDisjunction("Unable to determine server version, buildInfo response is missing the 'version' field")
+              .flatMap(v => ServerVersion.fromString(v.getValue))))
     }
 
-    val finalize: ((Vector[PhysicalError], Vector[List[Int]])) => MongoDbIO[List[Int]] = {
+    val finalize: ((Vector[String], Vector[ServerVersion])) => MongoDbIO[ServerVersion] = {
       case (errs, vers) =>
         vers.headOption.map(_.point[MongoDbIO]) orElse
-        errs.headOption.map(ex => fail[List[Int]](ex.cause)) getOrElse
         // FIXME: Shouldn’t be creating fresh MongoExceptions
+        errs.headOption.map(msg => fail[ServerVersion](new MongoException(msg))) getOrElse
         fail(new MongoException("No database found."))
     }
 
@@ -320,29 +324,30 @@ object MongoDbIO {
     def decodeField(s: String): BsonField = BsonField.Name(s)
 
     val decodeType: PartialFunction[java.lang.Object, IndexType] = {
-      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending
-      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending
-      case "hashed"                                => IndexType.Hashed
+      case x: java.lang.Number if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Number if x.intValue ≟ -1 => IndexType.Descending
+      case "hashed"                               => IndexType.Hashed
     }
 
     def decodeIndex(doc: Document): Option[Index] =
-      (for {
-        name <- Option(doc.get("name")).flatMap {
-                  case s: String => s.some
-                  case _ => None
-                }
-        keys <- Option(doc.get("key")).flatMap {
-                  case kd: Document =>
-                    kd.asScala.toList.toNel.flatMap(_.traverse {
-                      case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
-                    })
-                  case _ => None
-                }
-        unique = Option(doc.get("unique")).map {
-          case java.lang.Boolean.TRUE => true
-          case _                      => false
-        }.getOrElse(false)
-      } yield Index(name, keys, unique))
+      (Option(doc.get("name")).flatMap {
+        case s: String => s.some
+        case _ => None
+      } ⊛
+        Option(doc.get("key")).flatMap {
+          case kd: Document =>
+            kd.asScala.toList.toNel.flatMap(_.traverse {
+              case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
+            })
+          case _ => None
+        })(Index(
+          _,
+          _,
+          Option(doc.get("unique")).fold(
+            false) {
+            case java.lang.Boolean.TRUE => true
+            case _                      => false
+          }))
 
     collection(coll)
       .flatMap(c => collect[Document](c.listIndexes))
@@ -352,15 +357,9 @@ object MongoDbIO {
   def fail[A](t: Throwable): MongoDbIO[A] =
     liftTask(Task.fail(t))
 
-  def runNT(client: MongoClient): MongoDbIO ~> Task =
-    new (MongoDbIO ~> Task) {
-      def apply[A](m: MongoDbIO[A]) = m.run(client)
-    }
+  def runNT(client: MongoClient) = λ[MongoDbIO ~> Task](_ run client)
 
-  val liftTask: Task ~> MongoDbIO =
-    new (Task ~> MongoDbIO) {
-      def apply[A](t: Task[A]) = lift(_ => t)
-    }
+  val liftTask = λ[Task ~> MongoDbIO](t => lift(_ => t))
 
   /** Returns the underlying, configured aggregate iterable for applying the
     * given pipeline to the source collection.

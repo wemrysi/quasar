@@ -36,7 +36,7 @@ import quasar.Predef._
 import quasar.Variables
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
-import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.sql.Sql
 
@@ -70,6 +70,9 @@ object Mounting {
     extends Mounting[MountingError \/ Unit]
 
   final case class Unmount(path: APath)
+    extends Mounting[MountingError \/ Unit]
+
+  final case class Remount[T](from: Path[Abs,T,Sandboxed], to: Path[Abs,T,Sandboxed])
     extends Mounting[MountingError \/ Unit]
 
   /** Indicates the wrong type of path (file vs. dir) was supplied to the `mount`
@@ -159,18 +162,6 @@ object Mounting {
       }
     }
 
-    /** Remount `src` at `dst`, results in an error if there is no mount at
-      * `src`.
-      */
-    def remount[T](
-      src: Path[Abs,T,Sandboxed],
-      dst: Path[Abs,T,Sandboxed]
-    )(implicit
-      S0: MountingFailure :<: S,
-      S1: PathMismatchFailure :<: S
-    ): F[Unit] =
-      modify(src, dst, ι).void
-
     /** Replace the mount at the given path with one described by the
       * provided config.
       */
@@ -187,11 +178,22 @@ object Mounting {
     def unmount(path: APath)(implicit S0: MountingFailure :<: S): F[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Unmount(path)))
 
+    /** Remount `src` at `dst`, results in an error if there is no mount at
+      * `src`.
+      */
+    def remount[T](
+      src: Path[Abs,T,Sandboxed],
+      dst: Path[Abs,T,Sandboxed]
+    )(implicit S0: MountingFailure :<: S): F[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(Remount(src, dst)))
+
     ////
 
     private val notFound: Prism[MountingError, APath] =
       MountingError.pathError composePrism PathError.pathNotFound
 
+    // TODO: look at this for comprehension more closely
+    @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
     private def modify[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],

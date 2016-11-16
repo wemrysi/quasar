@@ -17,17 +17,22 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.std.StdLibTestRunner.genPrintableAscii
 
-import org.scalacheck.{Arbitrary, Gen}, Arbitrary._
+import org.scalacheck.Arbitrary._
+import scalaz._, Scalaz._
 
 /** Defines the domains of values for which the MongoDb connector is expected
   * to behave properly. May be mixed in when implementing `StdLibTestRunner`.
 */
 trait MongoDbDomain {
-  val intDomain = arbitrary[Long].map(BigInt(_))
+  // NB: in the pipeline, the entire 64-bit range works, but in map-reduce,
+  // only about 53 bits of integer resolution are available.
+  // TODO: use `Long` in the Expr test, and this domain for JS.
+  val intDomain = arbitrary[Int].filter(_ ≠ Int.MinValue).map(BigInt(_))
   val decDomain = arbitrary[Double].map(BigDecimal(_))
 
-  // NB: restricted to ASCII only because most functions are not well-defined
-  // for the rest (e.g. $toLower, $toUpper, $substr)
-  val stringDomain = Gen.listOf(Gen.choose('\u0000', '\u007f')).map(_.mkString)
+  // NB: restricted to printable ASCII only because most functions are not
+  // well-defined for the rest (e.g. $toLower, $toUpper, $substr)
+  val stringDomain = genPrintableAscii
 }

@@ -23,18 +23,12 @@ import scala.{runtime => R}
 
 object Predef extends Predef
 
-class Predef extends LowPriorityImplicits {
+class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with quasar.pkg.PackageMethods {
   /** The typelevel Predef additions which makes literal
    *  types more reasonable to use.
    */
   type ValueOf[A]                           = scala.ValueOf[A]
   def valueOf[A](implicit z: ValueOf[A]): A = z.value
-
-  /** An endomorphism is a mapping from a category to itself.
-   *  It looks like scalaz already staked out "Endo" for the
-   *  lower version.
-   */
-  type EndoK[F[X]] = scalaz.NaturalTransformation[F, F]
 
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec
@@ -82,28 +76,20 @@ class Predef extends LowPriorityImplicits {
   val  Stream     = I.Stream
   val  #::        = Stream.#::
 
-  type inline = scala.inline
-
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def ??? : Nothing = throw new java.lang.RuntimeException("not implemented")
 
-  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
-  implicit def $conforms[A]: P.<:<[A, A] = P.$conforms[A]
-  implicit def ArrowAssoc[A]: A => P.ArrowAssoc[A] = P.ArrowAssoc[A] _
-  implicit def augmentString(x: String): I.StringOps = P.augmentString(x)
-  implicit def genericArrayOps[T]: Array[T] => C.mutable.ArrayOps[T] =
-    P.genericArrayOps[T] _
-  implicit val wrapString: String => I.WrappedString = P.wrapString _
-  implicit val unwrapString: I.WrappedString => String = P.unwrapString _
-  @inline implicit val booleanWrapper: Boolean => R.RichBoolean =
-    P.booleanWrapper _
-  @inline implicit val charWrapper: Char => R.RichChar = P.charWrapper _
-  @inline implicit val intWrapper: Int => R.RichInt = P.intWrapper _
-  @inline implicit val doubleWrapper: Double => R.RichDouble = P.doubleWrapper _
+  implicit def genericArrayOps[T]: Array[T] => C.mutable.ArrayOps[T] = P.genericArrayOps[T] _
+
+  @inline implicit def wrapString(x: String): I.WrappedString    = P.wrapString(x)
+  @inline implicit def unwrapString(x: I.WrappedString): String  = P.unwrapString(x)
+  @inline implicit def booleanWrapper(x: Boolean): R.RichBoolean = P.booleanWrapper(x)
+  @inline implicit def charWrapper(x: Char): R.RichChar          = P.charWrapper(x)
+  @inline implicit def intWrapper(x: Int): R.RichInt             = P.intWrapper(x)
+  @inline implicit def doubleWrapper(x: Double): R.RichDouble    = P.doubleWrapper(x)
 
   // would rather not have these, but …
   def print(x: scala.Any)   = scala.Console.print(x)
-  def println()             = scala.Console.println()
   def println(x: scala.Any) = scala.Console.println(x)
   // Need these often to avoid bad inference
   type Product = scala.Product
@@ -124,7 +110,8 @@ class Predef extends LowPriorityImplicits {
 }
 
 abstract class LowPriorityImplicits {
-  implicit def genericWrapArray[T]:
-      scala.Array[T] => C.mutable.WrappedArray[T] =
-    P.genericWrapArray[T] _
+  self: Predef =>
+
+  @inline implicit def augmentString(x: String): I.StringOps               = P.augmentString(x)
+  implicit def genericWrapArray[T](x: Array[T]): C.mutable.WrappedArray[T] = P.genericWrapArray[T](x)
 }

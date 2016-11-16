@@ -18,6 +18,7 @@ package quasar.fp
 
 import quasar.Predef._
 import quasar.RenderTree
+import quasar.fp.ski._
 
 import monocle.Iso
 import scalaz._
@@ -29,7 +30,7 @@ import scalaz._
   */
 sealed abstract class ExternallyManaged
 
-case object Extern extends ExternallyManaged
+final case object Extern extends ExternallyManaged
 
 object ExternallyManaged {
   def unit = Iso[ExternallyManaged, Unit](κ(()))(κ(Extern))

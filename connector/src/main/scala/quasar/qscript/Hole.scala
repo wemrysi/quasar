@@ -17,7 +17,8 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.fp._
+import quasar.fp.ski._
+import quasar.{RenderTree, Terminal}
 
 import monocle.Iso
 import scalaz._
@@ -31,4 +32,5 @@ object Hole {
 
   implicit val equal: Equal[Hole] = Equal.equalRef
   implicit val show: Show[Hole] = Show.showFromToString
+  implicit val renderTree: RenderTree[Hole] = RenderTree.make(κ(Terminal(List("○"), None)))
 }

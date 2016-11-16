@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -123,10 +124,8 @@ object SimplifyJoin {
           : QScriptCore[T, T[H]] => H[T[H]] = fa => GtoH(QC.inj(fa match {
             case Union(src, lb, rb) =>
               Union(src, applyToBranch(lb), applyToBranch(rb))
-            case Drop(src, lb, rb) =>
-              Drop(src, applyToBranch(lb), applyToBranch(rb))
-            case Take(src, lb, rb) =>
-              Take(src, applyToBranch(lb), applyToBranch(rb))
+            case Subset(src, lb, sel, rb) =>
+              Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
             case _ => fa
           }))
     }

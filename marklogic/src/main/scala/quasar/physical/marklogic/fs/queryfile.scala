@@ -17,23 +17,25 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan, Planner => QPlanner}
-import quasar.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.RenderTree.ops._
-import quasar.SKI.κ
+import quasar.{Data, Planner => QPlanner}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
-import quasar.fp._
-import quasar.fp.eitherT._
+import quasar.fp._, eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
+import quasar.frontend.logicalplan.{constant, LogicalPlan}
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xml.NCName
+import quasar.physical.marklogic.xquery._, expr._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
+import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
 import scalaz._, Scalaz._, concurrent._
 
@@ -41,8 +43,8 @@ object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
   import MarkLogicPlanner._, MarkLogicPlannerError._
+  import FunctionDecl.FunctionDecl3
 
-  // TODO: Still need to implement ExecutePlan.
   def interpret[S[_]](
     resultsChunkSize: Positive
   )(implicit
@@ -52,30 +54,28 @@ object queryfile {
     S3: MLResultHandles :<: S,
     S4: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] = {
-    def plannedLP[A](
-      lp: Fix[LogicalPlan])(
-      f: MainModule => ContentSourceIO[A]
-    ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
-      type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type MLQScript0[A]     = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
-      type MLQScript[A]      = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
-      implicit val mlQScripToQScriptTotal: Injectable.Aux[MLQScript, QScriptTotal[Fix, ?]] =
-        Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-          Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-            Injectable.inject[Const[ShiftedRead[AFile], ?], QScriptTotal[Fix, ?]]))
-      type MLPlan[A]         = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
-      type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
-      type QSR[A]            = QScriptRead[Fix, A]
+    type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+    type PrologsT[F[_], A] = WriterT[F, Prologs, A]
+
+    def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
+      lift(fa).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
+
+    def lpToXQuery(lp: Fix[LogicalPlan]): QPlan[MainModule] = {
+      type MLQScript[A] = QScriptShiftRead[Fix, AFile, A]
+      type MLPlan[A]    = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+      type QSR[A]       = QScriptRead[Fix, APath, A]
+      type QSSR[A]       = QScriptShiftRead[Fix, APath, A]
+
+      implicit val marklogicQScriptToQSTotal: Injectable.Aux[MLQScript, QScriptTotal[Fix, ?]] =
+        ::\::[QScriptCore[Fix, ?]](::/::[Fix, ThetaJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
-      val optimize = new Optimize[Fix]
+      val rewrite = new Rewrite[Fix]
+      val C = Coalesce[Fix, MLQScript, MLQScript]
 
-      def phase(main: MainModule): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", main.render))
-
-      val listContents: DiscoverPath.ListContents[QPlan] =
-        adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
+      def logPhase(pr: PhaseResult): QPlan[Unit] =
+        MonadTell[QPlan, PhaseResults].tell(Vector(pr))
 
       def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
         qs.cataM(MarkLogicPlanner[MLPlan, MLQScript].plan).run map {
@@ -85,41 +85,99 @@ object queryfile {
       val linearize: Algebra[MLQScript, List[MLQScript[ExternallyManaged]]] =
         qsr => qsr.as[ExternallyManaged](Extern) :: Foldable[MLQScript].fold(qsr)
 
-      val planning = for {
-        qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
-        shifted <- transFutu(qs)(ShiftRead[Fix, QSR, MLQScript0].shiftRead(idPrism.reverseGet)(_: QSR[Fix[QSR]]))
-                     .transCataM(ExpandDirs[Fix, MLQScript0, MLQScript].expandDirs(idPrism.reverseGet, listContents)) ∘
-                     (_.transCata(optimize.applyAll))
-        shftdRT =  shifted.cata(linearize).reverse.render
-        _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
-                     PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
-        mod     <- plan(shifted).leftMap(mlerr => mlerr match {
+      for {
+        qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
+        shifted <- shiftRead[Fix](qs)
+                     // TODO: Eliminate this once the filesystem implementation
+                     //       is updated
+                     .transCataM(ExpandDirs[Fix, QSSR, MLQScript].expandDirs(idPrism.reverseGet, d => liftQP(ops.ls(d))))
+        _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
+        optmzed =  shifted
+                     .transAna(
+                       repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
+                       repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
+                       repeatedly(C.coalesceSR[MLQScript, AFile](idPrism)) ⋙
+                       repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
+                     .transCata(rewrite.optimize(reflNT))
+
+        _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
+        main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
                        FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
                          // TODO: Change to include the QScript context when supported
-                         LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+                         constant(Data.Str(s)), Some(mlerr.shows)))
 
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
                    })
-        a       <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
-      } yield a
-
-      planning.run.run
+        _       <- logPhase(PhaseResult.detail("XQuery", main.render))
+      } yield main
     }
 
-    // FIXME: Actually write-back to MarkLogic
-    def exec(lp: Fix[LogicalPlan], out: AFile) =
-      plannedLP(lp)(κ(out.point[ContentSourceIO]))
+    val lpadToLength: FunctionDecl3 =
+      declareLocal(NCName("lpad-to-length"))(
+        $("padchar") as SequenceType("xs:string"),
+        $("length")  as SequenceType("xs:integer"),
+        $("str")     as SequenceType("xs:string")
+      ).as(SequenceType("xs:string")) { (padchar, length, str) =>
+        val (slen, padct, prefix) = ($("slen"), $("padct"), $("prefix"))
+        let_(
+          slen   := fn.stringLength(str),
+          padct  := fn.max(mkSeq_("0".xqy, length - (~slen))),
+          prefix := fn.stringJoin(for_($("_") in (1.xqy to ~padct)) return_ padchar, "".xs))
+        .return_(
+          fn.concat(~prefix, str))
+      }
+
+    def saveTo[F[_]: QNameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
+      val dstDirUri = pathUri(asDir(dst))
+
+      for {
+        ts     <- freshName[F]
+        i      <- freshName[F]
+        result <- freshName[F]
+        fname  <- freshName[F]
+        now    <- qscript.secondsSinceEpoch[F].apply(fn.currentDateTime)
+        dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
+      } yield {
+        let_(
+          ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
+          $("_") := xdmp.directoryCreate(dstDirUri.xs))
+        .return_ {
+          for_(
+            result at i in mkSeq_(results))
+          .let_(
+            fname := fn.concat(dstDirUri.xs, ~ts, dpart))
+          .return_(
+            xdmp.documentInsert(~fname, ~result))
+        }
+      }
+    }
+
+    def exec(lp: Fix[LogicalPlan], out: AFile) = {
+      import MainModule._
+
+      def saveResults(mm: MainModule): QPlan[MainModule] =
+        saveTo[PrologsT[QPlan, ?]](out, mm.queryBody).run map {
+          case (plogs, body) =>
+            (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
+        }
+
+      (lpToXQuery(lp) >>= saveResults >>= (mm => liftQP(SessionIO.executeModule_(mm))))
+        .as(out).run.run
+    }
 
     def eval(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(main =>
+      lpToXQuery(lp).flatMap(main => liftQP(
         ContentSourceIO.resultCursor(
           SessionIO.evaluateModule_(main),
-          resultsChunkSize))
+          resultsChunkSize)
+      )).run.run
 
     def explain(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(main => ExecutionPlan(FsType, main.render).point[ContentSourceIO])
+      lpToXQuery(lp)
+        .map(main => ExecutionPlan(FsType, main.render))
+        .run.run
 
     def exists(file: AFile): Free[S, Boolean] =
       lift(ops.exists(file)).into[S]

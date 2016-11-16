@@ -17,14 +17,14 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.SKI._
-import quasar.{EnvironmentError, EnvErrT}
+import quasar.connector.{EnvironmentError, EnvErrT}
+import quasar.fp.ski._
 import quasar.fs._
+import quasar.physical.mongodb.MapReduce._
 import quasar.physical.mongodb.execution._
 import quasar.physical.mongodb.mongoiterable._
 import quasar.physical.mongodb.workflow.$SortF
 import quasar.physical.mongodb.workflowtask._
-import MapReduce._
 
 import java.lang.{Boolean => JBoolean}
 import scala.Predef.classOf
@@ -113,9 +113,6 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
 
 private[mongodb] object MongoDbIOWorkflowExecutor {
   import EnvironmentError._
-
-  /** The minimum MongoDbIO version required to be able to execute `Workflow`s. */
-  val MinMongoDbVersion = List(2, 6, 0)
 
   /** Catch MongoExceptions and attempt to convert to EnvironmentError. */
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =
