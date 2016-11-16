@@ -23,6 +23,7 @@ import quasar.physical.marklogic.xml.namespaces._
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
+import eu.timepit.refined.api.Refined
 import scalaz.IList
 import scalaz.syntax.monad._
 
@@ -107,6 +108,30 @@ object qscript {
         }
       }
     })
+
+  // qscript:comp-eq($x as item()*, $y as item()*) as xs:boolean?
+  def compEq[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("eq", _ eq _, fn.False)
+
+  // qscript:comp-ne($x as item()*, $y as item()*) as xs:boolean?
+  def compNe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("ne", _ ne _, fn.True)
+
+  // qscript:comp-lt($x as item()*, $y as item()*) as xs:boolean?
+  def compLt[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("lt", _ lt _, emptySeq)
+
+  // qscript:comp-le($x as item()*, $y as item()*) as xs:boolean?
+  def compLe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("le", _ le _, emptySeq)
+
+  // qscript:comp-gt($x as item()*, $y as item()*) as xs:boolean?
+  def compGt[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("gt", _ gt _, emptySeq)
+
+  // qscript:comp-ge($x as item()*, $y as item()*) as xs:boolean?
+  def compGe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("ge", _ ge _, emptySeq)
 
   // qscript:delete-field($src as element(), $field as xs:QName) as element()
   def deleteField[F[_]: PrologW]: F[FunctionDecl2] =
@@ -333,5 +358,26 @@ object qscript {
                    .return_(kvEnt)
         zMap    <- ejson.mkObject[F] apply entries
       } yield zMap
+    })
+
+  ////
+
+  private def mkComparisonFunction[F[_]: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
+    qs.declare(Refined.unsafeApply(s"comp-$opName")) flatMap (_(
+      $("x") as ST.Top,
+      $("y") as ST.Top
+    ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
+      (asDateTime[F].apply(x) |@| asDateTime[F].apply(y))((xdt, ydt) =>
+        try_ {
+          if_(
+            isCastable(x, ST("xs:date"))     or
+            isCastable(y, ST("xs:date"))     or
+            isCastable(x, ST("xs:dateTime")) or
+            isCastable(y, ST("xs:dateTime")))
+          .then_ { op(xdt, ydt) }
+          .else_ { op(x, y) }
+        } .catch_($("_")) { _ =>
+          recover
+        })
     })
 }

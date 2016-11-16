@@ -88,7 +88,9 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
       for {
         x        <- freshName[F]
         xqyOrder <- NonEmptyList((bucket, SortDir.Ascending), order: _*).traverse { case (func, sortDir) =>
-                      mapFuncXQuery(func, ~x) strengthR SortDirection.fromQScript(sortDir)
+                      mapFuncXQuery(func, ~x) flatMap { by =>
+                        ejson.castAsAscribed[F].apply(by) strengthR SortDirection.fromQScript(sortDir)
+                      }
                     }
       } yield src match {
         case IterativeFlwor(bindings, filter, _, _, result) =>
@@ -108,7 +110,6 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
     case Filter(src, f) =>
       for {
         x <- freshName[F]
-        // FIXME: This cast shouldn't be necessary once projecting produces typed values.
         p <- mapFuncXQuery(f, ~x) map (xs.boolean)
       } yield src match {
         case IterativeFlwor(bindings, filter, order, isStable, result) =>
@@ -158,13 +159,16 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
     } yield func(acc.render, x.render)(nxt)
   }
 
+  def castingCombiner(fm: FreeMap[T])(f: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
+    combiner(fm)((acc, x) => ejson.castAsAscribed[F].apply(x) flatMap (f(acc, _)))
+
   def reduceFuncInit(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
     case Avg(fm)              => fx(x => mapFuncXQuery[T, F](fm, x) flatMap { v =>
                                    qscript.incAvgState[F].apply(1.xqy, v)
                                  })
     case Count(_)             => fx(_ => 1.xqy.point[F])
-    case Max(fm)              => fx(mapFuncXQuery[T, F](fm, _))
-    case Min(fm)              => fx(mapFuncXQuery[T, F](fm, _))
+    case Max(fm)              => fx(x => (ejson.castAsAscribed[F] |@| mapFuncXQuery[T, F](fm, x))(_ apply _).join)
+    case Min(fm)              => fx(x => (ejson.castAsAscribed[F] |@| mapFuncXQuery[T, F](fm, x))(_ apply _).join)
     case Sum(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F](fm, _))
     case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.singletonArray[F].apply(_)))
@@ -184,8 +188,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
     case Avg(fm)              => combiner(fm)(qscript.incAvg[F].apply(_, _))
     case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
-    case Max(fm)              => combiner(fm)((x, y) => (if_ (y gt x) then_ y else_ x).point[F])
-    case Min(fm)              => combiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
+    case Max(fm)              => castingCombiner(fm)((x, y) => (if_ (y gt x) then_ y else_ x).point[F])
+    case Min(fm)              => castingCombiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
     case Sum(fm)              => combiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
     case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
     case UnshiftArray(fm)     => combiner(fm)(ejson.arrayAppend[F].apply(_, _))
