@@ -73,6 +73,8 @@ abstract class StdLibSpec extends Qspec {
     "StringLib" >> {
       import StringLib._
 
+      // TODO: This may need to move to a more general section in order to also include
+      //       Array || Array, String || Array, Array || String
       "Concat" >> {
         "any strings" >> prop { (str1: String, str2: String) =>
           binary(Concat(_, _).embed, Data.Str(str1), Data.Str(str2), Data.Str(str1 + str2))

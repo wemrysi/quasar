@@ -31,7 +31,7 @@ import scalaz.syntax.monad._
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object qscript {
   import syntax._, expr._, axes.{attribute, child}
-  import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl5}
+  import FunctionDecl._
 
   val qs     = NamespaceDecl(qscriptNs)
   val errorN = qs name qscriptError.local
@@ -316,6 +316,24 @@ object qscript {
             finalize fnapply (map.get(~m, ~k))
           }
         }
+      }
+    })
+
+  // NB: Copied from StringLib.safeSubstring
+  // qscript:safe-substring($str as xs:string?, $start as xs:integer?, $length as xs:integer?) as xs:string?
+  def safeSubstring[F[_]: PrologW]: F[FunctionDecl3] =
+    qs.declare("safe-substring") map (_(
+      $("str")    as ST("xs:string?"),
+      $("start")  as ST("xs:integer?"),
+      $("length") as ST("xs:integer?")
+    ).as(ST("xs:string?")) { (str: XQuery, start: XQuery, length: XQuery) =>
+      val l = $("l")
+      let_(l := fn.stringLength(str)) return_ {
+        if_((start lt 1.xqy) or (start gt ~l))
+        .then_ { "".xs }
+        .else_(if_(length lt 0.xqy)
+        .then_ { fn.substring(str, start, Some(~l)) }
+        .else_ { fn.substring(str, start, Some(length)) })
       }
     })
 
