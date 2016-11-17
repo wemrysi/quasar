@@ -92,11 +92,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
-
-    testSql2ToN1ql(
-      "select name from `beer-sample` limit 1",
-      """select value v from (select value _4 from (select value _2[0:least(array_length(_2), _1[0])] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest _3 _4) as v""")
+      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest ifnull(_3, { "$na": null }) _4) as v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
@@ -113,36 +109,6 @@ class BasicQueryEnablementSpec
 
   "QScript to N1QL" should {
 
-    "convert a squashed read" in {
-      // select * from foo
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            ExcludeId,
-            Free.point(RightSide))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= "select value v from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as v"
-    }
-
-    "convert a simple projection" in {
-      // select zed from foo
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            ExcludeId,
-            ProjectFieldR(Free.point(RightSide), StrLit("zed")))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= """select value v from (select value _2.["zed"] from (select value _0 from (select value ifmissing(v.`value`, v) from `foo` v) as _1 unnest _1 as _0) as _2) as v"""
-    }
-
     "read followed by a map" in {
       // select (a + b) from foo
       val qs =
@@ -156,48 +122,6 @@ class BasicQueryEnablementSpec
       val n1ql = n1qlFromQS(qs)
 
       n1ql must_= """select value v from (select value (_0.["a"] + _0.["b"]) from (select value ifmissing(v.`value`, v) from `foo` v) as _0) as v"""
-    }
-
-    "convert a basic reduction" in {
-      // select sum(height) from person
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("person"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            ExcludeId,
-            ProjectFieldR(
-              Free.point(RightSide),
-              StrLit("height")))),
-          QCT.inj(Reduce((),
-            NullLit(), // reduce on a constant bucket, which is normalized to Null
-            List(ReduceFuncs.Sum[FreeMap](HoleF)),
-            Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= """select value v from (select value object_add({}, "0", sum(_3)) from (select value _2.["height"] from (select value _0 from (select value ifmissing(v.`value`, v) from `person` v) as _1 unnest _1 as _0) as _2) as _3) as v"""
-    }
-
-    "convert a flatten array" in {
-      // select loc[:*] from zips
-      val qs =
-        chain[Fix, QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("zips"), ExcludeId))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            ExcludeId,
-            ProjectFieldR(
-              Free.point(RightSide),
-              StrLit("loc")))),
-          QCT.inj(LeftShift((),
-            HoleF,
-            ExcludeId,
-            Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))))
-
-      val n1ql = n1qlFromQS(qs)
-
-      n1ql must_= """select value v from (select value object_add({}, "loc", (select value _3 from (select value _2.["loc"] from (select value _0 from (select value ifmissing(v.`value`, v) from `zips` v) as _1 unnest _1 as _0) as _2) as _4 unnest _4 as _3))) as v"""
     }
   }
 

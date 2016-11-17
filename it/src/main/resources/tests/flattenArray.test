@@ -1,8 +1,9 @@
 {
     "name": "flatten array",
     "backends": {
-        "postgresql": "pending",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+        "marklogic":  "skip",
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips",
