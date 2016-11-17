@@ -2,8 +2,7 @@
     "name": "convert null to/from strings",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "nulls.data",
     "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",

@@ -46,7 +46,11 @@ class ResultFileQueryRegressionSpec
     for {
       tmpFile <- hoistM(manage.tempFile(DataDir)).liftM[Process]
       outFile <- fsQ.executeQuery(expr, vars, basePath, tmpFile).liftM[Process]
-      cleanup =  hoistM(manage.delete(tmpFile)).whenM(outFile ≟ tmpFile)
+      cleanup =  hoistM(
+                   query.fileExists(tmpFile).liftM[FileSystemErrT].ifM(
+                     manage.delete(tmpFile),
+                     ().point[M])
+                 ).whenM(outFile ≟ tmpFile)
       data    <- read.scanAll(outFile)
                    .translate(hoistM)
                    .onComplete(Process.eval_(cleanup))

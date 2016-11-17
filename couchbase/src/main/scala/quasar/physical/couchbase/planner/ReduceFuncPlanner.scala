@@ -51,7 +51,15 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
     case Sum(a)           =>
       partialQueryString(s"sum(${n1ql(a)})").point[M]
     case UnshiftArray(a)  =>
-      partialQueryString(s"array_agg(${n1ql(a)})").point[M]
+      val aN1ql   = n1ql(a)
+      val n1qlStr = s"array_agg($aN1ql)"
+      prtell[M](Vector(detail(
+        "N1QL UnshiftArray",
+        s"""  a:    $aN1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case UnshiftMap(k, v) =>
       val kN1ql   = n1ql(k)
       val vN1ql   = n1ql(v)
