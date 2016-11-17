@@ -147,29 +147,26 @@ trait CoalesceInstances {
 class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
   private def CoalesceTotal = Coalesce[T, QScriptTotal, QScriptTotal]
 
-  private def freeQC(branch: FreeQS): FreeQS =
+  private type QST = QScriptTotal[T[CoEnv[Hole, QScriptTotal, ?]]]
+  private type CoEnvQST[A] = CoEnv[Hole, QScriptTotal, A]
+
+  private def freeTotal(branch: FreeQS)(coalesce: QST => Option[QST]): FreeQS =
     freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
       co.run.fold(
         κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))(in).right)))
+        in => CoEnv(repeatedly(coalesce)(in).right)))
+
+  private def freeQC(branch: FreeQS): FreeQS =
+    freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
 
   private def freeSR(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceSR(coenvPrism[QScriptTotal, Hole]))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceSR(coenvPrism[QScriptTotal, Hole]))
 
   private def freeEJ(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def freeTJ(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def ifNeq(f: FreeQS => FreeQS): FreeQS => Option[FreeQS] =
     branch => {
