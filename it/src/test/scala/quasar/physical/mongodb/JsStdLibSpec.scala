@@ -55,6 +55,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _)         => Skipped("TODO").left
     case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
+    case (structural.ArrayConcat, _)   => Skipped("TODO").left
+
     case _                  => ().right
   }
 

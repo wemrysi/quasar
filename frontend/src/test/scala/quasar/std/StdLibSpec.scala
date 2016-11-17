@@ -20,12 +20,14 @@ import quasar.Predef._
 import quasar.{Data, Qspec, Type}
 import quasar.frontend.logicalplan._
 
-import matryoshka._
-import org.specs2.execute._
-import org.specs2.matcher._
+import scala.math.abs
+
+import matryoshka.Fix
+import org.specs2.execute.Result
+import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
-import scala.math.abs
+import scalaz.Equal
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
@@ -43,7 +45,7 @@ abstract class StdLibSpec extends Qspec {
             s"$x is a Number and matches $exp",
             s"$x is a Number but does not match $exp", s)
         case _ =>
-          result(v == expected,
+          result(Equal[Data].equal(v, expected),
             s"$v matches $expected",
             s"$v does not match $expected", s)
       }
@@ -73,8 +75,6 @@ abstract class StdLibSpec extends Qspec {
     "StringLib" >> {
       import StringLib._
 
-      // TODO: This may need to move to a more general section in order to also include
-      //       Array || Array, String || Array, Array || String
       "Concat" >> {
         "any strings" >> prop { (str1: String, str2: String) =>
           binary(Concat(_, _).embed, Data.Str(str1), Data.Str(str2), Data.Str(str1 + str2))
@@ -1004,6 +1004,35 @@ abstract class StdLibSpec extends Qspec {
 
         "false" >> prop { (x: Data, y: Data) =>
           ternary(Cond(_, _, _).embed, Data.Bool(false), x, y, y)
+        }
+      }
+    }
+
+    "StructuralLib" >> {
+      import StructuralLib._
+
+      // FIXME: No idea why this is necessary, but ScalaCheck arbContainer
+      //        demands it and can't seem to find one in this context.
+      implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
+
+      "ArrayConcat" >> {
+        "array  || array" >> prop { (xs: List[String], ys: List[String]) =>
+          val (xstrs, ystrs) = (xs map (Data._str(_)), ys map (Data._str(_)))
+          binary(ArrayConcat(_, _).embed, Data._arr(xstrs), Data._arr(ystrs), Data._arr(xstrs ::: ystrs))
+        }
+
+        "array  || string" >> prop { (xs: List[String], y: String) =>
+          val (xstrs, ystrs) = (xs map (Data._str(_)), y.toList map (c => Data._str(c.toString)))
+          binary(ArrayConcat(_, _).embed, Data._arr(xstrs), Data._str(y), Data._arr(xstrs ::: ystrs))
+        }
+
+        "string || array" >> prop { (x: String, ys: List[String]) =>
+          val (xstrs, ystrs) = (x.toList map (c => Data._str(c.toString)), ys map (Data._str(_)))
+          binary(ArrayConcat(_, _).embed, Data._str(x), Data._arr(ystrs), Data._arr(xstrs ::: ystrs))
+        }
+
+        "string || string" >> prop { (x: String, y: String) =>
+          binary(ArrayConcat(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
         }
       }
     }
