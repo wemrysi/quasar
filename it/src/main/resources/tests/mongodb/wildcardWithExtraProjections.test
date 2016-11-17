@@ -6,8 +6,8 @@
     "marklogic":         "skip",
     "couchbase":         "skip"
   },
-  "data": "zips.data",
-  "query": "select *, concat(city, concat(\", \", state)), city = \"BOULDER\" from zips where city like \"BOULDER%\"",
+  "data": "../zips.data",
+  "query": "select *, concat(city, concat(\", \", state)), city = \"BOULDER\" from `../zips` where city like \"BOULDER%\"",
   "predicate": "containsExactly",
   "expected": [
     { "value": {  "_id": "80301", "city": "BOULDER",          "loc": [ -105.21426, 40.049733 ],  "pop": 18174.0, "state": "CO", "1": "BOULDER, CO",          "2": true  } },
