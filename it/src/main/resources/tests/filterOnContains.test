@@ -11,6 +11,6 @@
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",
     "predicate": "equalsExactly",
-    "ignoreFieldOrder": [ "couchbase" ],
+    "ignoreFieldOrder": [ "marklogic" ],
     "expected": [{ "city": "CANDIA", "state": "NH", "pop": 3557, "_id":"03034", "loc": [-71.304857, 43.058514] }]
 }

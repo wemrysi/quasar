@@ -18,14 +18,13 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.Data
-import quasar.{ejson => ejs}
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs_}
 import quasar.physical.marklogic.prisms._
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.refineV
-import matryoshka._
+import matryoshka.AlgebraM
 import scalaz._, Scalaz._
 
 trait EncodeXQuery[M[_], F[_]] {
@@ -39,35 +38,6 @@ object EncodeXQuery {
     new EncodeXQuery[M, Coproduct[F, G, ?]] {
       val encodeXQuery: AlgebraM[M, Coproduct[F, G, ?], XQuery] =
         _.run.fold(F.encodeXQuery, G.encodeXQuery)
-    }
-
-  implicit def commonEncodeXQuery[M[_]: PrologW]: EncodeXQuery[M, ejs.Common] =
-    new EncodeXQuery[M, ejs.Common] {
-      val encodeXQuery: AlgebraM[M, ejs.Common, XQuery] = {
-        case ejs.Arr(xs) => ejson.seqToArray_[M](mkSeq(xs))
-        case ejs.Null()  => ejson.null_[M]
-        case ejs.Bool(b) => b.fold(fn.True, fn.False).point[M]
-        case ejs.Str(s)  => s.xs.point[M]
-        case ejs.Dec(d)  => xs.double(d.toString.xqy).point[M]
-      }
-    }
-
-  implicit def extensionEncodeXQuery[M[_]: PrologW: MonadErrMsgs_]: EncodeXQuery[M, ejs.Extension] =
-    new EncodeXQuery[M, ejs.Extension] {
-      val encodeXQuery: AlgebraM[M, ejs.Extension, XQuery] = {
-        // TODO: We'd like to be able to deconstruct 'meta' to see if it was a stringly-keyd map or some
-        //       atomic type that we could turn into attributes.
-        //
-        // TODO: We likely have to deal with the ejs encoding of Data used in the LP -> QScript conversion
-        //       so this may be needed sooner than later?
-        case ejs.Meta(value, meta) => value.point[M]
-        case ejs.Map(entries)      => objAsXQuery(entries)(XQuery.stringLit.getOption, _.point[M])
-        case ejs.Byte(b)           => xs.byte(b.toInt.xqy).point[M]
-        case ejs.Char(c)           => c.toString.xs.point[M]
-        // TODO: There appears to be a limit on integers in MarkLogic, find out what it is
-        //       and validate `i`.
-        case ejs.Int(i)            => xs.integer(i.toString.xqy).point[M]
-      }
     }
 
   implicit def dataEncodeXQuery[M[_]: PrologW: MonadErrMsgs_]: EncodeXQuery[M, Const[Data, ?]] =

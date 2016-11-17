@@ -2,8 +2,7 @@
   "name": "many simple projections (order matters)",
 
   "backends": {
-    "postgresql": "pending",
-    "marklogic":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "zips.data",
