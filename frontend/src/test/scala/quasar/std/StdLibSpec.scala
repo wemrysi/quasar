@@ -1015,24 +1015,24 @@ abstract class StdLibSpec extends Qspec {
       //        demands it and can't seem to find one in this context.
       implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
 
-      "ArrayConcat" >> {
-        "array  || array" >> prop { (xs: List[String], ys: List[String]) =>
-          val (xstrs, ystrs) = (xs map (Data._str(_)), ys map (Data._str(_)))
-          binary(ArrayConcat(_, _).embed, Data._arr(xstrs), Data._arr(ystrs), Data._arr(xstrs ::: ystrs))
+      "ConcatOp" >> {
+        "array  || array" >> prop { (xs: List[BigInt], ys: List[BigInt]) =>
+          val (xints, yints) = (xs map (Data._int(_)), ys map (Data._int(_)))
+          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._arr(yints), Data._arr(xints ::: yints))
         }
 
-        "array  || string" >> prop { (xs: List[String], y: String) =>
-          val (xstrs, ystrs) = (xs map (Data._str(_)), y.toList map (c => Data._str(c.toString)))
-          binary(ArrayConcat(_, _).embed, Data._arr(xstrs), Data._str(y), Data._arr(xstrs ::: ystrs))
+        "array  || string" >> prop { (xs: List[BigInt], y: String) =>
+          val (xints, ystrs) = (xs map (Data._int(_)), y.toList map (c => Data._str(c.toString)))
+          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._str(y), Data._arr(xints ::: ystrs))
         }
 
-        "string || array" >> prop { (x: String, ys: List[String]) =>
-          val (xstrs, ystrs) = (x.toList map (c => Data._str(c.toString)), ys map (Data._str(_)))
-          binary(ArrayConcat(_, _).embed, Data._str(x), Data._arr(ystrs), Data._arr(xstrs ::: ystrs))
+        "string || array" >> prop { (x: String, ys: List[BigInt]) =>
+          val (xstrs, yints) = (x.toList map (c => Data._str(c.toString)), ys map (Data._int(_)))
+          binary(ConcatOp(_, _).embed, Data._str(x), Data._arr(yints), Data._arr(xstrs ::: yints))
         }
 
         "string || string" >> prop { (x: String, y: String) =>
-          binary(ArrayConcat(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
+          binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
         }
       }
     }
