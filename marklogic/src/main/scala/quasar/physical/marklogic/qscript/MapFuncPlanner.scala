@@ -17,8 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.NameGenerator
-import quasar.ejson.EJson
+import quasar.Data
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.xquery._
@@ -26,18 +25,19 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
-import scalaz.{Apply, EitherT}
+import scalaz.{Const, EitherT, Monad}
 import scalaz.std.option._
 import scalaz.syntax.monad._
 
 object MapFuncPlanner {
-  import expr.{emptySeq, if_, let_}, axes._
+  import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
 
-  def apply[T[_[_]]: Recursive, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
-    case Constant(ejson) =>
-      ejson.cataM(EncodeXQuery[EitherT[F, ErrorMessages, ?], EJson].encodeXQuery).run.flatMap(_.fold(
-        msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
-        _.point[F]))
+  def apply[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+    case Constant(ejson)              =>
+      EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
+        .encodeXQuery(Const(ejson.cata(Data.fromEJson))).run.flatMap(_.fold(
+          msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
+          _.point[F]))
 
     case Undefined()                  => emptySeq.point[F]
 
@@ -83,26 +83,26 @@ object MapFuncPlanner {
 
     // math
     case Negate(x)                    => (-x).point[F]
-    case Add(x, y)                    => binOp[F](x, y)(_ + _)
-    case Multiply(x, y)               => binOp[F](x, y)(_ * _)
-    case Subtract(x, y)               => binOp[F](x, y)(_ - _)
-    case Divide(x, y)                 => binOp[F](x, y)(_ div _)
-    case Modulo(x, y)                 => binOp[F](x, y)(_ mod _)
-    case Power(b, e)                  => math.pow(b, e).point[F]
+    case Add(x, y)                    => castedBinOp[F](x, y)(_ + _)
+    case Multiply(x, y)               => castedBinOp[F](x, y)(_ * _)
+    case Subtract(x, y)               => castedBinOp[F](x, y)(_ - _)
+    case Divide(x, y)                 => castedBinOp[F](x, y)(_ div _)
+    case Modulo(x, y)                 => castedBinOp[F](x, y)(_ mod _)
+    case Power(b, e)                  => (ejson.castAsAscribed[F].apply(b) |@| ejson.castAsAscribed[F].apply(e))(math.pow)
 
     // relations
-    case Not(x)                       => fn.not(x).point[F]
-    case MapFuncs.Eq(x, y)            => binOp[F](x, y)(_ eq _)
-    case Neq(x, y)                    => binOp[F](x, y)(_ ne _)
-    case Lt(x, y)                     => binOp[F](x, y)(_ lt _)
-    case Lte(x, y)                    => binOp[F](x, y)(_ le _)
-    case Gt(x, y)                     => binOp[F](x, y)(_ gt _)
-    case Gte(x, y)                    => binOp[F](x, y)(_ ge _)
+    case Not(x)                       => ejson.castAsAscribed[F].apply(x) map (fn.not)
+    case MapFuncs.Eq(x, y)            => castedBinOpF[F](x, y)(qscript.compEq[F].apply(_, _))
+    case Neq(x, y)                    => castedBinOpF[F](x, y)(qscript.compNe[F].apply(_, _))
+    case Lt(x, y)                     => castedBinOpF[F](x, y)(qscript.compLt[F].apply(_, _))
+    case Lte(x, y)                    => castedBinOpF[F](x, y)(qscript.compLe[F].apply(_, _))
+    case Gt(x, y)                     => castedBinOpF[F](x, y)(qscript.compGt[F].apply(_, _))
+    case Gte(x, y)                    => castedBinOpF[F](x, y)(qscript.compGe[F].apply(_, _))
     case IfUndefined(x, alternate)    => if_(fn.empty(x)).then_(alternate).else_(x).point[F]
-    case And(x, y)                    => binOp[F](x, y)(_ and _)
-    case Or(x, y)                     => binOp[F](x, y)(_ or _)
-    case Between(v1, v2, v3)          => ternOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
-    case Cond(p, t, f)                => if_(p).then_(t).else_(f).point[F]
+    case And(x, y)                    => castedBinOp[F](x, y)(_ and _)
+    case Or(x, y)                     => castedBinOp[F](x, y)(_ or _)
+    case Between(v1, v2, v3)          => castedTernOp[F](v1, v2, v3)((x1, x2, x3) => mkSeq_(x2 le x1) and mkSeq_(x1 le x3))
+    case Cond(p, t, f)                => if_(xs.boolean(p)).then_(t).else_(f).point[F]
 
     // set
     case Within(x, arr)               => qscript.elementLeftShift[F].apply(arr) map (xs => fn.exists(fn.indexOf(xs, x)))
@@ -131,6 +131,7 @@ object MapFuncPlanner {
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
+    // FIXME: Also needs to handle strings, and arrays + strings?
     case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
     case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
@@ -141,8 +142,11 @@ object MapFuncPlanner {
           (src `/` field).point[F]
 
         case XQuery.StringLit(s) =>
-          (asQName[F](s) |@| freshVar[F])((qn, m) =>
-            let_(m -> src) return_ (m.xqy `/` child(qn)))
+          (asQName[F](s) |@| freshName[F])((qn, m) =>
+            if (flwor.isMatching(src))
+              let_(m := src) return_ (~m `/` child(qn))
+            else
+              src `/` child(qn))
 
         case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
@@ -155,9 +159,15 @@ object MapFuncPlanner {
         case XQuery.StringLit(s) =>
           for {
             qn <- asQName(s)
-            m  <- freshVar[F]
-            n  <- mem.nodeDelete[F](m.xqy)
-          } yield let_(m -> src) return_ n
+            m  <- freshName[F]
+            n1 <- mem.nodeDelete[F](~m `/` child(qn))
+            n2 <- mem.nodeDelete[F](src `/` child(qn))
+          } yield {
+            if (flwor.isMatching(src))
+              let_(m := src) return_ n1
+            else
+              n2
+          }
 
         case _ => qscript.deleteField[F] apply (src, xs.QName(field))
       }
@@ -171,11 +181,33 @@ object MapFuncPlanner {
 
   ////
 
-  private def binOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F])((vx, vy) =>
-      mkSeq_(let_(vx -> x, vy -> y) return_ op(vx.xqy, vy.xqy)))
+  private def binOpF[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y))
+      for {
+        vx <- freshName[F]
+        vy <- freshName[F]
+        r  <- op(~vx, ~vy)
+      } yield mkSeq_(let_(vx := x, vy := y) return_ r)
+    else
+      op(x, y)
 
-  private def ternOp[F[_]: NameGenerator: Apply](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F] |@| freshVar[F])((vx, vy, vz) =>
-      mkSeq_(let_(vx -> x, vy -> y, vz -> z) return_ op(vx.xqy, vy.xqy, vz.xqy)))
+  private def castedBinOpF[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
+    binOpF(x, y)((vx, vy) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy))(op).join)
+
+  private def castedBinOp[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery)(op: (XQuery, XQuery) => XQuery): F[XQuery] =
+    castedBinOpF[F](x, y)((a, b) => op(a, b).point[F])
+
+  private def ternOpF[F[_]: QNameGenerator: Monad](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => F[XQuery]): F[XQuery] =
+    if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
+      for {
+        vx <- freshName[F]
+        vy <- freshName[F]
+        vz <- freshName[F]
+        r  <- op(~vx, ~vy, ~vz)
+      } yield mkSeq_(let_(vx := x, vy := y, vz := z) return_ r)
+    else
+      op(x, y, z)
+
+  private def castedTernOp[F[_]: QNameGenerator: PrologW](x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => XQuery): F[XQuery] =
+    ternOpF(x, y, z)((vx, vy, vz) => (ejson.castAsAscribed[F].apply(vx) |@| ejson.castAsAscribed[F].apply(vy) |@| ejson.castAsAscribed[F].apply(vz))(op))
 }

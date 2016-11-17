@@ -43,6 +43,9 @@ object xs {
   def duration(xqy: XQuery): XQuery =
     XQuery(s"xs:duration($xqy)")
 
+  def hexBinary(xqy: XQuery): XQuery =
+    XQuery(s"xs:hexBinary($xqy)")
+
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")
 

@@ -89,12 +89,22 @@ abstract class QueryRegressionTest[S[_]](
 
   lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
 
+  // NB: The printing is just to indicate progress (especially for travis-ci) as
+  //     these tests have the potential to be slow for a backend.
+  //
+  //     Ideally, we'd have specs2 log each example in the suite as it finishes, but
+  //     all attempts at doing this have been unsuccessful, if we succeed eventually
+  //     this printing can be removed.
   fileSystemShould { fs =>
     suiteName should {
+      step(print(s"Running $suiteName ["))
+
       tests.toList foreach { case (f, t) =>
         regressionExample(f, t, fs.name, fs.setupInterpM, fs.testInterpM)
+        step(print("."))
       }
 
+      step(println("]"))
       step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
     }
   }
