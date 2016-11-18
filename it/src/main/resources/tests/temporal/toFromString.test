@@ -9,7 +9,7 @@
         "marklogic":         "skip"
     },
     "data": "../days.data",
-    "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 19)), timestamp(str), to_string(ts) from `../days`",
+    "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 8)), timestamp(str), to_string(ts) from `../days`",
     "predicate": "containsExactly",
     "expected": [
         { "0": { "$date": "2014-08-17" }, "1": { "$time": "06:00" }, "2": { "$timestamp": "2014-08-17T06:00:00Z" }, "3": "2014-08-17T06:00:00Z" },
