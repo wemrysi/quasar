@@ -47,7 +47,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (relations.Cond, _)     => Skipped("TODO").left
+    case (relations.Cond, _)           => Skipped("TODO").left
 
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
@@ -55,7 +55,9 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _)         => Skipped("TODO").left
     case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
-    case _                  => ().right
+    case (structural.ConcatOp, _)      => Skipped("TODO").left
+
+    case _                             => ().right
   }
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])

@@ -2,8 +2,7 @@
   "name": "filter with pipeline using variables in query",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "smallZips.data",

@@ -26,7 +26,6 @@ import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
 import scalaz.{Const, EitherT, Monad}
-import scalaz.std.option._
 import scalaz.syntax.monad._
 
 object MapFuncPlanner {
@@ -117,7 +116,7 @@ object MapFuncPlanner {
                                            (n, e) => if_ (s eq "null".xs) then_ n else_ e)
     case ToString(x)                  => qscript.toString[F] apply x
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
-    case Substring(s, loc, len)       => fn.substring(s, loc + 1.xqy, some(len)).point[F]
+    case Substring(s, loc, len)       => qscript.safeSubstring[F] apply (s, loc + 1.xqy, len)
 
     // structural
     case MakeArray(x)                 => ejson.singletonArray[F] apply x
@@ -131,8 +130,7 @@ object MapFuncPlanner {
         case _ => ejson.singletonObject[F] apply (k, v)
       }
 
-    // FIXME: Also needs to handle strings, and arrays + strings?
-    case ConcatArrays(x, y)           => ejson.arrayConcat[F] apply (x, y)
+    case ConcatArrays(x, y)           => qscript.concat[F] apply (x, y)
     case ConcatMaps(x, y)             => ejson.objectConcat[F] apply (x, y)
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 

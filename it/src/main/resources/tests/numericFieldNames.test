@@ -12,7 +12,7 @@
 
   "predicate": "containsAtLeast",
 
-  "ignoreFieldOrder": true,
+  "ignoreFieldOrder": [ "couchbase" ],
 
   "expected": [
     { "12": "NEW SALEM", "42": 14077 }

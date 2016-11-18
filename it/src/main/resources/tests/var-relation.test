@@ -2,8 +2,7 @@
   "name": "select from a table named by a variable",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "smallZips.data",

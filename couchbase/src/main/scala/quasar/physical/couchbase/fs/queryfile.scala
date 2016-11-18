@@ -110,14 +110,13 @@ object queryfile {
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftP
-
-      _    <- lift(Task.delay(
-                Observable
-                  .from(docs)
-                  .flatMap(bkt.async.insert(_).asScala)
-                  .toBlocking
-                  .last
-              )).into.liftP
+      _      <- lift(docs.nonEmpty.whenM(Task.delay(
+                  Observable
+                    .from(docs)
+                    .flatMap(bkt.async.insert(_).asScala)
+                    .toBlocking
+                    .last
+                ))).into.liftP
     } yield out).run.run
 
   def evaluatePlan[S[_]](
