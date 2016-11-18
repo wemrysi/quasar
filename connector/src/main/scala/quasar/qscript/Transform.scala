@@ -381,7 +381,7 @@ class Transform
       TJ.prj(combiner).fold(
         QC.prj(combiner) match {
           case Some(Map(_, mf)) if mf.count ≟ 0 => mf.as[JoinSide](LeftSide).right[PlannerError]
-          case _ => (InternalError(s"non theta join condition found: ${values(2).value.shows} with provenance: ${values(2).ann.shows}"): PlannerError).left[JoinFunc]
+          case _ => InternalError.fromMsg(s"non theta join condition found: ${values(2).value.shows} with provenance: ${values(2).ann.shows}").left[JoinFunc]
         })(
         _.combine.right[PlannerError])
     }
@@ -462,7 +462,7 @@ class Transform
       (Planner.UnboundVariable(name): PlannerError).left[Target[F]]
 
     case lp.Let(name, form, body) =>
-      (Planner.InternalError("un-elided Let"): PlannerError).left[Target[F]]
+      Planner.InternalError.fromMsg("un-elided Let").left[Target[F]]
 
     case lp.Typecheck(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
@@ -560,18 +560,18 @@ class Transform
 	  QC.prj(QC.inj(reifyResult(a3.ann, a3.value)).embed.transCata(rewrite.normalize).project) match {
             case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
               mf.toCoEnv[T].project match {
-                case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
+                case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError.fromMsg("unsupported ordering type")
                 case StrLit(str)     => List(str).right
-                case _               => InternalError("unsupported ordering function").left
+                case _               => InternalError.fromMsg("unsupported ordering function").left
               }
-            case other => InternalError(s"Expected a constant, but received ${other.shows}").left
+            case other => InternalError.fromMsg(s"Expected a constant, but received ${other.shows}").left
           }
 	}
         orderStrs.flatMap {
           _.traverse {
             case "ASC"  => SortDir.Ascending.right
             case "DESC" => SortDir.Descending.right
-            case _      => InternalError("unsupported ordering direction").left
+            case _      => InternalError.fromMsg("unsupported ordering direction").left
           }
         }
       }
@@ -639,7 +639,7 @@ class Transform
               QC.inj(Union(src,
                 Free.roll(FI.inject(QC.inj(Map(lbranch, merged)))),
                 Free.roll(FI.inject(QC.inj(Map(rbranch, merged)))))).embed).right,
-            InternalError("unaligned union provenances").left)
+            InternalError.fromMsg("unaligned union provenances").left)
       }
 
     case lp.InvokeUnapply(set.Intersect, Sized(a1, a2)) =>

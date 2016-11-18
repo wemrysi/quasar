@@ -32,7 +32,7 @@ object common {
     EitherT(
       couchbase.common.bucketCollectionFromPath(path).bimap[PlannerError, N1QL](
         // TODO: Improve error handling
-        err => quasar.Planner.InternalError(err.shows),
+        err => quasar.Planner.InternalError.fromMsg(err.shows),
         bc => {
           val v = "ifmissing(v.`value`, v)"
           val r = idStatus match {

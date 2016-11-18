@@ -46,6 +46,7 @@ object common {
 
   val CBDataCodec = DataCodec.Precise
 
+  // FIXME: Return PathError instead of FSError
   def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
     Path.flatten(None, None, None, Some(_), Some(_), f)
       .toIList.unite.uncons(

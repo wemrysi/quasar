@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.Planner.{InternalError, PlannerError}
+import quasar.Planner.InternalError
 import quasar.common.PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.ejson
@@ -48,7 +48,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
               key.point[M]
             case key =>
               EitherT(
-                (InternalError(s"Unsupported object key: ${key.shows}"): PlannerError)
+                InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
                   .left[String].point[PR])
           },
           v => processFreeMapDefault(v.fromCoEnv, tmpName)
