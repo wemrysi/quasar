@@ -31,6 +31,9 @@ object fn {
   def ceiling(n: XQuery): XQuery =
     XQuery(s"fn:ceiling($n)")
 
+  def codepointsToString(cps: XQuery): XQuery =
+    XQuery(s"fn:codepoints-to-string($cps)")
+
   def concat(x: XQuery, xs: XQuery*): XQuery =
     XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
 
@@ -138,6 +141,9 @@ object fn {
 
   def stringJoin(strs: XQuery, sep: XQuery): XQuery =
     XQuery(s"fn:string-join($strs, $sep)")
+
+  def stringToCodepoints(str: XQuery): XQuery =
+    XQuery(s"fn:string-to-codepoints($str)")
 
   def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:substring($str, ${startLoc}${asArg(length)})")

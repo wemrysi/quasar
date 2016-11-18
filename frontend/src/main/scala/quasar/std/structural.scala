@@ -149,19 +149,21 @@ trait StructuralLib extends Library {
     Func.Input2(AnyArray ⨿ Str, AnyArray ⨿ Str),
     noSimplification,
     partialTyperV[nat._2] {
-      case Sized(t1, t2) if t1.arrayLike && t2.contains(AnyArray ⨿ Str) => ArrayConcat.tpe(Func.Input2(t1, FlexArr(0, None, Top)))
-      case Sized(t1, t2) if t1.contains(AnyArray ⨿ Str) && t2.arrayLike => ArrayConcat.tpe(Func.Input2(FlexArr(0, None, Top), t2))
-      case Sized(t1, t2) if t1.arrayLike && t2.arrayLike                => ArrayConcat.tpe(Func.Input2(t1, t2))
+      case Sized(t1, t2) if t1.arrayLike && t2.contains(AnyArray ⨿ Str)     => ArrayConcat.tpe(Func.Input2(t1, FlexArr(0, None, Top)))
+      case Sized(t1, t2) if t1.contains(AnyArray ⨿ Str) && t2.arrayLike     => ArrayConcat.tpe(Func.Input2(FlexArr(0, None, Top), t2))
+      case Sized(t1, t2) if t1.arrayLike && t2.arrayLike                    => ArrayConcat.tpe(Func.Input2(t1, t2))
 
       case Sized(Const(Data.Str(str1)), Const(Data.Str(str2)))              => success(Const(Data.Str(str1 ++ str2)))
       case Sized(t1, t2) if Str.contains(t1) && t2.contains(AnyArray ⨿ Str) => success(Type.Str)
       case Sized(t1, t2) if t1.contains(AnyArray ⨿ Str) && Str.contains(t2) => success(Type.Str)
       case Sized(t1, t2) if Str.contains(t1) && Str.contains(t2)            => StringLib.Concat.tpe(Func.Input2(t1, t2))
 
-      case Sized(t1, t2) if t1 == t2 => success(t1)
+      case Sized(t1, t2) if t1 == t2                                        => success(t1)
 
-      case Sized(t1, t2) if Str.contains(t1) && t2.arrayLike => failure(NonEmptyList(GenericError("cannot concat string with array")))
-      case Sized(t1, t2) if t1.arrayLike && Str.contains(t2) => failure(NonEmptyList(GenericError("cannot concat array with string")))
+      case Sized(Const(Data.Str(s)), Const(Data.Arr(ys)))                   => success(Const(Data.Arr(s.map(c => Data._str(c.toString)).toList ::: ys)))
+      case Sized(Const(Data.Arr(xs)), Const(Data.Str(s)))                   => success(Const(Data.Arr(xs ::: s.map(c => Data._str(c.toString)).toList)))
+      case Sized(t1, t2) if Str.contains(t1) && t2.arrayLike                => ArrayConcat.tpe(Func.Input2(FlexArr(0, None, Str), t2))
+      case Sized(t1, t2) if t1.arrayLike && Str.contains(t2)                => ArrayConcat.tpe(Func.Input2(t1, FlexArr(0, None, Str)))
     },
     partialUntyperV[nat._2] {
       case x if x.contains(AnyArray ⨿ Str) => success(Func.Input2(AnyArray ⨿ Str, AnyArray ⨿ Str))

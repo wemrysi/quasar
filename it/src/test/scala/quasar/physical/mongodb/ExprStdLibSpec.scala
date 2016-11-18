@@ -56,6 +56,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
+    case (structural.ConcatOp, _)   => notHandled.left
+
     case _                  => ().right
   }
 
