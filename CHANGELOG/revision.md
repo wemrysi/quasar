@@ -1,0 +1,1 @@
+- remove some MapFuncs that were only applied to `LeftShif` in favor of the `IdStatus` type already used by `ShiftedRead`.
