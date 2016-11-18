@@ -2,7 +2,8 @@
     "name": "largest cities",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip"
+        "marklogic":  "skip",
+        "couchbase":  "skipCI"
     },
     "data": "zips.data",
     "query": "select city, state, sum(pop) from zips group by city, state order by sum(pop) desc limit 10",

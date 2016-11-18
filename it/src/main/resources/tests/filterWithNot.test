@@ -2,7 +2,8 @@
   "name": "filter with negated regex selector",
 
   "backends": {
-    "postgresql": "pending"
+    "postgresql": "pending",
+    "couchbase":  "skipCI"
   },
 
   "data": "zips.data",
