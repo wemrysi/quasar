@@ -154,11 +154,7 @@ object MongoDbQScriptPlanner {
       //     short-circuit, so …
       case Guard(_, _, cont, _) => cont.right
 
-      case DupArrayIndices(_) => unimplemented("DupArrayindices expression")
-      case DupMapKeys(_)      => unimplemented("DupMapKeys expression")
       case Range(_, _)        => unimplemented("Range expression")
-      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices expression")
-      case ZipMapKeys(_)      => unimplemented("ZipMapKeys expression")
     }
 
     mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
@@ -230,11 +226,7 @@ object MongoDbQScriptPlanner {
           InternalError("uncheckable type").left)(
           f => If(f(expr), cont, fallback).right)
 
-      case DupArrayIndices(_) => unimplemented("DupArrayIndices JS")
-      case DupMapKeys(_)      => unimplemented("DupMapKeys JS")
       case Range(_, _)        => unimplemented("Range JS")
-      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices JS")
-      case ZipMapKeys(_)      => unimplemented("ZipMapKeys JS")
 
       case _ => scala.sys.error("doesn't happen")
     }
@@ -520,6 +512,7 @@ object MongoDbQScriptPlanner {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` here?
                 qs.getConst.idStatus match {
+                  case IdOnly => ExprBuilder(dataset, $field("_id").right)
                   case IncludeId =>
                     ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
                   case ExcludeId => dataset
@@ -541,7 +534,7 @@ object MongoDbQScriptPlanner {
                    ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, WF, EX](funcHandler)(src, f).liftM[GenT]
-          case LeftShift(src, struct, repair) => unimplemented("LeftShift")
+          case LeftShift(src, struct, id, repair) => unimplemented("LeftShift")
           // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
           //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
           case Reduce(src, bucket, reducers, repair) =>

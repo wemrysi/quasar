@@ -109,11 +109,14 @@ object Planner {
               val rdd = initRDD.map { raw =>
                 DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
               }
-              if(idStatus === IncludeId) {
-                (sc, rdd.zipWithIndex.map {
-                  case (d, idx) => Data.Arr(List(Data.Int(idx), d)) : Data
+              (sc,
+                idStatus match {
+                  case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
+                  case IncludeId =>
+                    rdd.zipWithIndex.map[Data](p =>
+                      Data.Arr(List(Data.Int(p._2), p._1)))
+                  case ExcludeId => rdd
                 }).right[PlannerError]
-              } else (sc, rdd).right[PlannerError]
             })
           })
         }
@@ -300,7 +303,7 @@ object Planner {
               case Sample => (i: Index, c: Count) => i < c
             })
 
-        case LeftShift(src, struct, repair) =>
+        case LeftShift(src, struct, id, repair) =>
 
           val structFunc: PlannerError \/ (Data => Data) =
             freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
@@ -323,10 +326,18 @@ object Planner {
 
           StateT((sc: SparkContext) =>
             EitherT((structFunc ⊛ repairFunc)((df, rf) =>
-              src.flatMap((input: Data) => df(input) match {
-                case Data.Arr(list) => list.map(rf(input, _))
-                case Data.Obj(m) => m.values.map(rf(input, _))
-                case _ => List.empty[Data]
+              src.flatMap((input: Data) => (df(input), id) match {
+                case (Data.Arr(list), ExcludeId) => list.map(rf(input, _))
+                case (Data.Arr(list), IncludeId) =>
+                  list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
+                case (Data.Arr(list), IdOnly) =>
+                  list.indices.map(i => rf(input, Data.Int(i)))
+                case (Data.Obj(m), ExcludeId) => m.values.map(rf(input, _))
+                case (Data.Obj(m), IncludeId) =>
+                  m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
+                case (Data.Obj(m), IdOnly) =>
+                  m.keys.map(k => rf(input, Data.Str(k)))
+                case (_, _) => List.empty[Data]
               })).map((sc, _)).point[Task]))
 
         case Union(src, lBranch, rBranch) =>

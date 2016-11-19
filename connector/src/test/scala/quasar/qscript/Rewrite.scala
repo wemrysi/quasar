@@ -87,6 +87,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Unreferenced[Fix, Fix[QScriptCore]]().embed,
             BoolLit[Fix, Hole](true)).embed,
           HoleF,
+          ExcludeId,
           Free.point[MapFunc, JoinSide](RightSide))
 
       Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
@@ -94,6 +95,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         LeftShift(
           Unreferenced[Fix, Fix[QScriptCore]]().embed,
           BoolLit[Fix, Hole](true),
+          ExcludeId,
           Free.point[MapFunc, JoinSide](RightSide)).some)
     }
 
@@ -122,7 +124,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(QCT.inj(Map(
               Free.roll(DET.inj(Const[DeadEnd, FreeQS](Root))),
               ProjectFieldR(HoleF, StrLit("city"))))),
-            Free.roll(ZipMapKeys(HoleF)),
+            HoleF,
+            IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
@@ -143,6 +146,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           RootR,
           QC.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("city")),
+            ExcludeId,
             ProjectFieldR(Free.point(RightSide), StrLit("name"))))))
     }
 
@@ -174,7 +178,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(DET.inj(Const(Root))),
             Free.roll(QCT.inj(LeftShift(
               Free.point(SrcHole),
-              Free.roll(ZipMapKeys(HoleF)),
+              HoleF,
+              IncludeId,
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
                 Free.roll(MakeArray(Free.point(RightSide)))))))),
@@ -197,7 +202,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         equal(
           QC.inj(LeftShift(
             RootR.embed,
-            Free.roll(ZipMapKeys(HoleF)),
+            HoleF,
+            IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(Constant(
                 ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))),

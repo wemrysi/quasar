@@ -176,12 +176,12 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
 
         makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
       }
-      case Map(src, f)            => freeMFEq(f).map(Map(src, _))
-      case LeftShift(src, s, r)   => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, _))
-      case Union(src, l, r)       => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
-      case Filter(src, f)         => freeMFEq(f).map(Filter(src, _))
+      case Map(src, f)             => freeMFEq(f).map(Map(src, _))
+      case LeftShift(src, s, i, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, _))
+      case Union(src, l, r)        => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
+      case Filter(src, f)          => freeMFEq(f).map(Filter(src, _))
       case Subset(src, from, sel, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Subset(src, _, sel, _))
-      case Unreferenced()         => None
+      case Unreferenced()          => None
     })
   }
 

@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.physical.couchbase, couchbase._
 import quasar.physical.couchbase.N1QL.{Read => _, _}
 import quasar.Planner.PlannerError
-import quasar.qscript.{IdStatus, IncludeId, ExcludeId}
+import quasar.qscript.{IdStatus, IdOnly, IncludeId, ExcludeId}
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -36,6 +36,7 @@ object common {
         bc => {
           val v = "ifmissing(v.`value`, v)"
           val r = idStatus match {
+            case IdOnly    => "meta(v).id"
             case IncludeId => "[meta(v).id, ifmissing(v.`value`, v)]"
             case ExcludeId => v
           }

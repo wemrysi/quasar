@@ -52,20 +52,42 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
           for_(x in src) return_ g
       }
 
-    case LeftShift(src, struct, repair) =>
+    // TODO: Use type information from `Guard` when available to determine
+    //       if `ext` is being treated as an array or an object.
+    case LeftShift(src, struct, id, repair) =>
       for {
         l       <- freshName[F]
+        ext     <- freshName[F]
+        isArr   <- freshName[F]
+        r0      <- freshName[F]
         r       <- freshName[F]
+        i       <- freshName[F]
         extract <- mapFuncXQuery(struct, ~l)
-        lshift  <- qscript.elementLeftShift[F] apply (extract)
+        lshift  <- qscript.elementLeftShift[F] apply (~ext)
+        chkArr  <- ejson.isArray[F] apply ~ext
+        getId   =  if_ (~isArr) then_ ~i else_ fn.nodeName(~r0)
+        idExpr  <- id match {
+                     case IdOnly    => getId.point[F]
+                     case IncludeId => ejson.seqToArray_[F](mkSeq_(getId, ~r0))
+                     case ExcludeId => (~r0).point[F]
+                   }
         merge   <- mergeXQuery(repair, ~l, ~r)
       } yield  src match {
         case IterativeFlwor(bindings, filter, order, isStable, result) =>
-          val addlBindings = IList(BindingClause.let_(l := result), BindingClause.for_(r in lshift))
+          val addlBindings = IList(
+            BindingClause.let_(l := result, ext := extract, isArr := chkArr),
+            BindingClause.for_(r0 at i in lshift),
+            BindingClause.let_(r := idExpr))
+
           XQuery.Flwor(bindings :::> addlBindings, filter, order, isStable, merge)
 
         case _ =>
-          for_ (l in src, r in lshift) return_ merge
+          for_ (l in src)
+          .let_(ext   := extract,
+                isArr := chkArr)
+          .for_(r0 at i in lshift)
+          .let_(r     := idExpr)
+          .return_(merge)
       }
 
     // TODO: Start leveraging the cts:* aggregation functions when possible

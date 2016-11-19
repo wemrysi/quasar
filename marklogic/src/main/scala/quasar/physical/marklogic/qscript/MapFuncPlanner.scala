@@ -171,10 +171,6 @@ object MapFuncPlanner {
       }
 
     // other
-    case DupMapKeys(m)                => qscript.elementDupKeys[F]    apply m
-    case DupArrayIndices(a)           => ejson.arrayDupIndices[F]     apply a
-    case ZipMapKeys(m)                => qscript.zipMapElementKeys[F] apply m
-    case ZipArrayIndices(a)           => ejson.arrayZipIndices[F]     apply a
     case Range(x, y)                  => (x to y).point[F]
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.

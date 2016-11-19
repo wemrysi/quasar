@@ -346,10 +346,6 @@ object MapFunc {
         case Null(a1) => f(a1) ∘ (Null(_))
         case ToString(a1) => f(a1) ∘ (ToString(_))
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
-        case DupArrayIndices(a1) => f(a1) ∘ (DupArrayIndices(_))
-        case DupMapKeys(a1) => f(a1) ∘ (DupMapKeys(_))
-        case ZipArrayIndices(a1) => f(a1) ∘ (ZipArrayIndices(_))
-        case ZipMapKeys(a1) => f(a1) ∘ (ZipMapKeys(_))
 
         // binary
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
@@ -432,10 +428,6 @@ object MapFunc {
         case (Null(a1), Null(b1)) => in.equal(a1, b1)
         case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
-        case (DupArrayIndices(a1), DupArrayIndices(b1)) => in.equal(a1, b1)
-        case (DupMapKeys(a1), DupMapKeys(b1)) => in.equal(a1, b1)
-        case (ZipArrayIndices(a1), ZipArrayIndices(b1)) => in.equal(a1, b1)
-        case (ZipMapKeys(a1), ZipMapKeys(b1)) => in.equal(a1, b1)
 
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -523,10 +515,6 @@ object MapFunc {
           case Null(a1) => shz("Null", a1)
           case ToString(a1) => shz("ToString", a1)
           case MakeArray(a1) => shz("MakeArray", a1)
-          case DupArrayIndices(a1) => shz("DupArrayIndices", a1)
-          case DupMapKeys(a1) => shz("DupMapKeys", a1)
-          case ZipArrayIndices(a1) => shz("ZipArrayIndices", a1)
-          case ZipMapKeys(a1) => shz("ZipMapKeys", a1)
 
           // binary
           case Add(a1, a2) => shz("Add", a1, a2)
@@ -624,10 +612,6 @@ object MapFunc {
           case Null(a1) => nAry("Null", a1)
           case ToString(a1) => nAry("ToString", a1)
           case MakeArray(a1) => nAry("MakeArray", a1)
-          case DupArrayIndices(a1) => nAry("DupArrayIndices", a1)
-          case DupMapKeys(a1) => nAry("DupMapKeys", a1)
-          case ZipArrayIndices(a1) => nAry("ZipArrayIndices", a1)
-          case ZipMapKeys(a1) => nAry("ZipMapKeys", a1)
 
           // binary
           case Add(a1, a2) => nAry("Add", a1, a2)
@@ -865,26 +849,11 @@ object MapFuncs {
     def a2 = field
   }
 
-  // helpers & QScript-specific
-  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
-    * `{ k1: k1, k2: k2, ...}`.
-    */
-  @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns an array of `[v1, v2, ...]` into an array of `[0, 1, ...]`.
-    */
-  @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
-    * `{ k1: [k1, v1], k2: [k2, v2], ...}`.
-    */
-  @Lenses final case class ZipMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns an array of `[v1, v2, ...]` into an array of
-    * `[[0, v1], [1, v2], ...]`.
-    */
-  @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
     def a1 = from
     def a2 = to
   }
+
   /** A conditional specifically for checking that `a1` satisfies `pattern`.
     */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)

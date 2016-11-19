@@ -65,33 +65,6 @@ object ejson {
       arr `/` child.element()(idx)
     })
 
-  // ejson:array-dup-indices($arr as element()?) as element()?
-  def arrayDupIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    ejs.declare("array-dup-indices") flatMap (_(
-      $("arr") as ST("element()?")
-    ).as(ST("element()?")) { arr: XQuery =>
-      val i = $("i")
-      seqToArray[F].apply(
-        fn.nodeName(arr),
-        for_ ($("_") at i in (arr `/` child.element())) return_ (~i - 1.xqy))
-    })
-
-  // ejson:array-zip-indices($arr as element()?) as element()?
-  def arrayZipIndices[F[_]: PrologW]: F[FunctionDecl1] =
-    ejs.declare("array-zip-indices") flatMap (_(
-      $("arr") as ST("element()?")
-    ).as(ST("element()?")) { arr: XQuery =>
-      val (i, elt) = ($("i"), $("elt"))
-
-      for {
-        ixelt <- mkArrayElt[F](~i - 1.xqy)
-        pair  <- mkArray_[F](mkSeq_(ixelt, ~elt))
-        zpair <- mkArrayElt[F](pair)
-        zelts =  for_(elt at i in (arr `/` child.element())) return_ zpair
-        zarr  <- mkArray[F] apply (fn.nodeName(arr), zelts)
-      } yield zarr
-    })
-
   // ejson:ascribed-type($elt as element()) as xs:string?
   def ascribedType[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("ascribed-type").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
