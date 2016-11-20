@@ -2,8 +2,7 @@
   "name": "explicitly grouped, with only reduced projections, and a filter",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "zips.data",

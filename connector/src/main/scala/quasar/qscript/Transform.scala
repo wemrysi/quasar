@@ -205,8 +205,7 @@ class Transform
     Target(Ann(base.buckets, Free.roll(func(lval, cval, rval))), base.src)
   }
 
-  private def shiftValues(input: Target[F], f: FreeMap => MapFunc[FreeMap]):
-      Target[F] = {
+  private def shiftValues(input: Target[F]): Target[F] = {
     val Ann(provs, value) = input.ann
     val (sides, leftAccess, rightAccess) =
       concat(
@@ -216,10 +215,10 @@ class Transform
     Target(Ann(
       provenance.Value(Free.roll[MapFunc, Hole](ProjectIndex(rightAccess, IntLit(0)))) :: prov.rebase(leftAccess, provs),
       Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
-      QC.inj(LeftShift(input.value, Free.roll(f(value)), sides)).embed)
+      QC.inj(LeftShift(input.value, value, IncludeId, sides)).embed)
   }
 
-  private def shiftIds(input: Target[F], f: FreeMap => MapFunc[FreeMap]):
+  private def shiftIds(input: Target[F]):
       Target[F] = {
     val Ann(provs, value) = input.ann
     val (sides, leftAccess, rightAccess) =
@@ -230,7 +229,7 @@ class Transform
     Target(Ann(
       provenance.Value(rightAccess) :: prov.rebase(leftAccess, provs),
       rightAccess),
-      QC.inj(LeftShift(input.value, Free.roll(f(value)), sides)).embed)
+      QC.inj(LeftShift(input.value, value, IdOnly, sides)).embed)
   }
 
   private def flatten(input: Target[F]): Target[F] = {
@@ -253,10 +252,8 @@ class Transform
       //   id(p, x:foo) - 1
       //   id(p, x:bar) - 2
       // (one bucket)
-      case structural.FlattenMap =>
-        flatten(shiftValues(values(0), ZipMapKeys(_)))
-      case structural.FlattenArray =>
-        flatten(shiftValues(values(0), ZipArrayIndices(_)))
+      case  structural.FlattenArray | structural.FlattenMap =>
+        flatten(shiftValues(values(0)))
 
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -265,10 +262,8 @@ class Transform
       //   id(p, y:foo) - foo
       //   id(p, y:bar) - bar
       // (one bucket)
-      case structural.FlattenMapKeys =>
-        flatten(shiftIds(values(0), DupMapKeys(_)))
-      case structural.FlattenArrayIndices =>
-        flatten(shiftIds(values(0), DupArrayIndices(_)))
+      case structural.FlattenArrayIndices | structural.FlattenMapKeys =>
+        flatten(shiftIds(values(0)))
 
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -277,8 +272,8 @@ class Transform
       //   id(p, y, foo) - 1
       //   id(p, y, bar) - 2
       // (two buckets)
-      case structural.ShiftMap   => shiftValues(values(0), ZipMapKeys(_))
-      case structural.ShiftArray => shiftValues(values(0), ZipArrayIndices(_))
+      case structural.ShiftArray | structural.ShiftMap =>
+        shiftValues(values(0))
 
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -287,8 +282,8 @@ class Transform
       //   id(p, y, foo) - foo
       //   id(p, y, bar) - bar
       // (two buckets)
-      case structural.ShiftMapKeys      => shiftIds(values(0), DupMapKeys(_))
-      case structural.ShiftArrayIndices => shiftIds(values(0), DupArrayIndices(_))
+      case structural.ShiftArrayIndices | structural.ShiftMapKeys =>
+        shiftIds(values(0))
     }
 
   private def invokeExpansion2(func: BinaryFunc, values: Func.Input[Target[F], nat._2]):
@@ -306,6 +301,7 @@ class Transform
           QC.inj(LeftShift(
             join.base.src,
             Free.roll(Range(join.lval, join.rval)),
+            ExcludeId,
             sides)).embed)
     }
 
@@ -449,7 +445,7 @@ class Transform
       //       however doing that would break the old Mongo backend, and we can
       //       handle it here for now. But it should be moved to the SQL²
       //       compiler when the old Mongo backend is replaced. (#1298)
-      shiftValues(pathToProj(path), ZipMapKeys(_)).right
+      shiftValues(pathToProj(path)).right
 
     case lp.Constant(data) =>
       fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](

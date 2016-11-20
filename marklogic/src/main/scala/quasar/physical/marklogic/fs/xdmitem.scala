@@ -19,6 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.MonadErrMsgs
+import quasar.physical.marklogic.prisms._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
 
@@ -26,7 +27,6 @@ import scala.collection.JavaConverters._
 import scala.util.{Success, Failure}
 import scala.xml.Elem
 
-import org.threeten.bp.format.DateTimeFormatter
 import com.marklogic.xcc.types._
 import org.threeten.bp._
 import scalaz._, Scalaz._
@@ -111,15 +111,13 @@ object xdmitem {
     }
 
   private def parseLocalDate[F[_]: MonadErrMsgs](s: String): F[LocalDate] =
-    parseTemporal[F, LocalDate]("LocalDate", DateTimeFormatter.ISO_DATE.parse(_, LocalDate.FROM))(s)
+    parseTemporal[F, LocalDate]("LocalDate", isoLocalDate.getOption)(s)
 
   private def parseLocalTime[F[_]: MonadErrMsgs](s: String): F[LocalTime] =
-    parseTemporal[F, LocalTime]("LocalTime", DateTimeFormatter.ISO_TIME.parse(_, LocalTime.FROM))(s)
+    parseTemporal[F, LocalTime]("LocalTime", isoLocalTime.getOption)(s)
 
-  private def parseTemporal[F[_]: MonadErrMsgs, A](name: String, parse: String => A)(str: String): F[A] =
-    \/.fromTryCatchNonFatal(parse(str)).fold(
-      err => s"Failed to parse '$str' as a $name: ${err.getMessage}".wrapNel.raiseError[F, A],
-      _.point[F])
+  private def parseTemporal[F[_]: MonadErrMsgs, A](name: String, parse: String => Option[A])(str: String): F[A] =
+    parse(str).fold(s"Failed to parse '$str' as a $name.".wrapNel.raiseError[F, A])(_.point[F])
 
   private def xmlToData[F[_]: MonadErrMsgs](xmlString: String): F[Data] = {
     val el = SecureXML.loadString(xmlString).fold(_.toString.wrapNel.raiseError[F, Elem], _.point[F])

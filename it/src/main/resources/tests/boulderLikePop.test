@@ -2,8 +2,7 @@
   "name": "population of Boulder-like towns",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "zips.data",

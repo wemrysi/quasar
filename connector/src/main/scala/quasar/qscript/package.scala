@@ -159,10 +159,9 @@ package object qscript {
   }
 
   def rewriteShift[T[_[_]]: Recursive: Corecursive: EqualT]
-    (struct: FreeMap[T], repair0: JoinFunc[T])
-      : Option[(FreeMap[T], JoinFunc[T])] = {
-    def rewrite(elem: FreeMap[T], dup: FreeMap[T] => Unary[T, FreeMap[T]])
-        : Option[(FreeMap[T], JoinFunc[T])] = {
+    (idStatus: IdStatus, repair0: JoinFunc[T])
+      : Option[(IdStatus, JoinFunc[T])] =
+    (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc[T])]] {
       val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = repair0.toCoEnv[T]
 
       val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = RightSideF.toCoEnv[T]
@@ -176,21 +175,13 @@ package object qscript {
 
       if (repair.para(count(oneRef)) ≟ rightCount)
         // all `RightSide` access is through `oneRef`
-        (elem, transApoT(repair)(substitute(oneRef, rightSide)).fromCoEnv).some
+        (ExcludeId, transApoT(repair)(substitute(oneRef, rightSide)).fromCoEnv).some
       else if (repair.para(count(zeroRef)) ≟ rightCount)
         // all `RightSide` access is through `zeroRef`
-        (Free.roll[MapFunc[T, ?], Hole](dup(elem)),
-          transApoT(repair)(substitute(zeroRef, rightSide)).fromCoEnv).some
+        (IdOnly, transApoT(repair)(substitute(zeroRef, rightSide)).fromCoEnv).some
       else
         None
-    }
-
-    struct.resume match {
-      case -\/(ZipArrayIndices(elem)) => rewrite(elem, DupArrayIndices(_))
-      case -\/(ZipMapKeys(elem)) => rewrite(elem, DupMapKeys(_))
-      case _ => None
-    }
-  }
+    }.join
 
   /** A variant of `repeatedly` that works with `Inject` instances. */
   def injectRepeatedly[F [_], G[_], A]

@@ -29,6 +29,8 @@ import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
 
+import scala.sys
+
 import com.marklogic.xcc.ContentSource
 import matryoshka._
 import org.scalacheck.Arbitrary.arbitrary
@@ -46,7 +48,15 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     def nullary(
       prg: Fix[LP],
-      expected: Data): Result = skipped
+      expected: Data): Result = {
+
+      def absurd[A, B](a: A): B = sys.error("impossible!")
+
+      val mf = translate[Nothing](prg, absurd)
+      val xqyPlan = planFreeMap(mf)(absurd)
+
+      run(xqyPlan, expected)
+    }
 
     def unary(
       prg: Fix[LP] => Fix[LP],
@@ -54,11 +64,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
       expected: Data): Result = {
 
       val mf = translate[UnaryArg](prg(lpf.free('arg)), κ(UnaryArg._1))
-
-      val xqyPlan = asXqy(arg) flatMap { a1 =>
-        planMapFunc[Fix, G, UnaryArg](mf)(κ(a1))
-          .leftMap(err => ko(err.shows).toResult)
-      }
+      val xqyPlan = asXqy(arg) flatMap (a1 => planFreeMap(mf)(κ(a1)))
 
       run(xqyPlan, expected)
     }
@@ -66,12 +72,37 @@ class MarkLogicStdLibSpec extends StdLibSpec {
     def binary(
       prg: (Fix[LP], Fix[LP]) => Fix[LP],
       arg1: Data, arg2: Data,
-      expected: Data): Result = skipped
+      expected: Data): Result = {
+
+      val mf = translate[BinaryArg](prg(lpf.free('arg1), lpf.free('arg2)), {
+        case 'arg1 => BinaryArg._1
+        case 'arg2 => BinaryArg._2
+      })
+
+      val xqyPlan = (asXqy(arg1) |@| asXqy(arg2)).tupled flatMap {
+        case (a1, a2) => planFreeMap(mf)(_.fold(a1, a2))
+      }
+
+      run(xqyPlan, expected)
+    }
 
     def ternary(
       prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
       arg1: Data, arg2: Data, arg3: Data,
-      expected: Data): Result = skipped
+      expected: Data): Result = {
+
+      val mf = translate[TernaryArg](prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
+        case 'arg1 => TernaryArg._1
+        case 'arg2 => TernaryArg._2
+        case 'arg3 => TernaryArg._3
+      })
+
+      val xqyPlan = (asXqy(arg1) |@| asXqy(arg2) |@| asXqy(arg3)).tupled flatMap {
+        case (a1, a2, a3) => planFreeMap(mf)(_.fold(a1, a2, a3))
+      }
+
+      run(xqyPlan, expected)
+    }
 
     def intDomain    = arbitrary[Long]   map (BigInt(_))
     def decDomain    = arbitrary[Double] map (BigDecimal(_))
@@ -79,8 +110,16 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     ////
 
+    private val cpColl = Prolog.defColl(DefaultCollationDecl.codepoint)
+
+    private def planFreeMap[A](
+      freeMap: FreeMapA[Fix, A])(
+      recover: A => XQuery
+    ): H[XQuery] =
+      planMapFunc[Fix, G, A](freeMap)(recover) leftMap (e => ko(e.shows).toResult)
+
     private def run(plan: H[XQuery], expected: Data): Result = {
-      val (prologs, xqy) = plan.run.run.eval(1)
+      val (prologs, xqy) = plan.run.run.eval(1) leftMap (_ insert cpColl)
 
       val result = xqy.traverse(body => for {
         qr <- SessionIO.evaluateModule_(MainModule(Version.`1.0-ml`, prologs, body))
@@ -101,7 +140,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
     private def asXqy(d: Data): H[XQuery] =
       EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
         .encodeXQuery(Const(d))
-        .leftMap(errs => ko(errs.head).toResult)
+        .leftMap(errs => ko(errs intercalate ", ").toResult)
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

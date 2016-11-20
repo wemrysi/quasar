@@ -2,8 +2,7 @@
   "name": "filter on date part, where the field isn't a timestamp",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "../days.data",
