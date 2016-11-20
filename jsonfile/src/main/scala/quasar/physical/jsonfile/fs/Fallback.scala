@@ -158,15 +158,11 @@ trait Fallback[T[_[_]], F[_], Rep] extends Fresh[T, F, Rep] {
       case mf.ConcatArrays(xs, ys)     => ejfuns.concat(toEJson(xs), toEJson(ys))
       case mf.ConcatMaps(xs, ys)       => ejfuns.concat(toEJson(xs), toEJson(ys))
       case mf.DeleteField(src, field)  => TODO
-      case mf.DupArrayIndices(arr)     => TODO
-      case mf.DupMapKeys(map)          => TODO
       case mf.MakeArray(arr)           => TODO
       case mf.MakeMap(key, value)      => TODO
       case mf.ProjectField(src, field) => TODO
       case mf.ProjectIndex(arr, idx)   => TODO
       case mf.Range(from, to)          => TODO
-      case mf.ZipArrayIndices(arr)     => TODO
-      case mf.ZipMapKeys(map)          => TODO
     }
     val Special = mk {
       case mf.Cond(BoolRep(p), ifp, elsep)  => p.fold(ifp, elsep)
