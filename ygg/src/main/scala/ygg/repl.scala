@@ -20,7 +20,6 @@ import common._, json._, table._, trans._
 import scalaz._
 import TableData.fromJValues
 import quasar.sql._
-import matryoshka.Fix
 import ygg.macros.JValueMacros
 
 object repl {

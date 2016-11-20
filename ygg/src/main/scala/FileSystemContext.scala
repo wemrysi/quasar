@@ -23,6 +23,8 @@ import quasar.fp.TaskRef
 import quasar.fs.mount._, FileSystemDef._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import quasar.frontend.logicalplan.{ LogicalPlan => LP }
+import matryoshka.Fix
 
 /** This trait is intended as a basis for filesystem implementations.
  *  It encapsulates the most common types, utility methods, and implicit
@@ -40,7 +42,7 @@ trait FileSystemContext[F0[_]] extends EitherTContextLeft[F0, FileSystemError] w
   type F[A] = F0[A]
 
   def unknownPath(p: APath): FileSystemError    = pathErr(PathError pathNotFound p)
-  def unknownPlan(lp: FixPlan): FileSystemError = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
+  def unknownPlan(lp: Fix[LP]): FileSystemError = planningFailed(lp, UnsupportedPlan(lp.unFix, None))
   def makeDirList(names: PathSegment*): DirList = names.toSet
 }
 object FileSystemContext {
@@ -120,7 +122,6 @@ trait FileSystemIndependentTypes {
   type Errors  = Vector[FileSystemError]
   type DirList = Set[PathSegment]
   type Chunks  = Vector[quasar.Data]
-  type FixPlan = matryoshka.Fix[quasar.frontend.logicalplan.LogicalPlan]
 
   type WHandle = WriteFile.WriteHandle
   type RHandle = ReadFile.ReadHandle
@@ -134,7 +135,7 @@ trait FileSystemIndependentTypes {
   type QueryMap[+V] = Map[QHandle, V]
   type ReadMap[+V]  = Map[RHandle, V]
   type WriteMap[+V] = Map[WHandle, V]
-  type PlanMap[+V]  = Map[FixPlan, V]
+  type PlanMap[+V]  = Map[Fix[LP], V]
 }
 object FileSystemIndependentTypes extends FileSystemIndependentTypes
 
@@ -148,10 +149,10 @@ trait QueryFileSystem[F[_]] extends FileSystemTypes[F] {
   import QueryFile._
 
   def closeQ(rh: QHandle): F[Unit]
-  def evaluate(lp: FixPlan): FPLR[QHandle]
-  def execute(lp: FixPlan, out: AFile): FPLR[AFile]
+  def evaluate(lp: Fix[LP]): FPLR[QHandle]
+  def execute(lp: Fix[LP], out: AFile): FPLR[AFile]
   def exists(file: AFile): F[Boolean]
-  def explain(lp: FixPlan): FPLR[ExecutionPlan]
+  def explain(lp: Fix[LP]): FPLR[ExecutionPlan]
   def list(dir: ADir): FLR[DirList]
   def more(rh: QHandle): FLR[Chunks]
 

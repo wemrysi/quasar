@@ -1,0 +1,11 @@
+# quasar.std.StdLib
+
+val agg        = AggLib
+val array      = ArrayLib
+val date       = DateLib
+val identity   = IdentityLib
+val math       = MathLib
+val relations  = RelationsLib
+val set        = SetLib
+val string     = StringLib
+val structural = StructuralLib

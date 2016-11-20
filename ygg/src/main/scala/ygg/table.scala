@@ -37,6 +37,15 @@ package object table {
 
   implicit def tableMethods[T: TableRep](table: T): TableMethods[T] = new TableMethods[T](table)
 
+  private object compilerHelpers extends quasar.sql.CompilerHelpers {}
+  import quasar.sql.{ Sql, Query, fixParser }
+
+  def compileSql(q: String): Fix[Sql] = (fixParser parse Query(q)).toOption.get
+  def compileLp(q: String): Fix[LP]   = compilerHelpers fullCompileExp q
+
+  def evalSql[T: TableRep](table: T, q: String): T                            = EvalSql[T](table) eval compileSql(q)
+  def evalLp[A: TableRep](files: Map[FPath, A], args: Sym => A, q: String): A = EvalLp[A](files, args) eval compileLp(q)
+
   def companionOf[T: TableRep] : TableCompanion[T] = TableRep[T].companion
 
   def lazyTable[T: TableRep](slices: Iterable[Slice], size: TableSize): T =

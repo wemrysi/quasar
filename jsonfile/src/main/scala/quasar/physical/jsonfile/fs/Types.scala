@@ -16,13 +16,14 @@
 
 package quasar.physical.jsonfile.fs
 
-import quasar.Predef._
+import ygg._, common._
 import monocle._
 
-trait Extractor[A, B] {
+trait Extractor[A, +B] {
   def unapply(x: A): Option[B]
 }
 object Extractor {
+  def empty[A](): Extractor[A, Nothing]                         = new Empty[A]()
   def partial[A, B](pf: PartialFunction[A, B]): Extractor[A, B] = new Partial(pf)
   def apply[A, B](f: A => Option[B]): Extractor[A, B]           = new Impl(f)
 
@@ -31,6 +32,9 @@ object Extractor {
   }
   final class Partial[A, B](pf: PartialFunction[A, B]) extends Extractor[A, B] {
     def unapply(x: A): Option[B] = pf lift x
+  }
+  final class Empty[A]() extends Extractor[A, Nothing] {
+    def unapply(x: A): Option[Nothing] = None
   }
 }
 

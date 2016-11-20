@@ -23,26 +23,19 @@ object Ygg {
     "io.argonaut"    %% "argonaut-jawn" % "6.2-M3"
   )
 
-  def imports = """
-    import quasar._
+  def yggImports = """
     import java.nio.file._
     import java.time._
+    import quasar._, sql._
+    import quasar.qscript.{ MapFuncs => mf }
     import scalaz._, Scalaz._
-    import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
-  """.trim
-
-  def yggImports = imports + "\n" + """
-    import ygg._
     import ygg.common.{ quasarExtensionOps => _, _ }
-    import json._, table._, trans._
-    import quasar._, sql._, SemanticAnalysis._
-    import ygg.repl._
+    import ygg._, json._, table._, trans._, repl._
     import TableData.{ fromJValues => fromJson }
   """.trim
 
   def jsonfileImports = yggImports + "\n" + """
     import quasar.physical.jsonfile.fs._, FallbackJV._
-    val mf = quasar.qscript.MapFuncs
   """.trim
 
   def yggDropWarts = Seq(
@@ -71,7 +64,7 @@ object Ygg {
 
   def ygg(p: Project): Project = (
      yggSetup(p)
-    .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector, 'sql)
+    .dependsOn('foundation % BothScopes, 'macros, 'ejson, 'connector, 'sql % CompileOnTest)
     .settings(libraryDependencies ++= yggDeps)
     .settings(initialCommands in console := yggImports)
   )

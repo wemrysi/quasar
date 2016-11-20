@@ -19,11 +19,18 @@ package ygg.table
 import ygg._, common._, json._, trans._
 import scala.math.{ min, max }
 import scalaz._, Scalaz._
+import quasar.sql._
 
-class TablePairMethods[T: TableRep](val pair: (T, T)) {
-  def companion                          = companionOf[T]
+final case class TablePair[T: TableRep](pair: (T, T)) {
+  val C = companionOf[T]
+
+  def join(joinType: JoinType, selection: TransSpec2, merge: TransSpec2): T = joinType match {
+    case InnerJoin => ???
+    case LeftJoin  => ???
+    case RightJoin => ???
+    case FullJoin  => ???
+  }
   def zip(): T                           = ???
-  def join(): T                          = ???
   def cross(f: TransSpec2): T            = ???
   def concat(): T                        = ???
   def cogroup(by: PairOf[TransSpec1]): T = ???

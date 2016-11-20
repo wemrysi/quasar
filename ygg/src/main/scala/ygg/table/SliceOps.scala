@@ -25,7 +25,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def columns: ColumnMap      = source.columns
   def definedAt: BitSet       = doto(Bits())(defined => columns foreach { case (_, col) => defined or col.definedAt(0, size) })
-  def isDefinedAt(row: RowId) = columns.values.exists(_.isDefinedAt(row))
+  def isDefinedAt(row: RowId) = columns.values exists (_ isDefinedAt row)
   def isEmpty: Boolean        = size == 0
   def nonEmpty                = !isEmpty
   def size: Int               = source.size
@@ -279,7 +279,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         new HomogeneousArrayColumn[Long] {
           private val cols: Array[Int => Long] = longcols map (col => col apply _)
 
-          val tpe                          = CArrayType(CLong)
+          val tpe                            = CArrayType(CLong)
           def isDefinedAt(row: RowId)        = loopForall[LongColumn](longcols)(row)
           def apply(row: RowId): Array[Long] = inflate(cols, row)
         }
@@ -288,7 +288,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         new HomogeneousArrayColumn[Double] {
           private val cols: Array[Int => Double] = doublecols map (col => col apply _)
 
-          val tpe                            = CArrayType(CDouble)
+          val tpe                              = CArrayType(CDouble)
           def isDefinedAt(row: RowId)          = loopForall[DoubleColumn](doublecols)(row)
           def apply(row: RowId): Array[Double] = inflate(cols, row)
         }

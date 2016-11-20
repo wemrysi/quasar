@@ -22,7 +22,17 @@ import java.io.{ ByteArrayOutputStream, BufferedInputStream }
 import java.nio.file._
 import java.lang.Comparable
 
-package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases {
+package object common extends quasar.Predef
+        with ygg.pkg.PackageTime
+        with ygg.pkg.PackageAliases
+        with ygg.pkg.PackageMethods
+        with matryoshka.Corecursive.ToCorecursiveOps
+        with matryoshka.Recursive.ToRecursiveOps
+        with matryoshka.FunctorT.ToFunctorTOps
+        with quasar.RenderTreeT.ToRenderTreeTOps
+        with quasar.RenderTree.ToRenderTreeOps
+        // with quasar.contrib.matryoshka.ShowT.ToShowTOps
+{
   private val InputStreamBufferSize = 8192
 
   def indent(spaces: Int, s: String): String = s.lines map ("  " + _) mkString "\n"

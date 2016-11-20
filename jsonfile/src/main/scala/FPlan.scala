@@ -16,53 +16,25 @@
 
 package quasar.physical.jsonfile.fs
 
-import ygg._, common._
-import matryoshka._, Recursive.ops._
-import quasar._, sql._, SemanticAnalysis._, RenderTree.ops._
-import quasar.fp.ski._
-import pathy.Path._
-import quasar.contrib.pathy._
+import ygg._, common._, table._
 import scalaz._, Scalaz._
 
-final case class FPlan(sql: String, lp: Fix[LogicalPlan]) {
-  def universe                      = lp.universe
-  def toTransSpec: Fix[LogicalPlan] = lp.cata[Fix[LogicalPlan]](x => Fix(x))
-
-  override def toString = sql + "\n" + indent(2, lp.render.shows) + "\n"
+final case class FPlan(sql: String, lp: Fix[LP]) {
+  def universe             = lp.universe
+  def toTransSpec: Fix[LP] = lp.cata[Fix[LP]](x => Fix(x))
+  override def toString = this.shows
 }
 
 object FPlan {
-  val lpf = new quasar.frontend.logicalplan.LogicalPlanR[Fix]
-  val opt = new quasar.frontend.logicalplan.Optimizer[Fix]
+  def apply(q: String): FPlan = new FPlan(q, compileLp(q))
+  def apply(f: jFile): FPlan  = apply(f.slurpString)
 
-  def compile(query: String): String \/ Fix[LogicalPlan] =
-    for {
-      select <- fixParser.parse(Query(query)).leftMap(_.toString)
-      attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile(attr).leftMap(_.toString)
-    } yield cld
+  lazy val zipsFile = new jFile("it/src/main/resources/tests/zips.data")
+  lazy val zips     = ygg.table.TableData(zipsFile)
 
-  def fromString(q: String): FPlan = (
-    compile(q)
-      map     opt.optimize
-      flatMap (x => (lpf ensureCorrectTypes x).disjunction leftMap (_.list.toList mkString ";"))
-  ).fold(abort, FPlan(q, _))
+  implicit def show: Show[FPlan] = Show shows (x => x.sql + "\n" + indent(2, x.lp.render.shows) + "\n")
 
-  def fromFile(file: jFile): FPlan = FPlan(
-    file.slurpString,
-    lpf.read(
-      sandboxCurrent(
-        posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file.getPath).get
-      ).get
-    )
-  )
-}
-
-object Queries {
-  def zipsFile  = new jFile("it/src/main/resources/tests/zips.data")
-  lazy val zips = ygg.table.TableData(zipsFile)
-
-  def fplans: Vector[FPlan] = Vector(
+  def queries: Vector[FPlan] = Vector(
     """SELECT * FROM zips OFFSET 100 LIMIT 5""",
     """SELECT COUNT(*) as cnt, LENGTH(city) FROM zips""",
     """SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC""",
@@ -150,5 +122,5 @@ object Queries {
     """select zips2.city from zips join zips2 on zips._id = zips2._id""",
     """select zips2.city from zips, zips2 where zips.pop < zips2.pop""",
     ""
-  ).flatMap(s => Try(FPlan fromString s).toOption.toList)
+  ).flatMap(s => Try(apply(s)).toOption.toList)
 }

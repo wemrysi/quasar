@@ -16,15 +16,10 @@
 
 package quasar.physical.jsonfile.fs
 
-import quasar.Predef._
+import ygg._, common._
 import quasar.fs._
 import quasar.qscript.{ MapFuncs => mf }
-import matryoshka._
-import matryoshka.Recursive.ops._
-// import matryoshka.FunctorT.ops._
-// import matryoshka.Corecursive.ops._
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import jawn.Facade
 import java.time._
 

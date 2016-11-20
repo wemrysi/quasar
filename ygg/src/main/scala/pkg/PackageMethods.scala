@@ -16,10 +16,9 @@
 
 package ygg.pkg
 
-trait PackageAliases extends quasar.pkg.PackageAliases {
-  type Bytes                  = scala.Array[scala.Byte]
-  type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
-  type LazyPairOf[+A]         = scalaz.Need[PairOf[A]]
-  type MaybeSelf[A]           = A =?> A
-  type jUri                   = java.net.URI
+trait PackageMethods extends quasar.pkg.PackageMethods {
+  self: quasar.Predef with ygg.pkg.PackageAliases =>
+
+  def posixCodec: PathCodec                = pathy.Path.posixCodec
+  def unsafePrintPath(path: APath): String = posixCodec unsafePrintPath path
 }

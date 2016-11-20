@@ -1,0 +1,38 @@
+# From http://quasar-analytics.org/docs/sqlreference/
+# section CLAUSES, OPERATORS, AND FUNCTIONS
+#
+
+The following clauses are supported:
+
+Type        Clauses
+Basic       SELECT, AS, FROM
+Joins       LEFT OUTER JOIN, RIGHT OUTER JOIN, INNER JOIN, FULL JOIN, CROSS
+Filtering   WHERE
+Grouping    GROUP BY, HAVING
+Conditional CASE, WHEN, DEFAULT
+Paging      LIMIT, OFFSET
+Sorting     ORDER BY, DESC, ASC
+
+The following operators are supported:
+
+Type       Operators
+Numeric    +, -, *, /, %
+String     ~ , ~*, !~, !~*, LIKE, ||
+Array      ||, [ ... ]
+Relational =, >=, <=, <>, BETWEEN, IN, NOT IN
+Boolean    AND, OR, NOT
+Projection foo.bar, foo[2], foo{*}, foo[*]
+Date/Time  TIMESTAMP, DATE, INTERVAL, TIME
+Identity   OID
+
+The following functions are supported:
+
+Type        Functions
+String      CONCAT, LOWER, UPPER, SUBSTRING, LENGTH, SEARCH
+DateTime    DATE_PART, TO_TIMESTAMP
+Nulls       COALESCE
+Arrays      ARRAY_LENGTH, FLATTEN_ARRAY
+Objects     FLATTEN_OBJECT
+Set-Level   DISTINCT, DISTINCT_BY
+Aggregation COUNT, SUM, MIN, MAX, AVG
+Identity    SQUASH
