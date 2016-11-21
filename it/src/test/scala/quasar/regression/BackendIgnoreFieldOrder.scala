@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.regression
 
 import quasar.Predef._
+import quasar.BackendName
 
-import scalaz.Equal
+sealed trait IgnoreFieldOrderBackend
 
-final case class BackendName(name: String) extends scala.AnyVal
-
-object BackendName {
-  implicit val equal: Equal[BackendName] = Equal.equalA
-}
+final case object IgnoreFieldOrderAllBackends                           extends IgnoreFieldOrderBackend
+final case class  IgnoreFieldOrderBackends(backends: List[BackendName]) extends IgnoreFieldOrderBackend

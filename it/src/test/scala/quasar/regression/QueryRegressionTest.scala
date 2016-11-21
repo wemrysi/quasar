@@ -185,7 +185,12 @@ abstract class QueryRegressionTest[S[_]](
     exp.predicate(
       exp.rows.toVector,
       act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
-      exp.ignoreFieldOrder.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved))
+      exp.ignoreFieldOrderBackend match {
+        case IgnoreFieldOrderAllBackends            =>
+          FieldOrderIgnored
+        case IgnoreFieldOrderBackends(backendNames) =>
+          backendNames.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved)
+      })
   }
 
   /** Parse and execute the given query, returning a stream of results. */
