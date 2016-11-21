@@ -102,14 +102,16 @@ object Dependencies {
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined" %  refinedVersion
+    "eu.timepit" %% "refined"     % refinedVersion,
+    "org.scalaz" %% "scalaz-core" % scalazVersion force()
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.spire-math"             %% "jawn-parser"         % jawnVersion,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
+    "eu.timepit"                 %% "refined-scalacheck"  % refinedVersion % Test
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.4",

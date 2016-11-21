@@ -18,13 +18,15 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.ejson.EJson
-import quasar.fp.coproductShow
+import quasar.fp.{coproductEqual, coproductShow}
 import quasar.physical.marklogic.ErrorMessages
 
-import matryoshka.Fix
+import matryoshka._
 import monocle.Prism
 import scalaz._
+import scalaz.std.option._
 import scalaz.std.string._
+import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 
@@ -41,6 +43,9 @@ object MarkLogicPlannerError {
   val unrepresentableEJson = Prism.partial[MarkLogicPlannerError, (Fix[EJson], ErrorMessages)] {
     case UnrepresentableEJson(ejs, msgs) => (ejs, msgs)
   } (UnrepresentableEJson.tupled)
+
+  implicit val equal: Equal[MarkLogicPlannerError] =
+    Equal.equalBy(e => (invalidQName.getOption(e), unrepresentableEJson.getOption(e)))
 
   implicit val show: Show[MarkLogicPlannerError] =
     Show.shows {
