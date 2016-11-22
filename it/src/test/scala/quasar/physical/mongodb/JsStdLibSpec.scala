@@ -66,7 +66,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     for {
       t  <- lp.cata(MongoDbPlanner.jsExprƒ)
       (pj, ifs) = t
-      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError("no JS compilation")
+      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError.fromMsg("no JS compilation")
       wf =  chain[Fix[WorkflowF]](
               $read(coll),
               $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))

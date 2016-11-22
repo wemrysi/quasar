@@ -78,7 +78,7 @@ object view {
 
       for {
         lp <- resolveViewRefs[S](readLP).leftMap(se =>
-                planningFailed(readLP, Planner.InternalError(se.shows)))
+                planningFailed(readLP, Planner.InternalError fromMsg se.shows))
         h  <- refineConstantPlan(lp).fold(dataHandle(_).liftM[FileSystemErrT], queryHandle)
       } yield h
     }
@@ -267,7 +267,7 @@ object view {
 
     def resolve[A](lp: Fix[LP], op: Fix[LP] => ExecM[A]) =
       resolveViewRefs[S](lp).run.flatMap(_.fold(
-        e => planningFailed(lp, Planner.InternalError(e.shows)).raiseError[ExecM, A],
+        e => planningFailed(lp, Planner.InternalError fromMsg e.shows).raiseError[ExecM, A],
         p => op(p)).run.run)
 
     def listViews(dir: ADir): Free[S, Set[PathSegment]] =

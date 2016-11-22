@@ -18,12 +18,13 @@ package quasar.physical.couchbase
 
 import quasar.Predef._
 import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
+import quasar.contrib.pathy.APath
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
-import quasar.physical.couchbase.common.{Context, Cursor}
+import quasar.physical.couchbase.common.{BucketCollection, Context, Cursor}
 
 import java.net.ConnectException
 import java.util.concurrent.TimeUnit.SECONDS
@@ -148,4 +149,7 @@ package object fs {
             close)
         }
     }
+
+  def bucketCollectionFromPath(p: APath): FileSystemError \/ BucketCollection =
+    BucketCollection.fromPath(p) leftMap (FileSystemError.pathErr(_))
 }

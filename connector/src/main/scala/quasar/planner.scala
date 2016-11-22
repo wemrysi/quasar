@@ -79,7 +79,13 @@ object Planner {
       }
   }
 
-  final case class InternalError(message: String) extends PlannerError
+  final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
+    def message = msg + ~cause.map(ex => s" (caused by: $ex)")
+  }
+
+  object InternalError {
+    def fromMsg(msg: String): PlannerError = apply(msg, None)
+  }
 
   implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {
     def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))

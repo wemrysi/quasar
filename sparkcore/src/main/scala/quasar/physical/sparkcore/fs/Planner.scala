@@ -78,7 +78,7 @@ object Planner {
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
   def unimplemented(what: String): SparkState[RDD[Data]] =
-    EitherT[Task, PlannerError, RDD[Data]](InternalError(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
+    EitherT[Task, PlannerError, RDD[Data]](InternalError.fromMsg(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
 
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
@@ -87,7 +87,7 @@ object Planner {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-        EitherT(InternalError(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
+        EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
     }
 
@@ -146,8 +146,8 @@ object Planner {
 
         val countEval: SparkState[Long] = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
           case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-          case Data.Int(v) => InternalError(s"Provided Integer $v is not a Long").left[Long]
-          case a => InternalError(s"$a is not a Long number").left[Long]
+          case Data.Int(v) => InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
+          case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
         })).liftM[StateT[?[_], SparkContext, ?]])
         (fromState |@| countEval)((rdd, count) =>
           rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))

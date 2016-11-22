@@ -570,7 +570,7 @@ object WorkflowBuilder {
           commonShape(rewriteDocPrefix(shape, base)).fold(
             fail(_),
             s => shape.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-              fail(InternalError("A shape with no fields does not make sense")))(
+              fail(InternalError fromMsg "A shape with no fields does not make sense"))(
               fields => emit(CollectionBuilderF(
                 chain(wf,
                   s.fold(
@@ -653,7 +653,7 @@ object WorkflowBuilder {
                 toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
               else
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-                  fail(InternalError("A shape with no fields does not make sense")))(
+                  fail(InternalError fromMsg "A shape with no fields does not make sense"))(
                   fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
                     emitSt(ungrouped.size match {
                       case 0 =>
@@ -858,7 +858,7 @@ object WorkflowBuilder {
       swapM((documentize(c1) |@| documentize(c2)) {
         case ((lb, lshape), (rb, rshape)) =>
           Reshape.mergeMaps(lshape, rshape).fold[PlannerError \/ ((Base, Base), DocContents[A])](
-            -\/(InternalError("conflicting fields when merging contents: " + lshape + ", " + rshape)))(
+            -\/(InternalError.fromMsg("conflicting fields when merging contents: " + lshape + ", " + rshape)))(
             map => {
               val llb = if (Subset(map.keySet) == lb) Root() else lb
               val rrb = if (Subset(map.keySet) == rb) Root() else rb
@@ -1128,15 +1128,15 @@ object WorkflowBuilder {
                           $project[F](Reshape(shape + (rName -> \/-($var(rbase.toDocVar)))))),
                         Root(),
                         None))))
-                case _ => fail(InternalError("couldn’t merge array"))
+                case _ => fail(InternalError fromMsg "couldn’t merge array")
               },
-              fail(InternalError("couldn’t merge unrecognized op: " + wf)))
+              fail(InternalError.fromMsg("couldn’t merge unrecognized op: " + wf)))
           }
         }
       case (_, ArrayBuilderF(_, _)) => delegate
 
       case _ =>
-        fail(InternalError("failed to merge:\n" + left.render.show + "\n" + right.render.show))
+        fail(InternalError.fromMsg("failed to merge:\n" + left.render.show + "\n" + right.render.show))
     }
   }
 
@@ -1181,7 +1181,7 @@ object WorkflowBuilder {
       (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] = {
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
-        fail(InternalError("impossible – no arguments")))(
+        fail(InternalError fromMsg "impossible – no arguments"))(
         _.map { case (wb, exprs) => Fix(normalize[F].apply(ExprBuilderF(wb, \/-(f(exprs))))) })
     }
 
@@ -1193,7 +1193,7 @@ object WorkflowBuilder {
       (implicit ev2: RenderTree[WorkflowBuilder[F]])
       : M[WorkflowBuilder[F]] =
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
-        fail(InternalError("impossible – no arguments")))(
+        fail(InternalError fromMsg "impossible – no arguments"))(
         _.flatMap { case (wb, exprs) =>
           lift(exprs.traverse[PlannerError \/ ?, JsFn](_.para(toJs)).map(jses =>
             Fix(normalize[F].apply(ExprBuilderF(wb, -\/(JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase)))))))))))
@@ -1357,7 +1357,7 @@ object WorkflowBuilder {
                 .cata(
                   {
                     case Subset(fields) => fields.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).right
-                    case b => InternalError(s"Expected a Subset but found $b").left
+                    case b => InternalError.fromMsg(s"Expected a Subset but found $b").left
                   },
                   List().right)
                 .fold(fail, i => GroupBuilder(newSrc, keys, Doc(i.toListMap)).point[M])
