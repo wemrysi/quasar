@@ -17,9 +17,7 @@
 package quasar.physical.marklogic.validation
 
 import scala.Predef._
-import scala.{Array, Boolean, StringContext}
-
-import java.lang.SuppressWarnings
+import scala.{Boolean, StringContext}
 
 import eu.timepit.refined.api.Validate
 import scalaz.std.anyVal._
@@ -27,14 +25,12 @@ import scalaz.std.anyVal._
 /** Refined predicate that checks if a `String` is a valid XML Name.
   * @see https://www.w3.org/TR/2008/REC-xml-20081126/#NT-Name
   */
-final case class IsName()
+sealed abstract class IsName()
 
-// TODO: This is a false-negative as we aren't overloading anything here.
-@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object IsName extends (String => Boolean) {
   def apply(s: String): Boolean =
     s.headOption.exists(NameStartChars member _) && s.tail.forall(NameChars member _)
 
-  implicit def isNameValidate: Validate.Plain[String, IsName] =
-    Validate.fromPredicate(this, s => s"""IsName("$s")""", IsName())
+  implicit val isNameValidate: Validate.Plain[String, IsName] =
+    Validate.fromPredicate(this, s => s"""IsName("$s")""", new IsName {})
 }
