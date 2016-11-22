@@ -1,0 +1,1 @@
+- [1690] Fuse FLWOR expressions in theta-join branches.
