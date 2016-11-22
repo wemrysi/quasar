@@ -50,6 +50,9 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
+  def ejson = Seq(
+    "org.spire-math"             %% "jawn-parser"    % jawnVersion
+  )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
@@ -108,7 +111,6 @@ object Dependencies {
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "org.spire-math"             %% "jawn-parser"         % jawnVersion,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(
