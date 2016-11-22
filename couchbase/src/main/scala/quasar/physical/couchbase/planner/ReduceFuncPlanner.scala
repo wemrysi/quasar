@@ -44,6 +44,10 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
       partialQueryString(s"avg(${n1ql(a)})").point[M]
     case Count(a)         =>
       partialQueryString(s"count(${n1ql(a)})").point[M]
+    case First(a)         =>
+      partialQueryString(s"firstk(${n1ql(a)})").point[M]
+    case Last(a)          =>
+      partialQueryString(s"last(${n1ql(a)})").point[M]
     case Max(a)           =>
       partialQueryString(s"max(${n1ql(a)})").point[M]
     case Min(a)           =>

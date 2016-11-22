@@ -193,6 +193,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
     case Min(fm)              => fx(x => (ejson.castAsAscribed[F] |@| mapFuncXQuery[T, F](fm, x))(_ apply _).join)
     case Sum(fm)              => fx(mapFuncXQuery[T, F](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F](fm, _))
+    case First(fm)            => fx(mapFuncXQuery[T, F](fm, _))
+    case Last(fm)             => fx(mapFuncXQuery[T, F](fm, _))
     case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F](fm, x) flatMap (ejson.singletonArray[F].apply(_)))
     case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F](kfm, x).tuple(mapFuncXQuery[T, F](vfm, x)).flatMap {
                                    case (k, v) => ejson.singletonObject[F].apply(k, v)
@@ -214,6 +216,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
     case Min(fm)              => castingCombiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
     case Sum(fm)              => combiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
     case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
+    case First(fm)            => combiner(fm)((x, _) => x.point[F])
+    case Last(fm)             => combiner(fm)((_, y) => y.point[F])
     case UnshiftArray(fm)     => combiner(fm)(ejson.arrayAppend[F].apply(_, _))
 
     case UnshiftMap(kfm, vfm) =>

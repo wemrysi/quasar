@@ -985,8 +985,8 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan(logical: Fix[LP], queryContext: fs.QueryContext)
-    : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
+  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {

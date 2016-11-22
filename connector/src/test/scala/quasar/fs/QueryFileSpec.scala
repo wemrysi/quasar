@@ -16,13 +16,14 @@
 
 package quasar.fs
 
-import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._
 import quasar.scalacheck._
+
+import scala.Predef.$conforms
 
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._

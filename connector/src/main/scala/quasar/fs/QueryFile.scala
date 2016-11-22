@@ -22,6 +22,7 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
@@ -133,11 +134,11 @@ object QueryFile {
   }
 
   def convertToQScriptRead
-    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_], QS[_]: Traverse: Normalizable]
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError[M, FileSystemError],
+      merr: MonadError_[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
       R:        Const[Read, ?] :<: QS,
@@ -161,15 +162,24 @@ object QueryFile {
             Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
 
     val qs =
-      merr.map(
-        merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
-            perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
-            merr.point(_)))(
-          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
-        simplifyAndNormalize[T, InterimQS, QS])
+      // FIXME: other variant – delete if unused
+    //   merr.map(
+    //     merr.bind(
+    //       convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
+    //         perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
+    //         merr.point(_)))(
+    //       rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
+    //     simplifyAndNormalize[T, InterimQS, QS])
 
-    merr.bind(qs) { qs =>
+    // merr.bind(qs) { qs =>
+    //   mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
+      (convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
+        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
+        _.point[M]) >>=
+        rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)) ∘
+        simplifyAndNormalize[T, InterimQS, QS]
+
+    qs >>= { qs =>
       mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
     }
   }

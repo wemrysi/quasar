@@ -168,7 +168,7 @@ trait OptionTInstances {
     }
 }
 
-trait StateTInstances {
+sealed trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
       def attempt[A](fa: StateT[F, S, A]) =
@@ -320,7 +320,6 @@ package object fp
     with QFoldableOps
     with DebugOps
     with CatchableInstances {
-
 
   import ski._
 

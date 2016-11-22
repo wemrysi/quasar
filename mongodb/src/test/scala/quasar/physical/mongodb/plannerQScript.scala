@@ -21,14 +21,14 @@ import quasar._, RenderTree.ops._
 import quasar.common._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.fs.FileSystemError
 import quasar.javascript._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.SortDir
+import quasar.qscript.{DiscoverPath, SortDir}
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
@@ -44,7 +44,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends
+class PlannerQScriptSpec extends
     org.specs2.mutable.Specification with
     org.specs2.ScalaCheck with
     CompilerHelpers with
@@ -59,10 +59,12 @@ class PlannerSpec extends
   import CollectionUtil._
   import quasar.frontend.fixpoint.lpf
 
-  type EitherWriter[E, A] = EitherT[Writer[Vector[PhaseResult], ?], E, A]
+  type EitherWriter[A] =
+    EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
 
-  def emit[E, A](log: Vector[PhaseResult], v: E \/ A): EitherWriter[E, A] =
-    EitherT[Writer[Vector[PhaseResult], ?], E, A](Writer(log, v))
+  def emit[A: RenderTree](label: String, v: A)
+      : EitherWriter[A] =
+    EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
 
   case class equalToWorkflow(expected: Workflow)
       extends Matcher[Crystallized[WorkflowF]] {
@@ -86,30 +88,58 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
+  val listContents: DiscoverPath.ListContents[EitherWriter] =
+    dir => (
+      if (dir ≟ rootDir)
+        Set(
+          DirName("db").left[FileName],
+          DirName("db1").left,
+          DirName("db2").left)
+      else
+        Set(
+          FileName("foo").right[DirName],
+          FileName("zips").right,
+          FileName("zips2").right,
+          FileName("a").right,
+          FileName("slamengine_commits").right,
+          FileName("person").right,
+          FileName("caloriesBurnedData").right,
+          FileName("bar").right,
+          FileName("usa_factbook").right,
+          FileName("user_comments").right,
+          FileName("days").right,
+          FileName("logs").right,
+          FileName("usa_factbook").right,
+          FileName("cities").right)).point[EitherWriter]
+
+  implicit val monadTell: MonadTell[EitherT[PhaseResultT[Id, ?], FileSystemError, ?], PhaseResults] =
+    EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
+      WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
+
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
-      .leftMap[CompilationError](CompilationError.ManyErrors(_))
+      .valueOr(es => scala.sys.error("errors while planning: ${es}"))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
-      .flatMap(_.fold(
+      .traverse(_.fold(
         _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents)).leftMap(CPlannerError(_))))
+        MongoDbQScriptPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
 
   def plan0(query: String, model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]])
-      : Either[CompilationError, Crystallized[WorkflowF]] = {
+      : Either[FileSystemError, Crystallized[WorkflowF]] = {
     fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_, model, stats, indexes).run).value.toEither
+      queryPlanner(_, model, stats, indexes).run).value.toEither.map(_.value)
   }
 
-  def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+  def plan2_6(query: String): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
 
-  def plan3_0(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+  def plan3_0(query: String): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None))
 
   def plan3_2(query: String,
@@ -127,15 +157,14 @@ class PlannerSpec extends
     c => map.get(c).orElse(defaultIndexes(c))
   }
 
-  def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+  def plan(query: String): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
-  def plan(logical: Fix[LP]): Either[PlannerError, Crystallized[WorkflowF]] = {
+  def plan(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
-      _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
-      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
-      _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+      _          <- emit("Input",      logical)
+      simplified <- emit("Simplified", optimizer.simplify(logical))
+      phys       <- MongoDbQScriptPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
     } yield phys).run.value.toEither
   }
 

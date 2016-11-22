@@ -44,7 +44,7 @@ object MongoDbSpec {
 
   def clientShould(examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
     TestConfig.testDataPrefix.flatMap { prefix =>
-      TestConfig.fileSystemConfigs(MongoDBFsType).flatMap(_.traverse { case (name, setupUri, testUri) =>
+      TestConfig.fileSystemConfigs(FsType) >>= (_.traverse { case (name, setupUri, testUri) =>
         (connect(setupUri) |@| connect(testUri)) { (setupClient, testClient) =>
             Fragments(
               examples(name, prefix, setupClient, testClient),

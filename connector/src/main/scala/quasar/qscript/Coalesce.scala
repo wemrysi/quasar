@@ -216,6 +216,8 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
           case ReduceFuncs.Max(a)             => (a._1, ReduceFuncs.Max(a._2)).some
           case ReduceFuncs.Avg(a)             => (a._1, ReduceFuncs.Avg(a._2)).some
           case ReduceFuncs.Arbitrary(a)       => (a._1, ReduceFuncs.Arbitrary(a._2)).some
+          case ReduceFuncs.First(a)           => (a._1, ReduceFuncs.First(a._2)).some
+          case ReduceFuncs.Last(a)            => (a._1, ReduceFuncs.Last(a._2)).some
           case ReduceFuncs.UnshiftArray(a)    => (a._1, ReduceFuncs.UnshiftArray(a._2)).some
           case ReduceFuncs.UnshiftMap(a1, a2) =>
             (a1._1 ≟ a2._1).option((a1._1, ReduceFuncs.UnshiftMap(a1._2, a2._2)))
