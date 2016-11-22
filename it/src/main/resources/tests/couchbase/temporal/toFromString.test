@@ -1,8 +1,5 @@
 {
     "name": "convert dates to/from strings (Couchbase)",
-
-    "NB": "Couchbase's millis_to_utc doesn't show fractional part when milliseconds are zero",
-
     "backends": {
         "mongodb_2_6":       "skip",
         "mongodb_3_0":       "skip",

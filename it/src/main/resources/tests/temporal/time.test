@@ -3,8 +3,7 @@
 
   "backends": {
     "postgresql":        "pending",
-    "marklogic":         "skip",
-    "couchbase":         "skip"
+    "marklogic":         "skip"
   },
 
   "data": "../days.data",
@@ -13,6 +12,7 @@
     where time_of_day(ts) >= time(\"08:00\") and time_of_day(ts) < time(\"10:20:30.400\")",
 
   "predicate": "containsExactly",
+  "ignoreFieldOrder": [ "couchbase" ],
   "expected": [
       { "day": "Tuesday",   "tod": "08:00:00.000", "not a date": {"$na": null}, "missing": {"$na": null} },
       { "day": "Wednesday", "tod": "09:00:00.000", "not a date": {"$na": null}, "missing": {"$na": null} },

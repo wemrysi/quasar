@@ -115,9 +115,9 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Interval(a1)              =>
       unimplementedP("Interval")
     case TimeOfDay(a1)             =>
-      // TODO: ifnull naStr proliferation
+      val tod = s"""millis_to_utc(millis(${n1ql(unwrap(a1))}), "00:00:00.000")"""
       partialQueryString(
-        s"""ifnull(millis_to_utc(millis(${n1ql(unwrap(a1))}), "00:00:00.000"), $naStr)"""
+        s"""ifnull(case when regex_contains($tod, "[.]") then $tod else $tod || ".000" end, $naStr)"""
       ).point[M]
     case ToTimestamp(a1)           =>
       partialQueryString(
