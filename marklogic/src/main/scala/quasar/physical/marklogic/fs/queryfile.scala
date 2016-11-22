@@ -35,6 +35,9 @@ import quasar.physical.marklogic.xquery._, expr._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
+import scala.util.control.NonFatal
+
+import com.marklogic.xcc.types.{XdmItem, XSString}
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, concurrent._
@@ -59,6 +62,26 @@ object queryfile {
 
     def liftQP[F[_], A](fa: F[A])(implicit ev: F :<: S): QPlan[A] =
       lift(fa).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
+
+    def prettyPrint(xqy: XQuery): QPlan[Option[XQuery]] = {
+      val pp = SessionIO.resultsOf_(xdmp.prettyPrint(XQuery(s"'$xqy'"))).attempt flatMap {
+        case -\/(ex @ XQueryFailure(_, _)) =>
+          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
+            "Malformed XQuery", Some(ex))).left[ImmutableArray[XdmItem]].point[SessionIO]
+
+        // NB: As this is only for pretty printing, if we fail for some other reason
+        //     just return an empty result.
+        case -\/(NonFatal(_)) => ImmutableArray.fromArray(Array[XdmItem]())
+                                   .right[FileSystemError]
+                                   .point[SessionIO]
+
+        case -\/(fatal)       => SessionIO.fail[FileSystemError \/ ImmutableArray[XdmItem]](fatal)
+        case \/-(r)           => r.right[FileSystemError].point[SessionIO]
+      }
+
+      EitherT(lift(pp).into[S].liftM[PhaseResultT])
+        .map(_.headOption collect { case s: XSString => XQuery(s.asString) })
+    }
 
     def lpToXQuery(lp: Fix[LogicalPlan]): QPlan[MainModule] = {
       type MLQScript[A] = QScriptShiftRead[Fix, A]
@@ -92,7 +115,6 @@ object queryfile {
                        repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
                        repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
                      .transCata(rewrite.optimize(reflNT))
-
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
@@ -103,7 +125,9 @@ object queryfile {
                      case UnrepresentableEJson(ejs, _) =>
                        FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
                    })
-        _       <- logPhase(PhaseResult.detail("XQuery", main.render))
+        pp      <- prettyPrint(main.queryBody)
+        xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
+        _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
       } yield main
     }
 
