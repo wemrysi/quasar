@@ -1,0 +1,1458 @@
+# Import babysitting:
+#
+# ag-bare -w import --scala
+#
+ 412 import quasar.Predef._
+ 254 import scalaz._, Scalaz._
+ 111 import quasar.fp._
+  99 import scalaz.concurrent.Task
+  93 import scalaz._
+  93 import quasar.contrib.pathy._
+  88 import quasar.fp.ski._
+  84 import pathy.Path._
+  72 import matryoshka._
+  53 import quasar.fs._
+  47 import scala.Predef.$conforms
+  36 import quasar.Data
+  35 import argonaut._, Argonaut._
+  34 import quasar._
+  32 import quasar.fp.free._
+  32 import quasar.contrib.matryoshka._
+  31 import ygg.common._
+  28 import matryoshka._, Recursive.ops._
+  28 import eu.timepit.refined.auto._
+  26 import monocle.Prism
+  24 import scalaz.stream.Process
+  24 import matryoshka.Fix
+  22 import ygg._, common._
+  22 import quasar.qscript._
+  22 import quasar.effect._
+  21 import monocle.macros.Lenses
+  19 import scalaz.syntax.show._
+  19 import quasar.physical.marklogic.xquery.syntax._
+  19 import quasar.jscore._
+  19 import quasar.fp.numeric._
+  19 import pathy.scalacheck.PathyArbitrary._
+  18 import scalaz.stream._
+  18 import quasar.physical.mongodb.workflow._
+  18 import quasar.physical.mongodb.expression._
+  18 import quasar.frontend.fixpoint.lpf
+  17 import ygg._, common._, json._
+  17 import simulacrum.typeclass
+  17 import scalaz.{Failure => _, _}, Scalaz._
+  17 import quasar.javascript._
+  17 import quasar.fp._, eitherT._
+  16 import scalaz.syntax.std.option._
+  16 import scalaz.syntax.monad._
+  16 import scalaz.std.string._
+  15 import quasar.fp.ski.κ
+  15 import pathy.Path, Path._
+  14 import quasar.std.StdLib._
+  14 import quasar.physical.mongodb.accumulator._
+  14 import org.http4s._
+  14 import fixExprOp._
+  13 import quasar.frontend.logicalplan.LogicalPlan
+  13 import quasar.effect.Failure
+  13 import org.specs2.execute._
+  13 import org.scalacheck._
+  13 import org.http4s.dsl._
+  12 import scalaz.syntax.foldable._
+  12 import quasar.qscript.MapFuncs._
+  12 import quasar.fs.mount._
+  12 import quasar.fp._, free._
+  12 import quasar.fp.TaskRef
+  11 import trans._
+  11 import matryoshka._, Recursive.ops._, FunctorT.ops._
+  11 import eu.timepit.refined.api.Refined
+  10 import ygg._, common._, table._
+  10 import scalaz.std.tuple._
+  10 import scalaz.std.option._
+  10 import scala.collection.JavaConverters._
+  10 import quasar.physical.marklogic.xquery._
+  10 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+  10 import monocle.Lens
+  10 import SampleData._
+  10 import QueryFile._
+   9 import scalaz.std.list._
+   9 import quasar.physical.mongodb._
+   9 import quasar.jscore, jscore.{JsCore, JsFn}
+   9 import quasar._, Planner._
+   9 import quasar.RenderTree
+   9 import pathy.Path.posixCodec
+   9 import org.threeten.bp._
+   8 import ygg.data._
+   8 import quasar.{Data, DataCodec}
+   8 import quasar.sql._
+   8 import quasar.sql.Sql
+   8 import quasar.qscript.SortDir
+   8 import quasar.physical.marklogic.xml._
+   8 import quasar.contrib.pathy.ADir
+   8 import quasar._, RenderTree.ops._
+   8 import pathy.argonaut.PosixCodecJson._
+   8 import org.scalacheck.{Arbitrary, Gen}
+   8 import org.http4s.argonaut._
+   8 import org.apache.spark.rdd._
+   8 import org.apache.spark._
+   8 import matryoshka.patterns._
+   8 import argonaut._
+   8 import WriteFile._
+   8 import ManageFile._
+   7 import ygg._, common._, json._, table._
+   7 import shapeless._
+   7 import scalaz.syntax.functor._
+   7 import scalaz.std.iterable._
+   7 import scalaz.std.anyVal._
+   7 import scalaz._, Scalaz._, Ordering._
+   7 import scalaz.Scalaz._
+   7 import quasar.physical.mongodb.workflowtask._
+   7 import quasar.javascript.Js
+   7 import quasar.fp.eitherT._
+   7 import quasar.contrib.pathy._, PathArbitrary._
+   7 import quasar.connector.EnvironmentError
+   7 import quasar.common._
+   7 import quasar.Predef.{ -> => _, _ }
+   7 import quasar.Predef.String
+   7 import org.specs2.matcher._
+   7 import mjs._
+   7 import matryoshka._, FunctorT.ops._
+   7 import MapFuncs._
+   7 import CollectionUtil._
+   6 import ygg.table._
+   6 import ygg._, common._, data._
+   6 import shapeless.Nat
+   6 import scodec.bits.ByteVector
+   6 import scalaz.syntax.either._
+   6 import scalaz.scalacheck.ScalazProperties._
+   6 import scala.concurrent.duration._
+   6 import scala.Any
+   6 import quasar.physical.marklogic.validation._
+   6 import quasar.namegen._
+   6 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+   6 import quasar.fp.free, free._
+   6 import quasar.ejson.EJson
+   6 import quasar.effect.{KeyValueStore, MonotonicSeq}
+   6 import quasar.effect.LiftedOps
+   6 import quasar.contrib.shapeless._
+   6 import quasar.common.PhaseResults
+   6 import quasar.api._
+   6 import quasar.RenderTree.ops._
+   6 import org.threeten.bp.Instant
+   6 import org.specs2.specification.core.Fragment
+   6 import monocle.std.{disjunction => D}
+   6 import monocle.Iso
+   6 import java.lang.SuppressWarnings
+   6 import com.mongodb.async.client.MongoClient
+   6 import ReadFile._
+   6 import QueryFile.ResultHandle
+   6 import FileSystemError._, PathError._
+   6 import DataArbitrary._
+   5 import shapeless.{Data => _, :: => _, _}
+   5 import scalaz.{Order, Show}
+   5 import scalaz.syntax.applicative._
+   5 import scalaz.scalacheck.ScalaCheckBinding._
+   5 import quasar.{RenderTree, Terminal}
+   5 import quasar.std._
+   5 import quasar.sql.fixpoint._
+   5 import quasar.sql.JoinDir
+   5 import quasar.physical.mongodb.Bson
+   5 import quasar.main._
+   5 import quasar.fp.numeric.Positive
+   5 import quasar.fp.free.lift
+   5 import quasar.fp.free
+   5 import quasar.effect.MonotonicSeq
+   5 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+   5 import quasar.common.PhaseResult.detail
+   5 import quasar.api.matchers._
+   5 import quasar.api.PathUtils._
+   5 import quasar.NameGenerator
+   5 import quasar.DataArbitrary._
+   5 import pathy._, Path._
+   5 import org.specs2.scalaz._
+   5 import org.scalacheck.Arbitrary
+   5 import org.http4s.headers._
+   5 import monocle.std.tuple2._
+   5 import jscore._
+   5 import jawn._
+   5 import java.nio.file._
+   5 import fp._
+   5 import doobie.imports._
+   5 import com.marklogic.xcc.types.XdmItem
+   5 import Type._
+   5 import MapReduce._
+   5 import FileSystemError._
+   5 import EitherT.eitherTMonad
+   5 import Data._
+   5 import ByteBufferPool._
+   4 import scalaz.{Lens => _, _}
+   4 import scalaz.{Failure => _, _}
+   4 import scalaz.std.vector._
+   4 import scalaz.scalacheck.ScalazArbitrary._
+   4 import scalaz.concurrent._
+   4 import scalaz.Show
+   4 import scalaz.NonEmptyList
+   4 import scala.util.control.NonFatal
+   4 import scala.util.Random
+   4 import scala.StringContext
+   4 import scala.Predef.implicitly
+   4 import scala.Predef.identity
+   4 import sbt._, Keys._
+   4 import quasar.regression._
+   4 import quasar.qscript.{ MapFuncs => mf }
+   4 import quasar.physical.postgresql.common._
+   4 import quasar.physical.marklogic.xcc._
+   4 import quasar.physical.marklogic.ErrorMessages
+   4 import quasar.jscore, jscore.JsFn
+   4 import quasar.fs._, InMemory._
+   4 import quasar.frontend.logicalplan.{LogicalPlan => LP}
+   4 import quasar.fp.liftMT
+   4 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+   4 import quasar.effect.uuid.GenUUID
+   4 import quasar.contrib.pathy.APath
+   4 import quasar.config._
+   4 import quasar.Variables
+   4 import quasar.TreeMatchers
+   4 import org.http4s.HttpService
+   4 import monocle.function.Field1
+   4 import matryoshka._, FunctorT.ops._, Recursive.ops._
+   4 import java.time._
+   4 import java.lang.System
+   4 import java.lang.Exception
+   4 import eu.timepit.refined.scalacheck.numeric._
+   4 import eu.timepit.refined.refineV
+   4 import com.marklogic.xcc._
+   4 import argonaut.ArgonautScalaz._
+   4 import WorkflowBuilder._
+   4 import Mounting.PathTypeMismatch
+   4 import MaybeOrdering._
+   4 import FormatSpecifier._
+   3 import ygg.json._
+   3 import ygg._, common._, json._, table._, trans._
+   3 import transforms._
+   3 import structural._
+   3 import shapeless.{Data => _, _}
+   3 import shapeless.HNil
+   3 import scalaz.{Show, Order}
+   3 import scalaz.{ Source => _, _ }, Scalaz._
+   3 import scalaz.syntax.std.boolean._
+   3 import scalaz.iteratee._
+   3 import scalaz.concurrent.{Strategy, Task}
+   3 import scalaz._, Scalaz.{ToIdOps => _, _}
+   3 import scalaz._, Scalaz._, Validation.{success, failure}
+   3 import scalaz.Equal
+   3 import scala.util.parsing.combinator._
+   3 import scala.math.Ordering
+   3 import scala.collection.immutable.ListMap
+   3 import scala.collection.Seq
+   3 import scala.Symbol
+   3 import queryFixture._
+   3 import quasar.{Data, DataArbitrary}
+   3 import quasar.sql.CompilerHelpers
+   3 import quasar.sql, sql.Sql
+   3 import quasar.specs2.QuasarMatchers._
+   3 import quasar.scalacheck._
+   3 import quasar.qscript.ReduceFuncs._
+   3 import quasar.qscript.MapFunc._
+   3 import quasar.qscript, qscript._
+   3 import quasar.pkg.tests._
+   3 import quasar.physical.mongodb.{Bson, BsonField}
+   3 import quasar.physical.mongodb.planner.MongoDbPlanner
+   3 import quasar.physical.mongodb.expression.DocVar
+   3 import quasar.physical.mongodb.execution._
+   3 import quasar.physical.marklogic.xml.namespaces._
+   3 import quasar.physical.marklogic.prisms._
+   3 import quasar.physical.couchbase.common._
+   3 import quasar.physical.couchbase._
+   3 import quasar.main.FilesystemQueries
+   3 import quasar.fs.mount._, FileSystemDef.DefinitionResult
+   3 import quasar.fs.mount.ConnectionUri
+   3 import quasar.fs.PathError._
+   3 import quasar.fs.FileSystemType
+   3 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
+   3 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+   3 import quasar.frontend.logicalplan._
+   3 import quasar.frontend._
+   3 import quasar.fp.tree._
+   3 import quasar.fp.numeric.{Natural, Positive}
+   3 import quasar.fp.binder._
+   3 import quasar.effect.Read
+   3 import quasar.connector.PlannerErrT
+   3 import quasar.build.BuildInfo
+   3 import quasar.api.services._
+   3 import quasar._, Predef._
+   3 import quasar.Type
+   3 import quasar.RenderTree, RenderTree.ops._
+   3 import quasar.Predef.{Map => _, _}
+   3 import quasar.Predef.{ Eq => _, _ }
+   3 import quasar.Planner.UnsupportedPlan
+   3 import quasar.Planner.PlannerError
+   3 import quasar.DataCodec
+   3 import quasar.Data._
+   3 import quasar.BackendName
+   3 import posixCodec.printPath
+   3 import pathy.{Path => PPath}, PPath._
+   3 import org.specs2.specification.core._
+   3 import org.specs2.matcher.MatchResult
+   3 import org.specs2.execute.Result
+   3 import org.scalacheck.Arbitrary, Arbitrary._
+   3 import org.mapdb._
+   3 import org.http4s.server.syntax._
+   3 import org.http4s.headers.`Content-Type`
+   3 import org.apache.spark.SparkContext
+   3 import monocle._
+   3 import matryoshka.patterns.CoEnv
+   3 import jawn.Facade
+   3 import java.util.UUID
+   3 import java.net.URI
+   3 import java.lang.RuntimeException
+   3 import com.mongodb._
+   3 import c.universe._
+   3 import c._
+   3 import StateT.stateTMonadState
+   3 import ReduceFuncs._
+   3 import ReadFile.ReadHandle
+   3 import Planner._
+   3 import PathError._
+   3 import MountConfig._
+   3 import JsonTestSupport._
+   3 import Js._
+   3 import EnvironmentError._
+   3 import CPath._
+   3 import BsonGen._
+   2 import ygg._, common._, trans._
+   2 import ygg._, common._, table._, trans._
+   2 import ygg._, common._, table._, json._
+   2 import ygg._, common._, json._, data._
+   2 import ygg._, common._, data._, json._
+   2 import types.undef
+   2 import std.DateLib._
+   2 import shapeless.nat._
+   2 import shapeless.contrib.scalaz.instances._
+   2 import set._
+   2 import scopt.OptionParser
+   2 import scodec.bits._
+   2 import scalaz.{Optional => _, _}
+   2 import scalaz.{Node => _, _}, Scalaz._
+   2 import scalaz.{Lens => _, _}, Scalaz._
+   2 import scalaz.{Free => _, _}, Scalaz._
+   2 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
+   2 import scalaz.{Divide => _, _}, Scalaz._
+   2 import scalaz.{ Source => _, _ }, Scalaz._, Ordering._
+   2 import scalaz.syntax.id._
+   2 import scalaz.syntax.equal._
+   2 import scalaz.syntax.bifunctor._
+   2 import scalaz.syntax.apply._
+   2 import scalaz._, Scalaz._, scalaz.concurrent.Task
+   2 import scalaz._, Scalaz._, Validation.success
+   2 import scalaz._, Ordering._
+   2 import scalaz._, NaturalTransformation.refl
+   2 import scalaz._, Either3._
+   2 import scala.xml._
+   2 import scala.xml.Elem
+   2 import scala.util.Sorting.quickSort
+   2 import scala.util.Properties._
+   2 import scala.sys
+   2 import scala.reflect.macros.blackbox._
+   2 import scala.math.{ min, max }
+   2 import scala.collection.{ mutable => scm }
+   2 import scala.collection.immutable.Seq
+   2 import scala.annotation.tailrec
+   2 import scala._
+   2 import scala.Predef.{ $conforms, assert }
+   2 import scala.Predef.classOf
+   2 import scala.Predef.assert
+   2 import scala.Predef._
+   2 import scala.Predef.String
+   2 import scala.Option
+   2 import scala.Either
+   2 import rx.lang.scala._, JavaConverters._
+   2 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
+   2 import queryfileTypes._
+   2 import quasar.{Variables, VarName, VarValue}
+   2 import quasar.{RenderTree, Terminal, NonTerminal}
+   2 import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
+   2 import quasar.{Data, TestConfig}
+   2 import quasar.{Data, Func}
+   2 import quasar.{Data, DataCodec, DataEncodingError}
+   2 import quasar.{ qscript => qs }
+   2 import quasar.std.StdLib.set._
+   2 import quasar.std.StdLib, StdLib._
+   2 import quasar.sql.SemanticAnalysis._
+   2 import quasar.sql
+   2 import quasar.qscript.MapFunc
+   2 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
+   2 import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
+   2 import quasar.physical.sparkcore.fs.readfile.Input
+   2 import quasar.physical.sparkcore.fs.queryfile.Input
+   2 import quasar.physical.mongodb.workflow.$SortF
+   2 import quasar.physical.mongodb.optimize.pipeline._
+   2 import quasar.physical.mongodb.fs.bsoncursor._
+   2 import quasar.physical.mongodb.fs.MongoDBFsType
+   2 import quasar.physical.mongodb.Collection
+   2 import quasar.physical.marklogic.xml.SecureXML
+   2 import quasar.physical.marklogic.xml.QName
+   2 import quasar.physical.marklogic.xcc.SessionIO
+   2 import quasar.physical.marklogic.qscript._
+   2 import quasar.physical.couchbase.planner.Planner._
+   2 import quasar.physical.couchbase._, N1QL._, Select._
+   2 import quasar.physical.couchbase.N1QL._
+   2 import quasar.fs.mount.{Mounting, MountingError}
+   2 import quasar.fs.mount.hierarchical._
+   2 import quasar.fs.mount._, FileSystemDef._
+   2 import quasar.fs.mount._, FileSystemDef.DefErrT
+   2 import quasar.fs.mount.MountingsConfig
+   2 import quasar.fs.impl.ensureMoveSemantics
+   2 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
+   2 import quasar.fs._, InMemory.InMemState
+   2 import quasar.fs._, FileSystemTypeArbitrary._
+   2 import quasar.fs._, FileSystemError._
+   2 import quasar.fs._,
+   2 import quasar.fs.SandboxedPathy._
+   2 import quasar.fs.InMemory.InMemState
+   2 import quasar.fs.FileSystemError._
+   2 import quasar.fs.FileSystemError
+   2 import quasar.fs.DataCursor
+   2 import quasar.frontend.{logicalplan => lp}
+   2 import quasar.frontend.{SemanticErrors, SemanticErrsT}
+   2 import quasar.frontend.{ logicalplan => lp }
+   2 import quasar.frontend.SemanticErrsT
+   2 import quasar.fp.ski.ι
+   2 import quasar.fp.kleisli._
+   2 import quasar.fp.free.flatMapSNT
+   2 import quasar.fp._, ski._, numeric._
+   2 import quasar.ejson._
+   2 import quasar.contrib.pathy.{ADir, AFile, APath}
+   2 import quasar.contrib.pathy.FPath
+   2 import quasar.contrib.pathy.AFile
+   2 import quasar.console._
+   2 import quasar.connector.{EnvironmentError, EnvErrT}
+   2 import quasar.connector.CompileM
+   2 import quasar.common.{PhaseResults, PhaseResultT}
+   2 import quasar.common.{PhaseResult, PhaseResults}
+   2 import quasar.build
+   2 import quasar._, sql._
+   2 import quasar._, SemanticError._
+   2 import quasar._, Planner.{PlannerError, InternalError}
+   2 import quasar.Type._
+   2 import quasar.Type.Const
+   2 import quasar.QuasarSpecification
+   2 import quasar.Predef.List
+   2 import quasar.Planner.{InternalError, PlannerError}
+   2 import quasar.Planner._
+   2 import qfTransforms._
+   2 import org.threeten.bp.{Duration, Instant}
+   2 import org.threeten.bp.Duration
+   2 import org.specs2.matcher.TraversableMatchers._
+   2 import org.specs2.matcher.MustMatchers._
+   2 import org.specs2.matcher.MatchersImplicits._
+   2 import org.specs2.main.ArgProperty
+   2 import org.scalacheck.{Gen, Arbitrary, Shrink}
+   2 import org.scalacheck.Prop
+   2 import org.scalacheck.Gen
+   2 import org.scalacheck.Arbitrary.arbitrary
+   2 import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
+   2 import org.http4s.util._
+   2 import org.http4s.server._
+   2 import org.http4s.dsl.{Path => HPath}
+   2 import org.http4s._, Status._
+   2 import org.http4s._, Method.MOVE
+   2 import org.http4s.Uri
+   2 import org.http4s.Method.PUT
+   2 import org.http4s.Method.POST
+   2 import org.bson.BsonDocument
+   2 import org.apache.xerces.util.XMLChar
+   2 import org.apache.hadoop.fs.Path;
+   2 import org.apache.hadoop.fs.Path
+   2 import org.apache.hadoop.fs.FileSystem;
+   2 import org.apache.hadoop.fs.FileSystem
+   2 import monocle.syntax.fields._
+   2 import monocle.macros.GenLens
+   2 import monocle._, macros.Lenses
+   2 import matryoshka.{Hole => _, _}, Recursive.ops._
+   2 import matryoshka.{Hole => _, _}
+   2 import matryoshka._, Recursive.ops._, TraverseT.ops._
+   2 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+   2 import matryoshka.Recursive
+   2 import matryoshka.AlgebraM
+   2 import jscore.{
+   2 import java.util.concurrent.atomic.AtomicLong
+   2 import java.lang.{Boolean => JBoolean}
+   2 import java.lang.String
+   2 import java.io.{File, PrintWriter, FileOutputStream}
+   2 import java.io._
+   2 import java.io.OutputStreamWriter
+   2 import java.io.File
+   2 import java.io.BufferedWriter
+   2 import identity._
+   2 import hierarchical.MountedResultH
+   2 import grouping._
+   2 import fp3_0._
+   2 import fp.ski._
+   2 import eu.timepit.refined.string.Uri
+   2 import eu.timepit.refined.api.Validate
+   2 import eu.timepit.refined.api.RefType.ops._
+   2 import corequeryfile.RddState
+   2 import com.mongodb.async.client._
+   2 import com.marklogic.xcc.exceptions.XQueryException
+   2 import com.github.tototoshi.csv._
+   2 import com.couchbase.client.java.transcoder.JsonTranscoder
+   2 import com.couchbase.client.java.document.json.JsonObject
+   2 import com.couchbase.client.java.document.JsonDocument
+   2 import argonaut.JsonScalaz._
+   2 import argonaut.Json
+   2 import argonaut.EncodeJson
+   2 import argonaut.DecodeJson
+   2 import argonaut.Argonaut._
+   2 import WriterT.writerTMonad
+   2 import WriteFile.WriteHandle
+   2 import WorkflowExecutor.WorkflowCursor
+   2 import Validation.FlatMap._
+   2 import ToApiError.ops._
+   2 import ToApiError._, ops._
+   2 import StructuralLib._
+   2 import SliceTransform1._
+   2 import Selector._
+   2 import RelationsLib._
+   2 import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
+   2 import Provenance._
+   2 import Normalizable._
+   2 import MustMatchers._
+   2 import MoveSemantics._
+   2 import MountType._
+   2 import MongoQueryModel._
+   2 import MongoDbIO._
+   2 import MathLib._
+   2 import MapFunc._
+   2 import ManageFile.MoveSemantics
+   2 import MainModule._
+   2 import Leibniz.===
+   2 import JParser._
+   2 import JDBM._
+   2 import Iteratee._
+   2 import FunctionDecl._
+   2 import FileSystemTest._, FileSystemError._, PathError._
+   2 import FileSystemDef._
+   2 import FileSystemDef.DefinitionResult
+   2 import DateLib._
+   2 import ConfigError._
+   2 import CPathTraversal._
+   2 import C._
+   2 import Bson._
+   2 import Arbitrary._
+   2 import ApiError._
+   1 import ygg.table.Render
+   1 import ygg.table.NumericComparisons._
+   1 import ygg.macros._
+   1 import ygg.macros.JValueMacros
+   1 import ygg.macros.DataFacade
+   1 import ygg.json.{ JType => J }
+   1 import ygg.json.JTextT
+   1 import ygg.data.Bits
+   1 import ygg.common.{ quasarExtensionOps => _, _ }
+   1 import ygg.common._, ygg.json._
+   1 import ygg.cf.{ Remap, Empty }
+   1 import ygg.cf
+   1 import ygg._, table._, common._
+   1 import ygg._, json._, table._, trans._, repl._
+   1 import ygg._, common._, table._, trans._, json._
+   1 import ygg._, common._, json._, trans._, data._
+   1 import ygg._, common._, json._, trans._
+   1 import ygg._, common._, json._, data._, table._
+   1 import ygg._, common._, data._, trans._
+   1 import ygg._, common._, data._, json._, trans._
+   1 import xform._
+   1 import xcc.{ContentSourceIO, ResultCursor, SessionIO}
+   1 import x.fields
+   1 import x._
+   1 import windowsCodec.printPath
+   1 import wartremover._
+   1 import uuid.GenUUID
+   1 import trans.ID
+   1 import tableIndex.indices
+   1 import syntax._, expr._, axes.{attribute, child}
+   1 import syntax._, expr._, axes.child
+   1 import structural.ObjectProject
+   1 import string._
+   1 import std.StdLib._
+   1 import stateAdt._
+   1 import source._
+   1 import ski._
+   1 import shapeless.{nat, Sized}
+   1 import shapeless.{nat, Nat, Sized}
+   1 import shapeless.{Prism => _, _}
+   1 import shapeless.{Nat}
+   1 import shapeless.{Nat, Sized}
+   1 import shapeless.{Fin, Nat, Sized, Succ}
+   1 import shapeless.{Data => _, Coproduct => _, _}
+   1 import shapeless.{Annotations => _, Data => _, :: => _, _}
+   1 import shapeless.{:: => _, _}
+   1 import shapeless.tag.@@
+   1 import shapeless.ops.nat._
+   1 import shapeless.contrib.scalaz.instances.{deriveShow => _, _}
+   1 import shapeless.contrib.scalaz._
+   1 import shapeless.Sized
+   1 import self.nodes
+   1 import self._
+   1 import scodec.interop.scalaz._
+   1 import scodec.bits.{ByteVector}
+   1 import scalaz.~>
+   1 import scalaz.{~>, Monad}
+   1 import scalaz.{~>, /, Applicative}
+   1 import scalaz.{Zip => _, _}, Scalaz._
+   1 import scalaz.{Tree => _, _}, Scalaz._
+   1 import scalaz.{Ordering => _, _}
+   1 import scalaz.{Order, Show, /}
+   1 import scalaz.{Order => _, _}
+   1 import scalaz.{Optional => _, _}, Scalaz._
+   1 import scalaz.{NonEmptyList, Scalaz}, Scalaz._
+   1 import scalaz.{NonEmptyList, MonadError}
+   1 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
+   1 import scalaz.{Name => _, _}, Scalaz._
+   1 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
+   1 import scalaz.{Lens => _, Failure => _, _}, Id.Id
+   1 import scalaz.{Lens => _, Failure => _, _}
+   1 import scalaz.{Free, Scalaz}, Scalaz._
+   1 import scalaz.{Foldable, IList}
+   1 import scalaz.{Failure => _, Success => _, _}
+   1 import scalaz.{Equal, Show}
+   1 import scalaz.{Equal, Show, Monoid}
+   1 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
+   1 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
+   1 import scalaz.{Const, EitherT, Monad}
+   1 import scalaz.{:<:, ~>}
+   1 import scalaz.{:+: => _, Divide => _, _}, Scalaz.{ToIdOps => _, _}, Inject._, Leibniz._
+   1 import scalaz.{:+: => _, Divide => _, _},
+   1 import scalaz.{/-, -/}
+   1 import scalaz.{ Tree => _, _ }, Scalaz._
+   1 import scalaz.{ Show, Equal }
+   1 import scalaz.{ =?> => _, _ }, Scalaz.{ ToIdOps => _, _}, Ordering._
+   1 import scalaz.{ =?> => _, _ }
+   1 import scalaz.syntax.writer._
+   1 import scalaz.syntax.traverse._
+   1 import scalaz.syntax.std.list._
+   1 import scalaz.syntax.std.either._
+   1 import scalaz.syntax.nel._
+   1 import scalaz.syntax.monadError._
+   1 import scalaz.syntax.foldable1._
+   1 import scalaz.stream.{Writer => _, _}
+   1 import scalaz.stream.{Process, io}
+   1 import scalaz.stream.async
+   1 import scalaz.scalacheck.ScalazProperties.{equal => _, _}
+   1 import scalaz.iteratee.EnumeratorT
+   1 import scalaz.concurrent.{Task, Strategy}
+   1 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
+   1 import scalaz._, scalaz.syntax.applicative._
+   1 import scalaz._, concurrent.Task, Scalaz._
+   1 import scalaz._, Validation.{success, failure}
+   1 import scalaz._, Validation.{success, failureNel}
+   1 import scalaz._, Validation.success
+   1 import scalaz._, Scalaz.{ ToIdOps => _, _ }
+   1 import scalaz._, Scalaz._, concurrent._
+   1 import scalaz._, Scalaz._, Validation.{success, failureNel}
+   1 import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
+   1 import scalaz._, Scalaz._, Ordering._, Either3._
+   1 import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
+   1 import scalaz._, Scalaz._, &/._
+   1 import scalaz._, NonEmptyList.nels, Validation.{success, failure}
+   1 import scalaz._, Leibniz._, Scalaz._
+   1 import scalaz._, Leibniz._
+   1 import scalaz._, Id._
+   1 import scalaz._, Id.Id
+   1 import scalaz._ // , Scalaz._
+   1 import scalaz.ValidationNel
+   1 import scalaz.Validation.fromTryCatchNonFatal
+   1 import scalaz.Validation.FlatMap._
+   1 import scalaz.Validation, Validation.FlatMap._
+   1 import scalaz.Ordering._
+   1 import scalaz.NaturalTransformation.natToFunction
+   1 import scalaz.MonadError
+   1 import scalaz.Id._
+   1 import scalaz.IList
+   1 import scalaz.EitherT
+   1 import scalaz.Cofree
+   1 import scalaz./
+   1 import scalacheck.ScalazArbitrary._
+   1 import scala.{runtime => R}
+   1 import scala.{collection => C}
+   1 import scala.{Predef => P}
+   1 import scala.{Boolean, Option, Predef}
+   1 import scala.{ inline, AnyVal }
+   1 import scala.{ collection => sc }
+   1 import scala.{ Symbol => Sym }
+   1 import scala.{ Seq, StringContext }
+   1 import scala.{ Null, collection => sc }
+   1 import scala.{ Iterator }
+   1 import scala.{ Byte, Char }
+   1 import scala.{ Any, StringContext }
+   1 import scala.xml.factory.XMLLoader
+   1 import scala.xml.Utility
+   1 import scala.util.{Success, Failure}
+   1 import scala.util.{ Success, Failure }
+   1 import scala.util.parsing.input.CharArrayReader.EofCh
+   1 import scala.util.parsing.combinator.syntactical._
+   1 import scala.util.parsing.combinator.lexical._
+   1 import scala.util.matching.Regex
+   1 import scala.util.Try
+   1 import scala.util.Properties
+   1 import scala.reflect.ClassTag
+   1 import scala.math.{ceil, log}
+   1 import scala.math.{Ordering => SOrdering}
+   1 import scala.math.{ abs, signum }
+   1 import scala.math.signum
+   1 import scala.math.min
+   1 import scala.math.max
+   1 import scala.math.abs
+   1 import scala.math.Integral
+   1 import scala.math
+   1 import scala.language.postfixOps
+   1 import scala.io.Source
+   1 import scala.collection.{immutable => I}
+   1 import scala.collection.{Seq => SSeq}
+   1 import scala.collection.{JavaConversions, Seq}, JavaConversions._
+   1 import scala.collection.{ mutable => scm, immutable => sci }
+   1 import scala.collection.mutable.Builder
+   1 import scala.collection.mutable
+   1 import scala.collection.immutable.{Map => ScalaMap}
+   1 import scala.collection.immutable.NumericRange
+   1 import scala.collection.IndexedSeq
+   1 import scala.annotation.switch
+   1 import scala.Some
+   1 import scala.Right
+   1 import scala.None
+   1 import scala.AnyVal
+   1 import scala.AnyRef
+   1 import sbt._
+   1 import sampleData.data
+   1 import runner._
+   1 import relations._
+   1 import query.transforms.ExecM
+   1 import query._, transforms.ExecM
+   1 import quasar.{queryPlan, Variables}
+   1 import quasar.{fs => _, _}, RenderTree.ops._, Type._
+   1 import quasar.{ejson => ejs}
+   1 import quasar.{Variables, VariablesArbitrary}
+   1 import quasar.{UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+   1 import quasar.{Type, RenderTree, Terminal}, Type.⨿
+   1 import quasar.{TestConfig, Variables}
+   1 import quasar.{Terminal, RenderTree}
+   1 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+   1 import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
+   1 import quasar.{Planner => _, _}
+   1 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
+   1 import quasar.{NonTerminal, RenderedTree, RenderTree, Terminal}, RenderTree.ops._
+   1 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
+   1 import quasar.{NonTerminal, RenderTree, RenderedTree}, RenderTree.ops._
+   1 import quasar.{NonTerminal, RenderTree, RenderedTree, SemanticError, Terminal, VarName},
+   1 import quasar.{NameGenerator, Type}
+   1 import quasar.{NameGenerator => QNameGenerator}
+   1 import quasar.{NameGenerator => NG}
+   1 import quasar.{Func, TypeArbitrary}
+   1 import quasar.{Func, Type, SemanticError}
+   1 import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
+   1 import quasar.{DataEncodingError, Data, DataCodec}
+   1 import quasar.{Data, queryPlan, Variables}
+   1 import quasar.{Data, Type}
+   1 import quasar.{Data, Type, Func, BinaryFunc, Mapping, SemanticError}, SemanticError._
+   1 import quasar.{Data, TermLogicalPlanMatchers}
+   1 import quasar.{Data, Qspec, Type}
+   1 import quasar.{Data, Planner => QPlanner}
+   1 import quasar.{Data, GenericFunc}
+   1 import quasar.{Data, Func, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
+   1 import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError},
+   1 import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, Type, Mapping, SemanticError},
+   1 import quasar.{Data, Func, Type}
+   1 import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+   1 import quasar.{Data, DataCodec, Variables}
+   1 import quasar.{Data, DataCodec, Planner, SemanticError}
+   1 import quasar.{BinaryFunc, Data, Func, GenericFunc, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
+   1 import quasar.{BackendName, Data, TestConfig}
+   1 import quasar.{ ejson => ej }
+   1 import quasar.std.{DateLib, StringLib}
+   1 import quasar.std._, StdLib.set._, StdLib.structural._
+   1 import quasar.std._, StdLib._, structural._
+   1 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
+   1 import quasar.std._, IdentityLib.Squash, StdLib._, set._
+   1 import quasar.std.StdLibTestRunner.genPrintableAscii
+   1 import quasar.std.StdLib.string._
+   1 import quasar.std.StdLib.set.{Drop, Take}
+   1 import quasar.std.StdLib.identity.Squash
+   1 import quasar.std.StdLib._, structural._
+   1 import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._, math._
+   1 import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
+   1 import quasar.std.StdLib._ // TODO: remove this
+   1 import quasar.std.SetLib.Take
+   1 import quasar.std.IdentityLib.Squash
+   1 import quasar.std
+   1 import quasar.sql.{fixpoint => sql, _}
+   1 import quasar.sql.{fixParser, Query}
+   1 import quasar.sql.{Sql, Query}
+   1 import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST}
+   1 import quasar.sql.{SemanticAnalysis => SA}, SA._
+   1 import quasar.sql.{Query}
+   1 import quasar.sql.{Query, Sql}
+   1 import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
+   1 import quasar.sql.{CompilerHelpers, JoinDir}
+   1 import quasar.sql.{ Sql, nullLiteral }
+   1 import quasar.sql.{ Sql, Query, fixParser }
+   1 import quasar.sql._, ExprArbitrary._
+   1 import quasar.sql.SemanticAnalysis._, Provenance._
+   1 import quasar.sql.ExprArbitrary
+   1 import quasar.sql, sql.{Query, Sql}
+   1 import quasar.specs2._, QuasarMatchers._
+   1 import quasar.server.Server.QuasarConfig
+   1 import quasar.regression.{interpretHfsIO, HfsIO}
+   1 import quasar.queryPlan
+   1 import quasar.qscript.{provenance => prov}
+   1 import quasar.qscript.{Read => _, _}
+   1 import quasar.qscript.{MapFunc, SortDir}
+   1 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+   1 import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner}, MapFuncs._
+   1 import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
+   1 import quasar.qscript.{IdStatus, IdOnly, IncludeId, ExcludeId}
+   1 import quasar.qscript.{Coalesce => _, _}, MapFuncs._
+   1 import quasar.qscript.{Coalesce => _, _}
+   1 import quasar.qscript.SortDir._
+   1 import quasar.qscript.QScriptHelpers
+   1 import quasar.qscript.MapFuncs, MapFuncs._
+   1 import quasar.qscript, qscript.{Map => _, Read => _, _}
+   1 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
+   1 import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
+   1 import quasar.physical.mongodb.{Bson, BsonField, CollectionName}
+   1 import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
+   1 import quasar.physical.mongodb.workflowtask.WorkflowTask
+   1 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
+   1 import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
+   1 import quasar.physical.mongodb.planner._
+   1 import quasar.physical.mongodb.mongoiterable._
+   1 import quasar.physical.mongodb.fs.listContents
+   1 import quasar.physical.mongodb.fs.fsops._
+   1 import quasar.physical.mongodb.fs._, bsoncursor._
+   1 import quasar.physical.mongodb.fs._
+   1 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
+   1 import quasar.physical.mongodb.expression.ExprOpOps
+   1 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
+   1 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
+   1 import quasar.physical.mongodb.MapReduce._
+   1 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
+   1 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs_}
+   1 import quasar.physical.marklogic.xquery.{xs => xxs}
+   1 import quasar.physical.marklogic.xquery.{ejson => ejs, _}
+   1 import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
+   1 import quasar.physical.marklogic.xquery._, expr._
+   1 import quasar.physical.marklogic.xml.{NCName, QName}
+   1 import quasar.physical.marklogic.xml.NCName
+   1 import quasar.physical.marklogic.xml
+   1 import quasar.physical.marklogic.validation.IsNCName
+   1 import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml}
+   1 import quasar.physical.marklogic.fs.data.encodeXml
+   1 import quasar.physical.marklogic.fs._
+   1 import quasar.physical.marklogic.MonadErrMsgs
+   1 import quasar.physical.jsonfile.fs._, FallbackJV._
+   1 import quasar.physical.couchbase.planner._, Planner._
+   1 import quasar.physical.couchbase.fs.queryfile._
+   1 import quasar.physical.couchbase.common.{Context, Cursor}
+   1 import quasar.physical.couchbase.common.CBDataCodec
+   1 import quasar.physical.couchbase._, common._, N1QL._, planner._
+   1 import quasar.physical.couchbase._, common._
+   1 import quasar.physical.couchbase._, N1QL._
+   1 import quasar.physical.couchbase.N1QL.{Read => _, _}
+   1 import quasar.physical.couchbase, couchbase._
+   1 import quasar.physical._
+   1 import quasar.namegen.NameGen
+   1 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
+   1 import quasar.main.{FilesystemQueries, Prettify}
+   1 import quasar.main.Prettify
+   1 import quasar.main.MainErrT
+   1 import quasar.jscore, jscore.{Name, JsCoreF}
+   1 import quasar.jscore, jscore.{JsFn}
+   1 import quasar.jscore, jscore._
+   1 import quasar.jscore
+   1 import quasar.javascript.{Js}
+   1 import quasar.javascript._, Js.JSRenderTree
+   1 import quasar.javascript.Js._
+   1 import quasar.internal.MountServiceConfig._
+   1 import quasar.internal.MountServiceConfig
+   1 import quasar.fs.{QueryFile, FileSystem}
+   1 import quasar.fs.{PathError, FileSystemType}
+   1 import quasar.fs.{PathError, FileSystemError}
+   1 import quasar.fs.{FileSystemType, PathError}
+   1 import quasar.fs.{FileSystemError, QueryFile}
+   1 import quasar.fs.{FileSystemError, PhysicalError}
+   1 import quasar.fs.{FileSystem, FileSystemType}
+   1 import quasar.fs.{FileSystem, FileSystemType, PathError}
+   1 import quasar.fs.{Empty, PhysicalError, ReadFile}
+   1 import quasar.fs.mount.{Mounts, hierarchical}
+   1 import quasar.fs.mount.{MountingsConfig, MountingsConfigArbitrary}
+   1 import quasar.fs.mount.{MountRequest => MR, _}
+   1 import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig.FileSystemConfig
+   1 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef._
+   1 import quasar.fs.mount.{ConnectionUri, FileSystemDef}
+   1 import quasar.fs.mount.hierarchical.MountedResultH
+   1 import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefinitionResult, DefErrT}
+   1 import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+   1 import quasar.fs.impl.queryFileFromDataCursor
+   1 import quasar.fs.impl._
+   1 import quasar.fs.impl.ReadOpts
+   1 import quasar.fs._, mount._
+   1 import quasar.fs._, impl.ReadStream
+   1 import quasar.fs._, WriteFile.WriteHandle
+   1 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
+   1 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
+   1 import quasar.fs._, ReadFile.ReadHandle
+   1 import quasar.fs._, FileSystemError._, WriteFile._
+   1 import quasar.fs._, FileSystemError._, QueryFile._
+   1 import quasar.fs._, FileSystemError._, PathError._, WriteFile._
+   1 import quasar.fs._, FileSystemError._, PathError._
+   1 import quasar.fs._, FileSystemError._, FileSystemTest._
+   1 import quasar.fs.SpecialStr
+   1 import quasar.fs.PhysicalError
+   1 import quasar.fs.PathError
+   1 import quasar.fs.MonadFsErr
+   1 import quasar.fs.ManageFile._
+   1 import quasar.fs.ManageFile.MoveSemantics._
+   1 import quasar.fs.FileSystemTest.allFsUT
+   1 import quasar.fs.FileSystemErrT
+   1 import quasar.fs.FileSystem
+   1 import quasar.fs.Empty
+   1 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, _}
+   1 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
+   1 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Free => _}
+   1 import quasar.frontend.{logicalplan => lp}, lp._
+   1 import quasar.frontend.{logicalplan => lp}, lp.LogicalPlan
+   1 import quasar.frontend.logicalplan.{constant, LogicalPlan}
+   1 import quasar.frontend.logicalplan.{Free => _, free => _, _}
+   1 import quasar.frontend.logicalplan.{ LogicalPlan => LP }
+   1 import quasar.frontend.fixpoint._
+   1 import quasar.frontend.SemanticErrors
+   1 import quasar.fp.{liftMT, TaskRef}
+   1 import quasar.fp.{coproductShow, QuasarFreeOps}
+   1 import quasar.fp.{TaskRef}
+   1 import quasar.fp.{TaskRef, reflNT}
+   1 import quasar.fp.ski.κ2
+   1 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
+   1 import quasar.fp.free.{Interpreter, SpecializedInterpreter}
+   1 import quasar.fp.free.foldMapNT
+   1 import quasar.fp.coproductShow
+   1 import quasar.fp._, ski._
+   1 import quasar.fp._, eitherT._, free._
+   1 import quasar.fp._, Helpers._
+   1 import quasar.fp._ , free._
+   1 import quasar.ejson.{Int => _, _}
+   1 import quasar.ejson.{Common, Str}
+   1 import quasar.ejson.{Common, EJson, Extension}
+   1 import quasar.ejson, ejson.EJson
+   1 import quasar.ejson
+   1 import quasar.effect.{MonotonicSeq, Read}
+   1 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
+   1 import quasar.effect.{KeyValueStore, MonotonicSeq, uuid}
+   1 import quasar.effect.{Failure, KeyValueStore}
+   1 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
+   1 import quasar.effect.uuid._
+   1 import quasar.effect.KeyValueStore
+   1 import quasar.effect.AtomicRef
+   1 import quasar.csv._
+   1 import quasar.csv.CsvWriter
+   1 import quasar.convertError
+   1 import quasar.contrib.pathy.{FPath, refineTypeAbs}
+   1 import quasar.contrib.pathy.{AbsPath, APath, sandboxAbs}
+   1 import quasar.contrib.pathy.{APath, PathArbitrary}
+   1 import quasar.contrib.pathy.{ADir}
+   1 import quasar.contrib.pathy.{ADir, PathSegment}
+   1 import quasar.contrib.pathy.{ADir, APath}
+   1 import quasar.contrib.pathy.{ADir, AFile}
+   1 import quasar.contrib.pathy.sandboxCurrent
+   1 import quasar.contrib.pathy.prettyPrint
+   1 import quasar.contrib.pathy.mkAbsolute
+   1 import quasar.contrib.matryoshka.{freeCataM, interpretM}
+   1 import quasar.contrib.matryoshka.ShowT
+   1 import quasar.console.{logErrors, stderr}
+   1 import quasar.console.booleanProp
+   1 import quasar.console
+   1 import quasar.connector.{EnvironmentError, EnvErr}
+   1 import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
+   1 import quasar.connector.{EnvErr, EnvironmentError}
+   1 import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
+   1 import quasar.config.{ConfigOps, FsPath, WebConfig}
+   1 import quasar.config.{CfgErr, ConfigError}
+   1 import quasar.config.FsPath._
+   1 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
+   1 import quasar.common.{PhaseResult, PhaseResultW}
+   1 import quasar.common.PhaseResultW
+   1 import quasar.common.PhaseResultT
+   1 import quasar.common.PhaseResult.{detail, tree}
+   1 import quasar.build.BuildInfo._
+   1 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
+   1 import quasar.api.{Destination, HeaderParam}
+   1 import quasar.api.services.Fixture._
+   1 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
+   1 import quasar.api._, ToQResponse.ops._
+   1 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
+   1 import quasar.api._, ToApiError.ops._
+   1 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
+   1 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
+   1 import quasar.api._, ApiErrorEntityDecoder._
+   1 import quasar.api._,
+   1 import quasar.api.UriPathCodec
+   1 import quasar.api.ToQResponse.ops._
+   1 import quasar.api.MessageFormatGen._
+   1 import quasar.api.MessageFormat.{JsonContentType, Csv}
+   1 import quasar.api.MessageFormat.JsonContentType
+   1 import quasar.api.JsonPrecision.{Precise, Readable}
+   1 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
+   1 import quasar.api.ApiErrorEntityDecoder._
+   1 import quasar.api.ApiError
+   1 import quasar._, quasar.Planner._
+   1 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
+   1 import quasar._, Planner._, RenderTree.ops._
+   1 import quasar._, Planner.PlannerError
+   1 import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly
+   1 import quasar._, DataArbitrary._
+   1 import quasar.VariablesArbitrary._
+   1 import quasar.TypeArbitrary
+   1 import quasar.TestConfig
+   1 import quasar.TernaryFunc
+   1 import quasar.SemanticError._
+   1 import quasar.Predef.{Unit, String}
+   1 import quasar.Predef.{Unit, Boolean}
+   1 import quasar.Predef.{Some, None}
+   1 import quasar.Predef.{Set => _, _}
+   1 import quasar.Predef.{None, Unit}
+   1 import quasar.Predef.{Map, Vector}
+   1 import quasar.Predef.{Long, Map}
+   1 import quasar.Predef.{Boolean, Vector}
+   1 import quasar.Predef.{Array, Nothing, SuppressWarnings, Unit, Vector}
+   1 import quasar.Predef.{ String, Some }
+   1 import quasar.Predef.Unit
+   1 import quasar.Predef.Throwable
+   1 import quasar.Predef.PartialFunction
+   1 import quasar.Predef.Option
+   1 import quasar.Predef.Map
+   1 import quasar.Predef.Int
+   1 import quasar.Predef.Boolean
+   1 import quasar.Predef.=?>
+   1 import quasar.Planner.{PlannerError, UnsupportedJS}
+   1 import quasar.Planner.{NonRepresentableEJson, PlannerError}
+   1 import quasar.Planner.NoFilesFound
+   1 import quasar.Planner.InternalError
+   1 import quasar.Func
+   1 import quasar.Errors.ETask
+   1 import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
+   1 import quasar.DataCodec.Precise.NAKey
+   1 import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
+   1 import quasar.DataArbitrary.dataArbitrary
+   1 import quasar.DataArbitrary, DataArbitrary._
+   1 import quasar.Data.Str
+   1 import quasar.Data.Int
+   1 import quasar.Data.Dec
+   1 import quasar.Data.Bool
+   1 import pathy.scalacheck.{AbsFileOf, RelFileOf}
+   1 import pathy.scalacheck._
+   1 import pathy.Path.{dir1, file1, FileName, rootDir}
+   1 import pathy.Path.{dir => pDir, file => pFile, _}
+   1 import pathy.Path.{depth, dirName}
+   1 import pathy.Path.{File, Dir, Sandboxed}
+   1 import pathy.Path.{ rootDir, posixCodec }
+   1 import pathy.Path.rootDir
+   1 import pathy.Path.fileParent
+   1 import pathy.Path._, posixCodec._
+   1 import org.xml.sax.SAXException
+   1 import org.typelevel.discipline.specs2.mutable._
+   1 import org.threeten.bp.{LocalDate, LocalDateTime, ZoneOffset}
+   1 import org.threeten.bp.{Instant}
+   1 import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
+   1 import org.threeten.bp.{Instant, LocalDate, LocalTime}
+   1 import org.threeten.bp.{Instant, Duration}
+   1 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
+   1 import org.threeten.bp.{Duration, Instant, LocalDate, LocalDateTime, LocalTime, ZoneOffset}
+   1 import org.threeten.bp.temporal.{TemporalAccessor, TemporalQuery}
+   1 import org.threeten.bp.format._
+   1 import org.threeten.bp.format.DateTimeFormatter
+   1 import org.specs2.specification.dsl.FragmentsDsl._
+   1 import org.specs2.specification.create.DefaultFragmentFactory._
+   1 import org.specs2.specification.core.{Fragment, Fragments}
+   1 import org.specs2.specification.core.Fragments
+   1 import org.specs2.scalaz.{ScalazMatchers, Spec}
+   1 import org.specs2.scalaz.Spec
+   1 import org.specs2.scalaz.DisjunctionMatchers
+   1 import org.specs2.matcher.{Matcher, Expectable}
+   1 import org.specs2.matcher.{Expectable, Matcher}
+   1 import org.specs2.matcher._, MustMatchers._
+   1 import org.specs2.matcher.MustThrownMatchers._
+   1 import org.specs2.execute.{Failure => _, _}
+   1 import org.specs2.execute.SkipException
+   1 import org.specs2.execute.Pending
+   1 import org.specs2.execute.AsResult
+   1 import org.specs2._, matcher._
+   1 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
+   1 import org.scalacheck.{Arbitrary, Gen, Shrink}
+   1 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
+   1 import org.scalacheck._, Gen._
+   1 import org.scalacheck._, Arbitrary.arbitrary
+   1 import org.scalacheck.Shrink.shrink
+   1 import org.scalacheck.Gen, Gen._
+   1 import org.scalacheck.Arbitrary._
+   1 import org.scalacheck.Arbitrary, Arbitrary.arbitrary
+   1 import org.kohsuke.github._
+   1 import org.jboss.aesh.edit.actions.Action
+   1 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
+   1 import org.jboss.aesh.console.settings.SettingsBuilder
+   1 import org.jboss.aesh.console.helper.InterruptHook
+   1 import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
+   1 import org.http4s.{Status, Method, Request}
+   1 import org.http4s.{StaticFile, MediaType, HttpService}
+   1 import org.http4s.{Request, Status, HttpService}
+   1 import org.http4s.{Method, Request, Status, Uri}
+   1 import org.http4s.{MediaType, Charset, EntityEncoder}
+   1 import org.http4s.{DecodeResult => _, _}
+   1 import org.http4s.server.{Server => Http4sServer}
+   1 import org.http4s.server.staticcontent._
+   1 import org.http4s.server.middleware.{CORS, CORSConfig, GZip}
+   1 import org.http4s.server.middleware.GZip
+   1 import org.http4s.server.blaze.BlazeBuilder
+   1 import org.http4s.server.HttpMiddleware
+   1 import org.http4s.parser.HttpHeaderParser
+   1 import org.http4s.headers.{`Content-Type`, Accept}
+   1 import org.http4s.headers.{Accept}
+   1 import org.http4s.headers.Host
+   1 import org.http4s.headers.Accept
+   1 import org.http4s.dsl.{Path => HPath, _}
+   1 import org.http4s.client.middleware.Retry
+   1 import org.http4s._, util._, CaseInsensitiveString._
+   1 import org.http4s._, dsl._
+   1 import org.http4s._, Status._, Uri.Authority
+   1 import org.http4s._, Status.Ok
+   1 import org.http4s._, QValue._
+   1 import org.http4s.Uri.Authority
+   1 import org.http4s.Status, Status._
+   1 import org.http4s.Status
+   1 import org.http4s.Request
+   1 import org.http4s.Method.MOVE
+   1 import org.http4s.Method.DELETE
+   1 import org.bson.{BsonDocument, BsonValue}
+   1 import org.bson.{BsonBoolean, BsonDocument, Document}
+   1 import org.bson.types
+   1 import org.bson._
+   1 import org.apache.hadoop.util.Progressable;
+   1 import org.apache.hadoop.util.Progressable
+   1 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
+   1 import org.apache.hadoop.conf.Configuration
+   1 import org.apache.commons.io.FileUtils
+   1 import ops._
+   1 import mountHandler.HierarchicalFsRef
+   1 import monocle.{Lens, Prism}
+   1 import monocle.{Lens, Optional}
+   1 import monocle.{Getter, Prism}
+   1 import monocle.syntax.all._
+   1 import monocle.std.vector._
+   1 import monocle.std.tuple3._
+   1 import monocle.std.nel._
+   1 import monocle.function.Index
+   1 import monocle.function.Cons1
+   1 import monocle.Optional
+   1 import mnt.{F, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
+   1 import metadata.FsNode
+   1 import mergeEngine._
+   1 import matryoshka.∘
+   1 import matryoshka.{free => _, _}, TraverseT.ops._, Recursive.ops._
+   1 import matryoshka.{free => _, _}, Recursive.ops._
+   1 import matryoshka.{free => _, _}
+   1 import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
+   1 import matryoshka.{FunctorT, Fix}, FunctorT.ops._
+   1 import matryoshka.{Fix}
+   1 import matryoshka.{Fix, Recursive}, Recursive.ops._
+   1 import matryoshka.{Delay, Fix}
+   1 import matryoshka.{Corecursive, Embed, Fix, Recursive}, Recursive.ops._
+   1 import matryoshka._, TraverseT.ops._
+   1 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
+   1 import matryoshka._,
+   1 import matryoshka.Recursive.ops._
+   1 import matryoshka.Delay
+   1 import math._
+   1 import jsFp._
+   1 import js._
+   1 import jawn.{FContext, Facade}
+   1 import jawn._, jawn.AsyncParser._
+   1 import jawn._, AsyncParser._
+   1 import jawn.SimpleFacade
+   1 import javax.xml.parsers.SAXParserFactory
+   1 import javax.xml.XMLConstants
+   1 import java.util.{zip => jzip}
+   1 import java.util.logging._
+   1 import java.util.concurrent.{Executors, ThreadFactory}
+   1 import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
+   1 import java.util.concurrent.atomic.AtomicReference
+   1 import java.util.concurrent.atomic.AtomicInteger
+   1 import java.util.concurrent._
+   1 import java.util.concurrent.TimeoutException
+   1 import java.util.concurrent.TimeUnit.SECONDS
+   1 import java.util.concurrent.ConcurrentHashMap
+   1 import java.util.LinkedList
+   1 import java.util.Base64
+   1 import java.util.Arrays.fill
+   1 import java.util.Arrays.copyOf
+   1 import java.time.temporal.IsoFields
+   1 import java.time.ZoneOffset.UTC
+   1 import java.nio.{file => nio}
+   1 import java.nio.file.{Path => _, _}
+   1 import java.nio.charset.{ CharsetEncoder, CoderResult }
+   1 import java.nio.charset._
+   1 import java.nio.charset.StandardCharsets
+   1 import java.nio.ByteBuffer
+   1 import java.net.{JarURLConnection, URI, URLDecoder}
+   1 import java.net.URLDecoder
+   1 import java.net.ConnectException
+   1 import java.math.{ BigDecimal => BigDec }
+   1 import java.lang.{String, System}
+   1 import java.lang.ref.SoftReference
+   1 import java.lang.StringBuilder
+   1 import java.lang.Integer.bitCount
+   1 import java.lang.Double.isInfinite
+   1 import java.lang.Comparable
+   1 import java.lang.Character.{ codePointAt, forDigit }
+   1 import java.io.{File => JFile, FileInputStream}
+   1 import java.io.{ DataInput, DataOutput }
+   1 import java.io.{ ByteArrayOutputStream, BufferedInputStream }
+   1 import java.io.PrintWriter
+   1 import java.io.OutputStream;
+   1 import java.io.OutputStream
+   1 import java.io.FileNotFoundException
+   1 import fpCore._
+   1 import fp3_2._
+   1 import fixExprOp.{ I => _, _ }
+   1 import exprCoreFp._
+   1 import expr3_2Fp._
+   1 import expr3_0Fp._
+   1 import expr.{func, if_, for_, let_}, axes.child
+   1 import expr.{func, for_, if_, let_}
+   1 import expr.{emptySeq, if_, let_}, axes._, XQuery.flwor
+   1 import expr.let_
+   1 import expr._, axes.child
+   1 import expr.TypeswitchCaseClause
+   1 import eu.timepit.refined.refineMV
+   1 import eu.timepit.refined.numeric.{Positive => RPositive,_}
+   1 import eu.timepit.refined.numeric.{Positive => RPositive, NonNegative}
+   1 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+   1 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive, Greater}
+   1 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
+   1 import eu.timepit.refined.api.{RefType, Refined}
+   1 import eu.timepit.refined.W
+   1 import eitherT._
+   1 import doobie.imports.ConnectionIO
+   1 import data._
+   1 import cry.crystallize
+   1 import common._, json._, table._, trans._
+   1 import common._, json._
+   1 import common._
+   1 import com.sun.org.apache.xerces.internal.impl.Constants
+   1 import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
+   1 import com.mongodb.{Function => MFunction}
+   1 import com.mongodb.connection._
+   1 import com.mongodb.client.model._
+   1 import com.mongodb.client.model.MapReduceAction
+   1 import com.mongodb.client.model.CountOptions
+   1 import com.mongodb.bulk.BulkWriteResult
+   1 import com.mongodb.async.client.{MongoClient => AMongoClient, MongoClients, MongoClientSettings}
+   1 import com.mongodb.async.client.MongoIterable
+   1 import com.mongodb.async._
+   1 import com.mongodb.async.AsyncBatchCursor
+   1 import com.mongodb.MongoNamespace
+   1 import com.mongodb.MongoException
+   1 import com.marklogic.xcc.{Version => _, _}
+   1 import com.marklogic.xcc.{ResultItem, ResultSequence, Session}
+   1 import com.marklogic.xcc.types._
+   1 import com.marklogic.xcc.types.XSBoolean
+   1 import com.marklogic.xcc.exceptions.{RequestException, XQueryException}
+   1 import com.marklogic.xcc.exceptions._
+   1 import com.marklogic.xcc.exceptions.XccException
+   1 import com.marklogic.xcc.ResultSequence
+   1 import com.marklogic.xcc.ContentSource
+   1 import com.fasterxml.uuid._
+   1 import com.couchbase.client.java.{Bucket, Cluster}
+   1 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
+   1 import com.couchbase.client.java.query.consistency.ScanConsistency
+   1 import com.couchbase.client.java.error.InvalidPasswordException
+   1 import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
+   1 import com.couchbase.client.java.cluster.ClusterManager
+   1 import com.couchbase.client.java.CouchbaseCluster
+   1 import com.couchbase.client.java.Bucket
+   1 import cf.std.Eq
+   1 import builder._
+   1 import array._
+   1 import argonaut.{JsonObject, JsonNumber, Json, Argonaut}
+   1 import argonaut.{Json => AJson}
+   1 import argonaut.{Json => AJson, _}, Argonaut._
+   1 import argonaut.{DecodeResult => _, _}, Argonaut._
+   1 import argonaut._, Json._
+   1 import argonaut._, Argonaut._, JsonScalaz._
+   1 import argonaut._, Argonaut._, EncodeJsonScalaz._
+   1 import argonaut._, Argonaut._, DecodeResultScalaz._
+   1 import argonaut.JsonObjectScalaz._
+   1 import argonaut.JsonObject, JsonObject.{single => jSingle}
+   1 import argonaut.JsonObject
+   1 import argonaut.JsonIdentity._
+   1 import agg._
+   1 import _root_.shapeless._
+   1 import _root_.pathy.Path, Path._
+   1 import _root_.matryoshka.patterns._
+   1 import _root_.matryoshka._, Recursive.ops._, TraverseT.ops._
+   1 import Zip._
+   1 import XQuery._
+   1 import WriterT.writerTMonadListen
+   1 import WriteTable._
+   1 import WriteFile._, FileSystemError._, MongoDbIO._
+   1 import WorkflowExecutionError.{InvalidTask, InsertFailed, NoDatabase}
+   1 import WorkflowExecutionError._
+   1 import VariablesArbitrary._, ExprArbitrary._
+   1 import Validation.success
+   1 import TypeArbitrary._, DataArbitrary._
+   1 import TypeArbitrary._
+   1 import TraceFS._
+   1 import ToQResponse.{response, ops}, ops._
+   1 import TableTestSupport._
+   1 import TableData.{ fromJValues => fromJson }
+   1 import TableData.fromJValues
+   1 import TableData._
+   1 import TTypes.simplifiableProjection
+   1 import StringLib._
+   1 import StdLib.{set => s, _}
+   1 import StdLib._
+   1 import StaticContent.fromCliOptions
+   1 import StandardResults._
+   1 import SqlQueries._, ExprArbitrary._
+   1 import SortingRowFormat._
+   1 import SliceTransform2._
+   1 import Slice._
+   1 import SimplifyProjection._
+   1 import ShiftRead._
+   1 import SetLib._
+   1 import SemanticError.{TypeError, MissingField, MissingIndex}
+   1 import SemanticError._
+   1 import SemanticAnalysis.AllPhases
+   1 import ScalazMatchers._
+   1 import Scalaz._, Ordering._
+   1 import Scalaz._
+   1 import SOrdering.Implicits._
+   1 import RowInserter._
+   1 import RestApi._
+   1 import Reshape.reshape
+   1 import Reshape.Shape
+   1 import RenderTree.ops._
+   1 import RenderTree.make
+   1 import RenameSemantics._
+   1 import ReadFilesSpec._, FileSystemError._
+   1 import ReadFile._, WriteFile._, ManageFile._, QueryFile._
+   1 import ReadFile._, WriteFile._
+   1 import ReadFile._, FileSystemError._, MongoDbIO._
+   1 import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
+   1 import ReadFile.ReadHandle, WriteFile.WriteHandle
+   1 import QueryRegressionTest._
+   1 import QResponseSpec._
+   1 import Q.transforms._
+   1 import Prolog._
+   1 import Prettify._
+   1 import Predicate._
+   1 import Planner.SparkState
+   1 import PathError.{pathExists, pathNotFound}
+   1 import PathError._, Mounting.PathTypeMismatch
+   1 import PathError._, FileSystemError._
+   1 import Ordering._
+   1 import OS._
+   1 import NumericComparisons._
+   1 import MoveScenario._
+   1 import MountingsConfigArbitrary._
+   1 import MountingError._, PathError._, MountConfig._, FileSystemDef._
+   1 import MountingError._, PathError.InvalidPath
+   1 import Mounting._, MountConfig._
+   1 import MountTypeArbitrary._
+   1 import MountRequest._, MountingError._, MountConfig._
+   1 import MountRequest._
+   1 import MountConfigArbitrary._, PathArbitrary._
+   1 import MountConfig.{viewConfig, fileSystemConfig}
+   1 import MountConfig._, MountingError._, MountRequest._
+   1 import MountConfig._, ConnectionUriArbitrary._
+   1 import MongoDbSpec._
+   1 import MongoDbIOWorkflowExecutor._
+   1 import MetadataFixture._
+   1 import MessageFormat._
+   1 import MergeDiffData._
+   1 import MarkLogicPlanner._, MarkLogicPlannerError._
+   1 import MarkLogicPlanner._
+   1 import MapReduce._, Action._
+   1 import ManageFile.{MoveSemantics, MoveScenario}
+   1 import ManageFile._, MoveScenario._, MoveSemantics._
+   1 import ManageFile._, MoveScenario._
+   1 import ManageFile._, FileSystemError._, PathError._, MongoDbIO._, fsops._
+   1 import ManageFile.MoveSemantics, QueryFile.ResultHandle
+   1 import LP._
+   1 import JsonPrecision.{Precise,Readable}
+   1 import JsonPrecision._
+   1 import JsonFormat.{LineDelimited,SingleArray}
+   1 import JsonFormat._
+   1 import JoinDir._
+   1 import JavaScriptWorkflowExecutor._
+   1 import JavaScriptWorkflowExecutor.SimpleCollectionNamePattern
+   1 import JDBM.{ IndexMap, SortedSlice }
+   1 import InMemory._, Mounting.PathTypeMismatch
+   1 import InMemory._, FileSystemError._, PathError._, DataArbitrary._
+   1 import InMemory.InMemState, FileSystemError._, PathError._
+   1 import HeaderParam._
+   1 import Grouped.grouped
+   1 import GroupKeySpec.{ dnf, toVector }
+   1 import GithubKeys._
+   1 import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency, alphaNumChar }
+   1 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
+   1 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
+   1 import Gen._
+   1 import G.functorSyntax._
+   1 import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
+   1 import FunctionDecl.FunctionDecl3
+   1 import Func._
+   1 import FsPath._, ConfigError._
+   1 import FsPath._
+   1 import Free._
+   1 import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
+   1 import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
+   1 import FileSystemTest._, FileSystemError._
+   1 import FileSystemTest._
+   1 import FileSystemIndependentTypes._
+   1 import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
+   1 import FileSystemFixture._, InMemory._
+   1 import FileSystemError.executionFailed_
+   1 import FileSystemDef.{DefinitionError, DefErrT}
+   1 import FileSystemDef._, EnvironmentError._
+   1 import Failure.{mapError, toError}
+   1 import Executed.executed
+   1 import Examples._
+   1 import DecodeResult.{ok, fail}
+   1 import DecodeResult.{ok => jok, fail => jfail}
+   1 import DecodeResult._
+   1 import DataEncodingError._
+   1 import DataArbitrary._, FileSystemError._, PathError._
+   1 import Data.Obj
+   1 import CsvDetect._
+   1 import Csv._
+   1 import CoreConfigArbitrary._
+   1 import Coproduct._
+   1 import Contents._
+   1 import ConsoleIO._
+   1 import ConfigOps.defaultPathForOS, FsPath._
+   1 import ConfigOps._, ConfigError._
+   1 import ConfigError._, EnvironmentError._
+   1 import ConcatHelpers._
+   1 import Compiler.reduceGroupKeys
+   1 import Command.{XDir, XFile}
+   1 import Command._
+   1 import ColumnMap._
+   1 import Collection._
+   1 import CogroupTable._
+   1 import Codec.{ StatefulCodec, wrappedWriteInit }
+   1 import Check._
+   1 import BsonField._
+   1 import BsonCodec._
+   1 import BindingClause._
+   1 import Argonaut._
+   1 import ArbitraryExprOp._
+   1 import Arbitrary.arbitrary
+   1 import ApiError.apiError
+   1 import AggLib._
+   1 import $MapF._
+   1 import $FlatMapF._

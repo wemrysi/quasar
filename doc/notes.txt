@@ -1,0 +1,35 @@
+Some notes from psp:
+
+Quasar is the most challenging codebase I've ever had to work within. For a short time, the challenges were conceptual. Now the concepts are clear enough, and they're a great basis for the work. But the challenges remain.
+
+In brief, quasar suffers from the same problem as sbt: generality is a tradeoff, but not treated as one. The cost of generality has to be controlled, by nailing it down into less general constructs wherever that's possible. A machine with a thousand dials is too difficult to operate, for the same reason we avoid mutation: every dial might effect every other dial.
+
+***
+
+Adding a connector involves modifying at least half a dozen files, copying a bunch of boilerplate, setting an environment variable in just the right way before invoking sbt, and all of it has to be done inside the giant quasar codebase.
+
+We REALLY need it to be a simple turn-key operation. Like all similar recommendations, this is not only for consumption purposes. Incestuous integration as is currently performed means nobody has to specify any abstraction boundaries. That creates HUGE technical debt which must be paid in order for anyone to specify those boundaries - which in turn makes it that much less appealing for anyone to do, so it grows apace.
+
+***
+
+The pathy library MUST GO! Whenever I have to manipulate a path I immediately feel my blood pressure go through the roof as I know it's going to take me an hour to figure out how to do something trivial. I can elaborate on this at arbitrary length if necessary.
+
+***
+
+I set out to try to reproduce the simplest SQL joins in precog. Take a look at HorrorSpec (so named because I adapted the examples from a coding horror blog entry, not because of the horror involved) for what I worked out as support code for this. It's like it was designed for something else entirely - or utilized in some other way which I can't fathom.
+
+In any case, the thought of implementing more complex sql features on top of that foundation is not promising. I regret that I didn't start this task from first principles - if I'd never looked at anything but the SQL^2 spec and simply implemented an interpreter for that I'd be much better off. It still might be the right thing to do, but once I became highly conscious of the calendar it became difficult to consider bold steps.
+
+***
+
+The task has been made difficult by the absence of something more concrete to implement than
+
+  [S[_]](QueryFile ~> Free[S, ?])
+
+And it means that most everything at closer focus than that has been widely duplicated across connectors (see doc/quasar.scala.) Often it's the painful, organically derived duplication which is most difficult to deduplicate.
+
+I feel like this could be avoided, and that much of the work which has been left to be performed at the leaves could be performed on a common abstraction. (See
+
+An intuition which seems reasonable to me is that there should be very little code in a connector which doesn't directly utilize that connector's unique dependencies: couchbase calling couchbase methods, etc.
+
+Couldn't we articulate the expectations for a connector in terms of polymorphic optics, and write quasar in terms of the extractors on those optics? I think this would improve things in a bunch of ways: more granular type signatures are much clearer as an implementor and server to clarify the design on both sides of the abstraction. What is and is not handled by a particular connector can actually be seen in its types, as opposed to a pattern match which ends in a default unimplemented case. And this pushes boilerplate out of the leaves into the common infrastructure where it belongs.
