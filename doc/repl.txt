@@ -1,0 +1,25 @@
+# a couple illustrations of direct queries
+#
+#  - zips500 is just 500 zip code rows (there's also zips29353 with all of them)
+#  - .p dumps a table
+#  - there are various implicits to simplify, e.g. Symbol => field selection
+#    (or as precog so-verbosely calls it, DerefObjectStatic)
+#
+
+./sbt ygg/console
+
+scala> zips500('city).take(10).p
+"CUSHMAN"
+"CHICOPEE"
+"HOLYOKE"
+"FLORENCE"
+"MONTGOMERY"
+
+scala> zips500.filterLess('pop, 5000).p
+{"_id":"03223","city":"BEEBE RIVER","loc":[-71.636142,43.888507],"pop":2802,"state":"NH"}
+{"_id":"04735","city":"BRIDGEWATER","loc":[-67.841469,46.422154],"pop":652,"state":"ME"}
+{"_id":"05034","city":"BRIDGEWATER","loc":[-72.646704,43.580428],"pop":130,"state":"VT"}
+{"_id":"06752","city":"BRIDGEWATER","loc":[-73.360936,41.528684],"pop":1654,"state":"CT"}
+{"_id":"13612","city":"BLACK RIVER","loc":[-75.795777,44.004156],"pop":3651,"state":"NY"}
+{"_id":"13740","city":"BOVINA CENTER","loc":[-74.766112,42.27094],"pop":492,"state":"NY"}
+{"_id":"14012","city":"BARKER","loc":[-78.542004,43.336779],"pop":2441,"state":"NY"}
