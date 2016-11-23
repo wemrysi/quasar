@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.ejson, ejson.EJson
@@ -28,6 +29,7 @@ import quasar.qscript.MapFuncs._
 import scala.Predef.implicitly
 
 import matryoshka._
+import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -86,6 +88,21 @@ trait QScriptHelpers extends TTypes[Fix] {
   def chain[T[_[_]]: Corecursive, F[_]: Functor](op: F[T[F]], ops: F[Unit]*):
       T[F] =
     ops.foldLeft(op.embed)((acc, elem) => elem.as(acc).embed)
+
+  // TODO: This is more general than QScript
+  def beQScript[T[_[_]]: Recursive, F[_]: Functor](
+    expected: T[F])(
+    implicit
+    drt: Delay[RenderTree, F],
+    eql: Equal[T[F]]
+  ): Matcher[T[F]] =
+    new Matcher[T[F]] {
+      def apply[S <: T[F]](s: Expectable[S]) = {
+        // TODO: these are unintuitively reversed b/c of the `diff` implementation, should be fixed
+        def diff = (RenderTree[T[F]].render(s.value) diff RenderTree[T[F]].render(expected)).shows
+        result(expected ≟ s.value, s"\ntrees are equal:\n$diff", s"\ntrees are not equal:\n$diff", s)
+      }
+    }
 
   val listContents: DiscoverPath.ListContents[Id] =
     d =>

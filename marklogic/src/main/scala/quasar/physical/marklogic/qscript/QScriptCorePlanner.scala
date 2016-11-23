@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
+import quasar.common.SortDir
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._

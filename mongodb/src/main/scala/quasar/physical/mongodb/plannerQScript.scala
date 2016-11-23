@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._

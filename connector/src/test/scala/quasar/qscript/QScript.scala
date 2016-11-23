@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{Data, Type}
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncs._
@@ -108,7 +109,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a basic order by" in {
       val lp = fullCompileExp("select * from zips order by city")
       val qs = convert(listContents.some, lp)
-      qs must equal(chain(
+      qs must beSome(beQScript(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((),
           HoleF,
@@ -134,20 +135,19 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   ProjectIndexR(RightSideF, IntLit(1)),
                   Free.roll(Undefined()))))))),
             Free.roll(MakeArray(
-              Free.roll(MakeArray(
-                ProjectFieldR(
-                  Free.roll(Guard(
-                    ProjectIndexR(RightSideF, IntLit(1)),
-                    Type.Obj(scala.Predef.Map(), Type.Top.some),
-                    ProjectIndexR(RightSideF, IntLit(1)),
-                    Free.roll(Undefined()))),
-                  StrLit("city")))))))))),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Type.Obj(scala.Predef.Map(), Type.Top.some),
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Free.roll(Undefined()))),
+                StrLit("city")))))))),
         QC.inj(Sort((),
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
             Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
           List((ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2))))).some)
+        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2)))))))
     }
 
     "convert a basic reduction" in {
@@ -583,7 +583,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
   "convert distinct by" in {
     val lp = fullCompileExp("select distinct(city) from zips order by pop")
     val qs = convert(listContents.some, lp)
-    qs must equal(chain(
+    qs must beSome(beQScript(chain(
       ReadR(rootDir </> file("zips")),
       QC.inj(LeftShift((),
         HoleF,
@@ -617,14 +617,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                       Free.roll(Undefined()))),
                     StrLit("pop")))))))))),
           Free.roll(MakeArray(
-            Free.roll(MakeArray(
-              ProjectFieldR(
-                Free.roll(Guard(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  Free.roll(Undefined()))),
-                StrLit("pop")))))))))),
+            ProjectFieldR(
+              Free.roll(Guard(
+                ProjectIndexR(RightSideF, IntLit(1)),
+                Type.Obj(ScalaMap(),Some(Type.Top)),
+                ProjectIndexR(RightSideF, IntLit(1)),
+                Free.roll(Undefined()))),
+              StrLit("pop")))))))),
       QC.inj(Sort((),
         Free.roll(ConcatArrays(
           Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
@@ -633,7 +632,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       QC.inj(Reduce((),
         Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))),
         List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),
-        Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0")))))).some)
+        Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))))
   }
 
   "convert a multi-field reduce" in {

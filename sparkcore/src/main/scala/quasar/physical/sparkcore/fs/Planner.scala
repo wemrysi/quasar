@@ -18,13 +18,13 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar._, quasar.Planner._
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._
-import quasar.qscript.SortDir._
 
 import scala.math.{Ordering => SOrdering}
 import SOrdering.Implicits._
@@ -273,10 +273,10 @@ object Planner {
 
           val maybeBucket =
             freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
-          
+
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
-              val asc = sortBys(0)._2 === Ascending
+              val asc = sortBys(0)._2 === SortDir.Ascending
               val keys = bucket :: sortBys.map(_._1)
               src.sortBy(d => keys.map(_(d)), asc)
           }.point[Task]).liftM[SparkStateT]

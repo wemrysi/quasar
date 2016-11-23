@@ -18,6 +18,7 @@ package quasar.frontend
 
 import quasar.Predef._
 import quasar._
+import quasar.common.SortDir
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
 
@@ -48,6 +49,11 @@ package object logicalplan {
     Prism.partial[LogicalPlan[A], (Symbol, A, A)] {
       case Let(v, f, b) => (v, f, b)
     } ((Let[A](_, _, _)).tupled)
+
+  def sort[A] =
+    Prism.partial[LogicalPlan[A], (A, NonEmptyList[(A, SortDir)])] {
+      case Sort(a, ords) => (a, ords)
+    } ((Sort[A](_, _)).tupled)
 
   def typecheck[A] =
     Prism.partial[LogicalPlan[A], (A, Type, A, A)] {

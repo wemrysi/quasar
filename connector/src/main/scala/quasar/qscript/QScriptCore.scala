@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -106,6 +107,7 @@ object ReduceIndex {
 @Lenses final case class Sort[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
+  // FIXME: NonEmptyList
   order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 

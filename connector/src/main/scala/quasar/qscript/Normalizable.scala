@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._

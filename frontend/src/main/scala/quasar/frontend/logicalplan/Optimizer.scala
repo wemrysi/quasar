@@ -162,6 +162,7 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
     case Let(_, _, body) => body._2
     case Constant(Data.Obj(map)) =>
       Some(map.keys.map(n => lpr.constant(Data.Str(n))).toList)
+    case Sort(src, _) => src._2
     case InvokeUnapply(DeleteField, Sized(src, field)) =>
       src._2.map(_.filterNot(_ == field._1))
     case InvokeUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
@@ -169,7 +170,6 @@ class Optimizer[T[_[_]]: Recursive: Corecursive: EqualT] {
     // NB: the remaining Invoke cases simply pass through or combine shapes
     //     from their inputs. It would be great if this information could be
     //     handled generically by the type system.
-    case InvokeUnapply(OrderBy, Sized(src, _, _)) => src._2
     case InvokeUnapply(Take, Sized(src, _)) => src._2
     case InvokeUnapply(Drop, Sized(src, _)) => src._2
     case InvokeUnapply(Filter, Sized(src, _)) => src._2

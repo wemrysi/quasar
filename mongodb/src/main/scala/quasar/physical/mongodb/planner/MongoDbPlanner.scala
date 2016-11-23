@@ -31,7 +31,7 @@ import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.{MapFunc, SortDir}
+import quasar.qscript.MapFunc
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
@@ -524,23 +524,6 @@ object MongoDbPlanner {
       case n                      => n.head._2.map(List(_))
     }
 
-    val HasSortDirs: Ann => OutputM[List[SortDir]] = {
-      def isSortDir(node: LP[Ann]): OutputM[SortDir] =
-        node match {
-          case HasData(Data.Str("ASC"))  => \/-(SortDir.Ascending)
-          case HasData(Data.Str("DESC")) => \/-(SortDir.Descending)
-          case x => -\/(InternalError fromMsg "malformed sort dir: " + x)
-        }
-
-      _ match {
-        case MakeArrayN.Attr(array) =>
-          array.traverse(d => isSortDir(d.tail))
-        case Cofree(_, Constant(Data.Arr(dirs))) =>
-          dirs.traverse(d => isSortDir(Constant(d)))
-        case n => isSortDir(n.tail).map(List(_))
-      }
-    }
-
     val HasSelector: Ann => OutputM[PartialSelector] = _.head._1._1
 
     val HasJs: Ann => OutputM[PartialJs] = _.head._1._2
@@ -701,10 +684,6 @@ object MongoDbPlanner {
           }
         case GroupBy =>
           lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
-        case OrderBy =>
-          lift(Arity3(HasWorkflow, HasKeys, HasSortDirs).map {
-            case (p1, p2, dirs) => WB.sortBy(p1, p2, dirs)
-          })
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
         case Count      => groupExpr1(κ($sum($literal(Bson.Int32(1)))))
@@ -800,6 +779,11 @@ object MongoDbPlanner {
       case Free(name) =>
         state(-\/(InternalError fromMsg s"variable $name is unbound"))
       case Let(_, _, in) => state(in.head._2)
+      case Sort(src, ords) =>
+        state((HasWorkflow(src) |@| ords.traverse { case (a, sd) => HasWorkflow(a) strengthR sd }) { (src, os) =>
+          val (keys, dirs) = os.toList.unzip
+          WB.sortBy(src, keys, dirs)
+        })
       case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.

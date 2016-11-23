@@ -19,7 +19,7 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.Planner.InternalError
-import quasar.common.PhaseResult.detail
+import quasar.common.{PhaseResult, SortDir}, PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._, eitherT._
