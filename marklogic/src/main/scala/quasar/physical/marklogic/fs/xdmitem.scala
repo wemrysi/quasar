@@ -105,7 +105,7 @@ object xdmitem {
     Data._binary(ImmutableArray.fromArray(bytes)).point[F]
 
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
-    data.JsonParser.parseFromString(jsonString) match {
+    Data.jsonParser.parseFromString(jsonString) match {
       case Success(d) => d.point[F]
       case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
     }
