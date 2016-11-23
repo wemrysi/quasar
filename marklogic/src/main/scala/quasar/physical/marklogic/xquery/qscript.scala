@@ -33,8 +33,7 @@ object qscript {
   import syntax._, expr._, axes.{attribute, child}
   import FunctionDecl._
 
-  val qs     = NamespaceDecl(qscriptNs)
-  val errorN = qs name qscriptError.local
+  val qs = NamespaceDecl(qscriptNs)
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
@@ -265,9 +264,6 @@ object qscript {
       val n = $("n")
       fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
     })
-
-  def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
-    errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
   // qscript:reduce-with(
   //   $initial  as function(item()*        ) as item()*,

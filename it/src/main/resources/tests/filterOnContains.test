@@ -5,12 +5,11 @@
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",
     "predicate": "equalsExactly",
-    "ignoreFieldOrder": [ "marklogic" ],
+    "ignoreFieldOrder": [ "*" ],
     "expected": [{ "city": "CANDIA", "state": "NH", "pop": 3557, "_id":"03034", "loc": [-71.304857, 43.058514] }]
 }

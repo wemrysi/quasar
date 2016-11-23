@@ -18,6 +18,7 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
+import quasar.build.BuildInfo
 import quasar.common._
 import quasar.frontend._
 import quasar.contrib.pathy._
@@ -130,10 +131,12 @@ abstract class QueryRegressionTest[S[_]](
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
         case Some(SkipDirective.Skip)    => skipped
+        case Some(SkipDirective.SkipCI)  =>
+          BuildInfo.isCIBuild.fold(Skipped("(skipped during CI build)"), runTest)
         case Some(SkipDirective.Pending) =>
-          if (quasar.build.BuildInfo.coverageEnabled)
+          if (BuildInfo.coverageEnabled)
             Skipped("(pending example skipped during coverage run)")
-          else if (quasar.build.BuildInfo.isCIBuild)
+          else if (BuildInfo.isCIBuild)
             Skipped("(pending example skipped during CI build)")
           else
             runTest.pendingUntilFixed
@@ -182,7 +185,12 @@ abstract class QueryRegressionTest[S[_]](
     exp.predicate(
       exp.rows.toVector,
       act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
-      exp.ignoreFieldOrder.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved))
+      exp.ignoreFieldOrderBackend match {
+        case IgnoreFieldOrderAllBackends            =>
+          FieldOrderIgnored
+        case IgnoreFieldOrderBackends(backendNames) =>
+          backendNames.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved)
+      })
   }
 
   /** Parse and execute the given query, returning a stream of results. */

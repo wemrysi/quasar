@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.physical.couchbase.planner
+package quasar.regression
 
-import quasar.fp.ski.κ
-import quasar.physical.couchbase._
-import quasar.Planner.InternalError
+import quasar.Predef._
+import quasar.BackendName
 
-import matryoshka._
-import scalaz._, Scalaz._
+sealed trait IgnoreFieldOrderBackend
 
-final class UnreachablePlanner[F[_]: Applicative, QS[_]] extends Planner[F, QS] {
-  def plan: AlgebraM[M, QS, N1QL] =
-    κ(EitherT.fromDisjunction(InternalError.fromMsg("unreachable").left))
-
-}
+final case object IgnoreFieldOrderAllBackends                           extends IgnoreFieldOrderBackend
+final case class  IgnoreFieldOrderBackends(backends: List[BackendName]) extends IgnoreFieldOrderBackend

@@ -112,8 +112,7 @@ object MapFuncPlanner {
     case Bool(s)                      => xs.boolean(s).point[F]
     case Integer(s)                   => xs.integer(s).point[F]
     case Decimal(s)                   => xs.double(s).point[F]
-    case Null(s)                      => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
-                                           (n, e) => if_ (s eq "null".xs) then_ n else_ e)
+    case Null(s)                      => ejson.null_[F] map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
     case ToString(x)                  => qscript.toString[F] apply x
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => qscript.safeSubstring[F] apply (s, loc + 1.xqy, len)
