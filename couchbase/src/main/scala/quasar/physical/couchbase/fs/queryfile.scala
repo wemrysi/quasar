@@ -48,9 +48,14 @@ object queryfile {
 
   type Plan[S[_], A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
 
+  type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+
   implicit class LiftP[F[_]: Monad, A](p: F[A]) {
     val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
+
+  val rewrite = new Rewrite[Fix]
+  val C = Coalesce[Fix, CBQScript, CBQScript]
 
   implicit val codec = CBDataCodec
 
@@ -105,14 +110,13 @@ object queryfile {
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftP
-
-      _    <- lift(Task.delay(
-                Observable
-                  .from(docs)
-                  .flatMap(bkt.async.insert(_).asScala)
-                  .toBlocking
-                  .last
-              )).into.liftP
+      _      <- lift(docs.nonEmpty.whenM(Task.delay(
+                  Observable
+                    .from(docs)
+                    .flatMap(bkt.async.insert(_).asScala)
+                    .toBlocking
+                    .last
+                ))).into.liftP
     } yield out).run.run
 
   def evaluatePlan[S[_]](
@@ -223,8 +227,6 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Plan[S, N1QL] = {
-    type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
-
     val tell = prtell[Plan[S, ?]] _
 
     for {
@@ -238,7 +240,15 @@ object queryfile {
       shft =  shiftRead(qs).transCata(
                 SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
                   .simplifyJoin(idPrism.reverseGet))
-      _    <- tell(Vector(tree("QS post shiftRead", qs)))
+      _    <- tell(Vector(tree("QS post shiftRead", shft)))
+      opz  =  shft
+                .transAna(
+                   repeatedly(C.coalesceQC[CBQScript](idPrism))     >>>
+                   repeatedly(C.coalesceEJ[CBQScript](idPrism.get)) >>>
+                   repeatedly(C.coalesceSR[CBQScript](idPrism))     >>>
+                   repeatedly(Normalizable[CBQScript].normalizeF(_: CBQScript[Fix[CBQScript]])))
+                .transCata(rewrite.optimize(reflNT))
+      _    <- tell(Vector(tree("QScript (Optimized)", opz)))
       n1ql <- shft.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))

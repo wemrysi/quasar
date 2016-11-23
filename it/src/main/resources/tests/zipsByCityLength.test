@@ -2,9 +2,7 @@
     "name": "count occurrences of each value of length(city), with filtering",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "marklogic":         "skip",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select length(city) as len, count(*) as cnt
@@ -12,6 +10,7 @@
                 where state != \"MI\"
                 group by length(city)",
     "predicate": "containsExactly",
+    "ignoreFieldOrder": [ "marklogic" ],
     "expected": [{ "cnt":   2, "len":  3 },
                  { "cnt":  65, "len":  4 },
                  { "cnt": 206, "len":  5 },

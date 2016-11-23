@@ -295,33 +295,11 @@ object CoreMap extends Serializable {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case DupMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj(ListMap(m.keys.toList.fproduct(Data.Str(_)): _*))
-      case _ => undefined
-    }).right
-    case DupArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.indices.map(Data.Int(_)).toList)
-      case _ => undefined
-    }).right
-    case ZipMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj {
-        m.map{
-          case (k, v) => (k, Data.Arr(List(Data.Str(k), v)))
-        }
-      }
-      case _ => undefined
-    }).right
-    case ZipArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.zipWithIndex.map {
-        case (e, i) => Data.Arr(List(Data.Int(i), e))
-      })
-      case _ => undefined
-    }).right
     case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2,ff3) => ((x:Data) => f2(x)).right
-    case _ => InternalError("not implemented").left
+    case _ => InternalError.fromMsg("not implemented").left
   }
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {

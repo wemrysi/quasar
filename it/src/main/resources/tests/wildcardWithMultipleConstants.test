@@ -6,8 +6,7 @@
       "mongodb_3_0":       "pending",
       "mongodb_read_only": "pending",
       "mongodb_3_2":       "pending",
-      "postgresql":        "pending",
-      "couchbase":         "skip"
+      "postgresql":        "pending"
     },
 
     "data": "largeZips.data",
@@ -15,7 +14,7 @@
     "query": "select *, '1' as one, '2' as two from largeZips",
 
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": true,
+    "ignoreFieldOrder": [ "couchbase", "marklogic" ],
     "expected": [
         { "_id": "01002", "one": "1", "two": "2", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA" },
         { "_id": "01020", "one": "1", "two": "2", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA" },

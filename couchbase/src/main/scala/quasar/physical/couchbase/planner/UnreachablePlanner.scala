@@ -25,5 +25,6 @@ import scalaz._, Scalaz._
 
 final class UnreachablePlanner[F[_]: Applicative, QS[_]] extends Planner[F, QS] {
   def plan: AlgebraM[M, QS, N1QL] =
-    κ(EitherT.fromDisjunction(InternalError("unreachable").left))
+    κ(EitherT.fromDisjunction(InternalError.fromMsg("unreachable").left))
+
 }

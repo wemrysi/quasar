@@ -380,7 +380,7 @@ object MongoDbPlanner {
       }
 
       def reversibleRelop(f: GenericFunc[nat._2]): Output =
-        (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+        (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       (func, args) match {
         case (Gt, Sized(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
@@ -529,7 +529,7 @@ object MongoDbPlanner {
         node match {
           case HasData(Data.Str("ASC"))  => \/-(SortDir.Ascending)
           case HasData(Data.Str("DESC")) => \/-(SortDir.Descending)
-          case x => -\/(InternalError("malformed sort dir: " + x))
+          case x => -\/(InternalError fromMsg "malformed sort dir: " + x)
         }
 
       _ match {
@@ -798,7 +798,7 @@ object MongoDbPlanner {
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
       case Free(name) =>
-        state(-\/(InternalError("variable " + name + " is unbound")))
+        state(-\/(InternalError fromMsg s"variable $name is unbound"))
       case Let(_, _, in) => state(in.head._2)
       case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to

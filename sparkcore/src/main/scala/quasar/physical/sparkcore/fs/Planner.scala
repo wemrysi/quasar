@@ -78,7 +78,7 @@ object Planner {
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
   def unimplemented(what: String): SparkState[RDD[Data]] =
-    EitherT[Task, PlannerError, RDD[Data]](InternalError(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
+    EitherT[Task, PlannerError, RDD[Data]](InternalError.fromMsg(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
 
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
@@ -87,7 +87,7 @@ object Planner {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-        EitherT(InternalError(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
+        EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
     }
 
@@ -109,11 +109,14 @@ object Planner {
               val rdd = initRDD.map { raw =>
                 DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
               }
-              if(idStatus === IncludeId) {
-                (sc, rdd.zipWithIndex.map {
-                  case (d, idx) => Data.Arr(List(Data.Int(idx), d)) : Data
+              (sc,
+                idStatus match {
+                  case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
+                  case IncludeId =>
+                    rdd.zipWithIndex.map[Data](p =>
+                      Data.Arr(List(Data.Int(p._2), p._1)))
+                  case ExcludeId => rdd
                 }).right[PlannerError]
-              } else (sc, rdd).right[PlannerError]
             })
           })
         }
@@ -143,8 +146,8 @@ object Planner {
 
         val countEval: SparkState[Long] = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
           case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-          case Data.Int(v) => InternalError(s"Provided Integer $v is not a Long").left[Long]
-          case a => InternalError(s"$a is not a Long number").left[Long]
+          case Data.Int(v) => InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
+          case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
         })).liftM[StateT[?[_], SparkContext, ?]])
         (fromState |@| countEval)((rdd, count) =>
           rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
@@ -300,7 +303,7 @@ object Planner {
               case Sample => (i: Index, c: Count) => i < c
             })
 
-        case LeftShift(src, struct, repair) =>
+        case LeftShift(src, struct, id, repair) =>
 
           val structFunc: PlannerError \/ (Data => Data) =
             freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
@@ -323,10 +326,18 @@ object Planner {
 
           StateT((sc: SparkContext) =>
             EitherT((structFunc ⊛ repairFunc)((df, rf) =>
-              src.flatMap((input: Data) => df(input) match {
-                case Data.Arr(list) => list.map(rf(input, _))
-                case Data.Obj(m) => m.values.map(rf(input, _))
-                case _ => List.empty[Data]
+              src.flatMap((input: Data) => (df(input), id) match {
+                case (Data.Arr(list), ExcludeId) => list.map(rf(input, _))
+                case (Data.Arr(list), IncludeId) =>
+                  list.zipWithIndex.map(p => rf(input, Data.Arr(List(Data.Int(p._2), p._1))))
+                case (Data.Arr(list), IdOnly) =>
+                  list.indices.map(i => rf(input, Data.Int(i)))
+                case (Data.Obj(m), ExcludeId) => m.values.map(rf(input, _))
+                case (Data.Obj(m), IncludeId) =>
+                  m.map(p => Data.Arr(List(Data.Str(p._1), p._2)))
+                case (Data.Obj(m), IdOnly) =>
+                  m.keys.map(k => rf(input, Data.Str(k)))
+                case (_, _) => List.empty[Data]
               })).map((sc, _)).point[Task]))
 
         case Union(src, lBranch, rBranch) =>

@@ -1,5 +1,6 @@
 {
     "name": "unshift aggregation",
+    "NB": "Couchbase skipped due to different ordering of pop array. Enable once group contents ordering is possible.",
     "backends": {
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",

@@ -5,12 +5,12 @@
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select *, pop/1000 as popInK from largeZips",
     "predicate": "containsAtLeast",
+    "ignoreFieldOrder": [ "couchbase" ],
     "expected": [
         {"_id": "01002", "city": "CUSHMAN",          "loc": [ -72.51565, 42.377017], "pop": 36963, "state": "MA", "popInK": 36.963},
         {"_id": "01020", "city": "CHICOPEE",         "loc": [-72.576142, 42.176443], "pop": 31495, "state": "MA", "popInK": 31.495},

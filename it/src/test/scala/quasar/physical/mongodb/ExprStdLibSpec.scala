@@ -56,6 +56,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
+    case (structural.ConcatOp, _)   => notHandled.left
+
     case _                  => ().right
   }
 
@@ -75,7 +77,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
           case IsPipeline(p) => p.src
           case _             => false
         }
-        if (singlePipeline) wf.right else InternalError("compiled to map-reduce").left
+        if (singlePipeline) wf.right else InternalError.fromMsg("compiled to map-reduce").left
       }
       .strengthR(BsonField.Name("result"))
   }

@@ -23,6 +23,7 @@ import quasar.physical.marklogic.xml.namespaces._
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
+import eu.timepit.refined.api.Refined
 import scalaz.IList
 import scalaz.syntax.monad._
 
@@ -30,17 +31,16 @@ import scalaz.syntax.monad._
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object qscript {
   import syntax._, expr._, axes.{attribute, child}
-  import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl5}
+  import FunctionDecl._
 
-  val qs     = NamespaceDecl(qscriptNs)
-  val errorN = qs name qscriptError.local
+  val qs = NamespaceDecl(qscriptNs)
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
-  // qscript:as-date($item as item()) as xs:date?
+  // qscript:as-date($item as item()?) as xs:date?
   def asDate[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("as-date") map (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:date?")) { item =>
       if_(isCastable(item, ST("xs:date")))
       .then_ { xs.date(item) }
@@ -51,10 +51,10 @@ object qscript {
       }
     })
 
-  // qscript:as-dateTime($item as item()) as xs:dateTime?
+  // qscript:as-dateTime($item as item()?) as xs:dateTime?
   def asDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("as-dateTime") map (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:dateTime?")) { item =>
       if_(isCastable(item, ST("xs:dateTime")))
       .then_ { xs.dateTime(item) }
@@ -65,11 +65,11 @@ object qscript {
       }
     })
 
-  // qscript:as-map-key($item as item()) as xs:string
+  // qscript:as-map-key($item as item()?) as xs:string
   def asMapKey[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("as-map-key").qn[F] map { fname =>
       declare(fname)(
-        $("item") as ST("item()")
+        $("item") as ST("item()?")
       ).as(ST("xs:string")) { item =>
         typeswitch(item)(
           ($("a") as ST("attribute()")) return_ (a =>
@@ -108,6 +108,60 @@ object qscript {
       }
     })
 
+  // qscript:comp-eq($x as item()*, $y as item()*) as xs:boolean?
+  def compEq[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("eq", _ eq _, fn.False)
+
+  // qscript:comp-ne($x as item()*, $y as item()*) as xs:boolean?
+  def compNe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("ne", _ ne _, fn.True)
+
+  // qscript:comp-lt($x as item()*, $y as item()*) as xs:boolean?
+  def compLt[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("lt", _ lt _, emptySeq)
+
+  // qscript:comp-le($x as item()*, $y as item()*) as xs:boolean?
+  def compLe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("le", _ le _, emptySeq)
+
+  // qscript:comp-gt($x as item()*, $y as item()*) as xs:boolean?
+  def compGt[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("gt", _ gt _, emptySeq)
+
+  // qscript:comp-ge($x as item()*, $y as item()*) as xs:boolean?
+  def compGe[F[_]: PrologW]: F[FunctionDecl2] =
+    mkComparisonFunction[F]("ge", _ ge _, emptySeq)
+
+  // qscript:concat($x as item()?, $y as item()?) as item()?
+  def concat[F[_]: PrologW]: F[FunctionDecl2] =
+    qs.declare("concat") flatMap (_(
+      $("x") as ST("item()?"),
+      $("y") as ST("item()?")
+    ).as(ST("item()?")) { (x: XQuery, y: XQuery) =>
+      val (xArr, yArr) = ($("xArr"), $("yArr"))
+      for {
+        xt    <- ejson.isArray[F] apply x
+        yt    <- ejson.isArray[F] apply y
+        xcs   <- toCharArray[F].apply(x) flatMap (ejson.seqToArray_[F])
+        ycs   <- toCharArray[F].apply(y) flatMap (ejson.seqToArray_[F])
+        arrXY <- ejson.arrayConcat[F].apply(x, y)
+        xArrY <- ejson.arrayConcat[F].apply(xcs, y)
+        yArrX <- ejson.arrayConcat[F].apply(x, ycs)
+      } yield {
+        let_(
+          xArr := xt,
+          yArr := yt)
+        .return_(
+          if_(~xArr and ~yArr)
+          .then_(arrXY)
+          .else_(if_(~yArr)
+          .then_(xArrY)
+          .else_(if_(~xArr)
+          .then_(yArrX)
+          .else_(fn.concat(x, y)))))
+      }
+    })
+
   // qscript:delete-field($src as element(), $field as xs:QName) as element()
   def deleteField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
@@ -122,35 +176,19 @@ object qscript {
       }
     })
 
-  // qscript:element-dup-keys($elt as element()) as element()
-  def elementDupKeys[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-dup-keys") map (_(
-      $("elt") as ST("element()")
-    ).as(ST("element()")) { elt: XQuery =>
-      val (c, n) = ($("c"), $("n"))
-      element { fn.nodeName(elt) } {
-        for_    (c in (elt `/` child.element()))
-        .let_   (n := fn.nodeName(~c))
-        .return_(element { ~n } { ~n })
-      }
-    })
-
   // qscript:element-left-shift($elt as element()) as item()*
   def elementLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-left-shift") flatMap (_(
-      $("elt") as ST("element()")
+    qs.declare("element-left-shift") map (_(
+      $("elt") as ST("element()?")
     ).as(ST("item()*")) { elt =>
-      (ejson.arrayEltN.qn[F] |@| ejson.isArray[F].apply(elt))((aelt, eltIsArray) =>
-        if_ (eltIsArray)
-        .then_ { elt `/` child(aelt)  }
-        .else_ { elt `/` child.node() })
+      elt `/` child.element()
     })
 
-  // qscript:isoyear-from-dateTime($dt as xs:dateTime) as xs:integer
+  // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
   def isoyearFromDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:integer")) { dt: XQuery =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:integer?")) { dt: XQuery =>
       if_((fn.monthFromDateTime(dt) eq 1.xqy) and (xdmp.weekFromDate(xs.date(dt)) ge 52.xqy))
       .then_ { fn.yearFromDateTime(dt) - 1.xqy }
       .else_ {
@@ -196,10 +234,11 @@ object qscript {
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
 
+  // qscript:length($arrOrStr as item()?) as xs:integer?
   def length[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("length").qn[F] map { fname =>
       declare(fname)(
-        $("arrOrStr") as ST("item()")
+        $("arrOrStr") as ST("item()?")
       ).as(ST("xs:integer?")) { arrOrStr: XQuery =>
         val ct = $("ct")
         typeswitch(arrOrStr)(
@@ -216,18 +255,15 @@ object qscript {
       }
     }
 
-  // qscript:project-field($src as element(), $field as xs:QName) as item()*
+  // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
   def projectField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("project-field") map (_(
-      $("src")   as ST("element()"),
-      $("field") as ST("xs:QName")
+      $("src")   as ST("element()?"),
+      $("field") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
       fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
     })
-
-  def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
-    errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
   // qscript:reduce-with(
   //   $initial  as function(item()*        ) as item()*,
@@ -266,34 +302,60 @@ object qscript {
       }
     })
 
-  // qscript:seconds-since-epoch($dt as xs:dateTime) as xs:double
+  // NB: Copied from StringLib.safeSubstring
+  // qscript:safe-substring($str as xs:string?, $start as xs:integer?, $length as xs:integer?) as xs:string?
+  def safeSubstring[F[_]: PrologW]: F[FunctionDecl3] =
+    qs.declare("safe-substring") map (_(
+      $("str")    as ST("xs:string?"),
+      $("start")  as ST("xs:integer?"),
+      $("length") as ST("xs:integer?")
+    ).as(ST("xs:string?")) { (str: XQuery, start: XQuery, length: XQuery) =>
+      val l = $("l")
+      let_(l := fn.stringLength(str)) return_ {
+        if_((start lt 1.xqy) or (start gt ~l))
+        .then_ { "".xs }
+        .else_(if_(length lt 0.xqy)
+        .then_ { fn.substring(str, start, Some(~l)) }
+        .else_ { fn.substring(str, start, Some(length)) })
+      }
+    })
+
+  // qscript:seconds-since-epoch($dt as xs:dateTime?) as xs:double?
   def secondsSinceEpoch[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("seconds-since-epoch") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:double")) { dt =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:double?")) { dt =>
       mkSeq_(dt - epoch) div xs.dayTimeDuration("PT1S".xs)
     })
 
-  // qscript:timestamp-to-dateTime($millis as xs:integer) as xs:dateTime
+  // qscript:timestamp-to-dateTime($millis as xs:integer?) as xs:dateTime?
   def timestampToDateTime[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timestamp-to-dateTime") map (_(
-      $("millis") as ST("xs:integer")
-    ).as(ST("xs:dateTime")) { millis =>
+      $("millis") as ST("xs:integer?")
+    ).as(ST("xs:dateTime?")) { millis =>
       epoch + xs.dayTimeDuration(fn.concat("PT".xs, xs.string(millis div 1000.xqy), "S".xs))
     })
 
-  // qscript:timezone-offset-seconds($dt as xs:dateTime) as xs:integer
+  // qscript:timezone-offset-seconds($dt as xs:dateTime?) as xs:integer?
   def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timezone-offset-seconds") map (_(
-      $("dt") as ST("xs:dateTime")
-    ).as(ST("xs:integer")) { dt =>
+      $("dt") as ST("xs:dateTime?")
+    ).as(ST("xs:integer?")) { dt =>
       fn.timezoneFromDateTime(dt) div xs.dayTimeDuration("PT1S".xs)
     })
 
-  // qscript:to-string($item as item()) as xs:string?
+  // qscript:to-char-array($s as xs:string?) as element()?
+  def toCharArray[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.declare("to-char-array") map (_(
+      $("s") as ST("xs:string?")
+    ).as(ST("xs:string*")) { s: XQuery =>
+      fn.map("fn:codepoints-to-string#1".xqy, fn.stringToCodepoints(s))
+    })
+
+  // qscript:to-string($item as item()?) as xs:string
   def toString[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("to-string") flatMap (_(
-      $("item") as ST("item()")
+      $("item") as ST("item()?")
     ).as(ST("xs:string")) { item: XQuery =>
       ejson.typeOf[F].apply(item) map { tpe =>
         if_(tpe eq "null".xs)
@@ -316,22 +378,24 @@ object qscript {
       }
     })
 
-  // qscript:zip-map-element-keys($elt as element()) as element()
-  def zipMapElementKeys[F[_]: PrologW]: F[FunctionDecl1] =
-    qs.declare("zip-map-element-keys") flatMap (_(
-      $("elt") as ST("element()")
-    ).as(ST(s"element()")) { elt =>
-      val (c, n) = ($("child"), $("name"))
+  ////
 
-      for {
-        kelt    <- ejson.mkArrayElt[F](~n)
-        velt    <- ejson.mkArrayElt[F](~c)
-        kvArr   <- ejson.mkArray_[F](mkSeq_(kelt, velt))
-        kvEnt   <- ejson.renameOrWrap[F] apply (~n, kvArr)
-        entries =  for_ (c in elt `/` child.element())
-                   .let_(n := fn.nodeName(~c))
-                   .return_(kvEnt)
-        zMap    <- ejson.mkObject[F] apply entries
-      } yield zMap
+  private def mkComparisonFunction[F[_]: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
+    qs.declare(Refined.unsafeApply(s"comp-$opName")) flatMap (_(
+      $("x") as ST.Top,
+      $("y") as ST.Top
+    ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
+      (asDateTime[F].apply(x) |@| asDateTime[F].apply(y))((xdt, ydt) =>
+        try_ {
+          if_(
+            isCastable(x, ST("xs:date"))     or
+            isCastable(y, ST("xs:date"))     or
+            isCastable(x, ST("xs:dateTime")) or
+            isCastable(y, ST("xs:dateTime")))
+          .then_ { op(xdt, ydt) }
+          .else_ { op(x, y) }
+        } .catch_($("_")) { _ =>
+          recover
+        })
     })
 }
