@@ -2,7 +2,8 @@
   "name": "many simple projections (order matters)",
 
   "backends": {
-    "postgresql": "pending"
+    "postgresql": "pending",
+    "couchbase":  "skipCI"
   },
 
   "data": "zips.data",
