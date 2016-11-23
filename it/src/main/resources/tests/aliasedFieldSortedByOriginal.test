@@ -3,7 +3,9 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+	"spark_local": "skip",
+	"spark_hdfs": "skip"
     },
     "data": "zips.data",
     "query": "SELECT state AS `Result Alias`, COUNT(*) FROM zips GROUP BY state ORDER BY state",

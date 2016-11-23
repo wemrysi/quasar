@@ -8,7 +8,9 @@
         "mongodb_3_2":       "pending",
         "postgresql":        "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+	"spark_local": "skip",
+	"spark_hdfs":        "skip"
     },
 
     "data": "../zips.data",
