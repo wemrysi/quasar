@@ -26,7 +26,7 @@ import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._, N1QL._, Select._
 import quasar.physical.couchbase.common.CBDataCodec
-import quasar.qscript, qscript._
+import quasar.qscript, qscript.{Map => _, _}
 import quasar.std.StdLib.string._
 
 import matryoshka._, Recursive.ops._
@@ -66,20 +66,22 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   def rel(a1: N1QL, a2: N1QL, op: String): M[N1QL] = {
     val a1N1ql = n1ql(a1)
     val a2N1ql = n1ql(a2)
-    def trunc(v: String) = s"""
-      (case
-       when ifmissing($a1N1ql.["$DateKey"], $a2N1ql.["$DateKey"]) is not null
-       then date_trunc_millis(millis($v), "day")
-       else $v
-       end)"""
-    val lTrunc = trunc(n1ql(unwrap(a1)))
-    val rTrunc = trunc(n1ql(unwrap(a2)))
+    val a1Unwrapped = n1ql(unwrap(a1))
+    val a2Unwrapped = n1ql(unwrap(a2))
 
     // TODO: De-stringly
     val q = (op, a2N1ql) match {
-      case ("=",  "null") => s"$lTrunc is null"
-      case ("!=", "null") => s"$lTrunc is not null"
-      case _              => s"$lTrunc $op $rTrunc"
+      case ("=",  "null") => s"$a1Unwrapped is null"
+      case ("!=", "null") => s"$a1Unwrapped is not null"
+      case _              =>
+        s"""
+          (case
+           when ifmissing($a1N1ql.["$DateKey"], $a2N1ql.["$DateKey"]) is not null
+             then date_diff_str($a1Unwrapped, $a2Unwrapped, "day") $op 0
+           when ifmissing($a1N1ql.["$TimeKey"], $a1N1ql.["$TimestampKey"], $a2N1ql.["$TimeKey"], $a2N1ql.["$TimestampKey"]) is not null
+             then date_diff_str($a1Unwrapped, $a2Unwrapped, "millisecond") $op 0
+           else $a1Unwrapped $op $a2Unwrapped
+           end)"""
     }
 
     partialQueryString(q).point[M]
@@ -115,9 +117,20 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
     case Interval(a1)              =>
       unimplementedP("Interval")
     case TimeOfDay(a1)             =>
-      val tod = s"""millis_to_utc(millis(${n1ql(unwrap(a1))}), "00:00:00.000")"""
-      partialQueryString(
-        s"""{ "$TimeKey": ifnull(case when regex_contains($tod, "[.]") then $tod else $tod || ".000" end, $naStr) }"""
+      val a1N1ql = n1ql(a1)
+      def fracZero(expr: String) = s"""
+        (case
+         when regex_contains($expr, "[.]") then { "$TimeKey": $expr }
+         when $expr is not null then { "$TimeKey": $expr || ".000" }
+         else $naStr
+         end)"""
+      partialQueryString(s"""
+        (case
+         when $a1N1ql.["$DateKey"] then $naStr
+         when $a1N1ql.["$TimeKey"] then $a1N1ql
+         when $a1N1ql.["$TimestampKey"] then { "$TimeKey": split(split($a1N1ql.["$TimestampKey"], "T")[1], "Z")[0] }
+         else ${fracZero(s"""millis_to_utc(millis($a1N1ql), "00:00:00.000")""")}
+         end)"""
       ).point[M]
     case ToTimestamp(a1)           =>
       partialQueryString(
