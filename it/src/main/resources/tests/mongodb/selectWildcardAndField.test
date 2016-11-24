@@ -3,7 +3,9 @@
     "backends": {
         "postgresql":        "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+	"spark_local": "skip",
+	"spark_hdfs": "skip"
     },
     "data": "../largeZips.data",
     "query": "select *, pop/1000 as popInK from `../largeZips`",

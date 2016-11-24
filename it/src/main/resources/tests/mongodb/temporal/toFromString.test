@@ -4,7 +4,9 @@
         "mongodb_read_only": "pending",
         "postgresql":        "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+	"spark_local": "skip",
+	"spark_hdfs": "skip"
     },
     "data": "../../days.data",
     "query": "select date(substring(str, 0, 10)), time(substring(str, 11, 20)), timestamp(str), to_string(ts) from `../../days`",
