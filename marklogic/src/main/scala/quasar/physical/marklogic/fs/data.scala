@@ -27,25 +27,10 @@ import scala.xml._
 import scala.collection.immutable.Seq
 
 import eu.timepit.refined.auto._
-import jawn._
 import monocle.Prism
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
-  object JsonParser extends SupportParser[Data] {
-    implicit val facade: Facade[Data] =
-      new SimpleFacade[Data] {
-        def jarray(arr: List[Data])         = Data.Arr(arr)
-        def jobject(obj: Map[String, Data]) = Data.Obj(ListMap(obj.toList: _*))
-        def jnull()                         = Data.Null
-        def jfalse()                        = Data.False
-        def jtrue()                         = Data.True
-        def jnum(n: String)                 = Data.Dec(BigDecimal(n))
-        def jint(n: String)                 = Data.Int(BigInt(n))
-        def jstring(s: String)              = Data.Str(s)
-      }
-  }
-
   def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: DataType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe.shows, Null)
