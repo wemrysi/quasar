@@ -35,6 +35,7 @@ import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
 import matryoshka.{Hole => _, _}
+import org.specs2.execute.Result
 import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers
 
@@ -568,14 +569,14 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
     }
   }
 
-  private def withSpark[T](run: SparkContext => Task[MatchResult[Any]]): MatchResult[Any] = {
+  private def withSpark[T](run: SparkContext => Task[MatchResult[Any]]): Result = {
     newSc.flatMap {
       case Some(sc) =>
-        run(sc)
+        run(sc).map(_.toResult)
             .onFinish(κ(Task.delay {
               sc.stop()
             }))
-      case None => Task.now(ok("skip because QUASAR_SPARK_LOCAL is not set"))
+      case None => Task.now(skipped("skipped because QUASAR_SPARK_LOCAL is not set"))
     }.unsafePerformSync
   }
 
