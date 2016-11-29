@@ -44,42 +44,39 @@ private[qscript] final class ThetaJoinPlanner[F[_]: QNameGenerator: PrologW: Mon
         body   <- mergeXQuery(combine, ~l, ~r)
       } yield (lhs, rhs) match {
         case (IterativeFlwor(lcs, None, INil(), _, lr), IterativeFlwor(rcs, None, INil(), _, rr)) =>
-          XQuery.Flwor(
+          thetaJoinFlwor(
             NonEmptyList(BindingClause.let_(s := src)) |+|
             lcs                                        |+|
             NonEmptyList(BindingClause.let_(l := lr))  |+|
             rcs                                        |+|
             NonEmptyList(BindingClause.let_(r := rr)),
-            Some(filter),
-            IList(),
-            false,
+            filter,
             body)
 
         case (IterativeFlwor(lcs, None, INil(), _, lr), _                                        ) =>
-          XQuery.Flwor(
+          thetaJoinFlwor(
             NonEmptyList(BindingClause.let_(s := src)) |+|
             lcs                                        |+|
             NonEmptyList(
               BindingClause.let_(l := lr),
               BindingClause.for_(r in rhs)),
-            Some(filter),
-            IList(),
-            false,
+            filter,
             body)
 
         case (_                                       , IterativeFlwor(rcs, None, INil(), _, rr)) =>
-          XQuery.Flwor(
+          thetaJoinFlwor(
             NonEmptyList(
               BindingClause.let_(s := src),
               BindingClause.for_(l := lhs))            |+|
             rcs                                        |+|
             NonEmptyList(BindingClause.let_(r := rr)),
-            Some(filter),
-            IList(),
-            false,
+            filter,
             body)
 
         case _ => let_ (s := src) for_ (l in lhs, r in rhs) where_ filter return_ body
       }
   }
+
+  def thetaJoinFlwor(bindings: NonEmptyList[BindingClause], filter: XQuery, body: XQuery): XQuery =
+    XQuery.Flwor(bindings, Some(filter), IList.empty, false, body)
 }
