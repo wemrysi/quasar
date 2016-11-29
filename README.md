@@ -175,7 +175,7 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 
 To connect to Couchbase use the following `connectionUri` format:
 
-`couchbase://<host>[:<port>]?username=<username>&password=<password>`
+`couchbase://<host>[:<port>]?username=<username>&password=<password>[&queryTimeout=<seconds>]`
 
 To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
