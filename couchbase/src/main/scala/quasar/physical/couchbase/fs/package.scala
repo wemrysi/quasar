@@ -42,6 +42,8 @@ import scalaz.concurrent.Task
 package object fs {
   val FsType = FileSystemType("couchbase")
 
+  val defaultQueryTimeout: Duration = Duration.ofSeconds(300)
+
   type Eff[A] = (
     Task                                             :\:
     Read[Context, ?]                                 :\:
@@ -88,11 +90,9 @@ package object fs {
         params  <- liftDT((
                      uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
                      uri.params.get("password").toSuccessNel("No password in ConnectionUri") |@|
-                     (
-                       uri.params.get("queryTimeout") ∘ (s => parseLong(s)) | 300L.success
-                     ).bimap(
-                       κ(s"queryTimeout must be a valid long".wrapNel),
-                       Duration.ofSeconds)
+                     (uri.params.get("queryTimeoutSeconds") ∘ (parseLong(_) ∘ Duration.ofSeconds))
+                        .getOrElse(defaultQueryTimeout.success)
+                        .leftMap(κ(s"queryTimeoutSeconds must be a valid long".wrapNel))
                    )(ConnUriParams).disjunction)
         ev      <- env(params.queryTimeout).liftM[DefErrT]
         cluster <- EitherT(Task.delay(
