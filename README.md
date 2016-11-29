@@ -165,6 +165,8 @@ Then the filesystem will contain the paths `/local/test/` and `/local/students/c
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
+##### MongoDB
+
 To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
 - `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
 - `javax.net.ssl.trustStorePassword`: password for the trust store.
@@ -173,9 +175,18 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
+##### Couchbase
+
 To connect to Couchbase use the following `connectionUri` format:
 
 `couchbase://<host>[:<port>]?username=<username>&password=<password>`
+
+Known limitations:
+- Slow queries — query optimization hasn't been applied
+- Join unimplemented — future support planned
+- [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
+
+##### HDFS using Apache Spark
 
 To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
