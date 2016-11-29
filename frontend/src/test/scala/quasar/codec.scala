@@ -20,7 +20,7 @@ import argonaut._, Argonaut._
 import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
 import quasar.Predef._
 
-import org.threeten.bp._
+import java.time._
 import scalaz._, Scalaz._
 
 class DataCodecSpecs extends quasar.Qspec {
