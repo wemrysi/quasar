@@ -557,7 +557,7 @@ class Transform
     case lp.Sort(src, ords) =>
       val (kexprs, dirs) = ords.unzip
       val AutoJoinNResult(base, NonEmptyList(dset, keys)) = autojoinN(src <:: kexprs)
-      val orderings = keys.alignBoth(dirs.list).sequence \/> InternalError.fromMsg(s"Mismatched sort keys and dirs")
+      val orderings = keys.toNel.flatMap(_.alignBoth(dirs).sequence) \/> InternalError.fromMsg(s"Mismatched sort keys and dirs")
 
       orderings map (os =>
         Target(
@@ -565,7 +565,7 @@ class Transform
           QC.inj(Sort(
             base.src,
             prov.genBuckets(base.buckets).fold(NullLit[T, Hole]())(_._2),
-            os.toList)).embed))
+            os)).embed))
 
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)

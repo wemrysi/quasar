@@ -110,7 +110,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: QNameGenerator: PrologW: M
     case Sort(src, bucket, order) =>
       for {
         x        <- freshName[F]
-        xqyOrder <- NonEmptyList((bucket, SortDir.Ascending), order: _*).traverse { case (func, sortDir) =>
+        xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
                       mapFuncXQuery(func, ~x) flatMap { by =>
                         ejson.castAsAscribed[F].apply(by) strengthR SortDirection.fromQScript(sortDir)
                       }

@@ -145,7 +145,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
             Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
-          List((ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))),
+          (ProjectIndexR(HoleF, IntLit(3)), SortDir.asc).wrapNel)),
         QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2)))))))
     }
 
@@ -627,7 +627,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         Free.roll(ConcatArrays(
           Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
           Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
-        List(ProjectIndexR(HoleF, IntLit(3)) -> SortDir.Ascending))),
+        (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
       QC.inj(Reduce((),
         Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))),
         List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),

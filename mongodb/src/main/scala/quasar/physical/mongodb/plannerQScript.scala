@@ -549,7 +549,7 @@ object MongoDbQScriptPlanner {
                       accumulator(ai._1).left[Fix[ExprOp]])).toListMap)),
                 rep)).liftM[GenT]
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
+            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order.toList).unzip
             keys.traverse(getExprBuilder(funcHandler)(src, _))
               .map(WB.sortBy(src, _, dirs)).liftM[GenT]
           case Filter(src, f) =>

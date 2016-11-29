@@ -265,7 +265,7 @@ object Planner {
           )
         case Sort(src, bucket, orders) =>
 
-          val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
+          val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
             orders.traverse {
               case (freemap, sdir) =>
                 freeCataM(freemap)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
@@ -276,9 +276,9 @@ object Planner {
 
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
-              val asc = sortBys(0)._2 === SortDir.Ascending
-              val keys = bucket :: sortBys.map(_._1)
-              src.sortBy(d => keys.map(_(d)), asc)
+              val asc  = sortBys.head._2 === SortDir.Ascending
+              val keys = bucket <:: sortBys.map(_._1)
+              src.sortBy(d => keys.map(_(d)).toList, asc)
           }.point[Task]).liftM[SparkStateT]
 
         case Filter(src, f) =>

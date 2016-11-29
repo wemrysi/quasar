@@ -169,7 +169,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                         case SortDir.Descending => "DESC"
                       }
                       processFreeMap(or, tmpName3) ∘ (ord => s"${n1ql(ord)} $dir")
-                    }.map(_.mkString(", "))
+                    }.map(_ intercalate (", "))
         bN1ql    =  n1ql(b)
         bN1qlN   =  s"ifnull($bN1ql, $tmpName1)"
         s        =  select(
