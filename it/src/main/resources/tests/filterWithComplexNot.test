@@ -1,9 +1,12 @@
 {
     "name": "filter with complex query involving not",
 
+    "NB": "Couchbase disable due to heap exhaustion",
+
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "couchbase":         "skip"
     },
 
     "data": "largeZips.data",
