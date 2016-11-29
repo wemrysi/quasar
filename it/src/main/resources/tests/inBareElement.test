@@ -2,7 +2,8 @@
     "name": "filter field “in” a bare value",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip"
+        "marklogic":  "skip",
+        "couchbase":  "skipCI"
     },
     "data": "zips.data",
     "query": "select * from zips where state in \"ME\" and pop < 10",
