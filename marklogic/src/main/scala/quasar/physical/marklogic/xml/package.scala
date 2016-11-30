@@ -58,7 +58,7 @@ package object xml {
   def toData(elem: Elem, config: KeywordConfig): Data = {
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
       case Seq() => Str("")
-      case Seq(Text(str)) =>
+      case LeafText(str) =>
         m.flatMap(attrToData).cata(
           m => Obj(ListMap(
             config.attributesKeyName  -> m,
@@ -91,4 +91,28 @@ package object xml {
 
   def qualifiedName(elem: Elem): String =
     Option(elem.prefix).fold("")(_ + ":") + elem.label
+
+  /** Extract the child sequence from a node. */
+  object Children {
+    def unapply(node: Node): Option[Seq[Node]] =
+      some(node.child)
+  }
+
+  /** Matches a sequence devoid of `Elem` nodes. */
+  object Leaf {
+    def unapply(nodes: Seq[Node]): Option[Seq[Node]] =
+      nodes.forall({
+        case _: Elem => false
+        case _       => true
+      }) option nodes
+  }
+
+  /** Extracts all of the text from a leaf sequence. */
+  object LeafText {
+    def unapply(nodes: Seq[Node]): Option[String] =
+      Leaf.unapply(nodes) map (_.collect({
+        case Text(s)   => s
+        case PCData(s) => s
+      }).mkString)
+  }
 }
