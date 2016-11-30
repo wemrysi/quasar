@@ -3,7 +3,9 @@
 
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip"
+        "marklogic":  "skip",
+	"spark_local": "skip",
+      "spark_hdfs": "skip"
     },
 
     "data": "zips.data",

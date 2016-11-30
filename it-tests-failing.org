@@ -20,6 +20,14 @@ Everything under `it/src/main/resources/tests/joins`
 ** Tests with "LIKE %sth%" can not be reproduced
 multilineLike.test
 flattenGroupedObject.test
+filterSortLimit.test
+projectIndexFromGroupWithFilter.test
 
 * Spark related
-largestZips.test - spark 
+largestZips.test - spark does not handle desc and asc in the same query
+
+* Not yet checked
+filterOnFieldComparison.test
+groupByFlatten.test
+
+* Questionable

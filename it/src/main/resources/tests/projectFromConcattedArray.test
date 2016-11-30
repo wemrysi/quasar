@@ -4,7 +4,9 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+	"spark_local": "skip",
+      "spark_hdfs": "skip"
     },
     "data": "largeZips.data",
     "query": "select (loc || [1, 2])[1] from largeZips",
