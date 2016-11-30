@@ -23,7 +23,7 @@ import quasar.frontend.logicalplan._
 
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
-import org.threeten.bp.{Instant, Duration}
+import java.time.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
