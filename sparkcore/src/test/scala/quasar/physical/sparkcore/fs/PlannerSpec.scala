@@ -121,12 +121,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           state.eval(sc).run.map(result => result must beRightDisjunction.like{
             case rdd =>
               val results = rdd.collect
-              results.size must_= 5
-              results(0) must_= Data.Str("Poland")
-              results(1) must_= Data.Str("Poland")
-              results(2) must_= Data.Str("Poland")
-              results(3) must_= Data.Str("US")
-              results(4) must_= Data.Str("Austria")
+              results.toList must contain(exactly(
+                Data._str("Poland"),
+                Data._str("Poland"),
+                Data._str("Poland"),
+                Data._str("US"),
+                Data._str("Austria")))
           })
         })
       }
@@ -170,10 +170,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
             state.eval(sc).run.map(result => result must beRightDisjunction.like{
               case rdd =>
                 val results = rdd.collect
-                results.size must_= 3
-                results(0) must_= Data.Int(1)
-                results(1) must_= Data.Int(3)
-                results(2) must_= Data.Int(1)
+                results.toList must contain(exactly(Data._int(1), Data._int(3), Data._int(1)))
             })
           })
         }
@@ -192,10 +189,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
             state.eval(sc).run.map(result => result must beRightDisjunction.like{
               case rdd =>
                 val results = rdd.collect
-                results.size must_= 3
-                results(0) must_= Data.Int(23)
-                results(1) must_= Data.Int(84)
-                results(2) must_= Data.Int(34)
+                results.toList must contain(exactly(Data._int(23), Data._int(84), Data._int(34)))
             })
           })
         }
@@ -214,10 +208,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
             state.eval(sc).run.map(result => result must beRightDisjunction.like{
               case rdd =>
                 val results = rdd.collect
-                results.size must_= 3
-                results(0) must_= Data.Str("US")
-                results(1) must_= Data.Str("Poland")
-                results(2) must_= Data.Str("Austria")
+                results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
             })
           })
         }
@@ -236,10 +227,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
             state.eval(sc).run.map(result => result must beRightDisjunction.like{
               case rdd =>
                 val results = rdd.collect
-                results.size must_= 3
-                results(0) must_= Data.Int(23)
-                results(1) must_= Data.Int(32)
-                results(2) must_= Data.Int(34)
+                results.toList must contain(exactly(Data._int(23), Data._int(32), Data._int(34)))
             })
           })
         }
@@ -265,9 +253,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
               state.eval(sc).run.map(result => result must beRightDisjunction.like{
                 case rdd =>
                   val results = rdd.collect
-                  results.size must_== 2
-                  results(1) must_== Data.Dec(28)
-                  results(0) must_== Data.Dec(23)
+                  results.toList must contain(exactly(Data._dec(28), Data._dec(23)))
               })
             })
           }
@@ -291,9 +277,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
               state.eval(sc).run.map(result => result must beRightDisjunction.like{
                 case rdd =>
                   val results = rdd.collect
-                  results.size must_== 2
-                  results(1) must_== Data.Dec(1.71)
-                  results(0) must_== Data.Dec(1.23)
+                  results.toList must contain(exactly(Data._dec(1.71), Data._dec(1.23)))
               })
             })
           }
@@ -549,20 +533,20 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           val state: SparkState[RDD[Data]] = ψ(equiJoin)
           state.eval(sc).run.map(result => result must beRightDisjunction.like {
             case rdd =>
-              rdd.collect.toList must_= List(
-                Data.Obj(ListMap(
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
                   JoinDir.Left.name ->  Data.Null,
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Null
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
                 ))
-              )
+              ))
           })
         })
       }
