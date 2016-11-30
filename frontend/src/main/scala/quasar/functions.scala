@@ -170,7 +170,6 @@ trait GenericFuncInstances {
       case set.Take                       => "Take"
       case set.Drop                       => "Drop"
       case set.Range                      => "Range"
-      case set.OrderBy                    => "OrderBy"
       case set.Filter                     => "Filter"
       case set.InnerJoin                  => "InnerJoin"
       case set.LeftOuterJoin              => "LeftOuterJoin"

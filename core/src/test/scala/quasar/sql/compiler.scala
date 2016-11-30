@@ -18,9 +18,12 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.Data
+import quasar.common.SortDir
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
 import matryoshka.Fix
+import scalaz.NonEmptyList
+import scalaz.syntax.nel._
 
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
@@ -864,12 +867,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 "name" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
                 "__sd__0" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))))),
             DeleteField[FLP](
-              OrderBy[FLP](
+              lpf.sort(
                 lpf.free('__tmp1),
-                MakeArrayN[Fix](
-                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
-                MakeArrayN(
-                  lpf.constant(Data.Str("ASC")))),
+                (ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -889,14 +889,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   "name"    -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
                   "__sd__0" -> ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("height"))))),
               DeleteField[FLP](
-                OrderBy[FLP](
+                lpf.sort(
                   lpf.free('__tmp2),
-                  MakeArrayN[Fix](
-                    ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("name"))),
-                    ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0")))),
-                  MakeArrayN(
-                    lpf.constant(Data.Str("ASC")),
-                    lpf.constant(Data.Str("ASC")))),
+                  NonEmptyList(
+                    (ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("name"))).embed, SortDir.asc),
+                    (ObjectProject(lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.asc))),
                 lpf.constant(Data.Str("__sd__0")))))))
     }
 
@@ -904,26 +901,20 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select * from person order by height",
         lpf.let('__tmp0, Squash(read("person")),
-          OrderBy[FLP](
+          lpf.sort(
             lpf.free('__tmp0),
-            MakeArrayN[Fix](
-              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height")))),
-            MakeArrayN(
-              lpf.constant(Data.Str("ASC"))))))
+            (ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))).embed, SortDir.asc).wrapNel)))
     }
 
     "compile simple order by with ascending and descending" in {
       testLogicalPlanCompile(
         "select * from person order by height desc, name",
         lpf.let('__tmp0, Squash(read("person")),
-          OrderBy[FLP](
+          lpf.sort(
             lpf.free('__tmp0),
-            MakeArrayN[Fix](
-              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
-              ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name")))),
-            MakeArrayN(
-              lpf.constant(Data.Str("DESC")),
-              lpf.constant(Data.Str("ASC"))))))
+            NonEmptyList(
+              (ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))).embed, SortDir.desc),
+              (ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name"))).embed, SortDir.asc)))))
     }
 
     "compile simple order by with expression" in {
@@ -939,12 +930,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
                     lpf.constant(Data.Dec(2.54)))))),
             DeleteField[FLP](
-              OrderBy[FLP](
+              lpf.sort(
                 lpf.free('__tmp1),
-                MakeArrayN[Fix](
-                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
-                MakeArrayN(
-                  lpf.constant(Data.Str("ASC")))),
+                (ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -955,10 +943,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           Squash(
             makeObj(
               "name" -> ObjectProject(read("person"), lpf.constant(Data.Str("firstName"))))),
-          OrderBy[FLP](
+          lpf.sort(
             lpf.free('__tmp0),
-            MakeArrayN[Fix](ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name")))),
-            MakeArrayN(lpf.constant(Data.Str("ASC"))))))
+            (ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("name"))).embed, SortDir.asc).wrapNel)))
     }
 
     "compile simple order by with expression in synthetic field" in {
@@ -974,12 +961,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
                     lpf.constant(Data.Dec(2.54))))),
             DeleteField[FLP](
-              OrderBy[FLP](
+              lpf.sort(
                 lpf.free('__tmp1),
-                MakeArrayN[Fix](
-                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
-                MakeArrayN(
-                  lpf.constant(Data.Str("ASC")))),
+                (ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1000,12 +984,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     lpf.constant(Data.Str("quux"))),
                   lpf.constant(Data.Int(3))))),
             DeleteField[FLP](
-              OrderBy[FLP](
+              lpf.sort(
                 lpf.free('__tmp1),
-                MakeArrayN[Fix](
-                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
-                MakeArrayN(
-                  lpf.constant(Data.Str("ASC")))),
+                (ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1080,12 +1061,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                         lpf.constant(Data.Dec(2.54))))),
                 Take[FLP](
                   Drop[FLP](
-                    OrderBy[FLP](  // order by cm
+                    lpf.sort(  // order by cm
                       lpf.free('__tmp3),
-                      MakeArrayN[Fix](
-                        ObjectProject(lpf.free('__tmp3), lpf.constant(Data.Str("cm")))),
-                      MakeArrayN(
-                        lpf.constant(Data.Str("ASC")))),
+                      (ObjectProject(lpf.free('__tmp3), lpf.constant(Data.Str("cm"))).embed, SortDir.asc).wrapNel),
                   lpf.constant(Data.Int(10))), // offset 10
                 lpf.constant(Data.Int(5))))))))    // limit 5
     }
@@ -1341,12 +1319,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               "city" ->
                 ObjectProject(read("zips"), lpf.constant(Data.Str("city"))))),
           Distinct[FLP](
-            OrderBy[FLP](
+            lpf.sort(
               lpf.free('__tmp0),
-              MakeArrayN[Fix](
-                ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city")))),
-              MakeArrayN(
-                lpf.constant(Data.Str("ASC")))))))
+              (ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))).embed, SortDir.asc).wrapNel))))
     }
 
     "compile distinct with unrelated order by" in {
@@ -1360,12 +1335,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 "city" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
                 "__sd__0" -> ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             lpf.let('__tmp2,
-              OrderBy[FLP](
+              lpf.sort(
                 lpf.free('__tmp1),
-                MakeArrayN[Fix](
-                  ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0")))),
-                MakeArrayN(
-                  lpf.constant(Data.Str("DESC")))),
+                (ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))).embed, SortDir.desc).wrapNel),
               DeleteField[FLP](
                 DistinctBy[FLP](lpf.free('__tmp2),
                   DeleteField(lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0")))),

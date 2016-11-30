@@ -27,7 +27,7 @@ import quasar.qscript.MapFuncs._
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz.{ToIdOps => _, _}, Inject._, Leibniz._
 import shapeless.{nat, Sized}
@@ -138,9 +138,12 @@ class Transform
       rebaseBranch(rightF, rMap))
   }
 
-  private case class AutoJoinBase(src: T[F], buckets: List[prov.Provenance])
+  private case class AutoJoinBase(src: T[F], buckets: List[prov.Provenance]) {
+    def asTarget(vals: FreeMap): Target[F] = Target(Ann(buckets, vals), src)
+  }
   private case class AutoJoinResult(base: AutoJoinBase, lval: FreeMap, rval: FreeMap)
   private case class AutoJoin3Result(base: AutoJoinBase, lval: FreeMap, cval: FreeMap, rval: FreeMap)
+  private case class AutoJoinNResult(base: AutoJoinBase, vals: NonEmptyList[FreeMap])
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -185,24 +188,28 @@ class Transform
   /** A convenience for a pair of autojoins, does the same thing, but returns
     * access to all three values.
     */
-  private def autojoin3(left: Target[F], center: Target[F], right: Target[F]):
-      AutoJoin3Result = {
-    val AutoJoinResult(AutoJoinBase(lsrc, lprov), lval, cval) =
-      autojoin(left, center)
-
-    val AutoJoinResult(base, bval, rval) =
-      autojoin(Target(Ann(lprov, HoleF), lsrc), right)
-
+  private def autojoin3(left: Target[F], center: Target[F], right: Target[F]): AutoJoin3Result = {
+    val AutoJoinResult(lbase, lval, cval) = autojoin(left, center)
+    val AutoJoinResult(base , bval, rval) = autojoin(lbase asTarget HoleF, right)
     AutoJoin3Result(base, lval >> bval, cval >> bval, rval)
+  }
+
+  private def autojoinN[G[_]: Foldable1](ts: G[Target[F]]): AutoJoinNResult = {
+    val (t, vs) = ts.foldMapLeft1((_, HoleF[T].wrapNel)) {
+      case ((l, vals), r) =>
+        val AutoJoinResult(b, lv, rv) = autojoin(l, r)
+        (b asTarget HoleF, rv <:: vals.map(_ >> lv))
+    }
+
+    AutoJoinNResult(AutoJoinBase(t.value, t.ann.provenance), vs.reverse map (_ >> t.ann.values))
   }
 
   private def merge3Map(
     values: Func.Input[Target[F], nat._3])(
-    func: (FreeMap, FreeMap, FreeMap) => MapFunc[FreeMap]):
-      Target[F] = {
-    val AutoJoin3Result(base, lval, cval, rval) =
-      autojoin3(values(0), values(1), values(2))
-    Target(Ann(base.buckets, Free.roll(func(lval, cval, rval))), base.src)
+    func: (FreeMap, FreeMap, FreeMap) => MapFunc[FreeMap]
+  ): Target[F] = {
+    val AutoJoin3Result(base, lval, cval, rval) = autojoin3(values(0), values(1), values(2))
+    base asTarget Free.roll(func(lval, cval, rval))
   }
 
   private def shiftValues(input: Target[F]): Target[F] = {
@@ -547,42 +554,18 @@ class Transform
 
       Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Drop, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
-    case lp.InvokeUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
-      val AutoJoinResult(base, dataset, keys) = autojoin(a1, a2)
+    case lp.Sort(src, ords) =>
+      val (kexprs, dirs) = ords.unzip
+      val AutoJoinNResult(base, NonEmptyList(dset, keys)) = autojoinN(src <:: kexprs)
+      val orderings = keys.toNel.flatMap(_.alignBoth(dirs).sequence) \/> InternalError.fromMsg(s"Mismatched sort keys and dirs")
 
-      val keysList: List[FreeMap] = keys.toCoEnv[T].project match {
-        case StaticArray(as) => as.map(_.fromCoEnv)
-        case mf              => List(mf.embed.fromCoEnv)
-      }
-
-      val directionsList: PlannerError \/ List[SortDir] = {
-        val orderStrs: PlannerError \/ List[String] = {
-	  QC.prj(QC.inj(reifyResult(a3.ann, a3.value)).embed.transCata(rewrite.normalize).project) match {
-            case Some(Map(src, mf)) if QC.prj(src.project) ≟ Some(Unreferenced()) =>
-              mf.toCoEnv[T].project match {
-                case StaticArray(as) => as.traverse(x => StrLit.unapply(x.project)) \/> InternalError.fromMsg("unsupported ordering type")
-                case StrLit(str)     => List(str).right
-                case _               => InternalError.fromMsg("unsupported ordering function").left
-              }
-            case other => InternalError.fromMsg(s"Expected a constant, but received ${other.shows}").left
-          }
-	}
-        orderStrs.flatMap {
-          _.traverse {
-            case "ASC"  => SortDir.Ascending.right
-            case "DESC" => SortDir.Descending.right
-            case _      => InternalError.fromMsg("unsupported ordering direction").left
-          }
-        }
-      }
-
-      directionsList.map(dirs =>
+      orderings map (os =>
         Target(
-          Ann[T](base.buckets, dataset),
+          Ann[T](base.buckets, dset),
           QC.inj(Sort(
             base.src,
             prov.genBuckets(base.buckets).fold(NullLit[T, Hole]())(_._2),
-            keysList.zip(dirs))).embed))
+            os)).embed))
 
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)

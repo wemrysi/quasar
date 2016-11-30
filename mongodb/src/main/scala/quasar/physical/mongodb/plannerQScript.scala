@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
@@ -549,7 +549,7 @@ object MongoDbQScriptPlanner {
                       accumulator(ai._1).left[Fix[ExprOp]])).toListMap)),
                 rep)).liftM[GenT]
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
+            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order.toList).unzip
             keys.traverse(getExprBuilder(funcHandler)(src, _))
               .map(WB.sortBy(src, _, dirs)).liftM[GenT]
           case Filter(src, f) =>

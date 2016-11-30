@@ -86,7 +86,7 @@ object Sql {
                     case OrderBy(keys) =>
                       val nt = "OrderBy" :: astType
                       NonTerminal(nt, None,
-                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil)})
+                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil) }.toList)
                   } ::
                   Nil).foldMap(_.toList))
 
@@ -237,7 +237,7 @@ object GroupBy {
     }
 }
 
-@Lenses final case class OrderBy[A](keys: List[(OrderType, A)])
+@Lenses final case class OrderBy[A](keys: NonEmptyList[(OrderType, A)])
 object OrderBy {
   implicit val equal: Delay[Equal, OrderBy] =
     new Delay[Equal, OrderBy] {
