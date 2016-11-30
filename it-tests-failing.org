@@ -17,6 +17,9 @@ tests/wildcardWithExtraProjections.test
 QueryRegressionTest.scala
 ** All JOINs because all self-joins are note covered
 Everything under `it/src/main/resources/tests/joins`
+** Tests with "LIKE %sth%" can not be reproduced
+multilineLike.test
+flattenGroupedObject.test
 
 * Spark related
 largestZips.test - spark 
