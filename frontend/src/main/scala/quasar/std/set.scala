@@ -91,18 +91,6 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
-  // TODO second param is an Array, third param is Array[String]
-  val OrderBy = TernaryFunc(
-    Sifting,
-    "Orders a set by the natural ordering of a projection on the set",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Top),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(set, _, _) => set
-    },
-    untyper[nat._3](t => success(Func.Input3(t, Type.Top, Type.Top))))
-
   val Filter = BinaryFunc(
     Sifting,
     "Filters a set to include only elements where a projection is true",

@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.common
 
 import scalaz._
 
-sealed trait SortDir
+sealed abstract class SortDir
 
 object SortDir {
   final case object Ascending extends SortDir
   final case object Descending extends SortDir
+
+  val asc: SortDir  = Ascending
+  val desc: SortDir = Descending
 
   implicit val equal: Equal[SortDir] = Equal.equalRef
   implicit val show: Show[SortDir] = Show.showFromToString
