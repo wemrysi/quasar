@@ -22,7 +22,7 @@ import quasar.sql.fixpoint._
 
 import matryoshka.Fix
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Duration, Instant}
+import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 

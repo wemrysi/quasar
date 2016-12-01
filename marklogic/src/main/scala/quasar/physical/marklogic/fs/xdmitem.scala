@@ -28,7 +28,7 @@ import scala.util.{Success, Failure}
 import scala.xml.Elem
 
 import com.marklogic.xcc.types._
-import org.threeten.bp._
+import java.time._
 import scalaz._, Scalaz._
 
 object xdmitem {
@@ -80,7 +80,7 @@ object xdmitem {
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
     case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
-    case item: XSDateTime               => Data._timestamp(DateTimeUtils.toInstant(item.asDate)).point[F]
+    case item: XSDateTime               => Data._timestamp(item.asDate.toInstant).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]

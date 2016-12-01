@@ -28,7 +28,6 @@ object Dependencies {
   private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
 
   def foundation = Seq(
-    "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
