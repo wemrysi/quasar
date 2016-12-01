@@ -181,6 +181,14 @@ To connect to Couchbase use the following `connectionUri` format:
 
 `couchbase://<host>[:<port>]?username=<username>&password=<password>[&queryTimeoutSeconds=<seconds>]`
 
+Prerequisites:
+- Couchbase Server 4.5.1 or greater
+- A "default" bucket with anonymous access
+- Documents must have a "type" field to be listed
+- Primary index on queried buckets
+- Secondary index on "type" field for queried buckets
+- Additional indices and tuning as recommended by Couchbase for proper N1QL performance
+
 Known limitations:
 - Slow queries — query optimization hasn't been applied
 - Join unimplemented — future support planned
