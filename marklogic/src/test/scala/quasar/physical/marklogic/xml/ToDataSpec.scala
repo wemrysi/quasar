@@ -69,6 +69,18 @@ class ToDataSpec extends quasar.Qspec {
         ))
         toData(sample) must_= expected
       }
+
+      "element with just attributes" in {
+        val sample = <foo type="baz" quux="bar" />
+        val expected = Obj(
+          "foo" -> Obj(
+            "_attributes" -> Obj(
+              "type" -> Str("baz"),
+              "quux" -> Str("bar")
+            ),
+            "_text" -> Str("")))
+        toData(sample) must_= expected
+      }
     }
 
     "element with name prefix" in {

@@ -57,15 +57,10 @@ package object xml {
     */
   def toData(elem: Elem, config: KeywordConfig): Data = {
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
-      case Seq() => Str("")
-      case LeafText(str) =>
-        m.flatMap(attrToData).cata(
-          m => Obj(ListMap(
-            config.attributesKeyName  -> m,
-            config.textKeyName        -> Str(str)
-          )),
-          Str(str)
-        )
+      case Seq() =>
+        m.cata(attrsAndText(_,  ""), _str(""))
+      case LeafText(txt) =>
+        m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
         val childrenByName = elements(xs) groupBy qualifiedName
         val childrenData = childrenByName.mapValues {
@@ -77,9 +72,14 @@ package object xml {
     }
 
     def attrToData(meta: MetaData): Option[Data] = meta match {
-      case scala.xml.Null => None
-      case m              => Obj(ListMap(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*)).some
+      case scala.xml.Null => none
+      case m              => some(Obj(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*))
     }
+
+    def attrsAndText(attrs: MetaData, txt: String): Data =
+      attrToData(attrs).fold(_str(txt))(d => _obj(ListMap(
+        config.attributesKeyName -> d,
+        config.textKeyName       -> _str(txt))))
 
     Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
