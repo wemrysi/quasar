@@ -18,29 +18,29 @@ package quasar.physical.fallback.fs
 
 import quasar.Predef._
 import scalaz._
+import com.precog.bytecode.JType
 import com.precog.mimir._
 import com.precog._, yggdrasil._, vfs._, table._
 import com.precog.common._, security._
 
 object fall {
-  object stack extends StdLibEvaluatorStack[Need] {
-    import trans.TransSpec1
+  trait stack[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColumnarTableModule[M] {
+    type ErrOr[A] = EitherT[M, ResourceError, A]
 
-    type M[+A] = Need[A]
-    val M      = implicitly[Monad[Need]]
-
-    object vfs extends VFSMetadata[Need] {
-      def findDirectChildren(apiKey: APIKey, path: Path): EitherT[M, ResourceError, Set[PathMetadata]]                           = ???
-      def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): EitherT[M, ResourceError, PathStructure] = ???
-      def size(apiKey: APIKey, path: Path, version: Version): EitherT[M, ResourceError, Long]                                    = ???
+    object vfs extends VFSMetadata[M] {
+      def findDirectChildren(apiKey: APIKey, path: Path): ErrOr[Set[PathMetadata]]                           = ???
+      def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): ErrOr[PathStructure] = ???
+      def size(apiKey: APIKey, path: Path, version: Version): ErrOr[Long]                                    = ???
     }
 
-    trait TableCompanion extends ColumnarTableCompanion
+    trait TableCompanion extends BlockStoreColumnarTableCompanion
 
     object Table extends TableCompanion {
-      def apply(slices: StreamT[M, Slice], size: TableSize): Table                                                    = ???
-      def singleton(slice: Slice): Table                                                                              = ???
-      def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)] = ???
+      def load(table: Table, apiKey: APIKey, tpe: JType): ErrOr[Table] = ???
     }
+  }
+
+  object stack extends stack[Need] {
+    val M = implicitly[Monad[Need]]
   }
 }
