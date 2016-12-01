@@ -79,10 +79,16 @@ package object qscript {
   }
 
   /** Converts the given string to a QName if valid, failing with an error otherwise. */
-  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
-    refineV[IsNCName](encodeForQName(s)).disjunction
-      .map(ncn => QName.local(NCName(ncn)).point[F])
-      .getOrElse(invalidQName(s))
+  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] = {
+    def asNCName(str: String): Option[NCName] =
+      refineV[IsNCName](str).right.toOption map (NCName(_))
+
+    (s.split(':') match {
+      case Array(pfx, loc) => (asNCName(pfx) |@| asNCName(loc))((p, l) => QName.prefixed(NSPrefix(p), l))
+      case Array(loc)      => asNCName(encodeForQName(loc)) map (QName.local)
+      case _               => None
+    }).fold(invalidQName[F, QName](s))(_.point[F])
+  }
 
   def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
     fm.toCoEnv[T].project match {

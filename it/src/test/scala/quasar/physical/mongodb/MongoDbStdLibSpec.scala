@@ -28,7 +28,7 @@ import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
 import matryoshka._, Recursive.ops._
-import org.threeten.bp.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty

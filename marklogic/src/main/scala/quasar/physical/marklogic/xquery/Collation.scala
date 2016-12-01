@@ -16,22 +16,28 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.Predef.String
 
-import monocle.macros.Lenses
-import scalaz._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.string.Uri
+import scalaz.{Order, Show}
+import scalaz.std.string._
 import scalaz.syntax.show._
 
-@Lenses
-final case class DefaultCollationDecl(collation: Collation) {
-  def render: String = s"declare default collation ${collation.value.get.xs.shows}"
+/** A URI used to denote a collation.
+  * @see https://www.w3.org/TR/xquery-operators/#collations
+  */
+final case class Collation(value: String Refined Uri) {
+  override def toString = this.shows
 }
 
-object DefaultCollationDecl {
-  implicit val order: Order[DefaultCollationDecl] =
-    Order.orderBy(_.collation)
+object Collation {
+  val codepoint = Collation("http://marklogic.com/collation/codepoint")
 
-  implicit val show: Show[DefaultCollationDecl] =
-    Show.shows(nd => s"DefaultCollationDecl(${nd.render})")
+  implicit val order: Order[Collation] =
+    Order.orderBy(_.value.get)
+
+  implicit val show: Show[Collation] =
+    Show.shows(_.value.get)
 }

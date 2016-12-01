@@ -28,7 +28,6 @@ object Dependencies {
   private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
 
   def foundation = Seq(
-    "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
@@ -105,12 +104,14 @@ object Dependencies {
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined" %  refinedVersion
+    "eu.timepit" %% "refined"     % refinedVersion,
+    "org.scalaz" %% "scalaz-core" % scalazVersion force()
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
+    "eu.timepit"                 %% "refined-scalacheck"  % refinedVersion % Test,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(

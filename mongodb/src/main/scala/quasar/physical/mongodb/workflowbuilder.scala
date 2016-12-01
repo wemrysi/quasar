@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.namegen._
@@ -28,7 +29,6 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.std.StdLib._
-import quasar.qscript.SortDir
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
