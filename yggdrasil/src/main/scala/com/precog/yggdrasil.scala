@@ -4,9 +4,6 @@ import blueeyes._
 import scalaz._, Scalaz._, Ordering._
 
 package object yggdrasil {
-  // only usage of commons-primitives
-  type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
-
   type Identity   = Long
   type Identities = Array[Identity]
   object Identities {
