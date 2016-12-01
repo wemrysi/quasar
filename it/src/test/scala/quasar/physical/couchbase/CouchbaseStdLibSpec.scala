@@ -26,7 +26,6 @@ import quasar.fp.reflNT
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.fs.FileSystemError
-import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.physical.couchbase.common.{CBDataCodec, Context}
 import quasar.physical.couchbase.fs.{context, FsType}
 import quasar.physical.couchbase.fs.queryfile.{n1qlResults, Plan}
@@ -34,7 +33,7 @@ import quasar.physical.couchbase.N1QL.{n1qlQueryString, partialQueryString}
 import quasar.physical.couchbase.planner.CBPhaseLog
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.{NonRepresentableData, PlannerError}
-import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner}
+import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
 
 import matryoshka.Fix
@@ -45,8 +44,6 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class CouchbaseStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
-
   implicit val codec = CBDataCodec
 
   type Eff0[A] = Coproduct[MonotonicSeq, Read[Context, ?], A]
@@ -92,51 +89,32 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   }
 
   def runner(ctx: Context) = new MapFuncStdLibTestRunner {
-    def nullary(
-      prg: Fix[LP],
+    def nullaryMapFunc(
+      prg: FreeMapA[Fix, Nothing],
       expected: Data
     ): Result =
       skipped
 
-    def unary(
-      prg: Fix[LP] => Fix[LP],
+    def unaryMapFunc(
+      prg: FreeMapA[Fix, UnaryArg],
       arg: Data,
       expected: Data
-    ): Result = {
-      val mf: Free[MapFunc[Fix, ?], UnaryArg] =
-        translate(prg(lpf.free('arg)), κ(UnaryArg._1))
+    ): Result =
+      run(prg, κ(arg), expected, ctx)
 
-      run(mf, κ(arg), expected, ctx)
-    }
-
-    def binary(
-      prg: (Fix[LP], Fix[LP]) => Fix[LP],
+    def binaryMapFunc(
+      prg: FreeMapA[Fix, BinaryArg],
       arg1: Data, arg2: Data,
       expected: Data
-    ): Result = {
-      val mf: Free[MapFunc[Fix, ?], BinaryArg] =
-        translate(prg(lpf.free('arg1), lpf.free('arg2)), {
-          case 'arg1 => BinaryArg._1
-          case 'arg2 => BinaryArg._2
-        })
+    ): Result =
+      run[BinaryArg](prg, _.fold(arg1, arg2), expected, ctx)
 
-      run[BinaryArg](mf, _.fold(arg1, arg2), expected, ctx)
-    }
-
-    def ternary(
-      prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+    def ternaryMapFunc(
+      prg: FreeMapA[Fix, TernaryArg],
       arg1: Data, arg2: Data, arg3: Data,
       expected: Data
-    ): Result = {
-      val mf: Free[MapFunc[Fix, ?], TernaryArg] =
-        translate(prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
-          case 'arg1 => TernaryArg._1
-          case 'arg2 => TernaryArg._2
-          case 'arg3 => TernaryArg._3
-        })
-
-      run[TernaryArg](mf, _.fold(arg1, arg2, arg3), expected, ctx)
-    }
+    ): Result =
+      run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected, ctx)
 
     // TODO: remove let once '\\' is fixed in N1QL
     val genPrintableAsciiSansBackslash: Gen[String] =
