@@ -80,7 +80,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile expression with timestamp, date, time, and interval" in {
-      import org.threeten.bp.{Instant, LocalDate, LocalTime}
+      import java.time.{Instant, LocalDate, LocalTime}
 
       testTypedLogicalPlanCompile(
         """select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",

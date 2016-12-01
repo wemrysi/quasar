@@ -21,7 +21,7 @@ import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, _}, MapFuncs._
 
-import org.threeten.bp.Instant
+import java.time.Instant
 import matryoshka._
 import scalaz.{Divide => _, _}, Scalaz._
 

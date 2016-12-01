@@ -37,7 +37,7 @@ import matryoshka._, Recursive.ops._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.threeten.bp.Instant
+import java.time.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
@@ -2497,7 +2497,7 @@ class PlannerSpec extends
     }.pendingUntilFixed
 
     "plan filter with timestamp and interval" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow(chain[Workflow](
@@ -2561,7 +2561,7 @@ class PlannerSpec extends
     }
 
     "plan filter on date" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
@@ -2622,7 +2622,7 @@ class PlannerSpec extends
     }
 
     "plan convert to timestamp" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("select to_timestamp(epoch) from foo") must beWorkflow {
         chain[Workflow](

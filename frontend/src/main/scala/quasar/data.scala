@@ -28,7 +28,7 @@ import jawn._
 import matryoshka._
 import matryoshka.patterns._
 import monocle.Prism
-import org.threeten.bp.{Duration, Instant, LocalDate, LocalDateTime, LocalTime, ZoneOffset}
+import java.time.{Duration, Instant, LocalDate, LocalDateTime, LocalTime, ZoneOffset}
 import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 

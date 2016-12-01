@@ -26,7 +26,7 @@ import quasar.fp.ski._
 
 import scala.math
 
-import org.threeten.bp._
+import java.time._
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
