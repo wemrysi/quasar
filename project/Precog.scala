@@ -3,7 +3,7 @@ package precogbuild
 import sbt._, Keys._
 import scala._, Predef._
 
-object PlatformBuild {
+object Build {
   val BothScopes = "compile->compile;test->test"
 
   def envArgs     = (sys.env.getOrElse("ARGS", "").trim split "\\s+").toList
@@ -35,7 +35,7 @@ object PlatformBuild {
 
   def javaSpecVersion: String                       = sys.props("java.specification.version")
   def inBoth[A](f: Configuration => Seq[A]): Seq[A] = List(Test, Compile) flatMap f
-  def kindProjector                                 = "org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary
+  def kindProjector                                 = "org.spire-math" % "kind-projector" % "0.9.3" cross CrossVersion.binary
 
   implicit class ProjectOps(val p: sbt.Project) {
     def noArtifacts: Project = also(
