@@ -502,34 +502,12 @@ lazy val it = project
 
 import precogbuild.Build._
 
-def scalazVersion   = "7.2.4"
-def specsVersion    = "3.8.4-scalacheck-1.12.5"
-def pathyVersion    = "0.2.2"
-def argonautVersion = "6.2-M3"
-
-/** mimir used to be the evaluator project.
- */
+lazy val precog   = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
+lazy val blueeyes = project.setup dependsOn (precog % BothScopes)
 lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
 lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes) also (
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
      initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
-)
-lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
-
-lazy val precog = (
-  project.setup deps (
-
-    "org.openjdk.jmh" %  "jmh-generator-annprocess" % "1.17.1",
-    "com.chuusai"     %% "shapeless"                % "2.3.1",
-    "org.slf4s"       %% "slf4s-api"                % "1.7.13",
-    "org.spire-math"  %% "spire"                    % "0.13.0",
-    "org.scodec"      %% "scodec-bits"              % "1.1.0",
-    "org.scodec"      %% "scodec-scalaz"            % "1.3.0a",
-    "org.scalaz"      %% "scalaz-effect"            % scalazVersion,
-    "org.scalacheck"  %% "scalacheck"               % "1.12.5"       % Test,
-    "org.specs2"      %% "specs2-scalacheck"        % specsVersion   % Test,
-    "org.specs2"      %% "specs2-core"              % specsVersion   % Test
-  )
 )
 
 lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugins JmhPlugin also (
@@ -545,4 +523,4 @@ addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
 addCommandAlias("cc", "; mimir/test:compile ; test:compile")
 addCommandAlias("tt", "; mimir/test ; test")
 addCommandAlias("ttq", "; mimir/testQuick ; testQuick")
-addCommandAlias("cover", "; coverage ; test ; coverageReport")
+addCommandAlias("cover", "; coverage ; mimir/test ; coverageReport")

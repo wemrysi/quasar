@@ -130,4 +130,9 @@ object Dependencies {
     "com.propensive" %% "rapture-json-json4s" %   raptureVersion   % Test,
     "eu.timepit"     %% "refined-scalacheck"  %   refinedVersion   % Test
   )
+  def precog = Seq(
+    "org.slf4s"      %% "slf4s-api"     % "1.7.13",
+    "org.spire-math" %% "spire"         % "0.13.0",
+    "org.scodec"     %% "scodec-scalaz" % "1.3.0a"
+  )
 }
