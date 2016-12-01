@@ -210,7 +210,7 @@ lazy val root = project.in(file("."))
 //        /  \
       repl,   web,
 //        \  /
-           it, precog, blueeyes, yggdrasil, mimir)
+           it, precog, blueeyes, yggdrasil, mimir, fallback)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -502,8 +502,8 @@ lazy val it = project
 
 import precogbuild.Build._
 
-lazy val precog   = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
-lazy val blueeyes = project.setup dependsOn (precog % BothScopes)
+lazy val precog    = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
+lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
 lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
 lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes) also (
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
@@ -524,3 +524,15 @@ addCommandAlias("cc", "; mimir/test:compile ; test:compile")
 addCommandAlias("tt", "; mimir/test ; test")
 addCommandAlias("ttq", "; mimir/testQuick ; testQuick")
 addCommandAlias("cover", "; coverage ; mimir/test ; coverageReport")
+
+/** Fallback evaluator.
+ */
+lazy val fallback = project
+  .settings(name := "quasar-fallback-internal")
+  .dependsOn(connector % BothScopes, mimir)
+  .settings(commonSettings)
+  .settings(wartremoverWarnings in (Compile, compile) := scala.Nil)
+  .settings(scalacOptions -= "-Xfatal-warnings")
+  .settings(libraryDependencies += "commons-io" % "commons-io" % "2.1")
+  .settings(initialCommands in (Compile, console) := "import quasar._, qscript._, import quasar.physical.fallback.fs._")
+  .enablePlugins(AutomateHeaderPlugin)
