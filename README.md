@@ -208,6 +208,29 @@ To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/x
 
 `xcc://<username>:<password>@<host>:<port>/<database>`
 
+Prerequisites
+- MarkLogic 8.0+
+- Documents must to be organized under directories to be found by Quasar.
+- Namespaces used in queries must be defined on the server.
+- Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
+
+[Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
+- Only XML documents are currently supported (JSON support is coming soon, see [#1704](https://github.com/quasar-analytics/quasar/issues/1704)).
+- It is not yet possible to reference XML attributes in queries ([#1701](https://github.com/quasar-analytics/quasar/issues/1701)).
+- Most joins do not yet work ([#1581](https://github.com/quasar-analytics/quasar/issues/1581), [#1560](https://github.com/quasar-analytics/quasar/issues/1560), [#1539](https://github.com/quasar-analytics/quasar/issues/1539), [#1505](https://github.com/quasar-analytics/quasar/issues/1505)).
+- Field aliases must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- "Default" numeric field names are prefixed with an underscore ("_") in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- Index usage is currently poor, so performance may degrade on large directories and/or complex queries. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
+
+Quasar's data model is JSON-ish and thus there is a bit of translation required when applying it to XML. The current mapping aims to be intuitive while still taking advantage of the XDM as much as possible. Take note of the following:
+- Projecting a field will result in the child element(s) having the given name. If more than one element matches, the result will be an array.
+- As the children of an element form a sequence, they may be treated both as a mapping from element names to values and as an array of values. That is to say, given a document like `<foo><bar>1</bar><baz>2</baz></foo>`, `foo.bar` and `foo[0]` both refer to `<bar>1</bar>`.
+- XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
+  - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
+  - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
+  - Element attributes are serialized to an object at the `_attributes` key.
+  - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
+
 #### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
