@@ -1,11 +1,12 @@
 package precogbuild
 
 import sbt._, Keys._
+import scala._, Predef._
 
 object PlatformBuild {
   val BothScopes = "compile->compile;test->test"
 
-  def envArgs     = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
+  def envArgs     = (sys.env.getOrElse("ARGS", "").trim split "\\s+").toList
   def warningOpts = Seq("-g:vars", "-deprecation", "-unchecked", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
 
   /** Watch out Jonesy! It's the ol' double-cross!

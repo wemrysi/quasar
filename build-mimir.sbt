@@ -6,8 +6,8 @@ def pathyVersion    = "0.2.1"
 def argonautVersion = "6.2-M3"
 
 lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) also (
-  console in Compile <<= console in Compile in yggdrasil,
-     console in Test <<= console in Test in yggdrasil
+  console in Compile := (console in Compile in yggdrasil).value,
+     console in Test := (console in Test in yggdrasil).value
 )
 
 /** mimir used to be the evaluator project.
@@ -46,11 +46,11 @@ lazy val precog = (
 
 lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugins JmhPlugin also (
                 fork in Test :=  true,
-      sourceDirectory in Jmh <<= sourceDirectory in Test,
-       classDirectory in Jmh <<= classDirectory in Test,
-  dependencyClasspath in Jmh <<= dependencyClasspath in Test,
-              compile in Jmh <<= (compile in Jmh) dependsOn (compile in Test),
-                  run in Jmh <<= (run in Jmh) dependsOn (Keys.compile in Jmh)
+      sourceDirectory in Jmh := (sourceDirectory in Test).value,
+       classDirectory in Jmh := (classDirectory in Test).value,
+  dependencyClasspath in Jmh := (dependencyClasspath in Test).value,
+              compile in Jmh := ((compile in Jmh) dependsOn (compile in Test)).value,
+                  run in Jmh := ((run in Jmh) dependsOn (Keys.compile in Jmh)).evaluated
 )
 
 addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
