@@ -14,20 +14,31 @@ unifyFlattenedFieldsWithMultipleUses.test
 unifyFlattenedFieldsWithUnflattened.test
 union.test
 tests/wildcardWithExtraProjections.test
-QueryRegressionTest.scala
+
 ** All JOINs because all self-joins are note covered
 Everything under `it/src/main/resources/tests/joins`
 ** Tests with "LIKE %sth%" can not be reproduced
 multilineLike.test
 flattenGroupedObject.test
 filterSortLimit.test
-projectIndexFromGroupWithFilter.test
 
 * Spark related
 largestZips.test - spark does not handle desc and asc in the same query
 
 * Not yet checked
+timestampsAndIntervals.test
+projectIndexFromGroupWithFilter.test
 filterOnFieldComparison.test
 groupByFlatten.test
+statesByShortestFirstCity.test
+wildcardWithSort.test
+LocationCount.test
+zipsByCityLength.test
 
 * Questionable
+
+    "spark_local": "skip",
+    "spark_hdfs": "skip"
+
+    "spark_local": "pending",
+    "spark_hdfs": "pending"

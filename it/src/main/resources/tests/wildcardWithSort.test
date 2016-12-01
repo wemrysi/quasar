@@ -2,7 +2,9 @@
     "name": "wildcard with sort",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip"
+        "marklogic":  "skip",
+	    "spark_local": "pending",
+    "spark_hdfs": "pending"
     },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",
