@@ -21,6 +21,7 @@ import quasar.{BinaryFunc, Data, Func, GenericFunc, Reduction, SemanticError, Si
   SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.binder._
@@ -446,11 +447,11 @@ trait Compiler[F[_]] {
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
                             (CompilerState.rootTableReq ⊛
-                              CompilerState.addFields(names.foldMap(_.toList))(orderBy.keys.traverse { case (_, key) => compile0(key) }))((t, keys) =>
-                              Fix(set.OrderBy(
-                                t,
-                                Fix(structural.MakeArrayN(keys: _*)),
-                                Fix(structural.MakeArrayN(orderBy.keys.map { case (order, _) => lpr.constant(Data.Str(order.shows)) }: _*))))))
+                              CompilerState.addFields(names.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))((t, ks) =>
+                              lpr.sort(t, ks map {
+                                case (k, ASC ) => (k, SortDir.Ascending)
+                                case (k, DESC) => (k, SortDir.Descending)
+                              })))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {

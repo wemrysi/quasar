@@ -18,8 +18,8 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.PhaseResult.detail
+import quasar.Planner.InternalError
+import quasar.common.{PhaseResult, SortDir}, PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._, eitherT._
@@ -48,7 +48,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
               key.point[M]
             case key =>
               EitherT(
-                (InternalError(s"Unsupported object key: ${key.shows}"): PlannerError)
+                InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
                   .left[String].point[PR])
           },
           v => processFreeMapDefault(v.fromCoEnv, tmpName)
@@ -169,7 +169,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                         case SortDir.Descending => "DESC"
                       }
                       processFreeMap(or, tmpName3) ∘ (ord => s"${n1ql(ord)} $dir")
-                    }.map(_.mkString(", "))
+                    }.map(_ intercalate (", "))
         bN1ql    =  n1ql(b)
         bN1qlN   =  s"ifnull($bN1ql, $tmpName1)"
         s        =  select(

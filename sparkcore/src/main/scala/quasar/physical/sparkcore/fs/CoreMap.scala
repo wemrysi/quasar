@@ -26,7 +26,7 @@ import quasar.fp.ski._
 
 import scala.math
 
-import org.threeten.bp._
+import java.time._
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -299,7 +299,7 @@ object CoreMap extends Serializable {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2,ff3) => ((x:Data) => f2(x)).right
-    case _ => InternalError("not implemented").left
+    case _ => InternalError.fromMsg("not implemented").left
   }
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {

@@ -26,7 +26,7 @@ import matryoshka.Fix
 import org.specs2.execute.Result
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
+import java.time.{Instant, LocalDate, ZoneOffset}
 import scalaz.Equal
 
 /** Abstract spec for the standard library, intended to be implemented for each

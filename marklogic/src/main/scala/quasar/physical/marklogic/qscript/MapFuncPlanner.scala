@@ -24,6 +24,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
+import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
 import scalaz.{Const, EitherT, Monad}
 import scalaz.syntax.monad._
@@ -112,8 +113,7 @@ object MapFuncPlanner {
     case Bool(s)                      => xs.boolean(s).point[F]
     case Integer(s)                   => xs.integer(s).point[F]
     case Decimal(s)                   => xs.double(s).point[F]
-    case Null(s)                      => (ejson.null_[F] |@| qscript.qError[F](s"Invalid coercion to 'null': $s".xs))(
-                                           (n, e) => if_ (s eq "null".xs) then_ n else_ e)
+    case Null(s)                      => ejson.null_[F] map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
     case ToString(x)                  => qscript.toString[F] apply x
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => qscript.safeSubstring[F] apply (s, loc + 1.xqy, len)
@@ -150,25 +150,7 @@ object MapFuncPlanner {
       }
 
     case DeleteField(src, field)      =>
-      field match {
-        case XQuery.Step(_) =>
-          mem.nodeDelete[F](src `/` field)
-
-        case XQuery.StringLit(s) =>
-          for {
-            qn <- asQName(s)
-            m  <- freshName[F]
-            n1 <- mem.nodeDelete[F](~m `/` child(qn))
-            n2 <- mem.nodeDelete[F](src `/` child(qn))
-          } yield {
-            if (flwor.isMatching(src))
-              let_(m := src) return_ n1
-            else
-              n2
-          }
-
-        case _ => qscript.deleteField[F] apply (src, xs.QName(field))
-      }
+      qscript.deleteField[F] apply (src, field)
 
     // other
     case Range(x, y)                  => (x to y).point[F]

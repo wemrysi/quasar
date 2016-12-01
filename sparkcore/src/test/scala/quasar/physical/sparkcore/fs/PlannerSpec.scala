@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.console
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
@@ -136,7 +137,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           val src: RDD[Data] = sc.parallelize(data)
 
           def bucket = ProjectFieldR(HoleF, StrLit("country"))
-          def order = List((bucket, SortDir.Ascending))
+          def order = (bucket, SortDir.asc).wrapNel
           val sort = quasar.qscript.Sort(src, bucket, order)
 
           val state: SparkState[RDD[Data]] = ψ(sort)

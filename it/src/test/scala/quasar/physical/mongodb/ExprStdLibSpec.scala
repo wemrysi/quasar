@@ -77,7 +77,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
           case IsPipeline(p) => p.src
           case _             => false
         }
-        if (singlePipeline) wf.right else InternalError("compiled to map-reduce").left
+        if (singlePipeline) wf.right else InternalError.fromMsg("compiled to map-reduce").left
       }
       .strengthR(BsonField.Name("result"))
   }

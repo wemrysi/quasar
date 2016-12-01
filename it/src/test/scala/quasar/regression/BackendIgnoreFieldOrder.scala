@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.regression
 
-import scalaz._
+import quasar.Predef._
+import quasar.BackendName
 
-sealed trait SortDir
+sealed trait IgnoreFieldOrderBackend
 
-object SortDir {
-  final case object Ascending extends SortDir
-  final case object Descending extends SortDir
-
-  implicit val equal: Equal[SortDir] = Equal.equalRef
-  implicit val show: Show[SortDir] = Show.showFromToString
-}
+final case object IgnoreFieldOrderAllBackends                           extends IgnoreFieldOrderBackend
+final case class  IgnoreFieldOrderBackends(backends: List[BackendName]) extends IgnoreFieldOrderBackend
