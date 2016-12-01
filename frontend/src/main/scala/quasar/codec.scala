@@ -20,8 +20,9 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 
+import java.time.format.DateTimeFormatter
+
 import argonaut._, Argonaut._
-import org.threeten.bp.format.DateTimeFormatter
 import scalaz._, Scalaz._
 
 trait DataEncodingError {
