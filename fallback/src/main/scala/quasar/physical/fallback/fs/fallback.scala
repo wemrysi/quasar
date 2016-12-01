@@ -18,29 +18,43 @@ package quasar.physical.fallback.fs
 
 import quasar.Predef._
 import scalaz._
+import Scalaz._
+import blueeyes.yggConfig
+import blueeyes.json.JValue
 import com.precog.bytecode.JType
 import com.precog.mimir._
 import com.precog._, yggdrasil._, vfs._, table._
 import com.precog.common._, security._
 
-object fall {
-  trait stack[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColumnarTableModule[M] {
-    type ErrOr[A] = EitherT[M, ResourceError, A]
+trait PrecogEvaluator[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColumnarTableModule[M] {
+  type ErrOr[A] = EitherT[M, ResourceError, A]
 
-    object vfs extends VFSMetadata[M] {
-      def findDirectChildren(apiKey: APIKey, path: Path): ErrOr[Set[PathMetadata]]                           = ???
-      def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): ErrOr[PathStructure] = ???
-      def size(apiKey: APIKey, path: Path, version: Version): ErrOr[Long]                                    = ???
-    }
-
-    trait TableCompanion extends BlockStoreColumnarTableCompanion
-
-    object Table extends TableCompanion {
-      def load(table: Table, apiKey: APIKey, tpe: JType): ErrOr[Table] = ???
-    }
+  object vfs extends VFSMetadata[M] {
+    def findDirectChildren(apiKey: APIKey, path: Path): ErrOr[Set[PathMetadata]]                           = ???
+    def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): ErrOr[PathStructure] = ???
+    def size(apiKey: APIKey, path: Path, version: Version): ErrOr[Long]                                    = ???
   }
 
-  object stack extends stack[Need] {
-    val M = implicitly[Monad[Need]]
+  trait TableCompanion extends BlockStoreColumnarTableCompanion
+
+  object Table extends TableCompanion {
+    def load(table: Table, apiKey: APIKey, tpe: JType): ErrOr[Table] = EitherT right table.point[M]
   }
+
+  def sliceSize: Int = yggConfig.maxSliceSize
+  def fromRValues(values: Stream[RValue]): Table = {
+    def makeSlice(data: Stream[RValue]): Slice -> Stream[RValue] =
+      data splitAt sliceSize leftMap (Slice fromRValues _)
+
+    Table(
+      StreamT.unfoldM(values)(events => M.point(events.nonEmpty option makeSlice(events.toStream))),
+      ExactSize(values.length.toLong)
+    )
+  }
+}
+
+object fall extends PrecogEvaluator[Need] {
+  val M = implicitly[Monad[Need]]
+
+  def apply(values: JValue*): Table = fromRValues(values.toStream map RValue.fromJValue)
 }

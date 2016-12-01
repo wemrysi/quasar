@@ -525,6 +525,15 @@ addCommandAlias("tt", "; mimir/test ; test")
 addCommandAlias("ttq", "; mimir/testQuick ; testQuick")
 addCommandAlias("cover", "; coverage ; mimir/test ; coverageReport")
 
+def fallbackRepl = """
+import blueeyes.json._
+import quasar._
+import qscript._
+import quasar.physical.fallback.fs._
+import scalaz._
+import Scalaz._
+"""
+
 /** Fallback evaluator.
  */
 lazy val fallback = project
@@ -534,5 +543,5 @@ lazy val fallback = project
   .settings(wartremoverWarnings in (Compile, compile) := scala.Nil)
   .settings(scalacOptions -= "-Xfatal-warnings")
   .settings(libraryDependencies += "commons-io" % "commons-io" % "2.1")
-  .settings(initialCommands in (Compile, console) := "import quasar._, qscript._, import quasar.physical.fallback.fs._")
+  .settings(initialCommands in (Compile, console) := fallbackRepl)
   .enablePlugins(AutomateHeaderPlugin)
