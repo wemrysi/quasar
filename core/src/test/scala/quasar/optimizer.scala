@@ -17,9 +17,10 @@
 package quasar
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.frontend.logicalplan._
 import quasar.sql.CompilerHelpers
-import quasar.std._, StdLib.set._, StdLib.structural._
+import quasar.std._, StdLib.structural._
 
 import matryoshka._, FunctorT.ops._
 import org.scalacheck._
@@ -100,22 +101,18 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
           makeObj(
             "name" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("name")))),
           lpf.let('tmp2,
-            OrderBy[FLP](
+            lpf.sort(
               lpf.free('tmp1),
-              MakeArray[FLP](
-                ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
-              lpf.constant(Data.Str("foobar"))),
+              (ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name"))).embed, SortDir.asc).wrapNel),
             lpf.free('tmp2))))) must
         beTreeEqual(
           lpf.let('tmp1,
             makeObj(
               "name" ->
                 ObjectProject(read("person"), lpf.constant(Data.Str("name")))),
-            OrderBy[FLP](
+            lpf.sort(
               lpf.free('tmp1),
-              MakeArray[FLP](
-                ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name")))),
-              lpf.constant(Data.Str("foobar")))))
+              (ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("name"))).embed, SortDir.asc).wrapNel)))
     }
   }
 

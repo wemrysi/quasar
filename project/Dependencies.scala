@@ -28,7 +28,6 @@ object Dependencies {
   private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
 
   def foundation = Seq(
-    "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
@@ -49,6 +48,9 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-scalacheck-binding" %   scalazVersion   %     Test,
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
+  )
+  def ejson = Seq(
+    "org.spire-math"             %% "jawn-parser"    % jawnVersion
   )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
@@ -102,13 +104,14 @@ object Dependencies {
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined" %  refinedVersion
+    "eu.timepit" %% "refined"     % refinedVersion,
+    "org.scalaz" %% "scalaz-core" % scalazVersion force()
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "org.spire-math"             %% "jawn-parser"         % jawnVersion,
+    "eu.timepit"                 %% "refined-scalacheck"  % refinedVersion % Test,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(

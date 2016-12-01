@@ -21,9 +21,9 @@ import quasar.Predef._
 import java.util.Base64
 
 import monocle.Prism
-import org.threeten.bp._
-import org.threeten.bp.format._
-import org.threeten.bp.temporal.{TemporalAccessor, TemporalQuery}
+import java.time._
+import java.time.format._
+import java.time.temporal.{TemporalAccessor, TemporalQuery}
 import scalaz._
 
 object prisms {
@@ -43,14 +43,17 @@ object prisms {
     case _ => None
   } (d => s"${d.getSeconds}.${d.getNano}")
 
-  val isoInstant:   Prism[String, Instant]   = temporal(Instant.FROM  , DateTimeFormatter.ISO_INSTANT)
-  val isoLocalDate: Prism[String, LocalDate] = temporal(LocalDate.FROM, DateTimeFormatter.ISO_DATE)
-  val isoLocalTime: Prism[String, LocalTime] = temporal(LocalTime.FROM, DateTimeFormatter.ISO_TIME)
+  val isoInstant:   Prism[String, Instant]   = temporal(Instant from _, DateTimeFormatter.ISO_INSTANT)
+  val isoLocalDate: Prism[String, LocalDate] = temporal(LocalDate from _, DateTimeFormatter.ISO_DATE)
+  val isoLocalTime: Prism[String, LocalTime] = temporal(LocalTime from _, DateTimeFormatter.ISO_TIME)
 
   ////
 
   private val DurationEncoding = "(-?\\d+)(?:\\.(\\d+))?".r
 
-  private def temporal[T <: TemporalAccessor](q: TemporalQuery[T], fmt: DateTimeFormatter): Prism[String, T] =
-    Prism[String, T](s => \/.fromTryCatchNonFatal(fmt.parse(s, q)).toOption)(fmt.format)
+  // private def temporal[T <: TemporalAccessor](q: TemporalQuery[T], fmt: DateTimeFormatter): Prism[String, T] =
+  private def temporal[T <: TemporalAccessor](f: TemporalAccessor => T, fmt: DateTimeFormatter): Prism[String, T] = {
+    val tq = new TemporalQuery[T] { def queryFrom(q: TemporalAccessor): T = f(q) }
+    Prism[String, T](s => \/.fromTryCatchNonFatal(fmt.parse(s, tq)).toOption)(fmt.format)
+  }
 }

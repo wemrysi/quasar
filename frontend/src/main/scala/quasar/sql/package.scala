@@ -192,7 +192,7 @@ package object sql {
             ("group by" ::
               g.keys.map(_._2).mkString(", ") ::
               g.having.map("having " + _._2).toList).mkString(" ")),
-          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) mkString(", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
+          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) intercalate (", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
       case Vari(symbol) => ":" + symbol
       case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")

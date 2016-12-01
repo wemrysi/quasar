@@ -162,18 +162,22 @@ object qscript {
       }
     })
 
-  // qscript:delete-field($src as element(), $field as xs:QName) as element()
+  // qscript:delete-field($src as element()?, $field as xs:string) as element()?
   def deleteField[F[_]: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
-      $("src")   as ST("element()"),
-      $("field") as ST("xs:QName")
-    ).as(ST("element()")) { (src: XQuery, field: XQuery) =>
-      val n = $("n")
-      element { fn.nodeName(src) } {
-        for_    (n in (src `/` child.element()))
-        .where_ (fn.nodeName(~n) ne field)
-        .return_(~n)
-      }
+      $("src")   as ST("element()?"),
+      $("field") as ST("xs:string")
+    ).as(ST("element()?")) { (src: XQuery, field: XQuery) =>
+      val (s, n) = ($("s"), $("n"))
+      fn.map(func(s.render) {
+        element { fn.nodeName(~s) } {
+          mkSeq_(
+            ~s `/` attribute.node(),
+            for_    (n in (~s `/` child.element()))
+            .where_ (fn.string(fn.nodeName(~n)) ne field)
+            .return_(~n))
+        }
+      }, src)
     })
 
   // qscript:element-left-shift($elt as element()) as item()*

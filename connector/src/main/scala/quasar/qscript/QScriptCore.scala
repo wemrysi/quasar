@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -106,7 +107,7 @@ object ReduceIndex {
 @Lenses final case class Sort[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
-  order: List[(FreeMap[T], SortDir)])
+  order: NonEmptyList[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
 /** Creates a new dataset that contains the elements from the datasets created
@@ -247,7 +248,7 @@ object QScriptCore {
                 NonTerminal("Sort" :: nt, None,
                   RA.render(src) :: nested("Bucket", bucket) ::
                     NonTerminal("Order" :: "Sort" :: nt, None, order.map { case (x, dir) =>
-                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }) ::
+                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }.toList) ::
                     Nil)
               case Union(src, lBranch, rBranch) =>
                 NonTerminal("Union" :: nt, None, List(

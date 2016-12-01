@@ -110,7 +110,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     ////
 
-    private val cpColl = Prolog.defColl(DefaultCollationDecl.codepoint)
+    private val cpColl = Prolog.defColl(DefaultCollationDecl(Collation.codepoint))
 
     private def planFreeMap[A](
       freeMap: FreeMapA[Fix, A])(

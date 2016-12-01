@@ -27,7 +27,6 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.SortDir
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
@@ -38,7 +37,7 @@ import matryoshka._, Recursive.ops._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.threeten.bp.Instant
+import java.time.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
@@ -2498,7 +2497,7 @@ class PlannerSpec extends
     }.pendingUntilFixed
 
     "plan filter with timestamp and interval" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow(chain[Workflow](
@@ -2562,7 +2561,7 @@ class PlannerSpec extends
     }
 
     "plan filter on date" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
@@ -2623,7 +2622,7 @@ class PlannerSpec extends
     }
 
     "plan convert to timestamp" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("select to_timestamp(epoch) from foo") must beWorkflow {
         chain[Workflow](
@@ -3686,10 +3685,11 @@ class PlannerSpec extends
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
-  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.nonEmptyListOf(for {
-    x <- Gen.oneOf(genInnerInt, genInnerStr)
-    t <- Gen.oneOf(ASC, DESC)
-  } yield (t, x)).map(ps => Some(OrderBy(ps)))
+
+  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = {
+    val order = Gen.oneOf(ASC, DESC) tuple Gen.oneOf(genInnerInt, genInnerStr)
+    (order |@| Gen.listOf(order))((h, t) => Some(OrderBy(NonEmptyList(h, t: _*))))
+  }
 
   val maybeReducingExpr = Gen.oneOf(genOuterInt, genOuterStr)
 
@@ -3765,17 +3765,16 @@ class PlannerSpec extends
   "plan from LogicalPlan" should {
     import StdLib._
 
-    "plan simple OrderBy" in {
+    "plan simple Sort" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
           lpf.let(
             'tmp1, makeObj("bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
             lpf.let('tmp2,
-              s.OrderBy[FLP](
+              lpf.sort(
                 lpf.free('tmp1),
-                MakeArrayN[Fix](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar")))),
-                MakeArrayN(lpf.constant(Data.Str("ASC")))),
+                (ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar"))).embed, SortDir.asc).wrapNel),
               lpf.free('tmp2))))
 
       plan(lp) must beWorkflow(chain[Workflow](
@@ -3786,16 +3785,15 @@ class PlannerSpec extends
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression" in {
+    "plan Sort with expression" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
-          s.OrderBy[FLP](
+          lpf.sort(
             lpf.free('tmp0),
-            MakeArrayN[Fix](math.Divide[FLP](
+            (math.Divide[FLP](
               ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
-              lpf.constant(Data.Dec(10.0)))),
-            MakeArrayN(lpf.constant(Data.Str("ASC")))))
+              lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3810,7 +3808,7 @@ class PlannerSpec extends
           ExcludeId)))
     }
 
-    "plan OrderBy with expression and earlier pipeline op" in {
+    "plan Sort with expression and earlier pipeline op" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
@@ -3821,10 +3819,9 @@ class PlannerSpec extends
               relations.Eq[FLP](
                 ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
                 lpf.constant(Data.Int(0)))),
-            s.OrderBy[FLP](
+            lpf.sort(
               lpf.free('tmp1),
-              MakeArrayN[Fix](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar")))),
-              MakeArrayN(lpf.constant(Data.Str("ASC"))))))
+              (ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar"))).embed, SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3833,7 +3830,7 @@ class PlannerSpec extends
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression (and extra project)" in {
+    "plan Sort expression (and extra project)" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
@@ -3841,12 +3838,11 @@ class PlannerSpec extends
             'tmp9,
             makeObj(
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
-            s.OrderBy[FLP](
+            lpf.sort(
               lpf.free('tmp9),
-              MakeArrayN[Fix](math.Divide[FLP](
+              (math.Divide[FLP](
                 ObjectProject(lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
-                lpf.constant(Data.Dec(10.0)))),
-              MakeArrayN(lpf.constant(Data.Str("ASC"))))))
+                lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),

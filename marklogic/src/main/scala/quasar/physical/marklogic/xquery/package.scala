@@ -17,6 +17,7 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -50,9 +51,9 @@ package object xquery {
     case object Descending extends SortDirection
     case object Ascending  extends SortDirection
 
-    def fromQScript(s: quasar.qscript.SortDir): SortDirection = s match {
-      case quasar.qscript.SortDir.Ascending  => Ascending
-      case quasar.qscript.SortDir.Descending => Descending
+    def fromQScript(s: SortDir): SortDirection = s match {
+      case SortDir.Ascending  => Ascending
+      case SortDir.Descending => Descending
     }
   }
 
