@@ -29,20 +29,6 @@ likeWithConstantFoldablePattern.test
 different-flattens.test
 
 * Spark related
-** scalaz.NonEmptyList which is not Serializable
-Some executions retun scalaz.NonEmptyList which is not Serializable - that causes errors.
-Still need to investigate what's the cause of the error.
-
-largestCities.test
-sortByJS.test
-statesByShortestFirstCity.test
-sortWildcardOnExpression.test
-shortCities.test
-citiesByTotalPopulation.test
-orderedWildcardWithProjection.test
-sortProjectLimit.test
-citiesByLargestZip.test
-
 ** returns None instead of Some(value), needs further investigation
 groupByFlatten.test
 filterByJsWithOnlyReducing.test
@@ -71,6 +57,9 @@ convertToFromString.test
 complex-vars.test
 servlet.test
 projectFieldWithFlatten.test
+statesByShortestFirstCity.test
+shortCities.test
+citiesByLargestZip.test
 
 * Questionable
 filterOnFieldComparison.test - Returned values are correct but are not in the exact order as expecte
