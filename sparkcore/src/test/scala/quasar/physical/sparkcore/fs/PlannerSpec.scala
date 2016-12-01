@@ -121,12 +121,12 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
           state.eval(sc).run.map(result => result must beRightDisjunction.like{
             case rdd =>
               val results = rdd.collect
-              results.toList must contain(exactly(
+              results.toList must_= List(
                 Data._str("Poland"),
                 Data._str("Poland"),
                 Data._str("Poland"),
                 Data._str("US"),
-                Data._str("Austria")))
+                Data._str("Austria"))
           })
         })
       }
