@@ -1,13 +1,16 @@
 {
   "name": "filter on time_of_day",
 
+  "NB": "Couchbase disabled due to heap exhaustion",
+
   "backends": {
     "mongodb_2_6":       "pending",
     "mongodb_3_0":       "pending",
     "mongodb_read_only": "pending",
     "mongodb_3_2":       "pending",
     "postgresql":        "pending",
-    "marklogic":         "skip"
+    "marklogic":         "skip",
+    "couchbase":         "skip"
   },
 
   "data": "../days.data",
