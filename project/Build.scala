@@ -62,7 +62,8 @@ object PlatformBuild {
                     version :=  "0.1",
               scalacOptions ++= envArgs,
                scalaVersion :=  "2.11.8",
-        logBuffered in Test :=  false
+        logBuffered in Test :=  false,
+   unmanagedJars in Compile +=  (baseDirectory in ThisBuild).value / "lib" / "jdbm-3.0-SNAPSHOT.jar"
       )
     )
   }
