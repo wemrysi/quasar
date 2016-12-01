@@ -53,7 +53,7 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode dec with no fractional part" in { DataCodec.render(Data.Dec(2.0)) must beRightDisjunction("2.0") }
       "encode timestamp" in { DataCodec.render(Data.Timestamp(Instant.parse("2015-01-31T10:30:00Z"))) must beRightDisjunction("""{ "$timestamp": "2015-01-31T10:30:00Z" }""") }
       "encode date"      in { DataCodec.render(Data.Date(LocalDate.parse("2015-01-31")))              must beRightDisjunction("""{ "$date": "2015-01-31" }""") }
-      "encode time"      in { DataCodec.render(Data.Time(LocalTime.parse("10:30:00.000")))            must beRightDisjunction("""{ "$time": "10:30" }""") }
+      "encode time"      in { DataCodec.render(Data.Time(LocalTime.parse("10:30:00.000")))            must beRightDisjunction("""{ "$time": "10:30:00.000" }""") }
       "encode interval"  in { DataCodec.render(Data.Interval(Duration.parse("PT12H34M")))             must beRightDisjunction("""{ "$interval": "PT12H34M" }""") }
       "encode obj" in {
         // NB: more than 4, to verify order is preserved

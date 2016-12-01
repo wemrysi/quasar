@@ -1,9 +1,12 @@
 {
   "name": "sort by JS expression with filter",
 
+  "NB": "Couchbase disabled due to heap exhaustion",
+
   "backends": {
     "mongodb_read_only": "pending",
-    "postgresql":        "pending"
+    "postgresql":        "pending",
+    "couchbase":         "skip"
   },
 
   "data": "zips.data",
