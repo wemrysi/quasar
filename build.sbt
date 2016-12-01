@@ -519,23 +519,16 @@ lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
 lazy val precog = (
   project.setup deps (
 
-    "org.openjdk.jmh"   %  "jmh-generator-annprocess" % "1.17.1",
-    "com.slamdata"      %% "pathy-core"               % pathyVersion,
-    "com.slamdata"      %% "pathy-argonaut"           % pathyVersion,
-    "io.argonaut"       %% "argonaut"                 % argonautVersion,
-    "io.argonaut"       %% "argonaut-scalaz"          % argonautVersion,
-    "com.chuusai"       %% "shapeless"                % "2.3.1",
-    "org.slf4s"         %% "slf4s-api"                % "1.7.13",
-    "org.spire-math"    %% "spire"                    % "0.13.0",
-    "org.scodec"        %% "scodec-bits"              % "1.1.0",
-    "org.scodec"        %% "scodec-scalaz"            % "1.3.0a",
-    "org.scalaz"        %% "scalaz-effect"            % scalazVersion,
-    "org.scalaz"        %% "scalaz-concurrent"        % scalazVersion,
-    "com.slamdata"      %% "pathy-scalacheck"         % pathyVersion     % Test,
-    "org.scalacheck"    %% "scalacheck"               % "1.12.5"         % Test,
-    "org.scalaz.stream" %% "scalaz-stream"            % "0.8.3a"         % Test,
-    "org.specs2"        %% "specs2-scalacheck"        % specsVersion     % Test,
-    "org.specs2"        %% "specs2-core"              % specsVersion     % Test
+    "org.openjdk.jmh" %  "jmh-generator-annprocess" % "1.17.1",
+    "com.chuusai"     %% "shapeless"                % "2.3.1",
+    "org.slf4s"       %% "slf4s-api"                % "1.7.13",
+    "org.spire-math"  %% "spire"                    % "0.13.0",
+    "org.scodec"      %% "scodec-bits"              % "1.1.0",
+    "org.scodec"      %% "scodec-scalaz"            % "1.3.0a",
+    "org.scalaz"      %% "scalaz-effect"            % scalazVersion,
+    "org.scalacheck"  %% "scalacheck"               % "1.12.5"       % Test,
+    "org.specs2"      %% "specs2-scalacheck"        % specsVersion   % Test,
+    "org.specs2"      %% "specs2-core"              % specsVersion   % Test
   )
 )
 
