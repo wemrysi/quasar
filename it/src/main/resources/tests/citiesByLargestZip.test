@@ -3,7 +3,10 @@
   "backends": {
     "postgresql": "pending",
     "marklogic":  "skip",
-    "couchbase":  "skip"
+    "couchbase":  "skip",
+        "spark_local": "pending",
+    "spark_hdfs": "pending"
+
   },
   "note": "This is tricky because the sort key does not appear in the result. The
           result can be verified by running a similar query with 'select city, pop'.",

@@ -3,7 +3,10 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "skipCI"
+        "couchbase":  "skipCI",
+	    "spark_local": "pending",
+    "spark_hdfs": "pending"
+
     },
     "data": "zips.data",
     "ignoreFieldOrder": [ "mongo_2_6", "mongo_3_0", "mongo_3_2", "mongo_read_only" ],

@@ -1,4 +1,4 @@
-* Not Spark related
+* SKIPPED - failures not Spark related
 ** Tests failing because they do not terminate
 flattenArrayWithUnflattened.test
 aliasedFieldSortedByOriginal.test
@@ -17,28 +17,61 @@ tests/wildcardWithExtraProjections.test
 
 ** All JOINs because all self-joins are note covered
 Everything under `it/src/main/resources/tests/joins`
+
 ** Tests with "LIKE %sth%" can not be reproduced
 multilineLike.test
 flattenGroupedObject.test
 filterSortLimit.test
+projectIndexFromGroupWithFilter.test
+likeWithConstantFoldablePattern.test
+multistageFlatten.test
+likeWithConstantFoldablePattern.test
+different-flattens.test
 
 * Spark related
+** scalaz.NonEmptyList which is not Serializable
+Some executions retun scalaz.NonEmptyList which is not Serializable - that causes errors.
+Still need to investigate what's the cause of the error.
+
+largestCities.test
+sortByJS.test
+statesByShortestFirstCity.test
+sortWildcardOnExpression.test
+shortCities.test
+citiesByTotalPopulation.test
+orderedWildcardWithProjection.test
+sortProjectLimit.test
+citiesByLargestZip.test
+
+** returns None instead of Some(value), needs further investigation
+groupByFlatten.test
+filterByJsWithOnlyReducing.test
+inBareElement.test
+sameFieldName.test
+temporal/toFromString.test
+
+** Other
 largestZips.test - spark does not handle desc and asc in the same query
 
 * Not yet checked
 timestampsAndIntervals.test
-projectIndexFromGroupWithFilter.test
-filterOnFieldComparison.test
-groupByFlatten.test
-statesByShortestFirstCity.test
 wildcardWithSort.test
 LocationCount.test
 zipsByCityLength.test
+fakeObjectId.test
+tripleFlatten.test
+multitypeFlatten.test
+skipCount.test
+temporal/time.test
+temporal/filterOnDate.test
+nonJsJoinCondition.test
+projectIndexWithObjectFlatten.test
+temporal/toFromString.test
+convertToFromString.test
+complex-vars.test
+servlet.test
+projectFieldWithFlatten.test
 
 * Questionable
+filterOnFieldComparison.test - Returned values are correct but are not in the exact order as expecte
 
-    "spark_local": "skip",
-    "spark_hdfs": "skip"
-
-    "spark_local": "pending",
-    "spark_hdfs": "pending"

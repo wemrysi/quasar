@@ -3,7 +3,10 @@
 
   "backends": {
     "postgresql":        "pending",
-    "marklogic":         "skip"
+    "marklogic":         "skip",
+        "spark_local": "pending",
+    "spark_hdfs": "pending"
+
   },
 
   "data": "../days.data",

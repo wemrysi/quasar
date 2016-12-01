@@ -4,7 +4,10 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+	    "spark_local": "pending",
+    "spark_hdfs": "pending"
+
     },
     "data": "objectids.data",
     "query": "select oid(bar) from objectids",
