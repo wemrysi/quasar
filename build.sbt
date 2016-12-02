@@ -530,6 +530,7 @@ import blueeyes.json._
 import quasar._
 import qscript._
 import quasar.physical.fallback.fs._
+import matryoshka._, Recursive.ops._
 import scalaz._
 import Scalaz._
 """

@@ -56,5 +56,5 @@ trait PrecogEvaluator[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColu
 object fall extends PrecogEvaluator[Need] {
   val M = implicitly[Monad[Need]]
 
-  def apply(values: JValue*): Table = fromRValues(values.toStream map RValue.fromJValue)
+  def fromJson(values: JValue*): Table = fromRValues(values.toStream map RValue.fromJValue)
 }
