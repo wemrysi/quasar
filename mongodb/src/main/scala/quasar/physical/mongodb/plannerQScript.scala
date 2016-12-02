@@ -19,13 +19,14 @@ package quasar.physical.mongodb
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -88,7 +89,7 @@ object MongoDbQScriptPlanner {
       OutputM[JsCore] =
     fm.cataM(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
 
-  def unimplemented(name: String) = InternalError(s"unimplemented $name").left
+  def unimplemented(name: String) = InternalError.fromMsg(s"unimplemented $name").left
 
   // TODO: Should have a JsFn version of this for $reduce nodes.
   val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
@@ -153,11 +154,7 @@ object MongoDbQScriptPlanner {
       //     short-circuit, so …
       case Guard(_, _, cont, _) => cont.right
 
-      case DupArrayIndices(_) => unimplemented("DupArrayindices expression")
-      case DupMapKeys(_)      => unimplemented("DupMapKeys expression")
       case Range(_, _)        => unimplemented("Range expression")
-      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices expression")
-      case ZipMapKeys(_)      => unimplemented("ZipMapKeys expression")
     }
 
     mf => handleCommon(mf).cata(_.right, handleSpecial(mf))
@@ -226,14 +223,10 @@ object MongoDbQScriptPlanner {
             case Type.Date             => isDate
           }
         jsCheck(typ).fold[OutputM[JsCore]](
-          InternalError("uncheckable type").left)(
+          InternalError.fromMsg("uncheckable type").left)(
           f => If(f(expr), cont, fallback).right)
 
-      case DupArrayIndices(_) => unimplemented("DupArrayIndices JS")
-      case DupMapKeys(_)      => unimplemented("DupMapKeys JS")
       case Range(_, _)        => unimplemented("Range JS")
-      case ZipArrayIndices(_) => unimplemented("ZipArrayIndices JS")
-      case ZipMapKeys(_)      => unimplemented("ZipMapKeys JS")
 
       case _ => scala.sys.error("doesn't happen")
     }
@@ -273,9 +266,9 @@ object MongoDbQScriptPlanner {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
         v._1.project match {
           case Constant(b) => b.cataM(BsonCodec.fromEJson).toOption
-          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
-          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          // case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
+          // case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          // case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          // case InvokeUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId(str).toOption
           case _ => None
         }
     }
@@ -342,7 +335,7 @@ object MongoDbQScriptPlanner {
           case (IsBson(v1), _) =>
             \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(There(1, Here))))
 
-          case (_, _) => -\/(InternalError(node.map(_._1).shows))
+          case (_, _) => -\/(InternalError fromMsg node.map(_._1).shows)
         }
 
       def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
@@ -381,7 +374,7 @@ object MongoDbQScriptPlanner {
       }
 
       def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
-        (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+        (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
         case Constant(_)        => \/-(default)
@@ -460,7 +453,7 @@ object MongoDbQScriptPlanner {
                 ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
             }
           selCheck(typ).fold[OutputM[PartialSelector]](
-            -\/(InternalError(node.map(_._1).shows)))(
+            -\/(InternalError fromMsg node.map(_._1).shows))(
             f =>
             \/-(cont._2.fold[PartialSelector](
               κ(({ case List(field) => f(field) }, List(There(0, Here)))),
@@ -469,7 +462,7 @@ object MongoDbQScriptPlanner {
                   There(0, Here) :: p2.map(There(1, _)))
               })))
 
-        case _ => -\/(InternalError(node.map(_._1).shows))
+        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
       }
     }
 
@@ -490,10 +483,10 @@ object MongoDbQScriptPlanner {
 
     def unimplemented[WF[_]](name: String)
         : StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
-      StateT(κ((InternalError(s"unimplemented $name"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
+      StateT(κ(InternalError.fromMsg(s"unimplemented $name").left[(NameGen, WorkflowBuilder[WF])]))
 
     def shouldNotBeReached[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
-      StateT(κ((InternalError("should not be reached"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
+      StateT(κ(InternalError.fromMsg("should not be reached").left[(NameGen, WorkflowBuilder[WF])]))
   }
 
   object Planner {
@@ -519,6 +512,7 @@ object MongoDbQScriptPlanner {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` here?
                 qs.getConst.idStatus match {
+                  case IdOnly => ExprBuilder(dataset, $field("_id").right)
                   case IncludeId =>
                     ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
                   case ExcludeId => dataset
@@ -540,7 +534,7 @@ object MongoDbQScriptPlanner {
                    ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, WF, EX](funcHandler)(src, f).liftM[GenT]
-          case LeftShift(src, struct, repair) => unimplemented("LeftShift")
+          case LeftShift(src, struct, id, repair) => unimplemented("LeftShift")
           // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
           //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
           case Reduce(src, bucket, reducers, repair) =>
@@ -555,7 +549,7 @@ object MongoDbQScriptPlanner {
                       accumulator(ai._1).left[Fix[ExprOp]])).toListMap)),
                 rep)).liftM[GenT]
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
+            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order.toList).unzip
             keys.traverse(getExprBuilder(funcHandler)(src, _))
               .map(WB.sortBy(src, _, dirs)).liftM[GenT]
           case Filter(src, f) =>
@@ -703,7 +697,7 @@ object MongoDbQScriptPlanner {
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
           case Embed(ejson.Common(ejson.Str(key))) => BsonField.Name(key).right
-          case key => InternalError(s"Unsupported object key: ${key.shows}").left
+          case key => InternalError.fromMsg(s"Unsupported object key: ${key.shows}").left
         },
           handleFreeMap(funcHandler, _))) ∘
         (es => DocBuilder(src, es.toListMap))
@@ -790,7 +784,7 @@ object MongoDbQScriptPlanner {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
       if (typ.contains(subType)) cont.project.right
       else if (!subType.contains(typ))
-        InternalError("can only contain " + subType + ", but a(n) " + typ + " is expected").left
+        InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected").left
       else free.right
     case x => x.right
   }

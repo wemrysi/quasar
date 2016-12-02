@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._
@@ -96,7 +96,7 @@ sealed abstract class GenericFunc[N <: Nat] {
   def untyper0: Func.Untyper[N]
 
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
-    LP.InvokeF[A, N](this, args)
+    Invoke[A, N](this, args)
 
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
     untyper0((domain, codomain), tpe)
@@ -170,7 +170,6 @@ trait GenericFuncInstances {
       case set.Take                       => "Take"
       case set.Drop                       => "Drop"
       case set.Range                      => "Range"
-      case set.OrderBy                    => "OrderBy"
       case set.Filter                     => "Filter"
       case set.InnerJoin                  => "InnerJoin"
       case set.LeftOuterJoin              => "LeftOuterJoin"

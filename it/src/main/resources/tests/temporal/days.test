@@ -2,8 +2,7 @@
   "name": "dow and isodow",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "../days.data",

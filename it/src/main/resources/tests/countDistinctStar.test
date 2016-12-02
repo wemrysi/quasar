@@ -2,8 +2,7 @@
   "name": "count distinct *",
   "backends": {
     "mongodb_read_only": "pending",
-    "postgresql":        "pending",
-    "couchbase":         "skip"
+    "postgresql":        "pending"
   },
   "data": "olympics.data",
   "query": "select count(distinct *) as cnt from olympics",

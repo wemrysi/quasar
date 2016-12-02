@@ -2,8 +2,7 @@
   "name": "count distinct",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "olympics.data",

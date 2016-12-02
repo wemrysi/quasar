@@ -31,7 +31,15 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
 
   def plan: AlgebraM[M, ReduceFunc, N1QL] = {
     case Arbitrary(a)     =>
-      unimplementedP("Arbitrary")
+      val aN1ql   = n1ql(a)
+      val n1qlStr = s"min($aN1ql)"
+      prtell[M](Vector(detail(
+        "N1QL Arbitrary",
+        s"""  a:    $aN1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case Avg(a)           =>
       partialQueryString(s"avg(${n1ql(a)})").point[M]
     case Count(a)         =>
@@ -43,7 +51,15 @@ final class ReduceFuncPlanner[F[_]: Monad] extends Planner[F, ReduceFunc] {
     case Sum(a)           =>
       partialQueryString(s"sum(${n1ql(a)})").point[M]
     case UnshiftArray(a)  =>
-      partialQueryString(s"array_agg(${n1ql(a)})").point[M]
+      val aN1ql   = n1ql(a)
+      val n1qlStr = s"array_agg($aN1ql)"
+      prtell[M](Vector(detail(
+        "N1QL UnshiftArray",
+        s"""  a:    $aN1ql
+           |  n1ql: $n1qlStr""".stripMargin('|')
+      ))).as(
+        partialQueryString(n1qlStr)
+      )
     case UnshiftMap(k, v) =>
       val kN1ql   = n1ql(k)
       val vN1ql   = n1ql(v)

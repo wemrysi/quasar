@@ -38,7 +38,7 @@ package object planner {
     NameGenerator[F].prefixedName("_")
 
   def unimplemented[A](name: String): PlannerError \/ A =
-    InternalError(s"unimplemented $name").left
+    InternalError.fromMsg(s"unimplemented $name").left
 
   def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
     EitherT(unimplemented[A](name).point[PhaseResultT[F, ?]])

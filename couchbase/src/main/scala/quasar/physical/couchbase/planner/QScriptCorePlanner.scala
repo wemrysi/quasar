@@ -18,9 +18,8 @@ package quasar.physical.couchbase.planner
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.PhaseResult.detail
-import quasar.common.PhaseResultT
+import quasar.Planner.InternalError
+import quasar.common.{PhaseResult, SortDir}, PhaseResult.detail
 import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._, eitherT._
@@ -49,8 +48,8 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
               key.point[M]
             case key =>
               EitherT(
-                (InternalError(s"Unsupported object key: ${key.shows}"): PlannerError)
-                  .left[String].point[PhaseResultT[F, ?]])
+                InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
+                  .left[String].point[PR])
           },
           v => processFreeMapDefault(v.fromCoEnv, tmpName)
         )) ∘ (m =>
@@ -89,37 +88,46 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                           |  n1ql: $rN1qlStr""".stripMargin('|'))))
       } yield rN1ql
 
-    case LeftShift(src, struct, repair) =>
+    case LeftShift(src, struct, id, repair) =>
       for {
-        tmpName1 <- genName[M]
-        tmpName2 <- genName[M]
-        s        <- freeCataM(struct)(interpretM(
-                      κ(partialQueryString(tmpName1).point[M]),
+        n1    <- genName[M]
+        n2    <- genName[M]
+        s     <- freeCataM(struct)(interpretM(
+                   κ(partialQueryString(n1).point[M]),
+                   mapFuncPlanner[F, T].plan))
+        sN1ql =  n1ql(s)
+        u     =  id match {
+                   case IdOnly    =>
+                     s"ifnull(object_names($sN1ql), array_range(0, array_length(z)))"
+                   case IncludeId =>
+                     val a = s"(array [i, $sN1ql[i]] for i in array_range(0, array_length($sN1ql)) end)"
+                     s"(case when isobject($sN1ql) then $sN1ql else $a end)"
+                   case ExcludeId =>
+                     s"ifnull(object_values($sN1ql), $sN1ql)"
+                 }
+        r     <- freeCataM(repair)(interpretM(
+                   {
+                     case LeftSide  =>
+                       partialQueryString(n1).point[M]
+                     case RightSide =>
+                       (select(
+                         value         = true,
+                         resultExprs   = n2.wrapNel,
+                         keyspace      = src,
+                         keyspaceAlias = n1) |>
+                         unnest.set((u, n2).some)
+                       ).n1ql.point[M]
+                   },
                       mapFuncPlanner[F, T].plan))
-        sN1ql    =  n1ql(s)
-        r        <- freeCataM(repair)(interpretM(
-                      {
-                        case LeftSide  =>
-                          partialQueryString(tmpName1).point[M]
-                        case RightSide =>
-                          (
-                            select(
-                              value         = true,
-                              resultExprs   = sN1ql.wrapNel,
-                              keyspace      = src,
-                              keyspaceAlias = tmpName2) |>
-                            unnest.set(s"$tmpName2 as $tmpName1".some)
-                          ).n1ql.point[M]
-                      },
-                      mapFuncPlanner[F, T].plan))
-        rN1ql    =  n1ql(r)
-        _        <- prtell[M](Vector(detail(
-                      "N1QL LeftShift",
-                      s"""  src:    ${n1ql(src)}
-                         |  struct: $sN1ql
-                         |  repair: $rN1ql
-                         |  n1ql:   $rN1ql""".stripMargin('|'))))
-
+        rN1ql =  n1ql(r)
+        _     <- prtell[M](Vector(detail(
+                   "N1QL LeftShift",
+                   s"""  src:      ${n1ql(src)}
+                      |  struct:   $sN1ql
+                      |  idStatus: $id
+                      |  repair:   $rN1ql
+                      |  n1ql:     $rN1ql""".stripMargin('|')
+                 )))
       } yield r
 
     case qscript.Reduce(src, bucket, reducers, repair) =>
@@ -145,38 +153,45 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                      "N1QL Reduce",
                      s"""  src:      ${n1ql(src)}
                         |  bucket:   $bN1ql
-                        |  reducers: $red
                         |  repair:   $repN1ql
                         |  n1ql:     $sN1ql""".stripMargin('|'))))
       } yield s
 
     case qscript.Sort(src, bucket, order) =>
       for {
-        tmpName <- genName[M]
-        b       <- processFreeMap(bucket, tmpName)
-        o       <- order.traverse { case (or, d) =>
-                     val dir = d match {
-                       case SortDir.Ascending  => "ASC"
-                       case SortDir.Descending => "DESC"
-                     }
-                     processFreeMap(or, tmpName) ∘ (ord => s"${n1ql(ord)} $dir")
-                   }.map(_.mkString(", "))
-        bN1ql   =  n1ql(b)
-        s       =  select(
-                     value         = true,
-                     resultExprs   = tmpName.wrapNel,
-                     keyspace      = src,
-                     keyspaceAlias = tmpName)     |>
-                   groupBy.set(bN1ql.some) >>>
-                   orderBy.set(o.some)
-        _       <- prtell[M](Vector(detail(
-                     "N1QL Sort",
-                     s"""  src:    ${n1ql(src)}
-                        |  bucket: $bN1ql
-                        |  order:  $o
-                        |  n1ql:   ${n1ql(s)}""".stripMargin('|'))))
-
-      } yield s
+        tmpName1 <- genName[M]
+        tmpName2 <- genName[M]
+        tmpName3 <- genName[M]
+        b        <- processFreeMap(bucket, tmpName1)
+        o        <- order.traverse { case (or, d) =>
+                      val dir = d match {
+                        case SortDir.Ascending  => "ASC"
+                        case SortDir.Descending => "DESC"
+                      }
+                      processFreeMap(or, tmpName3) ∘ (ord => s"${n1ql(ord)} $dir")
+                    }.map(_ intercalate (", "))
+        bN1ql    =  n1ql(b)
+        bN1qlN   =  s"ifnull($bN1ql, $tmpName1)"
+        s        =  select(
+                      value         = true,
+                      resultExprs   = s"array_agg($tmpName1)".wrapNel,
+                      keyspace      = src,
+                      keyspaceAlias = tmpName1) |>
+                    groupBy.set(bN1qlN.some)
+        r        =  select(
+                      value         = true,
+                      resultExprs   = tmpName3.wrapNel,
+                      keyspace      = s,
+                      keyspaceAlias = tmpName2) |>
+                    unnest.set((tmpName2, tmpName3).some) >>>
+                    orderBy.set(o.some)
+        _        <- prtell[M](Vector(detail(
+                      "N1QL Sort",
+                      s"""  src:    ${n1ql(src)}
+                         |  bucket: $bN1ql
+                         |  order:  $o
+                         |  n1ql:   ${n1ql(r)}""".stripMargin('|'))))
+      } yield r
 
     case qscript.Filter(src, f) =>
       for {
@@ -249,7 +264,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                     resultExprs   = fN1ql.wrapNel,
                     keyspace      = src,
                     keyspaceAlias = tmpName1)
-      slice    =  takeOrDrop.bimap(κ(s"0:$tmpName2[0]"), κ(s"$tmpName2[0]:")).merge
+      slice    =  takeOrDrop.bimap(
+                    κ(s"0:least(array_length($tmpName3), $tmpName2[0])"),
+                    κ(s"$tmpName2[0]:")
+                  ).merge
       slc      =  select(
                     value         = true,
                     resultExprs   = s"$tmpName3[$slice]".wrapNel,
@@ -261,7 +279,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                     resultExprs   = s"$tmpName5".wrapNel,
                     keyspace      = slc,
                     keyspaceAlias = tmpName4)           |>
-                unnest.set(s"$tmpName4 $tmpName5".some)
+                unnest.set((tmpName4, tmpName5).some)
       selN1ql =  n1ql(sel)
       _       <- prtell[M](Vector(detail(
                    s"""N1QL ${takeOrDrop.bimap(κ("Take"), κ("Drop")).merge}""",
