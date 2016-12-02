@@ -7,7 +7,8 @@
     "mongodb_3_2":       "skip",
     "postgresql":        "pending",
     "spark_local": "skip",
-    "spark_hdfs": "skip"
+    "spark_hdfs": "skip",
+    "couchbase":         "skipCI"    
   },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",

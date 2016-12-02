@@ -18,7 +18,6 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.{Data, TestConfig}
-import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.fp.eitherT._
@@ -29,8 +28,6 @@ import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
 
-import scala.sys
-
 import com.marklogic.xcc.ContentSource
 import matryoshka._
 import org.scalacheck.Arbitrary.arbitrary
@@ -39,66 +36,50 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class MarkLogicStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
 
   def runner(contentSource: ContentSource) = new MapFuncStdLibTestRunner {
     type F[A] = WriterT[State[Long, ?], Prologs, A]
     type G[A] = EitherT[F, MarkLogicPlannerError, A]
     type H[A] = EitherT[F, Result, A]
 
-    def nullary(
-      prg: Fix[LP],
-      expected: Data): Result = {
-
-      def absurd[A, B](a: A): B = sys.error("impossible!")
-
-      val mf = translate[Nothing](prg, absurd)
-      val xqyPlan = planFreeMap(mf)(absurd)
+    def nullaryMapFunc(
+      prg: FreeMapA[Fix, Nothing],
+      expected: Data
+    ): Result = {
+      val xqyPlan = planFreeMap(prg)(absurd)
 
       run(xqyPlan, expected)
     }
 
-    def unary(
-      prg: Fix[LP] => Fix[LP],
+    def unaryMapFunc(
+      prg: FreeMapA[Fix, UnaryArg],
       arg: Data,
-      expected: Data): Result = {
-
-      val mf = translate[UnaryArg](prg(lpf.free('arg)), κ(UnaryArg._1))
-      val xqyPlan = asXqy(arg) flatMap (a1 => planFreeMap(mf)(κ(a1)))
+      expected: Data
+    ): Result = {
+      val xqyPlan = asXqy(arg) flatMap (a1 => planFreeMap(prg)(κ(a1)))
 
       run(xqyPlan, expected)
     }
 
-    def binary(
-      prg: (Fix[LP], Fix[LP]) => Fix[LP],
+    def binaryMapFunc(
+      prg: FreeMapA[Fix, BinaryArg],
       arg1: Data, arg2: Data,
-      expected: Data): Result = {
-
-      val mf = translate[BinaryArg](prg(lpf.free('arg1), lpf.free('arg2)), {
-        case 'arg1 => BinaryArg._1
-        case 'arg2 => BinaryArg._2
-      })
-
+      expected: Data
+    ): Result = {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2)).tupled flatMap {
-        case (a1, a2) => planFreeMap(mf)(_.fold(a1, a2))
+        case (a1, a2) => planFreeMap(prg)(_.fold(a1, a2))
       }
 
       run(xqyPlan, expected)
     }
 
-    def ternary(
-      prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+    def ternaryMapFunc(
+      prg: FreeMapA[Fix, TernaryArg],
       arg1: Data, arg2: Data, arg3: Data,
-      expected: Data): Result = {
-
-      val mf = translate[TernaryArg](prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
-        case 'arg1 => TernaryArg._1
-        case 'arg2 => TernaryArg._2
-        case 'arg3 => TernaryArg._3
-      })
-
+      expected: Data
+    ): Result = {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2) |@| asXqy(arg3)).tupled flatMap {
-        case (a1, a2, a3) => planFreeMap(mf)(_.fold(a1, a2, a3))
+        case (a1, a2, a3) => planFreeMap(prg)(_.fold(a1, a2, a3))
       }
 
       run(xqyPlan, expected)

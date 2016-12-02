@@ -3,9 +3,9 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-	    "spark_local": "pending",
-    "spark_hdfs": "pending"
-
+	"spark_local": "pending",
+        "spark_hdfs": "pending",
+        "couchbase":  "skipCI"
     },
     "data": "zips.data",
     "query": "select * from zips where state in \"ME\" and pop < 10",

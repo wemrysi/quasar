@@ -29,7 +29,9 @@ import scalaz.stream.Process
 
 class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
-    QueryRegressionTest.externalFS.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
+    QueryRegressionTest.externalFS.map(_.filterNot(fs =>
+      TestConfig.isMongoReadOnly(fs.name) || TestConfig.isCouchbase(fs.name)))
+  ) {
 
   val read = ReadFile.Ops[FileSystemIO]
 
