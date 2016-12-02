@@ -17,25 +17,12 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.NameGenerator
-import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.PhaseResultT
-import quasar.connector.PlannerErrT
+import quasar.Planner.PlannerError
 
-import scalaz._, Scalaz._
+import scalaz._
+import simulacrum.typeclass
 
-package object planner {
-  import N1QL.Id
-
-  type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
-
-  def genId[T[_[_]], F[_]: Functor: NameGenerator]: F[Id[T[N1QL]]] =
-    NameGenerator[F].prefixedName("_") ∘ (Id(_))
-
-  def unimplemented[A](name: String): PlannerError \/ A =
-    InternalError.fromMsg(s"unimplemented $name").left
-
-  def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
-    EitherT(unimplemented[A](name).point[PhaseResultT[F, ?]])
-
+@typeclass trait RenderQuery[A] {
+  def compact(a: A): PlannerError \/ String
+  def pretty(a: A): PlannerError \/ String
 }

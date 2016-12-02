@@ -29,8 +29,11 @@ import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.couchbase._, common._, N1QL._, planner._
+import quasar.physical.couchbase._, common._, planner._
+import quasar.physical.couchbase.RenderQuery.ops._
+import quasar.Planner.PlannerError
 import quasar.qscript.{Read => _, _}
+import quasar.RenderTree.ops._
 
 import scala.collection.JavaConverters._
 
@@ -50,8 +53,16 @@ object queryfile {
 
   type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
 
-  implicit class LiftP[F[_]: Monad, A](p: F[A]) {
-    val liftP = p.liftM[PhaseResultT].liftM[FileSystemErrT]
+  implicit class LiftF[F[_]: Monad, A](p: F[A]) {
+    val liftF = p.liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
+  implicit class LiftFE[A](d: FileSystemError \/ A) {
+    def liftFE[S[_]]: Plan[S, A] = EitherT(d.point[Free[S, ?]].liftM[PhaseResultT])
+  }
+
+  implicit class liftPE[A](d: PlannerError \/ A) {
+    def liftPE[S[_]]: Plan[S, A] = d.leftMap(FileSystemError.qscriptPlanningFailed(_)).liftFE
   }
 
   val rewrite = new Rewrite[Fix]
@@ -90,10 +101,7 @@ object queryfile {
     (for {
       n1ql   <- lpToN1ql(lp)
       r      <- n1qlResults(n1ql)
-      bktCol <- bucketCollectionFromPath(out).bimap(
-                  e => EitherT(e.left[BucketCollection].point[Free[S, ?]].liftM[PhaseResultT]),
-                  _.point[Free[S, ?]].liftP
-                ).merge
+      bktCol <- bucketCollectionFromPath(out).liftFE
       rObj   <- EitherT(r.traverse(d => DataCodec.render(d).bimap(
                   err => FileSystemError.writeFailed(d, err.shows),
                   str => jsonTranscoder.stringToJsonObject(str))
@@ -105,20 +113,20 @@ object queryfile {
                       .create()
                       .put("type", bktCol.collection)
                       .put("value", d))
-                )).liftP
-      ctx    <- Read.Ops[Context, S].ask.liftP
+                )).liftF
+      ctx    <- Read.Ops[Context, S].ask.liftF
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
-                )).into.liftP
-      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into[S].liftP
-      _      <- lift(exists.whenM(deleteHavingPrefix(bkt, bktCol.collection))).into[S].liftP
+                )).into.liftF
+      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into[S].liftF
+      _      <- lift(exists.whenM(deleteHavingPrefix(bkt, bktCol.collection))).into[S].liftF
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable
                     .from(docs)
                     .flatMap(bkt.async.insert(_).asScala)
                     .toBlocking
                     .last
-                ))).into.liftP
+                ))).into.liftF
     } yield out).run.run
 
   def evaluatePlan[S[_]](
@@ -132,9 +140,9 @@ object queryfile {
     (for {
       n1ql <- lpToN1ql(lp)
       r    <- n1qlResults(n1ql)
-      i    <- MonotonicSeq.Ops[S].next.liftP
+      i    <- MonotonicSeq.Ops[S].next.liftF
       h    =  ResultHandle(i)
-      _    <- results.put(h, Cursor(r)).liftP
+      _    <- results.put(h, Cursor(r)).liftF
     } yield h).run.run
 
   def more[S[_]](
@@ -162,8 +170,7 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    (lpToN1ql(lp) ∘ (n1ql => ExecutionPlan(FsType, n1qlQueryString(n1ql)))).run.run
-
+    ((lpToN1ql(lp) >>= (_.compact.liftPE)) ∘ (ExecutionPlan(FsType, _))).run.run
 
   def listContents[S[_]](
     dir: APath
@@ -190,18 +197,19 @@ object queryfile {
     } yield exists).exists(ι)
 
   def n1qlResults[S[_]](
-    n1ql: N1QL
+    n1ql: N1QLT[Fix]
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
   ): Plan[S, Vector[Data]] =
     for {
-      ctx     <- context.ask.liftP
+      ctx     <- context.ask.liftF
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
-                 )).into.liftP
+                 )).into.liftF
+      q       <- n1ql.compact.map(n1qlQuery).liftPE
       r       <- EitherT(lift(Task.delay(
-                   bkt.query(n1qlQuery(n1qlQueryString(n1ql)))
+                   bkt.query(q)
                      .allRows
                      .asScala
                      .toVector
@@ -215,7 +223,7 @@ object queryfile {
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, N1QL] = {
+  ): Plan[S, N1QLT[Fix]] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
@@ -228,8 +236,8 @@ object queryfile {
   )(implicit
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, N1QL] = {
-    val tell = prtell[Plan[S, ?]] _
+  ): Plan[S, N1QLT[Fix]] = {
+    val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
 
     for {
       _    <- tell(Vector(tree("lp", lp)))
@@ -238,11 +246,11 @@ object queryfile {
                 Plan[S, ?],
                 QScriptRead[Fix, ?]
               ](lc)(lp)
-      _    <- tell(Vector(tree("QS post convertToQScriptRead", qs)))
+      _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
       shft =  shiftRead(qs).transCata(
                 SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
                   .simplifyJoin(idPrism.reverseGet))
-      _    <- tell(Vector(tree("QS post shiftRead", shft)))
+      _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft
                 .transAna(
                    repeatedly(C.coalesceQC[CBQScript](idPrism))     >>>
@@ -250,13 +258,14 @@ object queryfile {
                    repeatedly(C.coalesceSR[CBQScript](idPrism))     >>>
                    repeatedly(Normalizable[CBQScript].normalizeF(_: CBQScript[Fix[CBQScript]])))
                 .transCata(rewrite.optimize(reflNT))
-      _    <- tell(Vector(tree("QScript (Optimized)", opz)))
+      _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- shft.cataM(
-                Planner[Free[S, ?], CBQScript].plan
+                Planner[Fix, Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))
-      q    =  outerN1ql(n1ql)
-      _    <- tell(Vector(detail("N1QL", n1qlQueryString(q))))
-    } yield q
+      q    <- n1ql.compact.liftPE
+      _    <- tell(Vector(detail("N1QL AST", n1ql.render.shows)))
+      _    <- tell(Vector(detail("N1QL", q)))
+    } yield n1ql
   }
 
   def listRootContents[S[_]]

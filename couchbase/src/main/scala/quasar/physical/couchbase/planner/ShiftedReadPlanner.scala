@@ -17,25 +17,51 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.fp.eitherT._
-import quasar.common.PhaseResult.detail
-import quasar.physical.couchbase._, common._
+import quasar.common.PhaseResultT
+import quasar.{Data => QData, NameGenerator}
+import quasar.Planner.{PlannerError, PlanPathError}
+import quasar.physical.couchbase._, N1QL.{Eq, Id, _}, Select.{Filter, Value, _}
+import quasar.physical.couchbase.common.BucketCollection
 import quasar.qscript, qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class ShiftedReadPlanner[F[_]: Monad] extends Planner[F, Const[ShiftedRead, ?]] {
-  val plan: AlgebraM[M, Const[ShiftedRead, ?], N1QL] = {
+final class ShiftedReadPlanner[T[_[_]]: Corecursive, F[_]: Monad: NameGenerator]
+  extends Planner[T, F, Const[ShiftedRead, ?]] {
+
+  def str(v: String) = Data[T[N1QL]](QData.Str(v))
+  def id(v: String)  = Id[T[N1QL]](v)
+
+  val plan: AlgebraM[M, Const[ShiftedRead, ?], N1QLT[T]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      for {
-        n    <- readPath[PR](absFile, idStatus)
-        nStr =  n1ql(n)
-        _    <- prtell[M](Vector(detail(
-                  "N1QL ShiftedRead",
-                  s"""  absFile:  $absFile
-                     |  idStatus: $idStatus
-                     |  n1ql:     $nStr""".stripMargin('|'))))
-      } yield n
+      (genId[T, M] ⊛
+       EitherT(
+         BucketCollection.fromPath(absFile)
+           .leftMap[PlannerError](PlanPathError(_)).point[F].liftM[PhaseResultT])
+      ) { (gId, bc) =>
+        val v =
+          IfMissing(
+            SelectField(gId.embed, str("value").embed).embed,
+            gId.embed)
+        val mId = SelectField(Meta(gId.embed).embed, str("id").embed)
+        val r: N1QLT[T] =
+          idStatus match {
+            case IdOnly    => gId
+            case IncludeId => Arr(List(gId.embed, v.embed))
+            case ExcludeId => v
+          }
+        Select(
+          Value(true),
+          ResultExpr(r.embed, none).wrapNel,
+          Keyspace(id(bc.bucket).embed, gId.some).some,
+          unnest  = none,
+          filter  = bc.collection.nonEmpty.option(
+                      Eq(id("type").embed, str(bc.collection).embed).embed
+                    ) ∘ (Filter(_)),
+          groupBy = none,
+          orderBy = Nil)
+      }
   }
+
 }

@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.physical.couchbase.planner
+package quasar.physical
 
-import quasar.fp.ski.κ
-import quasar.physical.couchbase._
-import quasar.Planner.InternalError
+package object couchbase {
 
-import matryoshka._
-import scalaz._, Scalaz._
-
-final class UnreachablePlanner[T[_[_]], F[_]: Applicative, QS[_]] extends Planner[T, F, QS] {
-  def plan: AlgebraM[M, QS, N1QLT[T]] =
-    κ(EitherT.fromDisjunction(InternalError.fromMsg("unreachable").left))
+  type N1QLT[T[_[_]]] = N1QL[T[N1QL]]
 
 }
