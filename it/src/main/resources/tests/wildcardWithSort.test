@@ -3,8 +3,8 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-	    "spark_local": "pending",
-    "spark_hdfs": "pending"
+	"spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",

@@ -17,6 +17,7 @@ tests/wildcardWithExtraProjections.test
 
 ** All JOINs because all self-joins are note covered
 Everything under `it/src/main/resources/tests/joins`
+nonJsJoinCondition.test
 
 ** Tests with "LIKE %sth%" can not be reproduced
 multilineLike.test
@@ -27,34 +28,34 @@ likeWithConstantFoldablePattern.test
 multistageFlatten.test
 likeWithConstantFoldablePattern.test
 different-flattens.test
+multitypeFlatten.test
+
+** Other
+skipCount.test - submitted as bug https://github.com/quasar-analytics/quasar/issues/1748
 
 * Spark related
-** returns None instead of Some(value), needs further investigation
+** known issues
+largestZips.test - spark does not handle desc and asc in the same query
+** right results, test issues
+*** precision issues
+All is fine but there are small differences for decimal values (losing precision)
+
+filterOnFieldComparison.test 
+wildcardWithSort.test
+convertToFromString.test
+
+* Not yet checked
 groupByFlatten.test
 filterByJsWithOnlyReducing.test
 inBareElement.test
 sameFieldName.test
 temporal/toFromString.test
-
-** Other
-largestZips.test - spark does not handle desc and asc in the same query
-
-* Not yet checked
 timestampsAndIntervals.test
-wildcardWithSort.test
 LocationCount.test
-zipsByCityLength.test
-fakeObjectId.test
 tripleFlatten.test
-multitypeFlatten.test
-skipCount.test
 temporal/time.test
 temporal/filterOnDate.test
-nonJsJoinCondition.test
 projectIndexWithObjectFlatten.test
-temporal/toFromString.test
-convertToFromString.test
-complex-vars.test
 servlet.test
 projectFieldWithFlatten.test
 statesByShortestFirstCity.test
@@ -62,5 +63,6 @@ shortCities.test
 citiesByLargestZip.test
 
 * Questionable
-filterOnFieldComparison.test - Returned values are correct but are not in the exact order as expecte
-
+temporal/toFromString.test - here we get "time" - Data.NA, system tries to parse 
+values like `06:00:00Z` and fails using DateLib.parseTime  
+complex-vars.test - comparing data & timestamp, how to do it?
