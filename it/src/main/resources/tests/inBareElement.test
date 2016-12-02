@@ -2,7 +2,6 @@
     "name": "filter field “in” a bare value",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "skipCI"
     },
     "data": "zips.data",
