@@ -3791,7 +3791,7 @@ class PlannerSpec extends
           'tmp0, read("db/foo"),
           lpf.sort(
             lpf.free('tmp0),
-            (math.Divide[FLP](
+            (math.Divide[Fix[LP]](
               ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
               lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel))
 
@@ -3814,9 +3814,9 @@ class PlannerSpec extends
           'tmp0, read("db/foo"),
           lpf.let(
             'tmp1,
-            s.Filter[FLP](
+            s.Filter[Fix[LP]](
               lpf.free('tmp0),
-              relations.Eq[FLP](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
                 lpf.constant(Data.Int(0)))),
             lpf.sort(
@@ -3840,7 +3840,7 @@ class PlannerSpec extends
               "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
             lpf.sort(
               lpf.free('tmp9),
-              (math.Divide[FLP](
+              (math.Divide[Fix[LP]](
                 ObjectProject(lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel)))
 
@@ -3881,21 +3881,21 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
+            relations.And[Fix[LP]](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-              relations.Eq[FLP](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              relations.And[Fix[LP]](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
@@ -3905,21 +3905,21 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
+            relations.And[Fix[LP]](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              relations.And[Fix[LP]](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
@@ -3929,21 +3929,21 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
+            relations.And[Fix[LP]](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))),
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              relations.And[Fix[LP]](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
+                relations.Eq[Fix[LP]](
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
@@ -3953,19 +3953,19 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                math.Add[FLP](
+            relations.And[Fix[LP]](
+              relations.Eq[Fix[LP]](
+                math.Add[Fix[LP]](
                   ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
                   ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
+              relations.Eq[Fix[LP]](
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case -\/(UnsupportedJoinCondition(cond)) =>
           cond must beTreeEqual(
-            relations.Eq[FLP](
-              math.Add[FLP](
+            relations.Eq[Fix[LP]](
+              math.Add[Fix[LP]](
                 ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
                 ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
               ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))).embed)
@@ -3987,15 +3987,15 @@ class PlannerSpec extends
               Type.Obj(Map(), Some(Type.Top)),
               lpf.free('check0),
               lpf.constant(Data.NA))),
-          s.Distinct[FLP](
-            identity.Squash[FLP](
+          s.Distinct[Fix[LP]](
+            identity.Squash[Fix[LP]](
               makeObj(
                 "city" ->
-                ObjectProject[FLP](
-                  s.Filter[FLP](
+                ObjectProject[Fix[LP]](
+                  s.Filter[Fix[LP]](
                     lpf.free('tmp0),
-                    string.Search[FLP](
-                      FlattenArray[FLP](
+                    string.Search[Fix[LP]](
+                      FlattenArray[Fix[LP]](
                         lpf.let(
                           'check1,
                           ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("loc"))),

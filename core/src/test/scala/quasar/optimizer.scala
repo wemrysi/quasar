@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.common.SortDir
-import quasar.frontend.logicalplan._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.structural._
 
@@ -121,7 +121,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
       optimizer.preferProjections(
         DeleteField(lpf.read(file("zips")),
           lpf.constant(Data.Str("pop")))) must
-        beTreeEqual[Fix[LogicalPlan]](
+        beTreeEqual[Fix[LP]](
           DeleteField(lpf.read(file("zips")),
             lpf.constant(Data.Str("pop"))))
     }
@@ -129,7 +129,7 @@ class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers 
     "convert a delete after a projection" in {
       optimizer.preferProjections(
         lpf.let('meh, lpf.read(file("zips")),
-          DeleteField[FLP](
+          DeleteField[Fix[LP]](
             makeObj(
               "city" -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("city"))),
               "pop"  -> ObjectProject(lpf.free('meh), lpf.constant(Data.Str("pop")))),
