@@ -151,6 +151,8 @@ object PruneArrays {
     type IG[A] = G[A]
   }
 
+  type AuxR[T[_[_]], IN[_]] = Aux[T, IN, IN]
+
   private def annotateEmpty(state: StateAcc): Annotation =
     Annotation(state, None)
 
@@ -334,7 +336,7 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
    *
    * T[G] => ArrayState[ArrayEnv[F, T[G]]]
    */
-  def findIndices(implicit P: PruneArrays.Aux[T, G, G])
+  def findIndices(implicit P: PruneArrays.AuxR[T, G])
       : CoalgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = tqs => {
     State(state => {
       val gtg = tqs.project
@@ -353,7 +355,7 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
    *
    * ArrayEnv[F, T[G]] => ArrayState[T[G]]
    */
-  def remapIndices(implicit P: PruneArrays.Aux[T, G, G])
+  def remapIndices(implicit P: PruneArrays.AuxR[T, G])
       : AlgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = arrenv => {
     val (env, qs): (StateAcc, G[T[G]]) = arrenv.run
 
@@ -363,7 +365,7 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     })
   }
 
-  def pruneArrays(implicit P: PruneArrays.Aux[T, G, G])
+  def pruneArrays(implicit P: PruneArrays.AuxR[T, G])
       : T[G] => T[G] =
     _.hyloM[ArrayState, ArrayEnv[G, ?], T[G]](remapIndices, findIndices).run(None)._2
 }

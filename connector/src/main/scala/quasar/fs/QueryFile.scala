@@ -80,7 +80,7 @@ object QueryFile {
       CI: Coalesce.Aux[T, IQS, IQS],
       CQ: Coalesce.Aux[T, QS, QS],
       SP: SimplifyProjection.Aux[IQS, QS],
-      PA: PruneArrays.Aux[T, QS, QS],
+      PA: PruneArrays.AuxR[T, QS],
       QC: QScriptCore[T, ?] :<: QS,
       TJ:   ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
@@ -116,7 +116,7 @@ object QueryFile {
     (lp: T[LogicalPlan])
     (implicit
       CQ:  Coalesce.Aux[T, QS, QS],
-      PA: PruneArrays.Aux[T, QS, QS],
+      PA: PruneArrays.AuxR[T, QS],
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
@@ -144,7 +144,7 @@ object QueryFile {
       merr: MonadError[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
-      PA: PruneArrays.Aux[T, QS, QS],
+      PA: PruneArrays.AuxR[T, QS],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
