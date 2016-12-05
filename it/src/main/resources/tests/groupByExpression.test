@@ -6,7 +6,7 @@
     "marklogic":  "skip",
     "couchbase":  "skip"
   },
-  "ignoreFieldOrder": [ "mongo_2_6", "mongo_3_0", "mongo_3_2", "mongo_read_only" ],
+  "ignoreFieldOrder": [ "mongodb_2_6", "mongodb_3_0", "mongodb_3_2", "mongodb_read_only" ],
   "data": "zips.data",
 
   "query": "select substring(city, 0, 1) as `first`, count(*) as numZips from zips group by substring(city, 0, 1)",
