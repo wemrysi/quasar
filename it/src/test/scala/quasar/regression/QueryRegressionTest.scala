@@ -150,11 +150,7 @@ abstract class QueryRegressionTest[S[_]](
     */
   def ensureTestData(testLoc: RFile, test: RegressionTest, run: Run): Task[Boolean] = {
     def ensureTestFile(loc: RFile): Task[Boolean] =
-      run(query.fileExists(dataFile(loc))).map {
-        sth =>
-        println(s"############ ${test.name}, backends: ${test.backends}")
-        sth
-      }.ifM(
+      run(query.fileExists(dataFile(loc))).ifM(
         false.point[Task],
         loadTestData(loc, run).as(true))
 
