@@ -77,9 +77,9 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
     def accumulate: MapFunc[(T[FreeMapCoEnv], StateAcc)] => StateAcc = {
       case ProjectIndex((src, Some(acc1)), (value, Some(acc2))) =>
         (src.project.run, value.project.run) match {
-          case (-\/(SrcHole), \/-(Constant(ej))) => IntLit.unapplyEJson(ej).map((acc1 ++ acc2) + _)  // static integer index
-          case (-\/(SrcHole), _)                 => None  // non-static index
-          case (_, _)                            => (acc1 ++ acc2).some
+          case (-\/(SrcHole), \/-(IntLitMapFunc(idx))) => ((acc1 ++ acc2) + idx).some  // static integer index
+          case (-\/(SrcHole), _)                       => None  // non-static index
+          case (_, _)                                  => (acc1 ++ acc2).some
         }
       case f => f.foldMapM[Option, Acc](_._2)
     }
@@ -96,10 +96,8 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
     */
   def remapIndicesInFunc(func: FreeMap, mapping: Mapping): FreeMap =
     freeTransCata[T, MapFunc, MapFunc, Hole, Hole](func) {
-      case co @ CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), mf))) =>
-        IntLit.unapply(mf.fromCoEnv).cata(
-          idx => CoEnv(\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)).toCoEnv))),
-          co)
+      case co @ CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLitCoEnv(idx)))) =>
+        CoEnv(\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)).toCoEnv)))
       case co => co
     }
 

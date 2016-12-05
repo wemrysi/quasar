@@ -889,16 +889,23 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](i: BigInt): FreeMapA[T, A] =
       Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T].apply(ejson.Int[T[EJson]](i))))
 
-    def unapplyEJson[T[_[_]]: Recursive](ej: T[EJson]): Option[BigInt] =
-      ExtEJson.prj(ej.project).flatMap {
+    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] =
+      mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
+  }
+
+  object IntLitMapFunc {
+    def unapply[T[_[_]]: Recursive, A](mf: MapFunc[T, A]): Option[BigInt] = mf match {
+      case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None
       }
-
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] = mf.resume.fold ({
-      case Constant(ej) => unapplyEJson(ej)
       case _ => None
-    }, _ => None)
+    }
+  }
+
+  object IntLitCoEnv {
+    def unapply[T[_[_]]: Recursive](coenv: T[CoEnv[Hole, MapFunc[T, ?], ?]]): Option[BigInt] =
+      IntLit.unapply(coenv.fromCoEnv)
   }
 
   object StrLit {
