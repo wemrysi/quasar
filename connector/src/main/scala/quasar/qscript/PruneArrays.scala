@@ -42,16 +42,14 @@ object PATypes {
       Semigroup.liftSemigroup[Option, Acc].append(self, other)
   }
 
-  /**
-   * @param newState the state produced by the current focus
-   * @param newEnv the environment annotated to the current focus
-   */
+  /** @param newState the state produced by the current focus
+    * @param newEnv the environment annotated to the current focus
+    */
   @Lenses final case class Annotation(newState: StateAcc, newEnv: StateAcc)
 
-  /**
-   * @param newState the state produced by the current focus
-   * @param out the value which replaces the current focus
-   */
+  /** @param newState the state produced by the current focus
+    * @param out the value which replaces the current focus
+    */
   @Lenses final case class Output[T[_[_]], F[_], G[_]](newState: StateAcc, out: F[T[G]])
 }
 
@@ -70,10 +68,9 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
 
   type Mapping = ScalaMap[BigInt, BigInt]
 
-  /**
-   * Returns `None` if a non-static non-integer index was found.
-   * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
-   */
+  /** Returns `None` if a non-static non-integer index was found.
+    * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
+    */
   def findIndicesInFunc(func: FreeMap): StateAcc = {
     type FreeMapCoEnv[A] = CoEnv[Hole, MapFunc, A]
 
@@ -94,10 +91,9 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
     func.toCoEnv.para[StateAcc](galg)
   }
 
-  /**
-   * Remap all indices in `func` in structures like `ProjectIndex(SrcHoe, IntLit(_))`
-   * according to the provided `mapping`.
-   */
+  /** Remap all indices in `func` in structures like `ProjectIndex(SrcHoe, IntLit(_))`
+    * according to the provided `mapping`.
+    */
   def remapIndicesInFunc(func: FreeMap, mapping: Mapping): FreeMap =
     freeTransCata[T, MapFunc, MapFunc, Hole, Hole](func) {
       case co @ CoEnv(\/-(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), mf))) =>
@@ -107,9 +103,7 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
       case co => co
     }
 
-  /**
-   * Prune the provided `array` keeping only the indices in `indicesToKeep`.
-   */
+  /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
   object arrayRewrite {
     def apply(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc =
       rebuildArray(removeUnusedIndices[JoinFunc](flattenArray(array), indicesToKeep))
@@ -325,17 +319,16 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
   type ArrayEnv[F[_], A] = EnvT[StateAcc, F, A]
   type ArrayState[A] = State[StateAcc, A]
 
-  /**
-   * Given an input, we accumulate state and annotate the focus.
-   *
-   * The state collects the used indices and indicates if the dereferenced array can be pruned.
-   * For example, if we deref an array non-statically, we cannot prune it.
-   *
-   * If the focus is an array that can be pruned, the annotatation is set to the state.
-   * Else the annotation is set to `None`.
-   *
-   * T[G] => ArrayState[ArrayEnv[F, T[G]]]
-   */
+  /** Given an input, we accumulate state and annotate the focus.
+    *
+    * The state collects the used indices and indicates if the dereferenced array can be pruned.
+    * For example, if we deref an array non-statically, we cannot prune it.
+    *
+    * If the focus is an array that can be pruned, the annotatation is set to the state.
+    * Else the annotation is set to `None`.
+    *
+    * T[G] => ArrayState[ArrayEnv[F, T[G]]]
+    */
   def findIndices(implicit P: PruneArrays.AuxR[T, G])
       : CoalgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = tqs => {
     State(state => {
@@ -345,16 +338,15 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     })
   }
 
-  /**
-   * Given an annotated input, we produce an output with state.
-   *
-   * If the previous state provides indices, we remap array dereferences accordingly.
-   *
-   * If an array has an associated environment, we update the state
-   * to be the environment and prune the array.
-   *
-   * ArrayEnv[F, T[G]] => ArrayState[T[G]]
-   */
+  /** Given an annotated input, we produce an output with state.
+    *
+    * If the previous state provides indices, we remap array dereferences accordingly.
+    *
+    * If an array has an associated environment, we update the state
+    * to be the environment and prune the array.
+    *
+    * ArrayEnv[F, T[G]] => ArrayState[T[G]]
+    */
   def remapIndices(implicit P: PruneArrays.AuxR[T, G])
       : AlgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = arrenv => {
     val (env, qs): (StateAcc, G[T[G]]) = arrenv.run
