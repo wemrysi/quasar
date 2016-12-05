@@ -6,7 +6,7 @@
         "couchbase":  "skipCI"
     },
     "data": "zips.data",
-    "ignoreFieldOrder": [ "mongo_2_6", "mongo_3_0", "mongo_3_2", "mongo_read_only" ],
+    "ignoreFieldOrder": [ "mongodb_2_6", "mongodb_3_0", "mongodb_3_2", "mongodb_read_only" ],
     "query": "select city, state, sum(pop) from zips group by city, state order by sum(pop) desc limit 10",
     "predicate": "equalsExactly",
     "expected": [{ "city": "CHICAGO",      "state": "IL", "2": 2452177 },
