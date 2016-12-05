@@ -73,10 +73,6 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def read(file: String): Fix[LP] =
     lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
-  // TODO: This type and implicit are a failed experiment and should be removed,
-  //       but they infect the compiler tests.
-  implicit def toFix[F[_]](unFixed: F[Fix[F]]): Fix[F] = Fix(unFixed)
-
   def makeObj(ts: (String, Fix[LP])*): Fix[LP] =
-    Fix(MakeObjectN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*))
+    MakeObjectN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*).embed
 }
