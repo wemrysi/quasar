@@ -33,8 +33,13 @@ multitypeFlatten.test
 ** Other
 skipCount.test - submitted as bug https://github.com/quasar-analytics/quasar/issues/1748
 
-* Spark related
-** known issues
+* Spark related - known issues
+** sort order is not maintained by `reducedByKey` which is called because of "distinct city"
+citiesByLargestZip.test
+shortCities.test
+statesByShortestFirstCity.test
+LocationCount.test
+** other
 largestZips.test - spark does not handle desc and asc in the same query
 ** right results, test issues
 *** precision issues
@@ -43,6 +48,9 @@ All is fine but there are small differences for decimal values (losing precision
 filterOnFieldComparison.test 
 wildcardWithSort.test
 convertToFromString.test
+** comparing dates & timestamps
+temporal/filterOnDate.test
+complex-vars.test - comparing data & timestamp, how to do it?
 
 * Not yet checked
 groupByFlatten.test
@@ -51,18 +59,15 @@ inBareElement.test
 sameFieldName.test
 temporal/toFromString.test
 timestampsAndIntervals.test
-LocationCount.test
-tripleFlatten.test
 temporal/time.test
-temporal/filterOnDate.test
-projectIndexWithObjectFlatten.test
 servlet.test
-projectFieldWithFlatten.test
-statesByShortestFirstCity.test
-shortCities.test
-citiesByLargestZip.test
+** weirdness
+projectFieldWithFlatten.test - intro & geo.{*} 'do not compose'
+tripleFlatten.test - I dont understand the assertion
+projectIndexWithObjectFlatten.test - some data in, some data null
+
 
 * Questionable
 temporal/toFromString.test - here we get "time" - Data.NA, system tries to parse 
 values like `06:00:00Z` and fails using DateLib.parseTime  
-complex-vars.test - comparing data & timestamp, how to do it?
+
