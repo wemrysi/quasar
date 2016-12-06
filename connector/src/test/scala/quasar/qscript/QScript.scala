@@ -265,7 +265,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           makeObj(
             "name" -> structural.ObjectProject(
               lpRead("/city"),
-              lpf.constant(Data.Str("name")))))) must
+              lpf.constant(Data.Str("name"))).embed)).embed) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -296,7 +296,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         None,
         makeObj(
           "0" ->
-            agg.Sum(structural.ObjectProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed))) must
+            agg.Sum(structural.ObjectProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed).embed)) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -316,7 +316,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         makeObj(
           "loc" ->
             structural.FlattenArray(
-              structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed))) must
+              structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed)) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -394,7 +394,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.ArrayConcat(
                 structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("baz"))).embed,
                 structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("quux"))).embed).embed,
-              structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed)) must
+              structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed).embed) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -418,7 +418,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               math.Multiply(
                 structural.ShiftArrayIndices(
                   structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed,
-                lpf.constant(Data.Int(10))).embed))) must
+                lpf.constant(Data.Int(10))).embed).embed)) must
       beSome(beQScript(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((),
@@ -500,7 +500,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           identity.Squash(
             structural.ObjectConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
-              JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed)) must
+              JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed).embed) must
       beSome(beQScript(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
@@ -539,11 +539,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               "name" ->
                 structural.ObjectProject(
                   JoinDir.Left.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("name"))),
+                  lpf.constant(Data.Str("name"))).embed,
               "address" ->
                 structural.ObjectProject(
                   JoinDir.Right.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("address")))))))
+                  lpf.constant(Data.Str("address"))).embed))))
       convert(None, lp) must
         beSome(beQScript(chain(
           RootR,
