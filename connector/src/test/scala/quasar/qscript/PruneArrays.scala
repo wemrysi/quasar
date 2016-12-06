@@ -333,7 +333,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
         QCT.inj(Reduce(
           QCT.inj(Filter(
             srcInitial,
-            ProjectIndexR(HoleF, IntLit(3)))),
+            ProjectIndexR(HoleF, IntLit(3)))).embed,
           NullLit(),
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(2)))),
           MakeMapR(IntLit(0), ReduceIndexF(0))))
@@ -351,7 +351,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
         QCT.inj(Reduce(
           QCT.inj(Filter(
             srcExpected,
-            ProjectIndexR(HoleF, IntLit(1)))),
+            ProjectIndexR(HoleF, IntLit(1)))).embed,
           NullLit(),
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
           MakeMapR(IntLit(0), ReduceIndexF(0))))
