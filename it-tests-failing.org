@@ -14,6 +14,7 @@ unifyFlattenedFieldsWithMultipleUses.test
 unifyFlattenedFieldsWithUnflattened.test
 union.test
 tests/wildcardWithExtraProjections.test
+fakeObjectId.test
 
 ** All JOINs because all self-joins are note covered
 Everything under `it/src/main/resources/tests/joins`
@@ -41,13 +42,6 @@ statesByShortestFirstCity.test
 LocationCount.test
 ** other
 largestZips.test - spark does not handle desc and asc in the same query
-** right results, test issues
-*** precision issues
-All is fine but there are small differences for decimal values (losing precision)
-
-filterOnFieldComparison.test 
-wildcardWithSort.test
-convertToFromString.test
 ** comparing dates & timestamps
 temporal/filterOnDate.test
 complex-vars.test - comparing data & timestamp, how to do it?
@@ -55,19 +49,12 @@ complex-vars.test - comparing data & timestamp, how to do it?
 * Not yet checked
 groupByFlatten.test
 filterByJsWithOnlyReducing.test
-inBareElement.test
 sameFieldName.test
 temporal/toFromString.test
 timestampsAndIntervals.test
-temporal/time.test
 servlet.test
 ** weirdness
 projectFieldWithFlatten.test - intro & geo.{*} 'do not compose'
 tripleFlatten.test - I dont understand the assertion
 projectIndexWithObjectFlatten.test - some data in, some data null
-
-
-* Questionable
-temporal/toFromString.test - here we get "time" - Data.NA, system tries to parse 
-values like `06:00:00Z` and fails using DateLib.parseTime  
 

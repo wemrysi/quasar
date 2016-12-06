@@ -10,8 +10,6 @@
     "mongodb_3_2":       "pending",
     "postgresql":        "pending",
     "marklogic":         "skip",
-    "spark_local": "pending",
-    "spark_hdfs": "pending",
     "couchbase":         "skip"
   },
 

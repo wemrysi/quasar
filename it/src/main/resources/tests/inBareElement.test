@@ -3,8 +3,6 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-	"spark_local": "pending",
-        "spark_hdfs": "pending",
         "couchbase":  "skipCI"
     },
     "data": "zips.data",
