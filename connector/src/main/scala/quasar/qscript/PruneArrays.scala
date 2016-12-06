@@ -28,8 +28,7 @@ import matryoshka._,
   Recursive.ops._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import scalaz.{:+: => _, Divide => _, _},
-  Leibniz._,
+import scalaz._,
   Scalaz._
 import simulacrum.typeclass
 
