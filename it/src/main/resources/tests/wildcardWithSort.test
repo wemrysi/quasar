@@ -2,7 +2,6 @@
     "name": "wildcard with sort",
     "backends": {
         "postgresql": "pending",
-        "marklogic":  "skip",
 	"spark_local": "pending",
         "spark_hdfs": "pending"
     },
