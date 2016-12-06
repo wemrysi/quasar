@@ -50,17 +50,14 @@ object PATypes {
   /** @param newState the state produced by the current focus
     * @param out the value which replaces the current focus
     */
-  @Lenses final case class Output[T[_[_]], F[_], G[_]](newState: StateAcc, out: F[T[G]])
+  @Lenses final case class Output[F[_], A](newState: StateAcc, out: F[A])
 }
 
 @typeclass trait PruneArrays[F[_]] {
   import PATypes._
 
-  type IT[H[_]]
-  type IG[A]
-
-  def find(state: StateAcc, in: F[IT[IG]]): Annotation
-  def remap(env: StateAcc, state: StateAcc, in: F[IT[IG]]): Output[IT, F, IG]
+  def find[A](state: StateAcc, in: F[A]): Annotation
+  def remap[A](env: StateAcc, state: StateAcc, in: F[A]): Output[F, A]
 }
 
 class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
@@ -138,35 +135,28 @@ class PAHelpers[T[_[_]]: Recursive: Corecursive] extends TTypes[T] {
 object PruneArrays {
   import PATypes._
 
-  sealed trait Aux[T[_[_]], IN[_], G[_]] extends PruneArrays[IN] {
-    type IT[H[_]] = T[H]
-    type IG[A] = G[A]
-  }
-
-  type AuxR[T[_[_]], IN[_]] = Aux[T, IN, IN]
-
   private def annotateEmpty(state: StateAcc): Annotation =
     Annotation(state, None)
 
-  private def haltRemap[T[_[_]], F[_], G[_]](out: F[T[G]]): Output[T, F, G] =
+  private def haltRemap[F[_], A](out: F[A]): Output[F, A] =
     Output(None, out)
 
-  private def default[T[_[_]], IN[_], G[_]]
-      : Aux[T, IN, G] =
-    new Aux[T, IN, G] {
-      def find(state: StateAcc, in: IN[T[G]]): Annotation = annotateEmpty(None)
-      def remap(env: StateAcc, state: StateAcc, in: IN[T[G]]): Output[T, IN, G] = haltRemap(in)
+  private def default[IN[_]]
+      : PruneArrays[IN] =
+    new PruneArrays[IN] {
+      def find[A](state: StateAcc, in: IN[A]): Annotation = annotateEmpty(None)
+      def remap[A](env: StateAcc, state: StateAcc, in: IN[A]): Output[IN, A] = haltRemap(in)
     }
 
-  implicit def coproduct[T[_[_]], G[_], I[_], J[_]]
-    (implicit I: Aux[T, I, G], J: Aux[T, J, G])
-      : Aux[T, Coproduct[I, J, ?], G] =
-    new Aux[T, Coproduct[I, J, ?], G] {
+  implicit def coproduct[I[_], J[_]]
+    (implicit I: PruneArrays[I], J: PruneArrays[J])
+      : PruneArrays[Coproduct[I, J, ?]] =
+    new PruneArrays[Coproduct[I, J, ?]] {
 
-      def find(state: StateAcc, in: Coproduct[I, J, T[G]]): Annotation =
+      def find[A](state: StateAcc, in: Coproduct[I, J, A]): Annotation =
         in.run.fold(I.find(state, _), J.find(state, _))
 
-      def remap(env: StateAcc, state: StateAcc, in: Coproduct[I, J, T[G]]): Output[T, Coproduct[I, J, ?], G] =
+      def remap[A](env: StateAcc, state: StateAcc, in: Coproduct[I, J, A]): Output[Coproduct[I, J, ?], A] =
         in.run.fold(
           { i =>
             val Output(newState, out) = I.remap(env, state, i)
@@ -178,53 +168,53 @@ object PruneArrays {
           })
     }
 
-  implicit def read[T[_[_]], G[_]]: Aux[T, Const[Read, ?], G] = default
-  implicit def shiftedRead[T[_[_]], G[_]]: Aux[T, Const[ShiftedRead, ?], G] = default
-  implicit def deadEnd[T[_[_]], G[_]]: Aux[T, Const[DeadEnd, ?], G] = default
+  implicit def read: PruneArrays[Const[Read, ?]] = default
+  implicit def shiftedRead: PruneArrays[Const[ShiftedRead, ?]] = default
+  implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
   // TODO examine branches
-  implicit def thetaJoin[T[_[_]], G[_]]: Aux[T, ThetaJoin[T, ?], G] = default
+  implicit def thetaJoin[T[_[_]]]: PruneArrays[ThetaJoin[T, ?]] = default
   // TODO examine branches
-  implicit def equiJoin[T[_[_]], G[_]]: Aux[T, EquiJoin[T, ?], G] = default
+  implicit def equiJoin[T[_[_]]]: PruneArrays[EquiJoin[T, ?]] = default
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive, G[_]]
-      : Aux[T, ProjectBucket[T, ?], G] =
-    new Aux[T, ProjectBucket[T, ?], G] {
+  implicit def projectBucket[T[_[_]]: Recursive: Corecursive]
+      : PruneArrays[ProjectBucket[T, ?]] =
+    new PruneArrays[ProjectBucket[T, ?]] {
 
       val helpers = new PAHelpers[T]
       import helpers._
 
-      def find(state: StateAcc, in: ProjectBucket[T[G]]): Annotation = in match {
+      def find[A](state: StateAcc, in: ProjectBucket[A]): Annotation = in match {
         case BucketField(_, value, name) =>
           annotateEmpty(findIndicesInFunc(value) |++| findIndicesInFunc(name) |++| state)
         case BucketIndex(_, value, index) =>
           annotateEmpty(findIndicesInFunc(value) |++| findIndicesInFunc(index) |++| state)
       }
 
-      def remap(env: StateAcc, state: StateAcc, in: ProjectBucket[T[G]]): Output[T, ProjectBucket, G] = {
+      def remap[A](env: StateAcc, state: StateAcc, in: ProjectBucket[A]): Output[ProjectBucket, A] = {
         val mapping: Option[Mapping] = indexMapping(state)
 
         in match {
           case qs @ BucketField(src, value, name) =>
-            def replacement(repl: Mapping): ProjectBucket[T[G]] =
+            def replacement(repl: Mapping): ProjectBucket[A] =
               BucketField(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(name, repl))
             Output(state, mapping.cata(replacement, qs))
           case qs @ BucketIndex(src, value, index) =>
-            def replacement(repl: Mapping): ProjectBucket[T[G]] =
+            def replacement(repl: Mapping): ProjectBucket[A] =
               BucketIndex(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(index, repl))
             Output(state, mapping.cata(replacement, qs))
         }
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, G[_]]
-      : Aux[T, QScriptCore[T, ?], G] =
-    new Aux[T, QScriptCore[T, ?], G] {
+  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive]
+      : PruneArrays[QScriptCore[T, ?]] =
+    new PruneArrays[QScriptCore[T, ?]] {
 
       val helpers = new PAHelpers[T]
       import helpers._
 
-      def find(state: StateAcc, in: QScriptCore[T[G]]): Annotation = in match {
+      def find[A](state: StateAcc, in: QScriptCore[A]): Annotation = in match {
         case LeftShift(_, struct, _, repair) => // TODO examine struct and repair
           repair.resume match {
             case -\/(ConcatArrays(_, _)) =>
@@ -254,7 +244,7 @@ object PruneArrays {
         case Unreferenced() => default.find(state, in)
       }
 
-      def remap(env: StateAcc, state: StateAcc, in: QScriptCore[T[G]]): Output[T, QScriptCore, G] = {
+      def remap[A](env: StateAcc, state: StateAcc, in: QScriptCore[A]): Output[QScriptCore, A] = {
         val mapping: Option[Mapping] = indexMapping(state)
 
         // ignore `env` everywhere except for `LeftShift`
@@ -269,7 +259,7 @@ object PruneArrays {
                   },
                   default.remap(env, state, qs))
               case _ =>
-                def replacement(repl: Mapping): QScriptCore[T[G]] =
+                def replacement(repl: Mapping): QScriptCore[A] =
                   LeftShift(src, remapIndicesInFunc(struct, repl), id, repair)
                 haltRemap(mapping.cata(replacement, qs))
             }
@@ -279,7 +269,7 @@ object PruneArrays {
               reducers0.map(_.map(remapIndicesInFunc(_, repl)))
             def bucket(repl: Mapping): FreeMap =
               remapIndicesInFunc(bucket0, repl)
-            def replacement(repl: Mapping): QScriptCore[T[G]] =
+            def replacement(repl: Mapping): QScriptCore[A] =
               Reduce(src, bucket(repl), reducers(repl), repair)
             haltRemap(mapping.cata(replacement, qs))
 
@@ -287,12 +277,12 @@ object PruneArrays {
           case qs @ Subset(_, _, _, _) => default.remap(env, state, qs) // TODO examine branches
 
           case qs @ Map(src, func) =>
-            def replacement(repl: Mapping): QScriptCore[T[G]] =
+            def replacement(repl: Mapping): QScriptCore[A] =
               Map(src, remapIndicesInFunc(func, repl))
             haltRemap(mapping.cata(replacement, qs))
 
           case qs @ Filter(src, func) =>
-            def replacement(repl: Mapping): QScriptCore[T[G]] =
+            def replacement(repl: Mapping): QScriptCore[A] =
               Filter(src, remapIndicesInFunc(func, repl))
             Output(state, mapping.cata(replacement, qs))
 
@@ -301,7 +291,7 @@ object PruneArrays {
               remapIndicesInFunc(bucket0, repl)
             def order(repl: Mapping): NonEmptyList[(FreeMap, SortDir)] =
               order0.map(_.leftMap(remapIndicesInFunc(_, repl)))
-            def replacement(repl: Mapping): QScriptCore[T[G]] =
+            def replacement(repl: Mapping): QScriptCore[A] =
               Sort(src, bucket(repl), order(repl))
             Output(state, mapping.cata(replacement, qs))
 
@@ -327,11 +317,11 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     *
     * T[G] => ArrayState[ArrayEnv[F, T[G]]]
     */
-  def findIndices(implicit P: PruneArrays.AuxR[T, G])
+  def findIndices(implicit P: PruneArrays[G])
       : CoalgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = tqs => {
     State(state => {
       val gtg = tqs.project
-      val Annotation(newState, newEnv) = P.find(state, gtg)
+      val Annotation(newState, newEnv) = P.find[T[G]](state, gtg)
       (newState, EnvT((newEnv, gtg)))
     })
   }
@@ -345,17 +335,17 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     *
     * ArrayEnv[F, T[G]] => ArrayState[T[G]]
     */
-  def remapIndices(implicit P: PruneArrays.AuxR[T, G])
+  def remapIndices(implicit P: PruneArrays[G])
       : AlgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = arrenv => {
     val (env, qs): (StateAcc, G[T[G]]) = arrenv.run
 
     State(state => {
-      val Output(newState, out) = P.remap(env, state, qs)
+      val Output(newState, out) = P.remap[T[G]](env, state, qs)
       (newState, out.embed)
     })
   }
 
-  def pruneArrays(implicit P: PruneArrays.AuxR[T, G])
+  def pruneArrays(implicit P: PruneArrays[G])
       : T[G] => T[G] =
     _.hyloM[ArrayState, ArrayEnv[G, ?], T[G]](remapIndices, findIndices).run(None)._2
 }
