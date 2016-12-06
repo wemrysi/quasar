@@ -183,11 +183,12 @@ object PruneArrays {
       val helpers = new PAHelpers[T]
       import helpers._
 
+      private def findInBucket(fm1: FreeMap, fm2: FreeMap): Annotation =
+        annotateEmpty(findIndicesInFunc(fm1) |++| findIndicesInFunc(fm2))
+
       def find[A](state: StateAcc, in: ProjectBucket[A]): Annotation = in match {
-        case BucketField(_, value, name) =>
-          annotateEmpty(findIndicesInFunc(value) |++| findIndicesInFunc(name) |++| state)
-        case BucketIndex(_, value, index) =>
-          annotateEmpty(findIndicesInFunc(value) |++| findIndicesInFunc(index) |++| state)
+        case BucketField(_, value, name) => findInBucket(value, name)
+        case BucketIndex(_, value, index) => findInBucket(value, index)
       }
 
       def remap[A](env: StateAcc, state: StateAcc, in: ProjectBucket[A]): Output[ProjectBucket, A] = {
@@ -197,11 +198,11 @@ object PruneArrays {
           case qs @ BucketField(src, value, name) =>
             def replacement(repl: Mapping): ProjectBucket[A] =
               BucketField(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(name, repl))
-            Output(state, mapping.cata(replacement, qs))
+            haltRemap(mapping.cata(replacement, qs))
           case qs @ BucketIndex(src, value, index) =>
             def replacement(repl: Mapping): ProjectBucket[A] =
               BucketIndex(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(index, repl))
-            Output(state, mapping.cata(replacement, qs))
+            haltRemap(mapping.cata(replacement, qs))
         }
       }
     }

@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef.List
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
@@ -76,6 +77,85 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
+    "rewrite map-sort with unused array elements" in {
+      val initialArray: JoinFunc =
+        ConcatArraysR(
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))),
+          MakeArrayR(IntLit(9)))
+
+      def initial(src: QST[Fix[QST]]): Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(Sort(
+            QCT.inj(LeftShift(
+              src.embed,
+              HoleF,
+              ExcludeId,
+              initialArray)).embed,
+            ProjectIndexR(HoleF, IntLit(0)),
+            NonEmptyList(
+              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
+              (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
+          ProjectIndexR(HoleF, IntLit(1)))).embed
+
+      val expectedArray: JoinFunc =
+        ConcatArraysR(
+          ConcatArraysR(
+            MakeArrayR(IntLit(6)),
+            MakeArrayR(IntLit(7))),
+          MakeArrayR(IntLit(9)))
+
+      def expected(src: QST[Fix[QST]]): Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(Sort(
+            QCT.inj(LeftShift(
+              src.embed,
+              HoleF,
+              ExcludeId,
+              expectedArray)).embed,
+            ProjectIndexR(HoleF, IntLit(0)),
+            NonEmptyList(
+              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
+              (ProjectIndexR(HoleF, IntLit(2)), SortDir.Ascending)))).embed,
+          ProjectIndexR(HoleF, IntLit(1)))).embed
+
+      initial(UnreferencedRT).pruneArrays must equal(expected(UnreferencedRT))
+      initial(RootRT).pruneArrays must equal(expected(RootRT))
+
+      val data = rootDir </> file("zips")
+      initial(ReadRT(data)).pruneArrays must equal(expected(ReadRT(data)))
+    }
+
+    "not rewrite map-sort with no unused array elements" in {
+      val initialArray: JoinFunc =
+        ConcatArraysR(
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))),
+          MakeArrayR(IntLit(9)))
+
+      def initial: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(Sort(
+            QCT.inj(LeftShift(
+              UnreferencedRT.embed,
+              HoleF,
+              ExcludeId,
+              initialArray)).embed,
+            ProjectIndexR(HoleF, IntLit(0)),
+            NonEmptyList(
+              (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
+              (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
+          ProjectIndexR(HoleF, IntLit(2)))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
     "not rewrite filter with unused array elements" in {
       val initial: Fix[QST] =
         QCT.inj(Filter(
@@ -87,6 +167,24 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               MakeArrayR(IntLit(6)),
               MakeArrayR(BoolLit(true))))).embed,
           ProjectIndexR(HoleF, IntLit(1)))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite sort with unused array elements" in {
+      val initial: Fix[QST] =
+        QCT.inj(Sort(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))))).embed,
+          ProjectIndexR(HoleF, IntLit(1)),
+          NonEmptyList(
+            (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
+            (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
 
       initial.pruneArrays must equal(initial)
     }
@@ -355,6 +453,119 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           MakeMapR(IntLit(0), ReduceIndexF(0))))
 
       initial.embed.pruneArrays must equal(expected.embed)
+    }
+
+    "rewrite bucket field with unused array elements" in {
+      val initial: Fix[QST] =
+        PBT.inj(BucketField(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(IntLit(7))),
+              MakeArrayR(StrLit("foo"))))).embed,
+          ProjectIndexR(HoleF, IntLit(2)),
+          ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      val expected: Fix[QST] =
+        PBT.inj(BucketField(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(StrLit("foo"))))).embed,
+          ProjectIndexR(HoleF, IntLit(1)),
+          ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "rewrite bucket index with unused array elements" in {
+      val initial: Fix[QST] =
+        PBT.inj(BucketIndex(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(IntLit(7))),
+              MakeArrayR(IntLit(8))))).embed,
+          ProjectIndexR(HoleF, IntLit(2)),
+          ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      val expected: Fix[QST] =
+        PBT.inj(BucketIndex(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(8))))).embed,
+          ProjectIndexR(HoleF, IntLit(1)),
+          ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    // this can be rewritten - we just don't support that yet
+    "not rewrite subset with unused array elements" in {
+      val src: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(Subset(
+          src,
+          Free.roll(QCT.inj(Map(
+            HoleQS,
+            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
+          Drop,
+          Free.roll(QCT.inj(Map(
+            HoleQS,
+            ProjectIndexR(HoleF, IntLit[Fix, Hole](0))))))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    // this can be rewritten - we just don't support that yet
+    "not rewrite union with unused array elements" in {
+      val src: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(Union(
+          src,
+          Free.roll(QCT.inj(Map(
+            HoleQS,
+            ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
+          Free.roll(QCT.inj(Map(
+            HoleQS,
+            ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))))).embed
+
+      initial.pruneArrays must equal(initial)
     }
 
     // this can be rewritten - we just don't support that yet
