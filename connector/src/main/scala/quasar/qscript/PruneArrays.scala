@@ -37,7 +37,7 @@ object PATypes {
   type Acc = Set[BigInt]
   type StateAcc = Option[Acc]
 
-  implicit class StateAccOps(val self: StateAcc) extends AnyVal {
+  implicit final class StateAccOps(val self: StateAcc) extends AnyVal {
     def |++|(other: StateAcc): StateAcc =
       Semigroup.liftSemigroup[Option, Acc].append(self, other)
   }
@@ -301,10 +301,10 @@ object PruneArrays {
     }
 }
 
-class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
+class PAFindRemap[T[_[_]]: Recursive: Corecursive, F[_]: Functor] {
   import PATypes._
 
-  type ArrayEnv[F[_], A] = EnvT[StateAcc, F, A]
+  type ArrayEnv[G[_], A] = EnvT[StateAcc, G, A]
   type ArrayState[A] = State[StateAcc, A]
 
   /** Given an input, we accumulate state and annotate the focus.
@@ -315,13 +315,13 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     * If the focus is an array that can be pruned, the annotatation is set to the state.
     * Else the annotation is set to `None`.
     *
-    * T[G] => ArrayState[ArrayEnv[F, T[G]]]
+    * T[F] => ArrayState[ArrayEnv[F, T[F]]]
     */
-  def findIndices(implicit P: PruneArrays[G])
-      : CoalgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = tqs => {
+  def findIndices(implicit P: PruneArrays[F])
+      : CoalgebraM[ArrayState, ArrayEnv[F, ?], T[F]] = tqs => {
     State(state => {
       val gtg = tqs.project
-      val Annotation(newState, newEnv) = P.find[T[G]](state, gtg)
+      val Annotation(newState, newEnv) = P.find[T[F]](state, gtg)
       (newState, EnvT((newEnv, gtg)))
     })
   }
@@ -333,19 +333,15 @@ class PAFindReplace[T[_[_]]: Recursive: Corecursive, G[_]: Traverse] {
     * If an array has an associated environment, we update the state
     * to be the environment and prune the array.
     *
-    * ArrayEnv[F, T[G]] => ArrayState[T[G]]
+    * ArrayEnv[F, T[F]] => ArrayState[T[F]]
     */
-  def remapIndices(implicit P: PruneArrays[G])
-      : AlgebraM[ArrayState, ArrayEnv[G, ?], T[G]] = arrenv => {
-    val (env, qs): (StateAcc, G[T[G]]) = arrenv.run
+  def remapIndices(implicit P: PruneArrays[F])
+      : AlgebraM[ArrayState, ArrayEnv[F, ?], T[F]] = arrenv => {
+    val (env, qs): (StateAcc, F[T[F]]) = arrenv.run
 
     State(state => {
-      val Output(newState, out) = P.remap[T[G]](env, state, qs)
+      val Output(newState, out) = P.remap[T[F]](env, state, qs)
       (newState, out.embed)
     })
   }
-
-  def pruneArrays(implicit P: PruneArrays[G])
-      : T[G] => T[G] =
-    _.hyloM[ArrayState, ArrayEnv[G, ?], T[G]](remapIndices, findIndices).run(None)._2
 }

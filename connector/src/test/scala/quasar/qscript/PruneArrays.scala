@@ -26,8 +26,6 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  val PA = new PAFindReplace[Fix, QST]
-
   "prune arrays" should {
     "rewrite map-filter with unused array elements" in {
       def initial(src: QST[Fix[QST]]): Fix[QST] =
@@ -54,11 +52,11 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(0)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial(UnreferencedRT)) must equal(expected(UnreferencedRT))
-      PA.pruneArrays.apply(initial(RootRT)) must equal(expected(RootRT))
+      initial(UnreferencedRT).pruneArrays must equal(expected(UnreferencedRT))
+      initial(RootRT).pruneArrays must equal(expected(RootRT))
 
       val data = rootDir </> file("zips")
-      PA.pruneArrays.apply(initial(ReadRT(data))) must equal(expected(ReadRT(data)))
+      initial(ReadRT(data)).pruneArrays must equal(expected(ReadRT(data)))
     }
 
     "not rewrite map-filter with no unused array elements" in {
@@ -75,7 +73,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(1)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
 
     "not rewrite filter with unused array elements" in {
@@ -90,7 +88,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               MakeArrayR(BoolLit(true))))).embed,
           ProjectIndexR(HoleF, IntLit(1)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
 
     "rewrite map with unused array elements 1,2" in {
@@ -116,7 +114,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(6)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite map with unused array elements 0,2" in {
@@ -142,7 +140,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(7)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite map with unused array elements 0,1" in {
@@ -168,7 +166,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(8)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite map with unused array elements in a binary map func" in {
@@ -200,7 +198,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(1)),
             ProjectIndexR(HoleF, IntLit(0))))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "not rewrite leftshift with nonstatic array dereference" in {
@@ -219,7 +217,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(2)),
             ProjectIndexR(HoleF, AddR(IntLit(0), IntLit(1)))))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
 
     "rewrite two leftshift arrays" in {
@@ -263,7 +261,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             LeftSideF[Fix])).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite filter-map-filter-leftshift" in {
@@ -312,7 +310,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(0)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(expected)
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite reduce-filter-leftshift" in {
@@ -356,7 +354,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
           MakeMapR(IntLit(0), ReduceIndexF(0))))
 
-      PA.pruneArrays.apply(initial.embed) must equal(expected.embed)
+      initial.embed.pruneArrays must equal(expected.embed)
     }
 
     // this can be rewritten - we just don't support that yet
@@ -383,7 +381,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
 
     // this can be rewritten - we just don't support that yet
@@ -411,7 +409,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
 
     // this can be rewritten - we just don't support that yet
@@ -434,7 +432,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
-      PA.pruneArrays.apply(initial) must equal(initial)
+      initial.pruneArrays must equal(initial)
     }
   }
 }

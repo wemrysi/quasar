@@ -86,7 +86,6 @@ object QueryFile {
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val rewrite = new Rewrite[T]
-    val pa = new PAFindReplace[T, QS]
 
     // TODO: This would be `transHylo` if there were such a thing.
     _.transAna(SP.simplifyProjection)
@@ -94,7 +93,7 @@ object QueryFile {
       //       repeatedly until unchanged.
       .transAna(rewrite.normalize)
       .transAna(rewrite.normalize)
-      .hyloM(pa.remapIndices, pa.findIndices).run(None)._2
+      .pruneArrays
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
