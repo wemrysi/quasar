@@ -4,7 +4,7 @@
     "postgresql": "pending",
     "marklogic":  "skip",
     "couchbase":  "skip",
-     "spark_local": "skip",
+    "spark_local": "skip",
     "spark_hdfs": "skip"
   },
   "note": "This is tricky because the sort key does not appear in the result. The
