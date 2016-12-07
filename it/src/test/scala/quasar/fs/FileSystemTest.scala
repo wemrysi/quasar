@@ -68,6 +68,17 @@ abstract class FileSystemTest[S[_]](
       ()
     }).unsafePerformSync
 
+  /** Returns the given result if the backend is external or `Skipped` otherwise.
+    *
+    * TODO: This exists primarily to be able to skip tests that query on the
+    *       rudimentary "In-Memory" filesystem. Once we have a proper in-memory
+    *       evaluator that is expected to execute arbitrary queries, this should
+    *       be removed.
+    */
+  def externalOnly[A: AsResult](name: BackendName)(a: => A): Result =
+    if (TestConfig.backendNames element name) AsResult(a)
+    else skipped("External filesystems only.")
+
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
 

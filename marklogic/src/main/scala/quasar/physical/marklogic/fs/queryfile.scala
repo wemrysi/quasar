@@ -25,6 +25,7 @@ import quasar.effect.MonotonicSeq
 import quasar.fp._, eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.frontend.logicalplan.{constant, LogicalPlan}
@@ -159,7 +160,8 @@ object queryfile {
       } yield {
         let_(
           ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
-          $("_") := xdmp.directoryCreate(dstDirUri.xs))
+          $("_") := try_(xdmp.directoryCreate(dstDirUri.xs))
+                    .catch_($("e"))(κ(emptySeq)))
         .return_ {
           for_(
             result at i in mkSeq_(results))
@@ -180,8 +182,14 @@ object queryfile {
             (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
 
-      (lpToXQuery(lp) >>= saveResults >>= (mm => liftQP(SessionIO.executeModule_(mm))))
-        .as(out).run.run
+      val resultFile = for {
+        xqy <- lpToXQuery(lp)
+        mm  <- saveResults(xqy)
+        _   <- liftQP(ops.deleteFile(out))
+        _   <- liftQP(SessionIO.executeModule_(mm))
+      } yield out
+
+      resultFile.run.run
     }
 
     def eval(lp: Fix[LogicalPlan]) =
