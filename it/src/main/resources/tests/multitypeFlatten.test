@@ -6,7 +6,7 @@
         "postgresql":        "pending",
         "marklogic":         "skip",
         "couchbase":         "skip",
-	"spark_local": "pending",
+        "spark_local": "pending",
         "spark_hdfs": "pending"
     },
     "data": "nested_foo.data",

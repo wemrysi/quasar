@@ -6,7 +6,7 @@
         "marklogic":         "skip",
         "couchbase":         "skip",
         "spark_local": "skip",
-      "spark_hdfs": "skip"
+        "spark_hdfs": "skip"
     },
     "data": "../largeZips.data",
     "query": "select largeZips.city, z2.state from `../largeZips` join `../largeZips` as z2 on largeZips._id = z2._id",

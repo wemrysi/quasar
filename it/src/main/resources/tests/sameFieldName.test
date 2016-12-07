@@ -5,9 +5,8 @@
         "postgresql":        "pending",
         "marklogic":         "skip",
         "couchbase":         "skip",
-	    "spark_local": "pending",
-    "spark_hdfs": "pending"
-
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": ["owners.data", "cars.data"],
     "query": "SELECT owner.name, car.name from owners as owner join cars as car on car._id = owner.carId",

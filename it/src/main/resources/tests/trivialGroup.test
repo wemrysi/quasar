@@ -13,8 +13,8 @@
         "mongodb_3_0",
         "mongodb_3_2",
         "mongodb_read_only",
-	"spark_local",
-	"spark_hdfs"
+        "spark_local",
+        "spark_hdfs"
     ],
     "expected": [{ "city": "BOULDER", "totalPop": 110948 }]
 }

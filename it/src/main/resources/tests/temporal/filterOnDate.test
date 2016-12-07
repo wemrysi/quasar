@@ -3,9 +3,8 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-	    "spark_local": "pending",
-    "spark_hdfs": "pending"
-
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "../days.data",
     "query": "select day from `../days`

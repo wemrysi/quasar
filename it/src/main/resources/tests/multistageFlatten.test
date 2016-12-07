@@ -5,8 +5,7 @@
         "marklogic":  "skip",
         "couchbase":  "skip",
         "spark_local": "skip",
-    "spark_hdfs": "skip"
-
+        "spark_hdfs": "skip"
     },
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (

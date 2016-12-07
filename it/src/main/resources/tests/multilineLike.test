@@ -3,8 +3,8 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-	    "spark_local": "skip",
-      "spark_hdfs": "skip"
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select count(*) from slamengine_commits where commit.message like \"Merge%\"",

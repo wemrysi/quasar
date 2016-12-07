@@ -5,8 +5,8 @@
         "postgresql":        "pending",
         "marklogic":         "skip",
         "couchbase":         "skip",
-		    "spark_local": "skip",
-      "spark_hdfs": "skip"
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",
