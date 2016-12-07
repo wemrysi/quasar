@@ -1,9 +1,7 @@
 {
     "name": "select aliased field sorted by original name",
     "backends": {
-        "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "SELECT state AS `ResultAlias`, COUNT(*) as cnt FROM zips GROUP BY state ORDER BY state",
