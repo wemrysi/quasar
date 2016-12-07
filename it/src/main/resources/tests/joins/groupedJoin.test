@@ -5,7 +5,7 @@
         "postgresql":        "pending",
         "marklogic":         "skip",
         "couchbase":         "skip",
-	"spark_local": "skip",
+        "spark_local": "skip",
       "spark_hdfs": "skip"
     },
     "data": "../slamengine_commits.data",

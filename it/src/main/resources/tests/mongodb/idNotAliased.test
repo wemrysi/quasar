@@ -7,8 +7,8 @@
         "mongodb_3_2":       "pending",
         "postgresql":        "skip",
         "marklogic":         "skip",
-	"spark_local": "skip",
-	"spark_hdfs": "skip"
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "../zips.data",
     "query": "select _id from `../zips` where city = \"BOULDER\" and state = \"CO\"",

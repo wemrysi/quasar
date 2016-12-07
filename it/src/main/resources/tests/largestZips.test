@@ -3,7 +3,7 @@
     "backends": {
         "postgresql": "pending",
         "couchbase":  "skip",
-	"spark_local": "skip",
+        "spark_local": "skip",
         "spark_hdfs": "skip"
     },
     "data": "zips.data",
