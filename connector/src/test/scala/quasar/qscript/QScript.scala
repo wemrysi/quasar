@@ -115,18 +115,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           IncludeId,
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
-              // FIXME: #1622
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
-                  ProjectIndexR(
-                    ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)),
-                    IntLit(0)))),
+                  Free.roll(MakeArray(
+                    ProjectIndexR(RightSideF, IntLit(0)))))),
                 Free.roll(MakeArray(
-                  ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)),
-                      IntLit(0)),
-                    IntLit(0)))))),
+                  Free.roll(MakeArray(
+                    ProjectIndexR(RightSideF, IntLit(0)))))))),
               Free.roll(MakeArray(
                 Free.roll(Guard(
                   ProjectIndexR(RightSideF, IntLit(1)),
@@ -426,7 +421,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           IncludeId,
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
-              Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))),
+              Free.roll(MakeArray(
+                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
               Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
             Free.roll(Constant(ejsonArr(ejsonStr("loc")))))))),
         QC.inj(LeftShift((),
@@ -446,7 +442,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               Free.roll(MakeArray(RightSideF)))),
             Free.roll(Constant(ejsonArr(ejsonInt(10)))))))),
         QC.inj(Reduce((),
-          ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)),
+          Free.roll(MakeArray(
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
           List(
             ReduceFuncs.UnshiftArray(
               Free.roll(Multiply(
@@ -475,9 +472,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
               Free.roll(ConcatArrays(
-                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))),
-                // FIXME: #1622
-                Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))))),
               Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
             Free.roll(MakeArray(
               Free.roll(Between(
@@ -563,7 +561,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           ExcludeId,
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(
-              ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))),
+              Free.roll(MakeArray(
+                ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
             Free.roll(MakeArray(RightSideF))))))),
         Free.roll(QCT.inj(LeftShift(
           Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
@@ -571,10 +570,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           ExcludeId,
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(
-              ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))),
+              Free.roll(MakeArray(
+                ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
             Free.roll(MakeArray(RightSideF))))))))),
       QC.inj(Reduce((),
-        ProjectIndexR(HoleF, IntLit(1)),
+        Free.roll(MakeArray(
+          ProjectIndexR(HoleF, IntLit(1)))),
         List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
         ReduceIndexF(0))))))
   }
@@ -589,12 +590,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         IncludeId,
         Free.roll(ConcatArrays(
           Free.roll(ConcatArrays(
-            // FIXME: #1622
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(
-                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))),
+                Free.roll(MakeArray(
+                  ProjectIndexR(RightSideF, IntLit(0)))))),
               Free.roll(MakeArray(
-                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
+                Free.roll(MakeArray(
+                  ProjectIndexR(RightSideF, IntLit(0)))))))),
             Free.roll(MakeArray(
               Free.roll(ConcatMaps(
                 Free.roll(MakeMap(
@@ -629,7 +631,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
         (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
       QC.inj(Reduce((),
-        Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))),
+        Free.roll(MakeArray(
+          Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))))),
         List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),
         Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))))
   }
