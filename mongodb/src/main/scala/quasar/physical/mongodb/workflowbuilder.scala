@@ -1187,7 +1187,18 @@ object WorkflowBuilder {
 
     // FIXME: no constraints
     def jsExpr1(wb: WorkflowBuilder[F], js: JsFn): WorkflowBuilder[F] =
-      ExprBuilder(wb, -\/(js))
+      Fix(normalize[F].apply(ExprBuilderF(wb, -\/(js))))
+
+    // Like JsExpr, but accepts a JsFn that expects to receive an array of values.
+    def jsArrayExpr(wbs: List[WorkflowBuilder[F]], js: JsFn)
+      (implicit ev2: RenderTree[WorkflowBuilder[F]])
+      : M[WorkflowBuilder[F]] =
+      fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
+        fail(InternalError("impossible – no arguments")))(
+        _.flatMap { case (wb, exprs) =>
+          lift(exprs.traverse[PlannerError \/ ?, JsFn](_.para(toJs)).map(jses =>
+            jsExpr1(jsExpr1(wb, JsFn(jsBase, jscore.Arr(jses.map(_(jscore.Ident(jsBase)))))), js)))
+        })
 
     def jsExpr(wbs: List[WorkflowBuilder[F]], f: List[JsCore] => JsCore)
       (implicit ev2: RenderTree[WorkflowBuilder[F]])
@@ -1196,7 +1207,7 @@ object WorkflowBuilder {
         fail(InternalError("impossible – no arguments")))(
         _.flatMap { case (wb, exprs) =>
           lift(exprs.traverse[PlannerError \/ ?, JsFn](_.para(toJs)).map(jses =>
-            Fix(normalize[F].apply(ExprBuilderF(wb, -\/(JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase)))))))))))
+            jsExpr1(wb, JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase))))))))
         })
 
     def makeObject(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =

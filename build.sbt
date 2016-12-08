@@ -63,6 +63,7 @@ lazy val buildSettings = Seq(
     "-Ybackend:GenBCode",
     "-Ydelambdafy:method",
     "-Ypartial-unification",
+    "-Ypatmat-exhaust-depth", "40",
     "-Yliteral-types",
     "-Ywarn-unused-import"),
   scalacOptions in (Test, console) --= Seq(

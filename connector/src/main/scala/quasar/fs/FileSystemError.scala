@@ -29,7 +29,7 @@ import pathy.Path.posixCodec
 import scalaz._
 import scalaz.syntax.show._
 
-sealed trait FileSystemError
+sealed abstract class FileSystemError
 
 object FileSystemError {
   import QueryFile.ResultHandle

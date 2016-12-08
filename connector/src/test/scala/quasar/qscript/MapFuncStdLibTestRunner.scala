@@ -17,11 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+import quasar.contrib.matryoshka._
+import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.std._
 
 import matryoshka._, Recursive.ops._
+import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 import shapeless.Sized
 
@@ -43,5 +46,13 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 
       case lp.Free(sym) => Free.pure(args(sym))
+
+      case lp.Constant(data) =>
+        Free.roll(MapFuncs.Constant[Fix, Free[MapFunc[Fix, ?], A]](
+          data.hylo[CoEnv[Data, EJson, ?], Fix[EJson]](
+            interpret[EJson, Data, Fix[EJson]](
+              _ => scala.sys.error("unsupported Data"),
+              _.embed),
+            Data.toEJson[EJson].apply(_))))
     }
 }

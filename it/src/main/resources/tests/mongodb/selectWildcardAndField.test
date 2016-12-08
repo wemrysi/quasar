@@ -1,6 +1,7 @@
 {
     "name": "select wildcard and field (MongoDB)",
     "backends": {
+        "mongodb_q_3_2":  "skip",
         "postgresql":        "skip",
         "marklogic":         "skip",
         "couchbase":         "skip"

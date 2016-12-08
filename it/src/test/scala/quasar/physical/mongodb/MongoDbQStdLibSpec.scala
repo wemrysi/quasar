@@ -17,17 +17,18 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar._, Planner.PlannerError
-import quasar.std._
+import quasar._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.DataCursor
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.fs.{DataCursor, FileSystemError}
+import quasar.physical.mongodb.WorkflowExecutor.WorkflowCursor
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
-import WorkflowExecutor.WorkflowCursor
+import quasar.qscript._
+import quasar.std._
 
-import matryoshka._, Recursive.ops._
+import matryoshka.{Hole => _, _}, Recursive.ops._
 import org.threeten.bp.format.DateTimeFormatter
 import org.specs2.execute._
 import org.specs2.matcher._
@@ -40,20 +41,20 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-abstract class MongoDbStdLibSpec extends StdLibSpec {
+abstract class MongoDbQStdLibSpec extends StdLibSpec {
   import quasar.frontend.fixpoint.lpf
 
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
-      : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
+  def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
+      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_2_6
-  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_3_2
+  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_2_6
+  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_3_2
 
-  MongoDbSpec.clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
+  MongoDbSpec.clientShould(QScriptFsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     /** Intercept and transform expected values into the form that's actually
@@ -67,7 +68,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     /** Identify constructs that are expected not to be implemented. */
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(func, _) => shortCircuit(backend, func, args)
-      case _ => ().right
+      case _                  => ().right
     }
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
@@ -97,34 +98,33 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
-    def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
-      check(args, prg).getOrElse(
-        (for {
-          coll <- MongoDbSpec.tempColl(prefix)
-          argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
-                      BsonCodec.fromData(arg).point[Task].unattempt.strengthL("arg" + idx) }
-          _     <- insert(
-                    coll,
-                    List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
+    val runner = new MapFuncStdLibTestRunner with MongoDbDomain {
+      def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
+        check(args, prg).getOrElse(
+          (for {
+            coll <- MongoDbSpec.tempColl(prefix)
+            argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
+              BsonCodec.fromData(arg).point[Task].unattempt.strengthL("arg" + idx) }
+            _     <- insert(
+              coll,
+              List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
 
-          qm  <- serverVersion.map(MongoQueryModel(_)).run(testClient)
+            qm  <- serverVersion.map(MongoQueryModel(_)).run(testClient)
 
-          lp = prg(
-                (0 until args.length).toList.map(idx =>
-                  Fix(StructuralLib.ObjectProject(
-                    lpf.read(coll.asFile),
-                    lpf.constant(Data.Str("arg" + idx))))))
-          t  <- compile(qm, coll, lp).point[Task].unattempt
-          (wf, resultField) = t
+            lp = prg(
+              (0 until args.length).toList.map(idx =>
+                Fix(StructuralLib.ObjectProject(
+                  lpf.free('hole),
+                  lpf.constant(Data.Str("arg" + idx))))))
+            t  <- compile(qm, coll, translate[Hole](lp, _ => SrcHole)).point[Task].unattempt
+            (wf, resultField) = t
+            rez <- evaluate(wf, coll).run(testClient)
 
-          rez <- evaluate(wf, coll).run(testClient)
+            _     <- dropCollection(coll).run(setupClient)
+          } yield {
+            rez must beSingleResult(beCloseTo(massage(expected)))
+          }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
-          _     <- dropCollection(coll).run(setupClient)
-        } yield {
-          rez must beSingleResult(beCloseTo(massage(expected)))
-        }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
-
-    val runner = new StdLibTestRunner with MongoDbDomain {
       def nullary(
         prg: Fix[LP],
         expected: Data): Result =
