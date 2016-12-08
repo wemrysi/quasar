@@ -3,7 +3,9 @@
     "backends": {
         "postgresql": "skip",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "../zips.data",
     "query": "select * from `../zips` where 43.058514 in loc[_]",

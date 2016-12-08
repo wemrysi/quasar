@@ -3,7 +3,9 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip"
+        "marklogic":         "skip",
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}{*}{*} from nested",

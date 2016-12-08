@@ -4,7 +4,9 @@
         "mongodb_read_only": "pending",
         "postgresql":        "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",
