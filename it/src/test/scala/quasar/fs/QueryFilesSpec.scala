@@ -17,7 +17,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.Data
+import quasar.{BackendCapability, Data}
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -58,7 +58,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
     "Querying Files" should {
       step(deleteForQuery(fs.setupInterpM).runVoid)
 
-      "executing query to an existing file overwrites with results" >> externalOnly(fs.name) {
+      "executing query to an existing file overwrites with results" >> ifSupports(fs, BackendCapability.query()) {
         val d = queryPrefix </> dir("execappends")
         val a = d </> file("afile")
         val b = d </> file("bfile")

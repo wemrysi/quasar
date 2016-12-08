@@ -16,17 +16,21 @@
 
 package quasar
 
-import quasar.Predef._
+import quasar.Predef.Boolean
 
+import monocle.macros.Lenses
 import scalaz._
-import scalaz.std.string._
+import scalaz.std.tuple._
 
-final case class BackendName(name: String) extends scala.AnyVal
+@Lenses
+final case class BackendRef(name: BackendName, capabilities: ISet[BackendCapability]) {
+  def supports(bc: BackendCapability): Boolean = capabilities member bc
+}
 
-object BackendName {
-  implicit val order: Order[BackendName] =
-    Order.orderBy(_.name)
+object BackendRef {
+  implicit val order: Order[BackendRef] =
+    Order.orderBy(r => (r.name, r.capabilities))
 
-  implicit val show: Show[BackendName] =
-    Show.shows(_.name)
+  implicit val show: Show[BackendRef] =
+    Show.showFromToString
 }

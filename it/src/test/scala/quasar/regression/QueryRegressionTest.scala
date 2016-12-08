@@ -101,7 +101,7 @@ abstract class QueryRegressionTest[S[_]](
       step(print(s"Running $suiteName ["))
 
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, fs.name, fs.setupInterpM, fs.testInterpM)
+        regressionExample(f, t, fs.ref.name, fs.setupInterpM, fs.testInterpM)
         step(print("."))
       }
 
@@ -300,7 +300,7 @@ abstract class QueryRegressionTest[S[_]](
 }
 
 object QueryRegressionTest {
-  lazy val knownFileSystems = TestConfig.backendNames.toSet
+  lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
   val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] =
     for {
