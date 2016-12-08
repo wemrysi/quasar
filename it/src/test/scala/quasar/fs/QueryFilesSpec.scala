@@ -58,7 +58,10 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
     "Querying Files" should {
       step(deleteForQuery(fs.setupInterpM).runVoid)
 
-      "executing query to an existing file overwrites with results" >> ifSupports(fs, BackendCapability.query()) {
+      "executing query to an existing file overwrites with results" >> ifSupports(fs,
+        BackendCapability.query(),
+        BackendCapability.write()) {
+
         val d = queryPrefix </> dir("execappends")
         val a = d </> file("afile")
         val b = d </> file("bfile")
