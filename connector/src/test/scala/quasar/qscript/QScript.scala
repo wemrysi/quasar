@@ -137,9 +137,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   Free.roll(Undefined()))),
                 StrLit("city")))))))),
         QC.inj(Sort((),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
-            Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
+          NullLit(),
           (ProjectIndexR(HoleF, IntLit(3)), SortDir.asc).wrapNel)),
         QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2)))))))
     }
@@ -626,9 +624,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 Free.roll(Undefined()))),
               StrLit("pop")))))))),
       QC.inj(Sort((),
-        Free.roll(ConcatArrays(
-          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
-          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
+        NullLit(),
         (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
       QC.inj(Reduce((),
         Free.roll(MakeArray(

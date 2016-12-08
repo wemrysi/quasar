@@ -564,7 +564,7 @@ class Transform
           Ann[T](base.buckets, dset),
           QC.inj(Sort(
             base.src,
-            prov.genBuckets(base.buckets).fold(NullLit[T, Hole]())(_._2),
+            prov.genBuckets(base.buckets.drop(1)).fold(NullLit[T, Hole]())(_._2),
             os)).embed))
 
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
