@@ -18,14 +18,10 @@ package quasar
 
 import quasar.Predef._
 
-import argonaut.DecodeJson
 import scalaz.Equal
 
 final case class BackendName(name: String) extends scala.AnyVal
 
 object BackendName {
   implicit val equal: Equal[BackendName] = Equal.equalA
-
-  implicit val decodeJson: DecodeJson[BackendName] =
-    DecodeJson.of[String].map(BackendName(_))
 }

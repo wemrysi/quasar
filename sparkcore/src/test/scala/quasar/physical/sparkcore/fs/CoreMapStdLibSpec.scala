@@ -22,8 +22,7 @@ import quasar.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Free => _}
-import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner, FreeMapA}, MapFuncs._
 import quasar.std._
 
 import matryoshka._
@@ -32,8 +31,6 @@ import org.specs2.execute._
 import scalaz._, Scalaz._
 
 class CoreMapStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
-
   val TODO: Result \/ Unit = Skipped("TODO").left
 
   /** Identify constructs that are expected not to be implemented. */
@@ -58,36 +55,35 @@ class CoreMapStdLibSpec extends StdLibSpec {
   }
 
   val runner = new MapFuncStdLibTestRunner {
-    def nullary(prg: Fix[LP], expected: Data) =
+    def nullaryMapFunc(
+      prg: FreeMapA[Fix, Nothing],
+      expected: Data
+    ): Result =
       failure
 
-    def unary(prg: Fix[LP] => Fix[LP], arg: Data, expected: Data) = {
-      val mf = translate(prg(lpf.free('arg)), κ(UnaryArg._1))
+    def unaryMapFunc(
+      prg: FreeMapA[Fix, UnaryArg],
+      arg: Data,
+      expected: Data
+    ): Result =
+      check(prg, List(arg)) getOrElse
+        run(prg, κ(arg), expected)
 
-      check(mf, List(arg)) getOrElse
-        run(mf, κ(arg), expected)
-    }
+    def binaryMapFunc(
+      prg: FreeMapA[Fix, BinaryArg],
+      arg1: Data, arg2: Data,
+      expected: Data
+    ): Result =
+      check(prg, List(arg1, arg2)) getOrElse
+       run[BinaryArg](prg, _.fold(arg1, arg2), expected)
 
-    def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, expected: Data) = {
-      val mf = translate[BinaryArg](prg(lpf.free('arg1), lpf.free('arg2)), {
-        case 'arg1 => BinaryArg._1
-        case 'arg2 => BinaryArg._2
-      })
-
-      check(mf, List(arg1, arg2)) getOrElse
-       run[BinaryArg](mf, _.fold(arg1, arg2), expected)
-    }
-
-    def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, arg3: Data, expected: Data) = {
-      val mf = translate[TernaryArg](prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
-        case 'arg1 => TernaryArg._1
-        case 'arg2 => TernaryArg._2
-        case 'arg3 => TernaryArg._3
-      })
-
-      check(mf, List(arg1, arg2, arg3)) getOrElse
-       run[TernaryArg](mf, _.fold(arg1, arg2, arg3), expected)
-    }
+    def ternaryMapFunc(
+      prg: FreeMapA[Fix, TernaryArg],
+      arg1: Data, arg2: Data, arg3: Data,
+      expected: Data
+    ): Result =
+      check(prg, List(arg1, arg2, arg3)) getOrElse
+       run[TernaryArg](prg, _.fold(arg1, arg2, arg3), expected)
 
     def intDomain = arbitrary[BigInt]
 

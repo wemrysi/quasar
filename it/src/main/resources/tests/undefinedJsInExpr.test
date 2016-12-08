@@ -2,8 +2,7 @@
     "name": "propagate undefined and null in JS",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "zips.data",
     "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",

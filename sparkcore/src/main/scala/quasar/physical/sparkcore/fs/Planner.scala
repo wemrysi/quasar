@@ -18,13 +18,13 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar._, quasar.Planner._
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski._
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import quasar.qscript.ReduceFuncs._
-import quasar.qscript.SortDir._
 
 import scala.math.{Ordering => SOrdering}
 import SOrdering.Implicits._
@@ -78,7 +78,7 @@ object Planner {
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
   def unimplemented(what: String): SparkState[RDD[Data]] =
-    EitherT[Task, PlannerError, RDD[Data]](InternalError(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
+    EitherT[Task, PlannerError, RDD[Data]](InternalError.fromMsg(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
 
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
@@ -87,7 +87,7 @@ object Planner {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-        EitherT(InternalError(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
+        EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
     }
 
@@ -146,8 +146,8 @@ object Planner {
 
         val countEval: SparkState[Long] = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
           case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-          case Data.Int(v) => InternalError(s"Provided Integer $v is not a Long").left[Long]
-          case a => InternalError(s"$a is not a Long number").left[Long]
+          case Data.Int(v) => InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
+          case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
         })).liftM[StateT[?[_], SparkContext, ?]])
         (fromState |@| countEval)((rdd, count) =>
           rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
@@ -269,7 +269,7 @@ object Planner {
           )
         case Sort(src, bucket, orders) =>
 
-          val maybeSortBys: PlannerError \/ List[(Data => Data, SortDir)] =
+          val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
             orders.traverse {
               case (freemap, sdir) =>
                 freeCataM(freemap)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
@@ -277,11 +277,11 @@ object Planner {
 
           val maybeBucket =
             freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
-          
+
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
-              val asc = sortBys(0)._2 === Ascending
-              val keys = bucket :: sortBys.map(_._1)
+              val asc  = sortBys.head._2 === SortDir.Ascending
+              val keys = bucket :: sortBys.map(_._1).toList
               src.sortBy(d => keys.map(_(d)), asc)
           }.point[Task]).liftM[SparkStateT]
 

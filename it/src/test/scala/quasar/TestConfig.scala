@@ -72,6 +72,11 @@ object TestConfig {
   def isMongoReadOnly(backendName: BackendName): Boolean =
     backendName == MONGO_READ_ONLY
 
+  /** True if this backend configuration is for a couchbase connection.
+    */
+  def isCouchbase(backendName: BackendName): Boolean =
+    backendName == COUCHBASE
+
   /** Returns the name of the environment variable used to configure the
     * given backend.
     */

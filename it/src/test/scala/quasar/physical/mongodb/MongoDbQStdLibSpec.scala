@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.fp.tree._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.fs.{DataCursor, FileSystemError}
 import quasar.physical.mongodb.WorkflowExecutor.WorkflowCursor
@@ -28,8 +29,10 @@ import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std._
 
+import java.time.format.DateTimeFormatter
+import scala.sys
+
 import matryoshka.{Hole => _, _}, Recursive.ops._
-import org.threeten.bp.format.DateTimeFormatter
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
@@ -125,24 +128,44 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
             rez must beSingleResult(beCloseTo(massage(expected)))
           }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
-      def nullary(
+      // TODO: Currently still using the old MapFuncStdLibSpec API. The new one
+      //       doesn’t mesh well with the general approach of the Mongo version.
+      //       Need to revisit later, and hopefully come up with a better one.
+
+      def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data) =
+        sys.error("impossible!")
+
+      def unaryMapFunc(prg: FreeMapA[Fix, UnaryArg], arg: Data, expected: Data) =
+        sys.error("impossible!")
+
+      def binaryMapFunc
+        (prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data, expected: Data) =
+        sys.error("impossible!")
+
+      def ternaryMapFunc
+        (prg: FreeMapA[Fix, TernaryArg],
+          arg1: Data, arg2: Data, arg3: Data,
+          expected: Data) =
+        sys.error("impossible!")
+
+      override def nullary(
         prg: Fix[LP],
         expected: Data): Result =
         run(Nil, κ(prg), expected)
 
-      def unary(
+      override def unary(
         prg: Fix[LP] => Fix[LP],
         arg: Data,
         expected: Data): Result =
         run(List(arg), { case List(arg) => prg(arg) }, expected)
 
-      def binary(
+      override def binary(
         prg: (Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data,
         expected: Data): Result =
         run(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }, expected)
 
-      def ternary(
+      override def ternary(
         prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data, arg3: Data,
         expected: Data): Result =

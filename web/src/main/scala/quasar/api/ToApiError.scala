@@ -242,9 +242,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Unsupported JavaScript in query plan.",
           err.message,
           "value" := value)
-      case InternalError(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Failed to plan query.", msg)
+      case InternalError(msg, cause) =>
+        fromMsg(
+          InternalServerError withReason "Failed to plan query.",
+          msg
+        ) :?+ ("cause" :?= cause.map(_.toString))
       case UnboundVariable(v) =>
         fromMsg_(
           InternalServerError withReason "Unbound variable.", v.toString)

@@ -18,6 +18,7 @@ package quasar.frontend.logicalplan
 
 import quasar.Predef._
 import quasar._
+import quasar.common.SortDir
 import quasar.contrib.pathy.FPath
 import quasar.contrib.shapeless._
 import quasar.fp._
@@ -44,9 +45,17 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
   def constant(data: Data) = lp.constant[T[LP]](data).embed
   def invoke[N <: Nat](func: GenericFunc[N], values: Func.Input[T[LP], N]) =
     Invoke(func, values).embed
+  def invoke1(func: GenericFunc[nat._1], v1: T[LP]) =
+    invoke[nat._1](func, Func.Input1(v1))
+  def invoke2(func: GenericFunc[nat._2], v1: T[LP], v2: T[LP]) =
+    invoke[nat._2](func, Func.Input2(v1, v2))
+  def invoke3(func: GenericFunc[nat._3], v1: T[LP], v2: T[LP], v3: T[LP]) =
+    invoke[nat._3](func, Func.Input3(v1, v2, v3))
   def free(name: Symbol) = lp.free[T[LP]](name).embed
   def let(name: Symbol, form: T[LP], in: T[LP]) =
     lp.let(name, form, in).embed
+  def sort(src: T[LP], order: NonEmptyList[(T[LP], SortDir)]) =
+    lp.sort(src, order).embed
   def typecheck(expr: T[LP], typ: Type, cont: T[LP], fallback: T[LP]) =
     lp.typecheck(expr, typ, cont, fallback).embed
 
@@ -151,6 +160,9 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
           inferTypes(fTyp, form).map(lp.let[Typed[LP]](n, _, in0))
         }
 
+      case Sort(src, ords) =>
+        (inferTypes(typ, src) ⊛ ords.traverse { case (a, d) => inferTypes(Type.Top, a) strengthR d })(lp.sort[Typed[LP]](_, _))
+
       case Typecheck(expr, t, cont, fallback) =>
         (inferTypes(t, expr) ⊛ inferTypes(typ, cont) ⊛ inferTypes(typ, fallback))(
           lp.typecheck[Typed[LP]](_, t, _, _))
@@ -206,6 +218,7 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
 
   // TODO: This can perhaps be decomposed into separate folds for annotating
   //       with “found” types, folding constants, and adding runtime checks.
+  // FIXME: No exhaustiveness checking here
   val checkTypesƒ:
       ((Type, LP[ConstrainedPlan[T]])) => NameT[SemDisj, ConstrainedPlan[T]] = {
     case (inf, term) =>
@@ -266,6 +279,9 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
           unifyOrCheck(inf, in.inferred, let(name, appConst(value, constant(Data.NA)), appConst(in, constant(Data.NA))))
         // TODO: Get the possible type from the LetF
         case Free(v) => emit(ConstrainedPlan(inf, Nil, free(v)))
+
+        case Sort(expr, ords) =>
+          unifyOrCheck(inf, expr.inferred, sort(appConst(expr, constant(Data.NA)), ords map (_ leftMap (appConst(_, constant(Data.NA))))))
       }
   }
 

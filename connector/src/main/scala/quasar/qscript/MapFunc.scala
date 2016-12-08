@@ -71,13 +71,11 @@ object MapFunc {
         case ConcatArraysN(as) =>
           as.foldRightM[Option, List[TCoMapFunc[T, A]]](
             Nil)(
-            (mf, acc) => (mf.project.run.toOption >>=
-              {
-                case MakeArray(value) => (value :: acc).some
-                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => coMapFuncR[T, A](Constant(v).right).embed) ++ acc).some
-                case _ => None
-              }))
+            (mf, acc) => (mf.project.run.toOption collect {
+              case MakeArray(value) => (value :: acc)
+              case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
+                (values.map(v => coMapFuncR[T, A](Constant(v).right).embed) ++ acc)
+            }))
         case _ => None
       }
   }

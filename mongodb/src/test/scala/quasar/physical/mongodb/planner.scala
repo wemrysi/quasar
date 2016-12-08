@@ -28,10 +28,10 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.SortDir
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
+import java.time.Instant
 import scala.Either
 
 import eu.timepit.refined.auto._
@@ -39,7 +39,6 @@ import matryoshka._, Recursive.ops._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
@@ -2499,7 +2498,7 @@ class PlannerSpec extends
     }.pendingUntilFixed
 
     "plan filter with timestamp and interval" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow(chain[Workflow](
@@ -2563,7 +2562,7 @@ class PlannerSpec extends
     }
 
     "plan filter on date" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
@@ -2624,7 +2623,7 @@ class PlannerSpec extends
     }
 
     "plan convert to timestamp" in {
-      import org.threeten.bp.Instant
+      import java.time.Instant
 
       plan("select to_timestamp(epoch) from foo") must beWorkflow {
         chain[Workflow](
@@ -3687,10 +3686,11 @@ class PlannerSpec extends
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
-  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.nonEmptyListOf(for {
-    x <- Gen.oneOf(genInnerInt, genInnerStr)
-    t <- Gen.oneOf(ASC, DESC)
-  } yield (t, x)).map(ps => Some(OrderBy(ps)))
+
+  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = {
+    val order = Gen.oneOf(ASC, DESC) tuple Gen.oneOf(genInnerInt, genInnerStr)
+    (order |@| Gen.listOf(order))((h, t) => Some(OrderBy(NonEmptyList(h, t: _*))))
+  }
 
   val maybeReducingExpr = Gen.oneOf(genOuterInt, genOuterStr)
 
@@ -3766,17 +3766,16 @@ class PlannerSpec extends
   "plan from LogicalPlan" should {
     import StdLib._
 
-    "plan simple OrderBy" in {
+    "plan simple Sort" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
           lpf.let(
-            'tmp1, makeObj("bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+            'tmp1, makeObj("bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
             lpf.let('tmp2,
-              s.OrderBy[FLP](
+              lpf.sort(
                 lpf.free('tmp1),
-                MakeArrayN[Fix](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar")))),
-                MakeArrayN(lpf.constant(Data.Str("ASC")))),
+                (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel),
               lpf.free('tmp2))))
 
       plan(lp) must beWorkflow(chain[Workflow](
@@ -3787,16 +3786,15 @@ class PlannerSpec extends
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression" in {
+    "plan Sort with expression" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
-          s.OrderBy[FLP](
+          lpf.sort(
             lpf.free('tmp0),
-            MakeArrayN[Fix](math.Divide[FLP](
-              ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
-              lpf.constant(Data.Dec(10.0)))),
-            MakeArrayN(lpf.constant(Data.Str("ASC")))))
+            (math.Divide[Fix[LP]](
+              lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+              lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3811,21 +3809,20 @@ class PlannerSpec extends
           ExcludeId)))
     }
 
-    "plan OrderBy with expression and earlier pipeline op" in {
+    "plan Sort with expression and earlier pipeline op" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
           lpf.let(
             'tmp1,
-            s.Filter[FLP](
+            lpf.invoke2(s.Filter,
               lpf.free('tmp0),
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
                 lpf.constant(Data.Int(0)))),
-            s.OrderBy[FLP](
+            lpf.sort(
               lpf.free('tmp1),
-              MakeArrayN[Fix](ObjectProject(lpf.free('tmp1), lpf.constant(Data.Str("bar")))),
-              MakeArrayN(lpf.constant(Data.Str("ASC"))))))
+              (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3834,20 +3831,19 @@ class PlannerSpec extends
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression (and extra project)" in {
+    "plan Sort expression (and extra project)" in {
       val lp =
         lpf.let(
           'tmp0, read("db/foo"),
           lpf.let(
             'tmp9,
             makeObj(
-              "bar" -> ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
-            s.OrderBy[FLP](
+              "bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+            lpf.sort(
               lpf.free('tmp9),
-              MakeArrayN[Fix](math.Divide[FLP](
-                ObjectProject(lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
-                lpf.constant(Data.Dec(10.0)))),
-              MakeArrayN(lpf.constant(Data.Str("ASC"))))))
+              (math.Divide[Fix[LP]](
+                lpf.invoke2(ObjectProject, lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3863,7 +3859,7 @@ class PlannerSpec extends
     }
 
     "plan distinct on full collection" in {
-      plan(s.Distinct(read("db/cities"))) must
+      plan(lpf.invoke1(s.Distinct, read("db/cities"))) must
         beWorkflow(chain[Workflow](
           $read(collection("db", "cities")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -3886,23 +3882,23 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
     }
 
@@ -3910,23 +3906,23 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
     }
 
@@ -3934,23 +3930,23 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
         case \/-(plan) =>
           plan must beTreeEqual(
-            Fix(s.InnerJoin[FLP](lpf.free('left), lpf.free('right),
-              relations.And[FLP](
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar")))),
-                relations.Eq[FLP](
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
       }
     }
 
@@ -3958,22 +3954,22 @@ class PlannerSpec extends
       MongoDbPlanner.alignJoinsƒ(
         lp.Invoke(s.InnerJoin,
           Func.Input3(lpf.free('left), lpf.free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                math.Add[FLP](
-                  ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-                  ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz"))),
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(math.Add,
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
         case -\/(UnsupportedJoinCondition(cond)) =>
           cond must beTreeEqual(
-            relations.Eq[FLP](
-              math.Add[FLP](
-                ObjectProject(lpf.free('right), lpf.constant(Data.Str("bar"))),
-                ObjectProject(lpf.free('left), lpf.constant(Data.Str("baz")))),
-              ObjectProject(lpf.free('left), lpf.constant(Data.Str("foo")))).embed)
+            lpf.invoke2(relations.Eq,
+              lpf.invoke2(math.Add,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
+              lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))))
       }
     }
 
@@ -3986,24 +3982,24 @@ class PlannerSpec extends
           'tmp0,
           lpf.let(
             'check0,
-            identity.Squash(read("db/zips")),
+            lpf.invoke1(identity.Squash, read("db/zips")),
             lpf.typecheck(
               lpf.free('check0),
               Type.Obj(Map(), Some(Type.Top)),
               lpf.free('check0),
               lpf.constant(Data.NA))),
-          s.Distinct[FLP](
-            identity.Squash[FLP](
+          lpf.invoke1(s.Distinct,
+            lpf.invoke1(identity.Squash,
               makeObj(
                 "city" ->
-                ObjectProject[FLP](
-                  s.Filter[FLP](
+                lpf.invoke2(ObjectProject,
+                  lpf.invoke2(s.Filter,
                     lpf.free('tmp0),
-                    string.Search[FLP](
-                      FlattenArray[FLP](
+                    lpf.invoke3(string.Search,
+                      lpf.invoke1(FlattenArray,
                         lpf.let(
                           'check1,
-                          ObjectProject(lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
+                          lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
                           lpf.typecheck(
                             lpf.free('check1),
                             Type.FlexArr(0, None, Type.Str),

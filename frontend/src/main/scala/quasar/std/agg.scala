@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar._
 
-import org.threeten.bp.Duration
+import java.time.Duration
 import scalaz._, Validation.{success, failureNel}
 import scalaz.std.list._
 import scalaz.std.option._

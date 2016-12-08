@@ -240,6 +240,7 @@ lazy val foundation = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 

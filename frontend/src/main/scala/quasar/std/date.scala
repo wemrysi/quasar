@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, Func, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
 
-import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
+import java.time.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, Validation.success
 import shapeless.{Data => _, _}
 

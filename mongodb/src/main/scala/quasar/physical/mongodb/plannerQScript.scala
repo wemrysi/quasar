@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults}
+import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.fp._, eitherT._
@@ -122,7 +122,7 @@ object MongoDbQScriptPlanner {
 
   // FIXME: This is temporary. Should go away when the connector is complete.
   def unimplemented[M[_], A](label: String)(implicit merr: MonadError_[M, FileSystemError]): M[A] =
-    merr.raiseError(qscriptPlanningFailed(InternalError(s"unimplemented $label")))
+    merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"unimplemented $label")))
 
   // TODO: Should have a JsFn version of this for $reduce nodes.
   val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
@@ -496,7 +496,7 @@ object MongoDbQScriptPlanner {
             case Type.Date             => isDate
           }
         jsCheck(typ).fold[M[JsCore]](
-          merr.raiseError(qscriptPlanningFailed(InternalError("uncheckable type"))))(
+          merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
 
       case Range(_, _)        => unimplemented[M, JsCore]("Range JS")
@@ -605,7 +605,7 @@ object MongoDbQScriptPlanner {
           case (IsBson(v1), _) =>
             \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(There(1, Here[T]()))))
 
-          case (_, _) => -\/(InternalError(node.map(_._1).shows))
+          case (_, _) => -\/(InternalError fromMsg node.map(_._1).shows)
         }
 
       def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
@@ -644,7 +644,7 @@ object MongoDbQScriptPlanner {
       }
 
       def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
-        (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+        (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
         case Constant(_)        => \/-(default)
@@ -723,7 +723,7 @@ object MongoDbQScriptPlanner {
                 ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
             }
           selCheck(typ).fold[OutputM[PartialSelector[T]]](
-            -\/(InternalError(node.map(_._1).shows)))(
+            -\/(InternalError.fromMsg(node.map(_._1).shows)))(
             f =>
             \/-(cont._2.fold[PartialSelector[T]](
               κ(({ case List(field) => f(field) }, List(There(0, Here[T]())))),
@@ -732,7 +732,7 @@ object MongoDbQScriptPlanner {
                   There(0, Here[T]()) :: p2.map(There(1, _)))
               })))
 
-        case _ => -\/(InternalError(node.map(_._1).shows))
+        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
       }
     }
 
@@ -853,7 +853,7 @@ object MongoDbQScriptPlanner {
                         accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                 repair)).join
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
+            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order.toList).unzip
             keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
               .map(WB.sortBy(src, _, dirs))
           case Filter(src, cond) =>
@@ -960,7 +960,7 @@ object MongoDbQScriptPlanner {
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) =
-          κ(merr.raiseError(qscriptPlanningFailed(InternalError(s"should not be reached: $label"))))
+          κ(merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"should not be reached: $label"))))
       }
 
     implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
@@ -1003,7 +1003,7 @@ object MongoDbQScriptPlanner {
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
           case Embed(ejson.Common(ejson.Str(key))) => BsonField.Name(key).point[M]
-          case key => merr.raiseError[BsonField.Name](qscriptPlanningFailed(InternalError(s"Unsupported object key: ${key.shows}")))
+          case key => merr.raiseError[BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
         },
           handler)) ∘
         (es => DocBuilder(src, es.toListMap))
@@ -1123,9 +1123,8 @@ object MongoDbQScriptPlanner {
       // println("found a guard we should try to remove!")
       if (typ.contains(subType)) cont.project.right
       else if (!subType.contains(typ))
-        InternalError("can only contain " + subType + ", but a(n) " + typ + " is expected").left
+        InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected").left
       else {
-        // println(typ.shows + " doesn’t contain " + subType.shows)
         free.right
       }
     case x => x.right
