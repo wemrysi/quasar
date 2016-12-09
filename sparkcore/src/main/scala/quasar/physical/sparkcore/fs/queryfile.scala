@@ -76,8 +76,7 @@ object queryfile {
       val rewrite = new Rewrite[Fix]
       for {
         qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
-          .map(shiftRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?]].apply(_)
-          .transCata(SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], SparkQScript].simplifyJoin(idPrism.reverseGet)))
+          .map(simplifyRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript].apply(_))
         optQS = qs.transAna(
           repeatedly(C.coalesceQC[SparkQScript](idPrism)) ⋙
             repeatedly(C.coalesceEJ[SparkQScript](idPrism.get)) ⋙

@@ -207,6 +207,18 @@ package object qscript {
           liftFG(injectRepeatedly(C.coalesceSR[G](idPrism))))
   }
 
+  def simplifyRead[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Functor, G[_]: Traverse, H[_]: Functor]
+    (implicit QC: QScriptCore[T, ?] :<: G,
+              TJ: ThetaJoin[T, ?] :<: G,
+              SR: Const[ShiftedRead, ?] :<: G,
+              GI: Injectable.Aux[G, QScriptTotal[T, ?]],
+              S: ShiftRead.Aux[T, F, G],
+              J: SimplifyJoin.Aux[T, G, H],
+              C: Coalesce.Aux[T, G, G],
+              N: Normalizable[G])
+      : T[F] => T[H] =
+    shiftRead[T, F, G].apply(_).transCata(J.simplifyJoin(idPrism.reverseGet))
+
   // Helpers for creating `Injectable` instances
 
   object ::\:: {
