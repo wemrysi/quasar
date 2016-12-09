@@ -183,21 +183,6 @@ trait StateTInstances {
     }
 }
 
-trait WriterTInstances {
-  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
-    new Catchable[WriterT[F, W, ?]] {
-      def attempt[A](fa: WriterT[F, W, A]) =
-        WriterT[F, W, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)      => (mzero[W], t.left)
-            case \/-((w, a)) => (w, a.right)
-          })
-
-      def fail[A](t: Throwable) =
-        WriterT(Catchable[F].fail(t).strengthL(mzero[W]))
-    }
-}
-
 trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
     import fp.ski._
@@ -305,7 +290,6 @@ trait DebugOps {
     }
   }
 }
-
 
 package object fp
     extends TreeInstances

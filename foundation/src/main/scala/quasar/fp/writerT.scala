@@ -14,24 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.fp
 
-import quasar.Predef.{Map => _, _}
-import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
+import quasar.Predef.Throwable
 
-import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ProjectBucketPlanner[F[_]: Applicative, T[_[_]]]
-  extends MarkLogicPlanner[F, ProjectBucket[T, ?]] {
+trait WriterTInstances {
+  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
+    new Catchable[WriterT[F, W, ?]] {
+      def attempt[A](fa: WriterT[F, W, A]) =
+        WriterT[F, W, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)      => (mzero[W], t.left)
+            case \/-((w, a)) => (w, a.right)
+          })
 
-  val plan: AlgebraM[F, ProjectBucket[T, ?], XQuery] = {
-    case BucketField(src, value, name) =>
-      s"((: BucketField :)$src)".xqy.point[F]
-
-    case BucketIndex(src, value, index) =>
-      s"((: BucketIndex :)$src)".xqy.point[F]
-  }
+      def fail[A](t: Throwable) =
+        WriterT(Catchable[F].fail(t).strengthL(mzero[W]))
+    }
 }
+
+object writerT extends WriterTInstances

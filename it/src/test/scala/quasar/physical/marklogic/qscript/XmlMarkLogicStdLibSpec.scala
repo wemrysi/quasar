@@ -17,16 +17,23 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.effect._
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.fmt
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ReadPlanner[F[_]: Applicative] extends MarkLogicPlanner[F, Const[Read, ?]] {
-  val plan: AlgebraM[F, Const[Read, ?], XQuery] = {
-    case Const(Read(absFile)) =>
-      s"((: Read :)())".xqy.point[F]
+import XmlMarkLogicStdLibSpec.SLib
+
+final class XmlMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, fmt.XML] {
+  def toMain[G[_]: Monad: Capture](xqy: SLib[XQuery]): RunT[G, MainModule] = {
+    val (prologs, q) = xqy.leftMap(e => ko(e.shows).toResult).run.run.eval(1)
+    EitherT.fromDisjunction[G](q map (MainModule(Version.`1.0-ml`, prologs, _)))
   }
+}
+
+object XmlMarkLogicStdLibSpec {
+  type SLib[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
 }

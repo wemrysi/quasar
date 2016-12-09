@@ -16,19 +16,21 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef.{Map => _, _}
+import quasar.Predef._
+import quasar.Data
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
-import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
-private[qscript] final class EquiJoinPlanner[F[_]: Applicative, T[_[_]]]
-  extends MarkLogicPlanner[F, EquiJoin[T, ?]] {
+abstract class StructuralPlannerSpec[F[_], FMT](
+  implicit SP: StructuralPlanner[F, FMT], DP: Planner[F, FMT, Const[Data, ?]]
+) extends XQuerySpec {
 
-  val plan: AlgebraM[F, EquiJoin[T, ?], XQuery] = {
-    case EquiJoin(src, lBranch, rBranch, leftKey, rightKey, joinType, combineFunc) =>
-      s"((: EquiJoin :)$src)".xqy.point[F]
+  def toM: F ~> M
+
+  xquerySpec(bn => s"Structural Planner(${bn.name})") { evalM =>
+    val evalF = evalM.compose[F[XQuery]](toM(_))
+
+    "TESTS GO HERE" >> todo
   }
 }

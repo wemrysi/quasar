@@ -19,6 +19,7 @@ package quasar.physical.marklogic.xquery
 import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
+import scalaz.Functor
 
 object json {
   val js = module("json", "http://marklogic.com/xdmp/json", "/MarkLogic/json/json.xqy")
@@ -26,6 +27,6 @@ object json {
   def isObject(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "object".xs
 
-  def transformFromJson[F[_]: PrologW](jsonNode: XQuery): F[XQuery] =
+  def transformFromJson[F[_]: Functor: PrologW](jsonNode: XQuery): F[XQuery] =
     js("transform-from-json") apply (jsonNode)
 }

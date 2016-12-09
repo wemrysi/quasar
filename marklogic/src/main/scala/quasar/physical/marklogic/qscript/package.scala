@@ -21,9 +21,10 @@ import quasar.ejson.{Common, Str}
 import quasar.fp.{coproductShow, QuasarFreeOps}
 import quasar.fp.ski.κ
 import quasar.contrib.matryoshka.{freeCataM, interpretM}
+import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.{ejson => ejs, _}
+import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
@@ -39,33 +40,6 @@ package object qscript {
 
   object MonadPlanErr {
     def apply[F[_]](implicit F: MonadPlanErr[F]): MonadPlanErr[F] = F
-  }
-
-  type MarkLogicPlanner[F[_], QS[_]] = Planner[F, QS, XQuery]
-
-  object MarkLogicPlanner {
-    def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP
-
-    implicit def qScriptCore[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
-      new QScriptCorePlanner[F, T]
-
-    implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
-      new DeadEndPlanner[F]
-
-    implicit def constRead[F[_]: Applicative]: MarkLogicPlanner[F, Const[Read, ?]] =
-      new ReadPlanner[F]
-
-    implicit def constShiftedRead[F[_]: QNameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead, ?]] =
-      new ShiftedReadPlanner[F]
-
-    implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
-      new ProjectBucketPlanner[F, T]
-
-    implicit def thetajoin[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
-      new ThetaJoinPlanner[F, T]
-
-    implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
-      new EquiJoinPlanner[F, T]
   }
 
   /** Matches "iterative" FLWOR expressions, those involving at least one `for` clause. */
@@ -90,56 +64,78 @@ package object qscript {
     }).fold(invalidQName[F, QName](s))(_.point[F])
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
+  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: Monad: MonadPlanErr, FMT](
+    fm: FreeMap[T],
+    src: XQuery
+  )(implicit
+    MFP: Planner[F, FMT, MapFunc[T, ?]],
+    SP:  StructuralPlanner[F, FMT]
+  ): F[XQuery] =
     fm.toCoEnv[T].project match {
       case MapFunc.StaticArray(elements) =>
         for {
-          xqyElts <- elements.traverse(mapFuncXQueryP(_, src))
-          arrElts <- xqyElts.traverse(ejs.mkArrayElt[F])
-          arr     <- ejs.mkArray_[F](mkSeq(arrElts))
+          xqyElts <- elements.traverse(mapFuncXQueryP[T, F, FMT](_, src))
+          arrElts <- xqyElts.traverse(SP.mkArrayElt)
+          arr     <- SP.mkArray(mkSeq(arrElts))
         } yield arr
 
-      case MapFunc.StaticMap(entries)    =>
+      case MapFunc.StaticMap(entries) =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     case Embed(Common(Str(s))) => asQName(s) map (qn => xs.QName(qn.xs))
+                     case Embed(Common(Str(s))) => s.xs.point[F]
                      case key                   => invalidQName[F, XQuery](key.convertTo[Fix].shows)
                    },
-                   mapFuncXQueryP(_, src)))
-          elts  <- xqyKV.traverse { case (k, v) => ejs.renameOrWrap[F].apply(k, v) }
-          map   <- ejs.mkObject[F] apply mkSeq(elts)
+                   mapFuncXQueryP[T, F, FMT](_, src)))
+          elts  <- xqyKV.traverse((SP.mkObjectEntry _).tupled)
+          map   <- SP.mkObject(mkSeq(elts))
         } yield map
 
-      case other                         => mapFuncXQueryP(other.embed, src)
+      case other => mapFuncXQueryP[T, F, FMT](other.embed, src)
     }
 
-  def mapFuncXQueryP[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](fm: T[CoEnv[Hole, MapFunc[T, ?], ?]], src: XQuery): F[XQuery] =
-    planMapFuncP(fm)(κ(src))
+  def mapFuncXQueryP[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT](
+    fm: T[CoEnv[Hole, MapFunc[T, ?], ?]],
+    src: XQuery
+  )(implicit
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
+  ): F[XQuery] =
+    planMapFuncP[T, F, FMT, Hole](fm)(κ(src))
 
-  def mergeXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
-    planMapFunc[T, F, JoinSide](jf) {
+  def mergeXQuery[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT](
+    jf: JoinFunc[T],
+    l: XQuery,
+    r: XQuery
+  )(implicit
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
+  ): F[XQuery] =
+    planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr, A](
+  def planMapFunc[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
+  )(implicit
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): F[XQuery] =
-    planMapFuncP(freeMap.toCoEnv)(recover)
+    planMapFuncP[T, F, FMT, A](freeMap.toCoEnv)(recover)
 
-  def planMapFuncP[T[_[_]]: Recursive, F[_]: QNameGenerator: PrologW: MonadPlanErr, A](
+  def planMapFuncP[T[_[_]]: Recursive, F[_]: Monad, FMT, A](
     freeMap: T[CoEnv[A, MapFunc[T, ?], ?]])(
     recover: A => XQuery
+  )(implicit
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): F[XQuery] =
-    freeMap.cataM(interpretM(recover(_).point[F], MapFuncPlanner[T, F]))
+    freeMap.cataM(interpretM(recover(_).point[F], MFP.plan))
 
-  def rebaseXQuery[T[_[_]]: Recursive: Corecursive, F[_]: QNameGenerator: PrologW: MonadPlanErr](
-    fqs: FreeQS[T], src: XQuery
-  ): F[XQuery] = {
-    import MarkLogicPlanner._
-    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
-  }
+  def rebaseXQuery[T[_[_]], F[_]: Monad, FMT](
+    fqs: FreeQS[T],
+    src: XQuery
+  )(implicit
+    QTP: Planner[F, FMT, QScriptTotal[T, ?]]
+  ): F[XQuery] =
+    freeCataM(fqs)(interpretM(κ(src.point[F]), QTP.plan))
 
   ////
 

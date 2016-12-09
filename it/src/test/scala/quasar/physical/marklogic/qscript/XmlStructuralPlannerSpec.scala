@@ -14,18 +14,26 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.Data
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.xquery._
 
-import scalaz._
+import matryoshka._
+import scalaz._, Scalaz._
 
-final class EJsonLibSpec extends XQuerySpec {
-  import expr.{attribute, element, emptySeq}
+final class XmlStructuralPlannerSpec
+  extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, fmt.XML] {
 
-  xquerySpec(bn => s"XQuery EJSON Library (${bn.name})") { eval =>
+  import XmlStructuralPlannerSpec.XmlPlan
+
+  val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
+
+  // TODO: projecting multiple child elements with the same name results in an array
+
+/*
     "attributes" >> {
       "returns element attributes as an object" >> {
         val book = element("book".xs)(mkSeq_(
@@ -76,5 +84,9 @@ final class EJsonLibSpec extends XQuerySpec {
         )))
       }
     }
-  }
+*/
+}
+
+object XmlStructuralPlannerSpec {
+  type XmlPlan[A] = MarkLogicPlanErrT[WriterT[State[Long, ?], Prologs, ?], A]
 }

@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic
 
-import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
+object fmt {
+  /** XML format. */
+  sealed abstract class XML
 
-import matryoshka._
-import scalaz._, Scalaz._
-
-private[qscript] final class DeadEndPlanner[F[_]: Applicative]
-  extends MarkLogicPlanner[F, Const[DeadEnd, ?]] {
-
-  val plan: AlgebraM[F, Const[DeadEnd, ?], XQuery] = {
-    case Const(Root) => mkSeq_("/".xqy).point[F]
-  }
+  /** JSON format. */
+  sealed abstract class JSON
 }

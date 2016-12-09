@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
-import quasar.contrib.scalaz.MonadTell_
+import quasar.Predef.String
+import quasar.fp.ski.κ
+import quasar.physical.marklogic.xquery._
 
-import scalaz._
+import matryoshka.AlgebraM
 
-package object common {
-  type PhaseResults = Vector[PhaseResult]
-  type PhaseResultW[A] = Writer[PhaseResults, A]
-  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
-  type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
+private[qscript] final class UnreachablePlanner[F[_]: MonadPlanErr, FMT, G[_]](
+  name: String
+) extends Planner[F, FMT, G] {
+
+  val plan: AlgebraM[F, G, XQuery] =
+    κ(MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(name)))
 }

@@ -272,7 +272,7 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
+  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],

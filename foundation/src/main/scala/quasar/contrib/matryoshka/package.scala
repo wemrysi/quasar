@@ -21,7 +21,7 @@ import quasar.fp.ski._
 
 import _root_.matryoshka._, Recursive.ops._, TraverseT.ops._
 import _root_.matryoshka.patterns._
-import scalaz._, Scalaz._
+import _root_.scalaz._, Scalaz._
 
 package object matryoshka extends CoEnvInstances {
 

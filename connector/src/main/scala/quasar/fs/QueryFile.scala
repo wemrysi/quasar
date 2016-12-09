@@ -22,6 +22,7 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
@@ -136,12 +137,12 @@ object QueryFile {
   }
 
   def convertToQScriptRead
-    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_], QS[_]: Traverse: Normalizable]
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults],
+      merr: MonadError_[M, FileSystemError],
+      mtell: MonadTell_[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
       PA: PruneArrays[QS],
       R:        Const[Read, ?] :<: QS,
@@ -164,18 +165,13 @@ object QueryFile {
           Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
             Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
 
-    val qs =
-      merr.map(
-        merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
-            perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
-            merr.point(_)))(
-          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
-        simplifyAndNormalize[T, InterimQS, QS])
-
-    merr.bind(qs) { qs =>
-      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
-    }
+    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+      .fold(
+        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
+        _.point[M])
+      .flatMap(rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents))
+      .map(simplifyAndNormalize[T, InterimQS, QS])
+      .flatMap(qs => mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs))
   }
 
   /** The result of the query is stored in an output file, overwriting any existing
