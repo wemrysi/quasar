@@ -222,6 +222,15 @@ package object qscript {
     Injectable.coproduct(
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
+
+  implicit final class BirecursiveOps[T[_[_]], F[_]](val self: T[F]) extends scala.AnyVal {
+    final def pruneArrays
+      (implicit PA: PruneArrays[F], RT: Recursive[T], CT: Corecursive[T], TF: Traverse[F])
+        : T[F] = {
+      val pa = new PAFindRemap[T, F]
+      self.hyloM[pa.ArrayState, pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(None)._2
+    }
+  }
 }
 
 package qscript {

@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.contrib.matryoshka._
 
-import matryoshka._, TraverseT.ops._
+import matryoshka._, FunctorT.ops._, TraverseT.nonInheritedOps._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -392,6 +392,18 @@ package object fp
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
+  def liftR[T[_[_]]: Corecursive: Recursive, F[_]: Traverse, G[_]: Traverse](orig: T[F] => T[F])(implicit F: F:<: G):
+      T[G] => T[G] =
+    tg => prjR[T, F, G](tg).fold(tg)(orig.andThen(injR[T, F, G]))
+
+  def injR[T[_[_]]: Corecursive: Recursive, F[_]: Functor, G[_]: Functor](orig: T[F])(implicit F: F :<: G):
+      T[G] =
+    orig.transCata[G](F.inj)
+
+  def prjR[T[_[_]]: Corecursive: Recursive, F[_]: Traverse, G[_]: Traverse](orig: T[G])(implicit F: F :<: G):
+      Option[T[F]] =
+    orig.transCataM[Option, F](F.prj)
 
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
