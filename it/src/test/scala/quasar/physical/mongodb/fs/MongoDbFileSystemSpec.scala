@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
-import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly
+import quasar._, DataArbitrary._
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp._
@@ -46,8 +46,9 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
-class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filterNot (fs => isMongoReadOnly(fs.name))))
-        with quasar.ExclusiveQuasarSpecification {
+class MongoDbFileSystemSpec
+  extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filter (_ supports BackendCapability.write())))
+  with quasar.ExclusiveQuasarSpecification {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad

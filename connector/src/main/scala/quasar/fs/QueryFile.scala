@@ -174,8 +174,9 @@ object QueryFile {
     }
   }
 
-  /** The result of the query is stored in an output file
-    * instead of being returned to the user immediately.
+  /** The result of the query is stored in an output file, overwriting any existing
+    * contents, instead of being returned to the user immediately.
+    *
     * The `LogicalPlan` is expected to only contain absolute paths even though
     * that is unfortunately not expressed in the types currently.
     */
@@ -244,6 +245,9 @@ object QueryFile {
 
     /** Returns the path to the result of executing the given `LogicalPlan`,
       * using the provided path if possible.
+      *
+      * If the given file path exists, it will be overwritten with the results
+      * from the query.
       *
       * Execution of certain plans may return a result file other than the
       * requested file if it is more efficient to do so (i.e. to avoid copying
