@@ -240,14 +240,14 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
     // relations
     case MF.Not(a1) =>
       Not(a1).embed.η[M]
-    case MF.Eq(a1, Data(QData.Null)) =>
-      IsNull(unwrap(a1)).embed.η[M]
-    case MF.Eq(a1, a2) =>
-      rel(Eq(a1, a2)).η[M]
-    case MF.Neq(a1, Data(QData.Null)) =>
-      IsNotNull(unwrap(a1)).embed.η[M]
-    case MF.Neq(a1, a2) =>
-      rel(Neq(a1, a2)).η[M]
+    case MF.Eq(a1, a2) => a2.project match {
+      case Data(QData.Null) => IsNull(unwrap(a1)).embed.η[M]
+      case _                => rel(Eq(a1, a2)).η[M]
+    }
+    case MF.Neq(a1, a2) => a2.project match {
+      case Data(QData.Null) => IsNotNull(unwrap(a1)).embed.η[M]
+      case _                => rel(Neq(a1, a2)).η[M]
+    }
     case MF.Lt(a1, a2) =>
       rel(Lt(a1, a2)).η[M]
     case MF.Lte(a1, a2) =>
@@ -355,8 +355,9 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
     // structural
     case MF.MakeArray(a1) =>
       Arr(List(a1)).embed.η[M]
-    case MF.MakeMap(a1, a2) => a2 ∘ {
-      case _: Select[T[N1QL]] => genId[T, M] ∘ (id1 =>
+    case MF.MakeMap(a1, a2) =>
+      genId[T, M] ∘ (id1 => selectOrElse(
+        a2,
         Select(
           Value(true),
           ResultExpr(
@@ -369,9 +370,8 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed)
-      case _ => Obj(Map(a1 -> a2)).embed.η[M]
-    }
+          orderBy = Nil).embed,
+      Obj(Map(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
       IfNull(
         ConcatStr(a1, a2).embed,
@@ -393,32 +393,30 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
       ).embed.η[M]
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[M]
-    case MF.ProjectField(a1, a2) => a1 ∘ {
-      case _: Select[T[N1QL]] => genId[T, M] ∘ (id =>
+    case MF.ProjectField(a1, a2) =>
+      genId[T, M] ∘ (id1 => selectOrElse(
+        a1,
         Select(
           Value(true),
-          ResultExpr(SelectField(id.embed, a2).embed, none).wrapNel,
-          Keyspace(a1, id.some).some,
+          ResultExpr(SelectField(id1.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id1.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed)
-      case _ =>
-        SelectField(a1, a2).embed.η[M]
-    }
-    case MF.ProjectIndex(a1, a2) => a1 ∘ {
-      case _: Select[T[N1QL]] => genId[T, M] ∘ (id =>
+          orderBy = Nil).embed,
+        SelectField(a1, a2).embed))
+    case MF.ProjectIndex(a1, a2) =>
+      genId[T, M] ∘ (id1 => selectOrElse(
+        a1,
         Select(
           Value(true),
-          ResultExpr(SelectElem(id.embed, a2).embed, none).wrapNel,
-          Keyspace(a1, id.some).some,
+          ResultExpr(SelectElem(id1.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id1.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed)
-      case _ =>
-        SelectElem(a1, a2).embed.η[M]
-    }
+          orderBy = Nil).embed,
+        SelectElem(a1, a2).embed))
     case MF.DeleteField(a1, a2) =>
       ObjRemove(a1, a2).embed.η[M]
 
@@ -445,7 +443,7 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
       def isArr(n: T[N1QL]): T[N1QL] = IsArr(n).embed
       def isObj(n: T[N1QL]): T[N1QL] = IsObj(n).embed
 
-      (cont, typ) match {
+      (cont.project, typ) match {
         case (_: Select[T[N1QL]], _: QType.FlexArr) => grdSel(isArr)
         case (_: Select[T[N1QL]], _: QType.Obj)     => grdSel(isObj)
         case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).η[M]
@@ -453,5 +451,4 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
         case _                                      => cont.η[M]
       }
   }
-
 }

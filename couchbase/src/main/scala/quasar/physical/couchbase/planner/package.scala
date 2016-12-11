@@ -22,15 +22,31 @@ import quasar.Planner.{InternalError, PlannerError}
 import quasar.common.PhaseResultT
 import quasar.connector.PlannerErrT
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
 package object planner {
-  import N1QL.Id
+  import N1QL.{Id, Select}, Select.{Value, ResultExpr}
 
   type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
 
   def genId[T[_[_]], F[_]: Functor: NameGenerator]: F[Id[T[N1QL]]] =
     NameGenerator[F].prefixedName("_") ∘ (Id(_))
+
+  def selectOrElse[T[_[_]]: Recursive](
+    a: T[N1QL], whenSelect: T[N1QL], otherwise: T[N1QL]
+  ): T[N1QL] =
+    a.project match {
+      case _: Select[T[N1QL]] => whenSelect
+      case _                  => otherwise
+    }
+
+  def wrapSelect[T[_[_]]: Recursive: Corecursive](a: T[N1QL]): T[N1QL] =
+    selectOrElse[T](
+      a, a,
+      Select(
+        Value(true), ResultExpr(a, none).wrapNel, keyspace = none,
+        unnest = none, filter = none, groupBy = none, orderBy = Nil).embed)
 
   def unimplemented[A](name: String): PlannerError \/ A =
     InternalError.fromMsg(s"unimplemented $name").left

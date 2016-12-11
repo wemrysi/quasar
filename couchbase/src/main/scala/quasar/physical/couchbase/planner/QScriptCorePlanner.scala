@@ -62,30 +62,14 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
       for {
         id1 <- genId[T, M]
         ff  <- processFreeMap(f, id1)
-      } yield {
-        val ks = src.project match {
-          case _: Select[T[N1QL]] =>
-            src
-          case _ =>
-            Select(
-              Value(true),
-              ResultExpr(src, none).wrapNel,
-              keyspace = none,
-              unnest   = none,
-              filter   = none,
-              groupBy  = none,
-              orderBy  = Nil).embed
-        }
-
-        Select(
-          Value(true),
-          ResultExpr(ff, none).wrapNel,
-          Keyspace(ks, id1.some).some,
-          unnest  = none,
-          filter  = none,
-          groupBy = none,
-          orderBy = Nil).embed
-      }
+      } yield Select(
+        Value(true),
+        ResultExpr(ff, none).wrapNel,
+        Keyspace(wrapSelect(src), id1.some).some,
+        unnest  = none,
+        filter  = none,
+        groupBy = none,
+        orderBy = Nil).embed
 
     case LeftShift(src, struct, id, repair) =>
       for {
@@ -121,7 +105,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
                      Select(
                        Value(true),
                        ResultExpr(id2.embed, none).wrapNel,
-                       Keyspace(src, id1.some).some,
+                       Keyspace(wrapSelect(src), id1.some).some,
                        Unnest(u, id2.some).some,
                        filter  = none,
                        groupBy = none,
@@ -212,15 +196,7 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
     }
 
     case qscript.Unreferenced() =>
-      Select(
-        Value(true),
-        ResultExpr(Arr[T[N1QL]](Nil).embed, none).wrapNel,
-        keyspace = none,
-        unnest   = none,
-        filter   = none,
-        groupBy  = none,
-        orderBy  = Nil
-      ).embed.η[M]
+      wrapSelect(Arr[T[N1QL]](Nil).embed).η[M]
   }
 
   def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
