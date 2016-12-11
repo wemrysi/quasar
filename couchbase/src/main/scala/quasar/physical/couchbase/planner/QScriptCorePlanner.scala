@@ -117,6 +117,8 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
     case qscript.Reduce(src, bucket, reducers, repair) =>
       for {
         id1 <- genId[T, M]
+        id2 <- genId[T, M]
+        id3 <- genId[T, M]
         b   <- processFreeMap(bucket, id1)
         red =  reducers.map(
                  _.traverse(
@@ -124,14 +126,25 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
                  ).flatMap(reduceFuncPlanner[T, F].plan)
                )
         rep <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
-      } yield Select(
-        Value(true),
-        ResultExpr(rep, none).wrapNel,
-        Keyspace(src, id1.some).some,
-        unnest = none,
-        filter = none,
-        GroupBy(b).some,
-        orderBy = Nil).embed
+      } yield {
+        val s = Select(
+          Value(false),
+          ResultExpr(rep, id2.some).wrapNel,
+          Keyspace(src, id1.some).some,
+          unnest = none,
+          filter = none,
+          GroupBy(b).some,
+          orderBy = Nil).embed
+
+        Select(
+          Value(true),
+          ResultExpr(id2.embed, none).wrapNel,
+          Keyspace(s, id3.some).some,
+          unnest = none,
+          Filter(IsNotNull(id2.embed).embed).some,
+          groupBy = none,
+          orderBy = Nil).embed
+      }
 
     case qscript.Sort(src, bucket, order) =>
       for {
