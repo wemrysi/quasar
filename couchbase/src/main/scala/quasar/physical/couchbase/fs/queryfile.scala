@@ -17,7 +17,7 @@
 package quasar.physical.couchbase.fs
 
 import quasar.Predef._
-import quasar.{Data, DataCodec}
+import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
@@ -29,8 +29,7 @@ import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.couchbase._, common._, planner._
-import quasar.physical.couchbase.RenderQuery.ops._
+import quasar.physical.couchbase._, common._, planner._, Planner._
 import quasar.Planner.PlannerError
 import quasar.qscript.{Read => _, _}
 import quasar.RenderTree.ops._
@@ -51,22 +50,17 @@ object queryfile {
 
   type Plan[S[_], A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
 
-  type CBQScript[A] = (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
-
   implicit class LiftF[F[_]: Monad, A](p: F[A]) {
     val liftF = p.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
 
   implicit class LiftFE[A](d: FileSystemError \/ A) {
-    def liftFE[S[_]]: Plan[S, A] = EitherT(d.point[Free[S, ?]].liftM[PhaseResultT])
+    def liftFE[S[_]]: Plan[S, A] = EitherT(d.η[Free[S, ?]].liftM[PhaseResultT])
   }
 
   implicit class liftPE[A](d: PlannerError \/ A) {
     def liftPE[S[_]]: Plan[S, A] = d.leftMap(FileSystemError.qscriptPlanningFailed(_)).liftFE
   }
-
-  val rewrite = new Rewrite[Fix]
-  val C = Coalesce[Fix, CBQScript, CBQScript]
 
   implicit val codec = CBDataCodec
 
@@ -90,8 +84,8 @@ object queryfile {
     case FileExists(file)     => fileExists(file)
   }
 
-  def executePlan[S[_]](
-    lp: Fix[LogicalPlan], out: AFile
+  def executePlan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+    lp: T[LogicalPlan], out: AFile
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
@@ -99,13 +93,13 @@ object queryfile {
     S3: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ AFile)] =
     (for {
-      n1ql   <- lpToN1ql(lp)
+      n1ql   <- lpToN1ql[T, S](lp)
       r      <- n1qlResults(n1ql)
       bktCol <- bucketCollectionFromPath(out).liftFE
       rObj   <- EitherT(r.traverse(d => DataCodec.render(d).bimap(
                   err => FileSystemError.writeFailed(d, err.shows),
                   str => jsonTranscoder.stringToJsonObject(str))
-                ).point[PhaseResultT[Free[S, ?], ?]])
+                ).η[PhaseResultT[Free[S, ?], ?]])
       docs   <- rObj.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
@@ -129,8 +123,8 @@ object queryfile {
                 ))).into.liftF
     } yield out).run.run
 
-  def evaluatePlan[S[_]](
-    lp: Fix[LogicalPlan]
+  def evaluatePlan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+    lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
@@ -138,7 +132,7 @@ object queryfile {
     results: KeyValueStore.Ops[ResultHandle, Cursor, S]
   ): Free[S, (PhaseResults, FileSystemError \/ ResultHandle)] =
     (for {
-      n1ql <- lpToN1ql(lp)
+      n1ql <- lpToN1ql[T, S](lp)
       r    <- n1qlResults(n1ql)
       i    <- MonotonicSeq.Ops[S].next.liftF
       h    =  ResultHandle(i)
@@ -152,7 +146,7 @@ object queryfile {
   ): Free[S, FileSystemError \/ Vector[Data]] =
     (for {
       h <- results.get(handle).toRight(FileSystemError.unknownResultHandle(handle))
-      r <- resultsFromCursor(h).point[FileSystemErrT[Free[S, ?], ?]]
+      r <- resultsFromCursor(h).η[FileSystemErrT[Free[S, ?], ?]]
       _ <- results.put(handle, r._1).liftM[FileSystemErrT]
     } yield r._2).run
 
@@ -163,14 +157,14 @@ object queryfile {
   ): Free[S, Unit] =
     results.delete(handle)
 
-  def explain[S[_]](
-    lp: Fix[LogicalPlan]
+  def explain[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+    lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    ((lpToN1ql(lp) >>= (_.compact.liftPE)) ∘ (ExecutionPlan(FsType, _))).run.run
+    ((lpToN1ql[T, S](lp) >>= (RenderQuery.compact(_).liftPE)) ∘ (ExecutionPlan(FsType, _))).run.run
 
   def listContents[S[_]](
     dir: APath
@@ -191,13 +185,13 @@ object queryfile {
   ): Free[S, Boolean] =
     (for {
       ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
+      bktCol <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
       exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
     } yield exists).exists(ι)
 
-  def n1qlResults[S[_]](
-    n1ql: N1QLT[Fix]
+  def n1qlResults[T[_[_]]: Recursive: Corecursive, S[_]](
+    n1ql: T[N1QL]
   )(implicit
     S0: Task :<: S,
     context: Read.Ops[Context, S]
@@ -207,7 +201,7 @@ object queryfile {
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
                  )).into.liftF
-      q       <- n1ql.compact.map(n1qlQuery).liftPE
+      q       <- RenderQuery.compact(n1ql).map(n1qlQuery).liftPE
       r       <- EitherT(lift(Task.delay(
                    bkt.query(q)
                      .allRows
@@ -217,52 +211,52 @@ object queryfile {
                  )).into.liftM[PhaseResultT])
     } yield r
 
-  def lpToN1ql[S[_]](
-    lp: Fix[LogicalPlan]
+  def lpToN1ql[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+    lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, N1QLT[Fix]] = {
+  ): Plan[S, T[N1QL]] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
-    lpLcToN1ql(lp, lc)
+    lpLcToN1ql[T, S](lp, lc)
   }
 
-  def lpLcToN1ql[S[_]](
-    lp: Fix[LogicalPlan],
+  def lpLcToN1ql[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, S[_]](
+    lp: T[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, N1QLT[Fix]] = {
+  ): Plan[S, T[N1QL]] = {
+    type CBQS[A] = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
+    val rewrite = new Rewrite[T]
+    val C = Coalesce[T, CBQS, CBQS]
 
     for {
       _    <- tell(Vector(tree("lp", lp)))
-      qs   <- convertToQScriptRead[
-                Fix,
-                Plan[S, ?],
-                QScriptRead[Fix, ?]
-              ](lc)(lp)
+      qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
       shft =  shiftRead(qs).transCata(
-                SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
+                SimplifyJoin[T, QScriptShiftRead[T, ?], CBQS]
                   .simplifyJoin(idPrism.reverseGet))
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft
                 .transAna(
-                   repeatedly(C.coalesceQC[CBQScript](idPrism))     >>>
-                   repeatedly(C.coalesceEJ[CBQScript](idPrism.get)) >>>
-                   repeatedly(C.coalesceSR[CBQScript](idPrism))     >>>
-                   repeatedly(Normalizable[CBQScript].normalizeF(_: CBQScript[Fix[CBQScript]])))
+                   repeatedly(C.coalesceQC[CBQS](idPrism))     >>>
+                   repeatedly(C.coalesceEJ[CBQS](idPrism.get)) >>>
+                   repeatedly(C.coalesceSR[CBQS](idPrism))     >>>
+                   repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
                 .transCata(rewrite.optimize(reflNT))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- shft.cataM(
-                Planner[Fix, Free[S, ?], CBQScript].plan
-              ).leftMap(FileSystemError.planningFailed(lp, _))
-      q    <- n1ql.compact.liftPE
+                Planner[T, Free[S, ?], CBQS].plan
+              ).leftMap(FileSystemError.qscriptPlanningFailed(_))
+      q    <- RenderQuery.compact(n1ql).liftPE
       _    <- tell(Vector(detail("N1QL AST", n1ql.render.shows)))
       _    <- tell(Vector(detail("N1QL", q)))
     } yield n1ql
@@ -288,13 +282,13 @@ object queryfile {
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
     (for {
       ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(dir).point[Free[S, ?]])
+      bktCol <- EitherT(bucketCollectionFromPath(dir).η[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
       types  <- lift(docTypesFromPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
       _      <- EitherT((
                   if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
                   else ().right
-                ).point[Free[S, ?]])
+                ).η[Free[S, ?]])
     } yield pathSegmentsFromPrefixTypes(bktCol.collection, types)).run
 
 }

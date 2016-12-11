@@ -22,8 +22,9 @@ import quasar.common.SortDir
 
 import scalaz._, NonEmptyList.nels, OneAnd.oneAnd
 
-sealed trait N1QL[A]
+sealed abstract class N1QL[A]
 
+// Overloading used for convenience constructors
 @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object N1QL extends N1QLInstances {
   import Select._, Case._

@@ -18,5 +18,4 @@ package quasar.physical.couchbase
 
 trait N1QLInstances
   extends N1QLTraverseInstance
-  with    N1QLRenderQueryInstance
   with    N1QLRenderTreeInstance

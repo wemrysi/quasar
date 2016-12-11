@@ -43,7 +43,6 @@ import scalaz.concurrent.Task
 
 class CouchbaseStdLibSpec extends StdLibSpec {
   import N1QL._, Select._
-  import RenderQuery.ops._
 
   implicit val codec = CBDataCodec
 
@@ -60,31 +59,27 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     ctx: Context
   ): Result = {
 
-    type N1QLF = N1QL[Fix[N1QL]]
+    def argN1ql(d: QData): M[Fix[N1QL]] = Data[Fix[N1QL]](d).embed.η[M]
 
-    def ↑[A](v: N1QL[A]): N1QL[A] = v
-
-    def argN1ql(d: QData): M[N1QLF] = ↑(Data(d)).point[M]
-
-    val q: M[N1QLF] =
+    val q: M[Fix[N1QL]] =
       freeCataM(fm)(interpretM(a => argN1ql(args(a)), mapFuncPlanner[Fix, F].plan))
 
     val r: FileSystemError \/ (String, Vector[QData]) =
       (for {
         qq <- q.leftMap(FileSystemError.qscriptPlanningFailed(_))
-        s  =  ↑(Select[Fix[N1QL]](
+        s  =  Select[Fix[N1QL]](
                 Value(false),
-                ResultExpr(qq.embed, Id("v").some).wrapNel,
+                ResultExpr(qq, Id("v").some).wrapNel,
                 keyspace = None,
                 unnest   = None,
                 filter   = None,
                 groupBy  = None,
-                orderBy  = Nil))
-        r  <- n1qlResults[Eff](s) ∘ (_ >>= {
+                orderBy  = Nil).embed
+        r  <- n1qlResults[Fix, Eff](s) ∘ (_ >>= {
                 case QData.Obj(v) => v.values.toVector
                 case v            => Vector(v)
               })
-        q  <- EitherT(s.compact.leftMap(
+        q  <- EitherT(RenderQuery.compact(s).leftMap(
                 FileSystemError.qscriptPlanningFailed(_)
               ).point[Free[Eff, ?]].liftM[PhaseResultT])
       } yield (q, r)).run.run.foldMap(

@@ -27,66 +27,64 @@ import quasar.physical.couchbase._, N1QL.{Id, Union, _}, Case._, Select.{Filter,
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript._
 
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, NonEmptyList.nels
 
 final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, QScriptCore[T, ?]] {
 
-  def int(i: Int) = Data[T[N1QL]](QData.Int(i))
+  def int(i: Int) = Data[T[N1QL]](QData.Int(i)).embed
 
-  def processFreeMapDefault(f: FreeMap[T], id: Id[T[N1QL]]): M[N1QLT[T]] =
-    freeCataM(f)(interpretM(
-      κ(id.ηM),
-      mapFuncPlanner[T, F].plan))
+  def processFreeMapDefault(f: FreeMap[T], id: Id[T[N1QL]]): M[T[N1QL]] =
+    freeCataM(f)(interpretM(κ(id.embed.η[M]), mapFuncPlanner[T, F].plan))
 
-  def processFreeMap(f: FreeMap[T], id: Id[T[N1QL]]): M[N1QLT[T]] =
+  def processFreeMap(f: FreeMap[T], id: Id[T[N1QL]]): M[T[N1QL]] =
     f.toCoEnv[T].project match {
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
           {
             case Embed(ejson.Common(ejson.Str(key))) =>
-              Data[T[N1QL]](QData.Str(key)).embed.point[M]
+              Data[T[N1QL]](QData.Str(key)).embed.η[M]
             case key =>
               EitherT(
                 InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
-                  .left[T[N1QL]].point[PR])
+                  .left[T[N1QL]].η[PR])
           },
           v => processFreeMapDefault(v.fromCoEnv, id)
-        )) ∘ (l => Obj(l.toMap ∘ (_.embed)))
+        )) ∘ (l => Obj(l.toMap).embed)
       case _ =>
         processFreeMapDefault(f, id)
     }
 
-  def plan: AlgebraM[M, QScriptCore[T, ?], N1QLT[T]] = {
+  def plan: AlgebraM[M, QScriptCore[T, ?], T[N1QL]] = {
     case qscript.Map(src, f) =>
       for {
         id1 <- genId[T, M]
         ff  <- processFreeMap(f, id1)
       } yield {
-        val ks: N1QLT[T] = src ∘ {
+        val ks = src.project match {
           case _: Select[T[N1QL]] =>
             src
           case _ =>
             Select(
               Value(true),
-              ResultExpr(src.embed, none).wrapNel,
+              ResultExpr(src, none).wrapNel,
               keyspace = none,
               unnest   = none,
               filter   = none,
               groupBy  = none,
-              orderBy  = Nil)
+              orderBy  = Nil).embed
         }
 
         Select(
           Value(true),
-          ResultExpr(ff.embed, none).wrapNel,
-          Keyspace(ks.embed, id1.some).some,
+          ResultExpr(ff, none).wrapNel,
+          Keyspace(ks, id1.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil)
+          orderBy = Nil).embed
       }
 
     case LeftShift(src, struct, id, repair) =>
@@ -95,39 +93,39 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
         id2 <- genId[T, M]
         id3 <- genId[T, M]
         s   <- freeCataM(struct)(interpretM(
-                 κ(id1.ηM),
+                 κ(id1.embed.η[M]),
                  mapFuncPlanner[T, F].plan))
-        sr  =  ArrRange(int(0).embed, LengthArr(s.embed).embed, none)
+        sr  =  ArrRange(int(0), LengthArr(s).embed, none)
         u   <- (id match {
                  case IdOnly =>
                    IfNull(
-                     ObjNames(s.embed).embed,
+                     ObjNames(s).embed,
                      sr.embed)
                  case IncludeId =>
                    Case(
-                     WhenThen(IsObj(s.embed).embed, s.embed)
+                     WhenThen(IsObj(s).embed, s)
                    )(
                      Else(ArrFor(
-                       expr   = Arr(List(id3.embed, SelectElem(s.embed, id3.embed).embed)).embed,
+                       expr   = Arr(List(id3.embed, SelectElem(s, id3.embed).embed)).embed,
                        `var`  = id3.embed,
                        inExpr = sr.embed).embed)
                    )
                  case ExcludeId =>
-                   IfNull(ObjValues(s.embed).embed, s.embed)
-               }).ηM
+                   IfNull(ObjValues(s).embed, s)
+               }).embed.η[M]
         r   <- freeCataM(repair)(interpretM(
                  {
                    case LeftSide  =>
-                     id1.ηM
+                     id1.embed.η[M]
                    case RightSide =>
                      Select(
                        Value(true),
                        ResultExpr(id2.embed, none).wrapNel,
-                       Keyspace(src.embed, id1.some).some,
-                       Unnest(u.embed, id2.some).some,
+                       Keyspace(src, id1.some).some,
+                       Unnest(u, id2.some).some,
                        filter  = none,
                        groupBy = none,
-                       orderBy = Nil).ηM
+                       orderBy = Nil).embed.η[M]
                  },
                  mapFuncPlanner[T, F].plan))
       } yield r
@@ -142,15 +140,14 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
                  ).flatMap(reduceFuncPlanner[T, F].plan)
                )
         rep <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
-        s   =  Select(
-                 Value(true),
-                 ResultExpr(rep.embed, none).wrapNel,
-                 Keyspace(src.embed, id1.some).some,
-                 unnest = none,
-                 filter = none,
-                 GroupBy(b.embed).some,
-                 orderBy = Nil)
-      } yield s
+      } yield Select(
+        Value(true),
+        ResultExpr(rep, none).wrapNel,
+        Keyspace(src, id1.some).some,
+        unnest = none,
+        filter = none,
+        GroupBy(b).some,
+        orderBy = Nil).embed
 
     case qscript.Sort(src, bucket, order) =>
       for {
@@ -159,24 +156,27 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
         id3 <- genId[T, M]
         b   <- processFreeMap(bucket, id1)
         o   <- order.traverse { case (or, d) =>
-                 (processFreeMap(or, id3) ∘ (a => OrderBy(a.embed, d)))
+                 (processFreeMap(or, id3) ∘ (OrderBy(_, d)))
                }
-        s   =  Select(
-                 Value(true),
-                 ResultExpr(ArrAgg(id1.embed).embed, none).wrapNel,
-                 Keyspace(src.embed, id1.some).some,
-                 unnest  = none,
-                 filter  = none,
-                 GroupBy(IfNull(b.embed, id1.embed).embed).some,
-                 orderBy = Nil)
-      } yield Select(
-        Value(true),
-        ResultExpr(id3.embed, none).wrapNel,
-        Keyspace(s.embed, id2.some).some,
-        Unnest(id2.embed, id3.some).some,
-        filter  = none,
-        groupBy = none,
-        orderBy = o.toList)
+      } yield {
+        val s =  Select(
+           Value(true),
+           ResultExpr(ArrAgg(id1.embed).embed, none).wrapNel,
+           Keyspace(src, id1.some).some,
+           unnest  = none,
+           filter  = none,
+           GroupBy(IfNull(b, id1.embed).embed).some,
+           orderBy = Nil).embed
+
+        Select(
+          Value(true),
+          ResultExpr(id3.embed, none).wrapNel,
+          Keyspace(s, id2.some).some,
+          Unnest(id2.embed, id3.some).some,
+          filter  = none,
+          groupBy = none,
+          orderBy = o.toList).embed
+      }
 
     case qscript.Filter(src, f) =>
       for {
@@ -185,25 +185,25 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
       } yield Select(
         Value(true),
         ResultExpr(id1.embed, none).wrapNel,
-        Keyspace(src.embed, id1.some).some,
+        Keyspace(src, id1.some).some,
         unnest  = none,
-        Filter(ff.embed).some,
+        Filter(ff).some,
         groupBy = none,
-        orderBy = Nil)
+        orderBy = Nil).embed
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
         idLB <- genId[T, M]
         idRB <- genId[T, M]
         lb   <- freeCataM(lBranch)(interpretM(
-                  κ(idLB.ηM),
+                  κ(idLB.embed.η[M]),
                   Planner[T, F, QScriptTotal[T, ?]].plan))
         rb   <- freeCataM(rBranch)(interpretM(
-                  κ(idRB.ηM),
+                  κ(idRB.embed.η[M]),
                   Planner[T, F, QScriptTotal[T, ?]].plan))
       } yield Union(
-        SelectField(src.embed, lb.embed).embed,
-        SelectField(src.embed, rb.embed).embed)
+        SelectField(src, lb).embed,
+        SelectField(src, rb).embed).embed
 
     case qscript.Subset(src, from, op, count) => op match {
       case Drop   => takeOrDrop(src, from, count.right)
@@ -220,10 +220,10 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
         filter   = none,
         groupBy  = none,
         orderBy  = Nil
-      ).ηM
+      ).embed.η[M]
   }
 
-  def takeOrDrop(src: N1QLT[T], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[N1QLT[T]] =
+  def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
     for {
       id1 <- genId[T, M]
       id2 <- genId[T, M]
@@ -231,42 +231,42 @@ final class QScriptCorePlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Mon
       id4 <- genId[T, M]
       id5 <- genId[T, M]
       f   <- freeCataM(from)(interpretM(
-               κ(id1.ηM),
+               κ(id1.embed.η[M]),
                Planner[T, F, QScriptTotal[T, ?]].plan))
       c   <- freeCataM(takeOrDrop.merge)(interpretM(
-               κ(id1.ηM),
+               κ(id1.embed.η[M]),
                Planner[T, F, QScriptTotal[T, ?]].plan))
     } yield {
       val s =
         Select(
           Value(false),
           nels(
-            ResultExpr(f.embed, id2.some),
-            ResultExpr(c.embed, id3.some)),
-          Keyspace(src.embed, id1.some).some,
+            ResultExpr(f, id2.some),
+            ResultExpr(c, id3.some)),
+          Keyspace(src, id1.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil)
+          orderBy = Nil).embed
 
-      val cnt = SelectElem(id3.embed, int(0).embed)
+      val cnt = SelectElem(id3.embed, int(0)).embed
 
       val slc =
         takeOrDrop.bimap(
            κ(Slice(
-             int(0).embed,
-             Least(LengthArr(id2.embed).embed, cnt.embed).embed.some)),
-           κ(Slice(cnt.embed, none))
-         ).merge
+             int(0),
+             Least(LengthArr(id2.embed).embed, cnt).embed.some)),
+           κ(Slice(cnt, none))
+         ).merge.embed
 
       Select(
         Value(true),
         ResultExpr(id5.embed, none).wrapNel,
-        Keyspace(s.embed, id4.some).some,
-        Unnest(SelectElem(id2.embed, slc.embed).embed, id5.some).some,
+        Keyspace(s, id4.some).some,
+        Unnest(SelectElem(id2.embed, slc).embed, id5.some).some,
         filter  = none,
         groupBy = none,
-        orderBy = Nil)
+        orderBy = Nil).embed
     }
 
 }

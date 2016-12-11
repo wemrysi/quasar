@@ -31,41 +31,41 @@ import scalaz._, Scalaz._
 final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, MapFunc[T, ?]] {
 
-  def str(s: String)   = Data[T[N1QL]](QData.Str(s))
-  def int(i: Int)      = Data[T[N1QL]](QData.Int(i))
-  def bool(b: Boolean) = Data[T[N1QL]](QData.Bool(b))
-  val na               = Data[T[N1QL]](QData.NA)
+  def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
+  def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
+  def bool(b: Boolean): T[N1QL] = Data[T[N1QL]](QData.Bool(b)).embed
+  val na: T[N1QL]               = Data[T[N1QL]](QData.NA).embed
 
-  def unwrap(a1: N1QLT[T]): N1QLT[T] =
+  def unwrap(a1: T[N1QL]): T[N1QL] =
     IfMissing(
-      SelectField(a1.embed, str(DateKey).embed).embed,
-      SelectField(a1.embed, str(TimeKey).embed).embed,
-      SelectField(a1.embed, str(TimestampKey).embed).embed,
-      a1.embed)
+      SelectField(a1, str(DateKey)).embed,
+      SelectField(a1, str(TimeKey)).embed,
+      SelectField(a1, str(TimestampKey)).embed,
+      a1).embed
 
-  def extract(a1: N1QLT[T], part: String): N1QLT[T] =
-    DatePartStr(unwrap(a1).embed, str(part).embed)
+  def extract(a1: T[N1QL], part: String): T[N1QL] =
+    DatePartStr(unwrap(a1), str(part)).embed
 
-  def rel(op: N1QLT[T]): N1QLT[T] = {
-    def handleDates(a1: T[N1QL], a2: T[N1QL], o: (T[N1QL], T[N1QL]) => N1QLT[T]): N1QLT[T] = {
-      val a1U = unwrap(a1.project).embed
-      val a2U = unwrap(a2.project).embed
+  def rel(op: N1QL[T[N1QL]]): T[N1QL] = {
+    def handleDates(a1: T[N1QL], a2: T[N1QL], o: (T[N1QL], T[N1QL]) => N1QL[T[N1QL]]): T[N1QL] = {
+      val a1U = unwrap(a1)
+      val a2U = unwrap(a2)
       Case(
         WhenThen(
           IsNotNull(IfMissing(
-            SelectField(a1, str(DateKey).embed).embed,
-            SelectField(a2, str(DateKey).embed).embed).embed).embed,
-          o(DateDiffStr(a1U, a2U, str("day").embed).embed, int(0).embed).embed),
+            SelectField(a1, str(DateKey)).embed,
+            SelectField(a2, str(DateKey)).embed).embed).embed,
+          o(DateDiffStr(a1U, a2U, str("day")).embed, int(0)).embed),
         WhenThen(
           IsNotNull(IfMissing(
-            SelectField(a1, str(TimeKey).embed).embed,
-            SelectField(a1, str(TimestampKey).embed).embed,
-            SelectField(a2, str(TimeKey).embed).embed,
-            SelectField(a2, str(TimestampKey).embed).embed).embed).embed,
-          o(DateDiffStr(a1U, a2U, str("millisecond").embed).embed, int(0).embed).embed)
+            SelectField(a1, str(TimeKey)).embed,
+            SelectField(a1, str(TimestampKey)).embed,
+            SelectField(a2, str(TimeKey)).embed,
+            SelectField(a2, str(TimestampKey)).embed).embed).embed,
+          o(DateDiffStr(a1U, a2U, str("millisecond")).embed, int(0)).embed)
       )(
         Else(o(a1, a2).embed)
-      )
+      ).embed
     }
 
     op match {
@@ -75,380 +75,382 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
       case Lte(a1, a2)             => handleDates(a1, a2, Lte(_, _))
       case Gt(a1, a2)              => handleDates(a1, a2, Gt(_, _))
       case Gte(a1, a2)             => handleDates(a1, a2, Gte(_, _))
-      case v                       => v
+      case v                       => v.embed
     }
   }
 
-  def datetime(a1: N1QLT[T], key: String, regex: Regex): N1QLT[T] =
+  def datetime(a1: T[N1QL], key: String, regex: Regex): T[N1QL] =
     Case(
       WhenThen(
-        IsNotNull(SelectField(a1.embed, str(key).embed).embed).embed,
-        a1.embed),
+        IsNotNull(SelectField(a1, str(key)).embed).embed,
+        a1),
       WhenThen(
-        RegexContains(a1.embed, str(regex.regex).embed).embed,
-        Obj(Map(str(key).embed -> a1.embed)).embed)
+        RegexContains(a1, str(regex.regex)).embed,
+        Obj(Map(str(key) -> a1)).embed)
     )(
       Else(Null[T[N1QL]].embed)
-    )
+    ).embed
 
-  def plan: AlgebraM[M, MapFunc[T, ?], N1QLT[T]] = {
+  def plan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] = {
     // nullary
     case MF.Constant(v) =>
-      Data[T[N1QL]](v.cataM(QData.fromEJson)).ηM
+      Data[T[N1QL]](v.cataM(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
-      Data[T[N1QL]](QData.NA).ηM
+      Data[T[N1QL]](QData.NA).embed.η[M]
 
     // array
     case MF.Length(a1) =>
       IfMissingOrNull(
-        Length(a1.embed).embed,
-        LengthArr(a1.embed).embed,
-        LengthObj(a1.embed).embed,
-        na.embed
-      ).ηM
+        Length(a1).embed,
+        LengthArr(a1).embed,
+        LengthObj(a1).embed,
+        na
+      ).embed.η[M]
 
     // date
     case MF.Date(a1) =>
-      datetime(a1, DateKey, dateRegex.r).ηM
+      datetime(a1, DateKey, dateRegex.r).η[M]
     case MF.Time(a1) =>
-      datetime(a1, TimeKey, timeRegex.r).ηM
+      datetime(a1, TimeKey, timeRegex.r).η[M]
     case MF.Timestamp(a1) =>
-      datetime(a1, TimestampKey, timestampRegex.r).ηM
+      datetime(a1, TimestampKey, timestampRegex.r).η[M]
     case MF.Interval(a1) =>
       unimplementedP("Interval")
     case MF.TimeOfDay(a1) =>
-      def fracZero(a1: N1QLT[T]): N1QLT[T] =
+      def fracZero(a1: T[N1QL]): T[N1QL] =
         Case(
           WhenThen(
-            RegexContains(a1.embed, str("[.]").embed).embed,
-            Time(a1.embed).embed),
+            RegexContains(a1, str("[.]")).embed,
+            Time(a1).embed),
           WhenThen(
-            IsNotNull(a1.embed).embed,
-            Time(ConcatStr(a1.embed, str(".000").embed).embed).embed)
+            IsNotNull(a1).embed,
+            Time(ConcatStr(a1, str(".000")).embed).embed)
         )(
-          Else(na.embed)
-        )
+          Else(na)
+        ).embed
 
-      def timeFromTS(a1: N1QLT[T]): N1QLT[T] =
+      def timeFromTS(a1: T[N1QL]): T[N1QL] =
         Time(SelectElem(
           Split(
             SelectElem(
-              Split(SelectField(a1.embed, str(TimestampKey).embed).embed,  str("T").embed).embed,
-              int(1).embed).embed,
-            str("Z").embed).embed,
-          int(0).embed).embed)
+              Split(SelectField(a1, str(TimestampKey)).embed,  str("T")).embed,
+              int(1)).embed,
+            str("Z")).embed,
+          int(0)).embed).embed
 
       Case(
-        WhenThen(SelectField(a1.embed, str(DateKey).embed).embed, na.embed),
-        WhenThen(SelectField(a1.embed, str(TimeKey).embed).embed, a1.embed),
-        WhenThen(SelectField(a1.embed, str(TimestampKey).embed).embed, timeFromTS(a1).embed)
+        WhenThen(SelectField(a1, str(DateKey)).embed, na),
+        WhenThen(SelectField(a1, str(TimeKey)).embed, a1),
+        WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
       )(
-        Else(fracZero(MillisToUTC(Millis(a1.embed).embed, str("00:00:00.000").embed.some)).embed)
-      ).ηM
+        Else(fracZero(MillisToUTC(Millis(a1).embed, str("00:00:00.000").some).embed))
+      ).embed.η[M]
     case MF.ToTimestamp(a1) =>
-      Timestamp(MillisToUTC(a1.embed, none).embed).ηM
+      Timestamp(MillisToUTC(a1, none).embed).embed.η[M]
     case MF.ExtractCentury(a1) =>
-      Ceil(Div(extract(a1, "year").embed, int(100).embed).embed).ηM
+      Ceil(Div(extract(a1, "year"), int(100)).embed).embed.η[M]
     case MF.ExtractDayOfMonth(a1) =>
-      extract(a1, "day").ηM
+      extract(a1, "day").η[M]
     case MF.ExtractDecade(a1)         =>
-      extract(a1, "decade").ηM
+      extract(a1, "decade").η[M]
     case MF.ExtractDayOfWeek(a1)      =>
-      extract(a1, "day_of_week").ηM
+      extract(a1, "day_of_week").η[M]
     case MF.ExtractDayOfYear(a1)      =>
-      extract(a1, "day_of_year").ηM
+      extract(a1, "day_of_year").η[M]
     case MF.ExtractEpoch(a1) =>
       Div(
         Millis(
           Case(
             WhenThen(
-              SelectField(a1.embed, str(DateKey).embed).embed,
+              SelectField(a1, str(DateKey)).embed,
               ConcatStr(
-                SelectField(a1.embed, str(DateKey).embed).embed,
-                str("T00:00:00.000Z").embed).embed),
+                SelectField(a1, str(DateKey)).embed,
+                str("T00:00:00.000Z")).embed),
             WhenThen(
-              SelectField(a1.embed, str(TimeKey).embed).embed,
-              na.embed)
+              SelectField(a1, str(TimeKey)).embed,
+              na)
           )(
             Else(IfMissing(
-              SelectField(a1.embed, str(TimestampKey).embed).embed,
-              a1.embed).embed)
+              SelectField(a1, str(TimestampKey)).embed,
+              a1).embed)
           ).embed
         ).embed,
-        int(1000).embed
-      ).ηM
+        int(1000)
+      ).embed.η[M]
     case MF.ExtractHour(a1) =>
-      extract(a1, "hour").ηM
+      extract(a1, "hour").η[M]
     case MF.ExtractIsoDayOfWeek(a1) =>
-      extract(a1, "iso_dow").ηM
+      extract(a1, "iso_dow").η[M]
     case MF.ExtractIsoYear(a1)        =>
-      extract(a1, "iso_year").ηM
+      extract(a1, "iso_year").η[M]
     case MF.ExtractMicroseconds(a1) =>
       Mult(
         Add(
-          Mult(extract(a1, "second").embed, int(1000).embed).embed,
-          extract(a1, "millisecond").embed).embed,
-        int(1000).embed
-      ).ηM
+          Mult(extract(a1, "second"), int(1000)).embed,
+          extract(a1, "millisecond")).embed,
+        int(1000)
+      ).embed.η[M]
     case MF.ExtractMillennium(a1) =>
-      Ceil(Div(extract(a1, "year").embed, int(1000).embed).embed).ηM
+      Ceil(Div(extract(a1, "year"), int(1000)).embed).embed.η[M]
     case MF.ExtractMilliseconds(a1) =>
       Add(
-        Mult(extract(a1, "second").embed, int(1000).embed).embed,
-        extract(a1, "millisecond").embed
-      ).ηM
+        Mult(extract(a1, "second"), int(1000)).embed,
+        extract(a1, "millisecond")
+      ).embed.η[M]
     case MF.ExtractMinute(a1) =>
-      extract(a1, "minute").ηM
+      extract(a1, "minute").η[M]
     case MF.ExtractMonth(a1) =>
-      extract(a1, "month").ηM
+      extract(a1, "month").η[M]
     case MF.ExtractQuarter(a1) =>
-      extract(a1, "quarter").ηM
+      extract(a1, "quarter").η[M]
     case MF.ExtractSecond(a1) =>
       Add(
-        extract(a1, "second").embed,
-        Div(extract(a1, "millisecond").embed, int(1000).embed).embed
-      ).ηM
+        extract(a1, "second"),
+        Div(extract(a1, "millisecond"), int(1000)).embed
+      ).embed.η[M]
     case MF.ExtractTimezone(a1) =>
-      extract(a1, "timezone").ηM
+      extract(a1, "timezone").η[M]
     case MF.ExtractTimezoneHour(a1) =>
-      extract(a1, "timezone_hour").ηM
+      extract(a1, "timezone_hour").η[M]
     case MF.ExtractTimezoneMinute(a1) =>
-      extract(a1, "timezone_minute").ηM
+      extract(a1, "timezone_minute").η[M]
     case MF.ExtractWeek(a1) =>
-      extract(a1, "iso_week").ηM
+      extract(a1, "iso_week").η[M]
     case MF.ExtractYear(a1) =>
-      extract(a1, "year").ηM
+      extract(a1, "year").η[M]
     case MF.Now() =>
-      NowStr[T[N1QL]].ηM
+      NowStr[T[N1QL]].embed.η[M]
 
     // math
     case MF.Negate(a1) =>
-      Neg(a1.embed).ηM
+      Neg(a1).embed.η[M]
     case MF.Add(a1, a2) =>
-      Add(a1.embed, a2.embed).ηM
+      Add(a1, a2).embed.η[M]
     case MF.Multiply(a1, a2) =>
-      Mult(a1.embed, a2.embed).ηM
+      Mult(a1, a2).embed.η[M]
     case MF.Subtract(a1, a2) =>
-      Sub(a1.embed, a2.embed).ηM
+      Sub(a1, a2).embed.η[M]
     case MF.Divide(a1, a2) =>
-      Div(a1.embed, a2.embed).ηM
+      Div(a1, a2).embed.η[M]
     case MF.Modulo(a1, a2) =>
-      Mod(a1.embed, a2.embed).ηM
+      Mod(a1, a2).embed.η[M]
     case MF.Power(a1, a2) =>
-      Pow(a1.embed, a2.embed).ηM
+      Pow(a1, a2).embed.η[M]
 
     // relations
     case MF.Not(a1) =>
-      Not(a1.embed).ηM
+      Not(a1).embed.η[M]
     case MF.Eq(a1, Data(QData.Null)) =>
-      IsNull(unwrap(a1).embed).ηM
+      IsNull(unwrap(a1)).embed.η[M]
     case MF.Eq(a1, a2) =>
-      rel(Eq(a1.embed, a2.embed)).ηM
+      rel(Eq(a1, a2)).η[M]
     case MF.Neq(a1, Data(QData.Null)) =>
-      IsNotNull(unwrap(a1).embed).ηM
+      IsNotNull(unwrap(a1)).embed.η[M]
     case MF.Neq(a1, a2) =>
-      rel(Neq(a1.embed, a2.embed)).ηM
+      rel(Neq(a1, a2)).η[M]
     case MF.Lt(a1, a2) =>
-      rel(Lt(a1.embed, a2.embed)).ηM
+      rel(Lt(a1, a2)).η[M]
     case MF.Lte(a1, a2) =>
-      rel(Lte(a1.embed, a2.embed)).ηM
+      rel(Lte(a1, a2)).η[M]
     case MF.Gt(a1, a2) =>
-      rel(Gt(a1.embed, a2.embed)).ηM
+      rel(Gt(a1, a2)).η[M]
     case MF.Gte(a1, a2) =>
-      rel(Gte(a1.embed, a2.embed)).ηM
+      rel(Gte(a1, a2)).η[M]
     case MF.IfUndefined(a1, a2) =>
-      IfMissing(a1.embed, a2.embed).ηM
+      IfMissing(a1, a2).embed.η[M]
     case MF.And(a1, a2) =>
-      And(a1.embed, a2.embed).ηM
+      And(a1, a2).embed.η[M]
     case MF.Or(a1, a2) =>
-      Or(a1.embed, a2.embed).ηM
+      Or(a1, a2).embed.η[M]
     case MF.Between(a1, a2, a3) =>
-      And(rel(Gte(a1.embed, a2.embed)).embed, rel(Lte(a1.embed, a3.embed)).embed).ηM
+      And(rel(Gte(a1, a2)), rel(Lte(a1, a3))).embed.η[M]
     case MF.Cond(cond, then_, else_) =>
       Case(
-        WhenThen(cond.embed, then_.embed)
+        WhenThen(cond, then_)
       )(
-        Else(else_.embed)
-      ).ηM
+        Else(else_)
+      ).embed.η[M]
 
     // set
     case MF.Within(a1, a2) =>
-      ArrContains(a2.embed, a1.embed).ηM
+      ArrContains(a2, a1).embed.η[M]
 
     // string
     case MF.Lower(a1) =>
-      Lower(a1.embed).ηM
+      Lower(a1).embed.η[M]
     case MF.Upper(a1) =>
-      Upper(a1.embed).ηM
+      Upper(a1).embed.η[M]
     case MF.Bool(a1) =>
       Case(
         WhenThen(
-          Eq(Lower(a1.embed).embed, str("true").embed).embed,
-          bool(true).embed),
+          Eq(Lower(a1).embed, str("true")).embed,
+          bool(true)),
         WhenThen(
-          Eq(Lower(a1.embed).embed, str("false").embed).embed,
-          bool(false).embed)
+          Eq(Lower(a1).embed, str("false")).embed,
+          bool(false))
       )(
-        Else(na.embed)
-      ).ηM
+        Else(na)
+      ).embed.η[M]
     // TODO: Handle large numbers across the board. Couchbase's number type truncates.
     case MF.Integer(a1) =>
       Case(
         WhenThen(
           Eq(
-            ToNumber(a1.embed).embed,
-            Floor(ToNumber(a1.embed).embed).embed).embed,
-          ToNumber(a1.embed).embed)
+            ToNumber(a1).embed,
+            Floor(ToNumber(a1).embed).embed).embed,
+          ToNumber(a1).embed)
       )(
-        Else(na.embed)
-      ).ηM
+        Else(na)
+      ).embed.η[M]
     case MF.Decimal(a1) =>
-      ToNumber(a1.embed).ηM
+      ToNumber(a1).embed.η[M]
     case MF.Null(a1) =>
       Case(
         WhenThen(
-          Eq(Lower(a1.embed).embed, str("null").embed).embed,
+          Eq(Lower(a1).embed, str("null")).embed,
           Null[T[N1QL]].embed)
       )(
-        Else(na.embed)
-      ).ηM
+        Else(na)
+      ).embed.η[M]
     case MF.ToString(a1) =>
       IfNull(
-        ToString(a1.embed).embed,
-        unwrap(a1).embed,
+        ToString(a1).embed,
+        unwrap(a1),
         Case(
           WhenThen(
-            Eq(Type(a1.embed).embed, str("null").embed).embed ,
-            str("null").embed)
+            Eq(Type(a1).embed, str("null")).embed ,
+            str("null"))
         )(
-          Else(a1.embed)
+          Else(a1)
         ).embed
-      ).ηM
+      ).embed.η[M]
     case MF.Search(a1, a2, a3)    =>
       Case(
         WhenThen(
-          a3.embed,
-          RegexContains(a1.embed, ConcatStr(str("(?i)(?s)").embed, a2.embed).embed).embed)
+          a3,
+          RegexContains(a1, ConcatStr(str("(?i)(?s)"), a2).embed).embed)
       )(
-        Else(RegexContains(a1.embed, ConcatStr(str("(?s)").embed, a2.embed).embed).embed)
-      ).ηM
+        Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
+      ).embed.η[M]
     case MF.Substring(a1, a2, a3) =>
       Case(
         WhenThen(
-          Lt(a2.embed, int(0).embed).embed,
-          str("").embed),
+          Lt(a2, int(0)).embed,
+          str("")),
         WhenThen(
-          Lt(a3.embed, int(0).embed).embed,
+          Lt(a3, int(0)).embed,
           IfNull(
-            Substr(a1.embed, a2.embed, None).embed,
-            str("").embed).embed)
+            Substr(a1, a2, None).embed,
+            str("")).embed)
       )(
         Else(IfNull(
           Substr(
-            a1.embed,
-            a2.embed,
-            Least(a3.embed, Sub(Length(a1.embed).embed, a2.embed).embed).embed.some
+            a1,
+            a2,
+            Least(a3, Sub(Length(a1).embed, a2).embed).embed.some
           ).embed,
-          str("").embed).embed)
-      ).ηM
+          str("")).embed)
+      ).embed.η[M]
 
     // structural
     case MF.MakeArray(a1) =>
-      Arr(List(a1.embed)).ηM
-    case MF.MakeMap(a1, a2: Select[T[N1QL]]) =>
-      genId[T, M] ∘ (id1 =>
+      Arr(List(a1)).embed.η[M]
+    case MF.MakeMap(a1, a2) => a2 ∘ {
+      case _: Select[T[N1QL]] => genId[T, M] ∘ (id1 =>
         Select(
           Value(true),
           ResultExpr(
             Obj(Map(
-              ToString(a1.embed).embed -> IfNull(id1.embed, na.embed).embed
+              ToString(a1).embed -> IfNull(id1.embed, na).embed
             )).embed,
             none
           ).wrapNel,
-          Keyspace(a2.embed, id1.some).some,
+          Keyspace(a2, id1.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil))
-    case MF.MakeMap(a1, a2) =>
-      Obj(Map(a1.embed -> a2.embed)).ηM
+          orderBy = Nil).embed)
+      case _ => Obj(Map(a1 -> a2)).embed.η[M]
+    }
     case MF.ConcatArrays(a1, a2) =>
       IfNull(
-        ConcatStr(a1.embed, a2.embed).embed,
+        ConcatStr(a1, a2).embed,
         ConcatArr(
           Case(
             WhenThen(
-              IsString(a1.embed).embed,
-              Split(a1.embed, str("").embed).embed)
+              IsString(a1).embed,
+              Split(a1, str("")).embed)
           )(
-            Else(a1.embed)
+            Else(a1)
           ).embed,
           Case(
             WhenThen(
-              IsString(a2.embed).embed,
-              Split(a2.embed, str("").embed).embed)
+              IsString(a2).embed,
+              Split(a2, str("")).embed)
           )(
-            Else(a2.embed)
+            Else(a2)
           ).embed).embed
-      ).ηM
+      ).embed.η[M]
     case MF.ConcatMaps(a1, a2) =>
-      ConcatObj(a1.embed, a2.embed).ηM
-    case MF.ProjectField(a1: Select[T[N1QL]], a2) =>
-      genId[T, M] ∘ (id =>
+      ConcatObj(a1, a2).embed.η[M]
+    case MF.ProjectField(a1, a2) => a1 ∘ {
+      case _: Select[T[N1QL]] => genId[T, M] ∘ (id =>
         Select(
           Value(true),
-          ResultExpr(SelectField(id.embed, a2.embed).embed, none).wrapNel,
-          Keyspace(a1.embed, id.some).some,
+          ResultExpr(SelectField(id.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil))
-    case MF.ProjectField(a1, a2) =>
-      SelectField(a1.embed, a2.embed).ηM
-    case MF.ProjectIndex(a1: Select[T[N1QL]], a2) =>
-      genId[T, M] ∘ (id =>
+          orderBy = Nil).embed)
+      case _ =>
+        SelectField(a1, a2).embed.η[M]
+    }
+    case MF.ProjectIndex(a1, a2) => a1 ∘ {
+      case _: Select[T[N1QL]] => genId[T, M] ∘ (id =>
         Select(
           Value(true),
-          ResultExpr(SelectElem(id.embed, a2.embed).embed, none).wrapNel,
-          Keyspace(a1.embed, id.some).some,
+          ResultExpr(SelectElem(id.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id.some).some,
           unnest  = none,
           filter  = none,
           groupBy = none,
-          orderBy = Nil))
-    case MF.ProjectIndex(a1, a2) =>
-      SelectElem(a1.embed, a2.embed).ηM
+          orderBy = Nil).embed)
+      case _ =>
+        SelectElem(a1, a2).embed.η[M]
+    }
     case MF.DeleteField(a1, a2) =>
-      ObjRemove(a1.embed, a2.embed).ηM
+      ObjRemove(a1, a2).embed.η[M]
 
     // helpers & QScript-specific
     case MF.Range(a1, a2) =>
-      Slice(a2.embed, Add(a1.embed, int(1).embed).embed.some).ηM
+      Slice(a2, Add(a1, int(1)).embed.some).embed.η[M]
     case MF.Guard(expr, typ, cont, _) =>
-      def grd(f: N1QLT[T] => N1QLT[T], e: N1QLT[T], c: N1QLT[T]): N1QLT[T] =
+      def grd(f: T[N1QL] => T[N1QL], e: T[N1QL], c: T[N1QL]): T[N1QL] =
         Case(
-          WhenThen(f(e).embed, c.embed))(
-          Else(na.embed))
+          WhenThen(f(e), c))(
+          Else(na)).embed
 
-      def grdSel(f: N1QLT[T] => N1QLT[T]): M[N1QLT[T]] =
+      def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
         genId[T, M] ∘ (id =>
           Select(
             Value(true),
-            ResultExpr(grd(f, id, id).embed, none).wrapNel,
-            Keyspace(cont.embed, id.some).some,
+            ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
+            Keyspace(cont, id.some).some,
             unnest  = none,
             filter  = none,
             groupBy = none,
-            orderBy = Nil))
+            orderBy = Nil).embed)
 
-      def isArr(n: N1QLT[T]): N1QLT[T] = IsArr(n.embed)
-      def isObj(n: N1QLT[T]): N1QLT[T] = IsObj(n.embed)
+      def isArr(n: T[N1QL]): T[N1QL] = IsArr(n).embed
+      def isObj(n: T[N1QL]): T[N1QL] = IsObj(n).embed
 
       (cont, typ) match {
         case (_: Select[T[N1QL]], _: QType.FlexArr) => grdSel(isArr)
         case (_: Select[T[N1QL]], _: QType.Obj)     => grdSel(isObj)
-        case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).point[M]
-        case (_                 , _: QType.Obj)     => grd(isObj, expr, cont).point[M]
-        case _                                      => cont.point[M]
+        case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).η[M]
+        case (_                 , _: QType.Obj)     => grd(isObj, expr, cont).η[M]
+        case _                                      => cont.η[M]
       }
   }
 

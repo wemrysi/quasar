@@ -26,15 +26,17 @@ import scalaz._, Scalaz._
 
 final class ReduceFuncPlanner[T[_[_]]: Corecursive, F[_]: Monad] extends Planner[T, F, ReduceFunc] {
 
-  def plan: AlgebraM[M, ReduceFunc, N1QLT[T]] = {
-    case RF.Arbitrary(a1)      => Min(a1.embed).ηM
-    case RF.Avg(a1)            => Avg(a1.embed).ηM
-    case RF.Count(a1)          => Count(a1.embed).ηM
-    case RF.Max(a1)            => Max(a1.embed).ηM
-    case RF.Min(a1)            => Min(a1.embed).ηM
-    case RF.Sum(a1)            => Sum(a1.embed).ηM
-    case RF.UnshiftArray(a1)   => ArrAgg(a1.embed).ηM
-    case RF.UnshiftMap(a1, a2) => Obj(Map(a1.embed -> a2.embed)).ηM
+  def plan: AlgebraM[M, ReduceFunc, T[N1QL]] = planʹ >>> (_.embed.η[M])
+
+  val planʹ: AlgebraicTransform[T, ReduceFunc, N1QL] = {
+    case RF.Arbitrary(a1)      => Min(a1)
+    case RF.Avg(a1)            => Avg(a1)
+    case RF.Count(a1)          => Count(a1)
+    case RF.Max(a1)            => Max(a1)
+    case RF.Min(a1)            => Min(a1)
+    case RF.Sum(a1)            => Sum(a1)
+    case RF.UnshiftArray(a1)   => ArrAgg(a1)
+    case RF.UnshiftMap(a1, a2) => Obj(Map(a1 -> a2))
   }
 
 }

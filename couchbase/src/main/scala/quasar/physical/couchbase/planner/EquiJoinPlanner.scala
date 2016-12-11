@@ -34,7 +34,7 @@ import scalaz._
 final class EquiJoinPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: NameGenerator]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
-  def plan: AlgebraM[M, EquiJoin[T, ?], N1QLT[T]] = {
+  def plan: AlgebraM[M, EquiJoin[T, ?], T[N1QL]] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, f, combine) => unimplementedP("EquiJoin")
   }
 }

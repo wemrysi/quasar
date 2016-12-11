@@ -26,7 +26,6 @@ import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.couchbase.fs.queryfile._
-import quasar.physical.couchbase.RenderQuery.ops._
 import quasar.physical.couchbase.planner._, Planner._
 import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
 import quasar.sql.CompilerHelpers
@@ -56,13 +55,13 @@ class BasicQueryEnablementSpec
 
   def lc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
     Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName("beer-sample").right))
-      .transform(λ[Id ~> Plan[S, ?]](_.point[Plan[S, ?]]))
+      .transform(λ[Id ~> Plan[S, ?]](_.η[Plan[S, ?]]))
       .run
 
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Eff](compileLogicalPlan(sql2), lc) >>= (_.compact.liftPE))
+    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), lc) >>= (RenderQuery.compact(_).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
@@ -70,7 +69,7 @@ class BasicQueryEnablementSpec
 
   def n1qlFromQS(qs: Fix[QST]): String =
     (qs.cataM(Planner[Fix, Free[MonotonicSeq, ?], QST].plan) >>= (n1ql =>
-      EitherT(n1ql.compact.point[Free[MonotonicSeq, ?]].liftM[PhaseResultT])
+      EitherT(RenderQuery.compact(n1ql).η[Free[MonotonicSeq, ?]].liftM[PhaseResultT])
     )).run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync

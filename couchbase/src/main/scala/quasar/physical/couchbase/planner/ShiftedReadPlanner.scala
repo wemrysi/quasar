@@ -33,34 +33,33 @@ final class ShiftedReadPlanner[T[_[_]]: Corecursive, F[_]: Monad: NameGenerator]
   def str(v: String) = Data[T[N1QL]](QData.Str(v))
   def id(v: String)  = Id[T[N1QL]](v)
 
-  val plan: AlgebraM[M, Const[ShiftedRead, ?], N1QLT[T]] = {
+  val plan: AlgebraM[M, Const[ShiftedRead, ?], T[N1QL]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       (genId[T, M] ⊛
        EitherT(
          BucketCollection.fromPath(absFile)
-           .leftMap[PlannerError](PlanPathError(_)).point[F].liftM[PhaseResultT])
+           .leftMap[PlannerError](PlanPathError(_)).η[F].liftM[PhaseResultT])
       ) { (gId, bc) =>
         val v =
           IfMissing(
             SelectField(gId.embed, str("value").embed).embed,
-            gId.embed)
+            gId.embed).embed
         val mId = SelectField(Meta(gId.embed).embed, str("id").embed)
-        val r: N1QLT[T] =
-          idStatus match {
-            case IdOnly    => gId
-            case IncludeId => Arr(List(gId.embed, v.embed))
-            case ExcludeId => v
-          }
+        val r = idStatus match {
+          case IdOnly    => gId.embed
+          case IncludeId => Arr(List(gId.embed, v)).embed
+          case ExcludeId => v
+        }
         Select(
           Value(true),
-          ResultExpr(r.embed, none).wrapNel,
+          ResultExpr(r, none).wrapNel,
           Keyspace(id(bc.bucket).embed, gId.some).some,
           unnest  = none,
           filter  = bc.collection.nonEmpty.option(
                       Eq(id("type").embed, str(bc.collection).embed).embed
                     ) ∘ (Filter(_)),
           groupBy = none,
-          orderBy = Nil)
+          orderBy = Nil).embed
       }
   }
 

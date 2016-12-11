@@ -36,6 +36,6 @@ package object planner {
     InternalError.fromMsg(s"unimplemented $name").left
 
   def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
-    EitherT(unimplemented[A](name).point[PhaseResultT[F, ?]])
+    EitherT(unimplemented[A](name).η[PhaseResultT[F, ?]])
 
 }

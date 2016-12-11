@@ -23,17 +23,13 @@ import quasar.physical.couchbase._
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
 abstract class Planner[T[_[_]], F[_], QS[_]] {
   type M[A]  = CBPhaseLog[F, A]
   type PR[A] = PhaseResultT[F, A]
 
-  implicit class PointM(v: N1QLT[T])(implicit M: Applicative[M]) {
-    def ηM: M[N1QLT[T]] = v.η[M]
-  }
-
-  def plan: AlgebraM[M, QS, N1QLT[T]]
+  def plan: AlgebraM[M, QS, T[N1QL]]
 }
 
 object Planner {
@@ -43,7 +39,7 @@ object Planner {
     implicit F: Planner[T, N, F], G: Planner[T, N, G]
   ): Planner[T, N, Coproduct[F, G, ?]] =
     new Planner[T, N, Coproduct[F, G, ?]] {
-      val plan: AlgebraM[M, Coproduct[F, G, ?], N1QLT[T]] =
+      val plan: AlgebraM[M, Coproduct[F, G, ?], T[N1QL]] =
         _.run.fold(F.plan, G.plan)
     }
 
