@@ -235,7 +235,7 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]
+  def normalize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Show]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     repeatedly(rewrite[T, A]) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => coMapFuncR[T, A](Constant(const).right)))
@@ -243,7 +243,7 @@ object MapFunc {
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def rewrite[T[_[_]]: Recursive: Corecursive: EqualT, A]:
+  def rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
