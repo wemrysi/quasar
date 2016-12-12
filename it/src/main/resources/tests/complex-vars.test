@@ -2,7 +2,9 @@
   "name": "variable with a non-trivial value",
 
   "backends": {
-    "postgresql": "pending"
+    "postgresql": "pending",
+    "spark_local": "pending",
+    "spark_hdfs": "pending"
   },
 
   "data": "days.data",

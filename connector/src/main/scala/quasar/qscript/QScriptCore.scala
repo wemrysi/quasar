@@ -122,12 +122,17 @@ object ReduceIndex {
 /** Eliminates some values from a dataset, based on the result of `f` (which
   * must evaluate to a boolean value for each element in the set).
   */
-@Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
+@Lenses final case class Filter[T[_[_]], A](
+  src: A,
+  f: FreeMap[T])
     extends QScriptCore[T, A]
 
 /** Chooses a subset of values from a dataset, given a count. */
-@Lenses final case class Subset[T[_[_]], A]
-  (src: A, from: FreeQS[T], op: SelectionOp, count: FreeQS[T])
+@Lenses final case class Subset[T[_[_]], A](
+  src: A,
+  from: FreeQS[T],
+  op: SelectionOp,
+  count: FreeQS[T])
     extends QScriptCore[T, A]
 
 /** A placeholder value that can appear in plans, but will never be referenced

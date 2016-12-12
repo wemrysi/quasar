@@ -45,6 +45,12 @@ class LogicalPlanR[T[_[_]]: Recursive: Corecursive] {
   def constant(data: Data) = lp.constant[T[LP]](data).embed
   def invoke[N <: Nat](func: GenericFunc[N], values: Func.Input[T[LP], N]) =
     Invoke(func, values).embed
+  def invoke1(func: GenericFunc[nat._1], v1: T[LP]) =
+    invoke[nat._1](func, Func.Input1(v1))
+  def invoke2(func: GenericFunc[nat._2], v1: T[LP], v2: T[LP]) =
+    invoke[nat._2](func, Func.Input2(v1, v2))
+  def invoke3(func: GenericFunc[nat._3], v1: T[LP], v2: T[LP], v3: T[LP]) =
+    invoke[nat._3](func, Func.Input3(v1, v2, v3))
   def free(name: Symbol) = lp.free[T[LP]](name).embed
   def let(name: Symbol, form: T[LP], in: T[LP]) =
     lp.let(name, form, in).embed

@@ -127,6 +127,16 @@ object ejson {
       ) default fn.False
     })
 
+  // ejson:many-to-array($items as item()*) as item()*
+  def manyToArray[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.declare("many-to-array") flatMap (_(
+      $("items") as ST.Top
+    ).as(ST.Top) { items: XQuery =>
+      seqToArray_[F](items) map { arr =>
+        if_(fn.count(items) gt 1.xqy) then_ arr else_ items
+      }
+    })
+
   // ejson:make-array($name as xs:QName, $elements as element(ejson:array-element)*) as element()
   def mkArray[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("make-array").qn[F] |@| arrayEltN.qn |@| typeAttrN.xs) { (fname, aelt, tpexs) =>

@@ -110,6 +110,8 @@ object queryfile {
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftP
+      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into[S].liftP
+      _      <- lift(exists.whenM(deleteHavingPrefix(bkt, bktCol.collection))).into[S].liftP
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable
                     .from(docs)
@@ -237,9 +239,7 @@ object queryfile {
                 QScriptRead[Fix, ?]
               ](lc)(lp)
       _    <- tell(Vector(tree("QS post convertToQScriptRead", qs)))
-      shft =  shiftRead(qs).transCata(
-                SimplifyJoin[Fix, QScriptShiftRead[Fix, ?], CBQScript]
-                  .simplifyJoin(idPrism.reverseGet))
+      shft =  simplifyRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], CBQScript].apply(qs)
       _    <- tell(Vector(tree("QS post shiftRead", shft)))
       opz  =  shft
                 .transAna(

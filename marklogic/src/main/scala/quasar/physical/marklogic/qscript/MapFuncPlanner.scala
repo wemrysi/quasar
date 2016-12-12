@@ -135,7 +135,7 @@ object MapFuncPlanner {
     case ProjectIndex(arr, idx)       => ejson.arrayElementAt[F] apply (arr, idx + 1.xqy)
 
     case ProjectField(src, field)     =>
-      field match {
+      val prj = field match {
         case XQuery.Step(_) =>
           (src `/` field).point[F]
 
@@ -148,6 +148,8 @@ object MapFuncPlanner {
 
         case _ => qscript.projectField[F] apply (src, xs.QName(field))
       }
+
+      prj flatMap (ejson.manyToArray[F] apply _)
 
     case DeleteField(src, field)      =>
       qscript.deleteField[F] apply (src, field)

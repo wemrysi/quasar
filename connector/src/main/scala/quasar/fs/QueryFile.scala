@@ -77,11 +77,12 @@ object QueryFile {
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
     (implicit
-      CI:  Coalesce.Aux[T, IQS, IQS],
+      CI: Coalesce.Aux[T, IQS, IQS],
+      CQ: Coalesce.Aux[T, QS, QS],
       SP: SimplifyProjection.Aux[IQS, QS],
-      CQ:  Coalesce.Aux[T, QS, QS],
-      QC:  QScriptCore[T, ?] :<: QS,
-      TJ:    ThetaJoin[T, ?] :<: QS,
+      PA: PruneArrays[QS],
+      QC: QScriptCore[T, ?] :<: QS,
+      TJ:   ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val rewrite = new Rewrite[T]
@@ -92,6 +93,7 @@ object QueryFile {
       //       repeatedly until unchanged.
       .transAna(rewrite.normalize)
       .transAna(rewrite.normalize)
+      .pruneArrays
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -113,6 +115,7 @@ object QueryFile {
     (lp: T[LogicalPlan])
     (implicit
       CQ:  Coalesce.Aux[T, QS, QS],
+      PA: PruneArrays[QS],
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
@@ -140,6 +143,7 @@ object QueryFile {
       merr: MonadError[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
+      PA: PruneArrays[QS],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
@@ -174,8 +178,9 @@ object QueryFile {
     }
   }
 
-  /** The result of the query is stored in an output file
-    * instead of being returned to the user immediately.
+  /** The result of the query is stored in an output file, overwriting any existing
+    * contents, instead of being returned to the user immediately.
+    *
     * The `LogicalPlan` is expected to only contain absolute paths even though
     * that is unfortunately not expressed in the types currently.
     */
@@ -244,6 +249,9 @@ object QueryFile {
 
     /** Returns the path to the result of executing the given `LogicalPlan`,
       * using the provided path if possible.
+      *
+      * If the given file path exists, it will be overwritten with the results
+      * from the query.
       *
       * Execution of certain plans may return a result file other than the
       * requested file if it is more efficient to do so (i.e. to avoid copying

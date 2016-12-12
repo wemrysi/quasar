@@ -3,7 +3,9 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

@@ -4,7 +4,9 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "../zips.data",
     "query": "select * from `../zips` where pop < loc[1] limit 10",
