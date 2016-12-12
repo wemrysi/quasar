@@ -16,27 +16,39 @@
 
 package quasar
 
-import quasar.Predef.Boolean
-
-import scala.Predef.implicitly
-
-import java.lang.String
-
+import quasar.Predef._
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import monocle.Prism
 import scalaz._
+import jawn._
 
 package object ejson {
   def str[A] = Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
 
   /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
     */
-  type Json[A] = Coproduct[Obj, Common, A]
-
+  type Json[A]  = Coproduct[Obj, Common, A]
   type EJson[A] = Coproduct[Extension, Common, A]
 
   val ExtEJson = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
+
+  val fixParser    = jsonParser[Fix]
+  val fixParserSeq = fixParser async AsyncParser.ValueStream
+
+  def jawnParser[A](implicit z: Facade[A]): SupportParser[A] =
+    new SupportParser[A] { implicit val facade: Facade[A] = z }
+
+  def jawnParserSeq[A](implicit z: Facade[A]): AsyncParser[A] =
+    jawnParser[A] async AsyncParser.ValueStream
+
+  def jsonParser[T[_[_]]: Corecursive]: SupportParser[T[Json]] =
+    jawnParser(jsonFacade[T, Json])
+
+  def readJson[A: Facade](in: JsonInput): Try[A]            = JsonInput.readOneFrom(jawnParser[A], in)
+  def readJsonSeq[A: Facade](in: JsonInput): Try[Vector[A]] = JsonInput.readSeqFrom(jawnParser[A], in)
+  def readJsonFix(in: JsonInput): Try[Fix[Json]]            = JsonInput.readOneFrom(fixParser, in)
+  def readJsonFixSeq(in: JsonInput): Try[Vector[Fix[Json]]] = JsonInput.readSeqFrom(fixParser, in)
 
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =

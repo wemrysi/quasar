@@ -26,6 +26,7 @@ import quasar.physical.marklogic.xml.SecureXML
 import scala.collection.JavaConverters._
 import scala.util.{Success, Failure}
 import scala.xml.Elem
+import matryoshka.Recursive.ops._
 
 import com.marklogic.xcc.types._
 import java.time._
@@ -106,8 +107,8 @@ object xdmitem {
     Data._binary(ImmutableArray.fromArray(bytes)).point[F]
 
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
-    Data.jsonParser.parseFromString(jsonString) match {
-      case Success(d) => d.point[F]
+    quasar.ejson.readJsonFix(jsonString) match {
+      case Success(d) => (d cata Data.fromJson).point[F]
       case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
     }
 
