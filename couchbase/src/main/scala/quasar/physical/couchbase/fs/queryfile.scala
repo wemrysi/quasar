@@ -241,9 +241,7 @@ object queryfile {
       _    <- tell(Vector(tree("lp", lp)))
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
-      shft =  shiftRead(qs).transCata(
-                SimplifyJoin[T, QScriptShiftRead[T, ?], CBQS]
-                  .simplifyJoin(idPrism.reverseGet))
+      shft =  simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS].apply(qs)
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft
                 .transAna(
