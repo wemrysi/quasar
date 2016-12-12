@@ -19,7 +19,6 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.common.PhaseResult.detail
-import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._, N1QL._
@@ -27,6 +26,9 @@ import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 // Join document by field that is not a primary key?
@@ -36,7 +38,7 @@ import scalaz._, Scalaz._
 // When falling back to Map/Reduce can quickly arrive at "error (reduction too large)"
 // ╰─ https://github.com/couchbase/couchstore/search?utf8=%E2%9C%93&q=MAX_REDUCTION_SIZE
 
-final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
+final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: BirecursiveT: ShowT]
   extends Planner[F, EquiJoin[T, ?]] {
 
   def plan: AlgebraM[M, EquiJoin[T, ?], N1QL] = {
@@ -44,19 +46,19 @@ final class EquiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Core
     (for {
       tmpName <- genName[M]
       sN1ql   =  n1ql(src)
-      lbN1ql  <- freeCataM(lBranch)(interpretM(
+      lbN1ql  <- lBranch.cataM(interpretM(
                    κ(partialQueryString(tmpName).point[M]),
                    Planner[F, QScriptTotal[T, ?]].plan))
-      rbN1ql  <- freeCataM(rBranch)(interpretM(
+      rbN1ql  <- rBranch.cataM(interpretM(
                    κ(partialQueryString(tmpName).point[M]),
                    Planner[F, QScriptTotal[T, ?]].plan))
-      lkN1ql  <- freeCataM(lKey)(interpretM(
+      lkN1ql  <- lKey.cataM(interpretM(
                    i => partialQueryString(i.shows).point[M],
                    mapFuncPlanner[F, T].plan))
-      rkN1ql  <- freeCataM(rKey)(interpretM(
+      rkN1ql  <- rKey.cataM(interpretM(
                    i => partialQueryString(i.shows).point[M],
                    mapFuncPlanner[F, T].plan))
-      cN1ql   <- freeCataM(combine)(interpretM(
+      cN1ql   <- combine.cataM(interpretM(
                    i => partialQueryString(i.shows).point[M],
                    mapFuncPlanner[F, T].plan))
       _       <- prtell[M](Vector(detail(

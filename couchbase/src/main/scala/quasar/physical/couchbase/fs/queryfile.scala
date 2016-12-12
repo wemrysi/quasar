@@ -21,7 +21,6 @@ import quasar.{Data, DataCodec}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
-import quasar.contrib.matryoshka._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, eitherT._
@@ -37,7 +36,9 @@ import scala.collection.JavaConverters._
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
-import matryoshka._, FunctorT.ops._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import rx.lang.scala._, JavaConverters._
 import scalaz._, Scalaz._
@@ -241,15 +242,14 @@ object queryfile {
       _    <- tell(Vector(tree("QS post convertToQScriptRead", qs)))
       shft =  simplifyRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], CBQScript].apply(qs)
       _    <- tell(Vector(tree("QS post shiftRead", shft)))
-      opz  =  shft
-                .transAna(
-                   repeatedly(C.coalesceQC[CBQScript](idPrism))     >>>
-                   repeatedly(C.coalesceEJ[CBQScript](idPrism.get)) >>>
-                   repeatedly(C.coalesceSR[CBQScript](idPrism))     >>>
-                   repeatedly(Normalizable[CBQScript].normalizeF(_: CBQScript[Fix[CBQScript]])))
-                .transCata(rewrite.optimize(reflNT))
+      opz  =  shft.transHylo(
+                rewrite.optimize(reflNT[CBQScript]),
+                repeatedly(C.coalesceQC[CBQScript](idPrism))       >>>
+                  repeatedly(C.coalesceEJ[CBQScript](idPrism.get)) >>>
+                  repeatedly(C.coalesceSR[CBQScript](idPrism))     >>>
+                  repeatedly(Normalizable[CBQScript].normalizeF(_: CBQScript[Fix[CBQScript]])))
       _    <- tell(Vector(tree("QScript (Optimized)", opz)))
-      n1ql <- shft.cataM(
+      n1ql <- opz.cataM(
                 Planner[Free[S, ?], CBQScript].plan
               ).leftMap(FileSystemError.planningFailed(lp, _))
       q    =  outerN1ql(n1ql)

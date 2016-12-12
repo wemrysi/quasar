@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.NameGenerator
 import quasar.Planner.InternalError
 import quasar.common.{PhaseResult, SortDir}, PhaseResult.detail
-import quasar.contrib.matryoshka._
 import quasar.ejson
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
@@ -28,19 +27,22 @@ import quasar.physical.couchbase._, N1QL._, Select._
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript.{Map => _, Read => _, _}
 
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz.{ToIdOps => _, _}
 
-final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
+final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: BirecursiveT: ShowT]
   extends Planner[F, QScriptCore[T, ?]] {
 
   def processFreeMapDefault(f: FreeMap[T], tmpName: String): M[N1QL] =
-    freeCataM(f)(interpretM(
+    f.cataM(interpretM(
       κ(partialQueryString(tmpName).point[M]),
       mapFuncPlanner[F, T].plan))
 
   def processFreeMap(f: FreeMap[T], tmpName: String): M[N1QL] =
-    f.toCoEnv[T].project match {
+    f.project match {
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           {
@@ -51,7 +53,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                 InternalError.fromMsg(s"Unsupported object key: ${key.shows}")
                   .left[String].point[PR])
           },
-          v => processFreeMapDefault(v.fromCoEnv, tmpName)
+          v => processFreeMapDefault(v, tmpName)
         )) ∘ (m =>
           partialQueryString(m.map { case (k, v) => s""""$k": ${n1ql(v)}""" }.mkString("{", ", ", "}"))
         )
@@ -92,7 +94,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
       for {
         n1    <- genName[M]
         n2    <- genName[M]
-        s     <- freeCataM(struct)(interpretM(
+        s     <- struct.cataM(interpretM(
                    κ(partialQueryString(n1).point[M]),
                    mapFuncPlanner[F, T].plan))
         sN1ql =  n1ql(s)
@@ -105,7 +107,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                    case ExcludeId =>
                      s"ifnull(object_values($sN1ql), $sN1ql)"
                  }
-        r     <- freeCataM(repair)(interpretM(
+        r     <- repair.cataM(interpretM(
                    {
                      case LeftSide  =>
                        partialQueryString(n1).point[M]
@@ -139,7 +141,7 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
                        red => processFreeMap(red, tmpName)
                      ).flatMap(reduceFuncPlanner[F].plan)
                    )
-        rep     <- freeCataM(repair)(interpretM(i => red(i.idx), mapFuncPlanner[F, T].plan))
+        rep     <- repair.cataM(interpretM(i => red(i.idx), mapFuncPlanner[F, T].plan))
         repN1ql =  n1ql(rep)
         bN1ql   =  n1ql(b)
         s       =  select(
@@ -215,10 +217,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
       for {
         tmpNameLB <- genName[M]
         tmpNameRB <- genName[M]
-        lb        <- freeCataM(lBranch)(interpretM(
+        lb        <- lBranch.cataM(interpretM(
                        κ(partialQueryString(tmpNameLB).point[M]),
                        Planner[F, QScriptTotal[T, ?]].plan))
-        rb        <- freeCataM(rBranch)(interpretM(
+        rb        <- rBranch.cataM(interpretM(
                        κ(partialQueryString(tmpNameRB).point[M]),
                        Planner[F, QScriptTotal[T, ?]].plan))
         srcN1ql   =  n1ql(src)
@@ -250,10 +252,10 @@ final class QScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: C
       tmpName3 <- genName[M]
       tmpName4 <- genName[M]
       tmpName5 <- genName[M]
-      f        <- freeCataM(from)(interpretM(
+      f        <- from.cataM(interpretM(
                     κ(partialQueryString(tmpName1).point[M]),
                     Planner[F, QScriptTotal[T, ?]].plan))
-      c        <- freeCataM(takeOrDrop.merge)(interpretM(
+      c        <- takeOrDrop.merge.cataM(interpretM(
                     κ(partialQueryString(tmpName1).point[M]),
                     Planner[F, QScriptTotal[T, ?]].plan))
       sN1ql    =  n1ql(src)

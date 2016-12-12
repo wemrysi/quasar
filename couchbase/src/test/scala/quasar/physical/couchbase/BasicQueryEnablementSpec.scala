@@ -31,7 +31,9 @@ import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
 import quasar.sql.CompilerHelpers
 
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute.Pending
 import org.specs2.specification.core.Fragment
 import pathy.Path._
@@ -92,7 +94,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value _4 from (select value _2[_1[0]:] from (select value (select value {"name": _5.["name"]} from (select value ifmissing(v.`value`, v) from `beer-sample` v) as _5) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _6 = (select value []))) as _3 unnest ifnull(_3, { "$na": null }) _4) as v""")
+      """select value v from (select value {"name": _6.["name"]} from (select value _4 from (select value _2[_1[0]:] from (select value (select value ifmissing(v.`value`, v) from `beer-sample` v) from (select value (select value [])) as _0) as _2 let _1 = (select value 1 let _5 = (select value []))) as _3 unnest ifnull(_3, { "$na": null }) _4) as _6) as v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
@@ -112,7 +114,7 @@ class BasicQueryEnablementSpec
     "read followed by a map" in {
       // select (a + b) from foo
       val qs =
-        chain[Fix, QST](
+        chain[Fix[QST], QST](
           SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
           QCT.inj(qscript.Map((),
             Free.roll(Add(

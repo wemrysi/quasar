@@ -19,13 +19,12 @@ package quasar.jscore
 import quasar.Predef._
 import quasar.javascript.Js
 
-import matryoshka._
+import matryoshka.data._
 
-final case class fixpoint[T[_[_]]: Corecursive]() {
-  type R = T[JsCoreF]
-
+final case class fixpoint[R](embed: JsCoreF[R] => R) {
+  // FIXME: Delete this!
   @inline private implicit def convert(x: JsCoreF[R]): R =
-    x.embed
+    embed(x)
 
   def Literal(value: Js.Lit): R                          = LiteralF[R](value)
   def Ident(value: Name): R                              = IdentF[R](value)

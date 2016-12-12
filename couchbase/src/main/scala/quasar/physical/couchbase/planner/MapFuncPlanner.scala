@@ -21,7 +21,6 @@ import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
 import quasar.{NameGenerator, Type}
 import quasar.Planner.{NonRepresentableEJson, PlannerError}
 import quasar.common.PhaseResult.detail
-import quasar.contrib.matryoshka._
 import quasar.fp._, eitherT._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._, N1QL._, Select._
@@ -29,10 +28,11 @@ import quasar.physical.couchbase.common.CBDataCodec
 import quasar.qscript, qscript.{Map => _, _}
 import quasar.std.StdLib.string._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz.{ToIdOps => _, _}
 
-final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: RecursiveT: ShowT]
   extends Planner[F, MapFunc[T, ?]] {
   import MapFuncs._
 
@@ -93,12 +93,11 @@ final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT
   def plan: AlgebraM[M, MapFunc[T, ?], N1QL] = {
     // nullary
     case Constant(v) =>
-      EitherT(v.cataM(quasar.Data.fromEJson) >>= (d =>
-        DataCodec.render(d).bimap(
+      EitherT(
+        DataCodec.render(v.cata(quasar.Data.fromEJson)).bimap(
           κ(NonRepresentableEJson(v.shows): PlannerError),
           partialQueryString(_)
-        ).point[PR]
-      ))
+        ).point[PR])
     case Undefined() =>
       partialQueryString("null").point[M]
 

@@ -19,7 +19,6 @@ package quasar.physical.couchbase
 import quasar.Predef._
 import quasar.{Data, DataCodec, TestConfig}
 import quasar.common.PhaseResultT
-import quasar.contrib.matryoshka.{freeCataM, interpretM}
 import quasar.effect.{MonotonicSeq, Read}
 import quasar.fp.free._
 import quasar.fp.reflNT
@@ -36,7 +35,9 @@ import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
 
-import matryoshka.Fix
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import matryoshka.patterns._
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.specs2.execute.Result
@@ -66,7 +67,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       ).point[F].liftM[PhaseResultT])
 
     val q: M[N1QL] =
-      freeCataM(fm)(interpretM(a => argN1ql(args(a)), mapFuncPlanner[F, Fix].plan))
+      fm.cataM(interpretM(a => argN1ql(args(a)), mapFuncPlanner[F, Fix].plan))
 
     val r: FileSystemError \/ (String, Vector[Data]) =
       (

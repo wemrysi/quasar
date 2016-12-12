@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
-import quasar.contrib.matryoshka.ShowT
 import quasar.physical.couchbase._
 import quasar.qscript._
 
@@ -55,19 +54,19 @@ object Planner {
     : Planner[F, Const[ShiftedRead, ?]] =
     new ShiftedReadPlanner[F]
 
-  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
+  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: BirecursiveT: ShowT]
     : Planner[F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[F, T]
 
-  def mapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  def mapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: RecursiveT: ShowT]
     : Planner[F, MapFunc[T, ?]] =
     new MapFuncPlanner[F, T]
 
-  implicit def projectBucketPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def projectBucketPlanner[F[_]: Monad: NameGenerator, T[_[_]]: RecursiveT: ShowT]
     : Planner[F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
+  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: BirecursiveT: ShowT]
     : Planner[F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[F, T]
 
@@ -75,7 +74,7 @@ object Planner {
     : Planner[F, ReduceFunc] =
     new ReduceFuncPlanner[F]
 
-  implicit def thetaJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
+  implicit def thetaJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: RecursiveT: ShowT]
     : Planner[F, ThetaJoin[T, ?]] =
     new UnreachablePlanner[F, ThetaJoin[T, ?]]
 

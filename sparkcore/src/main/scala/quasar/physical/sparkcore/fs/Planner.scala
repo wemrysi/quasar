@@ -19,7 +19,6 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar._, quasar.Planner._
 import quasar.common.SortDir
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski._
 import quasar.qscript._
@@ -32,6 +31,9 @@ import SOrdering.Implicits._
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import simulacrum.typeclass
@@ -122,7 +124,7 @@ object Planner {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
+  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]:
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
       type IT[G[_]] = T[G]
@@ -141,8 +143,8 @@ object Planner {
         val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
         val srcState = src.point[SparkState]
 
-        val fromState: SparkState[RDD[Data]] = freeCataM(from)(interpretM(κ(srcState), algebraM))
-        val countState: SparkState[RDD[Data]] = freeCataM(count)(interpretM(κ(srcState), algebraM))
+        val fromState: SparkState[RDD[Data]] = from.cataM(interpretM(κ(srcState), algebraM))
+        val countState: SparkState[RDD[Data]] = count.cataM(interpretM(κ(srcState), algebraM))
 
         val countEval: SparkState[Long] = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
           case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
@@ -197,13 +199,13 @@ object Planner {
             EitherT {
               val maybeFunc =
                 // TODO extract to a single method for compile-time efficiency
-                freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+                f.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
               maybeFunc.map(df => (sc, src.map(df))).point[Task]
             }
           )
         case Reduce(src, bucket, reducers, repair) =>
           val maybePartitioner: PlannerError \/ (Data => Data) =
-            freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+            bucket.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
 
           val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
             case Count(a) => a >>> {
@@ -227,13 +229,13 @@ object Planner {
           }
 
           val maybeTransformers: PlannerError \/ List[Data => Data] =
-            reducers.traverse(red => (red.traverse(freeCataM(_: FreeMap[T])(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)))).map(extractFunc))
+            reducers.traverse(red => (red.traverse(_.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)))).map(extractFunc))
 
           val reducersFuncs: List[(Data,Data) => Data] =
             reducers.map(reduceData)
 
           val maybeRepair: PlannerError \/ (Data => Data) =
-            freeCataM(repair)(interpretM({
+            repair.cataM(interpretM({
               case ReduceIndex(i) => ((x: Data) => x match {
                 case Data.Arr(elems) => elems(i)
                 case _ => Data.NA
@@ -268,11 +270,11 @@ object Planner {
           val maybeSortBys: PlannerError \/ NonEmptyList[(Data => Data, SortDir)] =
             orders.traverse {
               case (freemap, sdir) =>
-                freeCataM(freemap)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
+                freemap.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map((_, sdir))
             }
 
           val maybeBucket =
-            freeCataM(bucket)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+            bucket.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
 
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
@@ -285,7 +287,7 @@ object Planner {
           StateT((sc: SparkContext) =>
             EitherT {
               val maybeFunc =
-                freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+                f.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
               maybeFunc.map(df => (sc, src.filter{
                 df >>> {
                   case Data.Bool(b) => b
@@ -306,11 +308,11 @@ object Planner {
         case LeftShift(src, struct, id, repair) =>
 
           val structFunc: PlannerError \/ (Data => Data) =
-            freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+            struct.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
 
           def repairFunc: PlannerError \/ ((Data, Data) => Data) = {
             val dd: PlannerError \/ (Data => Data) =
-              freeCataM(repair)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
+              repair.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
                 case LeftSide => ((x: Data) => x match {
                   case Data.Arr(elems) => elems(0)
                   case _ => Data.NA
@@ -344,8 +346,8 @@ object Planner {
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
 
-          (freeCataM(lBranch)(interpretM(κ(srcState), algebraM)) ⊛
-            freeCataM(rBranch)(interpretM(κ(srcState), algebraM)))(_ ++ _)
+          (lBranch.cataM(interpretM(κ(srcState), algebraM)) ⊛
+            rBranch.cataM(interpretM(κ(srcState), algebraM)))(_ ++ _)
         case Unreferenced() =>
           StateT((sc: SparkContext) => {
             EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Task])
@@ -353,7 +355,7 @@ object Planner {
       }
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
+  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]:
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
@@ -362,10 +364,10 @@ object Planner {
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[SparkState]
 
-          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = EitherT(freeCataM(kf)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).liftM[SparkStateT]
-          
+          def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = EitherT(kf.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).liftM[SparkStateT]
+
           val merger: SparkState[Data => Data] = 
-            EitherT((freeCataM(combine)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
+            EitherT((combine.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
               case LeftSide => ((x: Data) => x match {
                 case Data.Arr(elems) => elems(0)
                 case _ => Data.NA
@@ -379,8 +381,8 @@ object Planner {
           for {
             lk <- genKey(lKey)
             rk <- genKey(rKey)
-            lRdd <- freeCataM(lBranch)(interpretM(κ(srcState), algebraM))
-            rRdd <- freeCataM(rBranch)(interpretM(κ(srcState), algebraM))
+            lRdd <- lBranch.cataM(interpretM(κ(srcState), algebraM))
+            rRdd <- rBranch.cataM(interpretM(κ(srcState), algebraM))
             merge <- merger
           } yield {
             val klRdd = lRdd.map(d => (lk(d), d))
@@ -408,8 +410,8 @@ object Planner {
           }
       }
     }
-  
-  implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
+
+  implicit def coproduct[T[_[_]]: RecursiveT: ShowT, F[_], G[_]](
     implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
       Planner.Aux[T, Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
