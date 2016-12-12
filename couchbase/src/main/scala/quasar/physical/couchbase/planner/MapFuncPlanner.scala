@@ -420,6 +420,9 @@ final class MapFuncPlanner[T[_[_]]: Recursive: Corecursive: ShowT, F[_]: Monad: 
     case MF.DeleteField(a1, a2) =>
       ObjRemove(a1, a2).embed.η[M]
 
+    case Meta(a1) =>
+      partialQueryString(s"meta(${n1ql(a1)})").point[M]
+
     // helpers & QScript-specific
     case MF.Range(a1, a2) =>
       Slice(a2, Add(a1, int(1)).embed.some).embed.η[M]
