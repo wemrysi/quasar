@@ -131,9 +131,9 @@ object xdmitem {
       } getOrElse d
 
     elem flatMap (e => OptionT(data.decodeXml[F]({
-      case n: Elem => singletonValue(xml.toData(n)).point[F]
+      case n: Elem => singletonValue(xml.toEJsonData(n)).point[F]
       case other   => noReprError[F, Data](other.toString)
-    })(e)) getOrElse xml.toData(e))
+    })(e)) getOrElse xml.toEJsonData(e))
   }
 
   private def noReprError[F[_]: MonadErrMsgs, A](form: String): F[A] =

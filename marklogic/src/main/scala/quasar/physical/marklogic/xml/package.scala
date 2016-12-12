@@ -28,6 +28,13 @@ package object xml {
 
   final case class KeywordConfig(attributesKeyName: String, textKeyName: String)
 
+  object KeywordConfig {
+    val ejsonCompliant =
+      KeywordConfig(
+        attributesKeyName = "_xml.attributes",
+        textKeyName       = "_xml.text")
+  }
+
   import Data._
 
   /** Example
@@ -84,7 +91,9 @@ package object xml {
     Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
 
-  def toData(elem: Elem): Data = toData(elem, KeywordConfig(attributesKeyName = "_attributes", textKeyName = "_text"))
+  /** Converts the given element to `Data` using EJson-compliant synthetic keys. */
+  def toEJsonData(elem: Elem): Data =
+    toData(elem, KeywordConfig.ejsonCompliant)
 
   def elements(nodes: Seq[Node]): Seq[Elem] =
     nodes.collect { case e: Elem => e }
