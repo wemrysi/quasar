@@ -75,6 +75,19 @@ object ejson {
       }
     }
 
+  // ejson:attributes($elt as element()) as element()
+  def attributes[F[_]: PrologW]: F[FunctionDecl1] =
+    ejs.declare("attributes") flatMap (_(
+      $("elt") as ST("element()")
+    ).as(ST("element()")) { (elt: XQuery) =>
+      val a       = $("a")
+      val entries = renameOrWrap[F] apply (fn.nodeName(~a), fn.data(~a)) map { entry =>
+                      fn.map(func(a.render)(entry), elt `/` axes.attribute.*)
+                    }
+
+      entries flatMap (mkObject[F] apply _)
+    })
+
   // ejson:cast-as-ascribed($item as item()?) as item()?
   def castAsAscribed[F[_]: PrologW]: F[FunctionDecl1] =
     ejs.declare("cast-as-ascribed") flatMap (_(
@@ -100,13 +113,15 @@ object ejson {
               .then_(xs.integer(e))
               .else_(if_(~tpe eq "decimal".xs)
               .then_(xs.double(e))
+              .else_(if_(~tpe eq "string".xs)
+              .then_(fn.string(e))
               .else_(if_(~tpe eq "binary".xs)
               .then_ {
                 if_(isCastable(e, ST("xs:hexBinary")))
                 .then_(xs.base64Binary(xs.hexBinary(e)))
                 .else_(xs.base64Binary(e))
               }
-              .else_(e))))))))
+              .else_(e)))))))))
             }
           }
         ) default item
@@ -276,7 +291,9 @@ object ejson {
             ST("xs:double")       return_ "decimal".xs,
             ST("xs:float")        return_ "decimal".xs,
             ST("xs:base64Binary") return_ "binary".xs,
-            ST("xs:hexBinary")    return_ "binary".xs
+            ST("xs:hexBinary")    return_ "binary".xs,
+            ST("xs:QName")        return_ "string".xs,
+            ST("xs:string")       return_ "string".xs
           ) default emptySeq
         }
       }

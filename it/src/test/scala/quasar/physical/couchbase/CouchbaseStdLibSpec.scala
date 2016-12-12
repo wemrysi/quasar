@@ -131,7 +131,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
     context(uri).fold(
       err => Task.fail(new RuntimeException(err.shows)),
-      ctx => Task.now(backend.name should tests(runner(ctx)))
+      ctx => Task.now(backend.name.shows should tests(runner(ctx)))
     ).void
   }).unsafePerformSync
 

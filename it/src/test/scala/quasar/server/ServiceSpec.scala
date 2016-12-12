@@ -171,7 +171,8 @@ class ServiceSpec extends quasar.Qspec {
   "/data/fs" should {
 
     lazy val fileSystemConfigs = {
-      val fsCfgs = TestConfig.backendNames
+      val fsCfgs = TestConfig.backendRefs
+        .map(_.name)
         .traverse((TestConfig.backendEnvName _ >>> TestConfig.loadConfig _)(_).run)
         .map(_
           .unite

@@ -97,11 +97,7 @@ object managefile {
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).point[Free[S, ?]])
-      qStr      =  s"""delete from `${bktCol.bucket}`
-                       where type like "${bktCol.collection}%""""
-      _         <- lift(Task.delay(
-                     bkt.query(n1qlQuery(qStr))
-                   )).into.liftM[FileSystemErrT]
+      _         <- lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[FileSystemErrT]
     } yield ()).run
 
   def tempFile[S[_]](

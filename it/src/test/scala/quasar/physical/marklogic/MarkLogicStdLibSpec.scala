@@ -125,6 +125,6 @@ class MarkLogicStdLibSpec extends StdLibSpec {
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceAt(uri).map(cs => backend.name should tests(runner(cs))).void
+    contentSourceAt(uri).map(cs => backend.name.shows should tests(runner(cs))).void
   }).unsafePerformSync
 }

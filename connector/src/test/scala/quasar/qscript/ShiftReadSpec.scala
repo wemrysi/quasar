@@ -48,21 +48,21 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
         Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
         Free.roll(ProjectIndex(HoleF, IntLit(1))))))
     }
-  }
 
-  "shift a simple aggregated read" in {
-    convert(listContents.some,
-      structural.MakeObject(
-        lpf.constant(Data.Str("0")),
-        agg.Count(lpRead("/foo/bar")).embed).embed).map(
-      transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
-        .transCata(rewrite.normalize[QST])) must
-    equal(chain(
-      SRT.inj(Const[ShiftedRead, Fix[QST]](
-        ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
-      QCT.inj(Reduce((),
-        NullLit(),
-        List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
-        Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
+    "shift a simple aggregated read" in {
+      convert(listContents.some,
+        structural.MakeObject(
+          lpf.constant(Data.Str("0")),
+          agg.Count(lpRead("/foo/bar")).embed).embed).map(
+        transFutu(_)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
+          .transCata(rewrite.normalize[QST])) must
+      equal(chain(
+        SRT.inj(Const[ShiftedRead, Fix[QST]](
+          ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
+        QCT.inj(Reduce((),
+          NullLit(),
+          List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
+    }
   }
 }

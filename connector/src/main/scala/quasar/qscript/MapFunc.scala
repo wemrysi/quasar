@@ -121,6 +121,11 @@ object MapFunc {
       }
   }
 
+  object EmptyArray {
+    def apply[T[_[_]]: Corecursive, A]: Constant[T, A] =
+      Constant[T, A](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))
+  }
+
   // TODO: subtyping is preventing embedding of MapFuncs
   /** This returns the set of expressions that are concatenated together. It can
     * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
@@ -138,7 +143,7 @@ object MapFunc {
         CoMapFuncR[T, A] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => coMapFuncR[T, A]((ConcatArrays(a, b): MapFunc[T, TCoMapFunc[T, A]]).right).embed).project
-        case Nil    => coMapFuncR[T, A](\/-(Constant[T, TCoMapFunc[T, A]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case Nil    => coMapFuncR[T, A](\/-(EmptyArray[T, TCoMapFunc[T, A]]))
       }
     }
 
@@ -344,6 +349,7 @@ object MapFunc {
         case Null(a1) => f(a1) ∘ (Null(_))
         case ToString(a1) => f(a1) ∘ (ToString(_))
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
+        case Meta(a1) => f(a1) ∘ (Meta(_))
 
         // binary
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
@@ -426,6 +432,7 @@ object MapFunc {
         case (Null(a1), Null(b1)) => in.equal(a1, b1)
         case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
+        case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -513,6 +520,7 @@ object MapFunc {
           case Null(a1) => shz("Null", a1)
           case ToString(a1) => shz("ToString", a1)
           case MakeArray(a1) => shz("MakeArray", a1)
+          case Meta(a1) => shz("Meta", a1)
 
           // binary
           case Add(a1, a2) => shz("Add", a1, a2)
@@ -610,6 +618,7 @@ object MapFunc {
           case Null(a1) => nAry("Null", a1)
           case ToString(a1) => nAry("ToString", a1)
           case MakeArray(a1) => nAry("MakeArray", a1)
+          case Meta(a1) => nAry("Meta", a1)
 
           // binary
           case Add(a1, a2) => nAry("Add", a1, a2)
@@ -687,6 +696,7 @@ object MapFunc {
       case string.Null => Null(_)
       case string.ToString => ToString(_)
       case structural.MakeArray => MakeArray(_)
+      case structural.Meta => Meta(_)
     }
   }
 
@@ -846,6 +856,7 @@ object MapFuncs {
     def a1 = src
     def a2 = field
   }
+  @Lenses final case class Meta[T[_[_]], A](a1: A) extends Unary[T, A]
 
   @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
     def a1 = from
@@ -884,13 +895,23 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](i: BigInt): FreeMapA[T, A] =
       Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T].apply(ejson.Int[T[EJson]](i))))
 
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] = mf.resume.fold ({
+    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] =
+      mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
+  }
+
+  object IntLitMapFunc {
+    def unapply[T[_[_]]: Recursive, A](mf: MapFunc[T, A]): Option[BigInt] = mf match {
       case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None
       }
       case _ => None
-    }, _ => None)
+    }
+  }
+
+  object IntLitCoEnv {
+    def unapply[T[_[_]]: Recursive](coenv: T[CoEnv[Hole, MapFunc[T, ?], ?]]): Option[BigInt] =
+      IntLit.unapply(coenv.fromCoEnv)
   }
 
   object StrLit {

@@ -3,7 +3,9 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",

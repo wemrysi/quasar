@@ -41,23 +41,23 @@ trait QScriptHelpers extends TTypes[Fix] {
       ThetaJoin :\:
       Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  implicit val QS: Injectable.Aux[QS, QST] =
-    ::\::[QScriptCore](
-      ::\::[ThetaJoin](
-        ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
-
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val R  =    implicitly[Const[Read, ?] :<: QS]
   val QC =       implicitly[QScriptCore :<: QS]
   val TJ =         implicitly[ThetaJoin :<: QS]
 
-  type QST[A] = QScriptTotal[A]
-
-  def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
+  implicit val QS: Injectable.Aux[QS, QST] =
+    ::\::[QScriptCore](
+      ::\::[ThetaJoin](
+        ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
   def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
+
+  type QST[A] = QScriptTotal[A]
+
+  def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
 
   val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
   val RT  =        implicitly[Const[Read, ?] :<: QST]
@@ -67,6 +67,10 @@ trait QScriptHelpers extends TTypes[Fix] {
   val PBT =         implicitly[ProjectBucket :<: QST]
   val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
+  val RootRT: QST[Fix[QST]] = DET.inj(Const[DeadEnd, Fix[QST]](Root))
+  val UnreferencedRT: QST[Fix[QST]] = QCT.inj(Unreferenced[Fix, Fix[QST]]())
+  def ReadRT(file: AFile): QST[Fix[QST]] = RT.inj(Const(Read(file)))
+
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(ProjectField(src, field))
@@ -74,6 +78,22 @@ trait QScriptHelpers extends TTypes[Fix] {
   def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(ProjectIndex(src, field))
+
+  def MakeArrayR[A](src: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MakeArray(src))
+
+  def MakeMapR[A](key: FreeMapA[A], src: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MakeMap(key, src))
+
+  def ConcatArraysR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ConcatArrays(left, right))
+
+  def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(Add(left, right))
 
   def lpRead(path: String): Fix[LP] =
     lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))

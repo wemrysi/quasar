@@ -128,7 +128,6 @@ class ProvenanceT[T[_[_]]: Corecursive: EqualT] extends TTypes[T] {
   def genBuckets(ps: List[Provenance]): Option[(List[Provenance], FreeMap)] =
     ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
       case Nil      => None
-      case h :: Nil => h.some
       case h :: t   =>
         t.foldLeft(
           Free.roll(MakeArray[T, FreeMap](h)))(

@@ -114,25 +114,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           HoleF,
           IncludeId,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              // FIXME: #1622
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(
-                  ProjectIndexR(
-                    ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)),
-                    IntLit(0)))),
-                Free.roll(MakeArray(
-                  ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)),
-                      IntLit(0)),
-                    IntLit(0)))))),
-              Free.roll(MakeArray(
-                Free.roll(Guard(
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  Type.Obj(scala.Predef.Map(), Type.Top.some),
-                  ProjectIndexR(RightSideF, IntLit(1)),
-                  Free.roll(Undefined()))))))),
+            Free.roll(MakeArray(
+              Free.roll(Guard(
+                ProjectIndexR(RightSideF, IntLit(1)),
+                Type.Obj(scala.Predef.Map(), Type.Top.some),
+                ProjectIndexR(RightSideF, IntLit(1)),
+                Free.roll(Undefined()))))),
             Free.roll(MakeArray(
               ProjectFieldR(
                 Free.roll(Guard(
@@ -142,11 +129,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   Free.roll(Undefined()))),
                 StrLit("city")))))))),
         QC.inj(Sort((),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
-            Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
-          (ProjectIndexR(HoleF, IntLit(3)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2)))))))
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
+        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))))
     }
 
     "convert a basic reduction" in {
@@ -265,7 +250,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           makeObj(
             "name" -> structural.ObjectProject(
               lpRead("/city"),
-              lpf.constant(Data.Str("name")))))) must
+              lpf.constant(Data.Str("name"))).embed)).embed) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -296,7 +281,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         None,
         makeObj(
           "0" ->
-            agg.Sum(structural.ObjectProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed))) must
+            agg.Sum(structural.ObjectProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed).embed)) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -316,7 +301,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         makeObj(
           "loc" ->
             structural.FlattenArray(
-              structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed))) must
+              structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed)) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -394,7 +379,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.ArrayConcat(
                 structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("baz"))).embed,
                 structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("quux"))).embed).embed,
-              structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed)) must
+              structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed).embed) must
       beSome(beQScript(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -418,7 +403,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               math.Multiply(
                 structural.ShiftArrayIndices(
                   structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed,
-                lpf.constant(Data.Int(10))).embed))) must
+                lpf.constant(Data.Int(10))).embed).embed)) must
       beSome(beQScript(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((),
@@ -426,7 +411,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           IncludeId,
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
-              Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))),
+              Free.roll(MakeArray(
+                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
               Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
             Free.roll(Constant(ejsonArr(ejsonStr("loc")))))))),
         QC.inj(LeftShift((),
@@ -446,7 +432,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               Free.roll(MakeArray(RightSideF)))),
             Free.roll(Constant(ejsonArr(ejsonInt(10)))))))),
         QC.inj(Reduce((),
-          ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)),
+          Free.roll(MakeArray(
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
           List(
             ReduceFuncs.UnshiftArray(
               Free.roll(Multiply(
@@ -458,7 +445,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a filter" in {
-      // "select * from foo where bar between 1 and 10"
+      // "select * from foo where baz between 1 and 10"
       convert(
         listContents.some,
         StdLib.set.Filter(
@@ -473,12 +460,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           HoleF,
           IncludeId,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))),
-                // FIXME: #1622
-                Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
-              Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
+            Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))),
             Free.roll(MakeArray(
               Free.roll(Between(
                 ProjectFieldR(
@@ -486,8 +468,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   StrLit("baz")),
                 IntLit(1),
                 IntLit(10))))))))),
-        QC.inj(Filter((), ProjectIndexR(HoleF, IntLit(3)))),
-        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(2)))))))
+        QC.inj(Filter((), ProjectIndexR(HoleF, IntLit(1)))),
+        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))))
     }
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
@@ -500,7 +482,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           identity.Squash(
             structural.ObjectConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
-              JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed)) must
+              JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed).embed) must
       beSome(beQScript(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
@@ -539,62 +521,57 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               "name" ->
                 structural.ObjectProject(
                   JoinDir.Left.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("name"))),
+                  lpf.constant(Data.Str("name"))).embed,
               "address" ->
                 structural.ObjectProject(
                   JoinDir.Right.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("address")))))))
+                  lpf.constant(Data.Str("address"))).embed))))
       convert(None, lp) must
         beSome(beQScript(chain(
           RootR,
           QC.inj(Map((), ProjectFieldR(HoleF, StrLit("foo")))))))
     }.pendingUntilFixed
-  }
 
-  "convert union" in {
-    val lp = fullCompileExp("select * from city union select * from person")
-    val qs = convert(listContents.some, lp)
-    qs must beSome(beQScript(chain(
-      QC.inj(Unreferenced[Fix, Fix[QS]]()),
-      QC.inj(Union((),
-        Free.roll(QCT.inj(LeftShift(
-          Free.roll(RT.inj(Const(Read(rootDir </> file("city"))))),
-          HoleF,
-          ExcludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(
-              ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))),
-            Free.roll(MakeArray(RightSideF))))))),
-        Free.roll(QCT.inj(LeftShift(
-          Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
-          HoleF,
-          ExcludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(
-              ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))),
-            Free.roll(MakeArray(RightSideF))))))))),
-      QC.inj(Reduce((),
-        ProjectIndexR(HoleF, IntLit(1)),
-        List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
-        ReduceIndexF(0))))))
-  }
-
-  "convert distinct by" in {
-    val lp = fullCompileExp("select distinct(city) from zips order by pop")
-    val qs = convert(listContents.some, lp)
-    qs must beSome(beQScript(chain(
-      ReadR(rootDir </> file("zips")),
-      QC.inj(LeftShift((),
-        HoleF,
-        IncludeId,
-        Free.roll(ConcatArrays(
-          Free.roll(ConcatArrays(
-            // FIXME: #1622
+    "convert union" in {
+      val lp = fullCompileExp("select * from city union select * from person")
+      val qs = convert(listContents.some, lp)
+      qs must beSome(beQScript(chain(
+        QC.inj(Unreferenced[Fix, Fix[QS]]()),
+        QC.inj(Union((),
+          Free.roll(QCT.inj(LeftShift(
+            Free.roll(RT.inj(Const(Read(rootDir </> file("city"))))),
+            HoleF,
+            ExcludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(
-                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))),
+                Free.roll(MakeArray(
+                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
+              Free.roll(MakeArray(RightSideF))))))),
+          Free.roll(QCT.inj(LeftShift(
+            Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
+            HoleF,
+            ExcludeId,
+            Free.roll(ConcatArrays(
               Free.roll(MakeArray(
-                ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)), IntLit(0)))))),
+                Free.roll(MakeArray(
+                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
+              Free.roll(MakeArray(RightSideF))))))))),
+        QC.inj(Reduce((),
+          Free.roll(MakeArray(
+            ProjectIndexR(HoleF, IntLit(1)))),
+          List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
+          ReduceIndexF(0))))))
+    }
+
+    "convert distinct by" in {
+      val lp = fullCompileExp("select distinct(city) from zips order by pop")
+      val qs = convert(listContents.some, lp)
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          IncludeId,
+          Free.roll(ConcatArrays(
             Free.roll(MakeArray(
               Free.roll(ConcatMaps(
                 Free.roll(MakeMap(
@@ -614,73 +591,117 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                       Type.Obj(ScalaMap(),Some(Type.Top)),
                       ProjectIndexR(RightSideF, IntLit(1)),
                       Free.roll(Undefined()))),
-                    StrLit("pop")))))))))),
+                    StrLit("pop")))))))),
+            Free.roll(MakeArray(
+              ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Type.Obj(ScalaMap(),Some(Type.Top)),
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Free.roll(Undefined()))),
+                StrLit("pop")))))))),
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
+        QC.inj(Reduce((),
           Free.roll(MakeArray(
-            ProjectFieldR(
-              Free.roll(Guard(
-                ProjectIndexR(RightSideF, IntLit(1)),
-                Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectIndexR(RightSideF, IntLit(1)),
-                Free.roll(Undefined()))),
-              StrLit("pop")))))))),
-      QC.inj(Sort((),
-        Free.roll(ConcatArrays(
-          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(0)))),
-          Free.roll(MakeArray(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(0)))))),
-        (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
-      QC.inj(Reduce((),
-        Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))),
-        List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(2)))),
-        Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))))
-  }
+            Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
+          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
+          Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))))
+    }
 
-  "convert a multi-field reduce" in {
-    val lp = fullCompileExp("select max(pop), min(city) from zips")
-    val qs = convert(listContents.some, lp)
-    qs must beSome(beQScript(chain(
-      ReadR(rootDir </> file("zips")),
-      QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
-      QC.inj(Reduce((),
-        NullLit(),
-        List(
-          ReduceFuncs.Max(
-            Free.roll(Guard(
-              ProjectFieldR(
-                Free.roll(Guard(
-                  HoleF,
-                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                  HoleF,
-                  Free.roll(Undefined()))),
-                StrLit("pop")),
-              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              ProjectFieldR(
-                Free.roll(Guard(
-                  HoleF,
-                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                  HoleF,
-                  Free.roll(Undefined()))),
-                StrLit("pop")),
-              Free.roll(Undefined())))),
-          ReduceFuncs.Min(
-            Free.roll(Guard(
-              ProjectFieldR(
-                Free.roll(Guard(
-                  HoleF,
-                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                  HoleF,
-                  Free.roll(Undefined()))),
-                StrLit("city")),
-              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              ProjectFieldR(
-                Free.roll(Guard(
-                  HoleF,
-                  Type.Obj(ScalaMap(),Some(Type.Top)),
-                  HoleF,
-                  Free.roll(Undefined()))),
-                StrLit("city")),
-              Free.roll(Undefined()))))),
-        Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))),
-          Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1))))))))))
+    "convert a multi-field reduce" in {
+      val lp = fullCompileExp("select max(pop), min(city) from zips")
+      val qs = convert(listContents.some, lp)
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
+        QC.inj(Reduce((),
+          NullLit(),
+          List(
+            ReduceFuncs.Max(
+              Free.roll(Guard(
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    HoleF,
+                    Type.Obj(ScalaMap(),Some(Type.Top)),
+                    HoleF,
+                    Free.roll(Undefined()))),
+                  StrLit("pop")),
+                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    HoleF,
+                    Type.Obj(ScalaMap(),Some(Type.Top)),
+                    HoleF,
+                    Free.roll(Undefined()))),
+                  StrLit("pop")),
+                Free.roll(Undefined())))),
+            ReduceFuncs.Min(
+              Free.roll(Guard(
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    HoleF,
+                    Type.Obj(ScalaMap(),Some(Type.Top)),
+                    HoleF,
+                    Free.roll(Undefined()))),
+                  StrLit("city")),
+                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    HoleF,
+                    Type.Obj(ScalaMap(),Some(Type.Top)),
+                    HoleF,
+                    Free.roll(Undefined()))),
+                  StrLit("city")),
+                Free.roll(Undefined()))))),
+          Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))),
+            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1))))))))))
+    }
+
+    "convert a filter followed by a reduce" in {
+      val lp = fullCompileExp("select count(*) from zips where pop > 1000")
+      val qs = convert(listContents.some, lp)
+
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          IncludeId,
+           Free.roll(ConcatArrays(
+             Free.roll(MakeArray(
+               Free.roll(Guard(
+                 ProjectIndexR(RightSideF, IntLit(1)),
+                 Type.Obj(ScalaMap(),Some(Type.Top)),
+                 ProjectIndexR(RightSideF, IntLit(1)),
+                 Free.roll(Undefined()))))),
+             Free.roll(MakeArray(
+               Free.roll(Guard(
+                 Free.roll(ProjectField(
+                   Free.roll(Guard(
+                     ProjectIndexR(RightSideF, IntLit(1)),
+                     Type.Obj(ScalaMap(),Some(Type.Top)),
+                     ProjectIndexR(RightSideF, IntLit(1)),
+                     Free.roll(Undefined()))),
+                   StrLit("pop"))),
+                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                 Free.roll(Gt(
+                   Free.roll(ProjectField(
+                     Free.roll(Guard(
+                     ProjectIndexR(RightSideF, IntLit(1)),
+                     Type.Obj(ScalaMap(),Some(Type.Top)),
+                     ProjectIndexR(RightSideF, IntLit(1)),
+                     Free.roll(Undefined()))),
+                   StrLit("pop"))),
+                 IntLit(1000))),
+               Free.roll(Undefined()))))))))),
+        QC.inj(Filter((),
+          Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+        QC.inj(Reduce((),
+          NullLit(),
+          List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
+          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))))))))
+    }
   }
 }

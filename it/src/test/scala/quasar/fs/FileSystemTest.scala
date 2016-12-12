@@ -17,7 +17,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{BackendName, Data, TestConfig}
+import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
 import quasar.contrib.pathy._
 import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.eitherT._
@@ -61,12 +61,19 @@ abstract class FileSystemTest[S[_]](
 
   def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
-      s"${fs.name.name} FileSystem" should examples(fs)
+      s"${fs.ref.name.shows} FileSystem" should examples(fs)
 
       step(fs.close.unsafePerformSync)
 
       ()
     }).unsafePerformSync
+
+  /** Returns the given result if the filesystem supports the given capabilities or `Skipped` otherwise. */
+  def ifSupports[A: AsResult](fs: FileSystemUT[S], capability: BackendCapability, capabilities: BackendCapability*)(a: => A): Result =
+    NonEmptyList(capability, capabilities: _*)
+      .traverse_(c => fs.supports(c).fold(().successNel[BackendCapability], c.failureNel))
+      .as(AsResult(a))
+      .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
@@ -177,8 +184,9 @@ object FileSystemTest {
           mem.testInterp)
 
       val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem]
+      val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
 
-      FileSystemUT(BackendName("No-view"), fs, fs, mem.testDir, mem.close)
+      FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
     }
 
   def hierarchicalUT: Task[FileSystemUT[FileSystem]] = {
@@ -190,7 +198,7 @@ object FileSystemTest {
 
     (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(
-        BackendName("hierarchical"),
+        BackendRef.name.set(BackendName("hierarchical"))(mem.ref),
         fs(f, mem.testInterp),
         fs(f, mem.setupInterp),
         mntDir,
@@ -198,8 +206,10 @@ object FileSystemTest {
   }
 
   def inMemUT: Task[FileSystemUT[FileSystem]] = {
+    val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
+
     InMemory.runStatefully(InMemory.InMemState.empty)
       .map(_ compose InMemory.fileSystem)
-      .map(f => FileSystemUT(BackendName("in-memory"), f, f, rootDir, ().point[Task]))
+      .map(f => FileSystemUT(ref, f, f, rootDir, ().point[Task]))
   }
 }
