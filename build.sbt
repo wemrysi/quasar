@@ -210,7 +210,7 @@ lazy val root = project.in(file("."))
 //        /  \
       repl,   web,
 //        \  /
-           it, precog, blueeyes, yggdrasil, mimir, fallback)
+           it, precog, blueeyes, yggdrasil, mimir, macros, fallback)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -530,19 +530,32 @@ import blueeyes.json._
 import quasar._
 import qscript._
 import quasar.physical.fallback.fs._
-import matryoshka._, Recursive.ops._
-import scalaz._
-import Scalaz._
+import matryoshka._, Recursive.ops._, RenderTree.ops._
+import scalaz._, Scalaz._
+import ygg.macros._, JsonMacros.EJson._
 """
+
+/** Macros.
+ */
+
+lazy val macros = project.setup
+  .dependsOn(precog % BothScopes, frontend)
+  .settings(commonSettings)
+  .settings(scalacOptions -= "-Xfatal-warnings")
+  .settings(scalacOptions += "-language:_")
+  .settings(libraryDependencies += "io.argonaut"    %% "argonaut-jawn" % "6.2-M3")
+  .settings(libraryDependencies += "org.spire-math" %% "jawn-ast"      % "0.10.4")
 
 /** Fallback evaluator.
  */
+
 lazy val fallback = project
   .settings(name := "quasar-fallback-internal")
-  .dependsOn(connector % BothScopes, mimir)
+  .dependsOn(connector % BothScopes, mimir, macros)
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) := scala.Nil)
   .settings(scalacOptions -= "-Xfatal-warnings")
   .settings(libraryDependencies += "commons-io" % "commons-io" % "2.1")
   .settings(initialCommands in (Compile, console) := fallbackRepl)
   .enablePlugins(AutomateHeaderPlugin)
+
