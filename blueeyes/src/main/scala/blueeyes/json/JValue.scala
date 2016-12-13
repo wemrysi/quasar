@@ -75,9 +75,8 @@ object JValue {
     }
   }
 
-  implicit final val order: Order[JValue] = new Order[JValue] {
-    def order(v1: JValue, v2: JValue) = Ordering.fromInt(v1 compare v2)
-  }
+  implicit val jvalueOrder: Order[JValue] = Order order ((x, y) => Ordering fromInt (x compare y))
+  implicit val jvalueShow: Show[JValue]   = Show.showFromToString
 
   def unsafeInsert(rootTarget: JValue, rootPath: JPath, rootValue: JValue): JValue = {
     // println(s"$rootTarget \\ $rootPath := $rootValue")

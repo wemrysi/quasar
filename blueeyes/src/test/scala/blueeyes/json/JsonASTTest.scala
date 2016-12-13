@@ -183,7 +183,7 @@ object JsonASTSpec extends quasar.Qspec {
         JField("c", JNum(3)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== LT
+    ((v1: JValue) ?|? v2) must_== LT
   }
 
   "sort objects by key then value" in {
@@ -199,7 +199,7 @@ object JsonASTSpec extends quasar.Qspec {
           JField("c", JNum(4)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== LT
+    ((v1: JValue) ?|? v2) must_== LT
   }
 
   "sort objects with undefined members" in {
@@ -215,7 +215,7 @@ object JsonASTSpec extends quasar.Qspec {
           JField("c", JNum(4)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== GT
+    ((v1: JValue) ?|? v2) must_== GT
   }
 
   "Properly --> subclasses of JValue" in {
