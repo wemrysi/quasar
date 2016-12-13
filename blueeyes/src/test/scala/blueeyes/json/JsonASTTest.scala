@@ -21,7 +21,7 @@ import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 
-object JsonASTSpec extends Specification with ScalaCheck {
+object JsonASTSpec extends quasar.Qspec {
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)
@@ -158,7 +158,7 @@ object JsonASTSpec extends Specification with ScalaCheck {
     val inverse = (value: JValue) => JValue.unflatten(value.flattenWithPath) == value
 
     prop(inverse)
-  }
+  }.flakyTest
 
   "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
     runArbitraryPathSpec
