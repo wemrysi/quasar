@@ -369,6 +369,8 @@ object CoreMap extends Serializable {
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b))             => Data.Bool(a < b)
     case (Data.Dec(a), Data.Dec(b))             => Data.Bool(a < b)
+    case (Data.Int(a), Data.Dec(b))             => Data.Bool(BigDecimal(a) < b)
+    case (Data.Dec(a), Data.Int(b))             => Data.Bool(a < BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b))             => Data.Bool(a.compareTo(b) < 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
@@ -382,6 +384,8 @@ object CoreMap extends Serializable {
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b))             => Data.Bool(a <= b)
     case (Data.Dec(a), Data.Dec(b))             => Data.Bool(a <= b)
+    case (Data.Int(a), Data.Dec(b))             => Data.Bool(BigDecimal(a) <= b)
+    case (Data.Dec(a), Data.Int(b))             => Data.Bool(a <= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b))             => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
@@ -395,6 +399,8 @@ object CoreMap extends Serializable {
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b))             => Data.Bool(a > b)
     case (Data.Dec(a), Data.Dec(b))             => Data.Bool(a > b)
+    case (Data.Int(a), Data.Dec(b))             => Data.Bool(BigDecimal(a) > b)
+    case (Data.Dec(a), Data.Int(b))             => Data.Bool(a > BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b))             => Data.Bool(a.compareTo(b) > 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
@@ -408,6 +414,8 @@ object CoreMap extends Serializable {
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b))             => Data.Bool(a >= b)
     case (Data.Dec(a), Data.Dec(b))             => Data.Bool(a >= b)
+    case (Data.Int(a), Data.Dec(b))             => Data.Bool(BigDecimal(a) >= b)
+    case (Data.Dec(a), Data.Int(b))             => Data.Bool(a >= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b))             => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
