@@ -21,6 +21,7 @@ import scalaz._
 import Scalaz._
 import blueeyes.yggConfig
 import blueeyes.json.JValue
+import com.precog.yggdrasil.vfs.StubVFSMetadata
 import com.precog.bytecode.JType
 import com.precog.mimir._
 import com.precog._, yggdrasil._, vfs._, table._
@@ -29,11 +30,11 @@ import com.precog.common._, security._
 trait PrecogEvaluator[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColumnarTableModule[M] {
   type ErrOr[A] = EitherT[M, ResourceError, A]
 
-  object vfs extends VFSMetadata[M] {
-    def findDirectChildren(apiKey: APIKey, path: Path): ErrOr[Set[PathMetadata]]                           = ???
-    def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): ErrOr[PathStructure] = ???
-    def size(apiKey: APIKey, path: Path, version: Version): ErrOr[Long]                                    = ???
-  }
+  def projections: Map[Path, Map[ColumnRef, Long]]
+
+  def fromJson(values: JValue*): Table = fromRValues(values.toStream map RValue.fromJValue)
+
+  object vfs extends StubVFSMetadata[M](projections)
 
   trait TableCompanion extends BlockStoreColumnarTableCompanion
 
@@ -52,9 +53,14 @@ trait PrecogEvaluator[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColu
     )
   }
 }
+object PrecogEvaluator {
+  def apply[M[+_]: Monad](ps: Map[Path, Map[ColumnRef, Long]]): PrecogEvaluator[M] = new PrecogEvaluator[M] {
+    val M           = implicitly[Monad[M]]
+    val projections = ps
+  }
+}
 
 object fall extends PrecogEvaluator[Need] {
-  val M = implicitly[Monad[Need]]
-
-  def fromJson(values: JValue*): Table = fromRValues(values.toStream map RValue.fromJValue)
+  val M           = implicitly[Monad[Need]]
+  val projections = Map[Path, Map[ColumnRef, Long]]()
 }
