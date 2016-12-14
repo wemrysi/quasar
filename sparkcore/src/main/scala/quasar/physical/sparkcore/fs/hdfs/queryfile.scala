@@ -24,6 +24,7 @@ import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
+import quasar.fp.free._
 import quasar.contrib.pathy._
 
 import java.io.BufferedWriter
@@ -73,14 +74,14 @@ class queryfile(fileSystem: Task[FileSystem]) {
     hdfs.close()
   }
 
-  def fileExists(f: AFile): Task[Boolean] = for {
+  def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] = lift(for {
     path <- toPath(f)
     hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
     hdfs.close()
     exists
-  }
+  }).into[S]
 
   def listContents(d: ADir): FileSystemErrT[Task, Set[PathSegment]] = EitherT(for {
     path <- toPath(d)
@@ -98,10 +99,10 @@ class queryfile(fileSystem: Task[FileSystem]) {
 
   def readChunkSize: Int = 5000
 
-  def input: Input =
-    Input(fromFile _, store _, fileExists _, listContents _, readChunkSize _)
+  def input[S[_]](implicit s0: Task :<: S): Input[S] =
+    Input(fromFile _, store _, fileExists[S] _, listContents _, readChunkSize _)
 }
 
 object queryfile {
-  def input(fileSystem: Task[FileSystem]): Input = new queryfile(fileSystem).input
+  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = new queryfile(fileSystem).input
 }
