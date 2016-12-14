@@ -285,7 +285,6 @@ class QScriptSpec
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
-    // FIXME: Should be able to get rid of ZipMapKeys
     "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
       convert(

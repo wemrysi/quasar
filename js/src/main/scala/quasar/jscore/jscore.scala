@@ -106,9 +106,12 @@ object JsCoreF {
           o1 ≟ o2 && eq.equal(a1, a2) && eq.equal(b1, b2)
         case (ArrF(v1), ArrF(v2)) => v1 ≟ v2
         case (FunF(p1, b1), FunF(p2, b2)) => p1 ≟ p2 && eq.equal(b1, b2)
-        // FIXME: Finish this!
+        case (ObjF(v1), ObjF(v2)) => v1 == v2
+        case (LetF(n1, e1, b1), LetF(n2, e2, b2)) =>
+          n1 ≟ n2 && eq.equal(e1, e2) && eq.equal(b1, b2)
+        case (SpliceObjectsF(s1), SpliceObjectsF(s2)) => s1 ≟ s2
+        case (SpliceArraysF(s1), SpliceArraysF(s2)) => s1 ≟ s2
         case (_, _) => false
-
       }
     }
   }
