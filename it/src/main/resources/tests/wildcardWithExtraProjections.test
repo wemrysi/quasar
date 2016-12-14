@@ -1,15 +1,12 @@
 {
   "name": "wildcard with additional projections and filtering",
 
-  "NB": "Couchbase disabled due to heap exhaustion",
-
   "backends": {
     "mongodb_2_6":       "skip",
     "mongodb_3_0":       "skip",
     "mongodb_read_only": "skip",
     "mongodb_3_2":       "skip",
-    "postgresql":        "pending",
-    "couchbase":         "skip"
+    "postgresql":        "pending"
   },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",
