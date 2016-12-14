@@ -80,24 +80,6 @@ object MapFunc {
       }
   }
 
-  object StaticMap {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMapFuncR[T, A]):
-        Option[List[(T[EJson], TCoMapFunc[T, A])]] =
-      mf match {
-        case ConcatMapsN(as) =>
-          as.foldRightM[Option, List[(T[EJson], TCoMapFunc[T, A])]](
-            Nil)(
-            (mf, acc) => (mf.project.run.toOption >>=
-              {
-                case MakeMap(Embed(CoEnv(\/-(Constant(k)))), v) => ((k, v) :: acc).some
-                case Constant(Embed(ejson.Extension(ejson.Map(kvs)))) =>
-                  (kvs.map(_.map(v => coMapFuncR[T, A](Constant(v).right).embed)) ++ acc).some
-                case _ => None
-              }))
-        case _ => None
-      }
-  }
-
   /** Like `StaticArray`, but returns as much of the array as can be statically
     * determined. Useful if you just want to statically lookup into an array if
     * possible, and punt otherwise.
@@ -117,6 +99,24 @@ object MapFunc {
                   (values.map(v => coMapFuncR[T, A](Constant(v).right).embed) ++ acc).right
                 case _ => acc.left
               })).merge.some
+        case _ => None
+      }
+  }
+
+  object StaticMap {
+    def unapply[T[_[_]]: Recursive: Corecursive, A](mf: CoMapFuncR[T, A]):
+        Option[List[(T[EJson], TCoMapFunc[T, A])]] =
+      mf match {
+        case ConcatMapsN(as) =>
+          as.foldRightM[Option, List[(T[EJson], TCoMapFunc[T, A])]](
+            Nil)(
+            (mf, acc) => (mf.project.run.toOption >>=
+              {
+                case MakeMap(Embed(CoEnv(\/-(Constant(k)))), v) => ((k, v) :: acc).some
+                case Constant(Embed(ejson.Extension(ejson.Map(kvs)))) =>
+                  (kvs.map(_.map(v => coMapFuncR[T, A](Constant(v).right).embed)) ++ acc).some
+                case _ => None
+              }))
         case _ => None
       }
   }
@@ -253,7 +253,7 @@ object MapFunc {
             Constant[T, TCoMapFunc[T, A]](EJson.fromCommon[T].apply(
               ejson.Bool[T[EJson]](v1 ≟ v2))).right).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArray(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
