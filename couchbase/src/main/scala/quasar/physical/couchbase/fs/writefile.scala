@@ -70,7 +70,7 @@ object writefile {
   ): Free[S, FileSystemError \/ WriteHandle] =
     (for {
       ctx      <- context.ask.liftM[FileSystemErrT]
-      bktCol   <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
+      bktCol   <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
       _        <- EitherT(lift(
                     Task.delay(ctx.manager.hasBucket(bktCol.bucket).booleanValue).ifM(
                       Task.now(().right),
