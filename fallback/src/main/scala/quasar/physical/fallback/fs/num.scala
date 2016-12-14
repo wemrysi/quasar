@@ -28,6 +28,8 @@ trait NumericAlgebra[A] {
   def pow(x: A, y: A): A
 }
 object NumericAlgebra {
+  import quasar.Data
+
   def apply[A](implicit z: NumericAlgebra[A]): NumericAlgebra[A] = z
 
   implicit object NumericAlgebraData extends NumericAlgebra[Data] {

@@ -42,6 +42,7 @@ import simulacrum.typeclass
 
 // TODO divide planner instances into separate files
 object Planner {
+  import quasar.Data
 
   // TODO consider moving to data.scala (conflicts with existing code)
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {

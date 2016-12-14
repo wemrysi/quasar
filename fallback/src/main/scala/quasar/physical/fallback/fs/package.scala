@@ -33,6 +33,8 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import java.time._
+import scalaz.syntax.OrderOps
+import java.lang.Comparable
 
 package fs {
   final case class SparkContext(conf: SparkConf) {
@@ -55,6 +57,12 @@ package object fs {
   def instantFromMillis(millis: Long)  = Instant ofEpochMilli millis
   def zonedUtcFromMillis(millis: Long) = ZonedDateTime.ofInstant(instantFromMillis(millis), ZoneOffset.UTC)
   def UTC                              = ZoneOffset.UTC
+
+  implicit def comparableOrder[A, B >: A <: Comparable[B]](x: A with Comparable[B]): Order[B] =
+    Order order ((x, y) => Ordering fromInt (x compareTo y))
+
+  implicit def comparableOrderOps[A, B >: A <: Comparable[B]](x: A with Comparable[B]): OrderOps[B] =
+    ToOrderOps[B](x)(comparableOrder[A, B](x))
 
   type CTag[A] = scala.reflect.ClassTag[A]
   type Data    = quasar.Data

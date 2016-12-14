@@ -31,6 +31,7 @@ import scalaz.{Divide => _, _}, Scalaz._
 import java.time._
 
 object CoreMap extends Serializable {
+  import quasar.Data
 
   private val undefined = Data.NA
 
@@ -386,11 +387,11 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Dec(b))             => Data.Bool(a <= b)
     case (Data.Int(a), Data.Dec(b))             => Data.Bool(BigDecimal(a) <= b)
     case (Data.Dec(a), Data.Int(b))             => Data.Bool(a <= BigDecimal(b))
-    case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Str(a), Data.Str(b))             => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Date(a), Data.Date(b))           => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Time(a), Data.Time(b))           => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Interval(a), Data.Interval(b))   => Data.Bool(a <= b)
+    case (Data.Str(a), Data.Str(b))             => Data.Bool(a <= b)
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a <= b)
+    case (Data.Date(a), Data.Date(b))           => Data.Bool(a <= b)
+    case (Data.Time(a), Data.Time(b))           => Data.Bool(a <= b)
     case (Data.Bool(true), Data.Bool(false))    => Data.Bool(false)
     case (Data.Bool(_), Data.Bool(_))           => Data.Bool(true)
     case _                                      => undefined
