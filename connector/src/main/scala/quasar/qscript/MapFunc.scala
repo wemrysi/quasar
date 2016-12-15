@@ -89,14 +89,14 @@ object MapFunc {
         Option[List[TCoMapFunc[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
-          as.foldRightM[List[TCoMapFunc[T, A]] \/ ?, List[TCoMapFunc[T, A]]](
+          as.foldLeftM[List[TCoMapFunc[T, A]] \/ ?, List[TCoMapFunc[T, A]]](
             Nil)(
-            (mf, acc) => mf.project.run.fold(
+            (acc, mf) => mf.project.run.fold(
               κ(acc.left),
               _ match {
-                case MakeArray(value) => (value :: acc).right
+                case MakeArray(value) => (acc :+ value).right
                 case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => coMapFuncR[T, A](Constant(v).right).embed) ++ acc).right
+                  (acc ++ values.map(v => coMapFuncR[T, A](Constant(v).right).embed)).right
                 case _ => acc.left
               })).merge.some
         case _ => None
@@ -253,7 +253,7 @@ object MapFunc {
             Constant[T, TCoMapFunc[T, A]](EJson.fromCommon[T].apply(
               ejson.Bool[T[EJson]](v1 ≟ v2))).right).some
 
-        case ProjectIndex(Embed(StaticArray(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
