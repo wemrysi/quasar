@@ -87,7 +87,7 @@ object TestConfig {
     */
   def externalFileSystems[S[_]](
     pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
-  ): Task[IList[FileSystemUT[S]]] = {
+  ): Task[IList[SupportedFs[S]]] = {
     def fs(
       envName: String,
       p: ADir
@@ -120,16 +120,9 @@ object TestConfig {
           testRef.release *> setupRef.release)
     }
 
-    def noBackendsFound: Throwable = new RuntimeException(
-      "No external backends to test. Consider setting one of these environment variables: " +
-      TestConfig.backendRefs.map(r => TestConfig.backendEnvName(r.name)).mkString(", ")
-    )
-
     TestConfig.testDataPrefix flatMap { prefix =>
       TestConfig.backendRefs.toIList
-        .traverse(r => lookupFileSystem(r, prefix).run)
-        .map(_.unite)
-        .flatMap(uts => if (uts.isEmpty) Task.fail(noBackendsFound) else Task.now(uts))
+        .traverse(r => lookupFileSystem(r, prefix).run.map(SupportedFs(r,_)))
     }
   }
 

@@ -28,7 +28,7 @@ import matryoshka.Fix
 class StreamingQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(
-      _.supports(BackendCapability.query())))) {
+      _.ref.supports(BackendCapability.query())))) {
 
   val suiteName = "Streaming Queries"
 

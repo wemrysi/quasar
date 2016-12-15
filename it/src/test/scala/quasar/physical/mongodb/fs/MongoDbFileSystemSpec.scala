@@ -47,7 +47,7 @@ import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec
-  extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filter (_ supports BackendCapability.write())))
+  extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
   with quasar.ExclusiveQuasarSpecification {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
@@ -369,12 +369,12 @@ class MongoDbFileSystemSpec
 object MongoDbFileSystemSpec {
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
-  val mongoFsUT: Task[IList[FileSystemUT[FileSystemIO]]] =
+  val mongoFsUT: Task[IList[SupportedFs[FileSystemIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
           FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef)
-        ).handleWith[IList[FileSystemUT[FileSystem]]] {
+        ).handleWith[IList[SupportedFs[FileSystem]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
       )(_.liftIO)

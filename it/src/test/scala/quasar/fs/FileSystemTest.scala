@@ -34,7 +34,7 @@ import eu.timepit.refined.auto._
 import monocle.Optional
 import monocle.function.Index
 import monocle.std.vector._
-import org.specs2.specification.core.Fragment
+import org.specs2.specification.core.{Fragment, Fragments}
 import org.specs2.execute.{Failure => _, _}
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
@@ -50,7 +50,7 @@ import scalaz.stream.Process
   *       filesystems would run concurrently.
   */
 abstract class FileSystemTest[S[_]](
-  val fileSystems: Task[IList[FileSystemUT[S]]]
+  val fileSystems: Task[IList[SupportedFs[S]]]
 ) extends quasar.Qspec {
 
   sequential
@@ -59,14 +59,12 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
-    fileSystems.map(_ traverse_[Id] { fs =>
-      s"${fs.ref.name.shows} FileSystem" should examples(fs)
-
-      step(fs.close.unsafePerformSync)
-
-      ()
-    }).unsafePerformSync
+  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Fragments =
+    fileSystems.map { fss =>
+      Fragments.foreach(fss.toList)(fs =>
+        s"${fs.ref.name.shows} FileSystem" >>
+          fs.impl.map(f => Fragments(examples(f), step(f.close.unsafePerformSync))).getOrElse(Fragments.empty))
+    }.unsafePerformSync
 
   /** Returns the given result if the filesystem supports the given capabilities or `Skipped` otherwise. */
   def ifSupports[A: AsResult](fs: FileSystemUT[S], capability: BackendCapability, capabilities: BackendCapability*)(a: => A): Result =
@@ -127,9 +125,9 @@ object FileSystemTest {
 
   //--- FileSystems to Test ---
 
-  def allFsUT: Task[IList[FileSystemUT[FileSystem]]] =
+  def allFsUT: Task[IList[SupportedFs[FileSystem]]] =
     (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (ut => ut.contramapF(chroot.fileSystem[FileSystem](ut.testDir)))
+      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.fileSystem[FileSystem](ut.testDir)))))
     }
 
   def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
@@ -148,12 +146,14 @@ object FileSystemTest {
     fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)
   }
 
-  def localFsUT: Task[IList[FileSystemUT[FileSystem]]] =
-    IList(
-      inMemUT,
-      hierarchicalUT,
-      nullViewUT
-    ).sequence
+  def localFsUT: Task[IList[SupportedFs[FileSystem]]] =
+    (inMemUT |@| hierarchicalUT |@| nullViewUT) { (mem, hier, nullUT) =>
+      IList(
+        SupportedFs(mem.ref, mem.some),
+        SupportedFs(hier.ref, hier.some),
+        SupportedFs(nullUT.ref, nullUT.some)
+      )
+    }
 
   def nullViewUT: Task[FileSystemUT[FileSystem]] =
     (
