@@ -729,5 +729,27 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 Free.roll(Undefined()))),
               Free.roll(Undefined()))))))))))
     }
+
+    "convert a static array projection prefix" in {
+      val lp = fullCompileExp("select ([7, 8] || loc)[1] from zips")
+      val qs = convert(listContents.some, lp)
+
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          ExcludeId,
+          Free.roll(MakeMap(
+            StrLit("0"),
+            Free.roll(Guard(
+              RightSideF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              Free.roll(Guard(
+                ProjectFieldR(RightSideF, StrLit("loc")),
+                Type.FlexArr(0, None, Type.Top),
+                IntLit(8),
+                Free.roll(Undefined()))),
+              Free.roll(Undefined()))))))))))
+    }
   }
 }
