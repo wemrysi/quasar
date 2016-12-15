@@ -60,13 +60,17 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (date.ExtractWeek, _) => notHandled
     case (date.ExtractYear, _) => notHandled
 
+    case (string.ToString, Data.Time(_) :: Nil) =>
+      Skipped("Time zero fractional printing doesn't match").left
+
     case _ => ().right
   }
 
   /** Identify constructs that are expected not to be implemented. */
   def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
-    case Invoke(func, _) => shortCircuit(func, args)
-    case _               => ().right
+    case Invoke(func, _)     => shortCircuit(func, args)
+    case TemporalTrunc(_, _) => notHandled
+    case _                   => ().right
   }
 
   def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =

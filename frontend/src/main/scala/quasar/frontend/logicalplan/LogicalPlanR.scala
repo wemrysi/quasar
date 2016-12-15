@@ -25,6 +25,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
+import quasar.std.DateLib.TemporalPart
 
 import scala.Predef.$conforms
 import scala.Symbol
@@ -61,6 +62,8 @@ final class LogicalPlanR[T]
     lp.sort(src, order).embed
   def typecheck(expr: T, typ: Type, cont: T, fallback: T) =
     lp.typecheck(expr, typ, cont, fallback).embed
+  def temporalTrunc(part: TemporalPart, src: T) =
+    lp.temporalTrunc(part, src).embed
 
   // NB: this can't currently be generalized to Binder, because the key type
   //     isn't exposed there.
@@ -165,6 +168,9 @@ final class LogicalPlanR[T]
 
       case Sort(src, ords) =>
         (inferTypes(typ, src) ⊛ ords.traverse { case (a, d) => inferTypes(Type.Top, a) strengthR d })(lp.sort[Typed[LP]](_, _))
+
+      case TemporalTrunc(part, src) =>
+        inferTypes(typ, src) ∘ (lp.temporalTrunc[Typed[LP]](part, _))
 
       case Typecheck(expr, t, cont, fallback) =>
         (inferTypes(t, expr) ⊛ inferTypes(typ, cont) ⊛ inferTypes(typ, fallback))(
@@ -284,9 +290,10 @@ final class LogicalPlanR[T]
           unifyOrCheck(inf, in.inferred, let(name, appConst(value, constant(Data.NA)), appConst(in, constant(Data.NA))))
         // TODO: Get the possible type from the LetF
         case Free(v) => emit(ConstrainedPlan(inf, Nil, free(v)))
-
         case Sort(expr, ords) =>
           unifyOrCheck(inf, expr.inferred, sort(appConst(expr, constant(Data.NA)), ords map (_ leftMap (appConst(_, constant(Data.NA))))))
+        case TemporalTrunc(part, src) =>
+          unifyOrCheck(inf, src.inferred, temporalTrunc(part, appConst(src, constant(Data.NA))))
       }
   }
 

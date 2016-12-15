@@ -65,6 +65,8 @@ object DataCodec {
   def render(data: Data)(implicit C: DataCodec): DataEncodingError \/ String =
     C.encode(data).map(_.pretty(minspace))
 
+  val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+
   val Precise = new DataCodec {
     val TimestampKey = "$timestamp"
     val DateKey = "$date"
@@ -90,7 +92,7 @@ object DataCodec {
 
         case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)))
         case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)))
-        case Time(value)      => \/-(Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))))
+        case Time(value)      => \/-(Json.obj(TimeKey      -> jString(value.format(dateTimeFormatter))))
         case Interval(value)  => \/-(Json.obj(IntervalKey  -> jString(value.toString)))
 
         case bin @ Binary(_)  => \/-(Json.obj(BinaryKey    -> jString(bin.base64)))

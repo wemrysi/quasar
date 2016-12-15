@@ -24,6 +24,9 @@ import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
+  def apply(function: XQuery, params: XQuery*): XQuery =
+    XQuery(s"xdmp:apply($function, ${mkSeq(params)})")
+
   def directory(uri: XQuery, depth: XQuery): XQuery =
     XQuery(s"xdmp:directory($uri, $depth)")
 
@@ -42,6 +45,12 @@ object xdmp {
   def documentProperties(uris: XQuery*): XQuery =
     XQuery(s"xdmp:document-properties${mkSeq(uris)}")
 
+  def formatNumber(seq: XQuery, picture: XQuery): XQuery =
+    XQuery(s"xdmp:format-number($seq, $picture)")
+
+  def function(function: XQuery): XQuery =
+    XQuery(s"xdmp:function($function)")
+
   def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
     XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
 
@@ -53,6 +62,9 @@ object xdmp {
 
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
+
+  def parseDateTime(picture: XQuery, value: XQuery): XQuery =
+    XQuery(s"xdmp:parse-dateTime($picture, $value)")
 
   def prettyPrint(qstring: XQuery): XQuery =
     XQuery(s"xdmp:pretty-print($qstring)")

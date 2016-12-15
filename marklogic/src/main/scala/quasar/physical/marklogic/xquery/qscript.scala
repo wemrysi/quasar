@@ -17,8 +17,9 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.fp.ski.ι
+import quasar.fp.ski.{ι, κ}
 import quasar.physical.marklogic.xml.namespaces._
+import quasar.std.DateLib.TemporalPart
 
 import java.lang.SuppressWarnings
 
@@ -34,6 +35,9 @@ object qscript {
   import FunctionDecl._
 
   val qs = NamespaceDecl(qscriptNs)
+
+  val dateFmt     = "[Y0001]-[M01]-[D01]".xs
+  val dateTimeFmt = "[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z".xs
 
   private val epoch = xs.dateTime("1970-01-01T00:00:00Z".xs)
 
@@ -346,6 +350,109 @@ object qscript {
       epoch + xs.dayTimeDuration(fn.concat("PT".xs, xs.string(millis div 1000.xqy), "S".xs))
     })
 
+  // qscript:start-of-day($date as xs:date?) as xs:$dateTime?
+  def startOfDay[F[_]: PrologW]: F[FunctionDecl1] =
+    qs.declare("start-of-day") map (_(
+      $("date") as ST("xs:date?")
+    ).as(ST("xs:dateTime?")) { date =>
+      xs.dateTime(date, xs.time("00:00:00-00:00".xs))
+    })
+
+  // qscript:temporal-trunc($dateTime as xs:dateTime?) as xs:$dateTime?
+  def temporalTrunc[F[_]: PrologW](part: TemporalPart): F[FunctionDecl1] =
+    qs.declare("temporal-trunc") map (_(
+      $("item") as ST("item()?")
+    ).as(ST("item()?")) { item =>
+      import TemporalPart._
+
+      def dt(
+        h: XQuery, m: XQuery, d: XQuery, hr: XQuery, min: XQuery, sec: XQuery, ms: XQuery
+      ): XQuery =
+        fn.concat(
+          xdmp.formatNumber(h, "0001".xs), "-".xs,
+          xdmp.formatNumber(m,   "01".xs), "-".xs,
+          xdmp.formatNumber(d,   "01".xs), "T".xs,
+          xdmp.formatNumber(hr,  "01".xs), ":".xs,
+          xdmp.formatNumber(min, "01".xs), ":".xs,
+          xdmp.formatNumber(sec, "01".xs), ".".xs,
+          xdmp.formatNumber(ms, "001".xs), "Z".xs)
+
+      def fmtDateTime(x: XQuery): XQuery = fn.formatDateTime(x, dateTimeFmt)
+
+      val (dateTime, wrap) = ($("dateTime"), $("wrap"))
+      let_(
+        dateTime := typeswitch(item)(
+          $("dateTime") as ST("xs:dateTime") return_ (ι),
+          $("date") as ST("xs:date") return_ (xs.dateTime(_, xs.time("00:00:00-00:00".xs))),
+          $("time") as ST("xs:time") return_ (xs.dateTime(xs.date("0001-01-01".xs), _))
+        ) default emptySeq,
+        wrap := typeswitch(item)(
+          $("dateTime") as ST("xs:dateTime") return_ (κ(
+            xdmp.function(xs.QName("xs:dateTime".xs)))),
+          $("date")     as ST("xs:date") return_ (κ(
+            func("$s")(xs.date(xdmp.parseDateTime(dateFmt, "$s".xqy))))),
+          $("time")     as ST("xs:time") return_ (κ(
+            func("$s")(xs.time(xdmp.parseDateTime(dateTimeFmt, "$s".xqy)))))
+        ) default emptySeq
+      ) return_ {
+
+      xdmp.apply(~wrap, part match {
+        case Century =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 100.xqy) * 100.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Day =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            fn.monthFromDateTime(~dateTime),
+            fn.dayFromDateTime(~dateTime),
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Decade =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 10.xqy) * 10.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Hour =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), 0.xqy, 0.xqy, 0.xqy)
+        case Microsecond => fmtDateTime(~dateTime)
+        case Millennium =>
+          dt(
+            (fn.yearFromDateTime(~dateTime) idiv 1000.xqy) * 1000.xqy, 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Millisecond => fmtDateTime(~dateTime)
+        case Minute =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            fn.monthFromDateTime(~dateTime),
+            fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), fn.minutesFromDateTime(~dateTime), 0.xqy, 0.xqy)
+        case Month =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Quarter =>
+          dt(
+            fn.yearFromDateTime(~dateTime),
+            mkSeq_(mkSeq_(xdmp.quarterFromDate(xs.date(~dateTime)) - 1.xqy) * 3.xqy) + 1.xqy,
+            1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+        case Second =>
+          dt(
+            fn.yearFromDateTime(~dateTime), fn.monthFromDateTime(~dateTime), fn.dayFromDateTime(~dateTime),
+            fn.hoursFromDateTime(~dateTime), fn.minutesFromDateTime(~dateTime),
+            math.floor(fn.secondsFromDateTime(~dateTime)), 0.xqy)
+        case Week =>
+          fmtDateTime(xs.dateTime(
+            xs.date(~dateTime) - xs.dayTimeDuration(
+              fn.concat("P".xs, xs.string(xdmp.weekdayFromDate(xs.date(~dateTime)) - 1.xqy), "D".xs))))
+        case Year =>
+          dt(
+            fn.yearFromDateTime(~dateTime), 1.xqy, 1.xqy,
+            0.xqy, 0.xqy, 0.xqy, 0.xqy)
+      })
+    }})
+
   // qscript:timezone-offset-seconds($dt as xs:dateTime?) as xs:integer?
   def timezoneOffsetSeconds[F[_]: PrologW]: F[FunctionDecl1] =
     qs.declare("timezone-offset-seconds") map (_(
@@ -369,8 +476,12 @@ object qscript {
     ).as(ST("xs:string")) { item: XQuery =>
       ejson.typeOf[F].apply(item) map { tpe =>
         if_(tpe eq "null".xs)
-        .then_ { "null".xs }
-        .else_ { fn.string(item) }
+        .then_("null".xs)
+        .else_(if_(tpe eq "time".xs)
+        .then_(fn.formatTime(item, "[H01]:[m01]:[s01].[f001]".xs))
+        .else_(if_(tpe eq "timestamp".xs)
+        .then_(fn.formatDateTime(item, dateTimeFmt))
+        .else_(fn.string(item))))
       }
     })
 

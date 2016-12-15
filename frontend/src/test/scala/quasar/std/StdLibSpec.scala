@@ -17,18 +17,21 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Qspec, Type}
+import quasar.{Data, DataCodec, Qspec, Type}
+import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
 
+import java.time._
+import java.time.ZoneOffset.UTC
 import scala.math.abs
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import org.specs2.execute.Result
+import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
-import java.time.{Instant, LocalDate, ZoneOffset}
-import scalaz.Equal
+import scalaz._, Scalaz._
+import scalaz.scalacheck.ScalaCheckBinding._
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
@@ -65,6 +68,15 @@ abstract class StdLibSpec extends Qspec {
         runner.decDomain.map(Data.Dec(_)),
         runner.stringDomain.map(Data.Str(_)))
     }
+
+    // TODO
+    // - Years outside 1-9999 cause issues for at least CB, ML.
+    // - Years 0-999 omitted for ML year zero disagreement involving millennium extract and trunc.
+    val arbDate: Arbitrary[LocalDate] =
+      Arbitrary(Gen.choose(
+        LocalDate.of(1000, 1, 1).toEpochDay,
+        LocalDate.of(9999, 12, 31).toEpochDay
+      )) ∘ (LocalDate.ofEpochDay(_))
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -177,6 +189,8 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ToString" >> {
+        implicit val ad = arbDate
+
         "string" >> prop { (str: String) =>
           unary(ToString(_).embed, Data.Str(str), Data.Str(str))
         }
@@ -204,22 +218,24 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        // TODO: need `Arbitrary`s for all of these
-        // "timestamp" >> prop { (x: Instant) =>
-        //   unary(ToString(_).embed, Data.Timestamp(x), Data.Str(x.toString))
-        // }
-        //
-        // "date" >> prop { (x: LocalDate) =>
-        //   unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
-        // }
-        //
-        // "time" >> prop { (x: LocalTime) =>
-        //   unary(ToString(_).embed, Data.Time(x), Data.Str(x.toString))
-        // }
-        //
-        // "interval" >> prop { (x: Duration) =>
-        //   unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
-        // }
+        "timestamp" >> prop { (x: Instant) =>
+          unary(ToString(_).embed, Data.Timestamp(x), Data.Str(x.toString))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
+          unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
+        }
+
+        "time" >> prop { (x: LocalTime) =>
+          unary(
+            ToString(_).embed,
+            Data.Time(x),
+            Data.Str(x.format(DataCodec.dateTimeFormatter)))
+        }
+
+        "interval" >> prop { (x: Duration) =>
+          unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
+        }
       }
     }
 
@@ -564,6 +580,52 @@ abstract class StdLibSpec extends Qspec {
 
         "midnight 1999-12-31" >> {
           unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+        }
+      }
+
+      "StartOfDay" >> {
+        implicit val ad = arbDate
+
+        "timestamp" >> prop { (x: LocalDate) =>
+          unary(
+            StartOfDay(_).embed,
+            Data.Date(x),
+            Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+        }
+      }
+
+      "TemporalTrunc" >> {
+        implicit val ad = arbDate
+
+        "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate, y: TemporalPart) =>
+          val t = x.atStartOfDay(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Date(x),
+              Data.Date(tt.toLocalDate)))
+        }
+
+        "time" >> prop { (x: LocalTime, y: TemporalPart) =>
+          truncLocalTime(y, x).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Time(x),
+              Data.Time(tt)))
         }
       }
 

@@ -578,6 +578,12 @@ class Transform
             prov.genBuckets(base.buckets.drop(1)).fold(NullLit[T, Hole]())(_._2),
             os)).embed))
 
+    case lp.TemporalTrunc(part, src) =>
+      val Ann(buckets, value) = src.ann
+      Target(
+        Ann(buckets, Free.roll[MapFunc, Hole](TemporalTrunc(part, value))),
+        src.value).right
+
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(

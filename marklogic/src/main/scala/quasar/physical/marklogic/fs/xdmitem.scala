@@ -33,7 +33,8 @@ import scalaz._, Scalaz._
 
 object xdmitem {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = xdm match {
+  def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = {
+    xdm match {
     case item: CtsBox                   =>
       Data.singletonObj("cts:box", Data.Obj(ListMap(
         "east"  -> Data._str(item.getEast),
@@ -81,7 +82,7 @@ object xdmitem {
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
     case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
-    case item: XSDateTime               => Data._timestamp(item.asDate.toInstant).point[F]
+    case item: XSDateTime               => Data._timestamp(ZonedDateTime.parse(item.asString).toInstant).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]
@@ -98,7 +99,7 @@ object xdmitem {
     case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._time(_))
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
     case other                          => noReprError[F, Data](other.toString)
-  }
+  }}
 
   ////
 

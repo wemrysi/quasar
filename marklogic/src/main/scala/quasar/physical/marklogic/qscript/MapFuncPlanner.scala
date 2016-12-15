@@ -51,6 +51,8 @@ object MapFuncPlanner {
     case Time(s)                      => xs.time(s).point[F]
     case Timestamp(s)                 => xs.dateTime(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
+    case StartOfDay(date)             => qscript.startOfDay[F] apply date
+    case TemporalTrunc(part, src)     => qscript.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => qscript.asDateTime[F] apply dt map xs.time
     case ToTimestamp(millis)          => qscript.timestampToDateTime[F] apply millis
     case Now()                        => fn.currentDateTime.point[F]
