@@ -24,7 +24,7 @@ import quasar.qscript.{provenance => prov}
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import scalaz.{NonEmptyList => NEL, _}, Scalaz._
+import scalaz._, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
   * connectors, along with the operations for dealing with them.
@@ -105,18 +105,6 @@ package object qscript {
 
   import MapFunc._
   import MapFuncs._
-
-  def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
-      Option[(FreeMap[T], NEL[FreeMap[T]])] =
-    buckets match {
-      case Nil => None
-      case head :: tail =>
-        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
-          NEL(head, tail).zipWithIndex.map(p =>
-            Free.roll(ProjectIndex[T, FreeMap[T]](
-              HoleF[T],
-              IntLit[T, Hole](p._2))))).some
-    }
 
   def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
