@@ -145,7 +145,8 @@ object FileSystemTest {
     fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)   orElse
     fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)    orElse
     fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition(10000L)) orElse
-    fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)
+    fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)         orElse
+    fsTestConfig(fallback.fs.FsType,        fallback.fs.definition)
   }
 
   def localFsUT: Task[IList[FileSystemUT[FileSystem]]] =

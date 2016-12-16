@@ -50,6 +50,7 @@ object TestConfig {
   val SPARK_HDFS      = BackendRef(BackendName("spark_hdfs")       , BackendCapability.All)
   val MARKLOGIC       = BackendRef(BackendName("marklogic")        , BackendCapability.All)
   val COUCHBASE       = BackendRef(BackendName("couchbase")        , BackendCapability.All)
+  val FALLBACK        = BackendRef(BackendName("fallback")         , BackendCapability.All)
 
   lazy val backendRefs: List[BackendRef] = List(
     MONGO_2_6      ,
@@ -61,7 +62,9 @@ object TestConfig {
     SPARK_LOCAL    ,
     SPARK_HDFS     ,
     MARKLOGIC      ,
-    COUCHBASE      )
+    COUCHBASE      ,
+    FALLBACK
+  )
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")

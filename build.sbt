@@ -444,7 +444,8 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    skeleton)
+    skeleton,
+    fallback)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
   .enablePlugins(AutomateHeaderPlugin)
