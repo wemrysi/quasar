@@ -703,5 +703,53 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
           Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))))))))
     }
+
+    "convert a non-static array projection" in {
+      val lp = fullCompileExp("select (loc || [7, 8])[0] from zips")
+      val qs = convert(listContents.some, lp)
+
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          ExcludeId,
+          Free.roll(MakeMap(
+            StrLit("0"),
+            Free.roll(Guard(
+              RightSideF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              Free.roll(Guard(
+                ProjectFieldR(RightSideF, StrLit("loc")),
+                Type.FlexArr(0, None, Type.Top),
+                ProjectIndexR(
+                  ConcatArraysR(
+                    ProjectFieldR(RightSideF, StrLit("loc")),
+                    Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
+                  IntLit(0)),
+                Free.roll(Undefined()))),
+              Free.roll(Undefined()))))))))))
+    }
+
+    "convert a static array projection prefix" in {
+      val lp = fullCompileExp("select ([7, 8] || loc)[1] from zips")
+      val qs = convert(listContents.some, lp)
+
+      qs must beSome(beQScript(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          ExcludeId,
+          Free.roll(MakeMap(
+            StrLit("0"),
+            Free.roll(Guard(
+              RightSideF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              Free.roll(Guard(
+                ProjectFieldR(RightSideF, StrLit("loc")),
+                Type.FlexArr(0, None, Type.Top),
+                IntLit(8),
+                Free.roll(Undefined()))),
+              Free.roll(Undefined()))))))))))
+    }
   }
 }

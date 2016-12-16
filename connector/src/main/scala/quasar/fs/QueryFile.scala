@@ -59,8 +59,9 @@ object QueryFile {
       PB:  ProjectBucket[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
       mergeable: Mergeable.Aux[T, QS],
-      eq:            Delay[Equal, QS],
-      show:           Delay[Show, QS])
+      render: Delay[RenderTree, QS],
+      eq: Delay[Equal, QS],
+      show: Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
     val optimizer = new Optimizer[T]
@@ -114,14 +115,15 @@ object QueryFile {
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (implicit
-      CQ:  Coalesce.Aux[T, QS, QS],
+      CQ: Coalesce.Aux[T, QS, QS],
       PA: PruneArrays[QS],
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
-      show:         Delay[Show, QS],
-      RT:     Delay[RenderTree, QS])
+      show: Delay[Show, QS],
+      renderI: Delay[RenderTree, QScriptInternal[T, ?]],
+      render: Delay[RenderTree, QS])
       : EitherT[Writer[PhaseResults, ?], FileSystemError, T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
     val rewrite = new Rewrite[T]
@@ -142,14 +144,15 @@ object QueryFile {
     (implicit
       merr: MonadError[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
-      CQ:  Coalesce.Aux[T, QS, QS],
-      PA: PruneArrays[QS],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
+      CQ: Coalesce.Aux[T, QS, QS],
+      PA: PruneArrays[QS],
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
-      show:           Delay[Show, QS],
-      RT:       Delay[RenderTree, QS])
+      show: Delay[Show, QS],
+      renderI: Delay[RenderTree, QScriptInternal[T, ?]],
+      render: Delay[RenderTree, QS])
       : M[T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
     val rewrite = new Rewrite[T]

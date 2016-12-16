@@ -118,7 +118,7 @@ package object qscript {
               IntLit[T, Hole](p._2))))).some
     }
 
-  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal](
+  def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
