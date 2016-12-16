@@ -10,6 +10,7 @@
         "marklogic":         "skip",
         "couchbase":         "skip",
         "spark_local": "skip",
+    "fallback": "skip",
 	"spark_hdfs":        "skip"
     },
 

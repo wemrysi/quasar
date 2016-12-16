@@ -4,6 +4,7 @@
         "postgresql": "pending",
         "couchbase":  "skip",
         "spark_local": "skip",
+    "fallback": "skip",
         "spark_hdfs": "skip"
     },
     "data": "zips.data",

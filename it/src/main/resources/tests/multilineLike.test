@@ -4,6 +4,7 @@
         "postgresql": "pending",
         "marklogic":  "skip",
         "spark_local": "skip",
+    "fallback": "skip",
         "spark_hdfs": "skip"
     },
     "data": "slamengine_commits.data",

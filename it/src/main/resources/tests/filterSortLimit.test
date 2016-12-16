@@ -4,6 +4,7 @@
     "backends": {
         "postgresql": "pending",
         "spark_local": "skip",
+    "fallback": "skip",
         "spark_hdfs": "skip"
     },
 
