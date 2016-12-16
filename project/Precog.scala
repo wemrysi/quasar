@@ -6,7 +6,6 @@ import scala._, Predef._
 object Build {
   val BothScopes = "compile->compile;test->test"
 
-  def envArgs     = (sys.env.getOrElse("ARGS", "").trim split "\\s+").toList
   def warningOpts = Seq("-g:vars", "-deprecation", "-unchecked", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
 
   /** Watch out Jonesy! It's the ol' double-cross!
@@ -61,7 +60,6 @@ object Build {
       serialTests scalacPlugins (kindProjector) also(
                organization :=  "com.precog",
                     version :=  "0.1",
-              scalacOptions ++= envArgs,
                scalaVersion :=  "2.11.8",
         logBuffered in Test :=  false,
    unmanagedJars in Compile +=  (baseDirectory in ThisBuild).value / "lib" / "jdbm-3.0-SNAPSHOT.jar"

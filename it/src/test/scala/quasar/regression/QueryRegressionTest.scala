@@ -121,6 +121,7 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Fragment = {
     def runTest: Result = {
+      scala.Console.err.println(s"regressionExample($loc, ${test.query}, ${test.variables})")
       val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
 
       (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run, backendName))
