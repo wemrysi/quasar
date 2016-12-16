@@ -34,9 +34,9 @@ import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import simulacrum.typeclass
+// import simulacrum.typeclass
 
-@typeclass trait Planner[F[_]] {
+trait Planner[F[_]] {
   type IT[G[_]]
 
   def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
@@ -44,6 +44,8 @@ import simulacrum.typeclass
 
 // TODO divide planner instances into separate files
 object Planner {
+
+  def apply[F[_]](implicit P: Planner[F]): Planner[F] = P
 
   // TODO consider moving to data.scala (conflicts with existing code)
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
