@@ -11,7 +11,9 @@ run () { echo >&2 "$@" && "$@"; }
 
 [[ -n "$TRACE" ]] && TRACE="-Dygg.trace=$TRACE"
 
+[[ -n "$1" ]] && REGEX="-Dygg.testregex=$1"
+
 makeJson () { printf '{"fallback":{"connectionUri":"$s"}}\n' "$CHROOT"; }
 
-QUASAR_FALLBACK="$(makeJson)" run ./sbt $TRACE "$TARGET $TESTS" |& \
+QUASAR_FALLBACK="$(makeJson)" run ./sbt $REGEX $TRACE "$TARGET $TESTS" |& \
   seq-map truncate -dm 1000

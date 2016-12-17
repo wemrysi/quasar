@@ -90,6 +90,12 @@ abstract class QueryRegressionTest[S[_]](
 
   lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
 
+  private var counter = 1
+  val testRegex = scala.sys.props.get("ygg.testregex") map (_.r)
+  testRegex foreach { re =>
+    step(println(s"Filtering regression tests with regex $re"))
+  }
+
   // NB: The printing is just to indicate progress (especially for travis-ci) as
   //     these tests have the potential to be slow for a backend.
   //
@@ -101,8 +107,16 @@ abstract class QueryRegressionTest[S[_]](
       step(print(s"Running $suiteName ["))
 
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, fs.ref.name, fs.setupInterpM, fs.testInterpM)
-        step(print("."))
+        val fname: String = fileName(f).value
+        testRegex match {
+          case Some(re) if re.findFirstIn(fname).isEmpty => ()
+          case _                                         =>
+            val num = counter
+            counter += 1
+            step(scala.Console.err.println("\n" + f"[$num%03d] $fname%s: ${t.query}%s"))
+            regressionExample(f, t, fs.ref.name, fs.setupInterpM, fs.testInterpM)
+            step(scala.Console.err.println(f"[$num%03d] done."))
+        }
       }
 
       step(println("]"))
@@ -121,7 +135,6 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Fragment = {
     def runTest: Result = {
-      scala.Console.err.println(s"regressionExample($loc, ${test.query}, ${test.variables})")
       val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
 
       (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run, backendName))
