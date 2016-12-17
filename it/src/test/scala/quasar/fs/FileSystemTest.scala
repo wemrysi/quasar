@@ -59,11 +59,15 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Fragments =
+  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
     fileSystems.map { fss =>
-      Fragments.foreach(fss.toList)(fs =>
-        s"${fs.ref.name.shows} FileSystem" >>
-          fs.impl.map(f => Fragments(examples(f), step(f.close.unsafePerformSync))).getOrElse(Fragments.empty))
+      fss.toList.foreach(fs =>
+        fs.impl.map { f =>
+          s"${fs.ref.name.shows} FileSystem" >>
+            Fragments(examples(f), step(f.close.unsafePerformSync))
+        } getOrElse {
+          s"${fs.ref.name.shows} FileSystem" >> skipped("Environment not setup to test this file system")
+        })
     }.unsafePerformSync
 
   /** Returns the given result if the filesystem supports the given capabilities or `Skipped` otherwise. */
