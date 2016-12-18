@@ -261,6 +261,16 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       : F[T[G]] => F[T[G]] =
     liftFF(repeatedly(swapMapSubset(FtoG)))
 
+  /** This is the operation to apply after all QScript transformations. */
+  def finalizeQScript[F[_]: Functor: Normalizable]
+    (qs: T[F])
+    (implicit C:  Coalesce.Aux[T, F, F], QC: QScriptCore :<: F)
+      : T[F] =
+    qs.transHylo(
+      optimize(reflNT[F]),
+          C.coalesce[F](idPrism) ⋙
+            repeatedly(Normalizable[F].normalizeF(_: F[T[F]])))
+
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
     * exposing only “true” joins and converting intra-data joins to map

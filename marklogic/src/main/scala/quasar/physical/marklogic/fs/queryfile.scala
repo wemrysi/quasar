@@ -110,13 +110,7 @@ object queryfile {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
         shifted =  shiftRead[Fix, QSR, MLQScript].apply(qs)
         _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
-        optmzed =  shifted
-                     .transHylo(
-                       rewrite.optimize(reflNT[MLQScript]),
-                       repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
-                         repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
-                         repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
-                         repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
+        optmzed =  rewrite.finalizeQScript(shifted)
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
