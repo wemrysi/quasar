@@ -54,9 +54,10 @@ class Transform
     PB: ProjectBucket[T, ?] :<: F,
     // TODO: Remove this one once we have multi-sorted AST
     FI: Injectable.Aux[F, QScriptTotal[T, ?]],
-    mergeable:  Mergeable.Aux[T, F],
-    eq:         Delay[Equal, F],
-    show:       Delay[Show, F]) extends TTypes[T] {
+    mergeable: Mergeable.Aux[T, F],
+    render: Delay[RenderTree, F],
+    eq: Delay[Equal, F],
+    show: Delay[Show, F]) extends TTypes[T] {
 
   private val prov = new provenance.ProvenanceT[T]
   private val rewrite = new Rewrite[T]

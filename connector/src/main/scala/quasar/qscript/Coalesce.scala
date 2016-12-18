@@ -64,28 +64,28 @@ trait Coalesce[IN[_]] {
 }
 
 trait CoalesceInstances {
-  def coalesce[T[_[_]]: BirecursiveT: EqualT] = new CoalesceT[T]
+  def coalesce[T[_[_]]: BirecursiveT: EqualT: ShowT] = new CoalesceT[T]
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT, G[_]]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit QC: QScriptCore[T, ?] :<: G)
       : Coalesce.Aux[T, QScriptCore[T, ?], G] =
     coalesce[T].qscriptCore[G]
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT, F[_]]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]]
       : Coalesce.Aux[T, ProjectBucket[T, ?], F] =
     coalesce[T].projectBucket[F]
 
-  implicit def shiftedRead[T[_[_]]: BirecursiveT: EqualT, G[_]]
+  implicit def shiftedRead[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit SR: Const[ShiftedRead, ?] :<: G)
       : Coalesce.Aux[T, Const[ShiftedRead, ?], G] =
     coalesce[T].shiftedRead[G]
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT, G[_]]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit TJ: ThetaJoin[T, ?] :<: G)
       : Coalesce.Aux[T, ThetaJoin[T, ?], G] =
     coalesce[T].thetaJoin[G]
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT, G[_]]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit EJ: EquiJoin[T, ?] :<: G)
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
     coalesce[T].equiJoin
@@ -156,7 +156,7 @@ trait CoalesceInstances {
     default
 }
 
-class CoalesceT[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   private def CoalesceTotal = Coalesce[T, QScriptTotal, QScriptTotal]
 
   private type QST = QScriptTotal[T[CoEnv[Hole, QScriptTotal, ?]]]
@@ -235,7 +235,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         }
 
       // TODO: Use NormalizableT#freeMF instead
-      def normalizeMapFunc[A](t: FreeMapA[A]): FreeMapA[A] =
+      def normalizeMapFunc[A: Show](t: FreeMapA[A]): FreeMapA[A] =
         t.transCata[FreeMapA[A]](MapFunc.normalize[T, A])
 
       def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =

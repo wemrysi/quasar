@@ -68,7 +68,6 @@ trait NormalizableInstances {
   }
 }
 
-// ShowT is needed for debugging
 class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT]
     extends TTypes[T] {
   import Normalizable._
@@ -82,12 +81,12 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT]
     (free ≠ freeNormalized).option(freeNormalized)
   }
 
-  def freeMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+  def freeMFEq[A: Equal: Show](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
     val fmNormalized = freeMF[A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+  def freeMF[A: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     fm.transCata[Free[MapFunc, A]](MapFunc.normalize[T, A])
 
   def makeNorm[A, B, C](

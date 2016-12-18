@@ -76,6 +76,29 @@ object MapFunc {
       }
   }
 
+  /** Like `StaticArray`, but returns as much of the array as can be statically
+    * determined. Useful if you just want to statically lookup into an array if
+    * possible, and punt otherwise.
+    */
+  object StaticArrayPrefix {
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
+        Option[List[FreeMapA[T, A]]] =
+      mf match {
+        case ConcatArraysN(as) =>
+          as.foldLeftM[List[FreeMapA[T, A]] \/ ?, List[FreeMapA[T, A]]](
+            Nil)(
+            (acc, mf) => mf.project.run.fold(
+              κ(acc.left),
+              _ match {
+                case MakeArray(value) => (acc :+ value).right
+                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
+                  (acc ++ values.map(v => rollMF[T, A](Constant(v)).embed)).right
+                case _ => acc.left
+              })).merge.some
+        case _ => None
+      }
+  }
+
   object StaticMap {
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
@@ -90,29 +113,6 @@ object MapFunc {
                   (kvs.map(_.map(v => rollMF[T, A](Constant(v)).embed)) ++ acc).some
                 case _ => None
               }))
-        case _ => None
-      }
-  }
-
-  /** Like `StaticArray`, but returns as much of the array as can be statically
-    * determined. Useful if you just want to statically lookup into an array if
-    * possible, and punt otherwise.
-    */
-  object StaticArrayPrefix {
-    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
-        Option[List[FreeMapA[T, A]]] =
-      mf match {
-        case ConcatArraysN(as) =>
-          as.foldRightM[List[FreeMapA[T, A]] \/ ?, List[FreeMapA[T, A]]](
-            Nil)(
-            (mf, acc) => mf.project.run.fold(
-              κ(acc.left),
-              _ match {
-                case MakeArray(value) => (value :: acc).right
-                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => rollMF[T, A](Constant(v)).embed) ++ acc).right
-                case _ => acc.left
-              })).merge.some
         case _ => None
       }
   }
@@ -224,7 +224,7 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: BirecursiveT: EqualT, A]
+  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
       : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
     repeatedly(rewrite[T, A]) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
@@ -232,7 +232,7 @@ object MapFunc {
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def rewrite[T[_[_]]: BirecursiveT: EqualT, A]:
+  def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
