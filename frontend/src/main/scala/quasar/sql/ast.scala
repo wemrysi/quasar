@@ -168,9 +168,6 @@ object Sql {
       }
     }
   }
-
-  // implicit def toExprAlgebraOps[A](a: Algebra[Sql, A]): AlgebraOps[Sql, A] =
-  //   toAlgebraOps[Sql, A](a)
 }
 
 @Lenses final case class Select[A] private[sql] (
