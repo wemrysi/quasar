@@ -858,8 +858,13 @@ object MongoDbQScriptPlanner {
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(
-        rewrite.finalizeQScript(
-          simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs))
+        simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
+          .transHylo(
+            rewrite.optimize(reflNT[MongoQScript]),
+            repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
+              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
+              repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
+              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
           .point[M])
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize))))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))

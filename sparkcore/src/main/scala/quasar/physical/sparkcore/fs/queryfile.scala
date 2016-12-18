@@ -78,7 +78,11 @@ object queryfile {
       for {
         qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
           .map(simplifyRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript].apply(_))
-        optQS = rewrite.finalizeQScript(qs)
+        optQS = qs.transHylo(
+          rewrite.optimize(reflNT[SparkQScript]),
+          repeatedly(C.coalesceQC[SparkQScript](idPrism)) ⋙
+            repeatedly(C.coalesceEJ[SparkQScript](idPrism.get)) ⋙
+            repeatedly(C.coalesceSR[SparkQScript](idPrism)))
         _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }

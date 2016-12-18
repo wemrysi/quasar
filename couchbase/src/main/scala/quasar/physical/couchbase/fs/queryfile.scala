@@ -242,7 +242,12 @@ object queryfile {
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
       shft =  simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS].apply(qs)
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
-      opz  =  rewrite.finalizeQScript(shft)
+      opz  =  shft.transHylo(
+                rewrite.optimize(reflNT[CBQS]),
+                repeatedly(C.coalesceQC[CBQS](idPrism))       >>>
+                  repeatedly(C.coalesceEJ[CBQS](idPrism.get)) >>>
+                  repeatedly(C.coalesceSR[CBQS](idPrism))     >>>
+                  repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan

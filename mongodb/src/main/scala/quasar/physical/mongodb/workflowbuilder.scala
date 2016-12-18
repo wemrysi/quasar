@@ -1842,4 +1842,72 @@ object WorkflowBuilder {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =
       new Ops[F]
   }
+
+  // FIXME: These implicits should not be here, because this is not a companion
+  //        object, and therefore not on the search path.
+
+  // implicit def WorkflowBuilderRenderTree[F[_]: Coalesce: Functor]
+  //   (implicit
+  //     RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
+  //     RC: RenderTree[Contents[Expr]],
+  //     RF: RenderTree[Fix[F]],
+  //     ev: WorkflowOpCoreF :<: F
+  //   ): RenderTree[Fix[WorkflowBuilderF[F, ?]]] =
+  //   new RenderTree[Fix[WorkflowBuilderF[F, ?]]] {
+  //     val nodeType = "WorkflowBuilder" :: Nil
+
+  //     def render(v: WorkflowBuilder[F]) = v.unFix match {
+  //       case CollectionBuilderF(graph, base, struct) =>
+  //         NonTerminal("CollectionBuilder" :: nodeType, Some(base.shows),
+  //           graph.render ::
+  //             Terminal("Schema" :: "CollectionBuilder" :: nodeType, struct ∘ (_.shows)) ::
+  //             Nil)
+  //       case spb @ ShapePreservingBuilderF(src, inputs, op) =>
+  //         val nt = "ShapePreservingBuilder" :: nodeType
+  //         NonTerminal(nt, None,
+  //           render(src) :: (inputs.map(render) :+ spb.dummyOp.render))
+  //       case ValueBuilderF(value) =>
+  //         Terminal("ValueBuilder" :: nodeType, Some(value.shows))
+  //       case ExprBuilderF(src, expr) =>
+  //         NonTerminal("ExprBuilder" :: nodeType, None,
+  //           render(src) :: expr.render :: Nil)
+  //       case DocBuilderF(src, shape) =>
+  //         val nt = "DocBuilder" :: nodeType
+  //         NonTerminal(nt, None,
+  //           render(src) ::
+  //             NonTerminal("Shape" :: nt, None,
+  //               shape.toList.map {
+  //                 case (name, expr) =>
+  //                   NonTerminal("Name" :: nodeType, Some(name.value), List(expr.render))
+  //               }) ::
+  //             Nil)
+  //       case ArrayBuilderF(src, shape) =>
+  //         val nt = "ArrayBuilder" :: nodeType
+  //         NonTerminal(nt, None,
+  //           render(src) ::
+  //             NonTerminal("Shape" :: nt, None, shape.map(_.render)) ::
+  //             Nil)
+  //       case GroupBuilderF(src, keys, content) =>
+  //         val nt = "GroupBuilder" :: nodeType
+  //         NonTerminal(nt, None,
+  //           render(src) ::
+  //             NonTerminal("By" :: nt, None, keys.map(render)) ::
+  //             RG.render(content).copy(nodeType = "Content" :: nt) ::
+  //             Nil)
+  //       case FlatteningBuilderF(src, fields) =>
+  //         val nt = "FlatteningBuilder" :: nodeType
+  //         NonTerminal(nt, None,
+  //           render(src) ::
+  //             fields.toList.map(x => $var(x.field).render.copy(nodeType = (x match {
+  //               case StructureType.Array(_) => "Array"
+  //               case StructureType.Object(_) => "Object"
+  //             }) :: nt)))
+  //       case SpliceBuilderF(src, structure) =>
+  //         NonTerminal("SpliceBuilder" :: nodeType, None,
+  //           render(src) :: structure.map(RC.render))
+  //       case ArraySpliceBuilderF(src, structure) =>
+  //         NonTerminal("ArraySpliceBuilder" :: nodeType, None,
+  //           render(src) :: structure.map(RC.render))
+  //     }
+  //   }
 }

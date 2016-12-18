@@ -33,11 +33,6 @@ trait Coalesce[IN[_]] {
   type IT[F[_]]
   type OUT[A]
 
-  /** Combines the other operations to create a single transformation that works
-    * for the particular Coproduct
-    */
-  def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]): OUT[IT[F]] => OUT[IT[F]]
-
   /** Coalesce for types containing QScriptCore. */
   def coalesceQC[F[_]: Functor]
     (FToOut: PrismNT[F, OUT])
@@ -75,11 +70,6 @@ trait CoalesceInstances {
       : Coalesce.Aux[T, ProjectBucket[T, ?], F] =
     coalesce[T].projectBucket[F]
 
-  implicit def shiftedRead[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
-    (implicit SR: Const[ShiftedRead, ?] :<: G)
-      : Coalesce.Aux[T, Const[ShiftedRead, ?], G] =
-    coalesce[T].shiftedRead[G]
-
   implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit TJ: ThetaJoin[T, ?] :<: G)
       : Coalesce.Aux[T, ThetaJoin[T, ?], G] =
@@ -96,9 +86,6 @@ trait CoalesceInstances {
     new Coalesce[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
       type OUT[A] = H[A]
-
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =
-        F.coalesce(FToOut) <<< G.coalesce(FToOut)
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
@@ -126,8 +113,6 @@ trait CoalesceInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
 
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) = ι
-
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore[IT, ?] :<: OUT) =
@@ -153,6 +138,10 @@ trait CoalesceInstances {
     default
 
   implicit def read[T[_[_]], OUT[_]]: Coalesce.Aux[T, Const[Read, ?], OUT] =
+    default
+
+  implicit def shiftedRead[T[_[_]], OUT[_]]
+      : Coalesce.Aux[T, Const[ShiftedRead, ?], OUT] =
     default
 }
 
@@ -237,9 +226,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       // TODO: Use NormalizableT#freeMF instead
       def normalizeMapFunc[A: Show](t: FreeMapA[A]): FreeMapA[A] =
         t.transCata[FreeMapA[A]](MapFunc.normalize[T, A])
-
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =
-        liftFF(repeatedly(coalesceQC(FToOut)))
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
@@ -397,8 +383,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) = ι
-
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) = {
@@ -430,46 +414,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         κ(None)
     }
 
-  def shiftedRead[G[_]](implicit SR: Const[ShiftedRead, ?] :<: G)
-      : Coalesce.Aux[T, Const[ShiftedRead, ?], G] =
-    new Coalesce[Const[ShiftedRead, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = G[A]
-
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =
-        liftFF(repeatedly(coalesceSR(FToOut)))
-
-      def coalesceQC[F[_]: Functor]
-        (FToOut: PrismNT[F, OUT])
-        (implicit QC: QScriptCore :<: OUT) =
-        κ(None)
-
-      def coalesceSR[F[_]: Functor]
-        (FToOut: PrismNT[F, OUT])
-        (implicit SR: Const[ShiftedRead, ?] :<: OUT)
-          : Const[ShiftedRead, IT[F]] => Option[Const[ShiftedRead, IT[F]]] =
-        κ(None)
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<: OUT) =
-        κ(None)
-
-      def coalesceTJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit TJ: ThetaJoin :<: OUT) =
-        κ(None)
-    }
-
-
-  def thetaJoin[G[_]](implicit TJ: ThetaJoin :<: G)
-      : Coalesce.Aux[T, ThetaJoin, G] =
+  def thetaJoin[G[_]](implicit TJ: ThetaJoin :<: G): Coalesce.Aux[T, ThetaJoin, G] =
     new Coalesce[ThetaJoin] {
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
-
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =
-        liftFG(injectRepeatedly(coalesceTJ(FToOut.get)))
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
@@ -508,9 +456,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     new Coalesce[EquiJoin] {
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
-
-      def coalesce[F[_]: Functor](FToOut: PrismNT[F, OUT]) =
-        liftFG(injectRepeatedly(coalesceEJ(FToOut.get)))
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
