@@ -53,9 +53,10 @@ class Transform
     PB: ProjectBucket[T, ?] :<: F,
     // TODO: Remove this one once we have multi-sorted AST
     FI: Injectable.Aux[F, QScriptTotal[T, ?]],
-    mergeable:  Mergeable.Aux[T, F],
-    eq:         Delay[Equal, F],
-    show:       Delay[Show, F]) extends TTypes[T] {
+    mergeable: Mergeable.Aux[T, F],
+    render: Delay[RenderTree, F],
+    eq: Delay[Equal, F],
+    show: Delay[Show, F]) extends TTypes[T] {
 
   private val prov = new provenance.ProvenanceT[T]
   private val rewrite = new Rewrite[T]
@@ -564,7 +565,7 @@ class Transform
           Ann[T](base.buckets, dset),
           QC.inj(Sort(
             base.src,
-            prov.genBuckets(base.buckets).fold(NullLit[T, Hole]())(_._2),
+            prov.genBuckets(base.buckets.drop(1)).fold(NullLit[T, Hole]())(_._2),
             os)).embed))
 
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>

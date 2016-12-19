@@ -67,29 +67,26 @@ trait NormalizableInstances {
   }
 }
 
-// ShowT is needed for debugging
 class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
     extends TTypes[T] {
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 
-  def freeTC(free: FreeQS): FreeQS = {
+  def freeTC(free: FreeQS): FreeQS =
     freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
-      liftCo(rewrite.normalizeCoEnv[QScriptTotal])
-    )
-  }
+      liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
     (free ≠ freeNormalized).option(freeNormalized)
   }
 
-  def freeMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+  def freeMFEq[A: Equal: Show](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
     val fmNormalized = freeMF[A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+  def freeMF[A: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
 
   def makeNorm[A, B, C](

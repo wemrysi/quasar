@@ -81,7 +81,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
     }
 
     "coalesce a Map into a subsequent LeftShift" in {
-      val exp =
+      val exp: QScriptCore[Fix[QScriptCore]] =
         LeftShift(
           Map(
             Unreferenced[Fix, Fix[QScriptCore]]().embed,
@@ -105,13 +105,13 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(Free.roll(Constant(value))))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
+          RootR.embed,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value))).embed))))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -156,13 +156,13 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(Free.roll(MakeArray(Free.roll(Constant(value))))))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
+          RootR.embed,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value)))))).embed))))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -206,7 +206,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(Constant(
-                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))),
+                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)),
               Free.roll(MakeArray(
                 Free.roll(ConcatArrays(
                   Free.roll(MakeArray(
@@ -214,7 +214,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                       Free.roll(MakeArray(Free.point(LeftSide))),
                       Free.roll(MakeArray(Free.point(RightSide))))))),
                   Free.roll(Constant(
-                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))))))))))).embed)
+                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))))))).embed)
     }
 
     "fold nested boolean values" in {
@@ -226,7 +226,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(
             // !false && (false || !true)
             Free.roll(And(
@@ -237,11 +237,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(Constant(
-            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
+            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false))))).embed))))
 
-      normalizeFExpr(exp) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "simplify a ThetaJoin" in {

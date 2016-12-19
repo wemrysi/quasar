@@ -277,8 +277,8 @@ object Planner {
           EitherT((maybeBucket |@| maybeSortBys) {
             case (bucket, sortBys) =>
               val asc  = sortBys.head._2 === SortDir.Ascending
-              val keys = bucket <:: sortBys.map(_._1)
-              src.sortBy(d => keys.map(_(d)).toList, asc)
+              val keys = bucket :: sortBys.map(_._1).toList
+              src.sortBy(d => keys.map(_(d)), asc)
           }.point[Task]).liftM[SparkStateT]
 
         case Filter(src, f) =>

@@ -19,28 +19,39 @@ package quasar.physical.couchbase
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.{PhaseResults, PhaseResultT}
+import quasar.common.PhaseResultT
 import quasar.connector.PlannerErrT
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
 package object planner {
+  import N1QL.{Id, Select}, Select.{Value, ResultExpr}
 
   type CBPhaseLog[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
 
-  def prtell[F[_]: Monad: MonadTell[?[_], PhaseResults]](pr: PhaseResults) =
-    MonadTell[F, PhaseResults].tell(pr)
+  def genId[T[_[_]], F[_]: Functor: NameGenerator]: F[Id[T[N1QL]]] =
+    NameGenerator[F].prefixedName("_") ∘ (Id(_))
 
-  def n1ql(n1ql: N1QL): String =
-    N1QL.n1qlQueryString(n1ql)
+  def selectOrElse[T[_[_]]: Recursive](
+    a: T[N1QL], whenSelect: T[N1QL], otherwise: T[N1QL]
+  ): T[N1QL] =
+    a.project match {
+      case _: Select[T[N1QL]] => whenSelect
+      case _                  => otherwise
+    }
 
-  def genName[F[_]: Functor: NameGenerator]: F[String] =
-    NameGenerator[F].prefixedName("_")
+  def wrapSelect[T[_[_]]: Recursive: Corecursive](a: T[N1QL]): T[N1QL] =
+    selectOrElse[T](
+      a, a,
+      Select(
+        Value(true), ResultExpr(a, none).wrapNel, keyspace = none,
+        unnest = none, filter = none, groupBy = none, orderBy = Nil).embed)
 
   def unimplemented[A](name: String): PlannerError \/ A =
     InternalError.fromMsg(s"unimplemented $name").left
 
   def unimplementedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
-    EitherT(unimplemented[A](name).point[PhaseResultT[F, ?]])
+    EitherT(unimplemented[A](name).η[PhaseResultT[F, ?]])
 
 }

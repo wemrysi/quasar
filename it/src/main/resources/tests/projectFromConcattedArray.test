@@ -1,10 +1,11 @@
 {
-    "name": "project from concatted array",
+    "name": "project from non-static concatted array",
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "largeZips.data",
     "query": "select (loc || [1, 2])[1] from largeZips",
