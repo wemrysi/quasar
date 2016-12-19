@@ -428,7 +428,15 @@ lazy val sparkcore = project
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
     libraryDependencies ++= Dependencies.sparkcore,
-    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
+    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad),
+    assemblyShadeRules in assembly ++= Seq(
+      ShadeRule.rename("org.jboss.netty.**" -> "org.jboss.spark.netty.@1")
+        .inLibrary("io.netty" % "netty" % "3.8.0.Final")
+        .inProject,
+      ShadeRule.rename("io.netty.**" -> "io.spark.netty.@1")
+      .inLibrary("io.netty" % "netty-all" % "4.0.29.Final")
+      .inProject
+    ))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
