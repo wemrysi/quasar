@@ -106,6 +106,24 @@ package object qscript {
   import MapFunc._
   import MapFuncs._
 
+  def flattenArray[T[_[_]], A: Show](array: ConcatArrays[T, FreeMapA[T, A]]): List[FreeMapA[T, A]] = {
+    def inner(jf: FreeMapA[T, A]): List[FreeMapA[T, A]] =
+      jf.resume match {
+        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
+        case _                           => List(jf)
+      }
+    inner(Free.roll(array))
+  }
+
+  def rebuildArray[T[_[_]]: Corecursive, A](funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = {
+    def inner(funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = funcs match {
+      case Nil          => Free.roll(EmptyArray[T, FreeMapA[T, A]])
+      case func :: Nil  => func
+      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
+    }
+    inner(funcs.reverse)
+  }
+
   def concat[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {

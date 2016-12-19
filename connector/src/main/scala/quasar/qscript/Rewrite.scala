@@ -204,6 +204,22 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
     case _ => None
   }
 
+  private def findUniqueBuckets(bucket0: FreeMap): Option[FreeMap] =
+    bucket0.resume match {
+      case -\/(array @ ConcatArrays(_, _)) =>
+        val bucket: FreeMap = rebuildArray(flattenArray(array).distinctE.toList)
+        if (bucket0 ≟ bucket) None else bucket.some
+     case _ => None
+  }
+
+  def uniqueBuckets = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+    case Reduce(src, bucket, reducers, repair) =>
+      findUniqueBuckets(bucket).map(Reduce(src, _, reducers, repair))
+    case Sort(src, bucket, order) =>
+      findUniqueBuckets(bucket).map(Sort(src, _, order))
+    case _ => None
+  }
+
   // /** Chains multiple transformations together, each of which can fail to change
   //   * anything.
   //   */
@@ -237,6 +253,7 @@ class Rewrite[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends TTypes[T] 
     repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
+      liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
       repeatedly(C.coalesceQC[G](prism)) ⋙
       liftFG(injectRepeatedly(C.coalesceTJ[G](prism.get))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
