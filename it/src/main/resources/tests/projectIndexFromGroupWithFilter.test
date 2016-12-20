@@ -12,7 +12,8 @@
     "ignoreFieldOrder": [
       "mongodb_2_6",
       "mongodb_3_0",
-      "mongodb_3_2"
+      "mongodb_3_2",
+      "couchbase"
     ],
     "expected": [
         { "sha": "53d2e5684d9403194dff1cc63423c2590038d1c0", "count": 1 },
