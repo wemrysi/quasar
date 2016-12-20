@@ -645,90 +645,89 @@ object MapFunc {
       }
     }
 
+  def translateNullaryMapping[T[_[_]], A]: NullaryFunc => MapFunc[T, A] = {
+    case date.Now => Now()
+  }
+
   def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFunc[T, A] = {
-    {
-      case date.ExtractCentury => ExtractCentury(_)
-      case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
-      case date.ExtractDecade => ExtractDecade(_)
-      case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
-      case date.ExtractDayOfYear => ExtractDayOfYear(_)
-      case date.ExtractEpoch => ExtractEpoch(_)
-      case date.ExtractHour => ExtractHour(_)
-      case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
-      case date.ExtractIsoYear => ExtractIsoYear(_)
-      case date.ExtractMicroseconds => ExtractMicroseconds(_)
-      case date.ExtractMillennium => ExtractMillennium(_)
-      case date.ExtractMilliseconds => ExtractMilliseconds(_)
-      case date.ExtractMinute => ExtractMinute(_)
-      case date.ExtractMonth => ExtractMonth(_)
-      case date.ExtractQuarter => ExtractQuarter(_)
-      case date.ExtractSecond => ExtractSecond(_)
-      case date.ExtractTimezone => ExtractTimezone(_)
-      case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
-      case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
-      case date.ExtractWeek => ExtractWeek(_)
-      case date.ExtractYear => ExtractYear(_)
-      case date.Date => Date(_)
-      case date.Time => Time(_)
-      case date.Timestamp => Timestamp(_)
-      case date.Interval => Interval(_)
-      case date.TimeOfDay => TimeOfDay(_)
-      case date.ToTimestamp => ToTimestamp(_)
-      case math.Negate => Negate(_)
-      case relations.Not => Not(_)
-      case string.Length => Length(_)
-      case string.Lower => Lower(_)
-      case string.Upper => Upper(_)
-      case string.Boolean => Bool(_)
-      case string.Integer => Integer(_)
-      case string.Decimal => Decimal(_)
-      case string.Null => Null(_)
-      case string.ToString => ToString(_)
-      case structural.MakeArray => MakeArray(_)
-      case structural.Meta => Meta(_)
-    }
+    case date.ExtractCentury => ExtractCentury(_)
+    case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
+    case date.ExtractDecade => ExtractDecade(_)
+    case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
+    case date.ExtractDayOfYear => ExtractDayOfYear(_)
+    case date.ExtractEpoch => ExtractEpoch(_)
+    case date.ExtractHour => ExtractHour(_)
+    case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
+    case date.ExtractIsoYear => ExtractIsoYear(_)
+    case date.ExtractMicroseconds => ExtractMicroseconds(_)
+    case date.ExtractMillennium => ExtractMillennium(_)
+    case date.ExtractMilliseconds => ExtractMilliseconds(_)
+    case date.ExtractMinute => ExtractMinute(_)
+    case date.ExtractMonth => ExtractMonth(_)
+    case date.ExtractQuarter => ExtractQuarter(_)
+    case date.ExtractSecond => ExtractSecond(_)
+    case date.ExtractTimezone => ExtractTimezone(_)
+    case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
+    case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
+    case date.ExtractWeek => ExtractWeek(_)
+    case date.ExtractYear => ExtractYear(_)
+    case date.Date => Date(_)
+    case date.Time => Time(_)
+    case date.Timestamp => Timestamp(_)
+    case date.Interval => Interval(_)
+    case date.TimeOfDay => TimeOfDay(_)
+    case date.ToTimestamp => ToTimestamp(_)
+    case math.Negate => Negate(_)
+    case relations.Not => Not(_)
+    case string.Length => Length(_)
+    case string.Lower => Lower(_)
+    case string.Upper => Upper(_)
+    case string.Boolean => Bool(_)
+    case string.Integer => Integer(_)
+    case string.Decimal => Decimal(_)
+    case string.Null => Null(_)
+    case string.ToString => ToString(_)
+    case structural.MakeArray => MakeArray(_)
+    case structural.Meta => Meta(_)
   }
 
-  def translateBinaryMapping[T[_[_]], A]: BinaryFunc => (A, A) => MapFunc[T, A] = {
-    {
-      // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
-      //     about the second. And it shouldn’t even have two in LP.
-      case array.ArrayLength => (a, b) => Length(a)
-      case math.Add => Add(_, _)
-      case math.Multiply => Multiply(_, _)
-      case math.Subtract => Subtract(_, _)
-      case math.Divide => Divide(_, _)
-      case math.Modulo => Modulo(_, _)
-      case math.Power => Power(_, _)
-      case relations.Eq => Eq(_, _)
-      case relations.Neq => Neq(_, _)
-      case relations.Lt => Lt(_, _)
-      case relations.Lte => Lte(_, _)
-      case relations.Gt => Gt(_, _)
-      case relations.Gte => Gte(_, _)
-      case relations.IfUndefined => IfUndefined(_, _)
-      case relations.And => And(_, _)
-      case relations.Or => Or(_, _)
-      case set.Within => Within(_, _)
-      case structural.MakeObject => MakeMap(_, _)
-      case structural.ObjectConcat => ConcatMaps(_, _)
-      case structural.ArrayProject => ProjectIndex(_, _)
-      case structural.ObjectProject => ProjectField(_, _)
-      case structural.DeleteField => DeleteField(_, _)
-      case string.Concat
-         | structural.ArrayConcat
-         | structural.ConcatOp => ConcatArrays(_, _)
-    }
+  def translateBinaryMapping[T[_[_]], A]
+      : BinaryFunc => (A, A) => MapFunc[T, A] = {
+    // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
+    //     about the second. And it shouldn’t even have two in LP.
+    case array.ArrayLength => (a, b) => Length(a)
+    case math.Add => Add(_, _)
+    case math.Multiply => Multiply(_, _)
+    case math.Subtract => Subtract(_, _)
+    case math.Divide => Divide(_, _)
+    case math.Modulo => Modulo(_, _)
+    case math.Power => Power(_, _)
+    case relations.Eq => Eq(_, _)
+    case relations.Neq => Neq(_, _)
+    case relations.Lt => Lt(_, _)
+    case relations.Lte => Lte(_, _)
+    case relations.Gt => Gt(_, _)
+    case relations.Gte => Gte(_, _)
+    case relations.IfUndefined => IfUndefined(_, _)
+    case relations.And => And(_, _)
+    case relations.Or => Or(_, _)
+    case set.Within => Within(_, _)
+    case structural.MakeObject => MakeMap(_, _)
+    case structural.ObjectConcat => ConcatMaps(_, _)
+    case structural.ArrayProject => ProjectIndex(_, _)
+    case structural.ObjectProject => ProjectField(_, _)
+    case structural.DeleteField => DeleteField(_, _)
+    case string.Concat
+       | structural.ArrayConcat
+       | structural.ConcatOp => ConcatArrays(_, _)
   }
 
-  def translateTernaryMapping[T[_[_]], A]:
-      TernaryFunc => (A, A, A) => MapFunc[T, A] = {
-    {
-      case relations.Between => Between(_, _, _)
-      case relations.Cond    => Cond(_, _, _)
-      case string.Search     => Search(_, _, _)
-      case string.Substring  => Substring(_, _, _)
-    }
+  def translateTernaryMapping[T[_[_]], A]
+      : TernaryFunc => (A, A, A) => MapFunc[T, A] = {
+    case relations.Between => Between(_, _, _)
+    case relations.Cond    => Cond(_, _, _)
+    case string.Search     => Search(_, _, _)
+    case string.Substring  => Substring(_, _, _)
   }
 }
 

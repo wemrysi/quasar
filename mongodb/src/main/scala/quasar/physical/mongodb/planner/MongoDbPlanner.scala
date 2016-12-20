@@ -662,6 +662,9 @@ object MongoDbPlanner {
           }
         case Drop =>
           lift(Arity2(HasWorkflow, HasInt).map((WB.skip(_, _)).tupled))
+        case Sample =>
+          // TODO: Use Mongo’s $sample operation when possible.
+          lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
         case Take =>
           lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
         case Union =>

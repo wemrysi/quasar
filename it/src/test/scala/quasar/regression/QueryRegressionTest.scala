@@ -20,6 +20,8 @@ import quasar.Predef._
 import quasar._
 import quasar.build.BuildInfo
 import quasar.common._
+import quasar.contrib.argonaut._
+import quasar.ejson
 import quasar.frontend._
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._, free._
@@ -30,11 +32,13 @@ import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
+import java.math.{MathContext, RoundingMode}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.matching.Regex
 
-import argonaut._, Argonaut._
+import argonaut._, Argonaut._, JsonMonocle._
+import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
@@ -159,6 +163,31 @@ abstract class QueryRegressionTest[S[_]](
     Task.gatherUnordered(locs.toList map ensureTestFile) map (_ any ι)
   }
 
+  /** This is a workaround for issue where Mongo can only return objects. The
+    * fallback evaluator will allow us to fix this in the right way, but for now
+    * we just work around it in the tests.
+    */
+  val promoteValue: Json => Option[Json] =
+    json => json.obj.fold(
+      json.some)(
+      _.toList match {
+        case ("value", result) :: Nil =>
+          (jObjectPrism.getOption(result) >>= (_("$na")))
+            .fold(result.some)(κ(None))
+        case _ => json.some
+      })
+
+  val TestContext = new MathContext(13, RoundingMode.DOWN)
+
+  /** This helps us get identical results on different connectors, even though
+    * they have different precisions for their floating point values.
+    */
+  val reducePrecision =
+    λ[EndoK[ejson.Common]](ejson.dec.modify(_.round(TestContext))(_))
+
+  val normalizeJson: Json => Option[Json] =
+    j => promoteValue(Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json])))
+
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
     exp: ExpectedResult,
@@ -184,7 +213,7 @@ abstract class QueryRegressionTest[S[_]](
 
     exp.predicate(
       exp.rows.toVector,
-      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
+      act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
       exp.ignoreFieldOrderBackend match {
         case IgnoreFieldOrderAllBackends            =>
           FieldOrderIgnored

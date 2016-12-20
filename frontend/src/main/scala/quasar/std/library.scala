@@ -36,14 +36,13 @@ trait Library {
       None
   }
 
-  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] = { _ =>
-    Validation.success(codomain)
-  }
+  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
+    _ => success(codomain)
 
   private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
     f(args).getOrElse {
       val msg: String = "Unknown arguments: " + args
-      Validation.failure(NonEmptyList(SemanticError.GenericError(msg)))
+      failure(NonEmptyList(SemanticError.GenericError(msg)))
     }
   }
 
@@ -58,9 +57,10 @@ trait Library {
   }
 
   protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] = {
-    case ((funcDomain, funcCodomain), rez) => Type.typecheck(rez, funcCodomain).fold(
-      κ(f(rez)),
-      κ(success(funcDomain)))
+    case ((funcDomain, funcCodomain), rez) =>
+      Type.typecheck(rez, funcCodomain).fold(
+        κ(f(rez)),
+        κ(success(funcDomain)))
   }
 
   private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {

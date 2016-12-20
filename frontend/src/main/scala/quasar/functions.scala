@@ -47,6 +47,22 @@ object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
 }
 
+final case class NullaryFunc
+  (val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val simplify: Func.Simplifier)
+    extends GenericFunc[nat._0] {
+  val domain = Sized[List]()
+  val typer0: Func.Typer[nat._0] = _ => Validation.success(codomain)
+  val untyper0: Func.Untyper[nat._0] = {
+    case ((funcDomain, _), _) => Validation.success(funcDomain)
+  }
+
+  def apply[A](): LP[A] =
+    applyGeneric(Sized[List]())
+}
+
 final case class UnaryFunc(
     val effect: DimensionalEffect,
     val help: String,
@@ -141,6 +157,7 @@ trait GenericFuncInstances {
       case date.ExtractWeek               => "ExtractWeek"
       case date.ExtractYear               => "ExtractYear"
       case date.Date                      => "Date"
+      case date.Now                       => "Now"
       case date.Time                      => "Time"
       case date.Timestamp                 => "Timestamp"
       case date.Interval                  => "Interval"
@@ -167,6 +184,7 @@ trait GenericFuncInstances {
       case relations.Or                   => "Or"
       case relations.Not                  => "Not"
       case relations.Cond                 => "Cond"
+      case set.Sample                     => "Sample"
       case set.Take                       => "Take"
       case set.Drop                       => "Drop"
       case set.Range                      => "Range"

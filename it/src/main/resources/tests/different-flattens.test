@@ -19,10 +19,8 @@
                 comments[*].`time`     LIKE \"%Dr%\")",
     "predicate": "equalsExactly",
     "TODO": "There should be only one result once MRA is fully implemented.",
-    "expected": [
-        { "profile": { "name": "Mary Jane", "age": 29, "title": "Dr" } },
-        { "profile": { "name": "Mary Jane", "age": 29, "title": "Dr" } },
-        { "profile": { "name": "Mary Jane", "age": 29, "title": "Dr" } },
-        { "profile": { "name": "Mary Jane", "age": 29, "title": "Dr" } }
-    ]
+    "expected": [{ "name": "Mary Jane", "age": 29, "title": "Dr" },
+                 { "name": "Mary Jane", "age": 29, "title": "Dr" },
+                 { "name": "Mary Jane", "age": 29, "title": "Dr" },
+                 { "name": "Mary Jane", "age": 29, "title": "Dr" }]
 }
