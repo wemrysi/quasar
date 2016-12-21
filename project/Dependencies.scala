@@ -64,9 +64,17 @@ object Dependencies {
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
 
-  def mongodb = Seq(
-    "org.mongodb" % "mongodb-driver-async" %   "3.2.2"
-  )
+  def mongodb = {
+    val nettyVersion = "4.1.3.Final" // This version should be kept in sync with
+                                     // transitive dependency of mongodb-driver-async
+    Seq(
+      "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
+      // sbt produces "continuing with a stub" without these two explicit dependencies
+      // despite the fact that they should be automatic transitive dependencies
+      "io.netty"    % "netty-buffer"         % nettyVersion,
+      "io.netty"    % "netty-handler"        % nettyVersion
+    )
+  }
 
   val postgresql = Seq(
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
