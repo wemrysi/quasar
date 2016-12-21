@@ -23,9 +23,7 @@ import quasar.qscript.{ MapFunc, MapFuncs => mf }
 import scalaz._, Scalaz._
 import java.{ time => jt }
 import java.time._
-import matryoshka._
-import matryoshka.Recursive.ops._
-// import matryoshka.Algebra
+import matryoshka._, implicits._
 import quasar.ejson.EJson
 
 trait MapFuncHandler[A] extends Prisms[A] {
@@ -81,7 +79,7 @@ trait MapFuncHandler[A] extends Prisms[A] {
     case Instant(v)   => f(toLocalTime(v))
   }
 
-  def step[T[_[_]] : Recursive]: Algebra[MapFunc[T, ?], A] = {
+  def step[T[_[_]] : RecursiveT]: Algebra[MapFunc[T, ?], A] = {
     // TIME
     case mf.Date(Str(s))                            => LocalDate(parseLocalDate(s))
     case mf.Time(Str(s))                            => LocalTime(parseLocalTime(s))

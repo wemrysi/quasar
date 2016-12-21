@@ -530,7 +530,7 @@ def fallbackRepl = """
 import blueeyes.json._
 import quasar._, fp._, qscript._
 import quasar.physical.fallback.fs._
-import matryoshka._, Recursive.ops._, RenderTree.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._, implicits._
 import scalaz._, Scalaz._
 import ygg.macros._, JsonMacros.EJson._
 """

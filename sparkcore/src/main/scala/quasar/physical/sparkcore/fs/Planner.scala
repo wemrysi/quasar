@@ -43,7 +43,6 @@ trait Planner[F[_]] extends Serializable {
 
 // TODO divide planner instances into separate files
 object Planner {
-
   def apply[F[_]](implicit P: Planner[F]): Planner[F] = P
 
   // TODO consider moving to data.scala (conflicts with existing code)
@@ -93,7 +92,7 @@ object Planner {
 
   implicit def shiftedread: Planner[Const[ShiftedRead, ?]] =
     new Planner[Const[ShiftedRead, ?]] {
-      
+
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]) =
         (qs: Const[ShiftedRead, RDD[Data]]) => {
           StateT((sc: SparkContext) => {
@@ -120,7 +119,7 @@ object Planner {
   implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]:
       Planner[QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
-      
+
 
       type Index = Long
       type Count = Long
@@ -351,7 +350,7 @@ object Planner {
   implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]:
       Planner[EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
-      
+
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
         case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
@@ -359,7 +358,7 @@ object Planner {
 
           def genKey(kf: FreeMap[T]): SparkState[(Data => Data)] = EitherT(kf.cataM(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).point[Task]).liftM[SparkStateT]
 
-          val merger: SparkState[Data => Data] = 
+          val merger: SparkState[Data => Data] =
             EitherT((combine.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
               case LeftSide => ((x: Data) => x match {
                 case Data.Arr(elems) => elems(0)
@@ -403,12 +402,12 @@ object Planner {
           }
       }
     }
-  
+
   implicit def coproduct[F[_], G[_]](
     implicit F: Planner[F], G: Planner[G]):
       Planner[Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
-      
+
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 }

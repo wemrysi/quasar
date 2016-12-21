@@ -17,6 +17,7 @@
 package quasar.physical.fallback.fs
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
 import quasar.qscript.ReduceFuncs._
@@ -25,21 +26,22 @@ import quasar.contrib.pathy._
 import quasar.qscript._
 import quasar.sql.JoinDir
 import quasar.fp.ski.κ
-import quasar.common.SortDir
 
 import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
-import pathy.Path._
 import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
 import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers
 import Planner._
 
 class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+  import quasar.Data
+
   sequential
 
   val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedread[Fix]
+  val sr = Planner.shiftedread
   val qscore = Planner.qscriptCore[Fix]
 
   val data = List(

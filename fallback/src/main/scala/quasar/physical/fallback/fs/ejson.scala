@@ -56,9 +56,9 @@ trait EJsonAlgebra[A] {
 
   def fromJson: Algebra[ej.Json, A] = _.run.fold(fromObj, fromCommon)
 
-  def convert[T[_[_]] : Recursive](data: T[ej.Json]): A               = data cata fromJson
-  def parser[T[_[_]]: Corecursive]: jawn.SupportParser[T[ej.Json]]    = ej.jsonParser[T]
-  def ingest[T[_[_]] : Recursive : Corecursive](json: String): Try[A] = parser[T].parseFromString(json) map convert[T]
+  def convert[T[_[_]]: RecursiveT](data: T[ej.Json]): A                = data cata fromJson
+  def parser[T[_[_]]: CorecursiveT]: jawn.SupportParser[T[ej.Json]]    = ej.jsonParser[T[ej.Json]]
+  def ingest[T[_[_]]: RecursiveT : CorecursiveT](json: String): Try[A] = parser[T].parseFromString(json) map convert[T]
 }
 
 object EJsonAlgebra {

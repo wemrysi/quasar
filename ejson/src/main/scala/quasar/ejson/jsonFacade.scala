@@ -18,7 +18,7 @@ package quasar.ejson
 
 import quasar.Predef._
 import jawn._
-import matryoshka._
+import matryoshka._, implicits._
 import scalaz._
 
 object jawnFacade {
@@ -26,19 +26,19 @@ object jawnFacade {
 }
 
 object jsonFacade {
-  def apply[T[_[_]]: Corecursive, F[_]: Functor](implicit C: Json :<: F): Facade[T[F]] = {
-    def rc(x: Common[T[F]]): T[F] = C(Coproduct.rightc(x)).embed
-    def lc(x: Obj[T[F]]): T[F]    = C(Coproduct.leftc(x)).embed
+  def apply[T, F[_]: Functor](implicit T: Corecursive.Aux[T, F], C: Json :<: F): Facade[T] = {
+    def rc(x: Common[T]): T = C(Coproduct.rightc(x)).embed
+    def lc(x: Obj[T]): T    = C(Coproduct.leftc(x)).embed
 
-    new SimpleFacade[T[F]] {
-      def jarray(arr: List[T[F]])            = rc(Arr(arr))
-      def jobject(obj: sciMap[String, T[F]]) = lc(Obj(ListMap(obj.toList: _*)))
-      def jnull()                            = rc(Null())
-      def jfalse()                           = rc(Bool(false))
-      def jtrue()                            = rc(Bool(true))
-      def jnum(n: String)                    = rc(Dec(BigDecimal(n)))
-      def jint(n: String)                    = rc(Dec(BigDecimal(n)))
-      def jstring(s: String)                 = rc(Str(s))
+    new SimpleFacade[T] {
+      def jarray(arr: List[T])            = rc(Arr(arr))
+      def jobject(obj: sciMap[String, T]) = lc(Obj(ListMap(obj.toList: _*)))
+      def jnull()                         = rc(Null())
+      def jfalse()                        = rc(Bool(false))
+      def jtrue()                         = rc(Bool(true))
+      def jnum(n: String)                 = rc(Dec(BigDecimal(n)))
+      def jint(n: String)                 = rc(Dec(BigDecimal(n)))
+      def jstring(s: String)              = rc(Str(s))
     }
   }
 }

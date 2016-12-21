@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import matryoshka.data.Fix
 import matryoshka._, implicits._
 import monocle.Prism
 import scalaz._
@@ -33,7 +34,7 @@ package object ejson {
   val ExtEJson = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
-  val fixParser    = jsonParser[Fix]
+  val fixParser    = jsonParser[Fix[Json]]
   val fixParserSeq = fixParser async AsyncParser.ValueStream
 
   def jawnParser[A](implicit z: Facade[A]): SupportParser[A] =
@@ -42,7 +43,7 @@ package object ejson {
   def jawnParserSeq[A](implicit z: Facade[A]): AsyncParser[A] =
     jawnParser[A] async AsyncParser.ValueStream
 
-  def jsonParser[T[_[_]]: Corecursive]: SupportParser[T[Json]] =
+  def jsonParser[T](implicit T: Corecursive.Aux[T, Json]): SupportParser[T] =
     jawnParser(jsonFacade[T, Json])
 
   def readJson[A: Facade](in: JsonInput): Try[A]            = JsonInput.readOneFrom(jawnParser[A], in)
