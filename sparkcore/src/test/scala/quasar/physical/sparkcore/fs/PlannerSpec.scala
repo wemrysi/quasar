@@ -35,6 +35,7 @@ import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
 import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
 
 class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
 
