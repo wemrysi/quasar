@@ -50,9 +50,9 @@ object queryfile {
 
   final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
-    store: (RDD[Data], AFile) => Task[Unit],
+    store: (RDD[Data], AFile) => Free[S, Unit],
     fileExists: AFile => Free[S, Boolean],
-    listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]],
+    listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
     readChunkSize: () => Int
   )
 
@@ -151,14 +151,13 @@ object queryfile {
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
     read.asks { sc =>
-      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc).run
+      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
+        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
 
-      injectFT.apply {
-        sparkStuff >>= (mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
+        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
+          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
           rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
-      }
+      
     }.join
   }
 
@@ -222,5 +221,5 @@ object queryfile {
 
   private def listContents[S[_]](input: Input[S], d: ADir)(implicit
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    injectFT[Task, S].apply(input.listContents(d).run)
+    input.listContents(d)
 }
