@@ -61,7 +61,7 @@ package object quasar {
     } yield logical
   }
 
-  private val optimizer = new Optimizer[Fix]
+  private val optimizer = new Optimizer[Fix[LP]]
   private val lpr = optimizer.lpr
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
