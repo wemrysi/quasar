@@ -612,7 +612,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile(inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 

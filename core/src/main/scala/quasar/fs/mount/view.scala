@@ -341,7 +341,7 @@ object view {
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], SemanticErrors \/ Fix[LP]] =
       lookup(loc).map { case (expr, vars) =>
-         precompile(expr, vars, fileParent(loc)).run.value
+         precompile[Fix[LP]](expr, vars, fileParent(loc)).run.value
       }
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler

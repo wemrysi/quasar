@@ -37,7 +37,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     for {
       select <- fixParser.parse(Query(query)).leftMap(_.toString)
       attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile(attr).leftMap(_.toString)
+      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(_.toString)
     } yield cld
   }
 
