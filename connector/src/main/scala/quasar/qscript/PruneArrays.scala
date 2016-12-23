@@ -95,30 +95,12 @@ class PAHelpers[T[_[_]]: BirecursiveT] extends TTypes[T] {
     }
 
   /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
-  object arrayRewrite {
-    def apply(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc =
-      rebuildArray(removeUnusedIndices[JoinFunc](flattenArray(array), indicesToKeep))
-
-    private def flattenArray(array: ConcatArrays[T, JoinFunc]): List[JoinFunc] = {
-      def inner(jf: JoinFunc): List[JoinFunc] =
-        jf.resume match {
-          case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
-          case _                           => List(jf)
-        }
-      inner(Free.roll(array))
-    }
-
-    private def removeUnusedIndices[A](array: List[A], indicesToKeep: Set[Int]): List[A] =
+  def arrayRewrite(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc = {
+    def removeUnusedIndices[A](array: List[A], indicesToKeep: Set[Int]): List[A] =
       indicesToKeep.toList.sorted map array
 
-    private def rebuildArray(funcs: List[JoinFunc]): JoinFunc = {
-      def inner(funcs: List[JoinFunc]): JoinFunc = funcs match {
-        case Nil          => Free.roll(EmptyArray[T, JoinFunc])
-        case func :: Nil  => func
-        case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
-      }
-      inner(funcs.reverse)
-    }
+    rebuildArray[T, JoinSide](
+      removeUnusedIndices[JoinFunc](flattenArray[T, JoinSide](array), indicesToKeep))
   }
 
   // TODO can we be more efficient?

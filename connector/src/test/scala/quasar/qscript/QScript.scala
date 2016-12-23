@@ -770,5 +770,52 @@ class QScriptSpec
                 Free.roll(Undefined()))),
               Free.roll(Undefined()))))))))))
     }
+
+    "convert a group by with reduction" in {
+      val lp = fullCompileExp("select (loc[0] > -78.0) as l, count(*) as c from zips group by (loc[0] > -78.0)")
+      val qs = convert(listContents.some, lp)
+
+      val inner: FreeMap =
+        Free.roll(Guard(
+          ProjectFieldR(
+            Free.roll(Guard(HoleF, Type.Obj(ScalaMap(),Some(Type.Top)), HoleF, Free.roll(Undefined()))),
+            StrLit("loc")),
+          Type.FlexArr(0, None, Type.Top),
+          Free.roll(Guard(
+            ProjectIndexR(
+              ProjectFieldR(
+                Free.roll(Guard(HoleF, Type.Obj(ScalaMap(),Some(Type.Top)), HoleF, Free.roll(Undefined()))),
+                StrLit("loc")),
+              IntLit(0)),
+            Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+            Free.roll(Gt(
+              ProjectIndexR(
+                ProjectFieldR(
+                  Free.roll(Guard(HoleF, Type.Obj(ScalaMap(),Some(Type.Top)), HoleF, Free.roll(Undefined()))),
+                  StrLit("loc")),
+                IntLit(0)),
+              DecLit(-78.0))),
+            Free.roll(Undefined()))),
+          Free.roll(Undefined())))
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
+        QC.inj(Reduce((),
+          Free.roll(MakeArray(
+            Free.roll(MakeArray(inner)))),
+          List(
+            ReduceFuncs.Arbitrary[FreeMap](inner),
+            ReduceFuncs.Count[FreeMap](Free.roll(Guard(
+              HoleF,
+              Type.Obj(ScalaMap(),Some(Type.Top)),
+              HoleF,
+              Free.roll(Undefined()))))),
+          Free.roll(ConcatMaps(
+            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0))),
+            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1))))))))(
+        implicitly, Corecursive[Fix[QS], QS])))
+
+    }
   }
 }
