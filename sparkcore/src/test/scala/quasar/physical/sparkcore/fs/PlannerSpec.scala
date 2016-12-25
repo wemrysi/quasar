@@ -44,7 +44,7 @@ class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatch
   sequential
 
   val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedread[Fix]
+  val sr = Planner.shiftedread
   val qscore = Planner.qscriptCore[Fix]
 
   val data = List(

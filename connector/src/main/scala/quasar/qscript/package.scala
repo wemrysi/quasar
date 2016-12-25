@@ -24,7 +24,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import monocle.macros.Lenses
-import scalaz.{NonEmptyList => NEL, _}, Scalaz._
+import scalaz._, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
   * connectors, along with the operations for dealing with them.
@@ -106,17 +106,23 @@ package object qscript {
   import MapFunc._
   import MapFuncs._
 
-  def concatBuckets[T[_[_]]: BirecursiveT](buckets: List[FreeMap[T]]):
-      Option[(FreeMap[T], NEL[FreeMap[T]])] =
-    buckets match {
-      case Nil => None
-      case head :: tail =>
-        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))).embed,
-          NEL(head, tail).zipWithIndex.map(p =>
-            Free.roll(ProjectIndex[T, FreeMap[T]](
-              HoleF[T],
-              IntLit[T, Hole](p._2))))).some
+  def flattenArray[T[_[_]], A: Show](array: ConcatArrays[T, FreeMapA[T, A]]): List[FreeMapA[T, A]] = {
+    def inner(jf: FreeMapA[T, A]): List[FreeMapA[T, A]] =
+      jf.resume match {
+        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
+        case _                           => List(jf)
+      }
+    inner(Free.roll(array))
+  }
+
+  def rebuildArray[T[_[_]]: CorecursiveT, A](funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = {
+    def inner(funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = funcs match {
+      case Nil          => Free.roll(EmptyArray[T, FreeMapA[T, A]])
+      case func :: Nil  => func
+      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
     }
+    inner(funcs.reverse)
+  }
 
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
