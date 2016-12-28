@@ -475,7 +475,7 @@ final class Compiler[M[_], T: Equal]
                           val sort = orderBy.map(orderBy =>
                             CompilerState.rootTableReq >>= (t =>
                               nam.fold(
-                                orderBy.keys.traverse(p => (t, p._1).point[CompilerM] ))(
+                                orderBy.keys.traverse(p => (t, p._1).point[M]))(
                                 n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
                                 .map(ks => lpr.sort(t, ks map {
                                   case (k, ASC ) => (k, SortDir.Ascending)
@@ -635,7 +635,7 @@ final class Compiler[M[_], T: Equal]
         }
 
       case InvokeFunction(name, Nil) =>
-        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[M[T]](
           fail(FunctionNotFound(name))) {
           case func @ NullaryFunc(_, _, _, _) =>
             compileFunction[nat._0](func, Sized[List]())
