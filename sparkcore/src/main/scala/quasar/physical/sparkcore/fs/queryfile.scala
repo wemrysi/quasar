@@ -21,16 +21,17 @@ import quasar.Data
 import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.connector.PlannerErrT
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._, eitherT._
 import quasar.fp.free._
-import quasar.fs._, FileSystemError._, QueryFile._
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.fs._, FileSystemError._, QueryFile._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
@@ -77,11 +78,11 @@ object queryfile {
       for {
         qs <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
           .map(simplifyRead[Fix, QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript].apply(_))
-        optQS = qs.transAna(
+        optQS = qs.transHylo(
+          rewrite.optimize(reflNT[SparkQScript]),
           repeatedly(C.coalesceQC[SparkQScript](idPrism)) ⋙
             repeatedly(C.coalesceEJ[SparkQScript](idPrism.get)) ⋙
             repeatedly(C.coalesceSR[SparkQScript](idPrism)))
-        .transCata(rewrite.optimize(idPrism.reverseGet))
         _  <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }
@@ -122,7 +123,7 @@ object queryfile {
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, SparkQScript]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
     read.asks { sc =>
       val sparkStuff: Task[PlannerError \/ RDD[Data]] =
@@ -141,7 +142,7 @@ object queryfile {
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, SparkQScript]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
     read.asks { sc =>
       val sparkStuff: Task[PlannerError \/ RDD[Data]] =
@@ -165,7 +166,7 @@ object queryfile {
       ms: MonotonicSeq.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ResultHandle]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, SparkQScript]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
     val open: Free[S, PlannerError \/ (ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (ResultHandle(_).right[PlannerError]))
