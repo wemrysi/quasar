@@ -187,6 +187,7 @@ lazy val githubReleaseSettings =
 lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
+lazy val buildSparkCore   = settingKey[Boolean]("Build spark core")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -427,7 +428,8 @@ lazy val sparkcore = project
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
-    libraryDependencies ++= Dependencies.sparkcore,
+    buildSparkCore := false,
+    libraryDependencies ++= Dependencies.sparkcore(buildSparkCore.value),
     wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad),
     assemblyShadeRules in assembly ++= Seq(
       ShadeRule.rename("org.jboss.netty.**" -> "org.jboss.spark.netty.@1")

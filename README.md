@@ -254,15 +254,11 @@ A view can be mounted at any file path. If a view's path is nested inside the pa
 
 Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
 
-1. Assemble Quasar for Spark
+1. Build sparkcore.jar
 
-```sbt web/assembly -Dquasar4Spark=yes```
+```sbt 'set every buildSparkCore := true' sparkcore/assembly```
 
-2. Build sparkcore.jar
-
-```sbt sparkcore/assembly -DbuildSparkCore=yes```
-
-3. Set environment variable QUASAR_HOME
+2. Set environment variable QUASAR_HOME
 
 QUASAR_HOME must point to a folder holding `sparkcore.jar`
 

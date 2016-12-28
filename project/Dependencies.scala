@@ -1,6 +1,6 @@
 package quasar.project
 
-import scala.Option
+import scala.{Option, Boolean}
 import java.lang.System
 import scala.collection.Seq
 
@@ -22,8 +22,6 @@ object Dependencies {
   private val slcVersion        = "0.4"
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
-
-  private val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
 
   def foundation = Seq(
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
@@ -82,8 +80,8 @@ object Dependencies {
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
-  def sparkcore = Seq(
-    "org.apache.spark" %% "spark-core" % "2.0.1" % (if(buildSparkCore == "yes") "provided" else "compile")
+  def sparkcore(buildSparkCore: Boolean) = Seq(
+    "org.apache.spark" %% "spark-core" % "2.0.1" % (if(buildSparkCore) "provided" else "compile")
   )
 
   def marklogicValidation = Seq(
