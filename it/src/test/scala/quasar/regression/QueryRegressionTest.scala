@@ -44,7 +44,7 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 abstract class QueryRegressionTest[S[_]](
-  fileSystems: Task[IList[FileSystemUT[S]]])(
+  fileSystems: Task[IList[SupportedFs[S]]])(
   implicit S0: QueryFile :<: S, S1: ManageFile :<: S,
            S2: WriteFile :<: S, S3: Task :<: S
 ) extends FileSystemTest[S](fileSystems) {
@@ -302,13 +302,13 @@ abstract class QueryRegressionTest[S[_]](
 object QueryRegressionTest {
   lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
-  val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] =
+  val externalFS: Task[IList[SupportedFs[FileSystemIO]]] =
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
-      hfsUts <- uts.traverse(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f =>
-                  ut.copy(testInterp = f).contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
-                })
+      hfsUts <- uts.traverse(sb => sb.impl.map(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f: FileSystemIO ~> Task =>
+                  SupportedFs(sb.ref, ut.copy(testInterp = f).contramapF(chroot.fileSystem[FileSystemIO](ut.testDir)).some)
+                }).getOrElse(sb.point[Task]))
     } yield hfsUts
 
   private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
