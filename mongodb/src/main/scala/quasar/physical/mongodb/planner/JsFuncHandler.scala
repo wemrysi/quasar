@@ -224,7 +224,7 @@ object JsFuncHandler {
       // TODO: case ExtractWeek(date) =>
       case ExtractYear(date) => Call(select(date, "getUTCFullYear"), Nil)
 
-      case Now() => Call(select(ident("Date"), "now"), Nil)
+      case Now() => Call(ident("ISODate"), Nil)
 
       case ProjectField(obj, field) => Access(obj, field)
       case ProjectIndex(arr, index) => Access(arr, index)

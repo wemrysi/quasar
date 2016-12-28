@@ -16,12 +16,13 @@
 
 package quasar.regression
 
-import scala.Predef.$conforms
 import quasar.Predef._
 
 import quasar.{Data, DataCodec}
 import quasar.DataArbitrary.dataArbitrary
 import quasar.fp._
+
+import scala.Predef.$conforms
 
 import argonaut._
 import org.scalacheck.Prop

@@ -6,7 +6,5 @@
   "data": "olympics.data",
   "query": "select distinct discipline from olympics where event like \"%pursuit\"",
   "predicate": "containsExactly",
-  "expected": [{ "discipline": "Speed skating"   },
-               { "discipline": "Biathlon"        },
-               { "discipline": "Cross Country S" }]
+  "expected": ["Speed skating", "Biathlon", "Cross Country S"]
 }

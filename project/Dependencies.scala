@@ -50,7 +50,8 @@ object Dependencies {
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
   def ejson = Seq(
-    "org.spire-math"             %% "jawn-parser"    % jawnVersion
+    "io.argonaut"                %% "argonaut"    % argonautVersion,
+    "org.spire-math"             %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
@@ -130,4 +131,8 @@ object Dependencies {
     "com.propensive" %% "rapture-json-json4s" %   raptureVersion   % Test,
     "eu.timepit"     %% "refined-scalacheck"  %   refinedVersion   % Test
   )
+  def it = Seq(
+    "io.argonaut" %% "argonaut-monocle"    %  argonautVersion % Test,
+    "org.http4s"  %% "http4s-blaze-client" %   http4sVersion  % Test,
+    "eu.timepit"  %% "refined-scalacheck"  %   refinedVersion % Test)
 }
