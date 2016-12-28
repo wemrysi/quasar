@@ -10,6 +10,6 @@
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",
-    "predicate": "equalsExactly",
-    "expected": [{ "value": { "city": "BOSTON" } }]
+    "predicate": "containsExactly",
+    "expected": [{ "city": "BOSTON" }]
 }

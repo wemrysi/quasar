@@ -17,8 +17,5 @@
   "query": "select day from days where ts >= :start and ts <= :end",
 
   "predicate": "equalsExactly",
-  "expected": [
-    { "day": "Wednesday" },
-    { "day": "Thursday" }
-  ]
+  "expected": ["Wednesday", "Thursday"]
 }

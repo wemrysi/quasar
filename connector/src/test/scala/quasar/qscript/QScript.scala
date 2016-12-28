@@ -94,7 +94,7 @@ class QScriptSpec
     }
 
     "convert a basic select with type checking" in {
-      val lp = fullCompileExp("select foo from bar")
+      val lp = fullCompileExp("select foo as foo from bar")
       val qs = convert(listContents.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
@@ -142,7 +142,7 @@ class QScriptSpec
     }
 
     "convert a basic reduction" in {
-      val lp = fullCompileExp("select sum(pop) from bar")
+      val lp = fullCompileExp("select sum(pop) as pop from bar")
       val qs = convert(listContents.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
@@ -158,7 +158,7 @@ class QScriptSpec
                 ProjectFieldR(HoleF, StrLit("pop")),
                 Free.roll(Undefined()))),
               Free.roll(Undefined()))))),
-          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))))))(
+          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -717,7 +717,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(),
           List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))))))(
+          ReduceIndexF(0))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -730,21 +730,19 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(MakeMap(
-            StrLit("0"),
+          Free.roll(Guard(
+            RightSideF,
+            Type.Obj(ScalaMap(),Some(Type.Top)),
             Free.roll(Guard(
-              RightSideF,
-              Type.Obj(ScalaMap(),Some(Type.Top)),
-              Free.roll(Guard(
-                ProjectFieldR(RightSideF, StrLit("loc")),
-                Type.FlexArr(0, None, Type.Top),
-                ProjectIndexR(
-                  ConcatArraysR(
-                    ProjectFieldR(RightSideF, StrLit("loc")),
-                    Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
-                  IntLit(0)),
-                Free.roll(Undefined()))),
-              Free.roll(Undefined()))))))))))
+              ProjectFieldR(RightSideF, StrLit("loc")),
+              Type.FlexArr(0, None, Type.Top),
+              ProjectIndexR(
+                ConcatArraysR(
+                  ProjectFieldR(RightSideF, StrLit("loc")),
+                  Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
+                IntLit(0)),
+              Free.roll(Undefined()))),
+            Free.roll(Undefined()))))))))
     }
 
     "convert a static array projection prefix" in {
@@ -756,17 +754,15 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(MakeMap(
-            StrLit("0"),
+          Free.roll(Guard(
+            RightSideF,
+            Type.Obj(ScalaMap(),Some(Type.Top)),
             Free.roll(Guard(
-              RightSideF,
-              Type.Obj(ScalaMap(),Some(Type.Top)),
-              Free.roll(Guard(
-                ProjectFieldR(RightSideF, StrLit("loc")),
-                Type.FlexArr(0, None, Type.Top),
-                IntLit(8),
-                Free.roll(Undefined()))),
-              Free.roll(Undefined()))))))))))
+              ProjectFieldR(RightSideF, StrLit("loc")),
+              Type.FlexArr(0, None, Type.Top),
+              IntLit(8),
+              Free.roll(Undefined()))),
+            Free.roll(Undefined()))))))))
     }
 
     "convert a group by with reduction" in {

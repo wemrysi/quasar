@@ -219,7 +219,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
 
-      val expQ = Fix(Squash(Fix(Squash(lpf.read(rootDir </> file("zips"))))))
+      val expQ = Fix(Squash(lpf.read(rootDir </> file("zips"))))
       val exp = (for {
         h   <- query.unsafe.eval(expQ)
         _   <- query.transforms.fsErrToExec(
@@ -636,7 +636,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
         beRightDisjunction.like { case r => r must beTreeEqual(
-          Squash(Squash(lpf.read(rootDir </> file("zips"))).embed).embed)
+          Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
 

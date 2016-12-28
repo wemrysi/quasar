@@ -17,7 +17,7 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.{BinaryFunc, Data, Func, GenericFunc, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
+import quasar.{BinaryFunc, Data, Func, GenericFunc, NullaryFunc, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
   SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
@@ -189,6 +189,9 @@ final class Compiler[M[_], T: Equal]
       MState: MonadState[M, CompilerState[T]])
       : M[T] = {
 
+    // NB: When there are multiple names for the same function, we may mark one
+    //     with an `*` to indicate that it’s the “preferred” name, and others
+    //     are for compatibility with other SQL dialects.
     val functionMapping = Map[String, GenericFunc[_]](
       "count"                   -> agg.Count,
       "sum"                     -> agg.Sum,
@@ -219,6 +222,13 @@ final class Compiler[M[_], T: Equal]
       "extract_week"            -> date.ExtractWeek,
       "extract_year"            -> date.ExtractYear,
       "date"                    -> date.Date,
+      "clock_timestamp"         -> date.Now, // Postgres (instantaneous)
+      "current_timestamp"       -> date.Now, // *, SQL92
+      "getdate"                 -> date.Now, // SQL Server
+      "localtimestamp"          -> date.Now, // MySQL, Postgres (trans start)
+      "now"                     -> date.Now, // MySQL, Postgres (trans start)
+      "statement_timestamp"     -> date.Now, // Postgres (statement start)
+      "transaction_timestamp"   -> date.Now, // Postgres (trans start)
       "time"                    -> date.Time,
       "timestamp"               -> date.Timestamp,
       "interval"                -> date.Interval,
@@ -415,16 +425,31 @@ final class Compiler[M[_], T: Equal]
           MErr.raiseError,
           names => {
 
-            val projs = projections.map(_.expr)
-
             val syntheticNames: List[String] =
               names.zip(syntheticOf(node)).flatMap {
                 case (Some(name), Some(_)) => List(name)
                 case (_, _) => Nil
               }
 
+            val (nam, initial) =
+              projections match {
+                case List(Proj(Cofree(_, Splice(_)), None)) =>
+                  (names.some,
+                    projections
+                      .map(_.expr)
+                      .traverse(compile0)
+                      .map(buildRecord(names, _)))
+                case List(Proj(expr, None)) => (none, compile0(expr))
+                case _ =>
+                  (names.some,
+                    projections
+                      .map(_.expr)
+                      .traverse(compile0)
+                      .map(buildRecord(names, _)))
+              }
+
             relations.foldRight(
-              projs.traverse(compile0).map(buildRecord(names, _)))(
+              initial)(
               (relations, select) => {
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
@@ -448,12 +473,14 @@ final class Compiler[M[_], T: Equal]
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
-                            (CompilerState.rootTableReq ⊛
-                              CompilerState.addFields(names.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))((t, ks) =>
-                              lpr.sort(t, ks map {
-                                case (k, ASC ) => (k, SortDir.Ascending)
-                                case (k, DESC) => (k, SortDir.Descending)
-                              })))
+                            CompilerState.rootTableReq >>= (t =>
+                              nam.fold(
+                                orderBy.keys.traverse(p => (t, p._1).point[CompilerM] ))(
+                                n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
+                                .map(ks => lpr.sort(t, ks map {
+                                  case (k, ASC ) => (k, SortDir.Ascending)
+                                  case (k, DESC) => (k, SortDir.Descending)
+                                }))))
 
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
@@ -529,6 +556,7 @@ final class Compiler[M[_], T: Equal]
           case IndexDeref    => structural.ArrayProject.left
           case Limit         => set.Take.left
           case Offset        => set.Drop.left
+          case Sample        => set.Sample.left
           case UnshiftMap    => structural.UnshiftMap.left
           case Except        => set.Except.left
           case UnionAll      => set.Union.left
@@ -604,6 +632,14 @@ final class Compiler[M[_], T: Equal]
 
           case _ =>
             fail(WrongArgumentCount("DATE_PART", 2, args.length))
+        }
+
+      case InvokeFunction(name, Nil) =>
+        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          fail(FunctionNotFound(name))) {
+          case func @ NullaryFunc(_, _, _, _) =>
+            compileFunction[nat._0](func, Sized[List]())
+          case func => fail(WrongArgumentCount(name, func.arity, 0))
         }
 
       case InvokeFunction(name, List(a1)) =>

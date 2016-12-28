@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.physical.mongodb.Bson
 
 import java.time.Instant
+import scala.Long
 
 import matryoshka._
 import matryoshka.implicits._
@@ -174,7 +175,7 @@ object Check {
   }
 
   val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
-  val minInstant = Instant.ofEpochMilli(0)  // FIXME: should be some negative value (this will miss any date before 1970)
+  val minInstant = Instant.ofEpochMilli(Long.MinValue)
   val minTimestamp = Bson.Timestamp.fromInstant(minInstant, 0)
   val minOid =
     ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))

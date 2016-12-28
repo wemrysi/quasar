@@ -474,6 +474,12 @@ class Transform
     case lp.Typecheck(expr, typ, cont, fallback) =>
       merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
 
+    case lp.InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized())
+        if func.effect ≟ Mapping =>
+      Target(
+        Ann(Nil, Free.roll[MapFunc, Hole](MapFunc.translateNullaryMapping(func))),
+        QC.inj(Unreferenced[T, T[F]]()).embed).right
+
     case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.ann
@@ -543,6 +549,11 @@ class Transform
               prov.swapProvenances(provenance.Value(rval) :: base.buckets),
               lval),
             base.src))).right
+
+    case lp.InvokeUnapply(set.Sample, Sized(a1, a2)) =>
+      val merged: MergeResult = merge(a1.value, a2.value)
+
+      Target(a1.ann, QC.inj(Subset(merged.src, merged.lval, Sample, Free.roll(FI.inject(QC.inj(reifyResult(a2.ann, merged.rval)))))).embed).right
 
     case lp.InvokeUnapply(set.Take, Sized(a1, a2)) =>
       val merged: MergeResult = merge(a1.value, a2.value)
