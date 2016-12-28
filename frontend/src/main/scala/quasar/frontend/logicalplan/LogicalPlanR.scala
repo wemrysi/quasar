@@ -269,6 +269,8 @@ class LogicalPlanR[T[_[_]]: BirecursiveT] {
           consts <- emitName[SemDisj, Func.Input[T[LP], nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, constant(Data.Obj(ListMap("" -> Data.NA))))))
           plan  <- unifyOrCheck(inf, types, invoke(structural.FlattenMap, consts))
         } yield plan
+        case InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized()) =>
+          handleGenericInvoke(inf, func, Sized[List]())
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
           handleGenericInvoke(inf, func, Func.Input1(a1))
         case InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) =>
