@@ -207,10 +207,10 @@ lazy val root = project.in(file("."))
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
-//        /  \
-      repl,   web,
-//        \  /
-           it)
+//        /   \
+       repl,  web,
+//             |
+              it)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
