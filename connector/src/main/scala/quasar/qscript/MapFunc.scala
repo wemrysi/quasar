@@ -879,6 +879,11 @@ object MapFuncs {
     }, _ => None)
   }
 
+  object DecLit {
+    def apply[T[_[_]]: CorecursiveT, A](d: BigDecimal): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Dec[T[EJson]](d))))
+  }
+
   object IntLit {
     def apply[T[_[_]]: CorecursiveT, A](i: BigInt): FreeMapA[T, A] =
       Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T[EJson]].apply(ejson.Int[T[EJson]](i))))
