@@ -341,7 +341,7 @@ For compressed output use `Accept-Encoding: gzip`.
 
 Executes a SQL² query, contained in the request body, on the backend responsible for the request path.
 
-The `Destination` header must specify the *output path*, where the results of the query will become available if this API successfully completes.
+The `Destination` header must specify the *output path*, where the results of the query will become available if this API successfully completes. If the output path already exists, it will be overwritten with the query results.
 
 All paths referenced in the query, as well as the output path, are interpreted as relative to the request path, unless they begin with `/`.
 

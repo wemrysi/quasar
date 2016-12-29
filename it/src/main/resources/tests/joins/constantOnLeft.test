@@ -2,11 +2,13 @@
     "name": "join where the left hand side is constant",
 
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
+        "couchbase":         "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "postgresql":        "pending",
+        "spark_local":       "skip",
+        "spark_hdfs":        "skip"
     },
 
     "data": "../largeZips.data",
@@ -15,7 +17,5 @@
             and \"CA\" = b.state",
 
     "predicate": "containsAtLeast",
-    "expected": [
-        { "city": "REDONDO BEACH", "state": "CA" }
-    ]
+    "expected": [{ "city": "REDONDO BEACH", "state": "CA" }]
 }

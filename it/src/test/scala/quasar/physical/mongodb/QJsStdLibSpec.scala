@@ -18,13 +18,13 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._
-import quasar.fp._
 import quasar.fs.FileSystemError
 import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import matryoshka._
+import matryoshka.data.Fix
 import org.specs2.execute._
 import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat
@@ -54,7 +54,7 @@ class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-    MongoDbQScriptPlanner.getJsFn[Fix, FileSystemError \/ ?](mf.toCoEnv[Fix]) ∘
+    MongoDbQScriptPlanner.getJsFn[Fix, FileSystemError \/ ?](mf) ∘
       (js =>
         (Crystallize[WorkflowF].crystallize(
           chain[Fix[WorkflowF]](

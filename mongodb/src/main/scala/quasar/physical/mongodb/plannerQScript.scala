@@ -19,7 +19,6 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
-import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.fp._, eitherT._
 import quasar.fp.ski._
@@ -36,10 +35,10 @@ import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
-import scala.Predef.$conforms
-
-import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
-import matryoshka.patterns.CoEnv
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
@@ -58,11 +57,16 @@ final case class There[T[_[_]]](index: Int, next: InputFinder[T])
 }
 
 object MongoDbQScriptPlanner {
+  import fixExprOp._
+
+  // FIXME: Move to Matryoshka.
+  def ginterpret[W[_], F[_], A, B](f: A => B, φ: GAlgebra[W, F, B])
+      : GAlgebra[W, CoEnv[A, F, ?], B] =
+    ginterpretM[W, Id, F, A, B](f, φ)
+
   type Partial[T[_[_]], In, Out] = (PartialFunction[List[In], Out], List[InputFinder[T]])
 
   type OutputM[A] = PlannerError \/ A
-
-  import fixExprOp._
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -89,9 +93,9 @@ object MongoDbQScriptPlanner {
           Some(_))
 
   def processMapFuncExpr
-    [T[_[_]]: Recursive: ShowT, M[_]: Monad, EX[_]: Traverse, A]
+    [T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (funcHandler: FuncHandler[T, EX])
-    (fm: T[CoEnv[A, MapFunc[T, ?], ?]])
+    (fm: FreeMapA[T, A])
     (recovery: A => Fix[ExprOp])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
@@ -101,8 +105,8 @@ object MongoDbQScriptPlanner {
         expression(funcHandler)))
 
   def getSelector
-    [T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
@@ -113,8 +117,8 @@ object MongoDbQScriptPlanner {
         κ(defaultSelector[T].point[OutputM]),
         selector[T]))
 
-  def processMapFunc[T[_[_]]: Recursive: ShowT, M[_]: Monad, A]
-    (fm: T[CoEnv[A, MapFunc[T, ?], ?]])
+  def processMapFunc[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, A]
+    (fm: FreeMapA[T, A])
     (recovery: A => JsCore)
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsCore] =
@@ -142,16 +146,14 @@ object MongoDbQScriptPlanner {
     }
   }
 
-  private def unpack[T[_[_]]: Corecursive: Recursive, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
-    freeCata(t)(interpret[F, T[F], T[F]](ι, _.embed))
-
+  private def unpack[T[_[_]]: BirecursiveT, F[_]: Traverse](t: Free[F, T[F]]): T[F] =
+    t.cata(interpret[F, T[F], T[F]](ι, _.embed))
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-  import fixExprOp.{ I => _, _ }
-  val check = Check[Fix, ExprOp]
+  val check = new Check[Fix[ExprOp], ExprOp]
 
-  def expression[T[_[_]]: Recursive: ShowT, M[_]: Applicative, EX[_]: Traverse]
+  def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
       AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
@@ -244,7 +246,7 @@ object MongoDbQScriptPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: Recursive: ShowT, M[_]: Applicative]
+  def javascript[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative]
     (implicit merr: MonadError_[M, FileSystemError])
       : AlgebraM[M, MapFunc[T, ?], JsCore] = {
     import jscore.{
@@ -255,7 +257,7 @@ object MongoDbQScriptPlanner {
 
     import MapFuncs._
 
-    val mjs = quasar.physical.mongodb.javascript[Fix]
+    val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
 
     // NB: Math.trunc is not present in MongoDB.
@@ -534,7 +536,7 @@ object MongoDbQScriptPlanner {
    * expressions which can be turned into selectors, factoring out the leftovers
    * for conversion using \$where.
    */
-  def selector[T[_[_]]: Recursive: ShowT]:
+  def selector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncs._
 
@@ -810,7 +812,7 @@ object MongoDbQScriptPlanner {
               })
       }
 
-    implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: ShowT]:
+    implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT]:
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
@@ -837,7 +839,7 @@ object MongoDbQScriptPlanner {
               (expr, jm) => WB.jsArrayExpr(List(src, WB.flattenMap(expr)), jm)).map(liftM[M, WorkflowBuilder[WF]]).join
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
-              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm.toCoEnv[T]))))((b, red) =>
+              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) =>
               getReduceBuilder[T, M, WF, EX](
                 funcHandler)(
                 red.map(_.sequence).sequence.fold(
@@ -853,11 +855,11 @@ object MongoDbQScriptPlanner {
                         accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                 repair)).join
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order.toList).unzip
+            val (keys, dirs) = ((bucket, SortDir.Ascending) <:: order).unzip
             keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
-              .map(WB.sortBy(src, _, dirs))
+              .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>
-            getSelector[T, M, EX](cond.toCoEnv[T]).fold(
+            getSelector[T, M, EX](cond).fold(
               // FIXME: If this is an ExprOp, then do this, but if it’s JS, we
               //        should use a `Where` selector instead.
               _ => getExprBuilder[T, M, WF, EX](funcHandler)(src, cond).map(cond =>
@@ -885,7 +887,7 @@ object MongoDbQScriptPlanner {
         }
       }
 
-    implicit def equiJoin[T[_[_]]: Recursive: Corecursive: ShowT]:
+    implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
@@ -906,8 +908,8 @@ object MongoDbQScriptPlanner {
           rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src) ⊛
           getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.lKey) ⊛
           getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.rKey) ⊛
-          getJsFn[T, M](qs.lKey.toCoEnv[T]).map(_.some).handleError(κ(none.point[M])) ⊛
-          getJsFn[T, M](qs.rKey.toCoEnv[T]).map(_.some).handleError(κ(none.point[M])))(
+          getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
+          getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
             qs.f match {
@@ -976,27 +978,27 @@ object MongoDbQScriptPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: Recursive: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExpr[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
-    (fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+    (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
-  def getJsFn[T[_[_]]: Recursive: ShowT, M[_]: Monad]
-    (fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+  def getJsFn[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
+    (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def getBuilder
-    [T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
-    (handler: T[CoEnv[A, MapFunc[T, ?], ?]] => M[Expr])
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
+    (handler: FreeMapA[T, A] => M[Expr])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
-    fm.toCoEnv[T].project match {
+    fm.project match {
       // TODO: identify cases for SpliceBuilder.
       case MapFunc.StaticArray(elems) =>
         elems.traverse(handler) ∘ (ArrayBuilder(src, _))
@@ -1011,7 +1013,7 @@ object MongoDbQScriptPlanner {
     }
 
   def getExprBuilder
-    [T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
@@ -1019,19 +1021,19 @@ object MongoDbQScriptPlanner {
     getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, _))(src, fm)
 
   def getReduceBuilder
-    [T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
     getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, _))(src, fm)
 
-  def getJsMerge[T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad]
+  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
     (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, JoinSide](
-      jf.toCoEnv[T]) {
+      jf) {
       case LeftSide => a1
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
@@ -1045,27 +1047,27 @@ object MongoDbQScriptPlanner {
       exf(a).map(_.right[JsFn]))(
       _ => jsf(a).map(_.left[Fix[ExprOp]]))
 
-  def handleFreeMap[T[_[_]]: Recursive: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX], fm: T[CoEnv[Hole, MapFunc[T, ?], ?]])
+  def handleFreeMap[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs[M, T[CoEnv[Hole, MapFunc[T, ?], ?]]](fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
+    exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
-  def handleRedRepair[T[_[_]]: Recursive: Corecursive: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX], jr: T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]])
+  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs[M, T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]]](jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
+    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: Recursive: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
-    (jr: T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]])
+    (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.toString))
 
-  def getJsRed[T[_[_]]: Recursive: ShowT, M[_]: Monad]
-    (jr: T[CoEnv[ReduceIndex, MapFunc[T, ?], ?]])
+  def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
+    (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.ident(ri.idx.toString))) ∘
@@ -1086,7 +1088,7 @@ object MongoDbQScriptPlanner {
       ev2: WorkflowBuilder.Ops[WF],
       ev3: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
-    freeCataM(free)(
+    free.cataM(
       interpretM[M, QScriptTotal[T, ?], qscript.Hole, WorkflowBuilder[WF]](κ(src.point[M]), F.plan(joinHandler, funcHandler)))
 
   // TODO: Need `Delay[Show, WorkflowBuilder]`
@@ -1111,23 +1113,25 @@ object MongoDbQScriptPlanner {
     }
 
   // This is maybe worth putting in Matryoshka?
-  def findFirst[T[_[_]]: Recursive, F[_]: Functor: Foldable, A](
+  def findFirst[T[_[_]]: RecursiveT, F[_]: Functor: Foldable, A](
     f: PartialFunction[T[F], A]):
       CoalgebraM[A \/ ?, F, T[F]] =
     tf => (f.lift(tf) \/> tf.project).swap
 
-  def elideMoreGeneralGuards[T[_[_]]: Recursive](subType: Type):
-      CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] =>
-        PlannerError \/ CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] = {
+  def elideMoreGeneralGuards[M[_]: Applicative, T[_[_]]: RecursiveT]
+    (subType: Type)
+    (implicit merr: MonadError_[M, FileSystemError])
+      : CoEnv[Hole, MapFunc[T, ?], FreeMap[T]] =>
+        M[CoEnv[Hole, MapFunc[T, ?], FreeMap[T]]] = {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
       // println("found a guard we should try to remove!")
-      if (typ.contains(subType)) cont.project.right
+      if (typ.contains(subType)) cont.project.point[M]
       else if (!subType.contains(typ))
-        InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected").left
+        merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected")))
       else {
-        free.right
+        free.point[M]
       }
-    case x => x.right
+    case x => x.point[M]
   }
 
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
@@ -1137,46 +1141,50 @@ object MongoDbQScriptPlanner {
   //       trying to strip out unnecessary ones after the fact
   // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def assumeReadType[T[_[_]]: Recursive: Corecursive, F[_]: Functor](typ: Type)(
-    implicit QC: QScriptCore[T, ?] :<: F, SR: Const[ShiftedRead, ?] :<: F):
-      QScriptCore[T, T[F]] => PlannerError \/ F[T[F]] = {
+  def assumeReadType[M[_]: Monad, T[_[_]]: BirecursiveT, F[_]: Functor]
+    (typ: Type)
+    (implicit
+      merr: MonadError_[M, FileSystemError],
+      QC: QScriptCore[T, ?] :<: F,
+      SR: Const[ShiftedRead, ?] :<: F)
+      : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
       // println("ok, found a filter we should try to elide checks from, with src: " + src.toString)
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
           // println("ok, found a filter we should try to elide checks from!")
-          freeTransCataM(cond)(elideMoreGeneralGuards(typ)) ∘
-            (c => QC.inj(Filter(src, c)))
-        case _ => QC.inj(f).right[PlannerError]
+          cond.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
+          (c => QC.inj(Filter(src, c)))
+        case _ => QC.inj(f).point[M]
       }
     case ls @ LeftShift(src, struct, id, repair) =>
       // println("ok, found a LeftShift we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          freeTransCataM(struct)(elideMoreGeneralGuards(typ)) ∘
-            (struct => QC.inj(LeftShift(src, struct, id, repair)))
-        case _ => QC.inj(ls).right[PlannerError]
+          struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
+          (struct => QC.inj(LeftShift(src, struct, id, repair)))
+        case _ => QC.inj(ls).point[M]
       }
     case m @ qscript.Map(src, mf) =>
       // println("ok, found a Map we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          freeTransCataM(mf)(elideMoreGeneralGuards(typ)) ∘
-            (mf => QC.inj(qscript.Map(src, mf)))
-        case _ => QC.inj(m).right[PlannerError]
+          mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
+          (mf => QC.inj(qscript.Map(src, mf)))
+        case _ => QC.inj(m).point[M]
       }
     case r @ Reduce(src, b, red, rep) =>
       // println("ok, found a Reduce we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          (freeTransCataM(b)(elideMoreGeneralGuards(typ)) ⊛
-            red.traverse(_.traverse(freeTransCataM(_)(elideMoreGeneralGuards(typ)))))(
+          (b.transCataM(elideMoreGeneralGuards[M, T](typ)) ⊛
+            red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
             (b, red) => QC.inj(Reduce(src, b, red, rep)))
-        case _ => QC.inj(r).right[PlannerError]
+        case _ => QC.inj(r).point[M]
       }
     case qc =>
       // println("ok, found a ??? we should try to elide checks from")
-      QC.inj(qc).right
+      QC.inj(qc).point[M]
   }
 
   type GenT[X[_], A]  = StateT[X, NameGen, A]
@@ -1189,7 +1197,7 @@ object MongoDbQScriptPlanner {
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
-    [T[_[_]]: Recursive: Corecursive: EqualT: RenderTreeT: ShowT,
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_],
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
@@ -1219,18 +1227,17 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        liftErr[GenT[M, ?], T[MongoQScript]](shiftRead(qs)
-          .transCata[MongoQScript](SimplifyJoin[T, QScriptShiftRead[T, ?], MongoQScript].simplifyJoin(idPrism.reverseGet))
-          .transAna(
+        simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
+          .transHylo(
+            rewrite.optimize(reflNT[MongoQScript]),
             repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
-            repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
-            repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
-            repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
-          .transCata(rewrite.optimize(idPrism.reverseGet))
-          .transCataM(liftFGM(assumeReadType[T, MongoQScript](Type.AnyObject)))))
+              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
+              repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
+              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
+          .transCataM(liftFGM(assumeReadType[GenT[M, ?], T, MongoQScript](Type.AnyObject))))
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize))))
+        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
       wf1 <- log("Workflow (raw)", liftM[GenT[M, ?], Fix[WF]](WorkflowBuilder.build(wb)))
       wf2 <- log(
         "Workflow (crystallized)",
@@ -1245,7 +1252,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT, M[_]]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],

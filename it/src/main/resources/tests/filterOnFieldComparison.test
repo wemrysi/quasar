@@ -1,13 +1,10 @@
 {
     "name": "filter on field comparison",
     "backends": {
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
-        "mongodb_3_2":       "pending",
-        "postgresql":        "pending",
         "couchbase":         "skip",
-        "marklogic":         "skip"
+        "marklogic":         "skip",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending"
     },
     "data": "zips.data",
     "query": "select * from zips where pop < loc[1] limit 10",

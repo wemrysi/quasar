@@ -32,7 +32,9 @@ import quasar.std._
 import java.time.format.DateTimeFormatter
 import scala.sys
 
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
@@ -54,8 +56,8 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_2_6
-  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_3_2
+  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_2_6.name
+  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_3_2.name
 
   MongoDbSpec.clientShould(QScriptFsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._

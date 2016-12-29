@@ -8,7 +8,9 @@
         "mongodb_q_3_2":     "skip",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "nullsWithMissing.data",
     "query": "select name,

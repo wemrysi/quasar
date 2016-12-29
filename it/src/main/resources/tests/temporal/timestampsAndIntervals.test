@@ -4,7 +4,9 @@
   "backends": {
     "postgresql": "pending",
     "marklogic":  "skip",
-    "couchbase":  "skip"
+    "couchbase":  "skip",
+    "spark_local": "skip",
+    "spark_hdfs": "skip"
   },
 
   "data": "../days.data",
@@ -17,7 +19,8 @@
   "predicate": "containsExactly",
 
   "expected": [
-    { "day": "Sunday",   "hoursSinceSunday":   6.0 },
-    { "day": "Saturday", "hoursSinceSunday": 156.0 }
-  ]
+    { "day": "Sunday",    "hoursSinceSunday":        6.0        },
+    { "day": "Saturday",  "hoursSinceSunday":      156.0        },
+    { "day": "Wednesday", "hoursSinceSunday":  -391176.0002777 },
+    { "day": "Monday",    "hoursSinceSunday": -3168958.777777  }]
 }

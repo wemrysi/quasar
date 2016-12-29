@@ -18,7 +18,6 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
-import quasar.contrib.matryoshka._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
@@ -27,8 +26,11 @@ import quasar.std._
 
 import scala.sys
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute.Result
+
 import scalaz._, Scalaz._
 import shapeless.Sized
 

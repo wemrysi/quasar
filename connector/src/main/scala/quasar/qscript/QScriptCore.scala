@@ -19,10 +19,10 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
-import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -125,12 +125,17 @@ object ReduceIndex {
 /** Eliminates some values from a dataset, based on the result of `f` (which
   * must evaluate to a boolean value for each element in the set).
   */
-@Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
+@Lenses final case class Filter[T[_[_]], A](
+  src: A,
+  f: FreeMap[T])
     extends QScriptCore[T, A]
 
 /** Chooses a subset of values from a dataset, given a count. */
-@Lenses final case class Subset[T[_[_]], A]
-  (src: A, from: FreeQS[T], op: SelectionOp, count: FreeQS[T])
+@Lenses final case class Subset[T[_[_]], A](
+  src: A,
+  from: FreeQS[T],
+  op: SelectionOp,
+  count: FreeQS[T])
     extends QScriptCore[T, A]
 
 /** A placeholder value that can appear in plans, but will never be referenced
@@ -273,7 +278,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]

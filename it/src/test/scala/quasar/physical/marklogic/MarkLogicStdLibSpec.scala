@@ -30,6 +30,7 @@ import quasar.std._
 
 import com.marklogic.xcc.ContentSource
 import matryoshka._
+import matryoshka.data.Fix
 import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
@@ -125,6 +126,6 @@ class MarkLogicStdLibSpec extends StdLibSpec {
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceAt(uri).map(cs => backend.name should tests(runner(cs))).void
+    contentSourceAt(uri).map(cs => backend.name.shows should tests(runner(cs))).void
   }).unsafePerformSync
 }

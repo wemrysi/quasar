@@ -5,10 +5,12 @@
         "mongodb_q_3_2":  "skip",
         "postgresql":        "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",
-    "predicate": "equalsExactly",
-    "expected": [{ "value": { "city": "BOSTON" } }]
+    "predicate": "containsExactly",
+    "expected": [{ "city": "BOSTON" }]
 }

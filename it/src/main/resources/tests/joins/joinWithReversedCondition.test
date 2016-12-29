@@ -5,7 +5,9 @@
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "couchbase":         "skip",
+        "spark_local": "skip",
+      "spark_hdfs": "skip"
     },
     "data": "../slamengine_commits.data",
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth

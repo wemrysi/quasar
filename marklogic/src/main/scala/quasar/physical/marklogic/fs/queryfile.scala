@@ -19,12 +19,12 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Data, Planner => QPlanner}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
 import quasar.fp._, eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.frontend.logicalplan.{constant, LogicalPlan}
@@ -39,7 +39,9 @@ import scala.util.control.NonFatal
 
 import com.marklogic.xcc.types.{XdmItem, XSString}
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -106,15 +108,15 @@ object queryfile {
 
       for {
         qs      <- convertToQScriptRead[Fix, QPlan, QSR](d => liftQP(ops.ls(d)))(lp)
-        shifted =  shiftRead[Fix](qs)
+        shifted =  shiftRead[Fix, QSR, MLQScript].apply(qs)
         _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted.cata(linearize).reverse))
         optmzed =  shifted
-                     .transAna(
+                     .transHylo(
+                       rewrite.optimize(reflNT[MLQScript]),
                        repeatedly(C.coalesceQC[MLQScript](idPrism)) ⋙
-                       repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
-                       repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
-                       repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
-                     .transCata(rewrite.optimize(reflNT))
+                         repeatedly(C.coalesceTJ[MLQScript](idPrism.get)) ⋙
+                         repeatedly(C.coalesceSR[MLQScript](idPrism)) ⋙
+                         repeatedly(Normalizable[MLQScript].normalizeF(_: MLQScript[Fix[MLQScript]])))
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
@@ -159,7 +161,8 @@ object queryfile {
       } yield {
         let_(
           ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
-          $("_") := xdmp.directoryCreate(dstDirUri.xs))
+          $("_") := try_(xdmp.directoryCreate(dstDirUri.xs))
+                    .catch_($("e"))(κ(emptySeq)))
         .return_ {
           for_(
             result at i in mkSeq_(results))
@@ -180,8 +183,14 @@ object queryfile {
             (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
 
-      (lpToXQuery(lp) >>= saveResults >>= (mm => liftQP(SessionIO.executeModule_(mm))))
-        .as(out).run.run
+      val resultFile = for {
+        xqy <- lpToXQuery(lp)
+        mm  <- saveResults(xqy)
+        _   <- liftQP(ops.deleteFile(out))
+        _   <- liftQP(SessionIO.executeModule_(mm))
+      } yield out
+
+      resultFile.run.run
     }
 
     def eval(lp: Fix[LogicalPlan]) =
