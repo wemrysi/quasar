@@ -1,5 +1,6 @@
 [![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
+[![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # Thanks to Sponsors
@@ -30,12 +31,6 @@ See the instructions below for running and configuring these JARs.
 
 **Note**: This requires Java 8 and Bash (Linux, Mac, or Cygwin on Windows).
 
-### Checkout
-
-```bash
-git clone git@github.com:quasar-analytics/quasar.git
-```
-
 ### Build
 
 The following sections explain how to build and run the various subprojects.
@@ -51,7 +46,6 @@ To compile the project and run tests, execute the following command:
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-This will lead to failures in the integration test project (`it`) because there is no configured "backend" available.
 Running the full test suite can be done in two ways:
 
 ##### Testing option 1 (prerequisite: docker)
@@ -62,14 +56,13 @@ A docker container running mongodb operates for the duration of the test run.
 ./bin/full-it-tests.sh
 ```
 
-##### Testing option 2 (prerequisite: mongodb)
+##### Testing option 2
 
-Currently Quasar only supports MongoDB so in order to run the integration
-tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
+In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
 you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
 allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew or simply go to the MongDB website and follow the
+In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongDB website and follow the
 instructions that can be found there.
 
 Once we have a MongoDB instance handy, we need to set a few
