@@ -70,7 +70,7 @@ object Dependencies {
   def nettyDepType = if(quasar4Spark == "yes") "provided" else "compile"
 
   def mongodb = Seq(
-    "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
+    "org.mongodb" % "mongodb-driver-async" %   "3.4.1",
     "io.netty"    % "netty-buffer"         % nettyVersion % nettyDepType,
     "io.netty"    % "netty-handler"        % nettyVersion % nettyDepType
   )
