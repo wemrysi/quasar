@@ -272,7 +272,6 @@ lazy val common = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
@@ -305,7 +304,7 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
+    libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
@@ -320,7 +319,6 @@ lazy val sql = project
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.Equals,
       Wart.NoNeedForMonad))
@@ -340,7 +338,6 @@ lazy val connector = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(

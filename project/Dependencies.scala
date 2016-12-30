@@ -49,6 +49,11 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
+
+  def frontend = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion
+  )
+
   def ejson = Seq(
     "io.argonaut"                %% "argonaut"    % argonautVersion,
     "org.spire-math"             %% "jawn-parser" % jawnVersion
