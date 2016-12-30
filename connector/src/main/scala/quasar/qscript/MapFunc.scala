@@ -824,7 +824,8 @@ object MapFuncs {
     def a3 = count
   }
 
-      // structural
+  // structural
+
   /** Makes a single-element [[ejson.Arr]] containing `a1`.
     */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]

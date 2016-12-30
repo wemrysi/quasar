@@ -136,7 +136,8 @@ trait FileSystemFixture {
     amendWrites(writeFile),
     liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 
-  import scalaz.StateT.stateTMonadState
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import StateT.stateTMonadState
 
   object MemFixTask extends SpecializedInterpreter[FileSystem, MemStateFix](
     interpretTerm = hoistFix compose readWrite
