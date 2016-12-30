@@ -423,7 +423,7 @@ object MongoDbQScriptPlanner {
 
       // TODO: move these to JsFuncHandler
       case Lower(a1) => Call(Select(a1, "toLowerCase"), Nil).point[M]
-      case Upper(a1) => Call(Select(a1, "toLUpperCase"), Nil).point[M]
+      case Upper(a1) => Call(Select(a1, "toUpperCase"), Nil).point[M]
       case Bool(a1) =>
         If(BinOp(jscore.Eq, a1, Literal(Js.Str("true"))),
           Literal(Js.Bool(true)),
@@ -476,7 +476,7 @@ object MongoDbQScriptPlanner {
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
       case ProjectField(a1, a2) => Access(a1, a2).point[M]
       case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
-      // case DeleteField(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
+      case DeleteField(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -855,7 +855,10 @@ object MongoDbQScriptPlanner {
                         accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                 repair)).join
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = ((bucket, SortDir.Ascending) <:: order).unzip
+            val (keys, dirs) = (bucket match {
+              case MapFuncs.NullLit() => order
+              case _                  => (bucket, SortDir.Ascending) <:: order
+            }).unzip
             keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>

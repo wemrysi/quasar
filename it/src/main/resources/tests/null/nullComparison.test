@@ -1,6 +1,7 @@
 {
     "name": "filter on `!= null`",
     "backends": {
+        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
     "data": "nulls.data",
