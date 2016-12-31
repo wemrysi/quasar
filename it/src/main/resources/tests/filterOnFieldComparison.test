@@ -1,7 +1,6 @@
 {
     "name": "filter on field comparison",
     "backends": {
-        "couchbase":         "skip",
         "marklogic":         "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
