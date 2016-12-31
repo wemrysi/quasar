@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.contrib.scalaz
 
 import scalaz.MonadError
 
@@ -22,6 +22,8 @@ import scalaz.MonadError
   * in the presence of multiple "mtl" constraints.
   */
 trait MonadError_[F[_], E] { self =>
+  def ME: MonadError[F, E]
+
   def raiseError[A](e: E): F[A]
   def handleError[A](fa: F[A])(f: E => F[A]): F[A]
 }
@@ -29,9 +31,17 @@ trait MonadError_[F[_], E] { self =>
 object MonadError_ {
   def apply[F[_], E](implicit F: MonadError_[F, E]): MonadError_[F, E] = F
 
-  implicit def monadErrorNoMonad[F[_], E](implicit F: MonadError[F, E]): MonadError_[F, E] =
+  implicit def monadErrorNoMonad[F[_], E](implicit F: MonadError[F, E])
+      : MonadError_[F, E] =
     new MonadError_[F, E] {
+      def ME = F
+
       def raiseError[A](e: E): F[A] = F.raiseError(e)
       def handleError[A](fa: F[A])(f: E => F[A]): F[A] = F.handleError(fa)(f)
     }
+}
+
+final class MonadError_Ops[F[_], S, A] private[scalaz](self: F[A])(implicit val F: MonadError_[F, S]) {
+  final def handleError(f: S => F[A]): F[A] =
+    F.handleError(self)(f)
 }

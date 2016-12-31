@@ -22,8 +22,10 @@ import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.fp._, eitherT._
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.scalacheck._
 
+import matryoshka.data.Fix
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -32,7 +34,8 @@ import scalaz.scalacheck.ScalazArbitrary._
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   "QueryFile" should {
     "descendantFiles" >> {

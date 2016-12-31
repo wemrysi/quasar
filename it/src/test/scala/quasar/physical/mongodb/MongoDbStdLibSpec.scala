@@ -22,7 +22,7 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
@@ -44,7 +44,7 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))
 

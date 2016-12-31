@@ -45,7 +45,7 @@ object MongoDbPlanner {
   import Planner._
   import WorkflowBuilder._
 
-  private val optimizer = new Optimizer[Fix]
+  private val optimizer = new Optimizer[Fix[LP]]
   private val lpr = optimizer.lpr
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround

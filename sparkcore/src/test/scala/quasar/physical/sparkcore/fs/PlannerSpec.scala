@@ -41,7 +41,10 @@ import org.specs2.execute.Result
 import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers
 
-class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+class PlannerSpec
+    extends quasar.Qspec
+    with QScriptHelpers
+    with DisjunctionMatchers {
 
   import Planner.SparkState
 

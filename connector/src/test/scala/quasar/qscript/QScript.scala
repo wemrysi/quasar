@@ -39,8 +39,6 @@ class QScriptSpec
     with CompilerHelpers
     with QScriptHelpers
     with TreeMatchers {
-  import quasar.frontend.fixpoint.lpf
-
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {

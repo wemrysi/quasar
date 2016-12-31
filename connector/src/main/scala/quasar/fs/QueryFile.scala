@@ -65,7 +65,7 @@ object QueryFile {
       show: Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
-    val optimizer = new Optimizer[T]
+    val optimizer = new Optimizer[T[LogicalPlan]]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
