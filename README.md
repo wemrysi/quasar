@@ -62,7 +62,7 @@ In order to run the integration tests for a given backend, you will need to prov
 you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
 allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongDB website and follow the
+In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
 instructions that can be found there.
 
 Once we have a MongoDB instance handy, we need to set a few
