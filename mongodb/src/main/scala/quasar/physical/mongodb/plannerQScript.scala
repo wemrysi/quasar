@@ -751,13 +751,11 @@ object MongoDbQScriptPlanner {
       e => merr.raiseError(qscriptPlanningFailed(e)),
       _.point[M])
 
-  /** Brings a [[WorkflowBuilder.M]] into our `M`.
-    */
+  /** Brings a [[WorkflowBuilder.M]] into our `M`. */
   def liftM[M[_]: Monad, A]
     (meh: WorkflowBuilder.M[A])
     (implicit merr: MonadError_[M, FileSystemError], mst: MonadState_[M, NameGen])
       : M[A] =
-    // FIXME: Not tracking state properly
     mst.gets(meh.eval) >>= (liftErr[M, A](_))
 
   trait Planner[F[_]] {

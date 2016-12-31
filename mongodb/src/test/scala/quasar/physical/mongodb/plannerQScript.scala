@@ -57,7 +57,6 @@ class PlannerQScriptSpec extends
   import Grouped.grouped
   import Reshape.reshape
   import jscore._
-  import Planner._
   import CollectionUtil._
   import quasar.frontend.fixpoint.lpf
 
@@ -2840,19 +2839,19 @@ class PlannerQScriptSpec extends
           collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
         defaultIndexes) must_==
         plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips._id = zips2._id"
       plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple join with no index" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = "select zips2.city from zips join zips2 on zips.pop = zips2.pop"
       plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan non-equi join" in {
       plan("select zips2.city from zips join zips2 on zips._id < zips2._id") must
@@ -3911,107 +3910,11 @@ class PlannerQScriptSpec extends
             reshape("value" -> $field("_id", "0")),
             ExcludeId)))
     }.pendingUntilFixed(notOnPar)
-  }
-
-  "alignJoinsƒ" should {
-    "leave well enough alone" in {
-      MongoDbPlanner.alignJoinsƒ(
-        lp.Invoke(s.InnerJoin,
-          Func.Input3(lpf.free('left), lpf.free('right),
-            lpf.invoke2(relations.And,
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
-        case \/-(plan) =>
-          plan must beTreeEqual(
-            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
-              lpf.invoke2(relations.And,
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
-      }
-    }
-
-    "swap a reversed condition" in {
-      MongoDbPlanner.alignJoinsƒ(
-        lp.Invoke(s.InnerJoin,
-          Func.Input3(lpf.free('left), lpf.free('right),
-            lpf.invoke2(relations.And,
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
-        case \/-(plan) =>
-          plan must beTreeEqual(
-            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
-              lpf.invoke2(relations.And,
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
-      }
-    }
-
-    "swap multiple reversed conditions" in {
-      MongoDbPlanner.alignJoinsƒ(
-        lp.Invoke(s.InnerJoin,
-          Func.Input3(lpf.free('left), lpf.free('right),
-            lpf.invoke2(relations.And,
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))),
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
-        case \/-(plan) =>
-          plan must beTreeEqual(
-            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
-              lpf.invoke2(relations.And,
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
-                lpf.invoke2(relations.Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
-      }
-    }
-
-    "fail with “mixed” conditions" in {
-      MongoDbPlanner.alignJoinsƒ(
-        lp.Invoke(s.InnerJoin,
-          Func.Input3(lpf.free('left), lpf.free('right),
-            lpf.invoke2(relations.And,
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(math.Add,
-                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
-                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
-              lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
-        case -\/(UnsupportedJoinCondition(cond)) =>
-          cond must beTreeEqual(
-            lpf.invoke2(relations.Eq,
-              lpf.invoke2(math.Add,
-                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
-                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
-              lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))))
-      }
-    }
 
     "plan with extra squash and flattening" in {
-      // NB: this case occurs when a view's LP is embedded in a larger query (See SD-1403),
-      // because type-checks are inserted into the inner and outer queries separately.
+      // NB: this case occurs when a view's LP is embedded in a larger query
+      //     (See SD-1403), because type-checks are inserted into the inner and
+      //     outer queries separately.
 
       val lp =
         lpf.let(
