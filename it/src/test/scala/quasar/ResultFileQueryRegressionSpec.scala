@@ -30,8 +30,8 @@ import scalaz.stream.Process
 class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(fs =>
-      fs.supports(BackendCapability.query()) &&
-      fs.supports(BackendCapability.write()) &&
+      fs.ref.supports(BackendCapability.query()) &&
+      fs.ref.supports(BackendCapability.write()) &&
       // NB: These are prohibitively slow on Couchbase
       !TestConfig.isCouchbase(fs.ref)))
   ) {

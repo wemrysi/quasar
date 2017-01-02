@@ -90,7 +90,7 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample`",
-      """select value v from (select value {"name": `_1`.["name"]} from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      """select value v from (select value `_1`.["name"] from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
 
     testSql2ToN1ql(
       "select name, type from `beer-sample`",
@@ -98,19 +98,19 @@ class BasicQueryEnablementSpec
 
     testSql2ToN1ql(
       "select name from `beer-sample` offset 1",
-      """select value v from (select value {"name": `_7`.["name"]} from (select value `_4` from (select (select value ifmissing(`_5`.["value"], `_5`) from `beer-sample` as `_5`) as `_1`, (select value 1 from (select value []) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
+      """select value v from (select value `_7`.["name"] from (select value `_4` from (select (select value ifmissing(`_5`.["value"], `_5`) from `beer-sample` as `_5`) as `_1`, (select value 1 from (select value []) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
 
     testSql2ToN1ql(
       "select count(*) from `beer-sample`",
-      """select value v from (select value `_2` from (select {"0": count(`_1`)} as `_2` from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
+      """select value v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
       "select count(name) from `beer-sample`",
-      """select value v from (select value `_2` from (select {"0": count(`_1`.["name"])} as `_2` from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
+      """select value v from (select value `_2` from (select count(`_1`.["name"]) as `_2` from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
       "select geo.lat + geo.lon from `beer-sample`",
-      """select value v from (select value {"0": (`_1`.["geo"].["lat"] + `_1`.["geo"].["lon"])} from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      """select value v from (select value (`_1`.["geo"].["lat"] + `_1`.["geo"].["lon"]) from (select value ifmissing(`_0`.["value"], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
   }
 
   "QScript to N1QL" should {

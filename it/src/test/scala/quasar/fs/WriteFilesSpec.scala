@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 
 class WriteFilesSpec extends FileSystemTest[FileSystem](
-  FileSystemTest.allFsUT.map(_ filter (_ supports BackendCapability.write()))) {
+  FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._

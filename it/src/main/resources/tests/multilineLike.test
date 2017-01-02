@@ -9,5 +9,5 @@
     "data": "slamengine_commits.data",
     "query": "select count(*) from slamengine_commits where commit.message like \"Merge%\"",
     "predicate": "equalsExactly",
-    "expected": [{ "0": 13 }]
+    "expected": [13]
 }

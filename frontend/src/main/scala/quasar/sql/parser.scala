@@ -442,6 +442,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     (query | defined_expr) * (
       keyword("limit")                        ^^^ (Limit(_: T[Sql], _: T[Sql]).embed)        |
         keyword("offset")                     ^^^ (Offset(_: T[Sql], _: T[Sql]).embed)       |
+        keyword("sample")                     ^^^ (Sample(_: T[Sql], _: T[Sql]).embed)       |
         keyword("union") ~ keyword("all")     ^^^ (UnionAll(_: T[Sql], _: T[Sql]).embed)     |
         keyword("union")                      ^^^ (Union(_: T[Sql], _: T[Sql]).embed)        |
         keyword("intersect") ~ keyword("all") ^^^ (IntersectAll(_: T[Sql], _: T[Sql]).embed) |

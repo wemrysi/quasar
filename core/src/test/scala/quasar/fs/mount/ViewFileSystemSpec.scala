@@ -41,7 +41,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   val query  = QueryFile.Ops[FileSystem]
   val read   = ReadFile.Ops[FileSystem]
@@ -218,7 +219,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
 
-      val expQ = Fix(Squash(Fix(Squash(lpf.read(rootDir </> file("zips"))))))
+      val expQ = Fix(Squash(lpf.read(rootDir </> file("zips"))))
       val exp = (for {
         h   <- query.unsafe.eval(expQ)
         _   <- query.transforms.fsErrToExec(
@@ -611,7 +612,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile(inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
@@ -635,7 +636,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
         beRightDisjunction.like { case r => r must beTreeEqual(
-          Squash(Squash(lpf.read(rootDir </> file("zips"))).embed).embed)
+          Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
 
