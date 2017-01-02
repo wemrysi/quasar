@@ -37,7 +37,7 @@ The following sections explain how to build and run the various subprojects.
 
 #### Basic Compile & Test
 
-To compile the project and run tests, execute the following command:
+To compile the project and run tests, first clone the quasar repo and then execute the following command:
 
 ```bash
 ./sbt test
