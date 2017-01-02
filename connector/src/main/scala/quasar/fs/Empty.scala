@@ -90,7 +90,7 @@ object Empty {
 
   ////
 
-  private val lp = new LogicalPlanR[Fix]
+  private val lp = new LogicalPlanR[Fix[LogicalPlan]]
 
   private def lpResult[F[_]: Applicative, A](plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
     lp.paths(plan)

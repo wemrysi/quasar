@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.{Data, Func}
 import quasar.DataArbitrary._
 import quasar.fp._
-import quasar.frontend.fixpoint.lpf
 import quasar.std
 
 import matryoshka._
@@ -33,6 +32,8 @@ import shapeless.contrib.scalaz.instances._
 import pathy.Path._
 
 class LogicalPlanSpecs extends Spec with ScalazMatchers {
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
+
   implicit val arbLogicalPlan: Delay[Arbitrary, LogicalPlan] =
     new Delay[Arbitrary, LogicalPlan] {
       def apply[A](arb: Arbitrary[A]) =

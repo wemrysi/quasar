@@ -24,6 +24,7 @@ import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._
+import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly
 
@@ -33,9 +34,7 @@ import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait QScriptHelpers extends TTypes[Fix] {
-  import quasar.frontend.fixpoint.lpf
-
+trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   type QS[A] =
     (QScriptCore :\:
       ThetaJoin :\:

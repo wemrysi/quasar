@@ -31,7 +31,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
   //     need to do a better job of handling this.
   import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
-  import quasar.frontend.fixpoint.lpf
 
   "compiler" should {
     "compile simple constant example 1" in {

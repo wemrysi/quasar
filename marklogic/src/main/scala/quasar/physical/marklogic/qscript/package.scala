@@ -17,6 +17,7 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
+import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{Common, EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
