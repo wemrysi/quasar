@@ -21,8 +21,7 @@ import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
-import quasar.frontend.fixpoint.lpf
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.std._
 
 import scala.sys
@@ -37,6 +36,7 @@ import shapeless.Sized
 
 /** The operations needed to execute the various StdLib tests for a QScript backend. */
 trait MapFuncStdLibTestRunner extends StdLibTestRunner {
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   def nullaryMapFunc(
     prg: FreeMapA[Fix, Nothing],

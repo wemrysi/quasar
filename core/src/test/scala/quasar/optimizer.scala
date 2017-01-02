@@ -31,8 +31,6 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
 class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
-  import quasar.frontend.fixpoint._
-
   "simplify" should {
 
     "inline trivial binding" in {

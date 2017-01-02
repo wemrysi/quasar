@@ -58,7 +58,6 @@ class PlannerQScriptSpec extends
   import Reshape.reshape
   import jscore._
   import CollectionUtil._
-  import quasar.frontend.fixpoint.lpf
 
   type EitherWriter[A] =
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]

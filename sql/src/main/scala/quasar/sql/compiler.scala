@@ -20,10 +20,10 @@ import quasar.Predef._
 import quasar.{BinaryFunc, Data, Func, GenericFunc, NullaryFunc, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
   SemanticError._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
 import quasar.common.SortDir
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.fp.binder._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib, StdLib._
@@ -36,17 +36,133 @@ import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
-trait Compiler[F[_]] {
+final case class TableContext[T]
+  (root: Option[T], full: () => T, subtables: Map[String, T])
+  (implicit T: Corecursive.Aux[T, LP]) {
+  def ++(that: TableContext[T]): TableContext[T] =
+    TableContext(
+      None,
+      () => structural.ObjectConcat(this.full(), that.full()).embed,
+      this.subtables ++ that.subtables)
+}
+
+final case class BindingContext[T]
+  (subbindings: Map[String, T]) {
+  def ++(that: BindingContext[T]): BindingContext[T] =
+    BindingContext(this.subbindings ++ that.subbindings)
+}
+
+final case class Context[T]
+  (bindingContext: List[BindingContext[T]],
+    tableContext: List[TableContext[T]]) {
+
+  def add(bc: BindingContext[T], tc: TableContext[T]): Context[T] = {
+    val modBindingContext: List[BindingContext[T]] =
+      this.bindingContext match {
+        case head :: tail => head ++ bc :: head :: tail
+        case Nil => bc :: Nil
+      }
+
+    val modTableContext: List[TableContext[T]] =
+      tc :: this.tableContext
+
+    Context(modBindingContext, modTableContext)
+  }
+
+  def dropHead: Context[T] =
+    Context(this.bindingContext.drop(1), this.tableContext.drop(1))
+}
+
+final case class CompilerState[T]
+  (fields: List[String], context: Context[T], nameGen: Int)
+
+private object CompilerState {
+  /** Runs a computation inside a binding/table context, which contains
+    * compilation data for the bindings/tables in scope.
+    */
+  def contextual[M[_], T, A]
+    (bc: BindingContext[T], tc: TableContext[T])
+    (compM: M[A])
+    (implicit m: MonadState[M, CompilerState[T]])
+      : M[A] = {
+
+    def preMod: CompilerState[T] => CompilerState[T] =
+      (state: CompilerState[T]) => state.copy(context = state.context.add(bc, tc))
+
+    def postMod: CompilerState[T] => CompilerState[T] =
+      (state: CompilerState[T]) => state.copy(context = state.context.dropHead)
+
+    m.modify(preMod) *> compM <* m.modify(postMod)
+  }
+
+  def addFields[M[_], T, A]
+    (add: List[String])(f: M[A])(implicit m: MonadState[M, CompilerState[T]])
+      : M[A] =
+    for {
+      curr <- fields
+      _    <- m.modify((s: CompilerState[T]) => s.copy(fields = curr ++ add))
+      a    <- f
+    } yield a
+
+  def fields[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+      : M[List[String]] =
+    m.get ∘ (_.fields)
+
+  def rootTable[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+      : M[Option[T]] =
+    m.get ∘ (_.context.tableContext.headOption.flatMap(_.root))
+
+  def rootTableReq[M[_], T]
+    (implicit
+      MErr: MonadError_[M, SemanticError],
+      MState: MonadState[M, CompilerState[T]])
+      : M[T] =
+    rootTable >>=
+      (_.fold(MErr.raiseError[T](CompiledTableMissing))(_.point[M]))
+
+  // prioritize binding context - when we want to prioritize a table,
+  // we will have the table reference already in the binding context
+  def subtable[M[_], T]
+    (name: String)
+    (implicit m: MonadState[M, CompilerState[T]])
+      : M[Option[T]] =
+    m.get ∘ { state =>
+      state.context.bindingContext.headOption.flatMap { bc =>
+        bc.subbindings.get(name) match {
+          case None =>
+            state.context.tableContext.headOption.flatMap(_.subtables.get(name))
+          case s => s
+        }
+      }
+    }
+
+  def subtableReq[M[_], T]
+    (name: String)
+    (implicit
+      MErr: MonadError_[M, SemanticError],
+      MState: MonadState[M, CompilerState[T]])
+      : M[T] =
+    subtable(name) >>=
+      (_.fold(
+        MErr.raiseError[T](CompiledSubtableMissing(name)))(
+        _.point[M]))
+
+  def fullTable[M[_], T](implicit m: MonadState[M, CompilerState[T]])
+      : M[Option[T]] =
+    m.get ∘ (_.context.tableContext.headOption.map(_.full()))
+
+  /** Generates a fresh name for use as an identifier, e.g. tmp321. */
+  def freshName[M[_], T](prefix: String)(implicit m: MonadState[M, CompilerState[T]]): M[Symbol] =
+    m.get ∘ (s => Symbol(prefix + s.nameGen.toString)) <*
+      m.modify((s: CompilerState[T]) => s.copy(nameGen = s.nameGen + 1))
+}
+
+final class Compiler[M[_], T: Equal]
+  (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import identity._
   import JoinDir._
 
-  val lpr = new LogicalPlanR[Fix]
-
-  // HELPERS
-  private type M[A] = EitherT[F, SemanticError, A]
-
-  private type CompilerStateT[F[_],A] = StateT[F, CompilerState, A]
-  private type CompilerM[A] = CompilerStateT[M, A]
+  val lpr = new LogicalPlanR[T]
 
   private def syntheticOf(node: CoExpr): List[Option[Synthetic]] =
     node.head._1
@@ -54,142 +170,24 @@ trait Compiler[F[_]] {
   private def provenanceOf(node: CoExpr): Provenance =
     node.head._2
 
-  private final case class TableContext(
-    root: Option[Fix[LP]],
-    full: () => Fix[LP],
-    subtables: Map[String, Fix[LP]]) {
-    def ++(that: TableContext): TableContext =
-      TableContext(
-        None,
-        () => Fix(structural.ObjectConcat(this.full(), that.full())),
-        this.subtables ++ that.subtables)
-  }
+  private def fail[A]
+    (error: SemanticError)
+    (implicit m: MonadError_[M, SemanticError]):
+      M[A] =
+    m.raiseError(error)
 
-  private final case class BindingContext(
-    subbindings: Map[String, Fix[LP]]) {
-    def ++(that: BindingContext): BindingContext =
-      BindingContext(this.subbindings ++ that.subbindings)
-  }
+  private def emit[A](value: A)(implicit m: Monad[M]): M[A] =
+    value.point[M]
 
-  private final case class Context(
-    bindingContext: List[BindingContext],
-    tableContext: List[TableContext]) {
-
-    def add(bc: BindingContext, tc: TableContext): Context = {
-      val modBindingContext: List[BindingContext] =
-        this.bindingContext match {
-          case head :: tail => head ++ bc :: head :: tail
-          case Nil => bc :: Nil
-        }
-
-      val modTableContext: List[TableContext] =
-        tc :: this.tableContext
-
-      Context(modBindingContext, modTableContext)
-    }
-
-    def dropHead: Context =
-      Context(this.bindingContext.drop(1), this.tableContext.drop(1))
-  }
-
-  private final case class CompilerState(
-    fields: List[String],
-    context: Context,
-    nameGen: Int)
-
-  private object CompilerState {
-
-    /** Runs a computation inside a binding/table context, which contains
-      * compilation data for the bindings/tables in scope.
-      */
-    def contextual[A](bc: BindingContext, tc: TableContext)(
-      compM: CompilerM[A])(
-      implicit m: Monad[F]): CompilerM[A] = {
-
-      def preMod: CompilerState => CompilerState =
-        (state: CompilerState) => state.copy(context = state.context.add(bc, tc))
-
-      def postMod: CompilerState => CompilerState =
-        (state: CompilerState) => state.copy(context = state.context.dropHead)
-
-      mod(preMod) *> compM <* mod(postMod)
-    }
-
-    def addFields[A](add: List[String])(f: CompilerM[A])(implicit m: Monad[F]):
-        CompilerM[A] =
-      for {
-        curr <- read[CompilerState, List[String]](_.fields)
-        _    <- mod((s: CompilerState) => s.copy(fields = curr ++ add))
-        a    <- f
-      } yield a
-
-    def fields(implicit m: Monad[F]): CompilerM[List[String]] =
-      read[CompilerState, List[String]](_.fields)
-
-    def rootTable(implicit m: Monad[F]): CompilerM[Option[Fix[LP]]] =
-      read[CompilerState, Option[Fix[LP]]](_.context.tableContext.headOption.flatMap(_.root))
-
-    def rootTableReq(implicit m: Monad[F]): CompilerM[Fix[LP]] =
-      rootTable.flatMap(_.map(emit).getOrElse(fail(CompiledTableMissing)))
-
-    // prioritize binding context - when we want to prioritize a table,
-    // we will have the table reference already in the binding context
-    def subtable(name: String)(implicit m: Monad[F]):
-        CompilerM[Option[Fix[LP]]] =
-      read[CompilerState, Option[Fix[LP]]]{ state =>
-        state.context.bindingContext.headOption.flatMap { bc =>
-          bc.subbindings.get(name) match {
-            case None =>
-              state.context.tableContext.headOption.flatMap(_.subtables.get(name))
-            case s => s
-          }
-        }
-      }
-
-    def subtableReq(name: String)(implicit m: Monad[F]):
-        CompilerM[Fix[LP]] =
-      subtable(name).flatMap(
-        _.map(emit).getOrElse(fail(CompiledSubtableMissing(name))))
-
-    def fullTable(implicit m: Monad[F]): CompilerM[Option[Fix[LP]]] =
-      read[CompilerState, Option[Fix[LP]]](_.context.tableContext.headOption.map(_.full()))
-
-    /** Generates a fresh name for use as an identifier, e.g. tmp321. */
-    def freshName(prefix: String)(implicit m: Monad[F]): CompilerM[Symbol] =
-      read[CompilerState, Int](_.nameGen).map(n => Symbol(prefix + n.toString)) <*
-        mod((s: CompilerState) => s.copy(nameGen = s.nameGen + 1))
-  }
-
-  private def read[A, B](f: A => B)(implicit m: Monad[F]):
-      StateT[M, A, B] =
-    StateT((s: A) => (s, f(s)).point[M])
-
-  private def fail[A](error: SemanticError)(implicit m: Monad[F]):
-      CompilerM[A] =
-    lift(error.left)
-
-  private def emit[A](value: A)(implicit m: Monad[F]): CompilerM[A] =
-    value.point[CompilerM]
-
-  private def lift[A](v: SemanticError \/ A)(implicit m: Monad[F]):
-      CompilerM[A] =
-    StateT[M, CompilerState, A]((s: CompilerState) =>
-      EitherT.eitherT(v.map(s -> _).point[F]))
-
-  private def whatif[S, A](f: StateT[M, S, A])(implicit m: Monad[F]):
-      StateT[M, S, A] =
-    read((s: S) => s).flatMap(oldState => f.imap(κ(oldState)))
-
-  private def mod(f: CompilerState => CompilerState)(implicit m: Monad[F]):
-      CompilerM[Unit] =
-    StateT[M, CompilerState, Unit](s => (f(s), ()).point[M])
-
-  type CoAnn[F[_]] = Cofree[F, SA.Annotations]
-  type CoExpr = CoAnn[Sql]
+  type CoExpr = Cofree[Sql, SA.Annotations]
 
   // CORE COMPILER
-  private def compile0(node: CoExpr)(implicit M: Monad[F]):
-      CompilerM[Fix[LP]] = {
+  private def compile0
+    (node: CoExpr)
+    (implicit
+      MErr: MonadError_[M, SemanticError],
+      MState: MonadState[M, CompilerState[T]])
+      : M[T] = {
 
     // NB: When there are multiple names for the same function, we may mark one
     //     with an `*` to indicate that it’s the “preferred” name, and others
@@ -266,18 +264,21 @@ trait Compiler[F[_]] {
       "shift_array"             -> structural.ShiftArray,
       "meta"                    -> structural.Meta)
 
-    def compileCases(cases: List[Case[CoExpr]], default: Fix[LP])(f: Case[CoExpr] => CompilerM[(Fix[LP], Fix[LP])]) =
+    def compileCases
+      (cases: List[Case[CoExpr]], default: T)
+      (f: Case[CoExpr] => M[(T, T)]) =
       cases.traverse(f).map(_.foldRight(default) {
-        case ((cond, expr), default) => Fix(relations.Cond(cond, expr, default))
+        case ((cond, expr), default) =>
+          relations.Cond(cond, expr, default).embed
       })
 
-    def flattenJoins(term: Fix[LP], relations: SqlRelation[CoExpr]):
-        Fix[LP] = relations match {
+    def flattenJoins(term: T, relations: SqlRelation[CoExpr]):
+        T = relations match {
       case _: NamedRelation[_]             => term
       case JoinRelation(left, right, _, _) =>
-        Fix(structural.ObjectConcat(
+        structural.ObjectConcat(
           flattenJoins(Left.projectFrom(term), left),
-          flattenJoins(Right.projectFrom(term), right)))
+          flattenJoins(Right.projectFrom(term), right)).embed
     }
 
     def buildJoinDirectionMap(relations: SqlRelation[CoExpr]):
@@ -292,8 +293,8 @@ trait Compiler[F[_]] {
       loop(relations, Nil)
     }
 
-    def compileTableRefs(joined: Fix[LP], relations: SqlRelation[CoExpr]):
-        Map[String, Fix[LP]] =
+    def compileTableRefs(joined: T, relations: SqlRelation[CoExpr]):
+        Map[String, T] =
       buildJoinDirectionMap(relations).map {
         case (name, dirs) =>
           name -> dirs.foldRight(
@@ -301,19 +302,17 @@ trait Compiler[F[_]] {
             (dir, acc) => dir.projectFrom(acc))
       }
 
-    def tableContext(joined: Fix[LP], relations: SqlRelation[CoExpr]):
-        TableContext =
+    def tableContext(joined: T, relations: SqlRelation[CoExpr]):
+        TableContext[T] =
       TableContext(
         Some(joined),
         () => flattenJoins(joined, relations),
         compileTableRefs(joined, relations))
 
-    def step(relations: SqlRelation[CoExpr]):
-        (Option[CompilerM[Fix[LP]]] =>
-          CompilerM[Fix[LP]] =>
-          CompilerM[Fix[LP]]) = {
-      (current: Option[CompilerM[Fix[LP]]]) =>
-      (next: CompilerM[Fix[LP]]) =>
+    def step(relations: SqlRelation[CoExpr])
+        : (Option[M[T]] => M[T] => M[T]) = {
+      (current: Option[M[T]]) =>
+      (next: M[T]) =>
       current.map { current =>
         for {
           stepName <- CompilerState.freshName("tmp")
@@ -322,7 +321,7 @@ trait Compiler[F[_]] {
             case ExprRelationAST(_, name)        => BindingContext(Map(name -> lpr.free(stepName)))
             case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
             case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
-            case r                               => BindingContext(Map())
+            case r                               => BindingContext[T](Map())
           }
           next2    <- CompilerState.contextual(bc, tableContext(lpr.free(stepName), relations))(next)
         } yield lpr.let(stepName, current, next2)
@@ -345,25 +344,25 @@ trait Compiler[F[_]] {
     }
 
     def compileFunction[N <: Nat](func: GenericFunc[N], args: Func.Input[CoExpr, N]):
-        CompilerM[Fix[LP]] =
-      args.traverse(compile0).map(args => Fix(func.applyGeneric(args)))
+        M[T] =
+      args.traverse(compile0).map(func.applyGeneric(_).embed)
 
-    def buildRecord(names: List[Option[String]], values: List[Fix[LP]]):
-        Fix[LP] = {
+    def buildRecord(names: List[Option[String]], values: List[T]):
+        T = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          Fix(structural.MakeObject(lpr.constant(Data.Str(name)), value))
+          structural.MakeObject(lpr.constant(Data.Str(name)), value).embed
         case (None, value) => value
       }
 
-      fields.reduceOption((a,b) => Fix(structural.ObjectConcat(a, b)))
+      fields.reduceOption(structural.ObjectConcat(_, _).embed)
         .getOrElse(lpr.constant(Data.Obj()))
     }
 
-    def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LP]] =
+    def compileRelation(r: SqlRelation[CoExpr]): M[T] =
       r match {
         case IdentRelationAST(name, _) =>
-          CompilerState.subtableReq(name)
+          CompilerState.subtableReq[M, T](name)
 
         case VariRelationAST(vari, _) =>
           fail(UnboundVariable(VarName(vari.symbol)))
@@ -377,8 +376,8 @@ trait Compiler[F[_]] {
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
-            val leftFree: Fix[LP] = lpr.free(leftName)
-            val rightFree: Fix[LP] = lpr.free(rightName)
+            val leftFree: T = lpr.free(leftName)
+            val rightFree: T = lpr.free(rightName)
 
             (compileRelation(left) ⊛
               compileRelation(right) ⊛
@@ -396,7 +395,7 @@ trait Compiler[F[_]] {
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
               lpr.let(leftName, left0,
                 lpr.let(rightName, right0, join)))
-            }).join
+          }).join
       }
 
     node.tail match {
@@ -423,7 +422,7 @@ trait Compiler[F[_]] {
           })
 
         namesOrError.fold(
-          err => EitherT.left[F, SemanticError, Fix[LP]](err.point[F]).liftM[CompilerStateT],
+          MErr.raiseError,
           names => {
 
             val syntheticNames: List[String] =
@@ -455,28 +454,28 @@ trait Compiler[F[_]] {
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
-                    (CompilerState.rootTableReq ⊛ compile0(filter))(
+                    (CompilerState.rootTableReq[M, T] ⊛ compile0(filter))(
                       set.Filter(_, _).embed))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
-                      (CompilerState.rootTableReq ⊛
+                      (CompilerState.rootTableReq[M, T] ⊛
                         groupBy.keys.traverse(compile0)) ((src, keys) =>
-                        Fix(set.GroupBy(src, Fix(structural.MakeArrayN(keys: _*))))))
+                        set.GroupBy(src, structural.MakeArrayN(keys: _*).embed).embed))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
-                        (CompilerState.rootTableReq ⊛ compile0(having))(
+                        (CompilerState.rootTableReq[M, T] ⊛ compile0(having))(
                           set.Filter(_, _).embed))
 
                       stepBuilder(having) {
-                        val squashed = select.map(set => Fix(Squash(set)))
+                        val squashed = select.map(Squash(_).embed)
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
-                            CompilerState.rootTableReq >>= (t =>
+                            CompilerState.rootTableReq[M, T] >>= (t =>
                               nam.fold(
-                                orderBy.keys.traverse(p => (t, p._1).point[CompilerM] ))(
+                                orderBy.keys.traverse(p => (t, p._1).point[M]))(
                                 n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
                                 .map(ks => lpr.sort(t, ks map {
                                   case (k, ASC ) => (k, SortDir.Ascending)
@@ -486,20 +485,20 @@ trait Compiler[F[_]] {
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                CompilerState.rootTableReq.map(t =>
+                                CompilerState.rootTableReq[M, T].map(t =>
                                   if (syntheticNames.nonEmpty)
-                                    Fix(set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      Fix(structural.DeleteField(acc, lpr.constant(Data.Str(field)))))))
-                                  else Fix(set.Distinct(t))).some
+                                    set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
+                                      structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed
+                                  else set.Distinct(t).embed).some
                               case _ => None
                             }
 
                             stepBuilder(distincted) {
                               val pruned =
-                                CompilerState.rootTableReq.map(
+                                CompilerState.rootTableReq[M, T].map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
-                                    Fix(structural.DeleteField(acc,
-                                      lpr.constant(Data.Str(field))))))
+                                    structural.DeleteField(acc,
+                                      lpr.constant(Data.Str(field))).embed))
 
                               pruned
                             }
@@ -522,11 +521,11 @@ trait Compiler[F[_]] {
           structural.ShiftArray(structural.MakeArrayN(vs: _*).embed).embed)
 
       case ArrayLiteral(exprs) =>
-        exprs.traverse(compile0).map(elems => Fix(structural.MakeArrayN(elems: _*)))
+        exprs.traverse(compile0).map(structural.MakeArrayN(_: _*).embed)
 
       case MapLiteral(exprs) =>
-        exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>
-          Fix(structural.MakeObjectN(elems: _*)))
+        exprs.traverse(_.bitraverse(compile0, compile0)) ∘
+        (structural.MakeObjectN(_: _*).embed)
 
       case Splice(expr) =>
         expr.fold(
@@ -566,7 +565,7 @@ trait Compiler[F[_]] {
           //       better represented in a Coproduct.
           case f @ Union     => fail(FunctionNotFound(f.name)).right
           case f @ Intersect => fail(FunctionNotFound(f.name)).right
-        }): GenericFunc[nat._2] \/ CompilerM[Fix[LP]])
+        }): GenericFunc[nat._2] \/ M[T])
           .valueOr(compileFunction[nat._2](_, Func.Input2(left, right)))
 
       case Unop(expr, op) =>
@@ -586,21 +585,21 @@ trait Compiler[F[_]] {
           case ShiftArrayIndices   => structural.ShiftArrayIndices.left
           case ShiftArrayValues    => structural.ShiftArray.left
           case UnshiftArray        => structural.UnshiftArray.left
-        }): GenericFunc[nat._1] \/ CompilerM[Fix[LP]])
+        }): GenericFunc[nat._1] \/ M[T])
           .valueOr(compileFunction[nat._1](_, Func.Input1(expr)))
 
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
-            CompilerState.rootTableReq.map(obj =>
-              Fix(structural.ObjectProject(obj, lpr.constant(Data.Str(name)))))
+            CompilerState.rootTableReq[M, T] ∘
+            (structural.ObjectProject(_, lpr.constant(Data.Str(name))).embed)
           else
             for {
               rName <- relationName(node).fold(fail, emit)
-              table <- CompilerState.subtableReq(rName)
+              table <- CompilerState.subtableReq[M, T](rName)
             } yield
               if ((rName: String) ≟ name) table
-              else Fix(structural.ObjectProject(table, lpr.constant(Data.Str(name)))))
+              else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
 
       case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
         args.traverse(compile0).flatMap {
@@ -625,7 +624,7 @@ trait Compiler[F[_]] {
               case "week"         => date.ExtractWeek
               case "year"         => date.ExtractYear
             }).cata(
-              f => emit(Fix(f(expr))),
+              f => emit(f(expr).embed),
               fail(UnexpectedDatePart("\"" + part + "\"")))
 
           case _ :: _ :: Nil =>
@@ -636,7 +635,7 @@ trait Compiler[F[_]] {
         }
 
       case InvokeFunction(name, Nil) =>
-        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[M[T]](
           fail(FunctionNotFound(name))) {
           case func @ NullaryFunc(_, _, _, _) =>
             compileFunction[nat._0](func, Sized[List]())
@@ -644,7 +643,7 @@ trait Compiler[F[_]] {
         }
 
       case InvokeFunction(name, List(a1)) =>
-        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[M[T]](
           fail(FunctionNotFound(name))) {
           case func @ UnaryFunc(_, _, _, _, _, _, _) =>
             compileFunction[nat._1](func, Func.Input1(a1))
@@ -660,7 +659,7 @@ trait Compiler[F[_]] {
               relations.Eq(lpr.free(name), lpr.constant(Data.Null)).embed,
               c2,
               lpr.free(name)).embed)),
-          functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+          functionMapping.get(name.toLowerCase).fold[M[T]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
               compileFunction[nat._2](func, Func.Input2(a1, a2))
@@ -668,7 +667,7 @@ trait Compiler[F[_]] {
           })
 
       case InvokeFunction(name, List(a1, a2, a3)) =>
-        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[M[T]](
           fail(FunctionNotFound(name))) {
           case func @ TernaryFunc(_, _, _, _, _, _, _) =>
             compileFunction[nat._3](func, Func.Input3(a1, a2, a3))
@@ -676,7 +675,7 @@ trait Compiler[F[_]] {
         }
 
       case InvokeFunction(name, args) =>
-        functionMapping.get(name.toLowerCase).fold[CompilerM[Fix[LP]]](
+        functionMapping.get(name.toLowerCase).fold[M[T]](
           fail(FunctionNotFound(name)))(
           func => fail(WrongArgumentCount(name, func.arity, args.length)))
 
@@ -707,46 +706,61 @@ trait Compiler[F[_]] {
     }
   }
 
-  def compile(tree: Cofree[Sql, SA.Annotations])(
-      implicit F: Monad[F]): F[SemanticError \/ Fix[LP]] = {
-    compile0(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.map(_.map(Compiler.reduceGroupKeys))
+  // TODO: This could have fewer constraints if we didn’t have to use the same
+  //       Monad as `compile0`.
+  def compile
+    (tree: Cofree[Sql, SA.Annotations])
+    (implicit
+      MErr: MonadError_[M, SemanticError],
+      MState: MonadState[M, CompilerState[T]])
+      : M[T] = {
+    compile0(tree).map(Compiler.reduceGroupKeys[T])
   }
 }
 
 object Compiler {
-  def apply[F[_]]: Compiler[F] = new Compiler[F] {}
+  def apply[M[_], T: Equal]
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+    new Compiler[M, T]
 
-  def trampoline = apply[scalaz.Free.Trampoline]
+  def trampoline[T: Equal]
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+    apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
 
-  def compile(tree: Cofree[Sql, SA.Annotations]):
-      SemanticError \/ Fix[LP] =
-    trampoline.compile(tree).run
+  def compile[T: Equal]
+    (tree: Cofree[Sql, SA.Annotations])
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : SemanticError \/ T =
+    trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
 
   /** Emulate SQL semantics by reducing any projection which trivially
     * matches a key in the "group by".
     */
-  def reduceGroupKeys(tree: Fix[LP]): Fix[LP] = {
+  def reduceGroupKeys[T: Equal]
+    (tree: T)
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : T = {
     // Step 0: identify key expressions, and rewrite them by replacing the
     // group source with the source at the point where they might appear.
-    def keysƒ(t: LP[(Fix[LP], List[Fix[LP]])]):
-        (Fix[LP], List[Fix[LP]]) =
+    def keysƒ(t: LP[(T, List[T])]):
+        (T, List[T]) =
     {
-      def groupedKeys(t: LP[Fix[LP]], newSrc: Fix[LP]): Option[List[Fix[LP]]] = {
+      def groupedKeys(t: LP[T], newSrc: T): Option[List[T]] = {
         t match {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
           case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
-            groupedKeys(src.unFix, newSrc)
+            groupedKeys(src.project, newSrc)
           case _ => None
         }
       }
 
-      (Fix(t.map(_._1)),
-        groupedKeys(t.map(_._1), Fix(t.map(_._1))).getOrElse(t.foldMap(_._2)))
+      (t.map(_._1).embed,
+        groupedKeys(t.map(_._1), t.map(_._1).embed).getOrElse(t.foldMap(_._2)))
     }
 
     // use `scalaz.IList` so we can use `scalaz.Equal[LP]`
-    val keys: IList[Fix[LP]] = IList.fromList(boundCata(tree)(keysƒ)._2)
+    val keys: IList[T] = IList.fromList(boundCata(tree)(keysƒ)._2)
 
     // Step 1: annotate nodes containing the keys.
     val ann: Cofree[LP, Boolean] = boundAttribute(tree)(keys.element)
@@ -765,6 +779,6 @@ object Compiler {
           else t.tail
       }
     }
-    ann.ana[Fix[LP]](rewriteƒ)
+    ann.ana[T](rewriteƒ)
   }
 }

@@ -38,7 +38,7 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
-  private val lpr = new LogicalPlanR[Fix]
+  private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
   def service[S[_]](
     implicit

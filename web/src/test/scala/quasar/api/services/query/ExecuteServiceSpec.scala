@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._
@@ -53,7 +53,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
 

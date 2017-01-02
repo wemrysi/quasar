@@ -58,7 +58,6 @@ class PlannerSpec extends
   import jscore._
   import Planner._
   import CollectionUtil._
-  import quasar.frontend.fixpoint.lpf
 
   type EitherWriter[E, A] = EitherT[Writer[Vector[PhaseResult], ?], E, A]
 

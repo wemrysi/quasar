@@ -29,8 +29,6 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
-  import quasar.frontend.fixpoint.lpf
-
   val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {

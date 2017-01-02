@@ -47,7 +47,7 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbQStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new lp.LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))
 
