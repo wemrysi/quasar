@@ -57,9 +57,9 @@ object Variables {
             case Fix(Ident(name)) =>
               posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
                 TableRelationAST(_, alias).right,
-                GenericError("bad path: " + name + " (note: absolute file path required)").left)  // FIXME
+                GenericError(s"bad path: $name (note: absolute file path required)").left)  // FIXME
             case x =>
-              GenericError("not a valid table name: " + x).left  // FIXME
+              GenericError(s"not a valid table name: ${x.unFix.prettyPrint}").left  // FIXME
           }
         case r => r.right
       }, _.right[SemanticError]).map(rel =>

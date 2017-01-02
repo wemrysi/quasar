@@ -24,7 +24,9 @@ import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait Sql[A]
+sealed trait Sql[A] {
+  def prettyPrint: String = "SQL AST" // TODO: Flesh out pretty printing of ast
+}
 object Sql {
   implicit val equal: Delay[Equal, Sql] =
     new Delay[Equal, Sql] {
