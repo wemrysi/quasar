@@ -19,6 +19,7 @@ package quasar.physical.mongodb.workflow
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
@@ -28,9 +29,10 @@ import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Gro
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
-import quasar.qscript.SortDir
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Ops that are provided by all supported MongoDB versions (since 2.6), or are

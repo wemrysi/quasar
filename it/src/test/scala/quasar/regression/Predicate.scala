@@ -16,10 +16,14 @@
 
 package quasar.regression
 
-import scala.Predef.$conforms
 import quasar.Predef._
+import quasar.fp._
+
+import scala.None
+import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
+import matryoshka._
 import org.specs2.execute._
 import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -37,6 +41,7 @@ object Predicate {
   import MustMatchers._
   import StandardResults._
   import DecodeResult.{ok => jok, fail => jfail}
+
 
   def matchJson(expected: Option[Json]): Matcher[Option[Json]] = new Matcher[Option[Json]] {
     def apply[S <: Option[Json]](s: Expectable[S]) = {
@@ -127,11 +132,11 @@ object Predicate {
       val expected = Process.emitAll(expected0).map(Some(_))
 
       (actual tee expected)(tee.zipAll(None, None))
-        .flatMap { case ((a, e)) =>
-          if (jsonMatches(a, e))
-            Process.halt
-          else
-            Process.emit(a must matchJson(e) : Result)
+        .flatMap {
+          case (a, e) if jsonMatches(a, e)                  => Process.halt
+          case (a, e) if (a == e &&
+                          fieldOrder === FieldOrderIgnored) => Process.halt
+          case (a, e)                                       => Process.emit(a must matchJson(e) : Result)
         }
         .runLog.map(_.foldMap()(Result.ResultMonoid))
     }
@@ -149,9 +154,11 @@ object Predicate {
 
       (actual tee expected)(tee.zipAll(None, None))
         .flatMap {
-          case (a, None) => Process.halt
-          case (a, e) if (jsonMatches(a, e)) => Process.halt
-          case (a, e) => Process.emit(a must matchJson(e) : Result)
+          case (a, None)                                    => Process.halt
+          case (a, e) if (jsonMatches(a, e))                => Process.halt
+          case (a, e) if (a == e &&
+                          fieldOrder === FieldOrderIgnored) => Process.halt
+          case (a, e)                                       => Process.emit(a must matchJson(e) : Result)
         }
         .runLog.map(_.foldMap()(Result.ResultMonoid))
     }

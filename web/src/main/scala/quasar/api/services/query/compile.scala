@@ -26,16 +26,18 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend._
 import quasar.fs._
-
-import scala.Predef.$conforms
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
 import argonaut._, Argonaut._
 import matryoshka._
+import matryoshka.data.Fix
 import org.http4s.dsl._
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
+  private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+
   def service[S[_]](
     implicit
     Q: QueryFile.Ops[S],
@@ -50,7 +52,7 @@ object compile {
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(
         InternalServerError withReason "No explain output for plan.",
-        "logicalPlan" := lp.render)
+        "logicalplan" := lp.render)
 
     def explainQuery(
       expr: Fix[sql.Sql],
@@ -70,7 +72,7 @@ object compile {
                 .map(physicalPlanJson =>
                   Json(
                     "physicalPlan" := physicalPlanJson,
-                    "inputs"       := LogicalPlan.paths(lp).map(p => posixCodec.printPath(p))
+                    "inputs"       := lpr.paths(lp).map(posixCodec.printPath)
                   ).toResponse[S])
                 .toRightDisjunction(noOutputError(lp))
                 .toResponse[S]

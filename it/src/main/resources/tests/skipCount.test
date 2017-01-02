@@ -4,7 +4,9 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "couchbase":  "skip",
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
 
     "data": "zips.data",
@@ -12,5 +14,5 @@
     "query": "select count(*) from (select * from zips offset 10) as x",
 
     "predicate": "equalsExactly",
-    "expected": [{ "0": 29343 }]
+    "expected": [29343]
 }

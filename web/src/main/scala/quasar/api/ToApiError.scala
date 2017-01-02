@@ -92,12 +92,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Failed to execute SQL^2 query.",
           reason,
           det.toList : _*)            :+
-        ("logicalPlan" :=  lp.render) :?+
+        ("logicalplan" :=  lp.render) :?+
         ("cause"       :?= cause.map(_.shows))
       case PathErr(e) =>
         e.toApiError
       case PlanningFailed(lp, e) =>
-        e.toApiError :+ ("logicalPlan" := lp.render)
+        e.toApiError :+ ("logicalplan" := lp.render)
       case QScriptPlanningFailed(e) =>
         e.toApiError
       case UnknownReadHandle(ReadHandle(path, id)) =>
@@ -242,9 +242,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Unsupported JavaScript in query plan.",
           err.message,
           "value" := value)
-      case InternalError(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Failed to plan query.", msg)
+      case InternalError(msg, cause) =>
+        fromMsg(
+          InternalServerError withReason "Failed to plan query.",
+          msg
+        ) :?+ ("cause" :?= cause.map(_.toString))
       case UnboundVariable(v) =>
         fromMsg_(
           InternalServerError withReason "Unbound variable.", v.toString)

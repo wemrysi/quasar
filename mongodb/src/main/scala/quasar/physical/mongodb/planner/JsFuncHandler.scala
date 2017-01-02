@@ -29,10 +29,9 @@ object JsFuncHandler {
   def apply[T[_[_]], A](func: MapFunc[T, A]): Option[Free[JsCoreF, A]] = {
     implicit def hole(a: A): Free[JsCoreF, A] = Free.pure(a)
 
-    val js = quasar.jscore.fixpoint[Free[?[_], A]]
-    import js._
-    val mjs = quasar.physical.mongodb.javascript[Free[?[_], A]]
+    val mjs = quasar.physical.mongodb.javascript[Free[JsCoreF, A]](Free.roll)
     import mjs._
+    import mjs.js._
 
     // NB: Math.trunc is not present in MongoDB.
     def trunc(expr: Free[JsCoreF, A]): Free[JsCoreF, A] =
@@ -225,7 +224,7 @@ object JsFuncHandler {
       // TODO: case ExtractWeek(date) =>
       case ExtractYear(date) => Call(select(date, "getUTCFullYear"), Nil)
 
-      case Now() => Call(select(ident("Date"), "now"), Nil)
+      case Now() => Call(ident("ISODate"), Nil)
 
       case ProjectField(obj, field) => Access(obj, field)
       case ProjectIndex(arr, index) => Access(arr, index)

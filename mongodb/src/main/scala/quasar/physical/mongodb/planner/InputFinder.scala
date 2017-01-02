@@ -17,11 +17,11 @@
 package quasar.physical.mongodb.planner
 
 import quasar.Predef._
+import quasar.frontend.logicalplan.LogicalPlan
 
-import quasar.{LogicalPlan}
-
-import matryoshka.{Recursive}
-import scalaz.{Cofree}
+import matryoshka.data._
+import matryoshka.implicits._
+import scalaz.Cofree
 
 sealed abstract class InputFinder {
   def apply[A](t: Cofree[LogicalPlan, A]): A
@@ -34,5 +34,5 @@ case object Here extends InputFinder {
 
 final case class There(index: Int, next: InputFinder) extends InputFinder {
   def apply[A](a: Cofree[LogicalPlan, A]): A =
-    next((Recursive[Cofree[?[_], A]].children(a).apply)(index))
+    next(a.children.apply(index))
 }

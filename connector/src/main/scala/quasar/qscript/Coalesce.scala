@@ -17,13 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
@@ -58,23 +59,23 @@ trait Coalesce[IN[_]] {
 }
 
 trait CoalesceInstances {
-  def coalesce[T[_[_]]: Recursive: Corecursive: EqualT] = new CoalesceT[T]
+  def coalesce[T[_[_]]: BirecursiveT: EqualT: ShowT] = new CoalesceT[T]
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: EqualT, G[_]]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit QC: QScriptCore[T, ?] :<: G)
       : Coalesce.Aux[T, QScriptCore[T, ?], G] =
     coalesce[T].qscriptCore[G]
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive: EqualT, F[_]]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]]
       : Coalesce.Aux[T, ProjectBucket[T, ?], F] =
     coalesce[T].projectBucket[F]
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive: EqualT, G[_]]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit TJ: ThetaJoin[T, ?] :<: G)
       : Coalesce.Aux[T, ThetaJoin[T, ?], G] =
     coalesce[T].thetaJoin[G]
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive: EqualT, G[_]]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit EJ: EquiJoin[T, ?] :<: G)
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
     coalesce[T].equiJoin
@@ -144,32 +145,32 @@ trait CoalesceInstances {
     default
 }
 
-class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
+class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   private def CoalesceTotal = Coalesce[T, QScriptTotal, QScriptTotal]
 
+  private type QST = QScriptTotal[T[CoEnv[Hole, QScriptTotal, ?]]]
+  private type CoEnvQST[A] = CoEnv[Hole, QScriptTotal, A]
+
+  private def freeTotal(branch: FreeQS)(coalesce: QST => Option[QST]): FreeQS =
+    branch
+      .convertTo[T[CoEnv[Hole, QScriptTotal, ?]]]
+      .cata((co: CoEnv[Hole, QScriptTotal, T[CoEnv[Hole, QScriptTotal, ?]]]) =>
+        co.run.fold(
+          κ(co),
+          in => CoEnv[Hole, QScriptTotal, T[CoEnv[Hole, QScriptTotal, ?]]](repeatedly(coalesce)(in).right)).embed)
+      .convertTo[FreeQS]
+
   private def freeQC(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
 
   private def freeSR(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceSR(coenvPrism[QScriptTotal, Hole]))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceSR(coenvPrism[QScriptTotal, Hole]))
 
   private def freeEJ(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def freeTJ(branch: FreeQS): FreeQS =
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](branch)(co =>
-      co.run.fold(
-        κ(co),
-        in => CoEnv(repeatedly(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))(in).right)))
+    freeTotal(branch)(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def ifNeq(f: FreeQS => FreeQS): FreeQS => Option[FreeQS] =
     branch => {
@@ -187,18 +188,13 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
       case (l,    r)    => f(l.getOrElse(lOrig), r.getOrElse(rOrig)).some
     }
 
-  def rewrite(elem0: FreeMap): Option[FreeMap] = {
-    val elem: T[CoEnv[Hole, MapFunc, ?]] = elem0.toCoEnv[T]
-
-    val hole: T[CoEnv[Hole, MapFunc, ?]] = HoleF.toCoEnv[T]
-
-    val oneRef =
-      Free.roll[MapFunc, Hole](ProjectIndex(HoleF, IntLit(1))).toCoEnv[T]
-    val rightCount: Int = elem.para(count(hole))
+  def rewrite(elem: FreeMap): Option[FreeMap] = {
+    val oneRef = Free.roll[MapFunc, Hole](ProjectIndex(HoleF, IntLit(1)))
+    val rightCount: Int = elem.elgotPara(count(HoleF))
 
     // all `RightSide` access is through `oneRef`
-    (elem.para(count(oneRef)) ≟ rightCount).option(
-      transApoT(elem)(substitute(oneRef, hole)).fromCoEnv)
+    (elem.elgotPara(count(oneRef)) ≟ rightCount).option(
+      elem.transApoT(substitute(oneRef, HoleF)))
   }
 
   def qscriptCore[G[_]](implicit QC: QScriptCore :<: G): Coalesce.Aux[T, QScriptCore, G] =
@@ -207,8 +203,8 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
       type OUT[A] = G[A]
 
       // TODO: I feel like this must be some standard fold.
-      def sequenceReduce(rf: ReduceFunc[(FreeMap, JoinFunc)])
-          : Option[(FreeMap, ReduceFunc[JoinFunc])] =
+      def sequenceReduce(rf: ReduceFunc[(IdStatus, JoinFunc)])
+          : Option[(IdStatus, ReduceFunc[JoinFunc])] =
         rf match {
           case ReduceFuncs.Count(a)           => (a._1, ReduceFuncs.Count(a._2)).some
           case ReduceFuncs.Sum(a)             => (a._1, ReduceFuncs.Sum(a._2)).some
@@ -227,6 +223,10 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
           case RightSide => replacement.some
         }
 
+      // TODO: Use NormalizableT#freeMF instead
+      def normalizeMapFunc[A: Show](t: FreeMapA[A]): FreeMapA[A] =
+        t.transCata[FreeMapA[A]](MapFunc.normalize[T, A])
+
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) = {
@@ -237,8 +237,8 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
               mf).some
           else s match {
             case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
-            case LeftShift(srcInner, struct, repair) =>
-              LeftShift(srcInner, struct, mf >> repair).some
+            case LeftShift(srcInner, struct, id, repair) =>
+              LeftShift(srcInner, struct, id, mf >> repair).some
             case Reduce(srcInner, bucket, funcs, repair) =>
               Reduce(srcInner, bucket, funcs, mf >> repair).some
             case Subset(innerSrc, lb, sel, rb) =>
@@ -265,57 +265,54 @@ class CoalesceT[T[_[_]]: Recursive: Corecursive: EqualT] extends TTypes[T] {
             }
             case _ => None
           })
-        case LeftShift(Embed(src), struct, shiftRepair) =>
+        case LeftShift(Embed(src), struct, id, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
-            case LeftShift(innerSrc, innerStruct, innerRepair)
+            case LeftShift(innerSrc, innerStruct, innerId, innerRepair)
                 if !shiftRepair.element(LeftSide) && struct != HoleF =>
               LeftShift(
-                FToOut.reverseGet(QC.inj(LeftShift(innerSrc, innerStruct, struct >> innerRepair))).embed,
+                FToOut.reverseGet(QC.inj(LeftShift(innerSrc, innerStruct, innerId, struct >> innerRepair))).embed,
                 HoleF,
+                id,
                 shiftRepair).some
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
-              LeftShift(innerSrc, struct >> mf, shiftRepair).some
+              LeftShift(innerSrc, struct >> mf, id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if freeTransCata(struct >> redRepair)(MapFunc.normalize) ≟ Free.point(ReduceIndex(0)) =>
-              rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
-            case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(_, elem)), redRepair)
-                if freeTransCata(struct >> redRepair)(MapFunc.normalize) ≟ Free.point(ReduceIndex(0)) =>
+                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if freeTransCata(struct >> redRepair)(MapFunc.normalize) ≟ Free.roll(ZipMapKeys(Free.point(ReduceIndex(0)))) =>
-              rightOnly(
-                Free.roll(ConcatArrays[T, FreeMap](Free.roll(MakeArray(k)), Free.roll(MakeArray(elem)))))(
-                shiftRepair) ∘
-                (Map(srcInner, _))
+                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+              rightOnly(id match {
+                case IncludeId =>
+                  Free.roll(ConcatArrays[T, FreeMap](Free.roll(MakeArray(k)), Free.roll(MakeArray(elem))))
+                case _         => elem
+              })(shiftRepair) ∘ (Map(srcInner, _))
             case _ => None
           }
         case Reduce(Embed(src), bucket, reducers, redRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
-            case LeftShift(innerSrc, struct, shiftRepair)
+            case LeftShift(innerSrc, struct, id, shiftRepair)
                 if shiftRepair =/= RightSideF =>
-              (rightOnly(HoleF)(freeTransCata(bucket >> shiftRepair)(MapFunc.normalize)) ⊛
-                reducers.traverse(_.traverse(mf => rightOnly(HoleF)(freeTransCata(mf >> shiftRepair)(MapFunc.normalize)))))((b, r) =>
-                Reduce(FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, RightSideF))).embed, b, r, redRepair))
-            case LeftShift(innerSrc, struct, shiftRepair) =>
-              (rewriteShift(struct, freeTransCata(bucket >> shiftRepair)(MapFunc.normalize)) ⊛
-                reducers.traverse(_.traverse(mf => rewriteShift(struct, freeTransCata(mf >> shiftRepair)(MapFunc.normalize)))))((b, r) =>
-                r.foldRightM[Option, (FreeMap, (JoinFunc, List[ReduceFunc[JoinFunc]]))]((b._1, (b._2, Nil)))((elem, acc) => {
+              (rightOnly(HoleF)(normalizeMapFunc(bucket >> shiftRepair)) ⊛
+                reducers.traverse(_.traverse(mf => rightOnly(HoleF)(normalizeMapFunc(mf >> shiftRepair)))))((b, r) =>
+                Reduce(FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, RightSideF))).embed, b, r, redRepair))
+            case LeftShift(innerSrc, struct, id, shiftRepair) =>
+              (rewriteShift(id, normalizeMapFunc(bucket >> shiftRepair)) ⊛
+                reducers.traverse(_.traverse(mf => rewriteShift(id, normalizeMapFunc(mf >> shiftRepair)))))((b, r) =>
+                r.foldRightM[Option, (IdStatus, (JoinFunc, List[ReduceFunc[JoinFunc]]))]((b._1, (b._2, Nil)))((elem, acc) => {
                   sequenceReduce(elem) >>= (e =>
                     (e._1 ≟ acc._1).option(
                       (acc._1, (acc._2._1, e._2 :: acc._2._2))))
                 })).join >>= {
-                case (st, (bucket, reducers)) =>
-                  if (st ≟ struct) None
-                  else
-                    (rightOnly(HoleF)(bucket) ⊛
-                      (reducers.traverse(_.traverse(rightOnly(HoleF)))))((sb, sr) =>
-                      Reduce(FToOut.reverseGet(QC.inj(LeftShift(innerSrc, st, RightSideF))).embed, sb, sr, redRepair))
+                case (newId, (bucket, reducers)) =>
+                  (rightOnly(HoleF)(bucket) ⊛
+                    (reducers.traverse(_.traverse(rightOnly(HoleF)))))((sb, sr) =>
+                    Reduce(FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, newId, RightSideF))).embed, sb, sr, redRepair))
               }
             case Map(innerSrc, mf) =>
               Reduce(
                 innerSrc,
-                freeTransCata(bucket >> mf)(MapFunc.normalize),
-                reducers.map(_.map(red => freeTransCata(red >> mf)(MapFunc.normalize))),
+                normalizeMapFunc(bucket >> mf),
+                reducers.map(_.map(red => normalizeMapFunc(red >> mf))),
                 redRepair).some
             case _ => None
           }

@@ -52,6 +52,9 @@ object SessionIO {
   def connectionUri: OptionT[SessionIO, URI] =
     OptionT(SessionIO(s => Option(s.getConnectionUri)))
 
+  val currentServerPointInTime: SessionIO[BigInt] =
+    SessionIO(_.getCurrentServerPointInTime) map (BigInt(_))
+
   def evaluateModule(main: MainModule, options: RequestOptions): SessionIO[QueryResults] =
     evaluateModule0(main, options) map (new QueryResults(_))
 
@@ -79,9 +82,6 @@ object SessionIO {
 
   def executeQuery_(query: XQuery): SessionIO[Executed] =
     executeQuery(query, new RequestOptions)
-
-  val currentServerPointInTime: SessionIO[BigInt] =
-    SessionIO(_.getCurrentServerPointInTime) map (BigInt(_))
 
   def insertContent[F[_]: Foldable](content: F[Content]): SessionIO[Executed] =
     SessionIO(_.insertContent(content.to[Array])).as(executed)

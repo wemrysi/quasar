@@ -23,7 +23,7 @@ import quasar.Planner.InternalError
 import matryoshka._
 import scalaz._, Scalaz._
 
-final class UnreachablePlanner[F[_]: Applicative, QS[_]] extends Planner[F, QS] {
-  def plan: AlgebraM[M, QS, N1QL] =
-    κ(EitherT.fromDisjunction(InternalError("unreachable").left))
+final class UnreachablePlanner[T[_[_]], F[_]: Applicative, QS[_]] extends Planner[T, F, QS] {
+  def plan: AlgebraM[M, QS, T[N1QL]] =
+    κ(EitherT.fromDisjunction(InternalError.fromMsg("unreachable").left))
 }

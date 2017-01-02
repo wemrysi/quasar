@@ -17,18 +17,20 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.connector.EnvironmentError, EnvironmentError.invalidCredentials
+import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
+import quasar.contrib.pathy.APath
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
-import quasar.fp._, free._
+import quasar.fp._, free._, ski.κ
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.DefErrT
-import quasar.physical.couchbase.common.{Context, Cursor}
+import quasar.physical.couchbase.common.{BucketCollection, Context, Cursor}
 
-import java.util.concurrent.TimeUnit.SECONDS
+import java.net.ConnectException
+import java.time.Duration
 
 import com.couchbase.client.java.CouchbaseCluster
-import com.couchbase.client.java.env.DefaultCouchbaseEnvironment
+import com.couchbase.client.java.env.{CouchbaseEnvironment, DefaultCouchbaseEnvironment}
 import com.couchbase.client.java.error.InvalidPasswordException
 import org.http4s.Uri
 import scalaz._, Scalaz._
@@ -40,6 +42,8 @@ import scalaz.concurrent.Task
 package object fs {
   val FsType = FileSystemType("couchbase")
 
+  val defaultQueryTimeout: Duration = Duration.ofSeconds(300)
+
   type Eff[A] = (
     Task                                             :\:
     Read[Context, ?]                                 :\:
@@ -50,49 +54,70 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  def interp[S[_]](
-      connectionUri: ConnectionUri
-    )(implicit
-      S0: Task :<: S
-    ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
+  object CBConnectException {
+    def unapply(ex: Throwable): Option[ConnectException] =
+      ex.getCause match {
+        case ex: ConnectException => ex.some
+        case _                    => none
+      }
+  }
 
-    final case class ConnUriParams(user: String, pass: String)
+  def context(connectionUri: ConnectionUri): DefErrT[Task, Context] = {
+    final case class ConnUriParams(user: String, pass: String, queryTimeout: Duration)
 
-    def liftDT[A](v: NonEmptyList[String] \/ A): DefErrT[Task, A] =
-      EitherT.fromDisjunction[Task](v.leftMap(_.left[EnvironmentError]))
+    def liftDT[A](v: => NonEmptyList[String] \/ A): DefErrT[Task, A] =
+      EitherT(Task.delay(
+        v.leftMap(_.left[EnvironmentError])
+      ))
 
-    // TODO: retrieve from connectionUri params
-    val env = DefaultCouchbaseEnvironment
-      .builder()
-      .queryTimeout(SECONDS.toMillis(150))
-      .build()
+    def env(qt: Duration): Task[CouchbaseEnvironment] = Task.delay(
+      DefaultCouchbaseEnvironment
+        .builder()
+        .queryTimeout(qt.toMillis)
+        .build()
+    )
 
-    val cbCtx: DefErrT[Task, Context] =
-      for {
-        uri     <- liftDT(
-                     Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
-                   )
-        cluster <- EitherT(Task.delay(
-                     CouchbaseCluster.fromConnectionString(env, uri.renderString).right
-                   ).handle {
-                     case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
-                   })
-        params  <- liftDT((
-                     uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
-                     uri.params.get("password").toSuccessNel("No password in ConnectionUri")
-                   )(ConnUriParams).disjunction)
-        cm      =  cluster.clusterManager(params.user, params.pass)
-        _       <- EitherT(Task.delay(
-                     // verify credentials via call to info
-                     cm.info
-                   ).as(
-                     ().right
-                   ).handle { case ex: InvalidPasswordException =>
+    for {
+      uri     <- liftDT(
+                   Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
+                 )
+      params  <- liftDT((
+                   uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
+                   uri.params.get("password").toSuccessNel("No password in ConnectionUri") |@|
+                   (uri.params.get("queryTimeoutSeconds") ∘ (parseLong(_) ∘ Duration.ofSeconds))
+                      .getOrElse(defaultQueryTimeout.success)
+                      .leftMap(κ(s"queryTimeoutSeconds must be a valid long".wrapNel))
+                 )(ConnUriParams).disjunction)
+      ev      <- env(params.queryTimeout).liftM[DefErrT]
+      cluster <- EitherT(Task.delay(
+                   CouchbaseCluster.fromConnectionString(ev, uri.renderString).right
+                 ).handle {
+                   case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
+                 })
+      cm      =  cluster.clusterManager(params.user, params.pass)
+      _       <- EitherT(Task.delay(
+                   // verify credentials via call to info
+                   cm.info
+                 ).as(
+                   ().right
+                 ).handle {
+                   case _: InvalidPasswordException =>
                      invalidCredentials(
                        "Unable to obtain a ClusterManager with provided credentials."
                      ).right[NonEmptyList[String]].left
-                   })
-      } yield Context(cluster, cm)
+                   case CBConnectException(ex) =>
+                     connectionFailed(
+                       ex
+                     ).right[NonEmptyList[String]].left
+                 })
+    } yield Context(cluster, cm)
+  }
+
+  def interp[S[_]](
+    connectionUri: ConnectionUri
+  )(implicit
+    S0: Task :<: S
+  ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
     def taskInterp(
       ctx: Context
@@ -115,7 +140,7 @@ package object fs {
         lift(Task.delay(ctx.cluster.disconnect()).void).into
       ))
 
-    EitherT(lift(cbCtx.run >>= (_.traverse(taskInterp))).into)
+    EitherT(lift(context(connectionUri).run >>= (_.traverse(taskInterp))).into)
   }
 
   def definition[S[_]](implicit
@@ -134,4 +159,7 @@ package object fs {
             close)
         }
     }
+
+  def bucketCollectionFromPath(p: APath): FileSystemError \/ BucketCollection =
+    BucketCollection.fromPath(p) leftMap (FileSystemError.pathErr(_))
 }

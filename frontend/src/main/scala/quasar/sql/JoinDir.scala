@@ -16,18 +16,21 @@
 
 package quasar.sql
 
-import quasar.{Data, LogicalPlan => LP}
-import quasar.Predef.String
+import quasar.Predef._
+import quasar.Data
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
-import matryoshka.Fix
+import matryoshka._
+import matryoshka.implicits._
 
 sealed abstract class JoinDir(val name: String) {
   import structural.ObjectProject
 
   val data: Data = Data.Str(name)
-  val const: Fix[LP] = LP.Constant(data)
-  def projectFrom(lp: Fix[LP]): Fix[LP] = Fix(ObjectProject(lp, const))
+  def const[T](implicit T: Corecursive.Aux[T, LP]): T = constant[T](data).embed
+  def projectFrom[T](lp: T)(implicit T: Corecursive.Aux[T, LP]): T =
+    ObjectProject(lp, const).embed
 }
 
 object JoinDir {

@@ -2,20 +2,19 @@
     "name": "filter on simple JS",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select city from largeZips where length(city) < 5",
     "predicate": "containsAtLeast",
-    "expected": [{"city": "LYNN"},
-                 {"city": "TROY"},
-                 {"city": "ROME"},
-                 {"city": "YORK"},
-                 {"city": "EDEN"},
-                 {"city": "CARY"},
-                 {"city": "ROME"},
-                 {"city": "ROME"},
-                 {"city": "M M"},
-                 {"city": "ABAC"}]
+    "expected": ["LYNN",
+                 "TROY",
+                 "ROME",
+                 "YORK",
+                 "EDEN",
+                 "CARY",
+                 "ROME",
+                 "ROME",
+                 "M M",
+                 "ABAC"]
 }

@@ -17,9 +17,11 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError},
+  SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}
@@ -49,16 +51,16 @@ trait MathLib extends Library {
   }
 
   object ZeroF {
-    def apply() = ConstantF(Zero())
-    def unapply[A](obj: LogicalPlan[A]): Boolean = obj match {
-      case ConstantF(Zero()) => true
+    def apply() = Constant(Zero())
+    def unapply[A](obj: LP[A]): Boolean = obj match {
+      case Constant(Zero()) => true
       case _                 => false
     }
   }
   object OneF {
-    def apply() = ConstantF(One())
-    def unapply[A](obj: LogicalPlan[A]): Boolean = obj match {
-      case ConstantF(One()) => true
+    def apply() = Constant(One())
+    def unapply[A](obj: LP[A]): Boolean = obj match {
+      case Constant(One()) => true
       case _                => false
     }
   }
@@ -92,10 +94,12 @@ trait MathLib extends Library {
     MathAbs,
     Func.Input2(MathAbs, MathRel),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
-          case InvokeF(_, Sized(Embed(ZeroF()), Embed(x))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
+          case Invoke(_, Sized(Embed(ZeroF()), Embed(x))) => x.some
           case _                                           => None
         }
     },
@@ -126,10 +130,12 @@ trait MathLib extends Library {
     MathRel,
     Func.Input2(MathRel, Type.Numeric),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
-          case InvokeF(_, Sized(Embed(OneF()), Embed(x))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(OneF()), Embed(x))) => x.some
           case _                                          => None
         }
     },
@@ -153,9 +159,11 @@ trait MathLib extends Library {
     Type.Numeric,
     Func.Input2(Type.Numeric, Type.Numeric),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None
         }
     },
@@ -178,10 +186,12 @@ trait MathLib extends Library {
     MathAbs,
     Func.Input2(MathAbs, MathAbs),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
-          case InvokeF(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
+          case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
+          case Invoke(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
           case _                                           => None
         }
     },
@@ -217,9 +227,11 @@ trait MathLib extends Library {
     MathRel,
     Func.Input2(MathAbs, MathRel),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(x), Embed(OneF()))) => x.some
+          case Invoke(_, Sized(Embed(x), Embed(OneF()))) => x.some
           case _                                         => None
         }
     },

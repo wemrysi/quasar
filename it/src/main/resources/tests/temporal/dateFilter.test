@@ -2,20 +2,14 @@
   "name": "filter on date part",
 
   "backends": {
-    "postgresql": "pending",
-    "couchbase":  "skip"
+    "postgresql": "pending"
   },
 
   "data": "../days.data",
 
-  "query": "select `day` from `../days` where date_part(\"dow\", ts) >= 3",
+  "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",
 
   "predicate": "containsExactly",
 
-  "expected": [
-    { "day": "Wednesday" },
-    { "day": "Thursday" },
-    { "day": "Friday" },
-    { "day": "Saturday" }
-  ]
+  "expected": ["Wednesday", "Thursday", "Friday", "Saturday"]
 }

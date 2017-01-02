@@ -17,12 +17,14 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
+import quasar.common.SortDir
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
@@ -34,25 +36,25 @@ import simulacrum.typeclass
 trait NormalizableInstances {
   import Normalizable._
 
-  def normalizable[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] =
+  def normalizable[T[_[_]]: BirecursiveT: EqualT: ShowT] =
     new NormalizableT[T]
 
   implicit def const[A]: Normalizable[Const[A, ?]] =
     make(λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None))
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[QScriptCore[T, ?]] =
     normalizable[T].QScriptCore
 
-  implicit def projectBucket[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ProjectBucket[T, ?]] =
     normalizable[T].ProjectBucket
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ThetaJoin[T, ?]] =
     normalizable[T].ThetaJoin
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
@@ -66,30 +68,26 @@ trait NormalizableInstances {
   }
 }
 
-// ShowT is needed for debugging
-class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
+class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT]
     extends TTypes[T] {
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 
-  def freeTC(free: FreeQS): FreeQS = {
-    freeTransCata[T, QScriptTotal, QScriptTotal, Hole, Hole](free)(
-      liftCo(rewrite.normalizeCoEnv[QScriptTotal])
-    )
-  }
+  def freeTC(free: FreeQS): FreeQS =
+    free.transCata[FreeQS](liftCo(rewrite.normalizeCoEnv[QScriptTotal]))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
     (free ≠ freeNormalized).option(freeNormalized)
   }
 
-  def freeMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+  def freeMFEq[A: Equal: Show](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
     val fmNormalized = freeMF[A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
-    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
+  def freeMF[A: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+    fm.transCata[Free[MapFunc, A]](MapFunc.normalize[T, A])
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
@@ -161,27 +159,21 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT]
         }
       }
 
-      case Sort(src, bucket, order) => {
-        val orderOpt: List[Option[(FreeMap, SortDir)]] =
-          order.map {
-            _.leftMap(freeMFEq(_)) match {
-              case (Some(fm), dir) => Some((fm, dir))
-              case (_, _)          => None
-            }
-          }
+      case Sort(src, bucket, order) =>
+        val orderOpt: NonEmptyList[Option[(FreeMap, SortDir)]] =
+          order.map { case (fm, dir) => freeMFEq(fm) strengthR dir }
 
-        val orderNormOpt: Option[List[(FreeMap, SortDir)]] =
-          orderOpt.exists(_.nonEmpty).option(
-            Zip[List].zipWith(orderOpt, order)(_.getOrElse(_)))
+        val orderNormOpt: Option[NonEmptyList[(FreeMap, SortDir)]] =
+          orderOpt any (_.nonEmpty) option orderOpt.fzipWith(order)(_ | _)
 
         makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
-      }
-      case Map(src, f)            => freeMFEq(f).map(Map(src, _))
-      case LeftShift(src, s, r)   => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, _))
-      case Union(src, l, r)       => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
-      case Filter(src, f)         => freeMFEq(f).map(Filter(src, _))
+
+      case Map(src, f)             => freeMFEq(f).map(Map(src, _))
+      case LeftShift(src, s, i, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, _))
+      case Union(src, l, r)        => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
+      case Filter(src, f)          => freeMFEq(f).map(Filter(src, _))
       case Subset(src, from, sel, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Subset(src, _, sel, _))
-      case Unreferenced()         => None
+      case Unreferenced()          => None
     })
   }
 

@@ -20,9 +20,9 @@ import quasar.Predef._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.sql.fixpoint._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Duration, Instant}
+import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 
@@ -71,9 +71,10 @@ trait ExprArbitrary {
     (smallNonEmptyListOf(exprGen(depth)) ⊛ Gen.option(exprGen(depth)))(
       GroupBy(_, _))
 
-  private def orderByGen(depth: Int): Gen[OrderBy[Fix[Sql]]] =
-    smallNonEmptyListOf((Gen.oneOf(ASC, DESC) ⊛ exprGen(depth))((_, _))) ∘
-  (OrderBy(_))
+  private def orderByGen(depth: Int): Gen[OrderBy[Fix[Sql]]] = {
+    val order = Gen.oneOf(ASC, DESC) tuple exprGen(depth)
+    (order ⊛ smallNonEmptyListOf(order))((o, os) => OrderBy(NonEmptyList(o, os: _*)))
+  }
 
   private def exprGen(depth: Int): Gen[Fix[Sql]] = Gen.lzy {
     if (depth <= 0) simpleExprGen

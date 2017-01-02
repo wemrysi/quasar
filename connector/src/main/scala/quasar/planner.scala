@@ -20,8 +20,10 @@ import quasar.Predef._
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fs.PathError
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
@@ -78,7 +80,13 @@ object Planner {
       }
   }
 
-  final case class InternalError(message: String) extends PlannerError
+  final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
+    def message = msg + ~cause.map(ex => s" (caused by: $ex)")
+  }
+
+  object InternalError {
+    def fromMsg(msg: String): PlannerError = apply(msg, None)
+  }
 
   implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {
     def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))

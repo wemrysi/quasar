@@ -15,19 +15,19 @@
  */
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
 import quasar.common.{PhaseResult, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql._
 import quasar.std.StdLib.set._
 
-import scala.Option
-
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Leibniz._
 import scalaz.std.vector._
 import scalaz.syntax.either._
@@ -46,9 +46,10 @@ package object quasar {
     * typechecked.
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
-  def precompile(query: Fix[Sql], vars: Variables, basePath: ADir)(
-    implicit RT: RenderTree[Fix[Sql]]):
-      CompileM[Fix[LP]] = {
+  def precompile[T: Equal: RenderTree]
+    (query: Fix[Sql], vars: Variables, basePath: ADir)
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : CompileM[T] = {
     import SemanticAnalysis.AllPhases
 
     for {
@@ -57,24 +58,27 @@ package object quasar {
                     Variables.substVars(ast, vars) leftMap (_.wrapNel))
       absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
       annTree  <- phase("Annotated Tree", AllPhases(absAst))
-      logical  <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annTree) leftMap (_.wrapNel))
     } yield logical
   }
+
+  private val optimizer = new Optimizer[Fix[LP]]
+  private val lpr = optimizer.lpr
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
     */
   def preparePlan(lp: Fix[LP]): CompileM[Fix[LP]] =
     for {
-      optimized   <- phase("Optimized", Optimizer.optimize(lp).right)
-      typechecked <- phase("Typechecked", LP.ensureCorrectTypes(optimized).disjunction)
+      optimized   <- phase("Optimized", optimizer.optimize(lp).right)
+      typechecked <- phase("Typechecked", lpr.ensureCorrectTypes(optimized).disjunction)
     } yield typechecked
 
   /** Identify plans which reduce to a (set of) constant value(s). */
   def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
     lp.project match {
-      case LP.ConstantF(Data.Set(records)) => records.left
-      case LP.ConstantF(value)             => List(value).left
-      case _                                        => lp.right
+      case Constant(Data.Set(records)) => records.left
+      case Constant(value)             => List(value).left
+      case _                           => lp.right
     }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
@@ -83,17 +87,17 @@ package object quasar {
   def queryPlan(
     query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LP]] =
-    precompile(query, vars, basePath)
+    precompile[Fix[LP]](query, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 
-  def addOffsetLimit[T[_[_]]: Corecursive](
-    lp: T[LP], off: Natural, lim: Option[Positive]):
-      T[LP] = {
-    val skipped =
-      Drop(lp, LP.ConstantF[T[LP]](Data.Int(off.get)).embed).embed
+  def addOffsetLimit[T]
+    (lp: T, off: Natural, lim: Option[Positive])
+    (implicit T: Corecursive.Aux[T, LP])
+      : T = {
+    val skipped = Drop(lp, constant[T](Data.Int(off.get)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, LP.ConstantF[T[LP]](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T](Data.Int(l.get)).embed).embed)
   }
 }

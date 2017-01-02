@@ -17,9 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar.{Func, Type, SemanticError}
 import quasar.contrib.shapeless._
 import quasar.fp.ski._
-import quasar.{Func, LogicalPlan, Type, SemanticError}
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
 import scalaz._, Validation.{success, failure}
@@ -29,18 +30,19 @@ trait Library {
   import Func._
 
   protected val noSimplification: Simplifier = new Simplifier {
-    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+    def apply[T]
+      (orig: LogicalPlan[T])
+      (implicit TR: Recursive.Aux[T, LogicalPlan], TC: Corecursive.Aux[T, LogicalPlan]) =
       None
   }
 
-  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] = { _ =>
-    Validation.success(codomain)
-  }
+  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
+    _ => success(codomain)
 
   private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
     f(args).getOrElse {
       val msg: String = "Unknown arguments: " + args
-      Validation.failure(NonEmptyList(SemanticError.GenericError(msg)))
+      failure(NonEmptyList(SemanticError.GenericError(msg)))
     }
   }
 
@@ -55,9 +57,10 @@ trait Library {
   }
 
   protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] = {
-    case ((funcDomain, funcCodomain), rez) => Type.typecheck(rez, funcCodomain).fold(
-      κ(f(rez)),
-      κ(success(funcDomain)))
+    case ((funcDomain, funcCodomain), rez) =>
+      Type.typecheck(rez, funcCodomain).fold(
+        κ(f(rez)),
+        κ(success(funcDomain)))
   }
 
   private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {

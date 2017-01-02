@@ -123,7 +123,7 @@ object util {
       // mostly because it seems to cause the REPL to fail to exit cleanly. If necessary,
       // it can also be forced using a system property (see MongoDB docs).
       if (sslSettings.isEnabled) {
-        settings.streamFactoryFactory(new com.mongodb.connection.netty.NettyStreamFactoryFactory())
+        settings.streamFactoryFactory(com.mongodb.connection.netty.NettyStreamFactoryFactory.builder.build())
       }
 
       settings.build

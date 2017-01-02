@@ -3,8 +3,7 @@
 
   "backends": {
     "mongodb_read_only": "pending",
-    "postgresql":        "pending",
-    "couchbase":         "skip"
+    "postgresql":        "pending"
   },
 
   "data": "../slamengine_commits.data",
@@ -15,6 +14,7 @@
               from `../slamengine_commits`",
 
   "predicate": "containsAtLeast",
+  "ignoreFieldOrder": [ "couchbase" ],
   "expected": [
     { "dayOfMonth": 29.0, "id": "33031" }
   ]
