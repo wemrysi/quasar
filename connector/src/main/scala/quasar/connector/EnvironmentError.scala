@@ -27,8 +27,6 @@ sealed trait EnvironmentError
 object EnvironmentError {
   final case class ConnectionFailed(error: Throwable)
     extends EnvironmentError
-  final case class InsufficientPermissions(message: String)
-    extends EnvironmentError
   final case class InvalidCredentials(message: String)
     extends EnvironmentError
   final case class UnsupportedVersion(backendName: String, version: String)
@@ -56,8 +54,6 @@ object EnvironmentError {
     Show.shows {
       case ConnectionFailed(err) =>
         s"Connection failed: ${summarize(err)}"
-      case InsufficientPermissions(msg) =>
-        s"Insufficient permissions: $msg"
       case InvalidCredentials(msg) =>
         s"Invalid credentials: $msg"
       case UnsupportedVersion(name, version) =>
@@ -71,8 +67,6 @@ object EnvironmentError {
     EncodeJson[EnvironmentError] {
       case ConnectionFailed(err) =>
         format("Connection failed.", Some(summarize(err)))
-      case InsufficientPermissions(msg) =>
-        format("Database user does not have permissions on database.", Some(msg))
       case InvalidCredentials(msg) =>
         format("Invalid username and/or password specified.", Some(msg))
       case err =>
