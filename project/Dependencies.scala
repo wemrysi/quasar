@@ -88,7 +88,7 @@ object Dependencies {
     ("org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
-      .exclude("commons-collections", "commons-collections")  // among it's transitive dependencies which means
+      .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
       .exclude("commons-beanutils", "commons-beanutils-core") // we need to exclude this stuff so that we can
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
