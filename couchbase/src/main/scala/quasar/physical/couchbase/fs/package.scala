@@ -101,12 +101,7 @@ package object fs {
       _       <- EitherT(Task.delay(
                    (cm.info.getMinVersion.compareTo(minimumRequiredVersion) >= 0).unlessM(
                      s"Couchbase Server must be ${minimumRequiredVersion}+"
-                       .wrapNel.left[EnvironmentError].left)))
-      _       <- EitherT(Task.delay(
-                   // verify credentials via call to info
-                   cm.info
-                 ).as(
-                   ().right
+                       .wrapNel.left[EnvironmentError].left)
                  ).handle {
                    case _: InvalidPasswordException =>
                      invalidCredentials(
