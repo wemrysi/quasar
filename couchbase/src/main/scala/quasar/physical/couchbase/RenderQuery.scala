@@ -41,7 +41,7 @@ object RenderQuery {
   }
 
   val alg: AlgebraM[PlannerError \/ ?, N1QL, String] = {
-    case Data(s @ QData.Str(v)) =>
+    case Data(QData.Str(v)) =>
       ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
     case Data(v) =>
       DataCodec.render(v).leftAs(NonRepresentableData(v))
