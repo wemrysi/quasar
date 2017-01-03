@@ -29,7 +29,6 @@ import scalaz._, Scalaz._
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
-    val compiler = Compiler.trampoline
     val asc: OrderType = ASC
 
     def transform[T]

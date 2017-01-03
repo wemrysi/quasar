@@ -52,7 +52,7 @@ lazy val buildSettings = Seq(
     "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
     "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
     "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.0"),
+  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.3"),
   addCompilerPlugin("org.scalamacros" %  "paradise"       % "2.1.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
@@ -208,10 +208,10 @@ lazy val root = project.in(file("."))
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
-//        /  \
-      repl,   web,
-//        \  /
-           it)
+//        /   \
+       repl,  web,
+//             |
+              it)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components

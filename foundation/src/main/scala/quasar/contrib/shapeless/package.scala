@@ -19,7 +19,7 @@ package quasar.contrib
 import quasar.Predef._
 
 import _root_.shapeless._
-import scalaz._, Leibniz._, Scalaz._
+import _root_.scalaz._, Leibniz._, Scalaz._
 
 package object shapeless {
   // TODO generalize this and contribute to shapeless-contrib

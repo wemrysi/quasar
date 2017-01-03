@@ -67,7 +67,7 @@ object Dependencies {
     val nettyVersion = "4.1.3.Final" // This version should be kept in sync with
                                      // transitive dependency of mongodb-driver-async
     Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
+      "org.mongodb" % "mongodb-driver-async" %   "3.4.1",
       // sbt produces "continuing with a stub" without these two explicit dependencies
       // despite the fact that they should be automatic transitive dependencies
       "io.netty"    % "netty-buffer"         % nettyVersion,

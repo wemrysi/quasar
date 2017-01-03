@@ -37,7 +37,10 @@ import pathy.Path._
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 
-class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+class PlannerSpec
+    extends quasar.Qspec
+    with QScriptHelpers
+    with DisjunctionMatchers {
 
   import Planner.SparkState
 
