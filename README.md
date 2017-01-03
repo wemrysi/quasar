@@ -249,7 +249,7 @@ Because of dependencies conflicts between Mongo & Spark connectors, currently pr
 
 1. Build sparkcore.jar
 
-```sbt 'set every buildSparkCore := true' sparkcore/assembly```
+```sbt 'set every sparkDependencyProvided := true' sparkcore/assembly```
 
 2. Set environment variable QUASAR_HOME
 

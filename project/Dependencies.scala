@@ -85,7 +85,16 @@ object Dependencies {
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    "org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile")
+    ("org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile"))
+      .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
+      .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
+      .exclude("commons-collections", "commons-collections")  // among it's transitive dependencies which means
+      .exclude("commons-beanutils", "commons-beanutils-core") // we need to exclude this stuff so that we can
+      .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
+      .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
+      .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
+      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
+      .exclude("org.scalatest", "scalatest_2.11")
   )
 
   def marklogicValidation = Seq(
