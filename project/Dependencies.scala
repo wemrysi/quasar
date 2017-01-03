@@ -64,12 +64,16 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.1.3.Final" // This version should be kept in sync with
-                                     // transitive dependency of mongodb-driver-async
+    val nettyVersion = "4.0.29.Final" // This version is set to be the same as Spark
+                                      // to avoid problems in web and it where their classpaths get merged
+                                      // In any case, it should be binary compatible with version 4.0.26 that this
+                                      // mongo release is expecting
     Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.4.1",
-      // sbt produces "continuing with a stub" without these two explicit dependencies
-      // despite the fact that they should be automatic transitive dependencies
+      "org.mongodb" % "mongodb-driver-async" %   "3.3.0", // Intentionnally not upgrading to the latest 3.4.1 in order
+                                                          // to make integration easier with Spark as the latest version
+                                                          // depends on netty 4.1.x
+      // These are optional dependencies of the mongo asynchronous driver.
+      // They are needed to connect to mongodb vis SSL which we do under certain configurations
       "io.netty"    % "netty-buffer"         % nettyVersion,
       "io.netty"    % "netty-handler"        % nettyVersion
     )
@@ -80,8 +84,8 @@ object Dependencies {
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
-  def sparkcore(buildSparkCore: Boolean) = Seq(
-    "org.apache.spark" %% "spark-core" % "2.0.1" % (if(buildSparkCore) "provided" else "compile")
+  def sparkcore(sparkProvided: Boolean) = Seq(
+    "org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile")
   )
 
   def marklogicValidation = Seq(

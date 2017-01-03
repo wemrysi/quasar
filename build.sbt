@@ -184,10 +184,10 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
-lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
-lazy val buildSparkCore   = settingKey[Boolean]("Build spark core")
+lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
+lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -428,17 +428,9 @@ lazy val sparkcore = project
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
-    buildSparkCore := false,
-    libraryDependencies ++= Dependencies.sparkcore(buildSparkCore.value),
-    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad),
-    assemblyShadeRules in assembly ++= Seq(
-      ShadeRule.rename("org.jboss.netty.**" -> "org.jboss.spark.netty.@1")
-        .inLibrary("io.netty" % "netty" % "3.8.0.Final")
-        .inProject,
-      ShadeRule.rename("io.netty.**" -> "io.spark.netty.@1")
-      .inLibrary("io.netty" % "netty-all" % "4.0.29.Final")
-      .inProject
-    ))
+    sparkDependencyProvided := false,
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
+    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
