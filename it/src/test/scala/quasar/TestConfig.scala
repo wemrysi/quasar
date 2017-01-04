@@ -21,6 +21,8 @@ import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig.FileSystemConfig
 
+import com.typesafe.config.ConfigFactory
+
 import argonaut._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -74,13 +76,13 @@ object TestConfig {
   /** Returns the name of the environment variable used to configure the
     * given backend.
     */
-  def backendEnvName(backendName: BackendName): String =
-    "QUASAR_" + backendName.name.toUpperCase
+  def backendConfName(backendName: BackendName): String =
+    backendName.name
 
   /** The name of the environment variable to configure the insert connection
     * for a read-only backend.
     */
-  def insertEnvName(b: BackendName) = backendEnvName(b) + "_INSERT"
+  def insertConfName(b: BackendName) = backendConfName(b) + "_insert"
 
   /** Returns the list of filesystems to test, using the provided function
     * to select an interpreter for a given config.
@@ -108,8 +110,8 @@ object TestConfig {
       }
 
       for {
-        test     <- fs(backendEnvName(r.name), p)
-        setup    <- fs(insertEnvName(r.name), p).run.liftM[OptionT]
+        test     <- fs(backendConfName(r.name), p)
+        setup    <- fs(insertConfName(r.name), p).run.liftM[OptionT]
         s        <- NameGenerator.salt.liftM[OptionT]
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
@@ -136,18 +138,24 @@ object TestConfig {
     *
     * Fails if it cannot parse the config and returns None if there is no config.
     */
-  def loadConfig(envName: String): OptionT[Task, MountConfig] =
-    console.readEnv(envName).flatMapF(value =>
+  def loadConfig(name: String): OptionT[Task, MountConfig] = {
+    val readConf = OptionT(Task.delay {
+      val config = ConfigFactory.load()
+      if (config.hasPath(name)) Some(config.getString(name))
+      else None
+    })
+    readConf.flatMapF(value =>
       Parse.decodeEither[MountConfig](value).fold(
-        e => fail("Failed to parse $" + envName + ": " + e),
+        e => fail(s"Failed to parse config parameter $name: $e"),
         _.point[Task]))
+  }
 
   /** Load a pair of backend configs, the first for inserting test data, and
     * the second for actually running tests. If no config is specified for
     * inserting, then the test config is just returned twice.
     */
   def loadConfigPair(name: BackendName): OptionT[Task, (MountConfig, MountConfig)] = {
-    OptionT((loadConfig(insertEnvName(name)).run |@| loadConfig(backendEnvName(name)).run) { (c1, c2) =>
+    OptionT((loadConfig(insertConfName(name)).run |@| loadConfig(backendConfName(name)).run) { (c1, c2) =>
       c2.map(c2 => (c1.getOrElse(c2), c2))
     })
   }

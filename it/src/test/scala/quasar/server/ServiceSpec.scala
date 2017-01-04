@@ -172,7 +172,7 @@ class ServiceSpec extends quasar.Qspec {
     val fileSystemConfigs =
       TestConfig.backendRefs
         .map(_.name)
-        .traverse((TestConfig.backendEnvName _ >>> TestConfig.loadConfig _)(_).run)
+        .traverse((TestConfig.backendConfName _ >>> TestConfig.loadConfig _)(_).run)
         .map(_
           .unite
           .zipWithIndex
