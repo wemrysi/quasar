@@ -21,13 +21,13 @@ import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.JsFn
 
+import java.time.Instant
 import scala.Any
 import scala.collection.JavaConverters._
 
 import monocle.Prism
 import org.bson._
 import org.bson.types
-import java.time.Instant
 import scalaz._, Scalaz._
 
 /**
@@ -60,7 +60,7 @@ object Bson {
     case rex:  BsonRegularExpression => Regex(rex.getPattern, rex.getOptions)
     case str:  BsonString            => Text(str.getValue)
     case sym:  BsonSymbol            => Symbol(sym.getSymbol)
-    case tms:  BsonTimestamp         => Timestamp.fromInstant(Instant.ofEpochSecond(tms.getTime.toLong), tms.getInc)
+    case tms:  BsonTimestamp         => Timestamp(tms.getTime, tms.getInc)
     case _:    BsonUndefined         => Undefined
       // NB: These types we can’t currently translate back to Bson, but we don’t
       //     expect them to appear.
@@ -202,8 +202,11 @@ object Bson {
     override def toString = s"Timestamp(${Instant.ofEpochSecond(epochSecond.toLong)}, ${ordinal.shows})"
   }
   object Timestamp {
-    def fromInstant(instant: Instant, ordinal: Int): Timestamp =
-      Timestamp((instant.toEpochMilli/1000).toInt, ordinal)
+    def fromInstant(instant: Instant, ordinal: Int): Option[Timestamp] = {
+      // TODO: Eliminate `toDouble` without hitting implicit widening
+      val secs = instant.getEpochSecond.toDouble
+      (secs.isValidInt).option(Timestamp(secs.toInt, ordinal))
+    }
   }
   final case object MinKey extends Bson {
     def repr = new BsonMinKey()

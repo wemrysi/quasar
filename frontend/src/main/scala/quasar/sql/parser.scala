@@ -49,17 +49,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       override def toString = ":" + chars
     }
 
-    // NB: `Token`, which we do not control, causes this.
-    @SuppressWarnings(Array(
-      "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable"))
     override def token: Parser[Token] =
       variParser |
       numLitParser |
       charLitParser |
       stringLitParser |
-      quotedIdentParser |
-      identifierString ^^ processIdent |
+      identParser |
       EofCh ^^^ EOF |
       '\'' ~> failure("unclosed character literal") |
       '"'  ~> failure("unclosed string literal") |
@@ -71,7 +66,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         case x ~ xs => (x :: xs).mkString
       }
 
-    def variParser: Parser[Token] = ':' ~> identifierString ^^ (Variable(_))
+    def variParser: Parser[Token] = ':' ~> identParser ^^ (t => Variable(t.chars))
 
     def numLitParser: Parser[Token] = rep1(digit) ~ opt('.' ~> rep(digit)) ~ opt((elem('e') | 'E') ~> opt(elem('-') | '+') ~ rep(digit)) ^^ {
       case i ~ None ~ None     => NumericLit(i mkString "")
@@ -98,6 +93,14 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
     def quotedIdentParser: Parser[Token] =
       delimitedString('`') ^^ (QuotedIdentifier(_))
+
+    // NB: `Token`, which we do not control, causes this.
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"))
+    def identParser: Parser[Token] =
+      quotedIdentParser | identifierString ^^ processIdent
+
 
     override def whitespace: Parser[scala.Any] = rep(
       whitespaceChar |
