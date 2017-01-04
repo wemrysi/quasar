@@ -56,8 +56,6 @@ package object sql {
 
   private def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
 
-  // NB: Statically allocated to avoid multiple allocations of the parser.
-  val muParser = parser[Mu]
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
 

@@ -223,7 +223,6 @@ class MongoDbFileSystemSpec
 
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]
-            type X1[A] = FileSystemErrT[X0, A]
 
             val x0: G ~> X0 =
               Hoist[PhaseResultT].hoist(run)

@@ -75,13 +75,6 @@ trait Library {
   protected def partialUntyper[N <: Nat](f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
     partialUntyperOV(f.lift(_).map(success))
 
-  protected def reflexiveTyper[N <: Nat]: Typer[N] = {
-    case Sized(Type.Const(data)) => success(data.dataType)
-    case Sized(x) => success(x)
-    case _ =>
-      failure(NonEmptyList(SemanticError.GenericError("Wrong number of arguments for reflexive typer")))
-  }
-
   protected def numericWidening = {
     def mapFirst[A, B](f: A => A, p: PartialFunction[A, B]) = new PartialFunction[A, B] {
       def isDefinedAt(a: A) = p.isDefinedAt(f(a))

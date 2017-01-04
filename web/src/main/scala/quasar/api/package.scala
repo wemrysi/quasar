@@ -225,9 +225,6 @@ package object api {
       pathCollector = pathCollector))
   }
 
-  def fileMediaType(file: String): Option[MediaType] =
-    MediaType.forExtension(file.split('.').last)
-
   def redirectService(basePath: String) = HttpService {
     // NB: this means we redirected to a path that wasn't handled, and need
     // to avoid getting into a loop.

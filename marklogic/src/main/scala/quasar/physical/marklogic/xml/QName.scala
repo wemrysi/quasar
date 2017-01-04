@@ -18,14 +18,12 @@ package quasar.physical.marklogic.xml
 
 import quasar.Predef._
 
-import eu.timepit.refined.api.Refined
 import scalaz.{Order, Show}
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 final case class QName(prefix: Option[NSPrefix], local: NCName) {
-  def asName: Name = Name(Refined.unsafeApply(this.shows))
   override def toString = this.shows
 }
 

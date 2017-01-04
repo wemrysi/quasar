@@ -298,22 +298,4 @@ object ejson {
         }
       }
     })
-
-  // ejson:unshift-object(
-  //   $keyf as function(item()) as xs:string,
-  //   $valf as function(item()) as item()*,
-  //   $seq  as item()*
-  // ) as element()
-  def unshiftObject[F[_]: PrologW]: F[FunctionDecl3] =
-    ejs.declare("unshift-object") flatMap (_(
-      $("keyf") as ST("function(item()) as xs:QName"),
-      $("valf") as ST("function(item()) as item()*"),
-      $("seq")  as ST("item()*")
-    ).as(ST(s"element()")) { (keyf: XQuery, valf: XQuery, seq: XQuery) =>
-      val x = "$x"
-      for {
-        entry <- renameOrWrap[F].apply(keyf.fnapply(x.xqy), valf.fnapply(x.xqy))
-        obj   <- mkObject[F].apply(fn.map(func(x)(entry), seq))
-      } yield obj
-    })
 }

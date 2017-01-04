@@ -188,14 +188,6 @@ object MapFunc {
         }
     }
 
-    object EjConstExtension {
-      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Extension[T[EJson]]] =
-        tco match {
-          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-          case _                                                      => None
-        }
-    }
-
     _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
       κ(None),
       {

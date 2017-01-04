@@ -52,11 +52,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
 
   val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
-  val PBI =     implicitly[ProjectBucket :<: QSI]
   val QCI =       implicitly[QScriptCore :<: QSI]
-  val TJI =         implicitly[ThetaJoin :<: QSI]
 
-  val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
   implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =

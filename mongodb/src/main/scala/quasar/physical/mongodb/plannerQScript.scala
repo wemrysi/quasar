@@ -764,12 +764,6 @@ object MongoDbQScriptPlanner {
     case x             => -\/(NonRepresentableEJson(x.shows))
   }
 
-  // This is maybe worth putting in Matryoshka?
-  def findFirst[T[_[_]]: RecursiveT, F[_]: Functor: Foldable, A](
-    f: PartialFunction[T[F], A]):
-      CoalgebraM[A \/ ?, F, T[F]] =
-    tf => (f.lift(tf) \/> tf.project).swap
-
   object Roll {
     def unapply[S[_]: Functor, A](obj: Free[S, A]): Option[S[Free[S, A]]] =
       obj.resume.swap.toOption
@@ -843,9 +837,6 @@ object MongoDbQScriptPlanner {
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
       StateT[F, NameGen, A](ng => EitherT(sa.run(ng).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)).point[W]))
-
-    def liftError[A](ea: PlannerError \/ A): M[A] =
-      EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)).point[W]).liftM[GenT]
 
     val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]

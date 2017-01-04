@@ -135,8 +135,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     val memState = InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)
 
-    val fv: Free[ViewFileSystem, A] = f flatMapSuspension view.fileSystem[ViewFileSystem]
-
     val (vs, r) =
       f.foldMap(free.foldMapNT(viewfs) compose view.fileSystem[ViewFileSystem])
         .run.run(VS.fs.set(memState)(VS.emptyWithViews(views)))

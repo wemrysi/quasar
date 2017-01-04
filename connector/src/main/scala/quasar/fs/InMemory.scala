@@ -51,7 +51,6 @@ object InMemory {
   type ResultMap = Map[ResultHandle, Vector[Data]]
 
   type InMemoryFs[A]  = State[InMemState, A]
-  type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 
