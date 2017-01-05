@@ -201,13 +201,6 @@ object Bson {
       List(Js.num(epochSecond.toLong), Js.num(ordinal.toLong)))
     override def toString = s"Timestamp(${Instant.ofEpochSecond(epochSecond.toLong)}, ${ordinal.shows})"
   }
-  object Timestamp {
-    def fromInstant(instant: Instant, ordinal: Int): Option[Timestamp] = {
-      // TODO: Eliminate `toDouble` without hitting implicit widening
-      val secs = instant.getEpochSecond.toDouble
-      (secs.isValidInt).option(Timestamp(secs.toInt, ordinal))
-    }
-  }
   final case object MinKey extends Bson {
     def repr = new BsonMinKey()
     def toJs = Js.Ident("MinKey")
