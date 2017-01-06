@@ -206,7 +206,7 @@ object MongoDbQScriptPlanner {
         //     Hopefully BlackShield will eliminate the need for this.
         def exprCheck: Type => Option[Fix[ExprOp] => Fix[ExprOp]] =
           generateTypeCheck[Fix[ExprOp], Fix[ExprOp]]($or(_, _)) {
-            case Type.Null => check.isNull//((expr: Fix[ExprOp]) => $eq($literal(Bson.Null), expr))
+            case Type.Null => check.isNull
             case Type.Int
                | Type.Dec
                | Type.Int ⨿ Type.Dec
@@ -1125,7 +1125,6 @@ object MongoDbQScriptPlanner {
       : CoEnv[Hole, MapFunc[T, ?], FreeMap[T]] =>
         M[CoEnv[Hole, MapFunc[T, ?], FreeMap[T]]] = {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
-      // println("found a guard we should try to remove!")
       if (typ.contains(subType)) cont.project.point[M]
       else if (!subType.contains(typ))
         merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected")))
@@ -1150,16 +1149,13 @@ object MongoDbQScriptPlanner {
       SR: Const[ShiftedRead, ?] :<: F)
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
-      // println("ok, found a filter we should try to elide checks from, with src: " + src.toString)
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          // println("ok, found a filter we should try to elide checks from!")
           cond.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (c => QC.inj(Filter(src, c)))
         case _ => QC.inj(f).point[M]
       }
     case ls @ LeftShift(src, struct, id, repair) =>
-      // println("ok, found a LeftShift we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
           struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
@@ -1167,7 +1163,6 @@ object MongoDbQScriptPlanner {
         case _ => QC.inj(ls).point[M]
       }
     case m @ qscript.Map(src, mf) =>
-      // println("ok, found a Map we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
           mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
@@ -1175,7 +1170,6 @@ object MongoDbQScriptPlanner {
         case _ => QC.inj(m).point[M]
       }
     case r @ Reduce(src, b, red, rep) =>
-      // println("ok, found a Reduce we should try to elide checks from")
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
           (b.transCataM(elideMoreGeneralGuards[M, T](typ)) ⊛
@@ -1184,7 +1178,6 @@ object MongoDbQScriptPlanner {
         case _ => QC.inj(r).point[M]
       }
     case qc =>
-      // println("ok, found a ??? we should try to elide checks from")
       QC.inj(qc).point[M]
   }
 

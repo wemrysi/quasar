@@ -56,8 +56,8 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_2_6.name
-  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_Q_3_2.name
+  def is2_6(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_Q_2_6.name
+  def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_Q_3_2.name
 
   MongoDbSpec.clientShould(QScriptFsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
