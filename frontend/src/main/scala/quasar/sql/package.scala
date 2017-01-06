@@ -21,7 +21,9 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
@@ -52,20 +54,21 @@ package object sql {
   // NB: we need to support relative paths, including `../foo`
   type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
-  private def parser[T[_[_]]: Recursive: Corecursive] = new SQLParser[T]()
+  private def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
 
-  // NB: Statically allocated to avoid multiple allocations of the parser.
-  val muParser = parser[Mu]
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
 
-  def CrossRelation[T[_[_]]: Corecursive](left: SqlRelation[T[Sql]], right: SqlRelation[T[Sql]]) =
-    JoinRelation(left, right, InnerJoin, boolLiteral[T[Sql]](true).embed)
+  def CrossRelation[T]
+    (left: SqlRelation[T], right: SqlRelation[T])
+    (implicit T: Corecursive.Aux[T, Sql])=
+    JoinRelation(left, right, InnerJoin, boolLiteral[T](true).embed)
 
-  def projectionNames[T[_[_]]: Recursive](
-    projections: List[Proj[T[Sql]]], relName: Option[String]):
-      SemanticError \/ List[(String, T[Sql])] = {
-    def extractName(expr: T[Sql]): Option[String] = expr.project match {
+  def projectionNames[T]
+    (projections: List[Proj[T]], relName: Option[String])
+    (implicit T: Recursive.Aux[T, Sql])
+      : SemanticError \/ List[(String, T)] = {
+    def extractName(expr: T): Option[String] = expr.project match {
       case Ident(name) if Some(name) != relName          => name.some
       case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
       case Unop(expr, FlattenMapValues)                  => extractName(expr)
@@ -73,20 +76,24 @@ package object sql {
       case _                                             => None
     }
 
-    val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}
+    val aliases = projections.flatMap(_.alias.toList)
 
-    (aliases diff aliases.distinct).headOption.cata(
+    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
       duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeft1(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
+      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
         alias.cata(
-          a => (used, a -> expr),
+          a => (used, a -> expr).right,
           {
             val tentativeName = extractName(expr) getOrElse index.toString
             val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
-            val name = (tentativeName #:: alternatives).dropWhile(used.contains).head
-            (used + name, name -> expr)
+            (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
+              // WartRemover seems to be confused by the `+` method on `Set`
+              @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+              val newUsed = used + name
+              (newUsed, name -> expr)
+            } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
           })
-      }._2.right)
+      }.map(_._2))
   }
 
   def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): Sql ~> (F ∘ Sql)#λ =
@@ -98,9 +105,9 @@ package object sql {
       }
     }
 
-  implicit class ExprOps[T[_[_]]: Recursive: Corecursive](q: T[Sql]) {
+  implicit class ExprOps[T[_[_]]: BirecursiveT](q: T[Sql]) {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
-      q.transCata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
+      q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
     def makeTables(bindings: List[String]): T[Sql] = q.project match {
       case sel @ Select(_, _, _, _, _, _) => {
@@ -135,7 +142,7 @@ package object sql {
     }
   }
 
-  def pprint[T[_[_]]: Recursive](sql: T[Sql]) = sql.para(pprintƒ)
+  def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
 
   private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9]*".r
 
@@ -146,8 +153,10 @@ package object sql {
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
   }
 
-  private def pprintRelationƒ[T[_[_]]: Recursive](r: SqlRelation[(T[Sql], String)]):
-      String =
+  private def pprintRelationƒ[T]
+    (r: SqlRelation[(T, String)])
+    (implicit T: Recursive.Aux[T, Sql])
+      : String =
     (r match {
       case IdentRelationAST(name, alias) =>
         _qq("`", name) :: alias.map("as " + _).toList
@@ -166,11 +175,12 @@ package object sql {
         }
     }).mkString(" ")
 
-  def pprintRelation[T[_[_]]: Recursive](r: SqlRelation[T[Sql]]) =
-    pprintRelationƒ(traverseRelation[Id, T[Sql], (T[Sql], String)](r, x => (x, pprint(x))))
+  def pprintRelation[T](r: SqlRelation[T])(implicit T: Recursive.Aux[T, Sql]) =
+    pprintRelationƒ(traverseRelation[Id, T, (T, String)](r, x => (x, pprint(x))))
 
-  def pprintƒ[T[_[_]]: Recursive]: Sql[(T[Sql], String)] => String = {
-    def caseSql(c: Case[(T[Sql], String)]): String =
+  def pprintƒ[T](implicit T: Recursive.Aux[T, Sql])
+      : Sql[(T, String)] => String = {
+    def caseSql(c: Case[(T, String)]): String =
       List("when", c.cond._2, "then", c.expr._2) mkString " "
 
     {
@@ -251,8 +261,8 @@ package object sql {
     }
   }
 
-  def normalizeƒ[T[_[_]]: Corecursive]:
-      Sql[T[Sql]] => Option[Sql[T[Sql]]] = {
+  def normalizeƒ[T](implicit T: Corecursive.Aux[T, Sql]):
+      Sql[T] => Option[Sql[T]] = {
     case Binop(l, r, Union) =>
       Unop(Binop(l, r, UnionAll).embed, Distinct).some
     case Binop(l, r, Intersect) =>

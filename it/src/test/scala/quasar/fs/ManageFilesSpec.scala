@@ -27,7 +27,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_ supports BackendCapability.write()))) {
+class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
   import FileSystemTest._, FileSystemError._, PathError._
   import ManageFile._
 

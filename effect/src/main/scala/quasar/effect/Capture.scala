@@ -16,8 +16,6 @@
 
 package quasar.effect
 
-import quasar.Predef._
-
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
 import simulacrum.typeclass

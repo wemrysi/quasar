@@ -21,7 +21,7 @@ import scalaz._, Scalaz._
 /** A version of MonadError that doesn't extend Monad to avoid ambiguous implicits
   * in the presence of multiple "mtl" constraints.
   */
-trait MonadError_[F[_], E] { self =>
+trait MonadError_[F[_], E] {
   def raiseError[A](e: E): F[A]
   def handleError[A](fa: F[A])(f: E => F[A]): F[A]
 }
@@ -65,4 +65,9 @@ sealed abstract class MonadError_Instances0 {
       def raiseError[A](e: E): F[A] = F.raiseError(e)
       def handleError[A](fa: F[A])(f: E => F[A]): F[A] = F.handleError(fa)(f)
     }
+}
+
+final class MonadError_Ops[F[_], E, A] private[scalaz] (self: F[A])(implicit F: MonadError_[F, E]) {
+  final def handleError(f: E => F[A]): F[A] =
+    F.handleError(self)(f)
 }

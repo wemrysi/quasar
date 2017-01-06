@@ -49,7 +49,7 @@ sealed abstract class PlannerInstances extends PlannerInstances0 {
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {
-  implicit def mapFunc[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: Recursive](
+  implicit def mapFunc[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
     implicit
     DP: Planner[M, FMT, Const[Data, ?]],
     SP: StructuralPlanner[M, FMT]
@@ -58,7 +58,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
 }
 
 sealed abstract class PlannerInstances1 extends PlannerInstances2 {
-  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: Recursive: Corecursive](
+  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
@@ -71,7 +71,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
   implicit def xmlConstShiftedRead[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr]: Planner[F, fmt.XML, Const[ShiftedRead, ?]] =
     new XmlShiftedReadPlanner[F]
 
-  implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: Recursive: Corecursive](
+  implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
     implicit
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
     MFP: Planner[F, FMT, MapFunc[T, ?]]

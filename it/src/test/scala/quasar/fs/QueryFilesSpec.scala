@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
@@ -41,7 +41,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
   def deleteForQuery(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(queryPrefix))
 
-  val lpr = new LogicalPlanR[Fix]
+  val lpr = new LogicalPlanR[Fix[LP]]
 
   def readRenamed(src: AFile, from: String, to: String): Fix[LP] =
     lpr.invoke1(

@@ -30,14 +30,9 @@ trait MonadListen_[F[_], W] {
 
 object MonadListen_ extends MonadListen_Instances {
   def apply[F[_], W](implicit L: MonadListen_[F, W]): MonadListen_[F, W] = L
-
-  implicit def monadListenNoMonad[F[_], W](implicit L: MonadListen[F, W]): MonadListen_[F, W] =
-    new MonadListen_[F, W] {
-      def listen[A](fa: F[A]) = L.listen(fa)
-    }
 }
 
-sealed abstract class MonadListen_Instances {
+sealed abstract class MonadListen_Instances extends MonadListen_Instances0 {
   implicit def eitherTMonadListen[F[_]: Functor, W, E](implicit L: MonadListen_[F, W]): MonadListen_[EitherT[F, E, ?], W] =
     new MonadListen_[EitherT[F, E, ?], W] {
       def listen[A](fa: EitherT[F, E, A]) =
@@ -48,5 +43,12 @@ sealed abstract class MonadListen_Instances {
     new MonadListen_[WriterT[F, W2, ?], W1] {
       def listen[A](fa: WriterT[F, W2, A]) =
         WriterT(L.listen(fa.run) map { case ((w2, a), w1) => (w2, (a, w1)) })
+    }
+}
+
+sealed abstract class MonadListen_Instances0 {
+  implicit def monadListenNoMonad[F[_], W](implicit L: MonadListen[F, W]): MonadListen_[F, W] =
+    new MonadListen_[F, W] {
+      def listen[A](fa: F[A]) = L.listen(fa)
     }
 }

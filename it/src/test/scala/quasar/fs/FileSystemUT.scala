@@ -24,6 +24,15 @@ import quasar.fp.free, free._
 import scalaz._
 import scalaz.concurrent.Task
 
+
+final case class SupportedFs[S[_]](
+  ref: BackendRef,
+  impl: Option[FileSystemUT[S]]
+) {
+  def liftIO: SupportedFs[Coproduct[Task, S, ?]] =
+    copy(impl = impl.map(_.liftIO))
+}
+
 /** FileSystem Under Test
   *
   * @param ref description of the filesystem

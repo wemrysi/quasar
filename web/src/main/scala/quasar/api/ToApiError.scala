@@ -66,11 +66,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Connection to backend failed.",
           s"Connection failed: $msg.")
 
-      case InsufficientPermissions(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Insufficient backend permssions.",
-          s"Insufficient permissions: $msg.")
-
       case InvalidCredentials(msg) =>
         fromMsg_(
           InternalServerError withReason "Invalid backend credentials.",

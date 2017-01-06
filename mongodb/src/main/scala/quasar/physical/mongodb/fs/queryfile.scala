@@ -32,7 +32,7 @@ import quasar.physical.mongodb.planner.MongoDbPlanner
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
 import com.mongodb.async.client.MongoClient
-import matryoshka.Fix
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -104,7 +104,7 @@ private final class QueryFileInterpreter[C](
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
 
-  private val lpr = new LogicalPlanR[Fix]
+  private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
   type QRT[F[_], A] = QueryRT[F, C, A]
   type MQ[A]        = QRT[MongoDbIO, A]

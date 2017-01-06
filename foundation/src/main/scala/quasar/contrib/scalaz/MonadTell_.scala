@@ -30,14 +30,9 @@ trait MonadTell_[F[_], W] {
 
 object MonadTell_ extends MonadTell_Instances {
   def apply[F[_], W](implicit T: MonadTell_[F, W]): MonadTell_[F, W] = T
-
-  implicit def monadTellNoMonad[F[_], W](implicit F: MonadTell[F, W]): MonadTell_[F, W] =
-    new MonadTell_[F, W] {
-      def writer[A](w: W, a: A) = F.writer(w, a)
-    }
 }
 
-sealed abstract class MonadTell_Instances {
+sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
   implicit def eitherTMonadTell[F[_]: Functor, W, E](implicit T: MonadTell_[F, W]): MonadTell_[EitherT[F, E, ?], W] =
     new MonadTell_[EitherT[F, E, ?], W] {
       def writer[A](w: W, a: A) = EitherT(T.writer(w, a) map (_.right[E]))
@@ -47,4 +42,19 @@ sealed abstract class MonadTell_Instances {
     new MonadTell_[WriterT[F, W2, ?], W1] {
       def writer[A](w: W1, a: A) = WriterT(T.writer(w, a) strengthL mzero[W2])
     }
+}
+
+sealed abstract class MonadTell_Instances0 {
+  implicit def monadTellNoMonad[F[_], W](implicit F: MonadTell[F, W]): MonadTell_[F, W] =
+    new MonadTell_[F, W] {
+      def writer[A](w: W, a: A) = F.writer(w, a)
+    }
+}
+
+final class MonadTell_Ops[F[_], W, A] private[scalaz] (self: F[A])(implicit F: MonadTell_[F, W]) {
+  final def :++>(w: ⇒ W)(implicit B: Bind[F]): F[A] =
+    B.bind(self)(a => B.map(F.tell(w))(_ => a))
+
+  final def :++>>(f: A ⇒ W)(implicit B: Bind[F]): F[A] =
+    B.bind(self)(a => B.map(F.tell(f(a)))(_ => a))
 }

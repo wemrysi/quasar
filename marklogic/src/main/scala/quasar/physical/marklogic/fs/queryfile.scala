@@ -19,7 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.{Capture, Kvs, MonoSeq}
@@ -38,7 +37,9 @@ import quasar.qscript._
 
 import com.marklogic.xcc.types.XSString
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 object queryfile {
@@ -101,7 +102,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Capture: SessionReader: XccErr,
-    T[_[_]]: Recursive: Corecursive: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     FMT
   ](
     lp: T[LogicalPlan]
@@ -127,13 +128,12 @@ object queryfile {
       qs      <- convertToQScriptRead[T, F, QSR](ops.ls[F])(lp)
       shifted =  shiftRead[T, QSR, MLQ].apply(qs)
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
-      optmzed =  shifted
-                   .transAna(
-                     repeatedly(C.coalesceQC[MLQ](idPrism)) ⋙
-                     repeatedly(C.coalesceTJ[MLQ](idPrism.get)) ⋙
-                     repeatedly(C.coalesceSR[MLQ](idPrism)) ⋙
-                     repeatedly(N.normalizeF(_: MLQ[T[MLQ]])))
-                   .transCata(R.optimize(reflNT))
+      optmzed =  shifted.transHylo(
+                   R.optimize(reflNT[MLQ]),
+                   repeatedly(C.coalesceQC[MLQ](idPrism))     ⋙
+                   repeatedly(C.coalesceTJ[MLQ](idPrism.get)) ⋙
+                   repeatedly(C.coalesceSR[MLQ](idPrism))     ⋙
+                   repeatedly(N.normalizeF(_: MLQ[T[MLQ]])))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)
       pp      <- prettyPrint[F](main.queryBody)

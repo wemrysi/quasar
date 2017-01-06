@@ -17,10 +17,10 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.ejson.{Common, Str}
-import quasar.fp.{coproductShow, QuasarFreeOps}
+import quasar.contrib.scalaz.MonadError_
+import quasar.ejson.{Common, EJson, Str}
+import quasar.fp.coproductShow
 import quasar.fp.ski.κ
-import quasar.contrib.matryoshka.{freeCataM, interpretM}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
@@ -29,8 +29,10 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import eu.timepit.refined.refineV
-import matryoshka.{Corecursive, Embed, Fix, Recursive}, Recursive.ops._
-import matryoshka.patterns.CoEnv
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 package object qscript {
@@ -64,17 +66,17 @@ package object qscript {
     }).fold(invalidQName[F, QName](s))(_.point[F])
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: Corecursive, F[_]: Monad: MonadPlanErr, FMT](
+  def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: MonadPlanErr, FMT](
     fm: FreeMap[T],
     src: XQuery
   )(implicit
     MFP: Planner[F, FMT, MapFunc[T, ?]],
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
-    fm.toCoEnv[T].project match {
+    fm.project match {
       case MapFunc.StaticArray(elements) =>
         for {
-          xqyElts <- elements.traverse(mapFuncXQueryP[T, F, FMT](_, src))
+          xqyElts <- elements.traverse(planMapFunc[T, F, FMT, Hole](_)(κ(src)))
           arrElts <- xqyElts.traverse(SP.mkArrayElt)
           arr     <- SP.mkArray(mkSeq(arrElts))
         } yield arr
@@ -83,25 +85,17 @@ package object qscript {
         for {
           xqyKV <- entries.traverse(_.bitraverse({
                      case Embed(Common(Str(s))) => s.xs.point[F]
-                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix].shows)
+                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
-                   mapFuncXQueryP[T, F, FMT](_, src)))
+                   planMapFunc[T, F, FMT, Hole](_)(κ(src))))
           elts  <- xqyKV.traverse((SP.mkObjectEntry _).tupled)
           map   <- SP.mkObject(mkSeq(elts))
         } yield map
 
-      case other => mapFuncXQueryP[T, F, FMT](other.embed, src)
+      case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mapFuncXQueryP[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT](
-    fm: T[CoEnv[Hole, MapFunc[T, ?], ?]],
-    src: XQuery
-  )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
-  ): F[XQuery] =
-    planMapFuncP[T, F, FMT, Hole](fm)(κ(src))
-
-  def mergeXQuery[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT](
+  def mergeXQuery[T[_[_]]: RecursiveT, F[_]: Monad, FMT](
     jf: JoinFunc[T],
     l: XQuery,
     r: XQuery
@@ -113,16 +107,8 @@ package object qscript {
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: Corecursive, F[_]: Monad, FMT, A](
+  def planMapFunc[T[_[_]]: RecursiveT, F[_]: Monad, FMT, A](
     freeMap: FreeMapA[T, A])(
-    recover: A => XQuery
-  )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
-  ): F[XQuery] =
-    planMapFuncP[T, F, FMT, A](freeMap.toCoEnv)(recover)
-
-  def planMapFuncP[T[_[_]]: Recursive, F[_]: Monad, FMT, A](
-    freeMap: T[CoEnv[A, MapFunc[T, ?], ?]])(
     recover: A => XQuery
   )(implicit
     MFP: Planner[F, FMT, MapFunc[T, ?]]
@@ -135,7 +121,7 @@ package object qscript {
   )(implicit
     QTP: Planner[F, FMT, QScriptTotal[T, ?]]
   ): F[XQuery] =
-    freeCataM(fqs)(interpretM(κ(src.point[F]), QTP.plan))
+    fqs.cataM(interpretM(κ(src.point[F]), QTP.plan))
 
   ////
 
@@ -147,9 +133,6 @@ package object qscript {
     case IntegralNumber(n) => "_" + n
     case other             => other
   }
-
-  private implicit def comfTraverse[T[_[_]], A]: Traverse[CoEnv[A, MapFunc[T, ?], ?]] =
-    Bitraverse[CoEnv[?, MapFunc[T, ?], ?]].rightTraverse[A]
 
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(

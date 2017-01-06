@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
 //       Without this contract we cannot safely fuse expressions by binding the
 //       return expression to a variable as, if it is a sequence, the results will,
 //       in the best case, also be sequences and exceptions in the worst.
-private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: Recursive: Corecursive](
+private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
   implicit
   SP: StructuralPlanner[F, FMT],
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],

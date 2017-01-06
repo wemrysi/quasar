@@ -1,12 +1,8 @@
 {
     "name": "sort wildcard on expression",
     "backends": {
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
-        "mongodb_3_2":       "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select * from largeZips order by pop/10 desc",

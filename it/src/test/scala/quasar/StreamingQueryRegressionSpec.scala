@@ -23,12 +23,12 @@ import quasar.sql.Sql
 import scala.None
 
 import eu.timepit.refined.auto._
-import matryoshka.Fix
+import matryoshka.data.Fix
 
 class StreamingQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(
-      _.supports(BackendCapability.query())))) {
+      _.ref.supports(BackendCapability.query())))) {
 
   val suiteName = "Streaming Queries"
 

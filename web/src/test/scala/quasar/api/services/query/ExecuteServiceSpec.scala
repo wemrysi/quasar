@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._
@@ -35,12 +35,11 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.http4s._
 import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import pathy.Path._
-import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
 // TODO: Consider if possible to use argonaut backend and avoid printing followed by parsing
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
@@ -53,9 +52,8 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
-  import quasar.frontend.fixpoint.lpf
 
-  type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   // Remove if eventually included in upstream scala-pathy
   implicit val arbitraryFileName: Arbitrary[FileName] =

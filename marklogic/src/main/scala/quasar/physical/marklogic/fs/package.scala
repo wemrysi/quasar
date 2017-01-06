@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 import argonaut.Json
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz.{ToIdOps => _, _}
 import scalaz.concurrent.Task

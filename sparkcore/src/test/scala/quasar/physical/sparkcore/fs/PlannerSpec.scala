@@ -36,18 +36,22 @@ import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 import pathy.Path._
 import matryoshka.{Hole => _, _}
+import matryoshka.data.Fix
 import org.specs2.execute.Result
 import org.specs2.matcher.MatchResult
 import org.specs2.scalaz.DisjunctionMatchers
 
-class PlannerSpec extends quasar.Qspec with QScriptHelpers with DisjunctionMatchers {
+class PlannerSpec
+    extends quasar.Qspec
+    with QScriptHelpers
+    with DisjunctionMatchers {
 
   import Planner.SparkState
 
   sequential
 
   val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedread[Fix]
+  val sr = Planner.shiftedread
   val qscore = Planner.qscriptCore[Fix]
 
   val data = List(

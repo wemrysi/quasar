@@ -22,17 +22,20 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
-import matryoshka._, Recursive.ops._
 import java.time.format.DateTimeFormatter
+import scala.concurrent.duration._
+
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
-import scala.concurrent.duration._
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}
@@ -41,7 +44,7 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))
 

@@ -14,11 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.frontend
+package quasar.physical.couchbase
 
-import matryoshka.Fix
-
-object fixpoint {
-  val optimizer = new quasar.frontend.logicalplan.Optimizer[Fix]
-  val lpf = optimizer.lpr
-}
+trait N1QLInstances
+  extends N1QLTraverseInstance
+  with    N1QLRenderTreeInstance

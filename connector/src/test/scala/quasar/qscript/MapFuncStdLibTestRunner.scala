@@ -20,19 +20,22 @@ import quasar.Predef._
 import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
-import quasar.frontend.fixpoint.lpf
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.std._
 
 import scala.sys
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute.Result
+
 import scalaz._, Scalaz._
 import shapeless.Sized
 
 /** The operations needed to execute the various StdLib tests for a QScript backend. */
 trait MapFuncStdLibTestRunner extends StdLibTestRunner {
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   def nullaryMapFunc(
     prg: FreeMapA[Fix, Nothing],

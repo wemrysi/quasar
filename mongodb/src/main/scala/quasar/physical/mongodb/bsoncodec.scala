@@ -17,13 +17,13 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._, Planner._
 
 import matryoshka._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Prism
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}
@@ -31,9 +31,9 @@ import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 
 object BsonCodec {
-  private def pad2(x: Int) = if (x < 10) "0" + x else x.toString
+  private def pad2(x: Int) = if (x < 10) "0" + x.toString else x.toString
   private def pad3(x: Int) =
-    if (x < 10) "00" + x else if (x < 100) "0" + x else x.toString
+    if (x < 10) "00" + x.toString else if (x < 100) "0" + x.toString else x.toString
 
   object EJsonType {
     def apply(typ: String): Bson =
