@@ -105,9 +105,6 @@ object SessionIO {
   def setTransactionMode(tm: Session.TransactionMode): SessionIO[Executed] =
     SessionIO(_.setTransactionMode(tm)).as(executed)
 
-  def transactionMode: SessionIO[Session.TransactionMode] =
-    SessionIO(_.getTransactionMode)
-
   def fail[A](t: Throwable): SessionIO[A] =
     liftT(Task.fail(t))
 

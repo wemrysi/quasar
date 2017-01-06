@@ -3673,7 +3673,6 @@ class PlannerSpec extends
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)
 
-  val noGroupBy = Gen.const[Option[GroupBy[Fix[Sql]]]](None)
   val groupBySeveral = Gen.nonEmptyListOf(Gen.oneOf(
     sql.IdentR("state"),
     sql.IdentR("territory"))).map(keys => GroupBy(keys.distinct, None))

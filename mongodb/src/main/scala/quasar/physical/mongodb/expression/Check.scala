@@ -176,7 +176,7 @@ object Check {
 
   val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
   val minInstant = Instant.ofEpochMilli(Long.MinValue)
-  val minTimestamp = Bson.Timestamp.fromInstant(minInstant, 0)
+  val minTimestamp = Bson.Timestamp(Int.MinValue, 0)
   val minOid =
     ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
   val minRegex = Bson.Regex("", "")

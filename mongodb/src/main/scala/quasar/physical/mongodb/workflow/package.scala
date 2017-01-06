@@ -225,8 +225,6 @@ package object workflow {
 
     def applySelector(s: Selector): Selector = s.mapUpFields(PartialFunction(applyFieldName _))
 
-    def applyMap[A](m: ListMap[BsonField, A]): ListMap[BsonField, A] = m.map(t => applyFieldName(t._1) -> t._2)
-
     def applyNel[A](m: NonEmptyList[(BsonField, A)]): NonEmptyList[(BsonField, A)] = m.map(t => applyFieldName(t._1) -> t._2)
 
     def apply[A <: F[_]](op: A): A
@@ -518,7 +516,11 @@ package object workflow {
                   MapReduceTask(src, mr, Some(MapReduce.Action.Reduce(Some(true))))
                 // NB: `finalize` should ensure that the final op is always a
                 //     $ReduceF.
-                case src => scala.sys.error("not a mapReduce: " + src)
+                case src =>
+                  // TODO: Find a better way to print this
+                  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+                  val msg = "not a mapReduce: " + src.unFix.toString
+                  scala.sys.error(msg)
               })))
       }
 
@@ -596,11 +598,6 @@ package object workflow {
             case WorkflowOpCoreF(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
             case src => src
           }
-
-        val uncleanƒ: F[Fix[F]] => Fix[F] = {
-          case WorkflowOpCoreF(x @ $SimpleMapF(_, _, _)) => I.inj(x.raw).embed
-          case x                                         => x.embed
-        }
 
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case WorkflowOpCoreF(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
