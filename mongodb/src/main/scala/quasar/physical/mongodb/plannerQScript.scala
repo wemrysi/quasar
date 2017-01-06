@@ -1127,7 +1127,7 @@ object MongoDbQScriptPlanner {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
       if (typ.contains(subType)) cont.project.point[M]
       else if (!subType.contains(typ))
-        merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("can only contain " + subType + ", but a(n) " + typ + " is expected")))
+        merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
       else {
         free.point[M]
       }
