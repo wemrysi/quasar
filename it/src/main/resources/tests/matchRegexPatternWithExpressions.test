@@ -3,6 +3,7 @@
 
   "backends": {
     "mongodb_read_only": "pending",
+    "mongodb_q_3_2":  "pending",
     "postgresql":        "pending"
   },
 
@@ -15,7 +16,7 @@
 
   "predicate": "containsExactly",
 
-  "ignoreFieldOrder": [ "couchbase" ],
+  "ignoreFieldOrder": ["couchbase"],
 
   "expected": [
     { "city": "BOULDER", "a": true,  "b": true  },

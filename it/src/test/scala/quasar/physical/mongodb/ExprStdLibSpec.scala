@@ -68,7 +68,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
         lpf.constant(Data.Str("result")),
         lp))
 
-    val ctx = QueryContext(queryModel, κ(None), κ(None))
+    val ctx = QueryContext(queryModel, κ(None), κ(None), listContents)
 
     MongoDbPlanner.plan(wrapped, ctx).run.value
       .flatMap { wf =>

@@ -40,28 +40,28 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
+  val COUCHBASE       = BackendRef(BackendName("couchbase")        , BackendCapability.All)
+  val MARKLOGIC       = BackendRef(BackendName("marklogic")        , BackendCapability.All)
   val MONGO_2_6       = BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All)
   val MONGO_3_0       = BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All)
   val MONGO_3_2       = BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All)
   val MONGO_READ_ONLY = BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query())
-  val SKELETON        = BackendRef(BackendName("skeleton")         , ISet.empty)
+  val MONGO_Q_2_6     = BackendRef(BackendName("mongodb_q_2_6")    , BackendCapability.All)
+  val MONGO_Q_3_0     = BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All)
+  val MONGO_Q_3_2     = BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All)
   val POSTGRESQL      = BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write())
-  val SPARK_LOCAL     = BackendRef(BackendName("spark_local")      , BackendCapability.All)
+  val SKELETON        = BackendRef(BackendName("skeleton")         , ISet.empty)
   val SPARK_HDFS      = BackendRef(BackendName("spark_hdfs")       , BackendCapability.All)
-  val MARKLOGIC       = BackendRef(BackendName("marklogic")        , BackendCapability.All)
-  val COUCHBASE       = BackendRef(BackendName("couchbase")        , BackendCapability.All)
+  val SPARK_LOCAL     = BackendRef(BackendName("spark_local")      , BackendCapability.All)
 
   lazy val backendRefs: List[BackendRef] = List(
-    MONGO_2_6      ,
-    MONGO_3_0      ,
-    MONGO_3_2      ,
-    MONGO_READ_ONLY,
-    SKELETON       ,
-    POSTGRESQL     ,
-    SPARK_LOCAL    ,
-    SPARK_HDFS     ,
-    MARKLOGIC      ,
-    COUCHBASE      )
+    COUCHBASE,
+    MARKLOGIC,
+    MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY,
+    MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2,
+    POSTGRESQL,
+    SKELETON,
+    SPARK_HDFS, SPARK_LOCAL)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
