@@ -16,7 +16,7 @@
 
 package quasar.contrib
 
-import _root_.scalaz.{MonadError, MonadTell, StateT}
+import _root_.scalaz.{Monad, MonadError, MonadTell, StateT}
 import _root_.scalaz.syntax.monad._
 
 package object scalaz {
@@ -36,6 +36,22 @@ package object scalaz {
         (f: A => StateT[F, S, B]) =
         StateT[F, S, B](s =>
           F.bind(fa.run(s))(p => f(p._2).run(p._1)))
+
+      def handleError[A]
+        (fa: StateT[F, S, A])
+        (f: E => StateT[F, S, A]) =
+        StateT[F, S, A](s => F.handleError(fa.run(s))(f(_).run(s)))
+
+      def raiseError[A](e: E) =
+        StateT[F, S, A](_ => F.raiseError[(S, A)](e))
+    }
+
+  implicit def stateTMonadError_[F[_], E, S](implicit F: MonadError_[F, E])
+      : MonadError_[StateT[F, S, ?], E] =
+    new MonadError_[StateT[F, S, ?], E] {
+      def ME = stateTMonadError(F.ME)
+
+      implicit val FM: Monad[F] = F.ME
 
       def handleError[A]
         (fa: StateT[F, S, A])

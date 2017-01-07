@@ -1,9 +1,10 @@
 {
     "name": "multi-flatten with fields at various depths",
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "skip",
+        "marklogic":  "skip",
+        "mongodb_q_3_2": "pending",
+        "postgresql": "pending",
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },
