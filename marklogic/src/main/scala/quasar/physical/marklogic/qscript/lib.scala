@@ -358,7 +358,11 @@ object lib {
     qs.declare("timestamp-to-dateTime") map (_(
       $("millis") as ST("xs:integer?")
     ).as(ST("xs:dateTime?")) { millis =>
-      epoch + xs.dayTimeDuration(fn.concat("PT".xs, xs.string(millis div 1000.xqy), "S".xs))
+      val prefix = $("prefix")
+      let_(
+        prefix := if_(millis lt 0.xqy) then_ "-PT".xs else_ "PT".xs)
+      .return_(
+        epoch + xs.dayTimeDuration(fn.concat(~prefix, xs.string(fn.abs(millis) div 1000.xqy), "S".xs)))
     })
 
   // qscript:timezone-offset-seconds($dt as xs:dateTime?) as xs:integer?
