@@ -48,7 +48,7 @@ object Bson {
     case arr:  BsonArray             => Arr(arr.getValues.asScala.toList ∘ fromRepr)
     case bin:  BsonBinary            => Binary.fromArray(bin.getData)
     case bool: BsonBoolean           => Bool(bool.getValue)
-    case dt:   BsonDateTime          => Date(Instant.ofEpochMilli(dt.getValue))
+    case dt:   BsonDateTime          => Date(dt.getValue)
     case doc:  BsonDocument          => Doc(doc.asScala.toList.toListMap ∘ fromRepr)
     case dub:  BsonDouble            => Dec(dub.doubleValue)
     case i32:  BsonInt32             => Int32(i32.intValue)
@@ -147,11 +147,21 @@ object Bson {
     def repr = new BsonBoolean(value)
     def toJs = Js.Bool(value)
   }
-  final case class Date(value: Instant) extends Bson {
-    def repr = new BsonDateTime(value.toEpochMilli)
-    def toJs =
-      Js.Call(Js.Ident("ISODate"), List(Js.Str(value.toString)))
+  /** NB: Can’t use `Instant`, because it encodes values outside the range of
+    *     Bson DateTimes.
+    */
+  final case class Date(millis: Long) extends Bson {
+    def repr = new BsonDateTime(millis)
+    def toJs = Js.Call(Js.Ident("ISODate"), List(Js.Str(Instant.ofEpochMilli(millis).toString)))
   }
+  object Date {
+    val minInstant = Instant.ofEpochMilli(Long.MinValue)
+    val maxInstant = Instant.ofEpochMilli(Long.MaxValue)
+    def fromInstant(inst: Instant) =
+      (minInstant.compareTo(inst) <= 0 && inst.compareTo(maxInstant) <= 0)
+        .option(Date(inst.toEpochMilli))
+  }
+
   final case object Null extends Bson {
     def repr = new BsonNull
     override def toJs = Js.Null

@@ -21,13 +21,16 @@ import quasar._
 import quasar.javascript.Js
 import quasar.jscore._
 
+import java.time.Instant
+
 final case class javascript[R](embed: JsCoreF[R] => R) {
   val js = jscore.fixpoint[R](embed)
   import js._
 
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
   def toJsDate(value: Bson.Date): R =
-    New(Name("Date"), List(Literal(Js.Str(value.value.toString))))
+    New(Name("Date"), List(
+      Literal(Js.Str(Instant.ofEpochMilli(value.millis).toString))))
 
   /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
   def toJsObjectId(value: Bson.ObjectId): R =
