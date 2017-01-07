@@ -47,14 +47,14 @@ package object main {
 
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
-    skeleton.fs.definition[PhysFsEff],
-    mongodb.fs.mongoDbFileSystemDef[PhysFsEff],
-    mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff],
-    postgresql.fs.definition[PhysFsEff],
+    couchbase.fs.definition[PhysFsEff],
     marklogic.fs.definitionXml[PhysFsEff](readChunkSize = 10000L),
-    sparkcore.fs.local.definition[PhysFsEff],
+    mongodb.fs.definition[PhysFsEff],
+    mongodb.fs.qscriptDefinition[PhysFsEff],
+    postgresql.fs.definition[PhysFsEff],
+    skeleton.fs.definition[PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
-    couchbase.fs.definition[PhysFsEff]
+    sparkcore.fs.local.definition[PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

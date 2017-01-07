@@ -1,6 +1,7 @@
 {
     "name": "filter with date literals",
     "backends": {
+        "mongodb_q_3_2": "pending",
         "postgresql": "pending",
         "marklogic":  "skip",
         "spark_local": "pending",

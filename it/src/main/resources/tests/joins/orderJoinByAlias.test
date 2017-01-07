@@ -2,6 +2,7 @@
     "name": "order join by alias",
     "backends": {
         "mongodb_read_only": "pending",
+        "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
         "marklogic":         "skip",
         "couchbase":         "skip",

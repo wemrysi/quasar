@@ -57,6 +57,15 @@ sealed abstract class MonadError_Instances extends MonadError_Instances0 {
       def handleError[A](fa: EitherT[F, E2, A])(f: E1 => EitherT[F, E2, A]) =
         EitherT(E.handleError(fa.run)(e1 => f(e1).run))
     }
+
+  implicit def stateTMonadError_[F[_]: Monad, E, S](implicit F: MonadError_[F, E]): MonadError_[StateT[F, S, ?], E] =
+    new MonadError_[StateT[F, S, ?], E] {
+      def handleError[A](fa: StateT[F, S, A])(f: E => StateT[F, S, A]) =
+        StateT(s => F.handleError(fa.run(s))(f(_).run(s)))
+
+      def raiseError[A](e: E) =
+        StateT(_ => F.raiseError[(S, A)](e))
+    }
 }
 
 sealed abstract class MonadError_Instances0 {

@@ -817,7 +817,12 @@ object MapFuncs {
   }
 
   // structural
+
+  /** Makes a single-element [[ejson.Arr]] containing `a1`.
+    */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Makes a single-element [[ejson.Map]] with key `key` and value `value`.
+    */
   @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
     def a1 = key
     def a2 = value

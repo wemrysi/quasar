@@ -167,7 +167,7 @@ trait OptionTInstances {
     }
 }
 
-trait StateTInstances {
+sealed trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
       def attempt[A](fa: StateT[F, S, A]) =
@@ -297,7 +297,6 @@ package object fp
     with DebugOps
     with CatchableInstances {
 
-
   import ski._
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
@@ -335,6 +334,11 @@ package object fp
   def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
+
+  def liftFGM[M[_]: Monad, F[_], G[_], A](orig: F[A] => M[G[A]])(implicit F: F :<: G):
+      G[A] => M[G[A]] =
+    ftf => F.prj(ftf).fold(ftf.point[M])(orig)
+
 
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =

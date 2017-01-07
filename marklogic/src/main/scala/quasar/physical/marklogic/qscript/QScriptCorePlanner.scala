@@ -198,6 +198,8 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
     case Min(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
     case Sum(fm)              => fx(mapFuncXQuery[T, F, FMT](fm, _))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case First(fm)            => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case Last(fm)             => fx(mapFuncXQuery[T, F, FMT](fm, _))
     case UnshiftArray(fm)     => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.singletonArray(_)))
     case UnshiftMap(kfm, vfm) => fx(x => mapFuncXQuery[T, F, FMT](kfm, x).tuple(mapFuncXQuery[T, F, FMT](vfm, x)).flatMap {
                                    case (k, v) => SP.singletonObject(k, v)
@@ -219,8 +221,9 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
     case Min(fm)              => castingCombiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
     case Sum(fm)              => combiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
     case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
+    case First(fm)            => combiner(fm)((x, _) => x.point[F])
+    case Last(fm)             => combiner(fm)((_, y) => y.point[F])
     case UnshiftArray(fm)     => combiner(fm)(SP.arrayAppend(_, _))
-
     case UnshiftMap(kfm, vfm) =>
       val (m, x) = ($("m"), $("x"))
       mapFuncXQuery[T, F, FMT](kfm, ~x).tuple(mapFuncXQuery[T, F, FMT](vfm, ~x)).flatMap {
