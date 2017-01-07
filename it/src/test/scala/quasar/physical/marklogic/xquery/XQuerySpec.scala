@@ -21,8 +21,10 @@ import quasar.{BackendName, Data, TestConfig}
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.testing
+import quasar.physical.marklogic.xcc.XccError
 
 import com.marklogic.xcc.ContentSource
+import com.marklogic.xcc.exceptions.XQueryException
 import org.specs2.specification.core.Fragment
 import scalaz._, Scalaz._, concurrent.Task
 
@@ -33,12 +35,17 @@ abstract class XQuerySpec extends quasar.Qspec {
   /** Convenience function for expecting results, i.e. xqy must resultIn(Data._str("foo")). */
   def resultIn(expected: Data) = equal(expected.right[ErrorMessages])
 
+  /** Convenience function for expecting no results. */
+  def resultInNothing = equal(noResults.left[Data])
+
   def xquerySpec(desc: BackendName => String)(tests: (M[XQuery] => ErrorMessages \/ Data) => Fragment): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
       contentSourceAt[Task](uri).map(cs => desc(backend.name) >> tests(evaluateXQuery(cs, _))).void
     }).unsafePerformSync
 
   ////
+
+  private val noResults = "No results found.".wrapNel
 
   private def evaluateXQuery(cs: ContentSource, xqy: M[XQuery]): ErrorMessages \/ Data = {
     val (prologs, body) = xqy.run.run
@@ -47,7 +54,13 @@ abstract class XQuerySpec extends quasar.Qspec {
     mainModule >>= (mm =>
       testing.moduleResults[ReaderT[Task, ContentSource, ?]](mm)
         .run(cs)
-        .map(_ >>= (_ \/> "No results found.".wrapNel))
+        .map(_ >>= (_ \/> noResults))
+        .handleWith {
+          // TODO: Why isn't this caught earlier? Is it being thrown by the ResultSequence?
+          case ex: XQueryException =>
+            Task.fail(new RuntimeException(
+              XccError.xqueryError(mm.render, ex).shows, ex))
+        }
         .unsafePerformSync)
   }
 }

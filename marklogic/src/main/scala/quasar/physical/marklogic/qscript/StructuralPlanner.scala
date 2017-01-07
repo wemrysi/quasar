@@ -52,7 +52,7 @@ trait StructuralPlanner[F[_], FMT] {
   def isArray(item: XQuery): F[XQuery]
 
   /** Returns the inner array elements or object entries of the given `node()`
-    * or the empty seq if it is neither an array or object.
+    * as a sequence or the empty seq if it is neither an array or object.
     */
   def leftShift(node: XQuery): F[XQuery]
 
@@ -161,6 +161,7 @@ trait StructuralPlanner[F[_], FMT] {
             ST("xs:dateTime")     return_ "timestamp".xs,
             ST("xs:date")         return_ "date".xs,
             ST("xs:time")         return_ "time".xs,
+            ST("xs:duration")     return_ "interval".xs,
             ST("xs:integer")      return_ "integer".xs,
             ST("xs:decimal")      return_ "decimal".xs,
             ST("xs:double")       return_ "decimal".xs,

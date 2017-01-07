@@ -37,7 +37,7 @@ object testing {
       rs <- qr.toImmutableArray[G]
     } yield rs.headOption traverse xdmitem.toData[ErrorMessages \/ ?] _
 
-    (contentsource.newSession[EitherT[F, XccError, ?]](None) >>= result)
+    (contentsource.defaultSession[EitherT[F, XccError, ?]] >>= result)
       .leftMap(_.shows.wrapNel)
       .run.map(_.join)
   }

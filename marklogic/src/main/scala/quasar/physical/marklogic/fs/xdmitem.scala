@@ -27,7 +27,7 @@ import scala.collection.JavaConverters._
 import scala.util.{Success, Failure}
 import scala.xml.Elem
 
-import com.marklogic.xcc.types._
+import com.marklogic.xcc.types.{Duration => _, _}
 import java.time._
 import scalaz._, Scalaz._
 
@@ -84,7 +84,7 @@ object xdmitem {
     case item: XSDateTime               => Data._timestamp(item.asDate.toInstant).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
-    case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]
+    case item: XSDuration               => Data._interval(convertDuration(item)).point[F]
     case item: XSFloat                  => Data._dec(item.asBigDecimal).point[F]
     case item: XSGDay                   => Data.singletonObj("xs:gDay"      , Data._str(item.asString)).point[F]
     case item: XSGMonth                 => Data.singletonObj("xs:gMonth"    , Data._str(item.asString)).point[F]
@@ -110,6 +110,21 @@ object xdmitem {
       case Success(d) => d.point[F]
       case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
     }
+
+  private def convertDuration(xsd: XSDuration): Duration = {
+    val xdd   = xsd.asDuration
+    val days  = (xdd.getYears * 365L) + (xdd.getMonths * 30) + xdd.getDays
+    val rsecs = BigDecimal(xdd.getSeconds)
+    val secs  = rsecs.toLong
+    val nanos = (rsecs - secs) / 1000000000
+    val dur   = Duration.ofDays(days)
+                  .plusHours(xdd.getHours.toLong)
+                  .plusMinutes(xdd.getMinutes.toLong)
+                  .plusSeconds(secs)
+                  .plusNanos(nanos.toLong)
+
+    if (xdd.isPositive) dur else dur.negated
+  }
 
   private def parseLocalDate[F[_]: MonadErrMsgs](s: String): F[LocalDate] =
     parseTemporal[F, LocalDate]("LocalDate", isoLocalDate.getOption)(s)

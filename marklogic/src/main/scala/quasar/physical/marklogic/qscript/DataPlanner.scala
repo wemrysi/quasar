@@ -16,7 +16,6 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.prisms._
 import quasar.physical.marklogic.xquery._
@@ -36,7 +35,7 @@ private[qscript] final class DataPlanner[M[_]: Monad, FMT](
     case Data.Dec(d)        => xs.double(d.toString.xqy).point[M]
     case Data.Id(id)        => id.xs.point[M]
     case Data.Int(i)        => xs.integer(i.toString.xqy).point[M]
-    case Data.Interval(d)   => xs.duration(s"PT${durationInSeconds(d)}S".xs).point[M]
+    case Data.Interval(d)   => xs.duration(isoDuration(d).xs).point[M]
     case Data.NA            => expr.emptySeq.point[M]
     case Data.Null          => SP.null_
     case Data.Str(s)        => s.xs.point[M]

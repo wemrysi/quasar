@@ -17,9 +17,12 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.Data
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -28,13 +31,24 @@ final class XmlStructuralPlannerSpec
   extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, fmt.XML] {
 
   import XmlStructuralPlannerSpec.XmlPlan
+  import expr._
 
+  val SP  = StructuralPlanner[XmlPlan, fmt.XML]
+  val DP  = Planner[XmlPlan, fmt.XML, Const[Data, ?]]
   val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
+  def asMapKey(qn: QName) = qn.xqy.point[XmlPlan]
 
-  // TODO: projecting multiple child elements with the same name results in an array
+  xquerySpec(_ => "XML Specific") { evalM =>
+    val eval = evalM.compose[XmlPlan[XQuery]](toM(_))
 
-/*
-    "attributes" >> {
+    "arrayElementAt" >> {
+      "returns the nth entry of an object" >> prop { (a: Data, b: Data, c: Data, d: Data) =>
+        val es = Data._obj(ListMap(keyed(NonEmptyList(a, b, c, d)).toList: _*))
+        eval(lit(es) >>= (SP.arrayElementAt(_, 2.xqy))) must resultIn(c)
+      }
+    }
+
+    "nodeMetadata" >> {
       "returns element attributes as an object" >> {
         val book = element("book".xs)(mkSeq_(
           attribute("author".xs)("Ursula K. LeGuin".xs),
@@ -42,7 +56,7 @@ final class XmlStructuralPlannerSpec
           "The Farthest Shore".xs
         ))
 
-        eval(ejson.attributes[M] apply book) must resultIn(Data.Obj(
+        eval(SP.nodeMetadata(book)) must resultIn(Data.Obj(
           "author"    -> Data._str("Ursula K. LeGuin"),
           "published" -> Data._str("1972")
         ))
@@ -50,41 +64,35 @@ final class XmlStructuralPlannerSpec
 
       "returns attributes of an empty element" >> {
         val person = element("person".xs)(attribute("name".xs)("Alice".xs))
-        eval(ejson.attributes[M] apply person) must resultIn(Data.Obj(
+        eval(SP.nodeMetadata(person)) must resultIn(Data.Obj(
           "name" -> Data._str("Alice")
         ))
       }
 
       "returns an empty object when element has no attributes" >> {
         val foo = element("foo".xs)("bar".xs)
-        eval(ejson.attributes[M] apply foo) must resultIn(Data.Obj())
+        eval(SP.nodeMetadata(foo)) must resultIn(Data.Obj())
       }
 
       "returns an empty object when empty element has no attributes" >> {
         val baz = element("baz".xs)(emptySeq)
-        eval(ejson.attributes[M] apply baz) must resultIn(Data.Obj())
+        eval(SP.nodeMetadata(baz)) must resultIn(Data.Obj())
       }
     }
 
-    "many-to-array" >> {
-      "passes through empty seq" >> {
-        eval(ejson.manyToArray[M] apply expr.emptySeq).toOption must beNone
-      }
+    "objectLookup" >> {
+      "returns repeated elements as an array" >> prop { (x: Data, y: Data, z: Data) =>
+        val obj = (lit(x) |@| lit(y) |@| lit(z))((a, b, c) => for {
+                    e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
+                    e2 <- SP.mkObjectEntry(xs.QName("baz".xs), b)
+                    e3 <- SP.mkObjectEntry(xs.QName("baz".xs), c)
+                    o  <- SP.mkObject(mkSeq_(e1, e2, e3))
+                  } yield o).join
 
-      "passes through single item" >> {
-        eval(ejson.manyToArray[M] apply "foo".xs) must resultIn(Data._str("foo"))
-      }
-
-      "returns array for more than one item" >> {
-        val three = mkSeq_("foo".xs, "bar".xs, "baz".xs)
-        eval(ejson.manyToArray[M] apply three) must resultIn(Data._arr(List(
-          Data._str("foo"),
-          Data._str("bar"),
-          Data._str("baz")
-        )))
+        eval(obj >>= (SP.objectLookup(_, xs.QName("baz".xs)))) must resultIn(Data._arr(List(y, z)))
       }
     }
-*/
+  }
 }
 
 object XmlStructuralPlannerSpec {

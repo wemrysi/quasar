@@ -62,7 +62,7 @@ object data {
         case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
         case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
         case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
-        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(durationInSeconds(d))   ).success
+        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(isoDuration(d))         ).success
         case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
         case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
         case Data.Str(s)        => elem(elementName, DT.String   , Text(s)                      ).success
@@ -135,9 +135,9 @@ object data {
           .point[F]
 
       case DataNode(DT.Interval, LeafText(ivl)) =>
-        durationInSeconds.getOption(ivl)
+        isoDuration.getOption(ivl)
           .map(Data._interval(_))
-          .toSuccessNel(s"Expected a duration in seconds, found: $ivl")
+          .toSuccessNel(s"Expected an ISO-8601 formatted duration, found: $ivl")
           .point[F]
 
       case DataNode(DT.NA, Seq()) => (Data.NA: Data).success.point[F]

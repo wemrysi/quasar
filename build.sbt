@@ -440,7 +440,7 @@ lazy val interface = project
   .dependsOn(
     core % BothScopes,
     couchbase,
-    marklogic,
+    marklogic % BothScopes,
     mongodb,
     postgresql,
     sparkcore,
@@ -468,7 +468,7 @@ lazy val repl = project
   */
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(interface, core % BothScopes)
+  .dependsOn(interface % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
@@ -486,7 +486,7 @@ lazy val web = project
   */
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(web, core % BothScopes)
+  .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(libraryDependencies ++= Dependencies.it)

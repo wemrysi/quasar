@@ -41,7 +41,7 @@ object contentsource {
 
   def resultCursor[F[_]: Bind: Capture: CSourceReader](chunkSize: Positive)(f: Session => F[QueryResults]): F[ResultCursor] =
     newSession[F](some(streamingOptions)) >>= (s =>
-      f(s) map (qr => new ResultCursor(chunkSize, s, qr.resultSequence)))
+      Capture[F].delay(f(s)).join map (qr => new ResultCursor(chunkSize, s, qr.resultSequence)))
 
   ////
 
