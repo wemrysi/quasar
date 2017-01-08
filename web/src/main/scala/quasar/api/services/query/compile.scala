@@ -28,8 +28,6 @@ import quasar.frontend._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
-import scala.Predef.$conforms
-
 import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data.Fix
@@ -50,11 +48,6 @@ object compile {
         case PhaseResult.Tree(name, value)   => value.asJson
         case PhaseResult.Detail(name, value) => value.asJson
       }
-
-    def dataResponse(data: List[Data]): QResponse[S] =
-      QResponse.string(Ok,
-        "Results\n" +
-          data.map(_.toJs.toList).flatten.map(_.toJs.pprint(0)).mkString("\n"))
 
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(

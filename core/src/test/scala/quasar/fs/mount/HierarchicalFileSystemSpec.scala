@@ -46,7 +46,6 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
 
   type ExecM[A] = transforms.ExecM[A]
   type MountedFs[A] = State[MountedState, A]
-  type MountedFsE[E, A] = EitherT[MountedFs, E, A]
 
   type HEff0[A] = Coproduct[MountedResultH, MountedFs, A]
   type HEff[A]  = Coproduct[MonotonicSeq, HEff0, A]

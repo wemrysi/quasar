@@ -79,9 +79,6 @@ abstract class MountingSpec[S[_]](
   val pathExists = MountingError.pathError composePrism
                    PathError.pathExists
 
-  def maybeInvalid[A](dj: MountingError \/ A): Option[APath] =
-    D.left composeOptional invalidPath getOption dj
-
   def maybeNotFound[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism notFound getOption dj
 

@@ -33,11 +33,7 @@ package object pathy {
   type RFile = RelFile[Sandboxed]
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
-
-  type FilePath[B] = Path[B,File,Sandboxed]
-  type DirPath[B]  = Path[B,Dir, Sandboxed]
-  type FPath = FilePath[scala.Any]
-  type DPath = DirPath[scala.Any]
+  type FPath = Path[scala.Any,File,Sandboxed]
 
   type PathSegment = DirName \/ FileName
 

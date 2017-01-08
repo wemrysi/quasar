@@ -225,8 +225,6 @@ package object workflow {
 
     def applySelector(s: Selector): Selector = s.mapUpFields(PartialFunction(applyFieldName _))
 
-    def applyMap[A](m: ListMap[BsonField, A]): ListMap[BsonField, A] = m.map(t => applyFieldName(t._1) -> t._2)
-
     def applyNel[A](m: NonEmptyList[(BsonField, A)]): NonEmptyList[(BsonField, A)] = m.map(t => applyFieldName(t._1) -> t._2)
 
     def apply[A <: F[_]](op: A): A
@@ -600,11 +598,6 @@ package object workflow {
             case WorkflowOpCoreF(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
             case src => src
           }
-
-        val uncleanƒ: F[Fix[F]] => Fix[F] = {
-          case WorkflowOpCoreF(x @ $SimpleMapF(_, _, _)) => I.inj(x.raw).embed
-          case x                                         => x.embed
-        }
 
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case WorkflowOpCoreF(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {

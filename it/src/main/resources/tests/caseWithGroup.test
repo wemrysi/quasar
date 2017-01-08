@@ -4,6 +4,7 @@
     "backends": {
         "postgresql": "pending",
         "marklogic":  "skip",
+        "mongodb_q_3_2": "pending",
         "couchbase":  "skip",
         "spark_local": "skip",
         "spark_hdfs": "skip"

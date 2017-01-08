@@ -148,7 +148,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound
+          case None       => Response.fallthrough
         }
       }
     }
@@ -224,9 +224,6 @@ package object api {
       systemPath = basePath,
       pathCollector = pathCollector))
   }
-
-  def fileMediaType(file: String): Option[MediaType] =
-    MediaType.forExtension(file.split('.').last)
 
   def redirectService(basePath: String) = HttpService {
     // NB: this means we redirected to a path that wasn't handled, and need

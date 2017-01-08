@@ -187,16 +187,6 @@ trait TypeInstances {
     }
   }
 
-  val TypeAndMonoid = new Monoid[Type] {
-    def zero = Type.Top
-
-    def append(v1: Type, v2: => Type) = (v1, v2) match {
-      case (Type.Top, that) => that
-      case (this0, Type.Top) => this0
-      case _ => v1 ⨯ v2
-    }
-  }
-
   val TypeGlbMonoid = new Monoid[Type] {
     def zero = Type.Top
     def append(f1: Type, f2: => Type) = Type.glb(f1, f2)

@@ -223,7 +223,6 @@ class MongoDbFileSystemSpec
 
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]
-            type X1[A] = FileSystemErrT[X0, A]
 
             val x0: G ~> X0 =
               Hoist[PhaseResultT].hoist(run)
@@ -373,7 +372,21 @@ object MongoDbFileSystemSpec {
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef)
+          FileSystemTest.fsTestConfig(FsType, definition)
+        ).handleWith[IList[SupportedFs[FileSystem]]] {
+          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+        }
+      )(_.liftIO)
+}
+
+object MongoDbQScriptFileSystemSpec {
+  // NB: No `chroot` here as we want to test deleting top-level
+  //     dirs (i.e. databases).
+  val mongoFsUT: Task[IList[SupportedFs[FileSystemIO]]] =
+    (Functor[Task] compose Functor[IList])
+      .map(
+        TestConfig.externalFileSystems(
+          FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
         ).handleWith[IList[SupportedFs[FileSystem]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }

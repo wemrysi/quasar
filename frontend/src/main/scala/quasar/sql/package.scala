@@ -56,8 +56,6 @@ package object sql {
 
   private def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
 
-  // NB: Statically allocated to avoid multiple allocations of the parser.
-  val muParser = parser[Mu]
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
 
@@ -206,7 +204,7 @@ package object sql {
               g.having.map("having " + _._2).toList).mkString(" ")),
           orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) intercalate (", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
-      case Vari(symbol) => ":" + symbol
+      case Vari(symbol) => ":" + _qq("`", symbol)
       case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
       case ArrayLiteral(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
       case MapLiteral(exprs) => exprs.map {
