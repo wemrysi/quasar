@@ -473,6 +473,8 @@ class Transform
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
 
+        // FIXME: We shouldn't have to guess which side is which.
+        // Fixing #1556 should address this issue.
         val pair: PlannerError \/ (SrcMerge[FreeQS, FreeMap], SrcMerge[FreeQS, FreeMap]) =
           joinBranches(inL, condL).fold(
             {
