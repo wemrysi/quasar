@@ -75,8 +75,8 @@ object TestConfig {
   def backendConfName(backendName: BackendName): String =
     backendName.name
 
-  /** The name of the environment variable to configure the insert connection
-    * for a read-only backend.
+  /** The name of the configuration parameter that points to uri that should be
+    *  used for inserting
     */
   def insertConfName(b: BackendName) = backendConfName(b) + "_insert"
 

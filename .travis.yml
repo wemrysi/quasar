@@ -42,7 +42,6 @@ before_cache:
 
 env:
   matrix:
-  - BACKEND_TO_TEST=''
   - MONGO_RELEASE=2_6
   - QUASAR_COUCHBASE='"couchbase://0.0.0.0?username=Administrator&password=password"'
   - QUASAR_MARKLOGIC='"xcc://marklogic:marklogic@localhost:8000/Documents"'

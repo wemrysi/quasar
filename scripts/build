@@ -42,7 +42,7 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
     export BACKEND_TO_TEST="-Dmongodb_3_0=\"mongodb://${QUASAR_MONGODB_HOST_3_0}\""
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-    export BACKEND_TO_TEST="-Dmongodb_3_0=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\" -Dmongodb_3_0_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\""
+    export BACKEND_TO_TEST="-Dmongodb_read_only=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\" -Dmongodb_read_only_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\""
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
     export BACKEND_TO_TEST="-Dmongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\""
   fi
