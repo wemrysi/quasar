@@ -42,13 +42,14 @@ before_cache:
 
 env:
   matrix:
+  - BACKEND_TO_TEST=''
   - MONGO_RELEASE=2_6
-  - QUASAR_COUCHBASE='{"couchbase":{"connectionUri":"couchbase://0.0.0.0?username=Administrator&password=password"}}'
-  - QUASAR_MARKLOGIC='{"marklogic":{"connectionUri":"xcc://marklogic:marklogic@localhost:8000/Documents"}}'
+  - BACKEND_TO_TEST='-Dcouchbase="couchbase://0.0.0.0?username=Administrator&password=password"'
+  - BACKEND_TO_TEST='-Dmarklogic="xcc://marklogic:marklogic@localhost:8000/Documents"'
   - MONGO_RELEASE=3_0
   - MONGO_RELEASE=3_0_RO
   - MONGO_RELEASE=3_2
-  - QUASAR_POSTGRESQL='{"postgresql":{"connectionUri":"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"}}'
+  - BACKEND_TO_TEST='-Dpostgresql="jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
 
   global:
   - LOCAL_MONGODB=true

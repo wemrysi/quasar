@@ -68,19 +68,19 @@ instructions that can be found there.
 Once we have a MongoDB instance handy, we need to configure the integration tests
 in order to inform Quasar about where to find the backends to test.
 
-Simply change the values of the config values in '/it/src/test/resources/application.conf'. For example:
+Simply change the values of the config values in '/it/testing.conf'. For example:
 
 ```
-mongodb_3_2="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-mongodb_3_0="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-mongodb_2_6="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
+mongodb_3_2="mongodb://<mongoURL>"
+mongodb_3_0="mongodb://<mongoURL>"
+mongodb_2_6="mongodb://<mongoURL>"
 ```
 
-where \`mongoURL\` is the url at which one can find a Mongo database. For example \`mongoURL\` would probably look
+where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
 something like `localhost:27017` for a local installation. This means the integration tests will be run against
 both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
 tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported versions of MongoDB, as well as read-only configurations.
+server, the tests are run against all supported filesystems.
 
 #### REPL JAR
 

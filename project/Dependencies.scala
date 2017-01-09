@@ -132,8 +132,8 @@ object Dependencies {
     "eu.timepit"     %% "refined-scalacheck"  %   refinedVersion   % Test
   )
   def it = Seq(
-    "io.argonaut"  %% "argonaut-monocle"    % argonautVersion % Test,
-    "org.http4s"   %% "http4s-blaze-client" % http4sVersion   % Test,
-    "eu.timepit"   %% "refined-scalacheck"  % refinedVersion  % Test,
-    "com.typesafe" %  "config"              % "1.3.1"         % Test)
+    "io.argonaut"      %% "argonaut-monocle"    % argonautVersion % Test,
+    "org.http4s"       %% "http4s-blaze-client" % http4sVersion   % Test,
+    "eu.timepit"       %% "refined-scalacheck"  % refinedVersion  % Test,
+    "io.verizon.knobs" %% "core"                % "3.12.27a"      % Test)
 }

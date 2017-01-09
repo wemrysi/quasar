@@ -67,7 +67,7 @@ abstract class FileSystemTest[S[_]](
             Fragments(examples(f), step(f.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
-          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No config provided to test this FileSystem, set config parameter $confParamName in 'it/src/test/resources/application.conf' in order to do so"))
+          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
         })
     }.unsafePerformSync
 
