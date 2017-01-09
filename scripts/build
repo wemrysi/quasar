@@ -38,13 +38,13 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
 
   if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
-    export BACKEND_TO_TEST='-Dmongodb_2_6="mongodb://${QUASAR_MONGODB_HOST_2_6}"'
+    export BACKEND_TO_TEST="-Dmongodb_2_6=\"mongodb://${QUASAR_MONGODB_HOST_2_6}\""
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
-    export BACKEND_TO_TEST='-Dmongodb_3_0="mongodb://${QUASAR_MONGODB_HOST_3_0}"'
+    export BACKEND_TO_TEST="-Dmongodb_3_0=\"mongodb://${QUASAR_MONGODB_HOST_3_0}\""
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-    export BACKEND_TO_TEST='-Dmongodb_3_0="mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}" -Dmongodb_3_0_insert="mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}"'
+    export BACKEND_TO_TEST="-Dmongodb_3_0=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\" -Dmongodb_3_0_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\""
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
-    export BACKEND_TO_TEST='-Dmongodb_3_2="mongodb://${QUASAR_MONGODB_HOST_3_2}"'
+    export BACKEND_TO_TEST="-Dmongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\""
   fi
 
   echo "Using local MongoDB config"
