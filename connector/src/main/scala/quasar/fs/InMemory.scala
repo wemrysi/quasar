@@ -51,7 +51,6 @@ object InMemory {
   type ResultMap = Map[ResultHandle, Vector[Data]]
 
   type InMemoryFs[A]  = State[InMemState, A]
-  type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 
@@ -207,7 +206,7 @@ object InMemory {
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
 
-    private val optimizer = new Optimizer[Fix]
+    private val optimizer = new Optimizer[Fix[LogicalPlan]]
 
     private def simpleEvaluation(lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
       val optLp = optimizer.optimize(lp0)
@@ -237,7 +236,7 @@ object InMemory {
 
     private def unsupported(lp: Fix[LogicalPlan]) =
       planningFailed(lp, UnsupportedPlan(
-        lp.unFix,
+        lp.project,
         some("In Memory interpreter does not currently support this plan")))
   }
 

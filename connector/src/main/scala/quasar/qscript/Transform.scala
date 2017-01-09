@@ -429,7 +429,7 @@ class Transform
         ProjectTarget(pathToProj(p), ejson.CommonEJson(ejson.Str[T[EJson]](n.fold(_.value, _.value))).embed)
     }
 
-  private def fromData[T[_[_]]: CorecursiveT](data: Data): Data \/ T[EJson] = {
+  def fromData(data: Data): Data \/ T[EJson] = {
     data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
       interpretM[Data \/ ?, EJson, Data, T[EJson]](
         _.left,

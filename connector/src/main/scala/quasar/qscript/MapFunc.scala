@@ -188,14 +188,6 @@ object MapFunc {
         }
     }
 
-    object EjConstExtension {
-      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Extension[T[EJson]]] =
-        tco match {
-          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-          case _                                                      => None
-        }
-    }
-
     _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
       κ(None),
       {
@@ -825,7 +817,12 @@ object MapFuncs {
   }
 
   // structural
+
+  /** Makes a single-element [[ejson.Arr]] containing `a1`.
+    */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Makes a single-element [[ejson.Map]] with key `key` and value `value`.
+    */
   @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
     def a1 = key
     def a2 = value

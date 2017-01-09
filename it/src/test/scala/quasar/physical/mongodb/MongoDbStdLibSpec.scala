@@ -22,7 +22,7 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
@@ -44,7 +44,7 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   args.report(showtimes = ArgProperty(true))
 
@@ -56,7 +56,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
   def is2_6(backend: BackendName): Boolean = backend === TestConfig.MONGO_2_6.name
   def is3_2(backend: BackendName): Boolean = backend === TestConfig.MONGO_3_2.name
 
-  MongoDbSpec.clientShould { (backend, prefix, setupClient, testClient) =>
+  MongoDbSpec.clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     /** Intercept and transform expected values into the form that's actually
@@ -97,6 +97,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
         case _ => None
       },
       check)
+
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
     def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =

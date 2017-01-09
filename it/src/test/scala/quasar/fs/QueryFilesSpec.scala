@@ -41,7 +41,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
   def deleteForQuery(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(queryPrefix))
 
-  val lpr = new LogicalPlanR[Fix]
+  val lpr = new LogicalPlanR[Fix[LP]]
 
   def readRenamed(src: AFile, from: String, to: String): Fix[LP] =
     lpr.invoke1(

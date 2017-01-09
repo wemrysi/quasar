@@ -2,9 +2,10 @@
     "name": "skip and count",
 
     "backends": {
-        "postgresql": "pending",
-        "marklogic":  "skip",
         "couchbase":  "skip",
+        "marklogic":  "skip",
+        "mongodb_q_3_2": "pending",
+        "postgresql": "pending",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
@@ -13,6 +14,6 @@
 
     "query": "select count(*) from (select * from zips offset 10) as x",
 
-    "predicate": "equalsExactly",
+    "predicate": "containsExactly",
     "expected": [29343]
 }

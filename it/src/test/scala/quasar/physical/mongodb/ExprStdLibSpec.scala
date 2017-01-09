@@ -40,8 +40,6 @@ import shapeless.Nat
   * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
-  import quasar.frontend.fixpoint.lpf
-
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
@@ -70,7 +68,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
         lpf.constant(Data.Str("result")),
         lp))
 
-    val ctx = QueryContext(queryModel, κ(None), κ(None))
+    val ctx = QueryContext(queryModel, κ(None), κ(None), listContents)
 
     MongoDbPlanner.plan(wrapped, ctx).run.value
       .flatMap { wf =>

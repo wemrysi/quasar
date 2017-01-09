@@ -21,6 +21,7 @@ import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
@@ -65,7 +66,7 @@ object QueryFile {
       show: Delay[Show, QS])
       : PlannerError \/ T[QS] = {
     val transform = new Transform[T, QS]
-    val optimizer = new Optimizer[T]
+    val optimizer = new Optimizer[T[LogicalPlan]]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
@@ -143,7 +144,7 @@ object QueryFile {
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError[M, FileSystemError],
+      merr: MonadError_[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
@@ -169,15 +170,13 @@ object QueryFile {
             Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
 
     val qs =
-      merr.map(
-        merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
-            perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
-            merr.point(_)))(
-          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
-        simplifyAndNormalize[T, InterimQS, QS])
+      (convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
+        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
+        _.point[M]) >>=
+        rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)) ∘
+        simplifyAndNormalize[T, InterimQS, QS]
 
-    merr.bind(qs) { qs =>
+    qs >>= { qs =>
       mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
     }
   }

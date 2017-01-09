@@ -41,7 +41,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   val query  = QueryFile.Ops[FileSystem]
   val read   = ReadFile.Ops[FileSystem]
@@ -133,8 +134,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       runViewFileSystem[VFS](liftMT[VSS, ErrsT] compose zoomNT[Id](VS.fs) compose InMemory.fileSystem)
 
     val memState = InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)
-
-    val fv: Free[ViewFileSystem, A] = f flatMapSuspension view.fileSystem[ViewFileSystem]
 
     val (vs, r) =
       f.foldMap(free.foldMapNT(viewfs) compose view.fileSystem[ViewFileSystem])
@@ -611,7 +610,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile(inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 

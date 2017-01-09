@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
-import quasar.frontend.logicalplan.{LogicalPlan => LP, Optimizer}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, LogicalPlanR, Optimizer}
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
@@ -31,17 +31,17 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait CompilerHelpers extends TermLogicalPlanMatchers {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   val compile: String => String \/ Fix[LP] = query => {
     for {
       select <- fixParser.parse(Query(query)).leftMap(_.toString)
       attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile(attr).leftMap(_.toString)
+      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(_.toString)
     } yield cld
   }
 
-  val optimizer = new Optimizer[Fix]
+  val optimizer = new Optimizer[Fix[LP]]
   val lpr = optimizer.lpr
 
   // Compile -> Optimize -> Typecheck

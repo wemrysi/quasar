@@ -25,6 +25,7 @@ import quasar.javascript._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.specs2.QuasarMatchers._
@@ -57,7 +58,6 @@ class PlannerSpec extends
   import jscore._
   import Planner._
   import CollectionUtil._
-  import quasar.frontend.fixpoint.lpf
 
   type EitherWriter[E, A] = EitherT[Writer[Vector[PhaseResult], ?], E, A]
 
@@ -96,8 +96,8 @@ class PlannerSpec extends
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
-        e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats, indexes)).leftMap(CPlannerError(_))))
+        _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
+        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents)).leftMap(CPlannerError(_))))
 
   def plan0(query: String, model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -137,7 +137,7 @@ class PlannerSpec extends
       _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
       simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
       _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
+      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
     } yield phys).run.value.toEither
   }
 
@@ -3673,7 +3673,6 @@ class PlannerSpec extends
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)
 
-  val noGroupBy = Gen.const[Option[GroupBy[Fix[Sql]]]](None)
   val groupBySeveral = Gen.nonEmptyListOf(Gen.oneOf(
     sql.IdentR("state"),
     sql.IdentR("territory"))).map(keys => GroupBy(keys.distinct, None))

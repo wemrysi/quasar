@@ -41,7 +41,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
   import fixExprOp._
 
   val readZips = read(collection("db", "zips"))
-  def pureInt(n: Int) = pure(Bson.Int32(n))
 
   implicit val workflowEqual: Equal[Fix[WorkflowF]] = Equal.equalA
 

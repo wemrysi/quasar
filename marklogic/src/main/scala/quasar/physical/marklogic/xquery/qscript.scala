@@ -235,9 +235,6 @@ object qscript {
         map.entry("avg".xs, avg)))
     })
 
-  def isDocumentNode(node: XQuery): XQuery =
-    xdmp.nodeKind(node) === "document".xs
-
   // qscript:length($arrOrStr as item()?) as xs:integer?
   def length[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("length").qn[F] map { fname =>

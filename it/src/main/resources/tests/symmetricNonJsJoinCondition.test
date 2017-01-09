@@ -1,10 +1,11 @@
 {
     "name": "flattening both sides of a join condition",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "marklogic":         "skip",
         "couchbase":         "skip",
+        "marklogic":         "skip",
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "skip",
+        "postgresql":        "pending",
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },

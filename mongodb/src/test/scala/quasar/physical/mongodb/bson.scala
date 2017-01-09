@@ -116,7 +116,7 @@ object BsonGen {
     listOf(arbitrary[Byte]).map(bytes => Binary.fromArray(bytes.toArray)),
     listOfN(12, arbitrary[Byte]).map(bytes => ObjectId.fromArray(bytes.toArray)),
     const(Date(Instant.now)),
-    const(Timestamp.fromInstant(Instant.now, 0)),
+    const(Timestamp(0, 0)),
     const(Regex("a.*", "")),
     const(JavaScript(Js.Null)),
     const(JavaScriptScope(Js.Null, ListMap.empty)),
