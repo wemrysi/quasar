@@ -16,7 +16,6 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.fmt
 import quasar.physical.marklogic.xml.namespaces._
@@ -47,6 +46,9 @@ trait StructuralPlanner[F[_], FMT] {
 
   /** Returns the value at the (zero-based) index in the array or the empty seq if none. */
   def arrayElementAt(array: XQuery, index: XQuery): F[XQuery]
+
+  /** Returns a representation of the item for use as a sort key. */
+  def asSortKey(item: XQuery): F[XQuery]
 
   /** Returns whether the given `item()` represents an EJson array. */
   def isArray(item: XQuery): F[XQuery]
@@ -111,69 +113,27 @@ trait StructuralPlanner[F[_], FMT] {
 
   //// Derived expressions. ////
 
+  /** Attempts to cast the given `item()` to a more specific type if it is a `node()`. */
+  def castIfNode(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+    castIfNodeFn.apply(item)
+
   /** Returns an array consisting of the given value. */
   def singletonArray(value: XQuery)(implicit F: Monad[F]): F[XQuery] =
-    mkArrayElt(value) >>= mkArray
+    mkArrayElt(value) >>= (mkArray(_))
 
   /** Returns an object with the given value associated with the given key. */
   def singletonObject(key: XQuery, value: XQuery)(implicit F: Monad[F]): F[XQuery] =
-    mkObjectEntry(key, value) >>= mkObject
-
-  /** Converts a sequence of items into an array. */
-  def seqToArray(seq: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
-    seqToArrayFn.apply(seq)
+    mkObjectEntry(key, value) >>= (mkObject(_))
 
   /** Returns the name of the type of the given item or the empty seq if unknown. */
   def typeOf(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     typeOfFn.apply(item)
 
-  /** Attempts to cast the given `item()` to a more specific type if it is a `node()`. */
-  def castIfNode(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
-    castIfNodeFn.apply(item)
+  /** Converts a sequence of items into an array. */
+  def seqToArray(seq: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+    seqToArrayFn.apply(seq)
 
   ////
-
-  // ejson:seq-to-array($items as item()*) as node()
-  private def seqToArrayFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
-    ejs.declare[F]("seq-to-array") flatMap (_(
-      $("items") as ST("item()*")
-    ).as(ST(s"node()")) { items: XQuery =>
-      val x = $("x")
-      for {
-        arrElt <- mkArrayElt(~x)
-        arr    <- mkArray(fn.map(func(x.render) { arrElt }, items))
-      } yield arr
-    })
-
-  // ejson:type-of($item as item()*) as xs:string?
-  private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
-    ejs.declare[F]("type-of") flatMap (_(
-      $("item") as ST.Top
-    ).as(ST("xs:string?")) { item: XQuery =>
-      val node = $("node")
-      nodeType(~node) map { nType =>
-        if_(fn.empty(item))
-        .then_ { "na".xs }
-        .else_ {
-          typeswitch(item)(
-            node as ST("node()")  return_ κ(nType),
-            ST("xs:boolean")      return_ "boolean".xs,
-            ST("xs:dateTime")     return_ "timestamp".xs,
-            ST("xs:date")         return_ "date".xs,
-            ST("xs:time")         return_ "time".xs,
-            ST("xs:duration")     return_ "interval".xs,
-            ST("xs:integer")      return_ "integer".xs,
-            ST("xs:decimal")      return_ "decimal".xs,
-            ST("xs:double")       return_ "decimal".xs,
-            ST("xs:float")        return_ "decimal".xs,
-            ST("xs:base64Binary") return_ "binary".xs,
-            ST("xs:hexBinary")    return_ "binary".xs,
-            ST("xs:QName")        return_ "string".xs,
-            ST("xs:string")       return_ "string".xs
-          ) default emptySeq
-        }
-      }
-    })
 
   // ejson:cast-if-node($item as item()?) as item()?
   private def castIfNodeFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
@@ -187,12 +147,58 @@ trait StructuralPlanner[F[_], FMT] {
         ) default item
       }
     })
+
+  // ejson:type-of($item as item()*) as xs:string?
+  private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
+    ejs.declare[F]("type-of") flatMap (_(
+      $("item") as ST.Top
+    ).as(ST("xs:string?")) { item: XQuery =>
+      val node = $("node")
+      nodeType(~node) map { nType =>
+        if_(fn.empty(item))
+        .then_ { "na".xs }
+        .else_ {
+          typeswitch(item)(
+            node as ST("node()")   return_ κ(nType),
+            ST("xs:boolean")       return_ "boolean".xs,
+            ST("xs:dateTime")      return_ "timestamp".xs,
+            ST("xs:date")          return_ "date".xs,
+            ST("xs:time")          return_ "time".xs,
+            ST("xs:duration")      return_ "interval".xs,
+            ST("xs:integer")       return_ "integer".xs,
+            ST("xs:decimal")       return_ "decimal".xs,
+            ST("xs:double")        return_ "decimal".xs,
+            ST("xs:float")         return_ "decimal".xs,
+            ST("xs:base64Binary")  return_ "binary".xs,
+            ST("xs:hexBinary")     return_ "binary".xs,
+            ST("xs:QName")         return_ "string".xs,
+            ST("xs:string")        return_ "string".xs,
+            ST("xs:untypedAtomic") return_ "string".xs
+          ) default emptySeq
+        }
+      }
+    })
+
+  // ejson:seq-to-array($items as item()*) as node()
+  private def seqToArrayFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
+    ejs.declare[F]("seq-to-array") flatMap (_(
+      $("items") as ST("item()*")
+    ).as(ST("node()")) { items: XQuery =>
+      val x = $("x")
+      for {
+        arrElt <- mkArrayElt(~x)
+        arr    <- mkArray(fn.map(func(x.render) { arrElt }, items))
+      } yield arr
+    })
 }
 
 object StructuralPlanner {
   val ejs = NamespaceDecl(ejsonNs)
 
   def apply[F[_], T](implicit L: StructuralPlanner[F, T]): StructuralPlanner[F, T] = L
+
+  implicit def jsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.JSON] =
+    new JsonStructuralPlanner[F]
 
   implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.XML] =
     new XmlStructuralPlanner[F]

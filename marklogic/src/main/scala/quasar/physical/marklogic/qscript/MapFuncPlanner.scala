@@ -46,7 +46,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Timestamp(s)                 => xs.dateTime(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
     case TimeOfDay(dt)                => lib.asDateTime[F] apply dt map xs.time
-    case ToTimestamp(millis)          => lib.timestampToDateTime[F] apply millis
+    case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => lib.asDateTime[F] apply time map (dt =>
@@ -79,7 +79,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case ExtractYear(time)            => lib.asDateTime[F] apply time map fn.yearFromDateTime
 
     // math
-    case Negate(x)                    => (-x).point[F]
+    case Negate(x)                    => SP.castIfNode(x) map (-_)
     case Add(x, y)                    => castedBinOp(x, y)(_ + _)
     case Multiply(x, y)               => castedBinOp(x, y)(_ * _)
     case Subtract(x, y)               => castedBinOp(x, y)(_ - _)
@@ -126,7 +126,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Meta(x)                      => lib.meta[F, FMT] apply x
 
     // other
-    case Range(x, y)                  => (x to y).point[F]
+    case Range(x, y)                  => castedBinOp(x, y)(_ to _)
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
     case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]

@@ -139,6 +139,10 @@ object queryfile {
       pp      <- prettyPrint[F](main.queryBody)
       xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
       _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
+      // NB: While it would be nice to use the pretty printed body in the module
+      //     returned for nicer error messages, we cannot as xdmp:pretty-print has
+      //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
+      //     causing them to be malformed.
     } yield main
   }
 

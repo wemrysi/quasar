@@ -17,7 +17,7 @@
 package quasar.physical.marklogic
 
 import quasar.Predef.{uuid => _, _}
-import quasar.{Data, DataCodec, Planner => QPlanner}
+import quasar.{Data, Planner => QPlanner}
 import quasar.common._
 import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
@@ -36,7 +36,6 @@ import java.net.URI
 import java.util.UUID
 import scala.util.control.NonFatal
 
-import argonaut.Json
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions._
 import matryoshka.data.Fix
@@ -118,9 +117,18 @@ package object fs {
     }
   }
 
-  // NB: This exists due to the awkward need to import the MonadReader_ and
+  // NB: These exists due to the awkward need to import the MonadReader_ and
   //     MonadError_ definitions for Read/Failure. Given some reorganization
   //     this could eventually go away.
+
+  def definitionJson[S[_]](
+    readChunkSize: Positive
+  )(implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): FileSystemDef[Free[S, ?]] =
+    definition[S, fmt.JSON](readChunkSize)
+
   def definitionXml[S[_]](
     readChunkSize: Positive
   )(implicit
@@ -214,15 +222,9 @@ package object fs {
   implicit val dataAsJsonContent: AsContent[JSON, Data] =
     new AsContent[JSON, Data] {
       def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] = {
-        def jsonContent(json: Json): Content = {
-          val opts = new ContentCreateOptions
-          opts.setFormatJson()
-          ContentFactory.newContent(uri.get, json.nospaces, opts)
-        }
-
-        DataCodec.Precise.encode(d).fold(
-          e => MonadErrMsgs[F].raiseError(e.message.wrapNel),
-          j => jsonContent(j).point[F])
+        val opts = new ContentCreateOptions
+        opts.setFormatJson()
+        ContentFactory.newContent(uri.get, data.encodeJson(d).nospaces, opts).point[F]
       }
     }
 

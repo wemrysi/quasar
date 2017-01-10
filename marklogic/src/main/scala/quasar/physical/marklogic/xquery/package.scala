@@ -122,7 +122,7 @@ package object xquery {
     QNameGenerator[F].freshQName map (BindingName(_))
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
+    XQuery(s"(${fa.toList.map(_.render).intercalate(", ")})")
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)

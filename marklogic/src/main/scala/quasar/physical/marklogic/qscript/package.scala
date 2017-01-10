@@ -54,6 +54,9 @@ package object qscript {
     }
   }
 
+  val EJsonTypeKey  = "_ejson.type"
+  val EJsonValueKey = "_ejson.value"
+
   /** Converts the given string to a QName if valid, failing with an error otherwise. */
   def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] = {
     def asNCName(str: String): Option[NCName] =

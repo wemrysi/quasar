@@ -25,7 +25,7 @@ import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.api.Refined
-import scalaz.{Bind, Functor, IList}
+import scalaz.{Bind, Functor}
 import scalaz.syntax.monad._
 
 /** Functions related to qscript planning. */
@@ -92,7 +92,9 @@ object lib {
             fn.stringJoin(mkSeq_(
               fn.string(fn.nodeName(jobj)),
               fn.map(fname :# 1, jobj `/` child.node())
-            ), "_".xs))
+            ), "_".xs)),
+
+          ST("null-node()") return_ "null".xs
         ) default ($("i"), fn.string)
       }
     }
@@ -242,7 +244,7 @@ object lib {
       $("cnt") as ST("xs:integer"),
       $("avg") as ST("xs:double")
     ).as(ST("map:map")) { (cnt, avg) =>
-      map.new_(IList(
+      map.new_(mkSeq_(
         map.entry("cnt".xs, cnt),
         map.entry("avg".xs, avg)))
     })
@@ -265,8 +267,10 @@ object lib {
           $("jarr") as ST("array-node()") return_ { jarr =>
             fn.count(jarr `/` child.node())
           },
-          $("qn")  as ST("xs:QName")  return_ (qn => fname(fn.string(qn))),
-          $("str") as ST("xs:string") return_ (fn.stringLength(_))
+          $("txt") as ST("text()")           return_ (t  => fname(fn.string(t))),
+          $("qn")  as ST("xs:QName")         return_ (qn => fname(fn.string(qn))),
+          $("ut")  as ST("xs:untypedAtomic") return_ (ut => fname(fn.string(ut))),
+          $("str") as ST("xs:string")        return_ (fn.stringLength(_))
         ) default emptySeq
       }
     }

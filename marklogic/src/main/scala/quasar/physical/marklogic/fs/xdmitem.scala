@@ -19,14 +19,14 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.MonadErrMsgs
-import quasar.physical.marklogic.prisms._
+import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
 
 import scala.collection.JavaConverters._
-import scala.util.{Success, Failure}
 import scala.xml.Elem
 
+import argonaut._
 import com.marklogic.xcc.types.{Duration => _, _}
 import java.time._
 import scalaz._, Scalaz._
@@ -61,7 +61,6 @@ object xdmitem {
         Data.singletonObj("cts:polygon", Data.singletonObj("vertices", Data.Arr(verts)))
       }
 
-    // TODO: What is the difference between JS{Array, Object} and their *Node variants?
     case item: JSArray                  => jsonToData[F](item.asString)
     case item: JSObject                 => jsonToData[F](item.asString)
     case item: JsonItem                 => jsonToData[F](item.asString)
@@ -106,10 +105,7 @@ object xdmitem {
     Data._binary(ImmutableArray.fromArray(bytes)).point[F]
 
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
-    Data.jsonParser.parseFromString(jsonString) match {
-      case Success(d) => d.point[F]
-      case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
-    }
+    Parse.decodeWithMessage(jsonString, data.decodeJson[F], _.wrapNel.raiseError[F, Data])
 
   private def convertDuration(xsd: XSDuration): Duration = {
     val xdd   = xsd.asDuration

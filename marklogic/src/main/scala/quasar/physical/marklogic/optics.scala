@@ -26,7 +26,7 @@ import java.time.format._
 import java.time.temporal.{TemporalAccessor, TemporalQuery}
 import scalaz._, Scalaz._
 
-object prisms {
+object optics {
   val base64Bytes = Prism[String, ImmutableArray[Byte]](
     s => \/.fromTryCatchNonFatal(Base64.getDecoder.decode(s))
            .map(ImmutableArray.fromArray)

@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Data
-import quasar.physical.marklogic.fmt
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
@@ -68,8 +67,10 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     new QScriptCorePlanner[F, FMT, T]
   }
 
-  implicit def xmlConstShiftedRead[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr]: Planner[F, fmt.XML, Const[ShiftedRead, ?]] =
-    new XmlShiftedReadPlanner[F]
+  implicit def constShiftedRead[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
+    implicit SP: StructuralPlanner[F, FMT]
+  ): Planner[F, FMT, Const[ShiftedRead, ?]] =
+    new ShiftedReadPlanner[F, FMT]
 
   implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
     implicit

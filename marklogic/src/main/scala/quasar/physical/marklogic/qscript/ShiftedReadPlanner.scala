@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.fp.ski.κ
-import quasar.physical.marklogic.fmt
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -27,9 +26,9 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class XmlShiftedReadPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr](
-  implicit SP: StructuralPlanner[F, fmt.XML]
-) extends Planner[F, fmt.XML, Const[ShiftedRead, ?]] {
+private[qscript] final class ShiftedReadPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  implicit SP: StructuralPlanner[F, FMT], O: SearchOptions[FMT]
+) extends Planner[F, FMT, Const[ShiftedRead, ?]] {
 
   import expr._, axes.child
 
@@ -58,7 +57,7 @@ private[qscript] final class XmlShiftedReadPlanner[F[_]: Monad: QNameGenerator: 
       incId <- extractId(~d) traverse (id => SP.seqToArray(mkSeq_(id, ~c)))
     } yield {
       for_(
-        d in cts.search(expr = fn.doc(), query = ctsQuery, options = IList("format-xml".xs)))
+        d in cts.search(expr = fn.doc(), query = ctsQuery, options = O.searchOptions))
       .let_(
         c := ~d `/` child.node())
       .return_(incId getOrElse ~c)

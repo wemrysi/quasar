@@ -116,7 +116,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
         x        <- freshName[F]
         xqyOrder <- ((bucket, SortDir.asc) <:: order).traverse { case (func, sortDir) =>
                       mapFuncXQuery[T, F, FMT](func, ~x) flatMap { by =>
-                        SP.castIfNode(by) strengthR SortDirection.fromQScript(sortDir)
+                        SP.asSortKey(by) strengthR SortDirection.fromQScript(sortDir)
                       }
                     }
       } yield src match {
@@ -190,13 +190,15 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
     combiner(fm)((acc, x) => SP.castIfNode(x) >>= (f(acc, _)))
 
   def reduceFuncInit(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) flatMap { v =>
-                                   lib.incAvgState[F].apply(1.xqy, v)
-                                 })
+    case Avg(fm)              => fx(x => for {
+                                   v0 <- mapFuncXQuery[T, F, FMT](fm, x)
+                                   v  <- SP.castIfNode(v0)
+                                   st <- lib.incAvgState[F].apply(1.xqy, v)
+                                 } yield st)
     case Count(_)             => fx(_ => 1.xqy.point[F])
     case Max(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
     case Min(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
-    case Sum(fm)              => fx(mapFuncXQuery[T, F, FMT](fm, _))
+    case Sum(fm)              => fx(x => mapFuncXQuery[T, F, FMT](fm, x) >>= (SP.castIfNode(_)))
     case Arbitrary(fm)        => fx(mapFuncXQuery[T, F, FMT](fm, _))
     case First(fm)            => fx(mapFuncXQuery[T, F, FMT](fm, _))
     case Last(fm)             => fx(mapFuncXQuery[T, F, FMT](fm, _))
@@ -215,11 +217,11 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
   }
 
   def reduceFuncCombine(rf: ReduceFunc[FreeMap[T]]): F[XQuery] = rf match {
-    case Avg(fm)              => combiner(fm)(lib.incAvg[F].apply(_, _))
+    case Avg(fm)              => castingCombiner(fm)(lib.incAvg[F].apply(_, _))
     case Count(fm)            => combiner(fm)((c, _) => (c + 1.xqy).point[F])
     case Max(fm)              => castingCombiner(fm)((x, y) => (if_ (y gt x) then_ y else_ x).point[F])
     case Min(fm)              => castingCombiner(fm)((x, y) => (if_ (y lt x) then_ y else_ x).point[F])
-    case Sum(fm)              => combiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
+    case Sum(fm)              => castingCombiner(fm)((x, y) => fn.sum(mkSeq_(x, y)).point[F])
     case Arbitrary(fm)        => combiner(fm)((x, _) => x.point[F])
     case First(fm)            => combiner(fm)((x, _) => x.point[F])
     case Last(fm)             => combiner(fm)((_, y) => y.point[F])

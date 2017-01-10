@@ -41,6 +41,10 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
 
   implicit val scalacheckParams = Parameters(maxSize = 10)
 
+  // FIXME: No idea why this is necessary, but ScalaCheck arbContainer
+  //        demands it and can't seem to find one in this context.
+  implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
+
   implicit val arbitraryData: Arbitrary[Data] = {
     val genKey = Gen.alphaChar flatMap (c => Gen.alphaStr map (c.toString + _))
     val genDbl = Gen.choose(-1000.0, 1000.0)

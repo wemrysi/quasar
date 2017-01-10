@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Data
-import quasar.physical.marklogic.prisms._
+import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 

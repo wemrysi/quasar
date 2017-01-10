@@ -52,6 +52,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def arrayElementAt(array: XQuery, index: XQuery) =
     (array `/` child.element()(index + 1.xqy)).point[F]
 
+  def asSortKey(item: XQuery): F[XQuery] =
+    castIfNode(item)
+
   def isArray(item: XQuery) =
     isArrayFn(item)
 
@@ -160,7 +163,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     ).as(ST(s"element()")) { (obj1: XQuery, obj2: XQuery) =>
       val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
 
-      mkObject {
+      mkObjectFn {
         let_(
           xs    := (obj2 `/` child.element()),
           names := fn.map("fn:node-name#1".xqy, ~xs),
@@ -264,7 +267,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
               .else_(if_(~tpe eq "time".xs)
               .then_(xs.time(e))
               .else_(if_(~tpe eq "interval".xs)
-              .then_(xs.duration(fn.concat("PT".xs, e, "S".xs)))
+              .then_(xs.duration(e))
               .else_(if_(~tpe eq "integer".xs)
               .then_(xs.integer(e))
               .else_(if_(~tpe eq "decimal".xs)
