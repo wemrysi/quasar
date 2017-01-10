@@ -120,6 +120,9 @@ object FsPath {
     if (os.isWin) parseWinAbsAsDir(s) else parseOther(codecForOS(os))
   }
 
+  def parseSystemAbsFile(s: String): OptionT[Task, Aux[Abs, File, Sandboxed]] =
+    forCurrentOS(parseAbsFile(_, s))
+
   def parseRelFile(os: OS, s: String): Option[Aux[Rel, File, Sandboxed]] =
     codecForOS(os).parseRelFile(s) >>= (p => sandboxFsPathIn(currentDir, Uniform(p)))
 
