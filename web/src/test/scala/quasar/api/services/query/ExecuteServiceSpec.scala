@@ -21,7 +21,7 @@ import quasar._
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
 import quasar.api.services.Fixture._
-import quasar.common._
+import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._

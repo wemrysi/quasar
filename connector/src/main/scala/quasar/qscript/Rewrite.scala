@@ -69,6 +69,29 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case x                                 => FtoG(QC.inj(x))
   }
 
+  // TODO unify this function with `unifySimpleBranches`
+  // including all the cases
+  def unifySimpleBranches2[F[_], A]
+    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
+    (rebase: FreeQS => A => Option[A])
+    (implicit
+      QC: QScriptCore :<: F,
+      FI: Injectable.Aux[F, QScriptTotal])
+      : Option[CoEnv[Hole, F, A]] =
+    (l.resumeTwice, r.resumeTwice) match {
+      case (-\/(m1), -\/(m2)) =>
+        (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
+          // both sides only map over the same data
+          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
+            CoEnv(\/-(QC.inj(Map(src, combine >>= {
+              case LeftSide  => mf1
+              case RightSide => mf2
+            })))).some
+          case _ => None
+        }
+      case _ => None
+    }
+
   def unifySimpleBranches[F[_], A]
     (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
     (rebase: FreeQS => A => Option[A])

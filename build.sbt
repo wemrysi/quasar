@@ -17,8 +17,6 @@ import scoverage._
 
 val BothScopes = "test->test;compile->compile"
 
-def isTravis: Boolean = sys.env contains "TRAVIS"
-
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -35,7 +33,6 @@ lazy val buildSettings = Seq(
   headers := Map(
     ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
     ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
-  scalaVersion := "2.11.8",
   scalaOrganization := "org.typelevel",
   outputStrategy := Some(StdoutOutput),
   initialize := {
@@ -97,7 +94,7 @@ lazy val buildSettings = Seq(
 // actually available to run.
 concurrentRestrictions in Global := {
   val maxTasks = 2
-  if (isTravis)
+  if (isTravisBuild.value)
     // Recreate the default rules with the task limit hard-coded:
     Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
   else
@@ -227,7 +224,7 @@ lazy val foundation = project
     buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build",
     exclusiveTestTag := "exclusive",
-    isCIBuild := isTravis,
+    isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation,
     wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)

@@ -35,11 +35,16 @@ sealed abstract class MarkLogicPlannerError
 
 object MarkLogicPlannerError {
   final case class InvalidQName(strLit: String) extends MarkLogicPlannerError
+  final case class Unimplemented(function: String) extends MarkLogicPlannerError
   final case class UnrepresentableEJson(ejson: Fix[EJson], msgs: ErrorMessages) extends MarkLogicPlannerError
 
   val invalidQName = Prism.partial[MarkLogicPlannerError, String] {
     case InvalidQName(s) => s
   } (InvalidQName)
+
+  val unimplemented = Prism.partial[MarkLogicPlannerError, String] {
+    case Unimplemented(f) => f
+  } (Unimplemented)
 
   val unrepresentableEJson = Prism.partial[MarkLogicPlannerError, (Fix[EJson], ErrorMessages)] {
     case UnrepresentableEJson(ejs, msgs) => (ejs, msgs)
@@ -52,6 +57,9 @@ object MarkLogicPlannerError {
     Show.shows {
       case InvalidQName(s) =>
         s"'$s' is not a valid XML QName."
+
+      case Unimplemented(f) =>
+        s"The function $f is not implemented."
 
       case UnrepresentableEJson(ejs, msgs) =>
         s"'${ejs.shows}' does not have an XQuery representation: ${msgs.intercalate(", ")}"
