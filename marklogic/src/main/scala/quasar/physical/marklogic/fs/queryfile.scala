@@ -120,12 +120,13 @@ object queryfile {
         _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed.cata(linearize).reverse))
         main    <- plan(optmzed).leftMap(mlerr => mlerr match {
                      case InvalidQName(s) =>
-                       FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
-                         // TODO: Change to include the QScript context when supported
+                       FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(
                          constant(Data.Str(s)), Some(mlerr.shows)))
 
+                     case Unimplemented(f) =>
+                       FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(constant(Data.Str(f)), Some(mlerr.shows)))
                      case UnrepresentableEJson(ejs, _) =>
-                       FileSystemError.planningFailed(lp, QPlanner.NonRepresentableEJson(ejs.shows))
+                       FileSystemError.qscriptPlanningFailed(QPlanner.NonRepresentableEJson(ejs.shows))
                    })
         pp      <- prettyPrint(main.queryBody)
         xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render

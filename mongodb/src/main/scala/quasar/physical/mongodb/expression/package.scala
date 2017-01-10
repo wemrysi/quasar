@@ -67,7 +67,7 @@ package object expression {
       // matches the pattern the planner generates for converting epoch time
       // values to timestamps. Adding numbers to dates works in ExprOp, but not
       // in Javacript.
-      case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli ≟ 0 =>
+      case $add($literal(Bson.Date(milli)), r) if milli ≟ 0 =>
         r.para(toJs[T, EX])
           .map(r => JsFn(JsFn.defaultName,
             jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
