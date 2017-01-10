@@ -1,8 +1,8 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":  "skip",
         "marklogic":  "skip",
+        "couchbase":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
         "spark_local": "skip",
