@@ -776,7 +776,7 @@ object MapFuncs {
   @Lenses final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class StartOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class TemporalTrunc[T[_[_]], A](a1: TemporalPart, a2: A) extends MapFunc[T, A]
+  @Lenses final case class TemporalTrunc[T[_[_]], A](part: TemporalPart, a1: A) extends Unary[T, A]
   /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
