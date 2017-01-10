@@ -152,11 +152,6 @@ object BsonCodec {
     case Bson.Arr(value)       => C.inj(ejson.Arr(value)).right
     case Bson.Doc(value)       =>
       E.inj(ejson.Map(value.toList.map(_.leftMap(Bson.Text(_))))).right
-      // TODO: Remove Undefined values from maps, but currently this breaks tests
-      // E.inj(ejson.Map(value.toList.map(_.bitraverse(Bson.Text(_).some, {
-      //   case Bson.Undefined => None
-      //   case bson           => bson.some
-      // }).toList).join)).right
     case Bson.Null             => C.inj(ejson.Null()).right
     case Bson.Bool(value)      => C.inj(ejson.Bool(value)).right
     case Bson.Text(value)      => C.inj(ejson.Str(value)).right

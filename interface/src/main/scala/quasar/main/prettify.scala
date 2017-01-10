@@ -136,15 +136,16 @@ object Prettify {
     case _ => Aligned.Right(DataCodec.Readable.encode(data).fold(
       _ => s"unexpected: $data",
       json => json.fold(
-        "null",
-        _.toString,
-        _.asJson.pretty(minspace),
-        ι,
-        // NB: the non-atomic types never appear here because the Data has been
-        // flattened.
-        _ => s"unexpected: $data",
-        _ => s"unexpected: $data"
-      )))
+        "undefined")(
+        _.fold(
+          "null",
+          _.toString,
+          _.asJson.pretty(minspace),
+          ι,
+          // NB: the non-atomic types never appear here because the Data has
+          //     been flattened.
+          _ => s"unexpected: $data",
+          _ => s"unexpected: $data"))))
   }
 
   def parse(str: String): Option[Data] = {

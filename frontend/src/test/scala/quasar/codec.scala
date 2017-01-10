@@ -72,7 +72,7 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beLeftDisjunction }
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("""{ "$binary": "TE1OTw==" }""") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("""{ "$oid": "abc" }""") }
-      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("""{ "$na": null }""") }
+      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("Undefined") }
     }
 
     "round-trip" >> prop { (data: Data) =>
@@ -150,7 +150,7 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode binary"    in { DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
       "encode empty binary" in { DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beRightDisjunction("\"\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("\"abc\"") }
-      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("null") }
+      "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("Undefined") }
     }
 
     "round-trip" >> prop { (data: Data) =>

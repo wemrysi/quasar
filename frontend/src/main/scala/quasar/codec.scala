@@ -53,7 +53,7 @@ object DataEncodingError {
 }
 
 trait DataCodec {
-  def encode(data: Data): DataEncodingError \/ Json
+  def encode(data: Data): DataEncodingError \/ Option[Json]
   def decode(json: Json): DataEncodingError \/ Data
 }
 object DataCodec {
@@ -63,7 +63,7 @@ object DataCodec {
     \/.fromEither(Parse.parse(str)).leftMap(ParseError.apply).flatMap(C.decode(_))
 
   def render(data: Data)(implicit C: DataCodec): DataEncodingError \/ String =
-    C.encode(data).map(_.pretty(minspace))
+    C.encode(data).map(_.fold("Undefined")(_.pretty(minspace)))
 
   val Precise = new DataCodec {
     val TimestampKey = "$timestamp"
@@ -73,31 +73,30 @@ object DataCodec {
     val BinaryKey = "$binary"
     val ObjKey = "$obj"
     val IdKey = "$oid"
-    val NAKey = "$na"
 
-    def encode(data: Data): DataEncodingError \/ Json = {
+    def encode(data: Data): DataEncodingError \/ Option[Json] = {
       import Data._
       data match {
         case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
         // For Object, if we find one of the above keys, which means we serialized something particular
         // to the precise encoding, wrap this object in another object with a single field with the name ObjKey
         case Obj(value) => for {
-          obj <- value.toList.traverse { case (k, v) => encode(v).map(k -> _) }.map(Json.obj(_: _*))
-        } yield value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj)))
+          obj <- value.toList.traverse { case (k, v) => encode(v).map(_.map(k -> _)) }.map(ps => Json.obj(ps.unite: _*))
+        } yield value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
 
-        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
+        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs.unite: _*).some)
         case Set(_)     => -\/(UnrepresentableDataError(data))
 
-        case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)))
-        case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)))
-        case Time(value)      => \/-(Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))))
-        case Interval(value)  => \/-(Json.obj(IntervalKey  -> jString(value.toString)))
+        case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)).some)
+        case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)).some)
+        case Time(value)      => \/-(Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))).some)
+        case Interval(value)  => \/-(Json.obj(IntervalKey  -> jString(value.toString)).some)
 
-        case bin @ Binary(_)  => \/-(Json.obj(BinaryKey    -> jString(bin.base64)))
+        case bin @ Binary(_)  => \/-(Json.obj(BinaryKey    -> jString(bin.base64)).some)
 
-        case Id(value)        => \/-(Json.obj(IdKey        -> jString(value)))
+        case Id(value)        => \/-(Json.obj(IdKey        -> jString(value)).some)
 
-        case `NA`             => \/-(Json.obj(NAKey        -> jNull))
+        case `NA`             => \/-(None)
       }
     }
 
@@ -130,39 +129,38 @@ object DataCodec {
               \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
             case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
-            case (`NAKey`, _) :: Nil            => \/-(Data.NA)
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
   }
 
   val Readable = new DataCodec {
-    def encode(data: Data): DataEncodingError \/ Json = {
+    def encode(data: Data): DataEncodingError \/ Option[Json] = {
       import Data._
       data match {
-        case Null => \/-(jNull)
-        case Bool(true) => \/-(jTrue)
-        case Bool(false) => \/-(jFalse)
+        case Null => \/-(jNull.some)
+        case Bool(true) => \/-(jTrue.some)
+        case Bool(false) => \/-(jFalse.some)
         case Int(x)   =>
-          if (x.isValidLong) \/-(jNumber(JsonLong(x.longValue)))
-          else \/-(jNumber(JsonBigDecimal(new java.math.BigDecimal(x.underlying))))
-        case Dec(x)   => \/-(jNumber(JsonBigDecimal(x)))
-        case Str(s)   => \/-(jString(s))
+          if (x.isValidLong) \/-(jNumber(JsonLong(x.longValue)).some)
+          else \/-(jNumber(JsonBigDecimal(new java.math.BigDecimal(x.underlying))).some)
+        case Dec(x)   => \/-(jNumber(JsonBigDecimal(x)).some)
+        case Str(s)   => \/-(jString(s).some)
 
-        case Obj(value) => value.toList.traverse { case (k, v) => encode(v).map(k -> _) }.map(Json.obj(_: _*))
-        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
+        case Obj(value) => value.toList.traverse { case (k, v) => encode(v).map(_.map(k -> _)) }.map(ps => Json.obj(ps.unite: _*).some)
+        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs.unite: _*).some)
         case Set(_)     => -\/(UnrepresentableDataError(data))
 
-        case Timestamp(value) => \/-(jString(value.toString))
-        case Date(value)      => \/-(jString(value.toString))
-        case Time(value)      => \/-(jString(value.toString))
-        case Interval(value)  => \/-(jString(value.toString))
+        case Timestamp(value) => \/-(jString(value.toString).some)
+        case Date(value)      => \/-(jString(value.toString).some)
+        case Time(value)      => \/-(jString(value.toString).some)
+        case Interval(value)  => \/-(jString(value.toString).some)
 
-        case bin @ Binary(_)  => \/-(jString(bin.base64))
+        case bin @ Binary(_)  => \/-(jString(bin.base64).some)
 
-        case Id(value)        => \/-(jString(value))
+        case Id(value)        => \/-(jString(value).some)
 
-        case `NA`             => \/-(jNull)
+        case `NA`             => \/-(None)
       }
     }
 

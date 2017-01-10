@@ -738,7 +738,7 @@ class TypesSpec extends quasar.Qspec {
       val exp = DataCodec.Precise.encode(data)
       exp.isRight ==> {
         (Right(typJson(Const(data))): scala.Either[DataEncodingError, Json]) must_===
-          exp.map(jd => Json((("Const", jd)))).toEither
+          exp.map(jd => Json((("Const", jd.getOrElse(jString("Undefined")))))).toEither
       }
     }
 

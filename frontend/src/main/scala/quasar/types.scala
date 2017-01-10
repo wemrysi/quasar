@@ -233,7 +233,7 @@ trait TypeInstances {
       case Bottom =>
         jString("Bottom")
       case Const(d) =>
-        Json("Const" -> DataCodec.Precise.encode(d).getOrElse(Json.obj("$na" -> jNull)))
+        Json("Const" -> DataCodec.Precise.encode(d).toOption.join.getOrElse(jString("Undefined")))
       case Null =>
         jString("Null")
       case Str =>
