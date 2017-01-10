@@ -22,6 +22,7 @@ import quasar.fp.ski._
 
 import java.time._
 import java.time.temporal.{ChronoUnit => CU}
+import java.time.ZoneOffset.UTC
 import scalaz._, Validation.success
 import scalaz.syntax.bind._
 import shapeless.{Data => _, _}
@@ -141,6 +142,16 @@ trait DateLib extends Library {
             .withMonth(1)
       }
     }.leftMap(err => GenericError(s"truncZonedDateTime: $err")))
+
+  def truncDate(part: TemporalPart, d: Data.Date): SemanticError \/ Data.Date =
+    truncZonedDateTime(part, d.value.atStartOfDay(UTC)) ∘ (t => Data.Date(t.toLocalDate))
+
+  def truncTime(part: TemporalPart, t: Data.Time): SemanticError \/ Data.Time =
+    truncLocalTime(part, t.value) ∘ (Data.Time(_))
+
+  def truncTimestamp(part: TemporalPart, ts: Data.Timestamp): SemanticError \/ Data.Timestamp =
+    truncZonedDateTime(part, ts.value.atZone(UTC)) ∘ (t => Data.Timestamp(t.toInstant))
+
 
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
@@ -270,9 +281,9 @@ trait DateLib extends Library {
         Type.Timestamp
     },
     untyper[nat._1] {
-      case Type.Const(Data.Timestamp(_)) => success(Func.Input1(Type.Date))
-      case Type.Timestamp                => success(Func.Input1(Type.Date))
-      case t             => success(Func.Input1(t))
+      case Type.Const(Data.Timestamp(ts)) => success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))
+      case Type.Timestamp                 => success(Func.Input1(Type.Date))
+      case t                              => success(Func.Input1(t))
     })
 
   val TimeOfDay = UnaryFunc(

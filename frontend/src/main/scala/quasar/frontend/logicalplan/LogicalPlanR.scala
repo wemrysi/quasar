@@ -25,7 +25,6 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
-import quasar.std.DateLib.TemporalPart
 
 import scala.Predef.$conforms
 import scala.Symbol
@@ -43,7 +42,7 @@ final case class ConstrainedPlan[T]
 
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
-  import quasar.std.StdLib._, structural._
+  import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._
 
   def read(path: FPath) = lp.read[T](path).embed
   def constant(data: Data) = lp.constant[T](data).embed
@@ -293,14 +292,29 @@ final class LogicalPlanR[T]
         case Sort(expr, ords) =>
           unifyOrCheck(inf, expr.inferred, sort(appConst(expr, constant(Data.NA)), ords map (_ leftMap (appConst(_, constant(Data.NA))))))
         case TemporalTrunc(part, src) =>
-          unifyOrCheck(inf, src.inferred, temporalTrunc(part, appConst(src, constant(Data.NA))))
+          val typer: Func.Typer[Nat._1] = StdLib.partialTyperV[nat._1] {
+              case Sized(Type.Const(d @ Data.Date(_)))      => truncDate(part, d).validationNel ∘ (Type.Const(_))
+              case Sized(Type.Date)                         => Type.Date.success
+              case Sized(Type.Const(t @ Data.Time(_)))      => truncTime(part, t).validationNel ∘ (Type.Const(_))
+              case Sized(Type.Time)                         => Type.Time.success
+              case Sized(Type.Const(t @ Data.Timestamp(_))) => truncTimestamp(part, t).validationNel ∘ (Type.Const(_))
+              case Sized(Type.Timestamp)                    => Type.Timestamp.success
+            }
+
+          val f: Func.Input[T, Nat._1] => T = { case Sized(i) => temporalTrunc(part, i) }
+
+          handleInvoke(inf, Mapping, typer, f, Func.Input1(src))
       }
   }
 
-  private def handleGenericInvoke[N <: Nat]
-    (inf: Type, func: GenericFunc[N], args: Func.Input[ConstrainedPlan[T], N])
-      : NameT[SemDisj, ConstrainedPlan[T]] = {
-    func.effect match {
+  private def handleInvoke[N <: Nat](
+    inf: Type,
+    effect: DimensionalEffect,
+    typer: Func.Typer[N],
+    f: Func.Input[T, N] => T,
+    args: Func.Input[ConstrainedPlan[T], N]
+  ): NameT[SemDisj, ConstrainedPlan[T]] = {
+    effect match {
       case Mapping =>
         val (types, constraints0, terms) = args.map {
           case ConstrainedPlan(in, con, pl) => (in, (con, pl))
@@ -308,15 +322,20 @@ final class LogicalPlanR[T]
 
         val constraints = constraints0.unsized.flatten
 
-        lift(func.tpe(types).disjunction).flatMap(
-          unifyOrCheck(inf, _, invoke(func, terms))).map(cp =>
+        lift(typer(types).disjunction).flatMap(
+          unifyOrCheck(inf, _, f(terms))).map(cp =>
           cp.copy(constraints = cp.constraints ++ constraints))
 
       case _ =>
-        lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
-          unifyOrCheck(inf, _, invoke(func, args.map(appConst(_, constant(Data.NA))))))
+        lift(typer(args.map(_.inferred)).disjunction).flatMap(
+          unifyOrCheck(inf, _, f(args.map(appConst(_, constant(Data.NA))))))
     }
   }
+
+  private def handleGenericInvoke[N <: Nat](
+    inf: Type, func: GenericFunc[N], args: Func.Input[ConstrainedPlan[T], N]
+  ): NameT[SemDisj, ConstrainedPlan[T]] =
+    handleInvoke(inf, func.effect, func.typer0, invoke(func, _: Func.Input[T, N]), args)
 
   type SemNames[A] = NameT[SemDisj, A]
 

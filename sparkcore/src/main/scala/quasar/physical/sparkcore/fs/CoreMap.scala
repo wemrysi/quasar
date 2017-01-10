@@ -25,7 +25,7 @@ import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
 
-import java.time._, ZoneOffset.UTC
+import java.time._
 import scala.math
 
 import matryoshka._
@@ -484,12 +484,9 @@ object CoreMap extends Serializable {
 
   private def temporalTrunc(part: TemporalPart, src: Data): PlannerError \/ Data =
     (src match {
-      case Data.Timestamp(v) =>
-        DateLib.truncZonedDateTime(part, v.atZone(UTC)) ∘ (t => Data.Timestamp(t.toInstant))
-      case Data.Date(v) =>
-        DateLib.truncZonedDateTime(part, v.atStartOfDay(UTC)) ∘ (t => Data.Date(t.toLocalDate))
-      case Data.Time(v) =>
-        DateLib.truncLocalTime(part, v) ∘ (Data.Time(_))
+      case d @ Data.Date(_)      => DateLib.truncDate(part, d)
+      case t @ Data.Time(_)      => DateLib.truncTime(part, t)
+      case t @ Data.Timestamp(_) => DateLib.truncTimestamp(part, t)
       case _ =>
         undefined.right
     }).leftMap(e => InternalError.fromMsg(e.shows))
