@@ -351,8 +351,5 @@ object QueryRegressionTest {
     }
 
   implicit val dataEncodeJson: EncodeJson[Data] =
-    EncodeJson(d =>
-      DataCodec.Precise
-        .encode(d)
-        .fold(err => scala.sys.error(err.message), _.getOrElse(jString("Undefined"))))
+    EncodeJson(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
 }

@@ -53,7 +53,7 @@ object DataEncodingError {
 }
 
 trait DataCodec {
-  def encode(data: Data): DataEncodingError \/ Option[Json]
+  def encode(data: Data): Option[Json]
   def decode(json: Json): DataEncodingError \/ Data
 }
 object DataCodec {
@@ -62,8 +62,8 @@ object DataCodec {
   def parse(str: String)(implicit C: DataCodec): DataEncodingError \/ Data =
     \/.fromEither(Parse.parse(str)).leftMap(ParseError.apply).flatMap(C.decode(_))
 
-  def render(data: Data)(implicit C: DataCodec): DataEncodingError \/ String =
-    C.encode(data).map(_.fold("Undefined")(_.pretty(minspace)))
+  def render(data: Data)(implicit C: DataCodec): Option[String] =
+    C.encode(data).map(_.pretty(minspace))
 
   val Precise = new DataCodec {
     val TimestampKey = "$timestamp"
@@ -74,29 +74,29 @@ object DataCodec {
     val ObjKey = "$obj"
     val IdKey = "$oid"
 
-    def encode(data: Data): DataEncodingError \/ Option[Json] = {
+    def encode(data: Data): Option[Json] = {
       import Data._
       data match {
         case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
         // For Object, if we find one of the above keys, which means we serialized something particular
         // to the precise encoding, wrap this object in another object with a single field with the name ObjKey
-        case Obj(value) => for {
-          obj <- value.toList.traverse { case (k, v) => encode(v).map(_.map(k -> _)) }.map(ps => Json.obj(ps.unite: _*))
-        } yield value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
+        case Obj(value) =>
+          val obj = Json.obj(value.toList.map { case (k, v) => encode(v).map(k -> _) }.unite: _*)
+          value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj))).some
 
-        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs.unite: _*).some)
-        case Set(_)     => -\/(UnrepresentableDataError(data))
+        case Arr(value) => Json.array(value.map(encode).unite: _*).some
+        case Set(_)     => None
 
-        case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)).some)
-        case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)).some)
-        case Time(value)      => \/-(Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))).some)
-        case Interval(value)  => \/-(Json.obj(IntervalKey  -> jString(value.toString)).some)
+        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.toString)).some
+        case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
+        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))).some
+        case Interval(value)  => Json.obj(IntervalKey  -> jString(value.toString)).some
 
-        case bin @ Binary(_)  => \/-(Json.obj(BinaryKey    -> jString(bin.base64)).some)
+        case bin @ Binary(_)  => Json.obj(BinaryKey    -> jString(bin.base64)).some
 
-        case Id(value)        => \/-(Json.obj(IdKey        -> jString(value)).some)
+        case Id(value)        => Json.obj(IdKey        -> jString(value)).some
 
-        case `NA`             => \/-(None)
+        case NA               => None
       }
     }
 
@@ -135,32 +135,32 @@ object DataCodec {
   }
 
   val Readable = new DataCodec {
-    def encode(data: Data): DataEncodingError \/ Option[Json] = {
+    def encode(data: Data): Option[Json] = {
       import Data._
       data match {
-        case Null => \/-(jNull.some)
-        case Bool(true) => \/-(jTrue.some)
-        case Bool(false) => \/-(jFalse.some)
+        case Null => jNull.some
+        case Bool(true) => jTrue.some
+        case Bool(false) => jFalse.some
         case Int(x)   =>
-          if (x.isValidLong) \/-(jNumber(JsonLong(x.longValue)).some)
-          else \/-(jNumber(JsonBigDecimal(new java.math.BigDecimal(x.underlying))).some)
-        case Dec(x)   => \/-(jNumber(JsonBigDecimal(x)).some)
-        case Str(s)   => \/-(jString(s).some)
+          if (x.isValidLong) jNumber(JsonLong(x.longValue)).some
+          else jNumber(JsonBigDecimal(new java.math.BigDecimal(x.underlying))).some
+        case Dec(x)   => jNumber(JsonBigDecimal(x)).some
+        case Str(s)   => jString(s).some
 
-        case Obj(value) => value.toList.traverse { case (k, v) => encode(v).map(_.map(k -> _)) }.map(ps => Json.obj(ps.unite: _*).some)
-        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs.unite: _*).some)
-        case Set(_)     => -\/(UnrepresentableDataError(data))
+        case Obj(value) => Json.obj(value.toList.map({ case (k, v) => encode(v) strengthL k }).unite: _*).some
+        case Arr(value) => Json.array(value.map(encode).unite: _*).some
+        case Set(_)     => None
 
-        case Timestamp(value) => \/-(jString(value.toString).some)
-        case Date(value)      => \/-(jString(value.toString).some)
-        case Time(value)      => \/-(jString(value.toString).some)
-        case Interval(value)  => \/-(jString(value.toString).some)
+        case Timestamp(value) => jString(value.toString).some
+        case Date(value)      => jString(value.toString).some
+        case Time(value)      => jString(value.toString).some
+        case Interval(value)  => jString(value.toString).some
 
-        case bin @ Binary(_)  => \/-(jString(bin.base64).some)
+        case bin @ Binary(_)  => jString(bin.base64).some
 
-        case Id(value)        => \/-(jString(value).some)
+        case Id(value)        => jString(value).some
 
-        case `NA`             => \/-(None)
+        case NA               => None
       }
     }
 

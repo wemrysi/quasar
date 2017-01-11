@@ -259,13 +259,13 @@ object Repl {
       case DebugLevel.Verbose => P.println(showPhaseResults(log) + "\n")
     }
 
-  def summarize[S[_]](max: Int, format: OutputFormat)(rows: IndexedSeq[Data])(implicit
-    P: ConsoleIO.Ops[S]
-  ): Free[S, Unit] = {
+  def summarize[S[_]]
+    (max: Int, format: OutputFormat)
+    (rows: IndexedSeq[Data])
+    (implicit P: ConsoleIO.Ops[S])
+      : Free[S, Unit] = {
     def formatJson(codec: DataCodec)(data: Data): Option[String] =
-      codec.encode(data).fold(
-        err => ("error: " + err.shows).some,
-        _.map(_.pretty(minspace)))
+      codec.encode(data).map(_.pretty(minspace))
 
     if (rows.lengthCompare(0) <= 0) P.println("No results found")
     else {
