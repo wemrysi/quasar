@@ -76,6 +76,9 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
   def nodeMetadata(node: XQuery): F[XQuery] =
     emptySeq.point[F]
 
+  def nodeToString(node: XQuery): F[XQuery] =
+    jsonNodeToString(node)
+
   def nodeType(node: XQuery): F[XQuery] =
     jsonNodeType(node)
 
@@ -86,7 +89,19 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
     jsonEncode(value) >>= (jsonObjectInsert(obj, key, _))
 
   def objectLookup(obj: XQuery, key: XQuery): F[XQuery] =
-    jsonDeserialize(map.get(xdmp.fromJson(obj), key))
+    key match {
+      case XQuery.Step(_) =>
+        (obj `/` key).point[F]
+
+      case XQuery.StringLit(s) =>
+        if (XQuery.flwor.isMatching(obj))
+          freshName[F] map (m => let_(m := obj) return_ (~m `/` child.nodeNamed(s)))
+        else
+          (obj `/` child.nodeNamed(s)).point[F]
+
+      case _ =>
+        map.get(xdmp.fromJson(obj), key).point[F]
+    }
 
   def objectMerge(o1: XQuery, o2: XQuery): F[XQuery] =
     jsonObjectMerge(o1, o2)
@@ -202,7 +217,20 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
       }
     })
 
-  // ejson:json-node-type($node as node()?) as xs:string?
+  // ejson:json-node-to-string($node as node()) as xs:string?
+  val jsonNodeToString: F[FunctionDecl1] =
+    ejs.declare[F]("json-node-to-string") flatMap (_(
+      $("node") as ST("node()")
+    ).as(ST("xs:string?")) { node: XQuery =>
+      val obj = $("obj")
+      jsonObjectToString(~obj) map { objStr =>
+        typeswitch(node)(
+          obj as ST("object-node()") return_ κ(objStr)
+        ) default fn.string(node)
+      }
+    })
+
+  // ejson:json-node-type($node as node()) as xs:string?
   val jsonNodeType: F[FunctionDecl1] =
     ejs.declare[F]("json-node-type") flatMap (_(
       $("node") as ST("node()")
@@ -244,6 +272,8 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
           .then_(xs.integer(~v))
           .else_(if_(~t eq "decimal".xs)
           .then_(xs.double(~v))
+          .else_(if_(~t eq "id".xs)
+          .then_(xs.string(~v))
           .else_(if_(~t eq "null".xs)
           .then_(nullNode)
           .else_(if_(~t eq "na".xs)
@@ -254,7 +284,7 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
             .then_(xs.base64Binary(xs.hexBinary(~v)))
             .else_(xs.base64Binary(~v))
           }
-          .else_(obj)))))))))
+          .else_(obj))))))))))
         }
       }
     })
@@ -309,6 +339,19 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: Pr
         if_(map.contains(~o, EJsonTypeKey.xs))
         .then_(map.get(~o, EJsonTypeKey.xs))
         .else_("object".xs)
+      }
+    })
+
+  // ejson:json-object-to-string($obj as object-node()) as xs:string
+  val jsonObjectToString: F[FunctionDecl1] =
+    ejs.declare[F]("json-object-to-string") map (_(
+      $("obj") as ST("object-node()")
+    ).as(ST("xs:string")) { obj: XQuery =>
+      val o = $("o")
+      let_(o := xdmp.fromJson(obj)) return_ {
+        fn.string(if_(map.contains(~o, EJsonValueKey.xs))
+        .then_(map.get(~o, EJsonValueKey.xs))
+        .else_(obj))
       }
     })
 }

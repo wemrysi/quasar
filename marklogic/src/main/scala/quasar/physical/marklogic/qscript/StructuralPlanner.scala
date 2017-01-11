@@ -88,6 +88,9 @@ trait StructuralPlanner[F[_], FMT] {
     */
   def nodeMetadata(node: XQuery): F[XQuery]
 
+  /** Returns a string representation of the given `node()`.  */
+  def nodeToString(node: XQuery): F[XQuery]
+
   /** Returns the name of the given `node()`'s type as an `xs:string` or the
     * empty seq if unknown.
     */
@@ -125,6 +128,10 @@ trait StructuralPlanner[F[_], FMT] {
   def singletonObject(key: XQuery, value: XQuery)(implicit F: Monad[F]): F[XQuery] =
     mkObjectEntry(key, value) >>= (mkObject(_))
 
+  /** Returns the string representation of the given item. */
+  def toString(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+    toStringFn.apply(item)
+
   /** Returns the name of the type of the given item or the empty seq if unknown. */
   def typeOf(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     typeOfFn.apply(item)
@@ -146,6 +153,23 @@ trait StructuralPlanner[F[_], FMT] {
           n as ST("node()") return_ κ(casted)
         ) default item
       }
+    })
+
+  private def toStringFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
+    ejs.declare[F]("to-string") flatMap (_(
+      $("item") as ST("item()?")
+    ).as(ST("xs:string?")) { item: XQuery =>
+      val (n, t) = ($("n"), $("t"))
+      (nodeToString(~n) |@| typeOf(item))((nstr, tpe) =>
+        let_(t := tpe) return_ {
+          if_(fn.empty(item) or ~t eq "na".xs)
+          .then_(emptySeq)
+          .else_(if_(~t eq "null".xs)
+          .then_("null".xs)
+          .else_(typeswitch(item)(
+            n as ST("node()") return_ κ(nstr)
+          ) default fn.string(item)))
+        })
     })
 
   // ejson:type-of($item as item()*) as xs:string?

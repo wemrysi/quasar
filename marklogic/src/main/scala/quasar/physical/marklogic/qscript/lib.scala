@@ -385,18 +385,6 @@ object lib {
       fn.map("fn:codepoints-to-string#1".xqy, fn.stringToCodepoints(s))
     })
 
-  // qscript:to-string($item as item()?) as xs:string
-  def toString[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
-    qs.declare("to-string") flatMap (_(
-      $("item") as ST("item()?")
-    ).as(ST("xs:string")) { item: XQuery =>
-      SP.typeOf(item) map { tpe =>
-        if_(tpe eq "null".xs)
-        .then_ { "null".xs }
-        .else_ { fn.string(item) }
-      }
-    })
-
   // qscript:zip-apply($fns as (function(item()*) as item()*)*) as function(item()*) as item()*
   def zipApply[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("zip-apply") map (_(

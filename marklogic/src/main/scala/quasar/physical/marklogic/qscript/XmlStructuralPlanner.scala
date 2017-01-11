@@ -81,6 +81,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def nodeMetadata(node: XQuery) =
     attributes(node)
 
+  def nodeToString(node: XQuery): F[XQuery] =
+    fn.string(node).point[F]
+
   def nodeType(node: XQuery) =
     ascribedType(node)
 

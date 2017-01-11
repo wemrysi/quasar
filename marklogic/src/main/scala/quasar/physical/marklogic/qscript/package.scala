@@ -22,13 +22,11 @@ import quasar.ejson.{Common, EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
 import quasar.contrib.scalaz.MonadError_
-import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
-import eu.timepit.refined.refineV
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
@@ -58,16 +56,9 @@ package object qscript {
   val EJsonValueKey = "_ejson.value"
 
   /** Converts the given string to a QName if valid, failing with an error otherwise. */
-  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] = {
-    def asNCName(str: String): Option[NCName] =
-      refineV[IsNCName](str).right.toOption map (NCName(_))
-
-    (s.split(':') match {
-      case Array(pfx, loc) => (asNCName(pfx) |@| asNCName(loc))((p, l) => QName.prefixed(NSPrefix(p), l))
-      case Array(loc)      => asNCName(encodeForQName(loc)) map (QName.local)
-      case _               => None
-    }).fold(invalidQName[F, QName](s))(_.point[F])
-  }
+  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
+    (QName.string.getOption(s) orElse QName.string.getOption(encodeForQName(s)))
+      .fold(invalidQName[F, QName](s))(_.point[F])
 
   def mapFuncXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: MonadPlanErr, FMT](
     fm: FreeMap[T],

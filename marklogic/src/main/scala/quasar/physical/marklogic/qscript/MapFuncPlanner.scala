@@ -32,7 +32,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   DP: Planner[F, FMT, Const[Data, ?]],
   SP: StructuralPlanner[F, FMT]
 ) extends Planner[F, FMT, MapFunc[T, ?]] {
-  import expr.{emptySeq, if_, let_}, XQuery.flwor
+  import expr.{emptySeq, if_, let_, some}, XQuery.flwor
 
   val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
@@ -45,38 +45,38 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Time(s)                      => xs.time(s).point[F]
     case Timestamp(s)                 => xs.dateTime(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
-    case TimeOfDay(dt)                => lib.asDateTime[F] apply dt map xs.time
+    case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
     case Now()                        => fn.currentDateTime.point[F]
 
-    case ExtractCentury(time)         => lib.asDateTime[F] apply time map (dt =>
+    case ExtractCentury(time)         => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 100.xqy))
-    case ExtractDayOfMonth(time)      => lib.asDateTime[F] apply time map fn.dayFromDateTime
-    case ExtractDecade(time)          => lib.asDateTime[F] apply time map (dt =>
+    case ExtractDayOfMonth(time)      => asDateTime(time) map fn.dayFromDateTime
+    case ExtractDecade(time)          => asDateTime(time) map (dt =>
                                            fn.floor(fn.yearFromDateTime(dt) div 10.xqy))
-    case ExtractDayOfWeek(time)       => lib.asDate[F].apply(time) map (d => mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
-    case ExtractDayOfYear(time)       => lib.asDate[F].apply(time) map (xdmp.yeardayFromDate)
-    case ExtractEpoch(time)           => lib.asDateTime[F] apply time flatMap (lib.secondsSinceEpoch[F].apply(_))
-    case ExtractHour(time)            => lib.asDateTime[F] apply time map fn.hoursFromDateTime
-    case ExtractIsoDayOfWeek(time)    => lib.asDate[F].apply(time) map (xdmp.weekdayFromDate)
-    case ExtractIsoYear(time)         => lib.asDateTime[F] apply time flatMap (lib.isoyearFromDateTime[F].apply(_))
-    case ExtractMicroseconds(time)    => lib.asDateTime[F] apply time map (dt =>
+    case ExtractDayOfWeek(time)       => asDate(time) map (d => mkSeq_(xdmp.weekdayFromDate(d) mod 7.xqy))
+    case ExtractDayOfYear(time)       => asDate(time) map (xdmp.yeardayFromDate)
+    case ExtractEpoch(time)           => asDateTime(time) flatMap (lib.secondsSinceEpoch[F].apply(_))
+    case ExtractHour(time)            => asDateTime(time) map fn.hoursFromDateTime
+    case ExtractIsoDayOfWeek(time)    => asDate(time) map (xdmp.weekdayFromDate)
+    case ExtractIsoYear(time)         => asDateTime(time) flatMap (lib.isoyearFromDateTime[F].apply(_))
+    case ExtractMicroseconds(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000000.xqy))
-    case ExtractMillennium(time)      => lib.asDateTime[F] apply time map (dt =>
+    case ExtractMillennium(time)      => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 1000.xqy))
-    case ExtractMilliseconds(time)    => lib.asDateTime[F] apply time map (dt =>
+    case ExtractMilliseconds(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000.xqy))
-    case ExtractMinute(time)          => lib.asDateTime[F] apply time map fn.minutesFromDateTime
-    case ExtractMonth(time)           => lib.asDateTime[F] apply time map fn.monthFromDateTime
-    case ExtractQuarter(time)         => lib.asDate[F].apply(time) map (xdmp.quarterFromDate)
-    case ExtractSecond(time)          => lib.asDateTime[F] apply time map fn.secondsFromDateTime
-    case ExtractTimezone(time)        => lib.asDateTime[F] apply time flatMap (lib.timezoneOffsetSeconds[F].apply(_))
-    case ExtractTimezoneHour(time)    => lib.asDateTime[F] apply time map (dt =>
+    case ExtractMinute(time)          => asDateTime(time) map fn.minutesFromDateTime
+    case ExtractMonth(time)           => asDateTime(time) map fn.monthFromDateTime
+    case ExtractQuarter(time)         => asDate(time) map (xdmp.quarterFromDate)
+    case ExtractSecond(time)          => asDateTime(time) map fn.secondsFromDateTime
+    case ExtractTimezone(time)        => asDateTime(time) flatMap (lib.timezoneOffsetSeconds[F].apply(_))
+    case ExtractTimezoneHour(time)    => asDateTime(time) map (dt =>
                                            fn.hoursFromDuration(fn.timezoneFromDateTime(dt)))
-    case ExtractTimezoneMinute(time)  => lib.asDateTime[F] apply time map (dt =>
+    case ExtractTimezoneMinute(time)  => asDateTime(time) map (dt =>
                                            fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
-    case ExtractWeek(time)            => lib.asDate[F].apply(time) map (xdmp.weekFromDate)
-    case ExtractYear(time)            => lib.asDateTime[F] apply time map fn.yearFromDateTime
+    case ExtractWeek(time)            => asDate(time) map (xdmp.weekFromDate)
+    case ExtractYear(time)            => asDateTime(time) map fn.yearFromDateTime
 
     // math
     case Negate(x)                    => SP.castIfNode(x) map (-_)
@@ -108,7 +108,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Integer(s)                   => xs.integer(s).point[F]
     case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => SP.null_ map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
-    case ToString(x)                  => lib.toString[F, FMT] apply x
+    case ToString(x)                  => SP.toString(x)
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
 
@@ -121,7 +121,9 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case ProjectField(src, field)     => SP.objectLookup(src, field)
     case DeleteField(src, field)      => SP.objectDelete(src, field)
 
-    case Within(x, arr)               => SP.leftShift(arr) map (xs => fn.exists(fn.indexOf(xs, x)))
+    case Within(x, arr)               => (freshName[F] |@| freshName[F] |@| SP.leftShift(arr))((a, b, bs) =>
+                                           (SP.castIfNode(x) |@| SP.castIfNode(~b))((cx, cb) =>
+                                             some(b in bs, a in cx) satisfies (cb eq ~a))).join
 
     case Meta(x)                      => lib.meta[F, FMT] apply x
 
@@ -133,6 +135,9 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   }
 
   ////
+
+  private def asDate(x: XQuery)     = SP.castIfNode(x) >>= (lib.asDate[F] apply _)
+  private def asDateTime(x: XQuery) = SP.castIfNode(x) >>= (lib.asDateTime[F] apply _)
 
   private def binOpF(x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
     if (flwor.isMatching(x) || flwor.isMatching(y))

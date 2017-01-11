@@ -2,8 +2,8 @@
     "name": "flatten a grouped object with filter",
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
