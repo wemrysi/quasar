@@ -14,7 +14,7 @@ script:
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
   - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; fi
-  - if [ $QUASAR_MARKLOGIC ]; then ./scripts/installMarkLogic; fi
+  - if [ $QUASAR_MARKLOGIC_JSON || $QUASAR_MARKLOGIC_XML ]; then ./scripts/installMarkLogic; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
@@ -44,7 +44,8 @@ env:
   matrix:
   - MONGO_RELEASE=2_6
   - QUASAR_COUCHBASE='{"couchbase":{"connectionUri":"couchbase://0.0.0.0?username=Administrator&password=password"}}'
-  - QUASAR_MARKLOGIC='{"marklogic":{"connectionUri":"xcc://marklogic:marklogic@localhost:8000/Documents"}}'
+  - QUASAR_MARKLOGIC_JSON='{"marklogic":{"connectionUri":"xcc://marklogic:marklogic@localhost:8000/Documents?format=json"}}'
+  - QUASAR_MARKLOGIC_XML='{"marklogic":{"connectionUri":"xcc://marklogic:marklogic@localhost:8000/Documents?format=xml"}}'
   - MONGO_RELEASE=3_0
   - MONGO_RELEASE=3_0_RO
   - MONGO_RELEASE=3_2
