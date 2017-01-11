@@ -8,6 +8,7 @@
     "data": "zips.data",
     "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",
     "predicate": "containsExactly",
+    "ignoreFieldOrder": [ "marklogic_json" ],
     "expected": [
         { "meh_len": { "$na": null }, "mep": { "$na": null }, "mep_len": { "$na": null } }]
 }

@@ -85,70 +85,63 @@ package object fs {
     fileParent(file) </> dir(fileName(file).value)
 
   /** The `ContentSource` located at the given URI. */
-  def contentSourceAt[F[_]: Capture](connectionUri: ConnectionUri): F[ContentSource] =
-    Capture[F].delay(ContentSourceFactory.newContentSource(new URI(connectionUri.value)))
+  def contentSourceAt[F[_]: Capture](uri: URI): F[ContentSource] =
+    Capture[F].delay(ContentSourceFactory.newContentSource(uri))
+
+  /** The `ContentSource` located at the given ConnectionUri. */
+  def contentSourceConnection[F[_]: Capture: Bind](connectionUri: ConnectionUri): F[ContentSource] =
+    Capture[F].delay(new URI(connectionUri.value)) >>= contentSourceAt[F]
+
+  def definition[S[_]](
+    readChunkSize: Positive
+  )(implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): FileSystemDef[Free[S, ?]] =
+    FileSystemDef fromPF {
+      case (FsType, uri) =>
+        MarkLogicConfig.fromUriString[EitherT[Free[S, ?], ErrorMessages, ?]](uri.value)
+          .leftMap(_.left[EnvironmentError])
+          .flatMap(cfg => cfg.docType.fold(
+            fileSystem[S, fmt.JSON](cfg.xccUri, readChunkSize),
+            fileSystem[S, fmt.XML](cfg.xccUri, readChunkSize)))
+    }
 
   /** The MarkLogic FileSystem definition.
     *
     * @tparam FMT           type representing the document format for the filesystem
     * @param  readChunkSize the size of a single chunk when streaming records from MarkLogic
     */
-  def definition[S[_], FMT](
+  def fileSystem[S[_], FMT](
+    xccUri: URI,
     readChunkSize: Positive
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S,
     C: AsContent[FMT, Data],
     P: Planner[MLFSQ, FMT, MLQScript[Fix, ?]]
-  ): FileSystemDef[Free[S, ?]] = {
+  ): DefErrT[Free[S, ?], DefinitionResult[Free[S, ?]]] = {
     val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
-
-    FileSystemDef fromPF {
-      case (FsType, uri) =>
-        runMarkLogicFs(uri) map { case (run, shutdown) =>
-          DefinitionResult[Free[S, ?]](
-            flatMapSNT(run) compose dropWritten compose interpretFileSystem(
-              handleMLPlannerErrors(queryfile.interpret[MLFSQ, FMT](readChunkSize)),
-              readfile.interpret[MLFS](readChunkSize),
-              writefile.interpret[MLFS, FMT],
-              managefile.interpret[MLFS]),
-            shutdown)
-        }
+    runMarkLogicFs(xccUri) map { case (run, shutdown) =>
+      DefinitionResult[Free[S, ?]](
+        flatMapSNT(run) compose dropWritten compose interpretFileSystem(
+          handleMLPlannerErrors(queryfile.interpret[MLFSQ, FMT](readChunkSize)),
+          readfile.interpret[MLFS](readChunkSize),
+          writefile.interpret[MLFS, FMT],
+          managefile.interpret[MLFS]),
+        shutdown)
     }
   }
-
-  // NB: These exists due to the awkward need to import the MonadReader_ and
-  //     MonadError_ definitions for Read/Failure. Given some reorganization
-  //     this could eventually go away.
-
-  def definitionJson[S[_]](
-    readChunkSize: Positive
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] =
-    definition[S, fmt.JSON](readChunkSize)
-
-  def definitionXml[S[_]](
-    readChunkSize: Positive
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] =
-    definition[S, fmt.XML](readChunkSize)
 
   def pathUri(path: APath): String =
     posixCodec.printPath(path)
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  def runMarkLogicFs[S[_]](
-    connectionUri: ConnectionUri
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
+  def runMarkLogicFs[S[_]](xccUri: URI)(
+    implicit S0: Task :<: S, S1: PhysErr :<: S
   ): DefErrT[Free[S, ?], (MarkLogicFs ~> Free[S, ?], Free[S, Unit])] = {
     val contentSource: DefErrT[Free[S, ?], ContentSource] =
-      EitherT(lift(contentSourceAt[Task](connectionUri) map (_.right[DefinitionError]) handle {
+      EitherT(lift(contentSourceAt[Task](xccUri) map (_.right[DefinitionError]) handle {
         case NonFatal(t) => t.getMessage.wrapNel.left[EnvironmentError].left
       }).into[S])
 

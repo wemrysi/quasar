@@ -142,13 +142,13 @@ object FileSystemTest {
   }
 
   def externalFsUT = TestConfig.externalFileSystems {
-    fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)            orElse
-    fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definitionJson(10000L)) orElse
-    fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)              orElse
-    fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)       orElse
-    fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)           orElse
-    fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)             orElse
-    fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)       orElse
+    fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)         orElse
+    fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition(10000L)) orElse
+    fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)           orElse
+    fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)    orElse
+    fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)        orElse
+    fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)          orElse
+    fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)    orElse
     fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
   }
 

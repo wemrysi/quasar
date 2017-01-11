@@ -117,6 +117,6 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad, FMT](
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceAt[Task](uri).map(cs => backend.name.shows >> tests(runner(cs))).void
+    contentSourceConnection[Task](uri).map(cs => backend.name.shows >> tests(runner(cs))).void
   }).unsafePerformSync
 }

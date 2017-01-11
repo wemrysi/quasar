@@ -2,10 +2,10 @@
     "name": "group by a computed value",
 
     "backends": {
-        "couchbase":  "skip",
-        "marklogic":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "couchbase":      "skip",
+        "marklogic_json": "pending",
+        "mongodb_q_3_2":  "pending",
+        "postgresql":     "pending"
     },
     "ignoreFieldOrder": ["mongodb_2_6",
                          "mongodb_3_0",
