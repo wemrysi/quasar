@@ -1,7 +1,6 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "marklogic":  "skip",
         "couchbase":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
