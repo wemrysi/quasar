@@ -13,8 +13,8 @@ script:
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
-  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; export BACKEND_TO_TEST="-Dcouchbase=${QUASAR_COUCHBASE}"; fi
-  - if [ $QUASAR_MARKLOGIC ]; then ./scripts/installMarkLogic; export BACKEND_TO_TEST="-Dmarklogic=${QUASAR_MARKLOGIC}"; fi
+  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" > $TEST_CONFIG_FILE ; fi
+  - if [ $QUASAR_MARKLOGIC ]; then ./scripts/installMarkLogic; echo "marklogic=${QUASAR_MARKLOGIC}" > $TEST_CONFIG_FILE ; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
@@ -65,3 +65,4 @@ env:
   - MONGO_3_2_LINUX=3.2.9
   - MONGO_3_2_PORT=27020
   - MONGO_3_2_AUTH=""
+  - TEST_CONFIG_FILE=it/testing.conf
