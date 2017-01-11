@@ -47,6 +47,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
+    case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>

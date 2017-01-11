@@ -21,7 +21,6 @@ import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, _}, MapFuncs._
 
-import java.time.Instant
 import matryoshka._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -92,7 +91,7 @@ object FuncHandler {
           case ExtractDayOfYear(a1) => $dayOfYear(a1)
           case ExtractEpoch(a1) =>
             $divide(
-              $subtract(a1, $literal(Bson.Date(Instant.ofEpochMilli(0)))),
+              $subtract(a1, $literal(Bson.Date(0))),
               $literal(Bson.Int32(1000)))
           case ExtractHour(a1) => $hour(a1)
           case ExtractIsoDayOfWeek(a1) =>
@@ -127,7 +126,7 @@ object FuncHandler {
           case ExtractYear(a1) => $year(a1)
 
           case ToTimestamp(a1) =>
-            $add($literal(Bson.Date(Instant.ofEpochMilli(0))), a1)
+            $add($literal(Bson.Date(0)), a1)
 
           case Between(a1, a2, a3)   => $and($lte(a2, a1),
                                               $lte(a1, a3))

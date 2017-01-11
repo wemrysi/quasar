@@ -22,11 +22,12 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar._, Planner._
 
+import java.time.{Instant, LocalDate, LocalDateTime, ZoneOffset}
+
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Prism
-import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 
@@ -110,7 +111,7 @@ object BsonCodec {
             extract(map.get("month"), Bson._int32) ⊛
             extract(map.get("day_of_month"), Bson._int32))((y, m, d) =>
             LocalDate.of(y, m, d)))
-          .map(date => Bson.Date(date.atStartOfDay.toInstant(ZoneOffset.UTC))) \/>
+          .flatMap(date => Bson.Date.fromInstant(date.atStartOfDay.toInstant(ZoneOffset.UTC))) \/>
           NonRepresentableEJson(value.shows + " is not a valid date")
       case (EJsonType("_ejson.time"), Bson.Doc(map)) =>
         (extract(map.get("hour"), Bson._int32) ⊛
@@ -134,7 +135,7 @@ object BsonCodec {
           extract(map.get("minute"), Bson._int32) ⊛
           extract(map.get("second"), Bson._int32) ⊛
           extract(map.get("nanosecond"), Bson._int32))((y, mo, d, h, mi, s, n) =>
-          Bson.Date(LocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))) \/>
+          Bson.Date.fromInstant(LocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))).join \/>
           NonRepresentableEJson(value.shows + " is not a valid timestamp")
       case (_, _) => value.right
     }
@@ -163,7 +164,7 @@ object BsonCodec {
     case Bson.Int32(value)     => E.inj(ejson.Int(value)).right
     case Bson.Int64(value)     => E.inj(ejson.Int(value)).right
     case Bson.Date(value)      =>
-      val ldt = LocalDateTime.ofInstant(value, ZoneOffset.UTC)
+      val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneOffset.UTC)
       E.inj(ejson.Meta(
         Bson.Doc(ListMap(
           "year"         -> Bson.Int32(ldt.getYear),

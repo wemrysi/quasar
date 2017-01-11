@@ -24,7 +24,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, eitherT._, free._
 import quasar.fp.numeric.Positive
-import quasar.frontend.logicalplan, logicalplan.LogicalPlan
+import quasar.frontend.logicalplan
 import quasar.fs._
 import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefinitionResult, DefErrT}
 import quasar.physical.marklogic.fmt._
@@ -133,6 +133,51 @@ package object fs {
     }
   }
 
+  /** Converts MarkLogicPlannerErrors into FileSystemErrors. */
+  def handleMLPlannerErrors[F[_]: Functor](f: QueryFile ~> MarkLogicPlanErrT[F, ?]): QueryFile ~> F = {
+    import QueryFile._, MarkLogicPlannerError._
+
+    def unsupportedPlan(desc: String, mlerr: MarkLogicPlannerError): FileSystemError =
+      FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(
+        logicalplan.constant(Data.Str(desc)), Some(mlerr.shows)))
+
+    def asFsError[A](
+      fa: MarkLogicPlanErrT[F, (PhaseResults, FileSystemError \/ A)]
+    ): F[(PhaseResults, FileSystemError \/ A)] = fa.run map {
+      case -\/(mlerr @ InvalidQName(s)) =>
+        (Vector[PhaseResult](), -\/(unsupportedPlan(s, mlerr)))
+
+      case -\/(mlerr @ Unimplemented(f)) =>
+        (Vector[PhaseResult](), -\/(unsupportedPlan(f, mlerr)))
+
+      case -\/(Unreachable(d)) =>
+        (Vector[PhaseResult](), -\/(FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
+          s"Should not have been reached, indicates a defect: $d.",
+          None))))
+
+      case \/-(r) => r
+    }
+
+    λ[QueryFile ~> F] {
+      case ExecutePlan(lp, file) => asFsError(f(ExecutePlan(lp, file)))
+      case EvaluatePlan(lp)      => asFsError(f(EvaluatePlan(lp)))
+      case More(h)               => f(More(h)) | Vector[Data]().right[FileSystemError]
+      case Close(h)              => f(Close(h)) | (())
+      case Explain(lp)           => asFsError(f(Explain(lp)))
+      case ListContents(dir)     => f(ListContents(dir)) | Set[PathSegment]().right[FileSystemError]
+      case FileExists(file)      => f(FileExists(file)) | false
+    }
+  }
+
+  val handleXccErrors: XccFailure ~> PhysErr = λ[XccFailure ~> PhysErr] {
+    case Failure.Fail(XccError.RequestError(ex)) =>
+      Failure.Fail(PhysicalError.unhandledFSError(ex))
+
+    case Failure.Fail(xe @ XccError.XQueryError(xqy, ex)) =>
+      Failure.Fail(PhysicalError.unhandledFSError(
+        new RuntimeException((xe: XccError).shows, ex)))
+  }
+
   def pathUri(path: APath): String =
     posixCodec.printPath(path)
 
@@ -231,47 +276,4 @@ package object fs {
 
       val FV = Functor[F].compose[Vector]
     }
-
-  ////
-
-  /** Converts MarkLogicPlannerErrors into FileSystemErrors. */
-  private def handleMLPlannerErrors[F[_]: Functor](f: QueryFile ~> MarkLogicPlanErrT[F, ?]): QueryFile ~> F = {
-    import QueryFile._, MarkLogicPlannerError._
-
-    def asFsError[A](
-      lp: Fix[LogicalPlan],
-      fa: MarkLogicPlanErrT[F, (PhaseResults, FileSystemError \/ A)]
-    ): F[(PhaseResults, FileSystemError \/ A)] = fa.run map {
-      case -\/(mlerr @ InvalidQName(s)) =>
-        (Vector[PhaseResult](), -\/(FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
-          // TODO: Change to include the QScript context when supported
-          logicalplan.constant(Data.Str(s)), Some((mlerr: MarkLogicPlannerError).shows)))))
-
-      case -\/(Unreachable(d)) =>
-        (Vector[PhaseResult](), -\/(FileSystemError.planningFailed(lp, QPlanner.InternalError(
-          s"Should not have been reached, indicates a defect: $d.",
-          None))))
-
-      case \/-(r) => r
-    }
-
-    λ[QueryFile ~> F] {
-      case ExecutePlan(lp, file) => asFsError(lp, f(ExecutePlan(lp, file)))
-      case EvaluatePlan(lp)      => asFsError(lp, f(EvaluatePlan(lp)))
-      case More(h)               => f(More(h)) | Vector[Data]().right[FileSystemError]
-      case Close(h)              => f(Close(h)) | (())
-      case Explain(lp)           => asFsError(lp, f(Explain(lp)))
-      case ListContents(dir)     => f(ListContents(dir)) | Set[PathSegment]().right[FileSystemError]
-      case FileExists(file)      => f(FileExists(file)) | false
-    }
-  }
-
-  private val handleXccErrors: XccFailure ~> PhysErr = λ[XccFailure ~> PhysErr] {
-    case Failure.Fail(XccError.RequestError(ex)) =>
-      Failure.Fail(PhysicalError.unhandledFSError(ex))
-
-    case Failure.Fail(xe @ XccError.XQueryError(xqy, ex)) =>
-      Failure.Fail(PhysicalError.unhandledFSError(
-        new RuntimeException((xe: XccError).shows, ex)))
-  }
 }
