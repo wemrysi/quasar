@@ -188,12 +188,14 @@ object RenderQuery {
       s"($a1 union $a2)".right
     case ArrFor(a1, a2, a3) =>
       s"(array $a1 for $a2 in $a3 end)".right
-    case Select(v, re, ks, un, ft, gb, ob) =>
+    case Select(v, re, ks, un, lt, ft, gb, ob) =>
       def alias(a: Option[Id[String]]) = ~(a ∘ (i => s" as `${i.v}`"))
       val value       = v.v.fold("value ", "")
       val resultExprs = (re ∘ (r => r.expr ⊹ alias(r.alias))).intercalate(", ")
       val kSpace      = ~(ks ∘ (k => s" from ${k.expr}" ⊹ alias(k.alias)))
       val unnest      = ~(un ∘ (u => s" unnest ${u.expr}" ⊹ alias(u.alias)))
+      val let         = lt.toNel.foldMap(
+                          " let " ⊹ _.map(b => s"${b.id.v} = ${b.expr}").intercalate(", "))
       val filter      = ~(ft ∘ (f  => s" where ${f.v}"))
       val groupBy     = ~(gb ∘ (g  => s" group by ${g.v}"))
       val orderBy     =
@@ -201,7 +203,7 @@ object RenderQuery {
           case OrderBy(a, Ascending)  => s"$a ASC"
           case OrderBy(a, Descending) => s"$a DESC"
         }).toNel ∘ (" order by " ⊹ _.intercalate(", ")))
-      s"(select $value$resultExprs$kSpace$unnest$filter$groupBy$orderBy)".right
+      s"(select $value$resultExprs$kSpace$unnest$let$filter$groupBy$orderBy)".right
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
