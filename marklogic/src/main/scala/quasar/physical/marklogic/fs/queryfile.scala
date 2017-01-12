@@ -45,7 +45,7 @@ import scalaz._, Scalaz._
 object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
-  import FunctionDecl.FunctionDecl3
+  import FunctionDecl.{FunctionDecl1, FunctionDecl3}
 
   type PrologL[F[_]]         = MonadListen_[F, Prologs]
   type MLQScript[T[_[_]], A] = QScriptShiftRead[T, A]
@@ -53,8 +53,9 @@ object queryfile {
   def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr: MonoSeq: PrologW: PrologL, FMT](
     resultsChunkSize: Positive
   )(implicit
-    K: Kvs[F, QueryFile.ResultHandle, ResultCursor],
-    P: Planner[F, FMT, MLQScript[Fix, ?]]
+    K : Kvs[F, QueryFile.ResultHandle, ResultCursor],
+    P : Planner[F, FMT, MLQScript[Fix, ?]],
+    SP: StructuralPlanner[F, FMT]
   ): QueryFile ~> F = {
     type QF[A] = FileSystemErrT[PhaseResultT[F, ?], A]
 
@@ -65,7 +66,7 @@ object queryfile {
       import MainModule._
 
       def saveResults(mm: MainModule): QF[MainModule] =
-        MonadListen_[QF, Prologs].listen(saveTo[QF](out, mm.queryBody)) map {
+        MonadListen_[QF, Prologs].listen(saveTo[QF, FMT](out, mm.queryBody)) map {
           case (body, plogs) =>
             (prologs.modify(_ union plogs) >>> queryBody.set(body))(mm)
         }
@@ -176,7 +177,20 @@ object queryfile {
         fn.concat(~prefix, str))
     }
 
-  private def saveTo[F[_]: Monad: QNameGenerator: PrologW](dst: AFile, results: XQuery): F[XQuery] = {
+  private def wrapUnlessNode[F[_]: Monad, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
+    declareLocal(NCName("wrap-unless-node"))(
+      $("item") as SequenceType("item()")
+    ).as(SequenceType("node()")) { item: XQuery =>
+      SP.singletonObject("value".xs, item) map { obj =>
+        typeswitch(item)(
+          SequenceType("node()") return_ item
+        ) default obj
+      }
+    }
+
+  private def saveTo[F[_]: Monad: QNameGenerator: PrologW, T](
+    dst: AFile, results: XQuery
+  )(implicit SP: StructuralPlanner[F, T]): F[XQuery] = {
     val dstDirUri = pathUri(asDir(dst))
 
     for {
@@ -186,6 +200,7 @@ object queryfile {
       fname  <- freshName[F]
       now    <- lib.secondsSinceEpoch[F].apply(fn.currentDateTime)
       dpart  <- lpadToLength[F]("0".xs, 8.xqy, xdmp.integerToHex(~i))
+      node   <- wrapUnlessNode[F, T].apply(~result)
     } yield {
       let_(
         ts     := xdmp.integerToHex(xs.integer(now * 1000.xqy)),
@@ -197,7 +212,7 @@ object queryfile {
         .let_(
           fname := fn.concat(dstDirUri.xs, ~ts, dpart))
         .return_(
-          xdmp.documentInsert(~fname, ~result))
+          xdmp.documentInsert(~fname, node))
       }
     }
   }

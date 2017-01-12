@@ -118,8 +118,9 @@ package object fs {
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S,
-    C: AsContent[FMT, Data],
-    P: Planner[MLFSQ, FMT, MLQScript[Fix, ?]]
+    C : AsContent[FMT, Data],
+    P : Planner[MLFSQ, FMT, MLQScript[Fix, ?]],
+    SP: StructuralPlanner[MLFSQ, FMT]
   ): DefErrT[Free[S, ?], DefinitionResult[Free[S, ?]]] = {
     val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
     runMarkLogicFs(xccUri) map { case (run, shutdown) =>

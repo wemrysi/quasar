@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.fp.liftMT
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.fmt
 import quasar.physical.marklogic.xml.namespaces._
@@ -31,7 +32,7 @@ import scalaz._, Scalaz._
   * @tparam F   the effects employed by the library.
   * @tparam FMT type index representing the data format supported by the library.
   */
-trait StructuralPlanner[F[_], FMT] {
+trait StructuralPlanner[F[_], FMT] { self =>
   import FunctionDecl._
   import StructuralPlanner.ejs
 
@@ -140,6 +141,30 @@ trait StructuralPlanner[F[_], FMT] {
   def seqToArray(seq: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     seqToArrayFn.apply(seq)
 
+  /** Transform the effect type used by the planner. */
+  def transform[G[_]](f: F ~> G): StructuralPlanner[G, FMT] =
+    new StructuralPlanner[G, FMT] {
+      def null_ : G[XQuery] = f(self.null_)
+      def arrayAppend(array: XQuery, value: XQuery): G[XQuery] = f(self.arrayAppend(array, value))
+      def arrayConcat(a1: XQuery, a2: XQuery): G[XQuery] = f(self.arrayConcat(a1, a2))
+      def arrayElementAt(array: XQuery, index: XQuery): G[XQuery] = f(self.arrayElementAt(array, index))
+      def asSortKey(item: XQuery): G[XQuery] = f(self.asSortKey(item))
+      def isArray(item: XQuery): G[XQuery] = f(self.isArray(item))
+      def leftShift(node: XQuery): G[XQuery] = f(self.leftShift(node))
+      def mkArray(elements: XQuery): G[XQuery] = f(self.mkArray(elements))
+      def mkArrayElt(item: XQuery): G[XQuery] = f(self.mkArrayElt(item))
+      def mkObject(entries: XQuery): G[XQuery] = f(self.mkObject(entries))
+      def mkObjectEntry(key: XQuery, value: XQuery): G[XQuery] = f(self.mkObjectEntry(key, value))
+      def nodeCast(node: XQuery): G[XQuery] = f(self.nodeCast(node))
+      def nodeMetadata(node: XQuery): G[XQuery] = f(self.nodeMetadata(node))
+      def nodeToString(node: XQuery): G[XQuery] = f(self.nodeToString(node))
+      def nodeType(node: XQuery): G[XQuery] = f(self.nodeType(node))
+      def objectDelete(obj: XQuery, key: XQuery): G[XQuery] = f(self.objectDelete(obj, key))
+      def objectInsert(obj: XQuery, key: XQuery, value: XQuery): G[XQuery] = f(self.objectInsert(obj, key, value))
+      def objectLookup(obj: XQuery, key: XQuery): G[XQuery] = f(self.objectLookup(obj, key))
+      def objectMerge(o1: XQuery, o2: XQuery): G[XQuery] = f(self.objectMerge(o1, o2))
+    }
+
   ////
 
   // ejson:cast-if-node($item as item()?) as item()?
@@ -216,14 +241,33 @@ trait StructuralPlanner[F[_], FMT] {
     })
 }
 
-object StructuralPlanner {
+object StructuralPlanner extends StructuralPlannerInstances {
   val ejs = NamespaceDecl(ejsonNs)
 
   def apply[F[_], T](implicit L: StructuralPlanner[F, T]): StructuralPlanner[F, T] = L
 
+  def forTrans[F[_]: Monad, FMT, T[_[_], _]: MonadTrans](
+    implicit SP: StructuralPlanner[F, FMT]
+  ): StructuralPlanner[T[F, ?], FMT] =
+    SP.transform(liftMT[F, T])
+}
+
+sealed abstract class StructuralPlannerInstances extends StructuralPlannerInstances0 {
   implicit def jsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.JSON] =
     new JsonStructuralPlanner[F]
 
   implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.XML] =
     new XmlStructuralPlanner[F]
+}
+
+sealed abstract class StructuralPlannerInstances0 {
+  implicit def eitherTStructuralPlanner[F[_]: Monad, FMT, E](
+    implicit SP: StructuralPlanner[F, FMT]
+  ): StructuralPlanner[EitherT[F, E, ?], FMT] =
+    StructuralPlanner.forTrans[F, FMT, EitherT[?[_], E, ?]]
+
+  implicit def writerTStructuralPlanner[F[_]: Monad, FMT, W: Monoid](
+    implicit SP: StructuralPlanner[F, FMT]
+  ): StructuralPlanner[WriterT[F, W, ?], FMT] =
+    StructuralPlanner.forTrans[F, FMT, WriterT[?[_], W, ?]]
 }
