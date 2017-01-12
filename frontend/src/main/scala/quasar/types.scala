@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.common.PrimaryType
 import quasar.fp._
 import quasar.fp.ski._
 import SemanticError.{TypeError, MissingField, MissingIndex}
@@ -28,6 +29,17 @@ import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
 
 sealed trait Type extends Product with Serializable { self =>
   import Type._
+
+  final def toPrimaryType: Option[PrimaryType] =
+    if      (Str.contains(this))       common.Arr.some
+    else if (Binary.contains(this))    common.Arr.some
+    else if (AnyArray.contains(this))  common.Arr.some
+    else if (Bool.contains(this))      common.Bool.some
+    else if (Dec.contains(this))       common.Dec.some
+    else if (Int.contains(this))       common.Int.some
+    else if (Null.contains(this))      common.Null.some
+    else if (AnyObject.contains(this)) common.Map.some
+    else                               none
 
   final def ⨯ (that: Type): Type =
     (this, that) match {
@@ -266,6 +278,17 @@ trait TypeInstances {
 
 object Type extends TypeInstances {
   type SemanticResult[A] = ValidationNel[SemanticError, A]
+
+  val fromPrimaryType: PrimaryType => Type = {
+    case common.Null => Null
+    case common.Bool => Bool
+    case common.Byte => Top
+    case common.Char => Top
+    case common.Int  => Int
+    case common.Dec  => Dec
+    case common.Arr  => Top
+    case common.Map  => AnyObject
+  }
 
   private def fail0[A](expected: Type, actual: Type, message: Option[String])
       : SemanticResult[A] =

@@ -237,6 +237,7 @@ final class Compiler[M[_], T: Equal]
       "to_timestamp"            -> date.ToTimestamp,
       "squash"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
+      "type_of"                 -> identity.TypeOf,
       "between"                 -> relations.Between,
       "where"                   -> set.Filter,
       "distinct"                -> set.Distinct,

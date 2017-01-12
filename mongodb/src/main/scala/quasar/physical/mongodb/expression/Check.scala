@@ -21,7 +21,6 @@ import quasar.Type
 import quasar.fp._
 import quasar.physical.mongodb.Bson
 
-import java.time.Instant
 import scala.Long
 
 import matryoshka._
@@ -56,7 +55,7 @@ final class Check[T, EX[_]]
     * actually use any new op here.
     */
   def isDate(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
-    between(Bson.Date(minInstant), expr, minTimestamp)
+    between(minDate, expr, minTimestamp)
   /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
     * ensures that this check is used only when it's safe, although we don't
     * actually use any new op here.
@@ -64,7 +63,7 @@ final class Check[T, EX[_]]
   def isTimestamp(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
     between(minTimestamp, expr, minRegex)
 
-  def isDateOrTimestamp(expr: T) = between(Bson.Date(minInstant), expr, minRegex)
+  def isDateOrTimestamp(expr: T) = between(minDate, expr, minRegex)
 
   // Some types that happen to be adjacent:
   def isNumberOrString(expr: T) = betweenExcl(Bson.Null, expr, Bson.Doc())
@@ -110,8 +109,8 @@ object Check {
       case IsBetween(Bson.Binary(`minBinary`), x, Bson.ObjectId(`minOid`))  => (x, Type.Binary).some
       case IsBetween(Bson.ObjectId(`minOid`),  x, Bson.Bool(false))         => (x, Type.Id).some
       case IsBetweenIncl(Bson.Bool(false),     x, Bson.Bool(true))          => (x, Type.Bool).some
-      case IsBetween(Bson.Date(`minInstant`),  x, `minRegex`)               => (x, Type.Date ⨿ Type.Timestamp).some
-      case IsBetween(Bson.Date(`minInstant`),  x, `minTimestamp`)           => (x, Type.Date).some
+      case IsBetween(`minDate`,  x, `minRegex`)               => (x, Type.Date ⨿ Type.Timestamp).some
+      case IsBetween(`minDate`,  x, `minTimestamp`)           => (x, Type.Date).some
       case IsBetween(`minTimestamp`,           x, `minRegex`)               => (x, Type.Timestamp).some
 
       case IsBetween(Bson.Doc(`nilMap`),       x, Bson.Binary(`minBinary`)) => (x, Type.AnyObject ⨿ Type.AnyArray).some
@@ -175,7 +174,7 @@ object Check {
   }
 
   val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
-  val minInstant = Instant.ofEpochMilli(Long.MinValue)
+  val minDate = Bson.Date(Long.MinValue)
   val minTimestamp = Bson.Timestamp(Int.MinValue, 0)
   val minOid =
     ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))

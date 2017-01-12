@@ -244,6 +244,8 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       ).embed.η[M]
     case MF.ToTimestamp(a1) =>
       Timestamp(MillisToUTC(a1, none).embed).embed.η[M]
+    case MF.TypeOf(a1) =>
+      unimplementedP("TypeOf")
     case MF.ExtractCentury(a1) =>
       Ceil(Div(extract(a1, year), int(100)).embed).embed.η[M]
     case MF.ExtractDayOfMonth(a1) =>

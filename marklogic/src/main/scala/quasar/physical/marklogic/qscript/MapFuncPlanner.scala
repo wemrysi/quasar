@@ -55,6 +55,7 @@ object MapFuncPlanner {
     case TemporalTrunc(part, src)     => qscript.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => qscript.asDateTime[F] apply dt map xs.time
     case ToTimestamp(millis)          => qscript.timestampToDateTime[F] apply millis
+    case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => qscript.asDateTime[F] apply time map (dt =>
