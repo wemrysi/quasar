@@ -34,7 +34,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
   def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
   def bool(b: Boolean): T[N1QL] = Data[T[N1QL]](QData.Bool(b)).embed
-  val na: T[N1QL]               = Data[T[N1QL]](QData.NA).embed
+  val undefined: T[N1QL]        = Null[T[N1QL]]().embed
 
   def unwrap(a1: T[N1QL]): T[N1QL] =
     IfMissing(
@@ -96,7 +96,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
     case MF.Constant(v) =>
       Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
-      Data[T[N1QL]](QData.NA).embed.η[M]
+      undefined.η[M]
 
     // array
     case MF.Length(a1) =>
@@ -104,7 +104,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         Length(a1).embed,
         LengthArr(a1).embed,
         LengthObj(a1).embed,
-        na
+        undefined
       ).embed.η[M]
 
     // date
@@ -126,7 +126,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             IsNotNull(a1).embed,
             Time(ConcatStr(a1, str(".000")).embed).embed)
         )(
-          Else(na)
+          Else(undefined)
         ).embed
 
       def timeFromTS(a1: T[N1QL]): T[N1QL] =
@@ -139,7 +139,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           int(0)).embed).embed
 
       Case(
-        WhenThen(SelectField(a1, str(DateKey)).embed, na),
+        WhenThen(SelectField(a1, str(DateKey)).embed, undefined),
         WhenThen(SelectField(a1, str(TimeKey)).embed, a1),
         WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
       )(
@@ -170,7 +170,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
                 str("T00:00:00.000Z")).embed),
             WhenThen(
               SelectField(a1, str(TimeKey)).embed,
-              na)
+              undefined)
           )(
             Else(IfMissing(
               SelectField(a1, str(TimestampKey)).embed,
@@ -291,7 +291,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Eq(Lower(a1).embed, str("false")).embed,
           bool(false))
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     // TODO: Handle large numbers across the board. Couchbase's number type truncates.
     case MF.Integer(a1) =>
@@ -302,7 +302,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             Floor(ToNumber(a1).embed).embed).embed,
           ToNumber(a1).embed)
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     case MF.Decimal(a1) =>
       ToNumber(a1).embed.η[M]
@@ -312,7 +312,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Eq(Lower(a1).embed, str("null")).embed,
           Null[T[N1QL]].embed)
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     case MF.ToString(a1) =>
       IfNull(
@@ -364,7 +364,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Value(true),
           ResultExpr(
             Obj(Map(
-              ToString(a1).embed -> IfNull(id1.embed, na).embed
+              ToString(a1).embed -> IfNull(id1.embed, undefined).embed
             )).embed,
             none
           ).wrapNel,
@@ -432,7 +432,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       def grd(f: T[N1QL] => T[N1QL], e: T[N1QL], c: T[N1QL]): T[N1QL] =
         Case(
           WhenThen(f(e), c))(
-          Else(na)).embed
+          Else(undefined)).embed
 
       def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
         genId[T[N1QL], M] ∘ (id =>
