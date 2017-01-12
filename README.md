@@ -197,11 +197,13 @@ e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
 ##### MarkLogic
 
-To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter as the `connectionUri`:
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
-`xcc://<username>:<password>@<host>:<port>/<database>?format=[json|xml]`
+`xcc://<username>:<password>@<host>:<port>/<database>[/root/dir/path]?format=[json|xml]`
 
 the mount will query either JSON or XML documents based on the value of the `format` parameter. For backwards-compatibility, if the `format` parameter is omitted then XML is assumed.
+
+If a root directory path is specified, all operations and queries within the mount will be local to the MarkLogic directory at the specified path.
 
 Prerequisites
 - MarkLogic 8.0+
