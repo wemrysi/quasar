@@ -17,7 +17,7 @@
 package quasar.frontend.logicalplan
 
 import quasar.Predef._
-import quasar._
+import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
 import quasar.contrib.pathy.FPath
 import quasar.contrib.shapeless._
@@ -32,7 +32,7 @@ import scala.Symbol
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
+import scalaz._, Scalaz._, Validation.{failure, success}, Validation.FlatMap._
 import shapeless.{nat, Nat, Sized}
 
 final case class NamedConstraint[T]
@@ -169,7 +169,10 @@ final class LogicalPlanR[T]
         (inferTypes(typ, src) ⊛ ords.traverse { case (a, d) => inferTypes(Type.Top, a) strengthR d })(lp.sort[Typed[LP]](_, _))
 
       case TemporalTrunc(part, src) =>
-        inferTypes(typ, src) ∘ (lp.temporalTrunc[Typed[LP]](part, _))
+        typ.contains(Type.Temporal).fold(
+          inferTypes(Type.Temporal, src) ∘ (lp.temporalTrunc[Typed[LP]](part, _)),
+          failure((TypeError(Type.Temporal, typ, none): SemanticError).wrapNel)
+        )
 
       case Typecheck(expr, t, cont, fallback) =>
         (inferTypes(t, expr) ⊛ inferTypes(typ, cont) ⊛ inferTypes(typ, fallback))(
@@ -294,48 +297,46 @@ final class LogicalPlanR[T]
         case TemporalTrunc(part, src) =>
           val typer: Func.Typer[Nat._1] = StdLib.partialTyperV[nat._1] {
               case Sized(Type.Const(d @ Data.Date(_)))      => truncDate(part, d).validationNel ∘ (Type.Const(_))
-              case Sized(Type.Date)                         => Type.Date.success
               case Sized(Type.Const(t @ Data.Time(_)))      => truncTime(part, t).validationNel ∘ (Type.Const(_))
-              case Sized(Type.Time)                         => Type.Time.success
               case Sized(Type.Const(t @ Data.Timestamp(_))) => truncTimestamp(part, t).validationNel ∘ (Type.Const(_))
-              case Sized(Type.Timestamp)                    => Type.Timestamp.success
+              case Sized(t)                                 => t.success
             }
 
-          val f: Func.Input[T, Nat._1] => T = { case Sized(i) => temporalTrunc(part, i) }
+          val constructLPNode: Func.Input[T, Nat._1] => T = { case Sized(i) => temporalTrunc(part, i) }
 
-          handleInvoke(inf, Mapping, typer, f, Func.Input1(src))
+          handleInvoke(inf, typer, constructLPNode, Func.Input1(src))
       }
   }
 
   private def handleInvoke[N <: Nat](
     inf: Type,
-    effect: DimensionalEffect,
     typer: Func.Typer[N],
-    f: Func.Input[T, N] => T,
+    constructLPNode: Func.Input[T, N] => T,
     args: Func.Input[ConstrainedPlan[T], N]
   ): NameT[SemDisj, ConstrainedPlan[T]] = {
-    effect match {
-      case Mapping =>
-        val (types, constraints0, terms) = args.map {
-          case ConstrainedPlan(in, con, pl) => (in, (con, pl))
-        }.unzip3[Type, List[NamedConstraint[T]], T]
+    val (types, constraints0, terms) = args.map {
+      case ConstrainedPlan(in, con, pl) => (in, (con, pl))
+    }.unzip3[Type, List[NamedConstraint[T]], T]
 
-        val constraints = constraints0.unsized.flatten
+    val constraints = constraints0.unsized.flatten
 
-        lift(typer(types).disjunction).flatMap(
-          unifyOrCheck(inf, _, f(terms))).map(cp =>
-          cp.copy(constraints = cp.constraints ++ constraints))
-
-      case _ =>
-        lift(typer(args.map(_.inferred)).disjunction).flatMap(
-          unifyOrCheck(inf, _, f(args.map(appConst(_, constant(Data.NA))))))
-    }
+    lift(typer(types).disjunction).flatMap(
+      unifyOrCheck(inf, _, constructLPNode(terms))).map(cp =>
+      cp.copy(constraints = cp.constraints ++ constraints))
   }
 
   private def handleGenericInvoke[N <: Nat](
     inf: Type, func: GenericFunc[N], args: Func.Input[ConstrainedPlan[T], N]
-  ): NameT[SemDisj, ConstrainedPlan[T]] =
-    handleInvoke(inf, func.effect, func.typer0, invoke(func, _: Func.Input[T, N]), args)
+  ): NameT[SemDisj, ConstrainedPlan[T]] = {
+    val constructLPNode = invoke(func, _: Func.Input[T, N])
+    func.effect match {
+      case Mapping =>
+        handleInvoke(inf, func.typer0, constructLPNode, args)
+      case _ =>
+        lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
+          unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
+    }
+  }
 
   type SemNames[A] = NameT[SemDisj, A]
 
