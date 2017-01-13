@@ -69,9 +69,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         ResultExpr(ff, none).wrapNel,
         Keyspace(wrapSelect(src), id1.some).some,
         unnest  = none,
+        let     = nil,
         filter  = none,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
 
     case LeftShift(src, struct, id, repair) =>
       for {
@@ -109,9 +110,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
                        ResultExpr(id2.embed, none).wrapNel,
                        Keyspace(wrapSelect(src), id1.some).some,
                        Unnest(u, id2.some).some,
+                       let     = nil,
                        filter  = none,
                        groupBy = none,
-                       orderBy = Nil).embed.η[M]
+                       orderBy = nil).embed.η[M]
                  },
                  mapFuncPlanner[T, F].plan))
       } yield r
@@ -133,19 +135,21 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
           Value(false),
           ResultExpr(rep, id2.some).wrapNel,
           Keyspace(src, id1.some).some,
-          unnest = none,
-          filter = none,
+          unnest  = none,
+          let     = nil,
+          filter  = none,
           GroupBy(b).some,
-          orderBy = Nil).embed
+          orderBy = nil).embed
 
         Select(
           Value(true),
           ResultExpr(id2.embed, none).wrapNel,
           Keyspace(s, id3.some).some,
-          unnest = none,
+          unnest  = none,
+          let     = nil,
           Filter(IsNotNull(id2.embed).embed).some,
           groupBy = none,
-          orderBy = Nil).embed
+          orderBy = nil).embed
       }
 
     case qscript.Sort(src, bucket, order) =>
@@ -163,15 +167,17 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
            ResultExpr(ArrAgg(id1.embed).embed, none).wrapNel,
            Keyspace(src, id1.some).some,
            unnest  = none,
+           let     = nil,
            filter  = none,
            GroupBy(IfNull(b, id1.embed).embed).some,
-           orderBy = Nil).embed
+           orderBy = nil).embed
 
         Select(
           Value(true),
           ResultExpr(id3.embed, none).wrapNel,
           Keyspace(s, id2.some).some,
           Unnest(id2.embed, id3.some).some,
+          let     = nil,
           filter  = none,
           groupBy = none,
           orderBy = o.toList).embed
@@ -186,9 +192,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         ResultExpr(id1.embed, none).wrapNel,
         Keyspace(src, id1.some).some,
         unnest  = none,
+        let     = nil,
         Filter(ff).some,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
@@ -211,7 +218,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
     }
 
     case qscript.Unreferenced() =>
-      wrapSelect(Arr[T[N1QL]](Nil).embed).η[M]
+      wrapSelect(Arr[T[N1QL]](nil).embed).η[M]
   }
 
   def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
@@ -236,9 +243,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
             ResultExpr(c, id3.some)),
           Keyspace(src, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed
+          orderBy = nil).embed
 
       val cnt = SelectElem(id3.embed, int(0)).embed
 
@@ -255,9 +263,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         ResultExpr(id5.embed, none).wrapNel,
         Keyspace(s, id4.some).some,
         Unnest(SelectElem(id2.embed, slc).embed, id5.some).some,
+        let     = nil,
         filter  = none,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
     }
 
 }

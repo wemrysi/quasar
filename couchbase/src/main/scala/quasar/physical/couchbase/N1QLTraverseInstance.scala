@@ -103,15 +103,16 @@ trait N1QLTraverseInstance {
       case ArrAgg(a1)              => f(a1) ∘ (ArrAgg(_))
       case Union(a1, a2)           => (f(a1) ⊛ f(a2))(Union(_, _))
       case ArrFor(a1, a2, a3)      => (f(a1) ⊛ f(a2) ⊛ f(a3))(ArrFor(_, _, _))
-      case Select(v, re, ks, un, fr, gb, ob) =>
+      case Select(v, re, ks, un, lt, fr, gb, ob) =>
         (re.traverse(i => f(i.expr) ∘ (ResultExpr(_, i.alias ∘ (a => Id[B](a.v))))) ⊛
          ks.traverse(i => f(i.expr) ∘ (Keyspace  (_, i.alias ∘ (a => Id[B](a.v))))) ⊛
          un.traverse(i => f(i.expr) ∘ (Unnest    (_, i.alias ∘ (a => Id[B](a.v))))) ⊛
+         lt.traverse(i => f(i.expr) ∘ (Binding(Id[B](i.id.v), _)))                  ⊛
          fr.traverse(i => f(i.v)    ∘ (Filter(_)))                                  ⊛
          gb.traverse(i => f(i.v)    ∘ (GroupBy(_)))                                 ⊛
          ob.traverse(i => f(i.a)    ∘ (OrderBy   (_, i.sortDir)))
         )(
-          Select(v, _, _, _, _, _, _)
+          Select(v, _, _, _, _, _, _, _)
         )
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛

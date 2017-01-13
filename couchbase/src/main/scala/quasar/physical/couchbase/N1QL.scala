@@ -133,6 +133,7 @@ object N1QL extends N1QLInstances {
     resultExprs: NonEmptyList[ResultExpr[A]],
     keyspace: Option[Keyspace[A]],
     unnest: Option[Unnest[A]],
+    let: List[Binding[A]],
     filter: Option[Filter[A]],
     groupBy: Option[GroupBy[A]],
     orderBy: List[OrderBy[A]]
@@ -143,6 +144,7 @@ object N1QL extends N1QLInstances {
     final case class ResultExpr[A](expr: A, alias: Option[Id[A]])
     final case class Keyspace[A](expr: A, alias: Option[Id[A]])
     final case class Unnest[A](expr: A, alias: Option[Id[A]])
+    final case class Binding[A](id: Id[A], expr: A)
     final case class Filter[A](v: A)
     final case class GroupBy[A](v: A)
     final case class OrderBy[A](a: A, sortDir: SortDir)

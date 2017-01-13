@@ -35,7 +35,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
   def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
   def bool(b: Boolean): T[N1QL] = Data[T[N1QL]](QData.Bool(b)).embed
-  val na: T[N1QL]               = Data[T[N1QL]](QData.NA).embed
+  val undefined: T[N1QL]        = Null[T[N1QL]]().embed
 
   val emptyStr       = str("")
   val nullStr        = str("null")
@@ -192,7 +192,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
     case MF.Constant(v) =>
       Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
-      Data[T[N1QL]](QData.NA).embed.η[M]
+      undefined.η[M]
 
     // array
     case MF.Length(a1) =>
@@ -200,7 +200,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         Length(a1).embed,
         LengthArr(a1).embed,
         LengthObj(a1).embed,
-        na
+        undefined
       ).embed.η[M]
 
     // date
@@ -222,7 +222,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         Case(
           WhenThen(IsNotNull(fz).embed, Time(fz).embed)
         )(
-          Else(na)
+          Else(undefined)
         ).embed
       }
 
@@ -236,7 +236,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           int(0)).embed).embed
 
       Case(
-        WhenThen(SelectField(a1, str(DateKey)).embed, na),
+        WhenThen(SelectField(a1, str(DateKey)).embed, undefined),
         WhenThen(SelectField(a1, str(TimeKey)).embed, a1),
         WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
       )(
@@ -267,7 +267,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
                 zeroTimeSuffix).embed),
             WhenThen(
               SelectField(a1, str(TimeKey)).embed,
-              na)
+              undefined)
           )(
             Else(IfMissing(
               SelectField(a1, str(TimestampKey)).embed,
@@ -323,7 +323,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             SelectField(a1, str(DateKey)).embed,
             Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(DateKey)).embed, zeroTimeSuffix).embed)).embed)
         )(
-          Else(na)
+          Else(undefined)
         ).embed.η[M]
     case MF.TemporalTrunc(Microsecond | Millisecond, a2) =>
       a2.η[M]
@@ -400,7 +400,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Eq(Lower(a1).embed, str("false")).embed,
           bool(false))
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     // TODO: Handle large numbers across the board. Couchbase's number type truncates.
     case MF.Integer(a1) =>
@@ -411,7 +411,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             Floor(ToNumber(a1).embed).embed).embed,
           ToNumber(a1).embed)
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     case MF.Decimal(a1) =>
       ToNumber(a1).embed.η[M]
@@ -421,7 +421,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Eq(Lower(a1).embed, nullStr).embed,
           Null[T[N1QL]].embed)
       )(
-        Else(na)
+        Else(undefined)
       ).embed.η[M]
     case MF.ToString(a1) =>
       IfNull(
@@ -473,35 +473,62 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Value(true),
           ResultExpr(
             Obj(Map(
-              ToString(a1).embed -> IfNull(id1.embed, na).embed
+              ToString(a1).embed -> IfNull(id1.embed, undefined).embed
             )).embed,
             none
           ).wrapNel,
           Keyspace(a2, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
       Obj(Map(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
-      IfNull(
-        ConcatStr(a1, a2).embed,
-        ConcatArr(
-          Case(
-            WhenThen(
-              IsString(a1).embed,
-              Split(a1, emptyStr).embed)
-          )(
-            Else(a1)
-          ).embed,
-          Case(
-            WhenThen(
-              IsString(a2).embed,
-              Split(a2, emptyStr).embed)
-          )(
-            Else(a2)
-          ).embed).embed
-      ).embed.η[M]
+      def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
+        case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none
+        case _                                                        => ().some
+      }.isEmpty
+
+      (containsAgg(a1) || containsAgg(a2)).fold(
+        IfNull(
+          ConcatStr(a1, a2).embed,
+          ConcatArr(
+            Case(
+              WhenThen(
+                IsString(a1).embed,
+                Split(a1, emptyStr).embed)
+            )(
+              Else(a1)
+            ).embed,
+            Case(
+              WhenThen(
+                IsString(a2).embed,
+                Split(a2, emptyStr).embed)
+            )(
+              Else(a2)
+            ).embed).embed
+        ).embed.η[M],
+        (genId[T[N1QL], M] ⊛ genId[T[N1QL], M]) { (id1, id2) =>
+          SelectElem(
+            Select(
+              Value(true),
+              ResultExpr(
+                IfNull(
+                  ConcatStr(id1.embed, id2.embed).embed,
+                  ConcatArr(Split(id1.embed, emptyStr).embed, id2.embed).embed,
+                  ConcatArr(id1.embed, Split(id2.embed, emptyStr).embed).embed,
+                  ConcatArr(id1.embed, id2.embed).embed).embed,
+                none
+              ).wrapNel,
+              keyspace = none,
+              unnest   = none,
+              List(Binding(id1, a1), Binding(id2, a2)),
+              filter   = none,
+              groupBy  = none,
+              orderBy  = nil).embed,
+            int(0)).embed
+        })
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[M]
     case MF.ProjectField(a1, a2) =>
@@ -512,9 +539,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ResultExpr(SelectField(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
         SelectField(a1, a2).embed))
     case MF.ProjectIndex(a1, a2) =>
       genId[T[N1QL], M] ∘ (id1 => selectOrElse(
@@ -524,9 +552,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ResultExpr(SelectElem(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
         SelectElem(a1, a2).embed))
     case MF.DeleteField(a1, a2) =>
       ObjRemove(a1, a2).embed.η[M]
@@ -541,7 +570,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       def grd(f: T[N1QL] => T[N1QL], e: T[N1QL], c: T[N1QL]): T[N1QL] =
         Case(
           WhenThen(f(e), c))(
-          Else(na)).embed
+          Else(undefined)).embed
 
       def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
         genId[T[N1QL], M] ∘ (id =>
@@ -550,9 +579,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
             Keyspace(cont, id.some).some,
             unnest  = none,
+            let     = nil,
             filter  = none,
             groupBy = none,
-            orderBy = Nil).embed)
+            orderBy = nil).embed)
 
       def isArr(n: T[N1QL]): T[N1QL] = IsArr(n).embed
       def isObj(n: T[N1QL]): T[N1QL] = IsObj(n).embed

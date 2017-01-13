@@ -94,16 +94,12 @@ object writefile {
   ): Free[S, Vector[FileSystemError]] =
     (for {
       st   <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
-      data <- EitherT(lift(Task.delay(chunk.foldMap(d =>
-                DataCodec.render(d).bimap(
-                  err => Vector(FileSystemError.writeFailed(d, err.shows)),
-                  str => Vector(
-                    JsonObject
-                      .create()
-                      .put("type", st.collection)
-                      .put("value", jsonTranscoder.stringToJsonObject(str))
-                  ))
-              ))).into)
+      data <- lift(Task.delay(chunk.map(DataCodec.render).unite
+                .map(str =>
+                  JsonObject
+                    .create()
+                    .put("type", st.collection)
+                    .put("value", jsonTranscoder.stringToJsonObject(str))))).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
       docs <- data.traverse(d => GenUUID.Ops[S].asks(uuid =>
                 JsonDocument.create(uuid.toString, d)
               )).liftM[EitherT[?[_], Vector[FileSystemError], ?]]

@@ -37,7 +37,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.matching.Regex
 
-import argonaut._, Argonaut._, JsonMonocle._
+import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -171,10 +171,9 @@ abstract class QueryRegressionTest[S[_]](
     json => json.obj.fold(
       json.some)(
       _.toList match {
-        case ("value", result) :: Nil =>
-          (jObjectPrism.getOption(result) >>= (_("$na")))
-            .fold(result.some)(κ(None))
-        case _ => json.some
+        case Nil                      => None
+        case ("value", result) :: Nil => result.some
+        case _                        => json.some
       })
 
   val TestContext = new MathContext(13, RoundingMode.DOWN)
@@ -352,8 +351,5 @@ object QueryRegressionTest {
     }
 
   implicit val dataEncodeJson: EncodeJson[Data] =
-    EncodeJson(d =>
-      DataCodec.Precise
-        .encode(d)
-        .fold(err => scala.sys.error(err.message), ι))
+    EncodeJson(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
 }
