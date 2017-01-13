@@ -28,10 +28,12 @@ import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
 
+import java.time.LocalDate
+
 import com.marklogic.xcc.ContentSource
 import matryoshka._
 import matryoshka.data.Fix
-import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -89,6 +91,13 @@ class MarkLogicStdLibSpec extends StdLibSpec {
     def intDomain    = arbitrary[Long]   map (BigInt(_))
     def decDomain    = arbitrary[Double] map (BigDecimal(_))
     def stringDomain = StdLibTestRunner.genPrintableAscii
+
+    // Years 0-999 omitted for year zero disagreement involving millennium extract and trunc.
+    val dateDomain: Gen[LocalDate] =
+      Gen.choose(
+        LocalDate.of(1000, 1, 1).toEpochDay,
+        LocalDate.of(9999, 12, 31).toEpochDay
+      ) ∘ (LocalDate.ofEpochDay(_))
 
     ////
 

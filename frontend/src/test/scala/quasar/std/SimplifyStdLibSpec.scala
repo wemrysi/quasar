@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, GenericFunc}
+import quasar.{Data, DateArbitrary, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -108,6 +108,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
     def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
     def stringDomain = arbitrary[String]
+
+    def dateDomain = DateArbitrary.genDate
   }
 
   tests(runner)

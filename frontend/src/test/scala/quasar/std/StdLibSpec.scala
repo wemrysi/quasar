@@ -31,7 +31,6 @@ import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalaCheckBinding._
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
@@ -62,21 +61,13 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+    implicit val arbDate = Arbitrary[LocalDate] { runner.dateDomain }
     implicit val arbData = Arbitrary[Data] {
       Gen.oneOf(
         runner.intDomain.map(Data.Int(_)),
         runner.decDomain.map(Data.Dec(_)),
         runner.stringDomain.map(Data.Str(_)))
     }
-
-    // TODO
-    // - Years outside 1-9999 cause issues for at least CB, ML.
-    // - Years 0-999 omitted for ML year zero disagreement involving millennium extract and trunc.
-    val arbDate: Arbitrary[LocalDate] =
-      Arbitrary(Gen.choose(
-        LocalDate.of(1000, 1, 1).toEpochDay,
-        LocalDate.of(9999, 12, 31).toEpochDay
-      )) ∘ (LocalDate.ofEpochDay(_))
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -189,8 +180,6 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ToString" >> {
-        implicit val ad = arbDate
-
         "string" >> prop { (str: String) =>
           unary(ToString(_).embed, Data.Str(str), Data.Str(str))
         }
@@ -584,8 +573,6 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "StartOfDay" >> {
-        implicit val ad = arbDate
-
         "timestamp" >> prop { (x: LocalDate) =>
           unary(
             StartOfDay(_).embed,
@@ -595,8 +582,6 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "TemporalTrunc" >> {
-        implicit val ad = arbDate
-
         "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
           val t = x.atZone(UTC)
 
