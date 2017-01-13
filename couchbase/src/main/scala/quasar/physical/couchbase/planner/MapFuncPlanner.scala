@@ -370,29 +370,56 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ).wrapNel,
           Keyspace(a2, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
       Obj(Map(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
-      IfNull(
-        ConcatStr(a1, a2).embed,
-        ConcatArr(
-          Case(
-            WhenThen(
-              IsString(a1).embed,
-              Split(a1, str("")).embed)
-          )(
-            Else(a1)
-          ).embed,
-          Case(
-            WhenThen(
-              IsString(a2).embed,
-              Split(a2, str("")).embed)
-          )(
-            Else(a2)
-          ).embed).embed
-      ).embed.η[M]
+      def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
+        case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none
+        case _                                                        => ().some
+      }.isEmpty
+
+      (containsAgg(a1) || containsAgg(a2)).fold(
+        IfNull(
+          ConcatStr(a1, a2).embed,
+          ConcatArr(
+            Case(
+              WhenThen(
+                IsString(a1).embed,
+                Split(a1, str("")).embed)
+            )(
+              Else(a1)
+            ).embed,
+            Case(
+              WhenThen(
+                IsString(a2).embed,
+                Split(a2, str("")).embed)
+            )(
+              Else(a2)
+            ).embed).embed
+        ).embed.η[M],
+        (genId[T[N1QL], M] ⊛ genId[T[N1QL], M]) { (id1, id2) =>
+          SelectElem(
+            Select(
+              Value(true),
+              ResultExpr(
+                IfNull(
+                  ConcatStr(id1.embed, id2.embed).embed,
+                  ConcatArr(Split(id1.embed, str("")).embed, id2.embed).embed,
+                  ConcatArr(id1.embed, Split(id2.embed, str("")).embed).embed,
+                  ConcatArr(id1.embed, id2.embed).embed).embed,
+                none
+              ).wrapNel,
+              keyspace = none,
+              unnest   = none,
+              List(Binding(id1, a1), Binding(id2, a2)),
+              filter   = none,
+              groupBy  = none,
+              orderBy  = nil).embed,
+            int(0)).embed
+        })
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[M]
     case MF.ProjectField(a1, a2) =>
@@ -403,9 +430,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ResultExpr(SelectField(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
         SelectField(a1, a2).embed))
     case MF.ProjectIndex(a1, a2) =>
       genId[T[N1QL], M] ∘ (id1 => selectOrElse(
@@ -415,9 +443,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           ResultExpr(SelectElem(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed,
+          orderBy = nil).embed,
         SelectElem(a1, a2).embed))
     case MF.DeleteField(a1, a2) =>
       ObjRemove(a1, a2).embed.η[M]
@@ -441,9 +470,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
             Keyspace(cont, id.some).some,
             unnest  = none,
+            let     = nil,
             filter  = none,
             groupBy = none,
-            orderBy = Nil).embed)
+            orderBy = nil).embed)
 
       def isArr(n: T[N1QL]): T[N1QL] = IsArr(n).embed
       def isObj(n: T[N1QL]): T[N1QL] = IsObj(n).embed
