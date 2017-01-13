@@ -58,7 +58,7 @@ object PATypes {
   def remap[A](env: StateAcc, state: StateAcc, in: F[A]): Output[F, A]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type Mapping = ScalaMap[BigInt, BigInt]
@@ -81,7 +81,10 @@ class PAHelpers[T[_[_]]: BirecursiveT] extends TTypes[T] {
     val galg: GAlgebra[(FreeMap, ?), CoEnv[Hole, MapFunc, ?], StateAcc] =
       _.run.fold(κ(Set().some), accumulate)
 
-    func.para[StateAcc](galg)
+    if (func ≟ HoleF)
+      None
+    else
+      func.para[StateAcc](galg)
   }
 
   /** Remap all indices in `func` in structures like
@@ -155,7 +158,7 @@ object PruneArrays {
   // TODO examine branches
   implicit def equiJoin[T[_[_]]]: PruneArrays[EquiJoin[T, ?]] = default
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 

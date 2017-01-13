@@ -190,6 +190,23 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
+    "not rewrite map with entire array referenced" in {
+      val initial: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(IntLit(7))),
+              MakeArrayR(IntLit(8))))).embed,
+          HoleF)).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
     "rewrite map with unused array elements 1,2" in {
       val initial: Fix[QST] =
         QCT.inj(Map(
