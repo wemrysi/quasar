@@ -376,10 +376,10 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           orderBy = nil).embed,
       Obj(Map(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
-      def containsAgg(v: T[N1QL]): Boolean = v.cataM[Unit \/ ?, Unit] {
-        case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => ().left
-        case _                                                        => ().right
-      }.isLeft
+      def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
+        case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none
+        case _                                                        => ().some
+      }.isEmpty
 
       (containsAgg(a1) || containsAgg(a2)).fold(
         IfNull(
