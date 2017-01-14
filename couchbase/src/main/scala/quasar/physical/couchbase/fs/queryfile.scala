@@ -96,17 +96,13 @@ object queryfile {
       n1ql   <- lpToN1ql[T, S](lp)
       r      <- n1qlResults(n1ql)
       bktCol <- bucketCollectionFromPath(out).liftFE
-      rObj   <- EitherT(r.traverse(d => DataCodec.render(d).bimap(
-                  err => FileSystemError.writeFailed(d, err.shows),
-                  str => jsonTranscoder.stringToJsonObject(str))
-                ).η[PhaseResultT[Free[S, ?], ?]])
-      docs   <- rObj.traverse(d => GenUUID.Ops[S].asks(uuid =>
+      docs   <- r.map(DataCodec.render).unite.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
                     JsonObject
                       .create()
                       .put("type", bktCol.collection)
-                      .put("value", d))
+                      .put("value", jsonTranscoder.stringToJsonObject(d)))
                 )).liftF
       ctx    <- Read.Ops[Context, S].ask.liftF
       bkt    <- lift(Task.delay(

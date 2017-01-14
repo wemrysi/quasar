@@ -22,7 +22,7 @@
     "predicate": "containsExactly",
     "ignoreFieldOrder": ["couchbase"],
     "expected": [
-        { "day": "Tuesday",   "tod": { "$time": "08:00:00.000" }, "not a date": {"$na": null}, "missing": {"$na": null} },
-        { "day": "Wednesday", "tod": { "$time": "09:00:00.000" }, "not a date": {"$na": null}, "missing": {"$na": null} },
-        { "day": "Thursday",  "tod": { "$time": "10:00:00.000" }, "not a date": {"$na": null}, "missing": {"$na": null} }]
+        { "day": "Tuesday",   "tod": { "$time": "08:00:00.000" } },
+        { "day": "Wednesday", "tod": { "$time": "09:00:00.000" } },
+        { "day": "Thursday",  "tod": { "$time": "10:00:00.000" } }]
 }

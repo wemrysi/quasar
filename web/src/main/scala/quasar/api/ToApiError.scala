@@ -339,7 +339,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
   ////
 
   private def encodeData(data: Data): Option[Json] =
-    DataCodec.Precise.encode(data).toOption
+    DataCodec.Precise.encode(data)
 }
 
 sealed abstract class ToApiErrorInstances0 {

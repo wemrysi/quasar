@@ -880,5 +880,65 @@ class QScriptSpec
         implicitly, Corecursive[Fix[QS], QS])))
 
     }
+
+    "convert a flattened array" in {
+      val lp = fullCompileExp("select city, loc[*] from zips")
+      val qs = convert(listContents.some, lp)
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          IncludeId,
+          ConcatArraysR(
+            MakeArrayR(ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                Free.roll(Constant(ejsonArr(ejsonStr("city"))))),
+              MakeArrayR(
+                ProjectFieldR(
+                  Free.roll(Guard(
+                    ProjectIndexR(RightSideF, IntLit(1)),
+                    Type.Obj(ScalaMap(), Some(Type.Top)),
+                    ProjectIndexR(RightSideF, IntLit(1)),
+                    Free.roll(Undefined()))),
+                  StrLit("city"))))),
+            MakeArrayR(ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                MakeArrayR(ConcatArraysR(
+                  ConcatArraysR(
+                    ConcatArraysR(
+                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
+                    MakeArrayR(ProjectFieldR(
+                      Free.roll(Guard(
+                        ProjectIndexR(RightSideF, IntLit(1)),
+                        Type.Obj(ScalaMap(), Some(Type.Top)),
+                        ProjectIndexR(RightSideF, IntLit(1)),
+                        Free.roll(Undefined()))),
+                      StrLit("loc")))),
+                  MakeArrayR(ProjectFieldR(
+                    Free.roll(Guard(
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Type.Obj(ScalaMap(), Some(Type.Top)),
+                      ProjectIndexR(RightSideF, IntLit(1)),
+                      Free.roll(Undefined()))),
+                    StrLit("loc")))))),
+              MakeArrayR(Free.roll(Undefined()))))))),
+        QC.inj(LeftShift((),
+          Free.roll(Guard(
+            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(2)),
+            Type.FlexArr(0, None, Type.Top),
+            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(3)),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)))),
+          ExcludeId,
+          ConcatMapsR(
+            MakeMapR(
+              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
+              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2))),
+            MakeMapR(StrLit("loc"), RightSideF)))))(
+        implicitly, Corecursive[Fix[QS], QS])))
+    }
   }
 }
