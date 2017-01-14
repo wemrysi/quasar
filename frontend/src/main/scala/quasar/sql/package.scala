@@ -21,7 +21,9 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
@@ -52,20 +54,21 @@ package object sql {
   // NB: we need to support relative paths, including `../foo`
   type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
-  private def parser[T[_[_]]: Recursive: Corecursive] = new SQLParser[T]()
+  private def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
 
-  // NB: Statically allocated to avoid multiple allocations of the parser.
-  val muParser = parser[Mu]
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
 
-  def CrossRelation[T[_[_]]: Corecursive](left: SqlRelation[T[Sql]], right: SqlRelation[T[Sql]]) =
-    JoinRelation(left, right, InnerJoin, boolLiteral[T[Sql]](true).embed)
+  def CrossRelation[T]
+    (left: SqlRelation[T], right: SqlRelation[T])
+    (implicit T: Corecursive.Aux[T, Sql])=
+    JoinRelation(left, right, InnerJoin, boolLiteral[T](true).embed)
 
-  def projectionNames[T[_[_]]: Recursive](
-    projections: List[Proj[T[Sql]]], relName: Option[String]):
-      SemanticError \/ List[(String, T[Sql])] = {
-    def extractName(expr: T[Sql]): Option[String] = expr.project match {
+  def projectionNames[T]
+    (projections: List[Proj[T]], relName: Option[String])
+    (implicit T: Recursive.Aux[T, Sql])
+      : SemanticError \/ List[(String, T)] = {
+    def extractName(expr: T): Option[String] = expr.project match {
       case Ident(name) if Some(name) != relName          => name.some
       case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
       case Unop(expr, FlattenMapValues)                  => extractName(expr)
@@ -73,20 +76,24 @@ package object sql {
       case _                                             => None
     }
 
-    val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}
+    val aliases = projections.flatMap(_.alias.toList)
 
-    (aliases diff aliases.distinct).headOption.cata(
+    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
       duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeft1(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
+      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
         alias.cata(
-          a => (used, a -> expr),
+          a => (used, a -> expr).right,
           {
             val tentativeName = extractName(expr) getOrElse index.toString
             val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
-            val name = (tentativeName #:: alternatives).dropWhile(used.contains).head
-            (used + name, name -> expr)
+            (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
+              // WartRemover seems to be confused by the `+` method on `Set`
+              @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+              val newUsed = used + name
+              (newUsed, name -> expr)
+            } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
           })
-      }._2.right)
+      }.map(_._2))
   }
 
   def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): Sql ~> (F ∘ Sql)#λ =
@@ -98,9 +105,9 @@ package object sql {
       }
     }
 
-  implicit class ExprOps[T[_[_]]: Recursive: Corecursive](q: T[Sql]) {
+  implicit class ExprOps[T[_[_]]: BirecursiveT](q: T[Sql]) {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
-      q.transCata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
+      q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
     def makeTables(bindings: List[String]): T[Sql] = q.project match {
       case sel @ Select(_, _, _, _, _, _) => {
@@ -135,7 +142,7 @@ package object sql {
     }
   }
 
-  def pprint[T[_[_]]: Recursive](sql: T[Sql]) = sql.para(pprintƒ)
+  def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
 
   private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9]*".r
 
@@ -146,8 +153,10 @@ package object sql {
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
   }
 
-  private def pprintRelationƒ[T[_[_]]: Recursive](r: SqlRelation[(T[Sql], String)]):
-      String =
+  private def pprintRelationƒ[T]
+    (r: SqlRelation[(T, String)])
+    (implicit T: Recursive.Aux[T, Sql])
+      : String =
     (r match {
       case IdentRelationAST(name, alias) =>
         _qq("`", name) :: alias.map("as " + _).toList
@@ -166,11 +175,12 @@ package object sql {
         }
     }).mkString(" ")
 
-  def pprintRelation[T[_[_]]: Recursive](r: SqlRelation[T[Sql]]) =
-    pprintRelationƒ(traverseRelation[Id, T[Sql], (T[Sql], String)](r, x => (x, pprint(x))))
+  def pprintRelation[T](r: SqlRelation[T])(implicit T: Recursive.Aux[T, Sql]) =
+    pprintRelationƒ(traverseRelation[Id, T, (T, String)](r, x => (x, pprint(x))))
 
-  def pprintƒ[T[_[_]]: Recursive]: Sql[(T[Sql], String)] => String = {
-    def caseSql(c: Case[(T[Sql], String)]): String =
+  def pprintƒ[T](implicit T: Recursive.Aux[T, Sql])
+      : Sql[(T, String)] => String = {
+    def caseSql(c: Case[(T, String)]): String =
       List("when", c.cond._2, "then", c.expr._2) mkString " "
 
     {
@@ -192,9 +202,9 @@ package object sql {
             ("group by" ::
               g.keys.map(_._2).mkString(", ") ::
               g.having.map("having " + _._2).toList).mkString(" ")),
-          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) mkString(", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
+          orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) intercalate (", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
-      case Vari(symbol) => ":" + symbol
+      case Vari(symbol) => ":" + _qq("`", symbol)
       case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
       case ArrayLiteral(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
       case MapLiteral(exprs) => exprs.map {
@@ -225,11 +235,10 @@ package object sql {
       }
       case Ident(name) => _qq("`", name)
       case InvokeFunction(name, args) =>
-        import quasar.std.StdLib.string
         (name, args) match {
-          case (string.Like.name, (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
+          case ("like", (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
             "(" + value + ") like (" + pattern + ")"
-          case (string.Like.name, (_, value) :: (_, pattern) :: (_, esc) :: Nil) =>
+          case ("like", (_, value) :: (_, pattern) :: (_, esc) :: Nil) =>
             "(" + value + ") like (" + pattern + ") escape (" + esc + ")"
           case _ => name + "(" + args.map(_._2).mkString(", ") + ")"
         }
@@ -252,8 +261,8 @@ package object sql {
     }
   }
 
-  def normalizeƒ[T[_[_]]: Corecursive]:
-      Sql[T[Sql]] => Option[Sql[T[Sql]]] = {
+  def normalizeƒ[T](implicit T: Corecursive.Aux[T, Sql]):
+      Sql[T] => Option[Sql[T]] = {
     case Binop(l, r, Union) =>
       Unop(Binop(l, r, UnionAll).embed, Distinct).some
     case Binop(l, r, Intersect) =>
@@ -276,91 +285,5 @@ package object sql {
       case JoinRelation(left, right, tpe, clause) =>
         G.apply3(traverseRelation(left, f), traverseRelation(right, f), f(clause))(
           JoinRelation(_, _, tpe, _))
-    }
-
-  private val astType = "AST" :: Nil
-
-  implicit def ExprRelationRenderTree: Delay[RenderTree, SqlRelation] =
-    new Delay[RenderTree, SqlRelation] {
-      def apply[A](ra: RenderTree[A]) = new RenderTree[SqlRelation[A]] {
-        def render(r: SqlRelation[A]): RenderedTree = r match {
-          case IdentRelationAST(name, alias) =>
-            val aliasString = alias.cata(" as " + _, "")
-            Terminal("IdentRelation" :: astType, Some(name + aliasString))
-          case VariRelationAST(vari, alias) =>
-            val aliasString = alias.cata(" as " + _, "")
-            Terminal("VariRelation" :: astType, Some(":" + vari.symbol + aliasString))
-          case ExprRelationAST(select, alias) =>
-            NonTerminal("ExprRelation" :: astType, Some("Expr as " + alias), ra.render(select) :: Nil)
-          case TableRelationAST(name, alias) =>
-            val aliasString = alias.cata(" as " + _, "")
-            Terminal("TableRelation" :: astType, Some(prettyPrint(name) + aliasString))
-          case JoinRelation(left, right, jt, clause) =>
-            NonTerminal("JoinRelation" :: astType, Some(jt.shows),
-              List(render(left), render(right), ra.render(clause)))
-        }
-      }
-    }
-
-  implicit val SqlRenderTree: Delay[RenderTree, Sql] =
-    new Delay[RenderTree, Sql] {
-      def apply[A](ra: RenderTree[A]): RenderTree[Sql[A]] = new RenderTree[Sql[A]] {
-        def renderCase(c: Case[A]): RenderedTree =
-          NonTerminal("Case" :: astType, None, ra.render(c.cond) :: ra.render(c.expr) :: Nil)
-
-        def render(n: Sql[A]) = n match {
-          case Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
-            val nt = "Select" :: astType
-            NonTerminal(nt,
-              isDistinct match { case `SelectDistinct` => Some("distinct"); case _ => None },
-              projections.map { p =>
-                NonTerminal("Proj" :: astType, p.alias, ra.render(p.expr) :: Nil)
-              } ⊹
-                (relations.map(ExprRelationRenderTree(ra).render) ::
-                  filter.map(ra.render) ::
-                  groupBy.map {
-                    case GroupBy(keys, Some(having)) => NonTerminal("GroupBy" :: astType, None, keys.map(ra.render) :+ ra.render(having))
-                    case GroupBy(keys, None)         => NonTerminal("GroupBy" :: astType, None, keys.map(ra.render))
-                  } ::
-                  orderBy.map {
-                    case OrderBy(keys) =>
-                      val nt = "OrderBy" :: astType
-                      NonTerminal(nt, None,
-                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil)})
-                  } ::
-                  Nil).foldMap(_.toList))
-
-          case SetLiteral(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
-          case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
-          case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
-
-          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
-
-          case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
-          case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
-
-          case Switch(cases, Some(default)) => NonTerminal("Switch" :: astType, None, cases.map(renderCase) :+ ra.render(default))
-          case Switch(cases, None)          => NonTerminal("Switch" :: astType, None, cases.map(renderCase))
-
-          case Binop(lhs, rhs, op) => NonTerminal("Binop" :: astType, Some(op.toString), ra.render(lhs) :: ra.render(rhs) :: Nil)
-
-          case Unop(expr, op) => NonTerminal("Unop" :: astType, Some(op.sql), ra.render(expr) :: Nil)
-
-          case Splice(expr) => NonTerminal("Splice" :: astType, None, expr.toList.map(ra.render))
-
-          case Ident(name) => Terminal("Ident" :: astType, Some(name))
-
-          case Vari(name) => Terminal("Variable" :: astType, Some(":" + name))
-
-          case Let(name, form, body) =>
-            NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
-
-          case IntLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case FloatLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case StringLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case NullLiteral() => Terminal("LiteralExpr" :: astType, None)
-          case BoolLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-        }
-      }
     }
 }

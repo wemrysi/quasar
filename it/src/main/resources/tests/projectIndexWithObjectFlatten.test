@@ -1,10 +1,12 @@
 {
     "name": "project index with object flatten",
     "backends": {
+        "couchbase":         "skip",
         "mongodb_read_only": "pending",
+        "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
-        "couchbase":         "skip"
+	"spark_local": "pending",
+        "spark_hdfs": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0] as parent, commit{*} from slamengine_commits",

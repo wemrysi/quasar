@@ -1,9 +1,12 @@
 {
     "name": "expressions with `= null` and `is null`",
     "backends": {
-        "postgresql": "pending",
+        "couchbase":  "skip",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "mongodb_q_3_2":  "skip",
+        "postgresql": "pending",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "nulls.data",
     "query": "select name,

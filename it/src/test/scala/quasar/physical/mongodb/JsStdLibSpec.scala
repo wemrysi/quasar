@@ -20,10 +20,13 @@ import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
 import quasar.std.StdLib._
 import quasar.jscore._
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import scalaz.{Name => _, _}, Scalaz._
 import shapeless.Nat
@@ -46,8 +49,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (relations.Cond, _)     => Skipped("TODO").left
-    case (relations.Coalesce, _) => Skipped("TODO").left
+    case (relations.Cond, _)           => Skipped("TODO").left
 
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
@@ -55,7 +57,9 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _)         => Skipped("TODO").left
     case (date.ExtractQuarter, _)      => Skipped("TODO").left
 
-    case _                  => ().right
+    case (structural.ConcatOp, _)      => Skipped("TODO").left
+
+    case _                             => ().right
   }
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
@@ -64,7 +68,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     for {
       t  <- lp.cata(MongoDbPlanner.jsExprƒ)
       (pj, ifs) = t
-      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError("no JS compilation")
+      js <- pj.lift(List.fill(ifs.length)(JsFn.identity)) \/> InternalError.fromMsg("no JS compilation")
       wf =  chain[Fix[WorkflowF]](
               $read(coll),
               $simpleMap(NonEmptyList(MapExpr(js)), ListMap.empty))

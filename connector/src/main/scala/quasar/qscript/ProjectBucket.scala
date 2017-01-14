@@ -17,11 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{NonTerminal, RenderTree}, RenderTree.ops._
-import quasar.contrib.matryoshka._
+import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -89,9 +89,7 @@ object ProjectBucket {
         }
     }
 
-  implicit def renderTree[T[_[_]]](implicit
-    FM: RenderTree[FreeMap[T]]
-  ): Delay[RenderTree, ProjectBucket[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ProjectBucket[T, ?]] =
     new Delay[RenderTree, ProjectBucket[T, ?]] {
       def apply[A](RA: RenderTree[A]): RenderTree[ProjectBucket[T, A]] = RenderTree.make {
         case BucketField(src, value, name) =>
@@ -107,7 +105,7 @@ object ProjectBucket {
       }
     }
 
-  implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
+  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]

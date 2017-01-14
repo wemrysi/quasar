@@ -18,13 +18,14 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
-import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
@@ -50,43 +51,27 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 object MapFunc {
   import MapFuncs._
 
+  type CoMapFuncR[T[_[_]], A] = CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]
+
+  def rollMF[T[_[_]], A](mf: MapFunc[T, FreeMapA[T, A]])
+      : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
+    CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](mf.right[A])
+
   /** Returns a List that maps element-by-element to a MapFunc array. If we
     * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
+        Option[List[FreeMapA[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
-          as.foldRightM[Option, List[T[CoEnv[A, MapFunc[T, ?], ?]]]](
+          as.foldRightM[Option, List[FreeMapA[T, A]]](
             Nil)(
-            (mf, acc) => (mf.project.run.toOption >>=
-              {
-                case MakeArray(value) => (value :: acc).some
-                case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed) ++ acc).some
-                case _ => None
-              }))
-        case _ => None
-      }
-  }
-
-  object StaticMap {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[(T[EJson], T[CoEnv[A, MapFunc[T, ?], ?]])]] =
-      mf match {
-        case ConcatMapsN(as) =>
-          as.foldRightM[Option, List[(T[EJson], T[CoEnv[A, MapFunc[T, ?], ?]])]](
-            Nil)(
-            (mf, acc) => (mf.project.run.toOption >>=
-              {
-                case MakeMap(Embed(CoEnv(\/-(Constant(k)))), v) => ((k, v) :: acc).some
-                case Constant(Embed(ejson.Extension(ejson.Map(kvs)))) =>
-                  (kvs.map(_.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed)) ++ acc).some
-                case _ => None
-              }))
+            (mf, acc) => (mf.project.run.toOption collect {
+              case MakeArray(value) => (value :: acc)
+              case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
+                values.map(v => rollMF[T, A](Constant(v)).embed) ++ acc
+            }))
         case _ => None
       }
   }
@@ -96,23 +81,45 @@ object MapFunc {
     * possible, and punt otherwise.
     */
   object StaticArrayPrefix {
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
+        Option[List[FreeMapA[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
-          as.foldRightM[List[T[CoEnv[A, MapFunc[T, ?], ?]]] \/ ?, List[T[CoEnv[A, MapFunc[T, ?], ?]]]](
+          as.foldLeftM[List[FreeMapA[T, A]] \/ ?, List[FreeMapA[T, A]]](
             Nil)(
-            (mf, acc) => mf.project.run.fold(
+            (acc, mf) => mf.project.run.fold(
               κ(acc.left),
               _ match {
-                case MakeArray(value) => (value :: acc).right
+                case MakeArray(value) => (acc :+ value).right
                 case Constant(Embed(ejson.Common(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant(v).right).embed) ++ acc).right
+                  (acc ++ values.map(v => rollMF[T, A](Constant(v)).embed)).right
                 case _ => acc.left
               })).merge.some
         case _ => None
       }
+  }
+
+  object StaticMap {
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
+        Option[List[(T[EJson], FreeMapA[T, A])]] =
+      mf match {
+        case ConcatMapsN(as) =>
+          as.foldRightM[Option, List[(T[EJson], FreeMapA[T, A])]](
+            Nil)(
+            (mf, acc) => (mf.project.run.toOption >>=
+              {
+                case MakeMap(Embed(CoEnv(\/-(Constant(k)))), v) => ((k, v) :: acc).some
+                case Constant(Embed(ejson.Extension(ejson.Map(kvs)))) =>
+                  (kvs.map(_.map(v => rollMF[T, A](Constant(v)).embed)) ++ acc).some
+                case _ => None
+              }))
+        case _ => None
+      }
+  }
+
+  object EmptyArray {
+    def apply[T[_[_]]: CorecursiveT, A]: Constant[T, A] =
+      Constant[T, A](EJson.fromCommon[T[EJson]].apply(ejson.Arr[T[EJson]](Nil)))
   }
 
   // TODO: subtyping is preventing embedding of MapFuncs
@@ -121,25 +128,16 @@ object MapFunc {
     * also arbitrary expressions that may evaluate to an array of any size.
     */
   object ConcatArraysN {
-    // TODO[matryoshka]: Once we handle directly recursive types, this
-    //                   overloading can go away.
-    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply[T[_[_]]: Recursive: Corecursive, A](args: List[FreeMapA[T, A]]):
-        FreeMapA[T, A] =
-      apply(args.map(_.toCoEnv[T])).embed.fromCoEnv
-
-    def apply[T[_[_]]: Recursive: Corecursive, A]
-      (args: List[T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]] = {
+    def apply[T[_[_]]: BirecursiveT, A](args: List[FreeMapA[T, A]])
+        : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
       args.toList match {
-        case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]((ConcatArrays(a, b): MapFunc[T, T[CoEnv[A, MapFunc[T, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case h :: t => t.foldLeft(h)((a, b) => rollMF[T, A](ConcatArrays(a, b)).embed).project
+        case Nil    => rollMF[T, A](EmptyArray[T, FreeMapA[T, A]])
       }
     }
 
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
+        Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -153,22 +151,18 @@ object MapFunc {
 
   }
 
-  type CoMF[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
-  type CoMFR[T[_[_]], A] = CoMF[T, A, T[CoMF[T, A, ?]]]
-
   // TODO subtyping is preventing embeding of MapFuncs
   object ConcatMapsN {
-    def apply[T[_[_]]: Recursive: Corecursive, A](args: List[T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]] = {
+    def apply[T[_[_]]: BirecursiveT, A](args: List[FreeMapA[T, A]])
+        : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
       args.toList match {
-        case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]((ConcatMaps(a, b): MapFunc[T, T[CoEnv[A, MapFunc[T, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(ejson.Arr[T[EJson]](Nil)))))
+        case h :: t => t.foldLeft(h)((a, b) => rollMF[T, A](ConcatMaps(a, b)).embed).project
+        case Nil    => rollMF[T, A](Constant(EJson.fromCommon[T[EJson]].apply(ejson.Arr[T[EJson]](Nil))))
       }
     }
 
-    def unapply[T[_[_]]: Recursive: Corecursive, A](
-      mf: CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]]):
-        Option[List[T[CoEnv[A, MapFunc[T, ?], ?]]]] =
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
+        Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -183,22 +177,14 @@ object MapFunc {
 
   // Transform effectively constant `MapFunc` into a `Constant` value.
   // This is a mini-evaluator for constant qscript values.
-  def foldConstant[T[_[_]]: Recursive: Corecursive, A]
+  def foldConstant[T[_[_]]: BirecursiveT, A]
     (implicit C: ejson.Common :<: ejson.EJson, E: ejson.Extension :<: ejson.EJson)
-      : CoMFR[T, A] => Option[T[EJson]] = {
+      : CoMapFuncR[T, A] => Option[T[EJson]] = {
     object EjConstCommon {
-      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Common[T[EJson]]] =
+      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Common[T[EJson]]] =
         tco match {
           case Embed(CoEnv(\/-(Constant(Embed(ejson.Common(v)))))) => Some(v)
           case _                                                   => None
-        }
-    }
-
-    object EjConstExtension {
-      def unapply[B](tco: T[CoMF[T, B, ?]]): Option[ejson.Extension[T[EJson]]] =
-        tco match {
-          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-          case _                                                      => None
         }
     }
 
@@ -230,23 +216,23 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]
-      : CoMFR[T, A] => CoMFR[T, A] =
+  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
+      : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
     repeatedly(rewrite[T, A]) ⋘
-      orOriginal(foldConstant[T, A].apply(_) ∘ (const => CoEnv(Constant(const).right)))
+      orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def rewrite[T[_[_]]: Recursive: Corecursive: EqualT, A]:
-      CoMFR[T, A] => Option[CoMFR[T, A]] = {
+  def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
+      CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
       {
         case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
-          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
-            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](EJson.fromCommon[T].apply(
-              ejson.Bool[T[EJson]](v1 ≟ v2))).right).some
+          rollMF[T, A](
+            Constant(EJson.fromCommon[T[EJson]].apply(
+              ejson.Bool[T[EJson]](v1 ≟ v2)))).some
 
         case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
@@ -262,32 +248,32 @@ object MapFunc {
             case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
-              }.map(p => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](p._2).right)).get
+              }.map(p => rollMF[T, A](Constant(p._2))).get
           }
 
         // elide Nil array on the left
         case ConcatArrays(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
+            rollMF[T, A](rhs).some
 
         // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
+            rollMF[T, A](lhs).some
 
         // elide Nil map on the left
         case ConcatMaps(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
+            rollMF[T, A](rhs).some
 
         // elide Nil map on the right
         case ConcatMaps(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
-            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
+            rollMF[T, A](lhs).some
 
         case _ => None
       })
@@ -333,6 +319,7 @@ object MapFunc {
         case Interval(a1) => f(a1) ∘ (Interval(_))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
         case Length(a1) => f(a1) ∘ (Length(_))
@@ -344,10 +331,7 @@ object MapFunc {
         case Null(a1) => f(a1) ∘ (Null(_))
         case ToString(a1) => f(a1) ∘ (ToString(_))
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
-        case DupArrayIndices(a1) => f(a1) ∘ (DupArrayIndices(_))
-        case DupMapKeys(a1) => f(a1) ∘ (DupMapKeys(_))
-        case ZipArrayIndices(a1) => f(a1) ∘ (ZipArrayIndices(_))
-        case ZipMapKeys(a1) => f(a1) ∘ (ZipMapKeys(_))
+        case Meta(a1) => f(a1) ∘ (Meta(_))
 
         // binary
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
@@ -365,7 +349,6 @@ object MapFunc {
         case IfUndefined(a1, a2) => (f(a1) ⊛ f(a2))(IfUndefined(_, _))
         case And(a1, a2) => (f(a1) ⊛ f(a2))(And(_, _))
         case Or(a1, a2) => (f(a1) ⊛ f(a2))(Or(_, _))
-        case Coalesce(a1, a2) => (f(a1) ⊛ f(a2))(Coalesce(_, _))
         case Within(a1, a2) => (f(a1) ⊛ f(a2))(Within(_, _))
         case MakeMap(a1, a2) => (f(a1) ⊛ f(a2))(MakeMap(_, _))
         case ConcatMaps(a1, a2) => (f(a1) ⊛ f(a2))(ConcatMaps(_, _))
@@ -420,6 +403,7 @@ object MapFunc {
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
         case (Length(a1), Length(b1)) => in.equal(a1, b1)
@@ -431,10 +415,7 @@ object MapFunc {
         case (Null(a1), Null(b1)) => in.equal(a1, b1)
         case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
-        case (DupArrayIndices(a1), DupArrayIndices(b1)) => in.equal(a1, b1)
-        case (DupMapKeys(a1), DupMapKeys(b1)) => in.equal(a1, b1)
-        case (ZipArrayIndices(a1), ZipArrayIndices(b1)) => in.equal(a1, b1)
-        case (ZipMapKeys(a1), ZipMapKeys(b1)) => in.equal(a1, b1)
+        case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -451,7 +432,6 @@ object MapFunc {
         case (IfUndefined(a1, a2), IfUndefined(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (And(a1, a2), And(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Or(a1, a2), Or(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (Coalesce(a1, a2), Coalesce(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Within(a1, a2), Within(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (MakeMap(a1, a2), MakeMap(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatMaps(a1, a2), ConcatMaps(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -512,6 +492,7 @@ object MapFunc {
           case Interval(a1) => shz("Interval", a1)
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case TypeOf(a1) => shz("TypeOf", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
           case Length(a1) => shz("Length", a1)
@@ -523,10 +504,7 @@ object MapFunc {
           case Null(a1) => shz("Null", a1)
           case ToString(a1) => shz("ToString", a1)
           case MakeArray(a1) => shz("MakeArray", a1)
-          case DupArrayIndices(a1) => shz("DupArrayIndices", a1)
-          case DupMapKeys(a1) => shz("DupMapKeys", a1)
-          case ZipArrayIndices(a1) => shz("ZipArrayIndices", a1)
-          case ZipMapKeys(a1) => shz("ZipMapKeys", a1)
+          case Meta(a1) => shz("Meta", a1)
 
           // binary
           case Add(a1, a2) => shz("Add", a1, a2)
@@ -544,7 +522,6 @@ object MapFunc {
           case IfUndefined(a1, a2) => shz("IfUndefined", a1, a2)
           case And(a1, a2) => shz("And", a1, a2)
           case Or(a1, a2) => shz("Or", a1, a2)
-          case Coalesce(a1, a2) => shz("Coalesce", a1, a2)
           case Within(a1, a2) => shz("Within", a1, a2)
           case MakeMap(a1, a2) => shz("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => shz("ConcatMaps", a1, a2)
@@ -569,7 +546,9 @@ object MapFunc {
       }
     }
 
-  implicit def renderTree[T[_[_]]](implicit ev0: Show[T[EJson]], ev1: RenderTree[Type]): Delay[RenderTree, MapFunc[T, ?]] =
+  // TODO: replace this with some kind of pretty-printing based on a syntax for
+  // MapFunc + EJson.
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFunc[T, ?]] =
     new Delay[RenderTree, MapFunc[T, ?]] {
       val nt = "MapFunc" :: Nil
 
@@ -580,7 +559,7 @@ object MapFunc {
 
         RenderTree.make {
           // nullary
-          case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)  // TODO: use RenderTree[T[EJson]]?
+          case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)
           case Undefined() => Terminal("Undefined" :: nt, None)
           case Now() => Terminal("Now" :: nt, None)
 
@@ -612,6 +591,7 @@ object MapFunc {
           case Interval(a1) => nAry("Interval", a1)
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case TypeOf(a1) => nAry("TypeOf", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
           case Length(a1) => nAry("Length", a1)
@@ -623,10 +603,7 @@ object MapFunc {
           case Null(a1) => nAry("Null", a1)
           case ToString(a1) => nAry("ToString", a1)
           case MakeArray(a1) => nAry("MakeArray", a1)
-          case DupArrayIndices(a1) => nAry("DupArrayIndices", a1)
-          case DupMapKeys(a1) => nAry("DupMapKeys", a1)
-          case ZipArrayIndices(a1) => nAry("ZipArrayIndices", a1)
-          case ZipMapKeys(a1) => nAry("ZipMapKeys", a1)
+          case Meta(a1) => nAry("Meta", a1)
 
           // binary
           case Add(a1, a2) => nAry("Add", a1, a2)
@@ -644,7 +621,6 @@ object MapFunc {
           case IfUndefined(a1, a2) => nAry("IfUndefined", a1, a2)
           case And(a1, a2) => nAry("And", a1, a2)
           case Or(a1, a2) => nAry("Or", a1, a2)
-          case Coalesce(a1, a2) => nAry("Coalesce", a1, a2)
           case Within(a1, a2) => nAry("Within", a1, a2)
           case MakeMap(a1, a2) => nAry("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => nAry("ConcatMaps", a1, a2)
@@ -665,90 +641,90 @@ object MapFunc {
       }
     }
 
+  def translateNullaryMapping[T[_[_]], A]: NullaryFunc => MapFunc[T, A] = {
+    case date.Now => Now()
+  }
+
   def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFunc[T, A] = {
-    {
-      case date.ExtractCentury => ExtractCentury(_)
-      case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
-      case date.ExtractDecade => ExtractDecade(_)
-      case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
-      case date.ExtractDayOfYear => ExtractDayOfYear(_)
-      case date.ExtractEpoch => ExtractEpoch(_)
-      case date.ExtractHour => ExtractHour(_)
-      case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
-      case date.ExtractIsoYear => ExtractIsoYear(_)
-      case date.ExtractMicroseconds => ExtractMicroseconds(_)
-      case date.ExtractMillennium => ExtractMillennium(_)
-      case date.ExtractMilliseconds => ExtractMilliseconds(_)
-      case date.ExtractMinute => ExtractMinute(_)
-      case date.ExtractMonth => ExtractMonth(_)
-      case date.ExtractQuarter => ExtractQuarter(_)
-      case date.ExtractSecond => ExtractSecond(_)
-      case date.ExtractTimezone => ExtractTimezone(_)
-      case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
-      case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
-      case date.ExtractWeek => ExtractWeek(_)
-      case date.ExtractYear => ExtractYear(_)
-      case date.Date => Date(_)
-      case date.Time => Time(_)
-      case date.Timestamp => Timestamp(_)
-      case date.Interval => Interval(_)
-      case date.TimeOfDay => TimeOfDay(_)
-      case date.ToTimestamp => ToTimestamp(_)
-      case math.Negate => Negate(_)
-      case relations.Not => Not(_)
-      case string.Length => Length(_)
-      case string.Lower => Lower(_)
-      case string.Upper => Upper(_)
-      case string.Boolean => Bool(_)
-      case string.Integer => Integer(_)
-      case string.Decimal => Decimal(_)
-      case string.Null => Null(_)
-      case string.ToString => ToString(_)
-      case structural.MakeArray => MakeArray(_)
-    }
+    case date.ExtractCentury => ExtractCentury(_)
+    case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
+    case date.ExtractDecade => ExtractDecade(_)
+    case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
+    case date.ExtractDayOfYear => ExtractDayOfYear(_)
+    case date.ExtractEpoch => ExtractEpoch(_)
+    case date.ExtractHour => ExtractHour(_)
+    case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
+    case date.ExtractIsoYear => ExtractIsoYear(_)
+    case date.ExtractMicroseconds => ExtractMicroseconds(_)
+    case date.ExtractMillennium => ExtractMillennium(_)
+    case date.ExtractMilliseconds => ExtractMilliseconds(_)
+    case date.ExtractMinute => ExtractMinute(_)
+    case date.ExtractMonth => ExtractMonth(_)
+    case date.ExtractQuarter => ExtractQuarter(_)
+    case date.ExtractSecond => ExtractSecond(_)
+    case date.ExtractTimezone => ExtractTimezone(_)
+    case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
+    case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
+    case date.ExtractWeek => ExtractWeek(_)
+    case date.ExtractYear => ExtractYear(_)
+    case date.Date => Date(_)
+    case date.Time => Time(_)
+    case date.Timestamp => Timestamp(_)
+    case date.Interval => Interval(_)
+    case date.TimeOfDay => TimeOfDay(_)
+    case date.ToTimestamp => ToTimestamp(_)
+    case identity.TypeOf => TypeOf(_)
+    case math.Negate => Negate(_)
+    case relations.Not => Not(_)
+    case string.Length => Length(_)
+    case string.Lower => Lower(_)
+    case string.Upper => Upper(_)
+    case string.Boolean => Bool(_)
+    case string.Integer => Integer(_)
+    case string.Decimal => Decimal(_)
+    case string.Null => Null(_)
+    case string.ToString => ToString(_)
+    case structural.MakeArray => MakeArray(_)
+    case structural.Meta => Meta(_)
   }
 
-  def translateBinaryMapping[T[_[_]], A]: BinaryFunc => (A, A) => MapFunc[T, A] = {
-    {
-      // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
-      //     about the second. And it shouldn’t even have two in LP.
-      case array.ArrayLength => (a, b) => Length(a)
-      case math.Add => Add(_, _)
-      case math.Multiply => Multiply(_, _)
-      case math.Subtract => Subtract(_, _)
-      case math.Divide => Divide(_, _)
-      case math.Modulo => Modulo(_, _)
-      case math.Power => Power(_, _)
-      case relations.Eq => Eq(_, _)
-      case relations.Neq => Neq(_, _)
-      case relations.Lt => Lt(_, _)
-      case relations.Lte => Lte(_, _)
-      case relations.Gt => Gt(_, _)
-      case relations.Gte => Gte(_, _)
-      case relations.IfUndefined => IfUndefined(_, _)
-      case relations.And => And(_, _)
-      case relations.Or => Or(_, _)
-      case relations.Coalesce => Coalesce(_, _)
-      case set.Within => Within(_, _)
-      case structural.MakeObject => MakeMap(_, _)
-      case structural.ObjectConcat => ConcatMaps(_, _)
-      case structural.ArrayProject => ProjectIndex(_, _)
-      case structural.ObjectProject => ProjectField(_, _)
-      case structural.DeleteField => DeleteField(_, _)
-      case string.Concat
-         | structural.ArrayConcat
-         | structural.ConcatOp => ConcatArrays(_, _)
-    }
+  def translateBinaryMapping[T[_[_]], A]
+      : BinaryFunc => (A, A) => MapFunc[T, A] = {
+    // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
+    //     about the second. And it shouldn’t even have two in LP.
+    case array.ArrayLength => (a, b) => Length(a)
+    case math.Add => Add(_, _)
+    case math.Multiply => Multiply(_, _)
+    case math.Subtract => Subtract(_, _)
+    case math.Divide => Divide(_, _)
+    case math.Modulo => Modulo(_, _)
+    case math.Power => Power(_, _)
+    case relations.Eq => Eq(_, _)
+    case relations.Neq => Neq(_, _)
+    case relations.Lt => Lt(_, _)
+    case relations.Lte => Lte(_, _)
+    case relations.Gt => Gt(_, _)
+    case relations.Gte => Gte(_, _)
+    case relations.IfUndefined => IfUndefined(_, _)
+    case relations.And => And(_, _)
+    case relations.Or => Or(_, _)
+    case set.Within => Within(_, _)
+    case structural.MakeObject => MakeMap(_, _)
+    case structural.ObjectConcat => ConcatMaps(_, _)
+    case structural.ArrayProject => ProjectIndex(_, _)
+    case structural.ObjectProject => ProjectField(_, _)
+    case structural.DeleteField => DeleteField(_, _)
+    case string.Concat
+       | structural.ArrayConcat
+       | structural.ConcatOp => ConcatArrays(_, _)
   }
 
-  def translateTernaryMapping[T[_[_]], A]:
-      TernaryFunc => (A, A, A) => MapFunc[T, A] = {
-    {
-      case relations.Between => Between(_, _, _)
-      case relations.Cond    => Cond(_, _, _)
-      case string.Search     => Search(_, _, _)
-      case string.Substring  => Substring(_, _, _)
-    }
+  def translateTernaryMapping[T[_[_]], A]
+      : TernaryFunc => (A, A, A) => MapFunc[T, A] = {
+    case relations.Between => Between(_, _, _)
+    case relations.Cond    => Cond(_, _, _)
+    case string.Search     => Search(_, _, _)
+    case string.Substring  => Substring(_, _, _)
   }
 }
 
@@ -798,6 +774,13 @@ object MapFuncs {
   /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
 
+  // identity
+  /** Returns a string describing the type of the value. If the value has a
+    * metadata map containing an "_ejson.type" entry, that value is returned.
+    * Otherwise, it returns a string naming a [[quasar.common.PrimaryType]].
+    */
+  @Lenses final case class TypeOf[T[_[_]], A](a1: A) extends Unary[T, A]
+
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Add[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
@@ -820,7 +803,6 @@ object MapFuncs {
   @Lenses final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Cond[T[_[_]], A](cond: A, then_ : A, else_ : A) extends Ternary[T, A] {
     def a1 = cond
@@ -847,7 +829,12 @@ object MapFuncs {
   }
 
   // structural
+
+  /** Makes a single-element [[ejson.Arr]] containing `a1`.
+    */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Makes a single-element [[ejson.Map]] with key `key` and value `value`.
+    */
   @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
     def a1 = key
     def a2 = value
@@ -866,47 +853,33 @@ object MapFuncs {
     def a1 = src
     def a2 = field
   }
+  @Lenses final case class Meta[T[_[_]], A](a1: A) extends Unary[T, A]
 
-  // helpers & QScript-specific
-  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
-    * `{ k1: k1, k2: k2, ...}`.
-    */
-  @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns an array of `[v1, v2, ...]` into an array of `[0, 1, ...]`.
-    */
-  @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
-    * `{ k1: [k1, v1], k2: [k2, v2], ...}`.
-    */
-  @Lenses final case class ZipMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Turns an array of `[v1, v2, ...]` into an array of
-    * `[[0, v1], [1, v2], ...]`.
-    */
-  @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
     def a1 = from
     def a2 = to
   }
+
   /** A conditional specifically for checking that `a1` satisfies `pattern`.
     */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]
 
   object NullLit {
-    def apply[T[_[_]]: Corecursive, A](): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T].apply(ejson.Null[T[EJson]]())))
+    def apply[T[_[_]]: CorecursiveT, A](): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Null[T[EJson]]())))
 
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Boolean = mf.resume.fold ({
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Boolean = mf.resume.fold ({
       case Constant(ej) => EJson.isNull(ej)
       case _ => false
     }, _ => false)
   }
 
   object BoolLit {
-    def apply[T[_[_]]: Corecursive, A](b: Boolean): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T].apply(ejson.Bool[T[EJson]](b))))
+    def apply[T[_[_]]: CorecursiveT, A](b: Boolean): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Bool[T[EJson]](b))))
 
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[Boolean] = mf.resume.fold ({
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[Boolean] = mf.resume.fold ({
       case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
         case ejson.Bool(b) => b.some
         case _ => None
@@ -915,39 +888,34 @@ object MapFuncs {
     }, _ => None)
   }
 
-  object IntLit {
-    def apply[T[_[_]]: Corecursive, A](i: BigInt): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T].apply(ejson.Int[T[EJson]](i))))
+  object DecLit {
+    def apply[T[_[_]]: CorecursiveT, A](d: BigDecimal): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Dec[T[EJson]](d))))
+  }
 
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]): Option[BigInt] = mf.resume.fold ({
+  object IntLit {
+    def apply[T[_[_]]: CorecursiveT, A](i: BigInt): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T[EJson]].apply(ejson.Int[T[EJson]](i))))
+
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[BigInt] =
+      mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
+  }
+
+  object IntLitMapFunc {
+    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[BigInt] = mf match {
       case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None
       }
       case _ => None
-    }, _ => None)
+    }
   }
 
   object StrLit {
-    def apply[T[_[_]]: Corecursive, A](str: String): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T].apply(ejson.Str[T[EJson]](str))))
+    def apply[T[_[_]]: CorecursiveT, A](str: String): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Str[T[EJson]](str))))
 
-    // TODO[matryoshka]: Once we handle directly recursive types, this
-    //                   overloading can go away.
-    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
-        Option[String] =
-      mf.run.fold({
-        _ => None
-      }, {
-        case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
-          case ejson.Str(str) => str.some
-          case _ => None
-        }
-        case _ => None
-      })
-
-    def unapply[T[_[_]]: Recursive, A](mf: FreeMapA[T, A]):
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]):
         Option[String] =
       mf.resume.fold({
         case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
@@ -960,4 +928,3 @@ object MapFuncs {
       })
   }
 }
-

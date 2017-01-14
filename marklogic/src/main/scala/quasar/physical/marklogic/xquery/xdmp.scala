@@ -33,14 +33,8 @@ object xdmp {
   def directoryDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:directory-delete($uri)")
 
-  def directoryProperties(uri: XQuery, depth: XQuery): XQuery =
-    XQuery(s"xdmp:directory-properties($uri, $depth)")
-
   def documentDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:document-delete($uri)")
-
-  def documentGetProperties(uri: XQuery, property: XQuery): XQuery =
-    XQuery(s"xdmp:document-get-properties($uri, $property)")
 
   def documentInsert(uri: XQuery, root: XQuery): XQuery =
     XQuery(s"xdmp:document-insert($uri, $root)")
@@ -59,6 +53,9 @@ object xdmp {
 
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
+
+  def prettyPrint(qstring: XQuery): XQuery =
+    XQuery(s"xdmp:pretty-print($qstring)")
 
   def quarterFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:quarter-from-date($date)")

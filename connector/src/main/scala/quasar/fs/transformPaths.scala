@@ -16,12 +16,13 @@
 
 package quasar.fs
 
-import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 
-import matryoshka.{FunctorT, Fix}, FunctorT.ops._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._
 import monocle.std.tuple2._
@@ -136,6 +137,9 @@ object transformPaths {
     transformIn(g, liftFT[S])
   }
 
+  private def transformFile(inPath: EndoK[AbsPath])(lp: Fix[LP]): Fix[LP] =
+    lp.transAna[Fix[LP]](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
+
   /** Returns a natural transformation that transforms all paths in `QueryFile`
     * operations using the given functions.
     *
@@ -152,18 +156,17 @@ object transformPaths {
   ): S ~> Free[S, ?] = {
     import QueryFile._
 
-    val Q             = QueryFile.Ops[S]
-    val U             = QueryFile.Unsafe[S]
-    val translateFile = natToFunction[AbsPath, AbsPath, File](inPath)
+    val Q = QueryFile.Ops[S]
+    val U = QueryFile.Unsafe[S]
 
     val g = λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
-        Q.execute(lp.transAna(transformLPPaths(translateFile)), inPath(out))
+        Q.execute(transformFile(inPath)(lp), inPath(out))
           .bimap(transformErrorPath(outPath), outPath(_))
           .run.run
 
       case EvaluatePlan(lp) =>
-        U.eval(lp.transAna(transformLPPaths(translateFile)))
+        U.eval(transformFile(inPath)(lp))
           .leftMap(transformErrorPath(outPath))
           .run.run
 
@@ -176,7 +179,7 @@ object transformPaths {
         U.close(h)
 
       case Explain(lp) =>
-        Q.explain(lp.transAna(transformLPPaths(translateFile)))
+        Q.explain(transformFile(inPath)(lp))
           .leftMap(transformErrorPath(outPath))
           .run.run
 
@@ -231,7 +234,7 @@ object transformPaths {
   private val fsPathError: Optional[FileSystemError, APath] =
     FileSystemError.pathErr composeLens PathError.errorPath
 
-  private val fsPlannerError: Optional[FileSystemError, Fix[LogicalPlan]] =
+  private val fsPlannerError: Optional[FileSystemError, Fix[LP]] =
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
@@ -240,11 +243,11 @@ object transformPaths {
     fsPathError.modify(f(_)) compose
     fsUnkRdError.modify(f(_)) compose
     fsUnkWrError.modify(f(_)) compose
-    fsPlannerError.modify(_.transAna(transformLPPaths(natToFunction[AbsPath,AbsPath,File](f))))
+    fsPlannerError.modify(transformFile(f))
 
-  private def transformLPPaths(f: AFile => AFile) = λ[LogicalPlan ~> LogicalPlan] {
+  private def transformLPPaths(f: AFile => AFile) = λ[LP ~> LP] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    case ReadF(p) => ReadF(f(mkAbsolute(rootDir, p)))
-    case lp       => lp
+    case lp.Read(p) => lp.read(f(mkAbsolute(rootDir, p)))
+    case lp         => lp
   }
 }

@@ -19,6 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.physical.marklogic.MonadErrMsgs
+import quasar.physical.marklogic.prisms._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
 
@@ -27,10 +28,11 @@ import scala.util.{Success, Failure}
 import scala.xml.Elem
 
 import com.marklogic.xcc.types._
-import org.threeten.bp._
+import java.time._
 import scalaz._, Scalaz._
 
 object xdmitem {
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = xdm match {
     case item: CtsBox                   =>
       Data.singletonObj("cts:box", Data.Obj(ListMap(
@@ -78,8 +80,8 @@ object xdmitem {
     case item: XSAnyURI                 => Data._str(item.asString).point[F]
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
-    case item: XSDate                   => Data.singletonObj("xs:date"      , Data._str(item.asString)).point[F]
-    case item: XSDateTime               => Data._timestamp(Instant.ofEpochMilli(item.asDate.getTime)).point[F]
+    case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
+    case item: XSDateTime               => Data._timestamp(item.asDate.toInstant).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]
@@ -93,10 +95,9 @@ object xdmitem {
     case item: XSInteger                => Data._int(item.asBigInteger).point[F]
     case item: XSQName                  => Data._str(item.asString).point[F]
     case item: XSString                 => Data._str(item.asString).point[F]
-                                           // NB: This can be represented with org.threeten.bp.OffsetTime
-    case item: XSTime                   => Data.singletonObj("xs:time"      , Data._str(item.asString)).point[F]
+    case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._time(_))
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
-    case other                          => s"No Data representation for '$other'.".wrapNel.raiseError[F, Data]
+    case other                          => noReprError[F, Data](other.toString)
   }
 
   ////
@@ -105,19 +106,36 @@ object xdmitem {
     Data._binary(ImmutableArray.fromArray(bytes)).point[F]
 
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
-    data.JsonParser.parseFromString(jsonString) match {
+    Data.jsonParser.parseFromString(jsonString) match {
       case Success(d) => d.point[F]
       case Failure(e) => e.toString.wrapNel.raiseError[F, Data]
     }
 
-  private def xmlToData[F[_]: MonadErrMsgs](xmlString: String): F[Data] = {
-    val el = SecureXML.loadString(xmlString).fold(_.toString.wrapNel.raiseError[F, Elem], _.point[F])
+  private def parseLocalDate[F[_]: MonadErrMsgs](s: String): F[LocalDate] =
+    parseTemporal[F, LocalDate]("LocalDate", isoLocalDate.getOption)(s)
 
-    el flatMap { e =>
-      if (xml.qualifiedName(e) === xml.namespaces.ejsonEjson.shows)
-        data.decodeXml[F](e)
-      else
-        xml.toData(e).point[F]
-    }
+  private def parseLocalTime[F[_]: MonadErrMsgs](s: String): F[LocalTime] =
+    parseTemporal[F, LocalTime]("LocalTime", isoLocalTime.getOption)(s)
+
+  private def parseTemporal[F[_]: MonadErrMsgs, A](name: String, parse: String => Option[A])(str: String): F[A] =
+    parse(str).fold(s"Failed to parse '$str' as a $name.".wrapNel.raiseError[F, A])(_.point[F])
+
+  private def xmlToData[F[_]: MonadErrMsgs](xmlString: String): F[Data] = {
+    val elem = SecureXML.loadString(xmlString).fold(
+                 _.toString.wrapNel.raiseError[F, Elem],
+                 _.point[F])
+
+    def singletonValue(d: Data): Data =
+      Data._obj.getOption(d) map (_.toList) collect {
+        case (_, value) :: Nil => value
+      } getOrElse d
+
+    elem flatMap (e => OptionT(data.decodeXml[F]({
+      case n: Elem => singletonValue(xml.toEJsonData(n)).point[F]
+      case other   => noReprError[F, Data](other.toString)
+    })(e)) getOrElse xml.toEJsonData(e))
   }
+
+  private def noReprError[F[_]: MonadErrMsgs, A](form: String): F[A] =
+    s"No Data representation for '$form'.".wrapNel.raiseError[F, A]
 }

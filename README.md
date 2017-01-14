@@ -1,5 +1,6 @@
 [![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
+[![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # Thanks to Sponsors
@@ -30,19 +31,13 @@ See the instructions below for running and configuring these JARs.
 
 **Note**: This requires Java 8 and Bash (Linux, Mac, or Cygwin on Windows).
 
-### Checkout
-
-```bash
-git clone git@github.com:quasar-analytics/quasar.git
-```
-
 ### Build
 
 The following sections explain how to build and run the various subprojects.
 
 #### Basic Compile & Test
 
-To compile the project and run tests, execute the following command:
+To compile the project and run tests, first clone the quasar repo and then execute the following command:
 
 ```bash
 ./sbt test
@@ -51,7 +46,6 @@ To compile the project and run tests, execute the following command:
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-This will lead to failures in the integration test project (`it`) because there is no configured "backend" available.
 Running the full test suite can be done in two ways:
 
 ##### Testing option 1 (prerequisite: docker)
@@ -62,14 +56,13 @@ A docker container running mongodb operates for the duration of the test run.
 ./bin/full-it-tests.sh
 ```
 
-##### Testing option 2 (prerequisite: mongodb)
+##### Testing option 2
 
-Currently Quasar only supports MongoDB so in order to run the integration
-tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
+In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
 you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
 allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew or simply go to the MongDB website and follow the
+In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
 instructions that can be found there.
 
 Once we have a MongoDB instance handy, we need to set a few
@@ -165,6 +158,8 @@ Then the filesystem will contain the paths `/local/test/` and `/local/students/c
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
+##### MongoDB
+
 To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
 - `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
 - `javax.net.ssl.trustStorePassword`: password for the trust store.
@@ -173,9 +168,61 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
+##### Couchbase
+
 To connect to Couchbase use the following `connectionUri` format:
 
-`couchbase://<host>[:<port>]?username=<username>&password=<password>`
+`couchbase://<host>[:<port>]?username=<username>&password=<password>[&queryTimeoutSeconds=<seconds>]`
+
+Prerequisites
+- Couchbase Server 4.5.1 or greater
+- A "default" bucket with anonymous access
+- Documents must have a "type" field to be listed
+- Primary index on queried buckets
+- Secondary index on "type" field for queried buckets
+- Additional indices and tuning as recommended by Couchbase for proper N1QL performance
+
+Known Limitations
+- Slow queries — query optimization hasn't been applied
+- Join unimplemented — future support planned
+- [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
+
+##### HDFS using Apache Spark
+
+To connect to HDFS using Apache Spark use the following `connectionUri` format:
+
+`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+
+e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+
+##### MarkLogic
+
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+
+`xcc://<username>:<password>@<host>:<port>/<database>`
+
+Prerequisites
+- MarkLogic 8.0+
+- Documents must to be organized under directories to be found by Quasar.
+- Namespaces used in queries must be defined on the server.
+- Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
+
+[Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
+- Only XML documents are currently supported (JSON support is coming soon, see [#1704](https://github.com/quasar-analytics/quasar/issues/1704)).
+- It is not yet possible to reference XML attributes in queries ([#1701](https://github.com/quasar-analytics/quasar/issues/1701)).
+- Most joins do not yet work ([#1581](https://github.com/quasar-analytics/quasar/issues/1581), [#1560](https://github.com/quasar-analytics/quasar/issues/1560), [#1539](https://github.com/quasar-analytics/quasar/issues/1539), [#1505](https://github.com/quasar-analytics/quasar/issues/1505)).
+- Field aliases must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- "Default" numeric field names are prefixed with an underscore ("_") in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- Index usage is currently poor, so performance may degrade on large directories and/or complex queries. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
+
+Quasar's data model is JSON-ish and thus there is a bit of translation required when applying it to XML. The current mapping aims to be intuitive while still taking advantage of the XDM as much as possible. Take note of the following:
+- Projecting a field will result in the child element(s) having the given name. If more than one element matches, the result will be an array.
+- As the children of an element form a sequence, they may be treated both as a mapping from element names to values and as an array of values. That is to say, given a document like `<foo><bar>1</bar><baz>2</baz></foo>`, `foo.bar` and `foo[0]` both refer to `<bar>1</bar>`.
+- XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
+  - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
+  - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
+  - Element attributes are serialized to an object at the `_attributes` key.
+  - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
 
 #### View mounts
 
@@ -195,6 +242,22 @@ For example, given the above MongoDB mount, an additional view could be defined 
 ```
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+#### Build Quasar for Apache Spark
+
+Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
+
+1. Assemble Quasar for Spark
+
+```sbt web/assembly -Dquasar4Spark=yes```
+
+2. Build sparkcore.jar
+
+```sbt sparkcore/assembly -DbuildSparkCore=yes```
+
+3. Set environment variable QUASAR_HOME
+
+QUASAR_HOME must point to a folder holding `sparkcore.jar`
 
 ## REPL Usage
 
@@ -271,7 +334,7 @@ For compressed output use `Accept-Encoding: gzip`.
 
 Executes a SQL² query, contained in the request body, on the backend responsible for the request path.
 
-The `Destination` header must specify the *output path*, where the results of the query will become available if this API successfully completes.
+The `Destination` header must specify the *output path*, where the results of the query will become available if this API successfully completes. If the output path already exists, it will be overwritten with the query results.
 
 All paths referenced in the query, as well as the output path, are interpreted as relative to the request path, unless they begin with `/`.
 
@@ -619,7 +682,6 @@ time      | `"10:30:05"`    | `{ "$time": "10:30:05" }` | HH:MM[:SS[:.SSS]]
 interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | Note: year/month not currently supported.
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
-error     | `null`          | `{ "$na": null }` | A runtime error occurred producing or representing this value.
 
 
 ### CSV

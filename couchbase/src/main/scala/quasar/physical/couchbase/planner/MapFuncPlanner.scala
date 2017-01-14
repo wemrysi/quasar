@@ -17,305 +17,473 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, eitherT._, ski.κ
-import quasar.NameGenerator
-import quasar.PhaseResult.Detail
-import quasar.physical.couchbase._
-import quasar.physical.couchbase.N1QL._, Select._
-import quasar.Planner.{NonRepresentableEJson, PlannerError}
-import quasar.qscript, qscript._
-import quasar.std.StdLib.string._
+import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
+import quasar.{Data => QData, Type => QType, NameGenerator}
+import quasar.fp._, eitherT._
+import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
+import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
+import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 
-import matryoshka._, Recursive.ops._
-import scalaz._, Scalaz.{ToIdOps => _, _}
+import matryoshka._
+import matryoshka.implicits._
+import scalaz._, Scalaz._
 
-final class MapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
-  extends Planner[F, MapFunc[T, ?]] {
-  import MapFuncs._
+final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+  extends Planner[T, F, MapFunc[T, ?]] {
 
-  def plan: AlgebraM[M, MapFunc[T, ?], N1QL] = {
+  def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
+  def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
+  def bool(b: Boolean): T[N1QL] = Data[T[N1QL]](QData.Bool(b)).embed
+  val undefined: T[N1QL]        = Null[T[N1QL]]().embed
+
+  def unwrap(a1: T[N1QL]): T[N1QL] =
+    IfMissing(
+      SelectField(a1, str(DateKey)).embed,
+      SelectField(a1, str(TimeKey)).embed,
+      SelectField(a1, str(TimestampKey)).embed,
+      a1).embed
+
+  def extract(a1: T[N1QL], part: String): T[N1QL] =
+    DatePartStr(unwrap(a1), str(part)).embed
+
+  def rel(op: N1QL[T[N1QL]]): T[N1QL] = {
+    def handleDates(a1: T[N1QL], a2: T[N1QL], o: (T[N1QL], T[N1QL]) => N1QL[T[N1QL]]): T[N1QL] = {
+      val a1U = unwrap(a1)
+      val a2U = unwrap(a2)
+      Case(
+        WhenThen(
+          IsNotNull(IfMissing(
+            SelectField(a1, str(DateKey)).embed,
+            SelectField(a2, str(DateKey)).embed).embed).embed,
+          o(DateDiffStr(a1U, a2U, str("day")).embed, int(0)).embed),
+        WhenThen(
+          IsNotNull(IfMissing(
+            SelectField(a1, str(TimeKey)).embed,
+            SelectField(a1, str(TimestampKey)).embed,
+            SelectField(a2, str(TimeKey)).embed,
+            SelectField(a2, str(TimestampKey)).embed).embed).embed,
+          o(DateDiffStr(a1U, a2U, str("millisecond")).embed, int(0)).embed)
+      )(
+        Else(o(a1, a2).embed)
+      ).embed
+    }
+
+    op match {
+      case Eq(a1, a2)              => handleDates(a1, a2, Eq(_, _))
+      case Neq(a1, a2)             => handleDates(a1, a2, Neq(_, _))
+      case Lt(a1, a2)              => handleDates(a1, a2, Lt(_, _))
+      case Lte(a1, a2)             => handleDates(a1, a2, Lte(_, _))
+      case Gt(a1, a2)              => handleDates(a1, a2, Gt(_, _))
+      case Gte(a1, a2)             => handleDates(a1, a2, Gte(_, _))
+      case v                       => v.embed
+    }
+  }
+
+  def datetime(a1: T[N1QL], key: String, regex: Regex): T[N1QL] =
+    Case(
+      WhenThen(
+        IsNotNull(SelectField(a1, str(key)).embed).embed,
+        a1),
+      WhenThen(
+        RegexContains(a1, str(regex.regex)).embed,
+        Obj(Map(str(key) -> a1)).embed)
+    )(
+      Else(Null[T[N1QL]].embed)
+    ).embed
+
+  def plan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] = {
     // nullary
-    case Constant(v) =>
-      EitherT(
-        v.cataM(EJson.fromEJson).bimap[PlannerError, N1QL](
-          κ(NonRepresentableEJson(v.shows)),
-          PartialQueryString(_)
-        ).point[PR])
-    case Undefined() =>
-      partialQueryString("null").point[M]
+    case MF.Constant(v) =>
+      Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
+    case MF.Undefined() =>
+      undefined.η[M]
 
     // array
-    case Length(a1) =>
-      partialQueryString(s"array_length(${n1ql(a1)})").point[M]
+    case MF.Length(a1) =>
+      IfMissingOrNull(
+        Length(a1).embed,
+        LengthArr(a1).embed,
+        LengthObj(a1).embed,
+        undefined
+      ).embed.η[M]
 
     // date
-    case Date(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains("${n1ql(a1)}", "$dateRegex") then v
-         else null
-         end)"""
-      ).point[M]
-    case Time(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains("${n1ql(a1)}", "$timeRegex") then v
-         else null
-         end)"""
-      ).point[M]
-    case Timestamp(a1) =>
-      partialQueryString(s"""
-        (case
-         when regexp_contains("${n1ql(a1)}", "$timestampRegex") then v
-         else null
-         end)"""
-      ).point[M]
-    case Interval(a1) => ???
-    case TimeOfDay(a1) => ???
-    case ToTimestamp(a1) => ???
-    case ExtractCentury(a1) => ???
-    case ExtractDayOfMonth(a1) => ???
-    case ExtractDecade(a1) => ???
-    case ExtractDayOfWeek(a1) => ???
-    case ExtractDayOfYear(a1) => ???
-    case ExtractEpoch(a1) => ???
-    case ExtractHour(a1) => ???
-    case ExtractIsoDayOfWeek(a1) => ???
-    case ExtractIsoYear(a1) => ???
-    case ExtractMicroseconds(a1) => ???
-    case ExtractMillennium(a1) => ???
-    case ExtractMilliseconds(a1) => ???
-    case ExtractMinute(a1) => ???
-    case ExtractMonth(a1) => ???
-    case ExtractQuarter(a1) => ???
-    case ExtractSecond(a1) => ???
-    case ExtractTimezone(a1) => ???
-    case ExtractTimezoneHour(a1) => ???
-    case ExtractTimezoneMinute(a1) => ???
-    case ExtractWeek(a1) => ???
-    case ExtractYear(a1) => ???
-    case Now() =>
-      partialQueryString("now_str()").point[M]
+    case MF.Date(a1) =>
+      datetime(a1, DateKey, dateRegex.r).η[M]
+    case MF.Time(a1) =>
+      datetime(a1, TimeKey, timeRegex.r).η[M]
+    case MF.Timestamp(a1) =>
+      datetime(a1, TimestampKey, timestampRegex.r).η[M]
+    case MF.Interval(a1) =>
+      unimplementedP("Interval")
+    case MF.TimeOfDay(a1) =>
+      def fracZero(a1: T[N1QL]): T[N1QL] =
+        Case(
+          WhenThen(
+            RegexContains(a1, str("[.]")).embed,
+            Time(a1).embed),
+          WhenThen(
+            IsNotNull(a1).embed,
+            Time(ConcatStr(a1, str(".000")).embed).embed)
+        )(
+          Else(undefined)
+        ).embed
+
+      def timeFromTS(a1: T[N1QL]): T[N1QL] =
+        Time(SelectElem(
+          Split(
+            SelectElem(
+              Split(SelectField(a1, str(TimestampKey)).embed,  str("T")).embed,
+              int(1)).embed,
+            str("Z")).embed,
+          int(0)).embed).embed
+
+      Case(
+        WhenThen(SelectField(a1, str(DateKey)).embed, undefined),
+        WhenThen(SelectField(a1, str(TimeKey)).embed, a1),
+        WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
+      )(
+        Else(fracZero(MillisToUTC(Millis(a1).embed, str("00:00:00.000").some).embed))
+      ).embed.η[M]
+    case MF.ToTimestamp(a1) =>
+      Timestamp(MillisToUTC(a1, none).embed).embed.η[M]
+    case MF.TypeOf(a1) =>
+      unimplementedP("TypeOf")
+    case MF.ExtractCentury(a1) =>
+      Ceil(Div(extract(a1, "year"), int(100)).embed).embed.η[M]
+    case MF.ExtractDayOfMonth(a1) =>
+      extract(a1, "day").η[M]
+    case MF.ExtractDecade(a1)         =>
+      extract(a1, "decade").η[M]
+    case MF.ExtractDayOfWeek(a1)      =>
+      extract(a1, "day_of_week").η[M]
+    case MF.ExtractDayOfYear(a1)      =>
+      extract(a1, "day_of_year").η[M]
+    case MF.ExtractEpoch(a1) =>
+      Div(
+        Millis(
+          Case(
+            WhenThen(
+              SelectField(a1, str(DateKey)).embed,
+              ConcatStr(
+                SelectField(a1, str(DateKey)).embed,
+                str("T00:00:00.000Z")).embed),
+            WhenThen(
+              SelectField(a1, str(TimeKey)).embed,
+              undefined)
+          )(
+            Else(IfMissing(
+              SelectField(a1, str(TimestampKey)).embed,
+              a1).embed)
+          ).embed
+        ).embed,
+        int(1000)
+      ).embed.η[M]
+    case MF.ExtractHour(a1) =>
+      extract(a1, "hour").η[M]
+    case MF.ExtractIsoDayOfWeek(a1) =>
+      extract(a1, "iso_dow").η[M]
+    case MF.ExtractIsoYear(a1)        =>
+      extract(a1, "iso_year").η[M]
+    case MF.ExtractMicroseconds(a1) =>
+      Mult(
+        Add(
+          Mult(extract(a1, "second"), int(1000)).embed,
+          extract(a1, "millisecond")).embed,
+        int(1000)
+      ).embed.η[M]
+    case MF.ExtractMillennium(a1) =>
+      Ceil(Div(extract(a1, "year"), int(1000)).embed).embed.η[M]
+    case MF.ExtractMilliseconds(a1) =>
+      Add(
+        Mult(extract(a1, "second"), int(1000)).embed,
+        extract(a1, "millisecond")
+      ).embed.η[M]
+    case MF.ExtractMinute(a1) =>
+      extract(a1, "minute").η[M]
+    case MF.ExtractMonth(a1) =>
+      extract(a1, "month").η[M]
+    case MF.ExtractQuarter(a1) =>
+      extract(a1, "quarter").η[M]
+    case MF.ExtractSecond(a1) =>
+      Add(
+        extract(a1, "second"),
+        Div(extract(a1, "millisecond"), int(1000)).embed
+      ).embed.η[M]
+    case MF.ExtractTimezone(a1) =>
+      extract(a1, "timezone").η[M]
+    case MF.ExtractTimezoneHour(a1) =>
+      extract(a1, "timezone_hour").η[M]
+    case MF.ExtractTimezoneMinute(a1) =>
+      extract(a1, "timezone_minute").η[M]
+    case MF.ExtractWeek(a1) =>
+      extract(a1, "iso_week").η[M]
+    case MF.ExtractYear(a1) =>
+      extract(a1, "year").η[M]
+    case MF.Now() =>
+      NowStr[T[N1QL]].embed.η[M]
 
     // math
-    case Negate(a1)       =>
-      partialQueryString(s"-${n1ql(a1)})").point[M]
-    case Add(a1, a2)      =>
-      partialQueryString(s"(${n1ql(a1)} + ${n1ql(a2)})").point[M]
-    case Multiply(a1, a2) =>
-      partialQueryString(s"(${n1ql(a1)} * ${n1ql(a2)})").point[M]
-    case Subtract(a1, a2) =>
-      partialQueryString(s"(${n1ql(a1)} - ${n1ql(a2)})").point[M]
-    case Divide(a1, a2)   =>
-      partialQueryString(s"(${n1ql(a1)} / ${n1ql(a2)})").point[M]
-    case Modulo(a1, a2)   =>
-      partialQueryString(s"(${n1ql(a1)} % ${n1ql(a2)})").point[M]
-    case Power(a1, a2)    =>
-      partialQueryString(s"power(${n1ql(a1)}, ${n1ql(a2)})").point[M]
+    case MF.Negate(a1) =>
+      Neg(a1).embed.η[M]
+    case MF.Add(a1, a2) =>
+      Add(a1, a2).embed.η[M]
+    case MF.Multiply(a1, a2) =>
+      Mult(a1, a2).embed.η[M]
+    case MF.Subtract(a1, a2) =>
+      Sub(a1, a2).embed.η[M]
+    case MF.Divide(a1, a2) =>
+      Div(a1, a2).embed.η[M]
+    case MF.Modulo(a1, a2) =>
+      Mod(a1, a2).embed.η[M]
+    case MF.Power(a1, a2) =>
+      Pow(a1, a2).embed.η[M]
 
     // relations
-    case Not(a1)             =>
-      partialQueryString(s"not ${n1ql(a1)})").point[M]
-    case Eq(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} = ${n1ql(a2)})").point[M]
-    case Neq(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} != ${n1ql(a2)})").point[M]
-    case Lt(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} < ${n1ql(a2)})").point[M]
-    case Lte(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} <= ${n1ql(a2)})").point[M]
-    case Gt(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} > ${n1ql(a2)})").point[M]
-    case Gte(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} >= ${n1ql(a2)})").point[M]
-    case IfUndefined(a1, a2) => ???
-    case And(a1, a2)         =>
-      partialQueryString(s"(${n1ql(a1)} and ${n1ql(a2)})").point[M]
-    case Or(a1, a2)          =>
-      partialQueryString(s"(${n1ql(a1)} or ${n1ql(a2)})").point[M]
-    case Coalesce(a1, a2)    => ???
-    case Between(a1, a2, a3) =>
-      for {
-        t      <- genName[M]
-        a1N1ql =  n1ql(a1)
-        a2N1ql =  n1ql(a2)
-        a3N1ql =  n1ql(a3)
-        s      =  select(
-                    value         = true,
-                    resultExprs   = t.wrapNel,
-                    keyspace      = a1,
-                    keyspaceAlias = t) |>
-                  filter.set(s"$t between $a2N1ql and $a3N1ql".some)
-        sN1ql  =  n1ql(s)
-        _      <- prtell[M](Vector(Detail(
-                    "N1QL Between",
-                    s"""  a1:   $a1N1ql
-                       |  a2:   $a2N1ql
-                       |  a3:   $a3N1ql
-                       |  n1ql: $sN1ql""".stripMargin('|'))))
-      } yield s
-    case Cond(cond, then_, else_) =>
-      partialQueryString(s"""
-        (case
-         when ${n1ql(cond)} then ${n1ql(then_)}
-         else ${n1ql(else_)}
-         end)"""
-      ).point[M]
+    case MF.Not(a1) =>
+      Not(a1).embed.η[M]
+    case MF.Eq(a1, a2) => a2.project match {
+      case Data(QData.Null) => IsNull(unwrap(a1)).embed.η[M]
+      case _                => rel(Eq(a1, a2)).η[M]
+    }
+    case MF.Neq(a1, a2) => a2.project match {
+      case Data(QData.Null) => IsNotNull(unwrap(a1)).embed.η[M]
+      case _                => rel(Neq(a1, a2)).η[M]
+    }
+    case MF.Lt(a1, a2) =>
+      rel(Lt(a1, a2)).η[M]
+    case MF.Lte(a1, a2) =>
+      rel(Lte(a1, a2)).η[M]
+    case MF.Gt(a1, a2) =>
+      rel(Gt(a1, a2)).η[M]
+    case MF.Gte(a1, a2) =>
+      rel(Gte(a1, a2)).η[M]
+    case MF.IfUndefined(a1, a2) =>
+      IfMissing(a1, a2).embed.η[M]
+    case MF.And(a1, a2) =>
+      And(a1, a2).embed.η[M]
+    case MF.Or(a1, a2) =>
+      Or(a1, a2).embed.η[M]
+    case MF.Between(a1, a2, a3) =>
+      And(rel(Gte(a1, a2)), rel(Lte(a1, a3))).embed.η[M]
+    case MF.Cond(cond, then_, else_) =>
+      Case(
+        WhenThen(cond, then_)
+      )(
+        Else(else_)
+      ).embed.η[M]
 
     // set
-    case Within(a1, a2) =>
-      partialQueryString(s"array_contains(${n1ql(a2)}, ${n1ql(a1)})").point[M]
+    case MF.Within(a1, a2) =>
+      ArrContains(a2, a1).embed.η[M]
 
     // string
-    case Lower(a1)             =>
-      partialQueryString(s"lower(${n1ql(a1)})").point[M]
-    case Upper(a1)             =>
-      partialQueryString(s"upper(${n1ql(a1)})").point[M]
-    case Bool(a1)              =>
-      val a1N1ql = n1ql(a1)
-      partialQueryString(s"""
-        (case
-         when lower("$a1N1ql") = "true"  then true
-         when lower("$a1N1ql") = "false" then false
-         else null
-         end)"""
-      ).point[M]
+    case MF.Lower(a1) =>
+      Lower(a1).embed.η[M]
+    case MF.Upper(a1) =>
+      Upper(a1).embed.η[M]
+    case MF.Bool(a1) =>
+      Case(
+        WhenThen(
+          Eq(Lower(a1).embed, str("true")).embed,
+          bool(true)),
+        WhenThen(
+          Eq(Lower(a1).embed, str("false")).embed,
+          bool(false))
+      )(
+        Else(undefined)
+      ).embed.η[M]
     // TODO: Handle large numbers across the board. Couchbase's number type truncates.
-    case Integer(a1)           =>
-      val a1N1ql = n1ql(a1)
-      partialQueryString(s"""
-        (case
-         when tonumber("$a1N1ql") = floor(tonumber("$a1N1ql")) then tonumber("$a1N1ql")
-         else null
-         end)"""
-      ).point[M]
-    case Decimal(a1)           =>
-      partialQueryString(s"""tonumber("${n1ql(a1)}")""").point[M]
-    case Null(a1)              =>
-      // TODO: Undefined isn't available, what to use?
-      partialQueryString(s"""
-        (case
-         when lower("${n1ql(a1)}") = "null" then null
-         else undefined
-         end)"""
-      ).point[M]
-    case ToString(a1)          =>
-      // overly simplistic?
-      partialQueryString(s"tostring(${n1ql(a1)})").point[M]
-    case Search(a1, a2, a3)    =>
-      val a1N1ql = n1ql(a1)
-      val a2N1ql = n1ql(a2)
-      val a3N1ql = n1ql(a3)
-      partialQueryString(s"""
-        (case
-         when $a3N1ql then regexp_contains("$a1N1ql", "(?i)" || "$a2N1ql")
-         else regexp_contains("$a1N1ql", "$a2N1ql")
-         end)"""
-       ).point[M]
-    case Substring(a1, a2, a3) =>
-      partialQueryString(s"""substr("${n1ql(a1)}", "${n1ql(a2)}", "${n1ql(a3)}")""").point[M]
+    case MF.Integer(a1) =>
+      Case(
+        WhenThen(
+          Eq(
+            ToNumber(a1).embed,
+            Floor(ToNumber(a1).embed).embed).embed,
+          ToNumber(a1).embed)
+      )(
+        Else(undefined)
+      ).embed.η[M]
+    case MF.Decimal(a1) =>
+      ToNumber(a1).embed.η[M]
+    case MF.Null(a1) =>
+      Case(
+        WhenThen(
+          Eq(Lower(a1).embed, str("null")).embed,
+          Null[T[N1QL]].embed)
+      )(
+        Else(undefined)
+      ).embed.η[M]
+    case MF.ToString(a1) =>
+      IfNull(
+        ToString(a1).embed,
+        unwrap(a1),
+        Case(
+          WhenThen(
+            Eq(Type(a1).embed, str("null")).embed ,
+            str("null"))
+        )(
+          Else(a1)
+        ).embed
+      ).embed.η[M]
+    case MF.Search(a1, a2, a3)    =>
+      Case(
+        WhenThen(
+          a3,
+          RegexContains(a1, ConcatStr(str("(?i)(?s)"), a2).embed).embed)
+      )(
+        Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
+      ).embed.η[M]
+    case MF.Substring(a1, a2, a3) =>
+      Case(
+        WhenThen(
+          Lt(a2, int(0)).embed,
+          str("")),
+        WhenThen(
+          Lt(a3, int(0)).embed,
+          IfNull(
+            Substr(a1, a2, None).embed,
+            str("")).embed)
+      )(
+        Else(IfNull(
+          Substr(
+            a1,
+            a2,
+            Least(a3, Sub(Length(a1).embed, a2).embed).embed.some
+          ).embed,
+          str("")).embed)
+      ).embed.η[M]
 
     // structural
-    case MakeArray(a1)                            =>
-      val a1N1ql  = n1ql(a1)
-      val n1qlStr = s"[$a1N1ql]"
-      prtell[M](Vector(Detail(
-        "N1QL MakeArray",
-        s"""  a1:   $a1N1ql
-           |  n1ql: $n1qlStr""".stripMargin('|')
-      ))).as(
-        partialQueryString(n1qlStr)
-      )
-    case MakeMap(a1, a2)                          =>
-      partialQueryString(s"""object_add({}, "${n1ql(a1)}", ${n1ql(a2)})""").point[M]
-    case ConcatArrays(a1, a2)                     =>
-      partialQueryString(s"array_concat(${n1ql(a1)}, ${n1ql(a2)})").point[M]
-    case ConcatMaps(a1, a2)                       =>
-      val a1N1ql = n1ql(a1)
-      val a2N1ql = n1ql(a2)
-      prtell[M](Vector(Detail(
-        "N1QL ConcatMaps",
-        s"""  a1:   $a1N1ql
-           |  a2:   $a2N1ql
-           |  n1ql: ???""".stripMargin('|')
-      ))).as(
-        partialQueryString("???ConcatMaps???")
-      )
-    case ProjectField(PartialQueryString(a1), a2) =>
-      val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1.$a2N1ql"
-      prtell[M](Vector(Detail(
-        "N1QL ProjectField(PartialQueryString(_), _)",
-        s"""  a1:   $a1
-           |  a2:   $a2N1ql
-           |  n1ql: $n1qlStr""".stripMargin('|')
-      ))).as(
-        partialQueryString(n1qlStr)
-      )
-    case ProjectField(a1, a2) =>
-      for {
-        tempName <- genName[M]
-        a1N1ql   =  n1ql(a1)
-        a2N1ql   =  n1ql(a2)
-        s        =  select(
-                      value         = true,
-                      resultExprs   = a2N1ql.wrapNel,
-                      keyspace      = a1,
-                      keyspaceAlias = tempName)
-        sN1ql    =  n1ql(s)
-        _        <- prtell[M](Vector(Detail(
-                      "N1QL ProjectField(_, _)",
-                      s"""  a1:   $a1N1ql
-                         |  a2:   $a2N1ql
-                         |  n1ql: $sN1ql""".stripMargin('|'))))
-      } yield s
-    case ProjectIndex(PartialQueryString(a1), a2) =>
-      val a2N1ql  = n1ql(a2)
-      val n1qlStr = s"$a1[$a2N1ql]"
-      prtell[M](Vector(Detail(
-        "N1QL ProjectIndex(PartialQueryString(_), _)",
-        s"""  a1:   $a1
-           |  a2:   $a2N1ql
-           |  n1ql: $n1qlStr""".stripMargin('|')
-      ))).as(
-        partialQueryString(n1qlStr)
-      )
-    case ProjectIndex(a1, a2)                     =>
-      for {
-        tmpName1 <- genName[M]
-        tmpName2 <- genName[M]
-        a1N1ql   =  n1ql(a1)
-        a2N1ql   =  n1ql(a2)
-                    // TODO: custom select for the moment
-        n1qlStr  =  s"(select value $tmpName1[$a2N1ql] let $tmpName1 = (select value array_agg($tmpName2) from $a1N1ql $tmpName2))"
-        _        <- prtell[M](Vector(Detail(
-                      "N1QL ProjectIndex(_, _)",
-                      s"""  a1:   $a1N1ql
-                         |  a2:   $a2N1ql
-                         |  n1ql: $n1qlStr""".stripMargin('|'))))
-      } yield partialQueryString(n1qlStr)
-    case DeleteField(a1, a2)                      =>
-      partialQueryString(s"object_remove(${n1ql(a2)}, ${n1ql(a1)})").point[M]
+    case MF.MakeArray(a1) =>
+      Arr(List(a1)).embed.η[M]
+    case MF.MakeMap(a1, a2) =>
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+        a2,
+        Select(
+          Value(true),
+          ResultExpr(
+            Obj(Map(
+              ToString(a1).embed -> IfNull(id1.embed, undefined).embed
+            )).embed,
+            none
+          ).wrapNel,
+          Keyspace(a2, id1.some).some,
+          unnest  = none,
+          let     = nil,
+          filter  = none,
+          groupBy = none,
+          orderBy = nil).embed,
+      Obj(Map(a1 -> a2)).embed))
+    case MF.ConcatArrays(a1, a2) =>
+      def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
+        case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none
+        case _                                                        => ().some
+      }.isEmpty
+
+      (containsAgg(a1) || containsAgg(a2)).fold(
+        IfNull(
+          ConcatStr(a1, a2).embed,
+          ConcatArr(
+            Case(
+              WhenThen(
+                IsString(a1).embed,
+                Split(a1, str("")).embed)
+            )(
+              Else(a1)
+            ).embed,
+            Case(
+              WhenThen(
+                IsString(a2).embed,
+                Split(a2, str("")).embed)
+            )(
+              Else(a2)
+            ).embed).embed
+        ).embed.η[M],
+        (genId[T[N1QL], M] ⊛ genId[T[N1QL], M]) { (id1, id2) =>
+          SelectElem(
+            Select(
+              Value(true),
+              ResultExpr(
+                IfNull(
+                  ConcatStr(id1.embed, id2.embed).embed,
+                  ConcatArr(Split(id1.embed, str("")).embed, id2.embed).embed,
+                  ConcatArr(id1.embed, Split(id2.embed, str("")).embed).embed,
+                  ConcatArr(id1.embed, id2.embed).embed).embed,
+                none
+              ).wrapNel,
+              keyspace = none,
+              unnest   = none,
+              List(Binding(id1, a1), Binding(id2, a2)),
+              filter   = none,
+              groupBy  = none,
+              orderBy  = nil).embed,
+            int(0)).embed
+        })
+    case MF.ConcatMaps(a1, a2) =>
+      ConcatObj(a1, a2).embed.η[M]
+    case MF.ProjectField(a1, a2) =>
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+        a1,
+        Select(
+          Value(true),
+          ResultExpr(SelectField(id1.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id1.some).some,
+          unnest  = none,
+          let     = nil,
+          filter  = none,
+          groupBy = none,
+          orderBy = nil).embed,
+        SelectField(a1, a2).embed))
+    case MF.ProjectIndex(a1, a2) =>
+      genId[T[N1QL], M] ∘ (id1 => selectOrElse(
+        a1,
+        Select(
+          Value(true),
+          ResultExpr(SelectElem(id1.embed, a2).embed, none).wrapNel,
+          Keyspace(a1, id1.some).some,
+          unnest  = none,
+          let     = nil,
+          filter  = none,
+          groupBy = none,
+          orderBy = nil).embed,
+        SelectElem(a1, a2).embed))
+    case MF.DeleteField(a1, a2) =>
+      ObjRemove(a1, a2).embed.η[M]
+
+    case MF.Meta(a1) =>
+      Meta(a1).embed.η[M]
 
     // helpers & QScript-specific
-    case DupMapKeys(a1)                   => ???
-    case DupArrayIndices(a1)              => ???
-    case ZipMapKeys(a1)                   =>
-      val a1N1ql = n1ql(a1)
-      prtell[M](Vector(Detail(
-        "N1QL ZipMapKeys",
-        s"""  a1:   $a1N1ql
-           |  n1ql: ???""".stripMargin('|')
-      ))).as(
-        partialQueryString(s"???ZipMapKeys???")
-      )
-    case ZipArrayIndices(a1)              => ???
-    case Range(a1, a2)                    =>
-      val a1N1ql = n1ql(a1)
-      val a2N1ql = n1ql(a2)
-      partialQueryString(s"[$a2N1ql:($a1N1ql + 1)]").point[M]
-    case Guard(expr, typ, cont, fallback) =>
-      cont.point[M]
+    case MF.Range(a1, a2) =>
+      Slice(a2, Add(a1, int(1)).embed.some).embed.η[M]
+    case MF.Guard(expr, typ, cont, _) =>
+      def grd(f: T[N1QL] => T[N1QL], e: T[N1QL], c: T[N1QL]): T[N1QL] =
+        Case(
+          WhenThen(f(e), c))(
+          Else(undefined)).embed
+
+      def grdSel(f: T[N1QL] => T[N1QL]): M[T[N1QL]] =
+        genId[T[N1QL], M] ∘ (id =>
+          Select(
+            Value(true),
+            ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
+            Keyspace(cont, id.some).some,
+            unnest  = none,
+            let     = nil,
+            filter  = none,
+            groupBy = none,
+            orderBy = nil).embed)
+
+      def isArr(n: T[N1QL]): T[N1QL] = IsArr(n).embed
+      def isObj(n: T[N1QL]): T[N1QL] = IsObj(n).embed
+
+      (cont.project, typ) match {
+        case (_: Select[T[N1QL]], _: QType.FlexArr) => grdSel(isArr)
+        case (_: Select[T[N1QL]], _: QType.Obj)     => grdSel(isObj)
+        case (_                 , _: QType.FlexArr) => grd(isArr, expr, cont).η[M]
+        case (_                 , _: QType.Obj)     => grd(isObj, expr, cont).η[M]
+        case _                                      => cont.η[M]
+      }
   }
 }

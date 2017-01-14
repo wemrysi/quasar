@@ -17,11 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
-import quasar.contrib.matryoshka._
+import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -76,26 +76,22 @@ object ThetaJoin {
       }
     }
 
-  // TODO: use the RenderTree for FreeQS, which contains QScriptTotal, which
-  // contains ThetaJoin...
-  implicit def renderTree[T[_[_]]: ShowT](implicit
-    JF: RenderTree[JoinFunc[T]]
-  ): Delay[RenderTree, ThetaJoin[T, ?]] =
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
     new Delay[RenderTree, ThetaJoin[T, ?]] {
       val nt = List("ThetaJoin")
       def apply[A](r: RenderTree[A]): RenderTree[ThetaJoin[T, A]] = RenderTree.make {
           case ThetaJoin(src, lBr, rBr, on, f, combine) =>
             NonTerminal(nt, None, List(
               r.render(src),
-              Terminal("LeftBranch" :: nt, lBr.shows.some),
-              Terminal("RightBranch" :: nt, rBr.shows.some),
+              lBr.render,
+              rBr.render,
               on.render,
               f.render,
               combine.render))
         }
       }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]

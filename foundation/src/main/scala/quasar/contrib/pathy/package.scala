@@ -21,7 +21,7 @@ import quasar.fp.ski._
 
 import argonaut._
 import _root_.pathy.Path, Path._
-import scalaz._, Scalaz._
+import _root_.scalaz._, Scalaz._
 
 package object pathy {
   type AbsPath[T] = Path[Abs,T,Sandboxed]
@@ -33,11 +33,7 @@ package object pathy {
   type RFile = RelFile[Sandboxed]
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
-
-  type FilePath[B] = Path[B,File,Sandboxed]
-  type DirPath[B]  = Path[B,Dir, Sandboxed]
-  type FPath = FilePath[scala.Any]
-  type DPath = DirPath[scala.Any]
+  type FPath = Path[scala.Any,File,Sandboxed]
 
   type PathSegment = DirName \/ FileName
 

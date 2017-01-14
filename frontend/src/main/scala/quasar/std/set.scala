@@ -17,28 +17,57 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar._, LogicalPlan._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+import quasar.sql.JoinDir
 
 import scala.collection.immutable.NumericRange
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.success
 import shapeless.{Data => _, _}
 
 trait SetLib extends Library {
   val Take: BinaryFunc = BinaryFunc(
     Sifting,
-    "(LIMIT)",
     "Takes the first N elements from a set",
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Take, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-            Take(src, ConstantF[T[LogicalPlan]](Data.Int(m.min(n))).embed).some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Take(src, Constant[T](Data.Int(m.min(n))).embed).some
+          case _ => None
+        }
+    },
+    partialTyper[nat._2] {
+      case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
+        Type.Const(Data.Set(Nil))
+      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
+          if n.isValidInt =>
+        Type.Const(Data.Set(s.take(n.intValue)))
+      case Sized(t, _) => t
+    },
+    untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+
+  val Sample: BinaryFunc = BinaryFunc(
+    Sifting,
+    "Randomly selects N elements from a set",
+    Type.Top,
+    Func.Input2(Type.Top, Type.Int),
+    new Func.Simplifier {
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Take(src, Constant[T](Data.Int(m.min(n))).embed).some
           case _ => None
         }
     },
@@ -54,19 +83,21 @@ trait SetLib extends Library {
 
   val Drop: BinaryFunc = BinaryFunc(
     Sifting,
-    "(OFFSET)",
     "Drops the first N elements from a set",
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Int(n)))))
-            if n == 0 =>
-          set.some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Drop, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-          Drop(src, ConstantF[T[LogicalPlan]](Data.Int(m + n)).embed).some
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Int(n)))))
+              if n == 0 =>
+            set.some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Drop, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Drop(src, Constant[T](Data.Int(m + n)).embed).some
+          case _ => None
+        }
     },
     partialTyper[nat._2] {
       case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
@@ -78,7 +109,6 @@ trait SetLib extends Library {
 
   val Range = BinaryFunc(
     Expansion,
-    "(..)",
     "Creates a set of values in the range from `a` to `b`, inclusive.",
     Type.Int,
     Func.Input2(Type.Int, Type.Int),
@@ -92,29 +122,17 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
-  // TODO second param is an Array, third param is Array[String]
-  val OrderBy = TernaryFunc(
-    Sifting,
-    "ORDER BY",
-    "Orders a set by the natural ordering of a projection on the set",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Top),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(set, _, _) => set
-    },
-    untyper[nat._3](t => success(Func.Input3(t, Type.Top, Type.Top))))
-
   val Filter = BinaryFunc(
     Sifting,
-    "WHERE",
     "Filters a set to include only elements where a projection is true",
     Type.Top,
     Func.Input2(Type.Top, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.True)))) =>
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.True)))) =>
             set.some
           case _ => None
         }
@@ -135,7 +153,6 @@ trait SetLib extends Library {
 
   val InnerJoin = TernaryFunc(
     Transformation,
-    "INNER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -144,50 +161,47 @@ trait SetLib extends Library {
       case Sized(_, _, Type.Const(Data.Bool(false))) => Type.Const(Data.Set(Nil))
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map("left" -> s1, "right" -> s2), None)
+      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val LeftOuterJoin = TernaryFunc(
     Transformation,
-    "LEFT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the left set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
     partialTyper[nat._3] {
       case Sized(s1, _, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map("left" -> s1, "right" -> Type.Null), None)
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> Type.Null), None)
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map("left" -> s1, "right" -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val RightOuterJoin = TernaryFunc(
     Transformation,
-    "RIGHT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the right set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
     partialTyper[nat._3] {
       case Sized(_, s2, Type.Const(Data.Bool(false))) =>
-        Type.Obj(Map("left" -> Type.Null, "right" -> s2), None)
+        Type.Obj(Map(JoinDir.Left.name -> Type.Null, JoinDir.Right.name -> s2), None)
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
-      case Sized(s1, s2, _) => Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> s2), None)
+      case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val FullOuterJoin = TernaryFunc(
     Transformation,
-    "FULL OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from either set.",
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
@@ -196,15 +210,14 @@ trait SetLib extends Library {
       case Sized(Type.Const(Data.Set(Nil)), Type.Const(Data.Set(Nil)), _) =>
         Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
-        Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> (s2 ⨿ Type.Null)), None)
+        Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
+      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val GroupBy = BinaryFunc(
     Transformation,
-    "GROUP BY",
     "Groups a projection of a set by another projection",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -216,7 +229,6 @@ trait SetLib extends Library {
 
   val Distinct = UnaryFunc(
     Sifting,
-    "DISTINCT",
     "Discards all but the first instance of each unique value",
     Type.Top,
     Func.Input1(Type.Top),
@@ -228,7 +240,6 @@ trait SetLib extends Library {
 
   val DistinctBy = BinaryFunc(
     Sifting,
-    "DISTINCT BY",
     "Discards all but the first instance of the first argument, based on uniqueness of the second argument",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -240,7 +251,6 @@ trait SetLib extends Library {
 
   val Union = BinaryFunc(
     Transformation,
-    "(UNION ALL)",
     "Creates a new set with all the elements of each input set, keeping duplicates.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -254,7 +264,6 @@ trait SetLib extends Library {
 
   val Intersect = BinaryFunc(
     Transformation,
-    "(INTERSECT ALL)",
     "Creates a new set with only the elements that exist in both input sets, keeping duplicates.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
@@ -266,16 +275,18 @@ trait SetLib extends Library {
 
   val Except = BinaryFunc(
     Transformation,
-    "(EXCEPT)",
     "Removes the elements of the second set from the first set.",
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Set(Nil))))) =>
-          set.some
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Set(Nil))))) =>
+            set.some
+          case _ => None
+        }
     },
     partialTyper[nat._2] {
       case Sized(s1, _) => s1
@@ -288,16 +299,17 @@ trait SetLib extends Library {
   //       on Cofree.
   val In = BinaryFunc(
     Sifting,
-    "(in)",
     "Determines whether a value is in a given set.",
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(item, set)) => set.project match {
-            case ConstantF(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
-            case ConstantF(_)           => RelationsLib.Eq(item, set).some
+          case Invoke(_, Sized(item, set)) => set.project match {
+            case Constant(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
+            case Constant(_)           => RelationsLib.Eq(item, set).some
             case lp                     => Within(item, StructuralLib.UnshiftArray(set).embed).some
           }
           case _ => None
@@ -316,7 +328,6 @@ trait SetLib extends Library {
 
   val Within = BinaryFunc(
     Mapping,
-    "within",
     "Determines whether a value is in a given array.",
     Type.Bool,
     Func.Input2(Type.Top, Type.AnyArray),
@@ -332,7 +343,7 @@ trait SetLib extends Library {
 
   val Constantly = BinaryFunc(
     Transformation,
-    "CONSTANTLY", "Always return the same value",
+    "Always return the same value",
     Type.Bottom,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
@@ -342,16 +353,6 @@ trait SetLib extends Library {
       case Sized(const, _) => const
     },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
-
-  def unaryFunctions: List[GenericFunc[nat._1]] =
-    Distinct :: Nil
-
-  def binaryFunctions: List[GenericFunc[nat._2]] =
-    Take :: Drop :: Range :: Filter :: GroupBy :: DistinctBy ::
-    Union :: Intersect :: Except :: In :: Within :: Constantly :: Nil
-
-  def ternaryFunctions: List[GenericFunc[nat._3]] =
-    OrderBy :: InnerJoin :: LeftOuterJoin :: RightOuterJoin :: FullOuterJoin :: Nil
 }
 
 object SetLib extends SetLib

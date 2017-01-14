@@ -20,6 +20,7 @@ import quasar.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
+import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
@@ -29,7 +30,7 @@ import quasar.main.FilesystemQueries
 import quasar.sql.{Query, Sql}
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.Accept

@@ -22,15 +22,20 @@ import quasar.std._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import WorkflowExecutor.WorkflowCursor
 
-import matryoshka._, Recursive.ops._
+import java.time.format.DateTimeFormatter
+import scala.concurrent.duration._
+
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
-import scala.concurrent.duration._
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}
@@ -39,30 +44,32 @@ import shapeless.{Nat}
   * evaluators.
   */
 abstract class MongoDbStdLibSpec extends StdLibSpec {
+  val lpf = new LogicalPlanR[Fix[LP]]
+
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
+  def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LP])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_2_6
-  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_3_2
+  def is2_6(backend: BackendName): Boolean = backend === TestConfig.MONGO_2_6.name
+  def is3_2(backend: BackendName): Boolean = backend === TestConfig.MONGO_3_2.name
 
-  MongoDbSpec.clientShould { (backend, prefix, setupClient, testClient) =>
+  MongoDbSpec.clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     /** Intercept and transform expected values into the form that's actually
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massage(expected: Data): Data = expected match {
-      case Data.Time(time) => Data.Str(time.toString)
+      case Data.Time(time) => Data.Str(time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS")))
       case _               => expected
     }
 
     /** Identify constructs that are expected not to be implemented. */
-    def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LogicalPlan, Unit] = {
-      case LogicalPlan.InvokeF(func, _) => shortCircuit(backend, func, args)
+    def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
+      case lp.Invoke(func, _) => shortCircuit(backend, func, args)
       case _ => ().right
     }
 
@@ -75,8 +82,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
       } yield rez
 
-    def check(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan]): Option[Result] =
-      prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
+    def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
+      prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
     final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
@@ -90,9 +97,10 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
         case _ => None
       },
       check)
+
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
-    def run(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan], expected: Data): Result =
+    def run(args: List[Data], prg: List[Fix[LP]] => Fix[LP], expected: Data): Result =
       check(args, prg).getOrElse(
         (for {
           coll <- MongoDbSpec.tempColl(prefix)
@@ -107,8 +115,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
           lp = prg(
                 (0 until args.length).toList.map(idx =>
                   Fix(StructuralLib.ObjectProject(
-                    LogicalPlan.Read(coll.asFile),
-                    LogicalPlan.Constant(Data.Str("arg" + idx))))))
+                    lpf.read(coll.asFile),
+                    lpf.constant(Data.Str("arg" + idx))))))
           t  <- compile(qm, coll, lp).point[Task].unattempt
           (wf, resultField) = t
 
@@ -116,29 +124,29 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          rez must beSingleResult(closeTo(massage(expected)))
+          rez must beSingleResult(beCloseTo(massage(expected)))
         }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
     val runner = new StdLibTestRunner with MongoDbDomain {
       def nullary(
-        prg: Fix[LogicalPlan],
+        prg: Fix[LP],
         expected: Data): Result =
         run(Nil, κ(prg), expected)
 
       def unary(
-        prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+        prg: Fix[LP] => Fix[LP],
         arg: Data,
         expected: Data): Result =
         run(List(arg), { case List(arg) => prg(arg) }, expected)
 
       def binary(
-        prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        prg: (Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data,
         expected: Data): Result =
         run(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }, expected)
 
       def ternary(
-        prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
         arg1: Data, arg2: Data, arg3: Data,
         expected: Data): Result =
         run(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }, expected)

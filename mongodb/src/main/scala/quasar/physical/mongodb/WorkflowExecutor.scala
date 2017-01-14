@@ -17,10 +17,10 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError, EnvErrT}
-import quasar.{NameGenerator => QNameGenerator, _}
-import quasar.fp.kleisli._
+import quasar.{NameGenerator => QNameGenerator}
+import quasar.connector.{EnvironmentError, EnvErrT}
 import quasar.fp.eitherT._
+import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.execution._
@@ -28,7 +28,9 @@ import quasar.physical.mongodb.workflow._
 import quasar.physical.mongodb.workflowtask._
 import WorkflowExecutionError._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Implements the necessary operations for executing a `Workflow` against

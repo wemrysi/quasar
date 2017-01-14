@@ -17,9 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar.{Func, Type, SemanticError}
 import quasar.contrib.shapeless._
 import quasar.fp.ski._
-import quasar.{Func, GenericFunc, LogicalPlan, Type, SemanticError}
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
 import scalaz._, Validation.{success, failure}
@@ -29,18 +30,19 @@ trait Library {
   import Func._
 
   protected val noSimplification: Simplifier = new Simplifier {
-    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+    def apply[T]
+      (orig: LogicalPlan[T])
+      (implicit TR: Recursive.Aux[T, LogicalPlan], TC: Corecursive.Aux[T, LogicalPlan]) =
       None
   }
 
-  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] = { _ =>
-    Validation.success(codomain)
-  }
+  protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
+    _ => success(codomain)
 
   private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
     f(args).getOrElse {
-      val msg: String = "Unknown arguments: " + args
-      Validation.failure(NonEmptyList(SemanticError.GenericError(msg)))
+      val msg: String = s"Unknown arguments: $args"
+      failure(NonEmptyList(SemanticError.GenericError(msg)))
     }
   }
 
@@ -55,9 +57,10 @@ trait Library {
   }
 
   protected def untyper[N <: Nat](f: Codomain => VDomain[N]): Untyper[N] = {
-    case ((funcDomain, funcCodomain), rez) => Type.typecheck(rez, funcCodomain).fold(
-      κ(f(rez)),
-      κ(success(funcDomain)))
+    case ((funcDomain, funcCodomain), rez) =>
+      Type.typecheck(rez, funcCodomain).fold(
+        κ(f(rez)),
+        κ(success(funcDomain)))
   }
 
   private def partialUntyperOV[N <: Nat](f: Codomain => Option[VDomain[N]]): Untyper[N] = {
@@ -71,13 +74,6 @@ trait Library {
 
   protected def partialUntyper[N <: Nat](f: PartialFunction[Codomain, Domain[N]]): Untyper[N] =
     partialUntyperOV(f.lift(_).map(success))
-
-  protected def reflexiveTyper[N <: Nat]: Typer[N] = {
-    case Sized(Type.Const(data)) => success(data.dataType)
-    case Sized(x) => success(x)
-    case _ =>
-      failure(NonEmptyList(SemanticError.GenericError("Wrong number of arguments for reflexive typer")))
-  }
 
   protected def numericWidening = {
     def mapFirst[A, B](f: A => A, p: PartialFunction[A, B]) = new PartialFunction[A, B] {
@@ -99,12 +95,4 @@ trait Library {
       self(args) ||| that(args)
     }
   }
-
-  // TODO exhaustiveness checking for each arity
-  def unaryFunctions: List[GenericFunc[nat._1]]
-  def binaryFunctions: List[GenericFunc[nat._2]]
-  def ternaryFunctions: List[GenericFunc[nat._3]]
-
-  def functions =
-    (unaryFunctions: List[GenericFunc[_]]) ++ binaryFunctions ++ ternaryFunctions
 }

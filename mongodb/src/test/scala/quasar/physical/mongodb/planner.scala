@@ -18,33 +18,41 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.common.{Map => _, _}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.SortDir
+import quasar.specs2.QuasarMatchers._
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
+import java.time.Instant
 import scala.Either
 
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
-import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
+class PlannerSpec extends
+    org.specs2.mutable.Specification with
+    org.specs2.ScalaCheck with
+    CompilerHelpers with
+    TreeMatchers {
+
   import StdLib.{set => s, _}
   import structural._
-  import LogicalPlan._
   import Grouped.grouped
   import Reshape.reshape
   import jscore._
@@ -71,9 +79,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   }
 
   import fixExprOp._
-  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix, ExprOp] = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp] =
+    new ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   import expr3_0Fp._
-  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix, ExprOp] = ExprOp3_2F.fixpoint[Fix, ExprOp]
+  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp] =
+    new ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   import expr3_2Fp._
 
   val basePath = rootDir[Sandboxed] </> dir("db")
@@ -86,8 +96,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
-        e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats, indexes)).leftMap(CPlannerError(_))))
+        _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
+        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents)).leftMap(CPlannerError(_))))
 
   def plan0(query: String, model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -122,12 +132,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
-  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
+  def plan(logical: Fix[LP]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
-      _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
-      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
-      _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
+      _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
+      simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
+      _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
+      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
     } yield phys).run.value.toEither
   }
 
@@ -163,8 +173,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         chain[Workflow](
           $read(collection("db", "foo")),
           $group(
-            grouped("0" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
+            grouped("__tmp0" -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape("value" -> $field("__tmp0")),
+            ExcludeId)))
     }
 
     "plan simple field projection on single set" in {
@@ -172,8 +185,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $project(
-            reshape("bar" -> $field("bar")),
-            IgnoreId)))
+            reshape("value" -> $field("bar")),
+            ExcludeId)))
     }
 
     "plan simple field projection on single set when table name is inferred" in {
@@ -181,8 +194,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("bar" -> $field("bar")),
-           IgnoreId)))
+           reshape("value" -> $field("bar")),
+           ExcludeId)))
     }
 
     "plan multiple field projection on single set when table name is inferred" in {
@@ -201,7 +214,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "baz")),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("bar")),
@@ -212,12 +225,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                      $lt($literal(Bson.Null), $field("foo")),
                      $lt($field("foo"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("foo")),
+                     $lte($literal(Check.minDate), $field("foo")),
                      $lt($field("foo"), $literal(Bson.Regex("", ""))))),
                  $add($field("foo"), $field("bar")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan concat" in {
@@ -225,7 +238,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
                  $lte($literal(Bson.Text("")), $field("baz")),
@@ -237,7 +250,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                  $concat($field("bar"), $field("baz")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan concat strings with ||" in {
@@ -246,7 +259,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "zips")),
          $project(
            reshape(
-             "0" ->
+             "value" ->
                $cond(
                  $or(
                    $and(
@@ -268,7 +281,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                      $field("state")),
                    $literal(Bson.Undefined)),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan concat strings with ||, constant on the right" in {
@@ -312,14 +325,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $project(
-          reshape("0" ->
+          reshape("value" ->
             $cond(
               $and(
                 $lte($literal(Bson.Text("")), $field("bar")),
                 $lt($field("bar"), $literal(Bson.Doc()))),
               $toLower($field("bar")),
               $literal(Bson.Undefined))),
-          IgnoreId)))
+          ExcludeId)))
     }
 
     "plan coalesce" in {
@@ -327,8 +340,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" -> $ifNull($field("bar"), $field("baz"))),
-           IgnoreId)))
+           reshape("value" ->
+             $cond(
+               $eq($field("bar"), $literal(Bson.Null)),
+               $field("baz"),
+               $field("bar"))),
+           ExcludeId)))
     }
 
     "plan date field extraction" in {
@@ -336,14 +353,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
-                 $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("baz")),
+                 $lte($literal(Check.minDate), $field("baz")),
                  $lt($field("baz"), $literal(Bson.Regex("", "")))),
                $dayOfMonth($field("baz")),
                $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan complex date field extraction" in {
@@ -352,17 +369,19 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "0" ->
+             "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $trunc(
                    $add(
-                     $divide($dayOfYear($field("baz")), $literal(Bson.Int32(92))),
+                     $divide(
+                       $subtract($month($field("baz")), $literal(Bson.Int32(1))),
+                       $literal(Bson.Int32(3))),
                      $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan date field extraction: \"dow\"" in {
@@ -371,14 +390,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "0" ->
+             "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $add($dayOfWeek($field("baz")), $literal(Bson.Int32(-1))),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan date field extraction: \"isodow\"" in {
@@ -387,16 +406,16 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $project(
            reshape(
-             "0" ->
+             "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $cond($eq($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
                    $add($dayOfWeek($field("baz")), $literal(Bson.Int32(-1)))),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan filter by date field (SD-1508)" in {
@@ -408,7 +427,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
              "__tmp2" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("ts")),
+                   $lte($literal(Check.minDate), $field("ts")),
                    $lt($field("ts"), $literal(Bson.Regex("", "")))),
                  $eq($year($field("ts")), $literal(Bson.Int32(2016))),
                  $literal(Bson.Undefined)),
@@ -444,8 +463,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             BinOp(Lt, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), Literal(Js.Num(-73, false))),
             ident("undefined")).toJs)),
         $project(
-          reshape("loc" -> $field("loc")),
-          IgnoreId)))
+          reshape("value" -> $field("loc")),
+          ExcludeId)))
     }
 
     "plan select array element" in {
@@ -453,14 +472,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "0" ->
+          "__tmp4" ->
             jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
               Access(Select(ident("x"), "loc"), jscore.Literal(Js.Num(0, false))),
               ident("undefined")))))),
           ListMap()),
         $project(
-          reshape("0" -> $include()),
-          IgnoreId)))
+          reshape("value" -> $field("__tmp4")),
+          ExcludeId)))
     }
 
     "plan array length" in {
@@ -468,14 +487,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
                  $lte($literal(Bson.Arr()), $field("bar")),
                  $lt($field("bar"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                $size($field("bar")),
                $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan sum in expression" in {
@@ -493,8 +512,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 $literal(Bson.Undefined)))),
           \/-($literal(Bson.Null))),
         $project(
-          reshape("0" -> $multiply($field("__tmp4"), $literal(Bson.Int32(100)))),
-          IgnoreId)))
+          reshape("value" -> $multiply($field("__tmp4"), $literal(Bson.Int32(100)))),
+          ExcludeId)))
     }
 
     "plan conditional" in {
@@ -503,7 +522,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "zips")),
          $project(
            reshape(
-             "0" ->
+             "value" ->
                $cond(
                  $or(
                    $and(
@@ -516,7 +535,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                    $field("city"),
                    $field("loc")),
                  $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan negate" in {
@@ -524,14 +543,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("bar")),
                  $lt($field("bar"), $literal(Bson.Text("")))),
                $multiply($literal(Bson.Int32(-1)), $field("bar")),
                $literal(Bson.Undefined))),
-           IgnoreId)))
+           ExcludeId)))
     }
 
     "plan simple filter" in {
@@ -563,7 +582,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
            Selector.Doc(
              BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10))))),
          $project(
-           reshape("0" ->
+           reshape("value" ->
              $cond(
                $and(
                  $lt($literal(Bson.Null), $field("b")),
@@ -574,7 +593,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                      $lt($literal(Bson.Null), $field("a")),
                      $lt($field("a"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("a")),
+                     $lte($literal(Check.minDate), $field("a")),
                      $lt($field("a"), $literal(Bson.Regex("", ""))))),
                  $add($field("a"), $field("b")),
                  $literal(Bson.Undefined)),
@@ -583,7 +602,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple js filter" in {
-      val mjs: javascript[Fix] = javascript[Fix]
+      val mjs = javascript[JsCore](_.embed)
       import mjs._
 
       plan("select * from zips where length(city) < 4") must
@@ -610,7 +629,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan filter with js and non-js" in {
-      val mjs: javascript[Fix] = javascript[Fix]
+      val mjs = javascript[JsCore](_.embed)
       import mjs._
 
       plan("select * from zips where length(city) < 4 and pop < 20000") must
@@ -924,12 +943,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $read(collection("db", "zips")),
         $group(
           grouped(
-            "__tmp0" -> $sum($literal(Bson.Int32(1)))),
+            "__tmp1" -> $sum($literal(Bson.Int32(1)))),
           -\/(reshape("0" -> $field("city")))),
         $match(Selector.Doc(
-          BsonField.Name("__tmp0") -> Selector.Gt(Bson.Int32(10)))),
+          BsonField.Name("__tmp1") -> Selector.Gt(Bson.Int32(10)))),
         $project(
-          reshape("city" -> $field("_id", "0")),
+          reshape("value" -> $field("_id", "0")),
           ExcludeId)))
     }
 
@@ -1014,7 +1033,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $read(collection("db", "zips")),
           $project(
             reshape(
-              "0" ->
+              "value" ->
                 $cond(
                   $and(
                     $lt($literal(Bson.Null), $field("pop")),
@@ -1024,7 +1043,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     $literal(Bson.Int32(0)),
                     $divide($field("pop"), $literal(Bson.Int32(10000)))),
                   $literal(Bson.Undefined))),
-            IgnoreId)))
+            ExcludeId)))
     }
 
     "drop nothing" in {
@@ -1039,7 +1058,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $project(
-            reshape("0" ->
+            reshape("value" ->
               $cond(
                 $or(
                   $and(
@@ -1050,17 +1069,17 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     $lt($field("city"), $literal(Bson.Doc())))),
                 $field("city"),
                 $literal(Bson.Undefined))),
-            IgnoreId)))
+            ExcludeId)))
     }
 
     "plan simple sort with field in projection" in {
       plan("select bar from foo order by bar") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
+          $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending)),
           $project(
-            reshape("bar" -> $field("bar")),
-            IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
+            reshape("value" -> $field("bar")),
+            ExcludeId)))
     }
 
     "plan simple sort with wildcard" in {
@@ -1084,7 +1103,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($literal(Bson.Null), $field("bar")),
                       $lt($field("bar"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("bar")),
+                      $lte($literal(Check.minDate), $field("bar")),
                       $lt($field("bar"), $literal(Bson.Regex("", ""))))),
                   $divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined))),
@@ -1226,7 +1245,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -1268,7 +1287,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -1343,8 +1362,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           grouped(),
           -\/(reshape("0" -> $field("city")))),
         $project(
-          reshape("city" -> $field("_id", "0")),
-          IgnoreId)))
+          reshape("value" -> $field("_id", "0")),
+          ExcludeId)))
     }
 
     "plan useless group by expression" in {
@@ -1352,8 +1371,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
-          reshape("city" -> $field("city")),
-          IgnoreId)))
+          reshape("value" -> $field("city")),
+          ExcludeId)))
     }
 
     "plan useful group by" in {
@@ -1451,7 +1470,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               "0" ->
                 $cond(
                   $and(
-                    $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("date")),
+                    $lte($literal(Check.minDate), $field("date")),
                     $lt($field("date"), $literal(Bson.Regex("", "")))),
                   $month($field("date")),
                   $literal(Bson.Undefined))))),
@@ -1478,8 +1497,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           chain[Workflow](
             $read(collection("db", "bar")),
             $group(
-              grouped("0" -> $sum($literal(Bson.Int32(1)))),
-              -\/(reshape("0" -> $field("baz")))))
+              grouped("__tmp0" -> $sum($literal(Bson.Int32(1)))),
+              -\/(reshape("0" -> $field("baz")))),
+            $project(
+              reshape(
+                "value" -> $field("__tmp0")),
+              ExcludeId))
         }
     }
 
@@ -1587,7 +1610,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                         $lt($literal(Bson.Null), $field("pop")),
                         $lt($field("pop"), $literal(Bson.Text("")))),
                       $and(
-                        $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                        $lte($literal(Check.minDate), $field("pop")),
                         $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                     $field("pop"),
                     $literal(Bson.Undefined))),
@@ -1669,7 +1692,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -1781,7 +1804,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "0" ->
+            "__tmp2" ->
               If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 BinOp(jscore.Add,
                   Call(ident("NumberLong"),
@@ -1790,8 +1813,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 ident("undefined")))))),
             ListMap()),
           $project(
-            reshape("0" -> $include()),
-            IgnoreId)))
+            reshape("value" -> $field("__tmp2")),
+            ExcludeId)))
     }
 
     "plan expressions with ~"in {
@@ -1848,8 +1871,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 FlatExpr(JsFn(Name("x"), Select(ident("x"), "__tmp2")))),
               ListMap()),
             $project(
-              reshape("geo" -> $field("__tmp2")),
-              IgnoreId))
+              reshape("value" -> $field("__tmp2")),
+              ExcludeId))
         }
     }
 
@@ -1883,7 +1906,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $match(Selector.Doc(
               BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))),
             $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-              "0" ->
+              "__tmp4" ->
                 If(
                   BinOp(jscore.Or,
                     Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
@@ -1894,7 +1917,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   ident("undefined")))))),
               ListMap()),
             $project(
-              reshape("0" -> $field("0")),
+              reshape("value" -> $field("__tmp4")),
               ExcludeId))
         }
     }
@@ -1916,8 +1939,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp2"))),
             $project(
-              reshape("loc" -> $field("__tmp2")),
-              IgnoreId))
+              reshape("value" -> $field("__tmp2")),
+              ExcludeId))
         }
     }
 
@@ -1928,7 +1951,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $simpleMap(NonEmptyList(
             MapExpr(JsFn(Name("x"),
               Obj(ListMap(
-                Name("0") ->
+                Name("__tmp4") ->
                   If(
                     BinOp(jscore.Or,
                       Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
@@ -1942,8 +1965,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     ident("undefined"))))))),
             ListMap()),
           $project(
-            reshape("0" -> $include()),
-            IgnoreId))
+            reshape("value" -> $field("__tmp4")),
+            ExcludeId))
       }
     }
 
@@ -1979,7 +2002,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $read(collection("db", "zips")),
         $project(
           reshape(
-            "__tmp5" ->
+            "__tmp6" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr(List())), $field("loc")),
@@ -1987,12 +2010,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 $field("loc"),
                 $literal(Bson.Arr(List(Bson.Undefined))))),
           IgnoreId),
-        $unwind(DocField(BsonField.Name("__tmp5"))),
+        $unwind(DocField(BsonField.Name("__tmp6"))),
         $match(Selector.Doc(
-          BsonField.Name("__tmp5") -> Selector.Lt(Bson.Int32(0)))),
+          BsonField.Name("__tmp6") -> Selector.Lt(Bson.Int32(0)))),
         $project(
-          reshape("loc" -> $field("__tmp5")),
-          IgnoreId)))
+          reshape("value" -> $field("__tmp6")),
+          ExcludeId)))
     }
 
     "group by flattened field" in {
@@ -2123,8 +2146,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $read(collection("db", "zips")),
             $limit(5),
             $project(
-              reshape("city" -> $field("city")),
-              IgnoreId))
+              reshape("value" -> $field("city")),
+              ExcludeId))
         }
     }
 
@@ -2160,7 +2183,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $match(Selector.Doc(
             BsonField.Name("foo") -> Selector.Eq(Bson.Null))),
           $project(
-            reshape("0" -> $eq($field("foo"), $literal(Bson.Null))),
+            reshape("value" -> $eq($field("foo"), $literal(Bson.Null))),
             ExcludeId)))
     }
 
@@ -2219,8 +2242,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             grouped(),
             -\/(reshape("0" -> $field("city")))),
           $group(
-            grouped("0" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
+            grouped("__tmp2" -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape("value" -> $field("__tmp2")),
+            ExcludeId)))
     }
 
     "plan distinct of expression as expression" in {
@@ -2241,8 +2267,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     $literal(Bson.Int32(1))),
                   $literal(Bson.Undefined))))),
           $group(
-            grouped("0" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
+            grouped("__tmp8" -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape("value" -> $field("__tmp8")),
+            ExcludeId)))
     }
 
     "plan distinct of wildcard" in {
@@ -2277,8 +2306,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             grouped(),
             -\/(reshape("0" -> $field("__tmp4")))),
           $group(
-            grouped("0" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
+            grouped("__tmp6" -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape("value" -> $field("__tmp6")),
+            ExcludeId)))
     }
 
     "plan distinct with simple order by" in {
@@ -2297,7 +2329,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               reshape("city" -> $field("_id", "0")),
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-    }
+    }.pendingUntilFixed("#1803")
 
     "plan distinct with unrelated order by" in {
       plan("select distinct city from zips order by pop desc") must
@@ -2448,15 +2480,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "0" ->
+            "__tmp2" ->
               If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 Call(ident("NumberLong"),
                   List(Select(Select(ident("x"), "city"), "length"))),
                 ident("undefined")))))),
             ListMap()),
           $project(
-            reshape("0" -> $include()),
-            IgnoreId)))
+            reshape("value" -> $field("__tmp2")),
+            ExcludeId)))
     }
 
     "plan select length() and simple field" in {
@@ -2485,7 +2517,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }.pendingUntilFixed
 
     "plan filter with timestamp and interval" in {
-      import org.threeten.bp.Instant
+      val date0 = Bson.Date.fromInstant(Instant.parse("2014-11-17T00:00:00Z")).get
+      val date22 = Bson.Date.fromInstant(Instant.parse("2014-11-17T22:00:00Z")).get
 
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow(chain[Workflow](
@@ -2499,7 +2532,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                       $lt($literal(Bson.Null), $field("date")),
                       $lt($field("date"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Instant.parse("1970-01-01T00:00:00Z"))), $field("date")),
+                      $lte($literal(Check.minDate), $field("date")),
                       $lt($field("date"), $literal(Bson.Regex("", ""))))),
                   $cond(
                     $or(
@@ -2510,10 +2543,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                         $lte($literal(Bson.Bool(false)), $field("date")),
                         $lt($field("date"), $literal(Bson.Regex("", ""))))),
                     $and(
-                      $lt($field("date"), $literal(Bson.Date(Instant.parse("2014-11-17T22:00:00Z")))),
+                      $lt($field("date"), $literal(date22)),
                       $gt(
                         $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
-                        $literal(Bson.Date(Instant.parse("2014-11-17T00:00:00Z"))))),
+                        $literal(date0))),
                     $literal(Bson.Undefined)),
                   $literal(Bson.Undefined)),
               "__tmp7" -> $$ROOT),
@@ -2538,18 +2571,24 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "days")),
           $project(
-            reshape("0" ->
+            reshape("value" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Date(Instant.parse("1970-01-01T00:00:00Z"))), $field("ts")),
+                  $lte($literal(Check.minDate), $field("ts")),
                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
                 $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
                 $literal(Bson.Undefined))),
-            IgnoreId)))
+            ExcludeId)))
     }
 
     "plan filter on date" in {
-      import org.threeten.bp.Instant
+      val date23 = Bson.Date.fromInstant(Instant.parse("2015-01-23T00:00:00Z")).get
+      val date25 = Bson.Date.fromInstant(Instant.parse("2015-01-25T00:00:00Z")).get
+      val date26 = Bson.Date.fromInstant(Instant.parse("2015-01-26T00:00:00Z")).get
+      val date28 = Bson.Date.fromInstant(Instant.parse("2015-01-28T00:00:00Z")).get
+      val date29 = Bson.Date.fromInstant(Instant.parse("2015-01-29T00:00:00Z")).get
+      val date30 = Bson.Date.fromInstant(Instant.parse("2015-01-30T00:00:00Z")).get
+
 
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
@@ -2566,19 +2605,19 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 Selector.And(
                   Selector.And(
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-23T00:00:00Z")))),
+                      BsonField.Name("ts") -> Selector.Gte(date23)),
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-28T00:00:00Z"))))),
+                      BsonField.Name("ts") -> Selector.Lt(date28))),
                   Selector.Or(
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-25T00:00:00Z")))),
+                      BsonField.Name("ts") -> Selector.Lt(date25)),
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-26T00:00:00Z")))))))),
+                      BsonField.Name("ts") -> Selector.Gte(date26)))))),
             Selector.And(
               Selector.Doc(
-                BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-29T00:00:00Z")))),
+                BsonField.Name("ts") -> Selector.Gte(date29)),
               Selector.Doc(
-                BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-30T00:00:00Z")))))))))
+                BsonField.Name("ts") -> Selector.Lt(date30)))))))
     }
 
     "plan js and filter with id" in {
@@ -2610,21 +2649,19 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan convert to timestamp" in {
-      import org.threeten.bp.Instant
-
       plan("select to_timestamp(epoch) from foo") must beWorkflow {
         chain[Workflow](
           $read(collection("db", "foo")),
           $project(
             reshape(
-              "0" ->
+              "value" ->
                 $cond(
                   $and(
                     $lt($literal(Bson.Null), $field("epoch")),
                     $lt($field("epoch"), $literal(Bson.Text("")))),
-                  $add($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("epoch")),
+                  $add($literal(Bson.Date(0)), $field("epoch")),
                   $literal(Bson.Undefined))),
-            IgnoreId))
+            ExcludeId))
       }
     }
 
@@ -2665,7 +2702,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       swapped: Boolean) = {
 
       val (leftLabel, rightLabel) =
-        if (swapped) ("right", "left") else ("left", "right")
+        if (swapped) (JoinDir.Right.name, JoinDir.Left.name) else (JoinDir.Left.name, JoinDir.Right.name)
       def initialPipeOps(
         src: Workflow, name: String, base: Fix[ExprOp], key: Reshape.Shape[ExprOp], mainLabel: String, otherLabel: String):
           Workflow =
@@ -2732,19 +2769,19 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
             chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-                BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-              $unwind(DocField(BsonField.Name("left"))),
-              $unwind(DocField(BsonField.Name("right"))),
+                JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+                JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+              $unwind(DocField(JoinHandler.LeftName)),
+              $unwind(DocField(JoinHandler.RightName)),
               $project(
-                reshape("city" ->
+                reshape("value" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "city"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "city"),
                     $literal(Bson.Undefined))),
-                IgnoreId)),
+                ExcludeId)),
             false).op)
     }
 
@@ -2754,22 +2791,22 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $read(collection("db", "zips")),
           $match(Selector.Doc(
             BsonField.Name("_id") -> Selector.Exists(true))),
-          $project(reshape("left" -> $$ROOT)),
+          $project(reshape(JoinDir.Left.name -> $$ROOT)),
           $lookup(
             CollectionName("zips2"),
-            BsonField.Name("left") \ BsonField.Name("_id"),
+            JoinHandler.LeftName \ BsonField.Name("_id"),
             BsonField.Name("_id"),
-            BsonField.Name("right")),
-          $unwind(DocField(BsonField.Name("right"))),
+            JoinHandler.RightName),
+          $unwind(DocField(JoinHandler.RightName)),
           $project(
-            reshape("city" ->
+            reshape("value" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field("right")),
-                  $lt($field("right"), $literal(Bson.Arr()))),
-                $field("right", "city"),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Right.name, "city"),
                 $literal(Bson.Undefined))),
-            IgnoreId)))
+            ExcludeId)))
     }
 
     "plan simple join with sharded inputs" in {
@@ -2805,50 +2842,45 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           jscore.Literal(Js.Null).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "__tmp11"   ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name),
                     $literal(Bson.Undefined)),
-                "__tmp12" -> $$ROOT),
-              IgnoreId),
-            $project(
-              reshape(
-                "city"    -> $field("__tmp11", "city"),
-                "__tmp13" ->
+                "__tmp12" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("__tmp12", "right")),
-                      $lt($field("__tmp12", "right"), $literal(Bson.Arr(List())))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
                     $cond(
                       $or(
                         $and(
-                          $lt($literal(Bson.Null), $field("__tmp12", "right", "_id")),
-                          $lt($field("__tmp12", "right", "_id"), $literal(Bson.Doc()))),
+                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "_id")),
+                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Doc()))),
                         $and(
-                          $lte($literal(Bson.Bool(false)), $field("__tmp12", "right", "_id")),
-                          $lt($field("__tmp12", "right", "_id"), $literal(Bson.Regex("", ""))))),
+                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "_id")),
+                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Regex("", ""))))),
                       $cond(
                         $and(
-                          $lte($literal(Bson.Doc()), $field("__tmp12", "left")),
-                          $lt($field("__tmp12", "left"), $literal(Bson.Arr(List())))),
+                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
                         $cond(
                           $or(
                             $and(
-                              $lt($literal(Bson.Null), $field("__tmp12", "left", "_id")),
-                              $lt($field("__tmp12", "left", "_id"), $literal(Bson.Doc()))),
+                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "_id")),
+                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Doc()))),
                             $and(
-                              $lte($literal(Bson.Bool(false)), $field("__tmp12", "left", "_id")),
-                              $lt($field("__tmp12", "left", "_id"), $literal(Bson.Regex("", ""))))),
-                          $lt($field("__tmp12", "left", "_id"), $field("__tmp12", "right", "_id")),
+                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "_id")),
+                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Regex("", ""))))),
+                          $lt($field(JoinDir.Left.name, "_id"), $field(JoinDir.Right.name, "_id")),
                           $literal(Bson.Undefined)),
                         $literal(Bson.Undefined)),
                       $literal(Bson.Undefined)),
@@ -2856,9 +2888,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               IgnoreId),
             $match(
               Selector.Doc(
-                BsonField.Name("__tmp13") -> Selector.Eq(Bson.Bool(true)))),
+                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("city" -> $field("city")),
+              reshape("value" -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
     }
@@ -2874,25 +2906,25 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "name"    ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
-                    $field("left", "name"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Left.name, "name"),
                     $literal(Bson.Undefined)),
                 "address" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "address"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "address"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
@@ -2907,27 +2939,27 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $read(collection("db", "foo")),
         $match(Selector.Doc(
           BsonField.Name("id") -> Selector.Exists(true))),
-        $project(reshape("left" -> $$ROOT)),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
         $lookup(
           CollectionName("bar"),
-          BsonField.Name("left") \ BsonField.Name("id"),
+          JoinHandler.LeftName \ BsonField.Name("id"),
           BsonField.Name("foo_id"),
-          BsonField.Name("right")),
-        $unwind(DocField(BsonField.Name("right"))),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
         $project(reshape(
           "name" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr(Nil)))),
-              $field("left", "name"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
+              $field(JoinDir.Left.name, "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr(Nil)))),
-              $field("right", "address"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
+              $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }
@@ -2940,32 +2972,32 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $project(reshape(
-          "left" -> $$ROOT,
+          JoinDir.Left.name -> $$ROOT,
           "__tmp0" -> $toLower($field("id"))),
           IgnoreId),
         $lookup(
           CollectionName("bar"),
           BsonField.Name("__tmp0"),
           BsonField.Name("foo_id"),
-          BsonField.Name("right")),
+          JoinHandler.RightName),
         $project(reshape(
-          "left" -> $field("left"),
-          "right" -> $field("right"))),
-        $unwind(DocField(BsonField.Name("right"))),
+          JoinDir.Left.name -> $field(JoinDir.Left.name),
+          JoinDir.Right.name -> $field(JoinDir.Right.name))),
+        $unwind(DocField(JoinHandler.RightName)),
         $project(reshape(
           "name" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr()))),
-              $field("left", "name"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr()))),
-              $field("right", "address"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }
@@ -2983,32 +3015,32 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             Selector.Doc(
               BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))))),
         $project(reshape(
-          "right" -> $$ROOT,
+          JoinDir.Right.name -> $$ROOT,
           "__tmp2" -> $field("foo_id")),
           ExcludeId),
         $lookup(
           CollectionName("foo"),
           BsonField.Name("__tmp2"),
           BsonField.Name("id"),
-          BsonField.Name("left")),
+          JoinHandler.LeftName),
         $project(reshape(
-          "right" -> $field("right"),
-          "left" -> $field("left"))),
-        $unwind(DocField(BsonField.Name("left"))),
+          JoinDir.Right.name -> $field(JoinDir.Right.name),
+          JoinDir.Left.name -> $field(JoinDir.Left.name))),
+        $unwind(DocField(JoinHandler.LeftName)),
         $project(reshape(
           "name" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr()))),
-              $field("left", "name"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr()))),
-              $field("right", "address"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }
@@ -3024,17 +3056,17 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           chain[Workflow](_,
             $project(
               reshape(
-                "left" ->
-                  $cond($eq($size($field("left")), $literal(Bson.Int32(0))),
+                JoinDir.Left.name ->
+                  $cond($eq($size($field(JoinDir.Left.name)), $literal(Bson.Int32(0))),
                     $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field("left")),
-                "right" ->
-                  $cond($eq($size($field("right")), $literal(Bson.Int32(0))),
+                    $field(JoinDir.Left.name)),
+                JoinDir.Right.name ->
+                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
                     $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field("right"))),
+                    $field(JoinDir.Right.name))),
               IgnoreId),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $simpleMap(
               NonEmptyList(
                 MapExpr(JsFn(Name("x"),
@@ -3042,17 +3074,17 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     Name("__tmp7") ->
                       If(
                         BinOp(jscore.And,
-                          Call(ident("isObject"), List(Select(ident("x"), "right"))),
+                          Call(ident("isObject"), List(Select(ident("x"), JoinDir.Right.name))),
                           UnOp(jscore.Not,
-                            Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "right"))))),
+                            Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), JoinDir.Right.name))))),
                         If(
                           BinOp(jscore.And,
-                            Call(ident("isObject"), List(Select(ident("x"), "left"))),
+                            Call(ident("isObject"), List(Select(ident("x"), JoinDir.Left.name))),
                             UnOp(jscore.Not,
-                              Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "left"))))),
+                              Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), JoinDir.Left.name))))),
                           SpliceObjects(List(
-                            Select(ident("x"), "left"),
-                            Select(ident("x"), "right"))),
+                            Select(ident("x"), JoinDir.Left.name),
+                            Select(ident("x"), JoinDir.Right.name))),
                           ident("undefined")),
                         ident("undefined"))))))),
               ListMap()),
@@ -3074,32 +3106,32 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0))))),
             $project(
               reshape(
-                "left"  -> $field("left"),
-                "right" ->
-                  $cond($eq($size($field("right")), $literal(Bson.Int32(0))),
+                JoinDir.Left.name  -> $field(JoinDir.Left.name),
+                JoinDir.Right.name ->
+                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
                     $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field("right"))),
+                    $field(JoinDir.Right.name))),
               IgnoreId),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "name"    ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
-                    $field("left", "name"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Left.name, "name"),
                     $literal(Bson.Undefined)),
                 "address" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "address"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "address"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
@@ -3113,27 +3145,27 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
-        $project(reshape("left" -> $$ROOT)),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
         $lookup(
           CollectionName("bar"),
-          BsonField.Name("left") \ BsonField.Name("id"),
+          JoinHandler.LeftName \ BsonField.Name("id"),
           BsonField.Name("foo_id"),
-          BsonField.Name("right")),
-        $unwind(DocField(BsonField.Name("right"))),  // FIXME: need to preserve docs with no match
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
         $project(reshape(
           "name" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr()))),
-              $field("left", "name"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr()))),
-              $field("right", "address"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }.pendingUntilFixed("TODO: left/right joins in $lookup")
@@ -3146,27 +3178,27 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "bar")),
-        $project(reshape("right" -> $$ROOT)),
+        $project(reshape(JoinDir.Right.name -> $$ROOT)),
         $lookup(
           CollectionName("foo"),
-          BsonField.Name("right") \ BsonField.Name("foo_id"),
+          JoinHandler.RightName \ BsonField.Name("foo_id"),
           BsonField.Name("id"),
-          BsonField.Name("left")),
-        $unwind(DocField(BsonField.Name("left"))),  // FIXME: need to preserve docs with no match
+          JoinHandler.LeftName),
+        $unwind(DocField(JoinHandler.LeftName)),  // FIXME: need to preserve docs with no match
         $project(reshape(
           "name" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr()))),
-              $field("left", "name"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr()))),
-              $field("right", "address"),
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }.pendingUntilFixed("TODO: left/right joins in $lookup")
@@ -3186,58 +3218,58 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
             chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-                BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-              $unwind(DocField(BsonField.Name("left"))),
-              $unwind(DocField(BsonField.Name("right")))),
+                JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+                JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+              $unwind(DocField(JoinHandler.LeftName)),
+              $unwind(DocField(JoinHandler.RightName))),
             false),
           reshape("0" -> $field("bar_id")),
-          Obj(ListMap(Name("0") -> Select(Select(ident("value"), "right"), "id"))).right,
+          Obj(ListMap(Name("0") -> Select(Select(ident("value"), JoinDir.Right.name), "id"))).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0))))),
             $project(
               reshape(
-                "right" ->
-                  $cond($eq($size($field("right")), $literal(Bson.Int32(0))),
+                JoinDir.Right.name ->
+                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
                     $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field("right")),
-                "left" -> $field("left")),
+                    $field(JoinDir.Right.name)),
+                JoinDir.Left.name -> $field(JoinDir.Left.name)),
               IgnoreId),
-            $unwind(DocField(BsonField.Name("right"))),
-            $unwind(DocField(BsonField.Name("left"))),
+            $unwind(DocField(JoinHandler.RightName)),
+            $unwind(DocField(JoinHandler.LeftName)),
             $project(
               reshape(
                 "name"    ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
                     $cond(
                       $and(
-                        $lte($literal(Bson.Doc()), $field("left", "left")),
-                        $lt($field("left", "left"), $literal(Bson.Arr()))),
-                      $field("left", "left", "name"),
+                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
+                        $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
+                      $field(JoinDir.Left.name, JoinDir.Left.name, "name"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
                 "address" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
                     $cond(
                       $and(
-                        $lte($literal(Bson.Doc()), $field("left", "right")),
-                        $lt($field("left", "right"), $literal(Bson.Arr()))),
-                      $field("left", "right", "address"),
+                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
+                        $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
+                      $field(JoinDir.Left.name, JoinDir.Right.name, "address"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
                 "zip"     ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "zip"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "zip"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
@@ -3256,53 +3288,53 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $read(collection("db", "foo")),
           $match(Selector.Doc(
             BsonField.Name("id") -> Selector.Exists(true))),
-          $project(reshape("left" -> $$ROOT)),
+          $project(reshape(JoinDir.Left.name -> $$ROOT)),
           $lookup(
             CollectionName("bar"),
-            BsonField.Name("left") \ BsonField.Name("id"),
+            JoinHandler.LeftName \ BsonField.Name("id"),
             BsonField.Name("foo_id"),
-            BsonField.Name("right")),
-          $unwind(DocField(BsonField.Name("right"))),
+            JoinHandler.RightName),
+          $unwind(DocField(JoinHandler.RightName)),
           $match(Selector.Doc(
-            BsonField.Name("right") \ BsonField.Name("id") -> Selector.Exists(true))),
-          $project(reshape("left" -> $$ROOT)),
+            JoinHandler.RightName \ BsonField.Name("id") -> Selector.Exists(true))),
+          $project(reshape(JoinDir.Left.name -> $$ROOT)),
           $lookup(
             CollectionName("baz"),
-            BsonField.Name("left") \ BsonField.Name("right") \ BsonField.Name("id"),
+            JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("id"),
             BsonField.Name("bar_id"),
-            BsonField.Name("right")),
-          $unwind(DocField(BsonField.Name("right"))),
+            JoinHandler.RightName),
+          $unwind(DocField(JoinHandler.RightName)),
           $project(reshape(
             "name" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field("left")),
-                  $lt($field("left"), $literal(Bson.Arr()))),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
                 $cond(
                   $and(
-                    $lte($literal(Bson.Doc()), $field("left", "left")),
-                    $lt($field("left", "left"), $literal(Bson.Arr()))),
-                  $field("left", "left", "name"),
+                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
+                    $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
+                  $field(JoinDir.Left.name, JoinDir.Left.name, "name"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
             "address" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field("left")),
-                  $lt($field("left"), $literal(Bson.Arr()))),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
                 $cond(
                   $and(
-                    $lte($literal(Bson.Doc()), $field("left", "right")),
-                    $lt($field("left", "right"), $literal(Bson.Arr()))),
-                  $field("left", "right", "address"),
+                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
+                    $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
+                  $field(JoinDir.Left.name, JoinDir.Right.name, "address"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
             "zip" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field("right")),
-                  $lt($field("right"), $literal(Bson.Arr()))),
-                $field("right", "zip"),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Right.name, "zip"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
     }
@@ -3329,48 +3361,48 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             "1" -> Select(Select(ident("value"), "author"), "login")).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "child"  ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
-                    $field("left", "sha"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Left.name, "sha"),
                     $literal(Bson.Undefined)),
                 "c_auth" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
                     $cond(
                       $and(
-                        $lte($literal(Bson.Doc()), $field("left", "author")),
-                        $lt($field("left", "author"), $literal(Bson.Arr()))),
-                      $field("left", "author", "login"),
+                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, "author")),
+                        $lt($field(JoinDir.Left.name, "author"), $literal(Bson.Arr()))),
+                      $field(JoinDir.Left.name, "author", "login"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
                 "parent" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "sha"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "sha"),
                     $literal(Bson.Undefined)),
                 "p_auth" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
                     $cond(
                       $and(
-                        $lte($literal(Bson.Doc()), $field("right", "author")),
-                        $lt($field("right", "author"), $literal(Bson.Arr()))),
-                      $field("right", "author", "login"),
+                        $lte($literal(Bson.Doc()), $field(JoinDir.Right.name, "author")),
+                        $lt($field(JoinDir.Right.name, "author"), $literal(Bson.Arr()))),
+                      $field(JoinDir.Right.name, "author", "login"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined))),
               IgnoreId)),
@@ -3403,39 +3435,39 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             "0" -> $field("__tmp3")).left).left,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "city1" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
-                    $field("left", "city"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Left.name, "city"),
                     $literal(Bson.Undefined)),
                 "loc" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr()))),
-                    $field("left", "loc"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Left.name, "loc"),
                     $literal(Bson.Undefined)),
                 "city2" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "city"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "city"),
                     $literal(Bson.Undefined)),
                 "pop" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right", "pop"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name, "pop"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
@@ -3451,50 +3483,45 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           jscore.Literal(Js.Null).right,
           chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
-              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(BsonField.Name("left"))),
-            $unwind(DocField(BsonField.Name("right"))),
+              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(JoinHandler.LeftName)),
+            $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
                 "__tmp11"   ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr()))),
-                    $field("right"),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                    $field(JoinDir.Right.name),
                     $literal(Bson.Undefined)),
-                "__tmp12" -> $$ROOT),
-              IgnoreId),
-            $project(
-              reshape(
-                "city"    -> $field("__tmp11", "city"),
-                "__tmp13" ->
+                "__tmp12" ->
                   $cond(
                     $and(
-                      $lte($literal(Bson.Doc()), $field("__tmp12", "right")),
-                      $lt($field("__tmp12", "right"), $literal(Bson.Arr(List())))),
+                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
                     $cond(
                       $or(
                         $and(
-                          $lt($literal(Bson.Null), $field("__tmp12", "right", "pop")),
-                          $lt($field("__tmp12", "right", "pop"), $literal(Bson.Doc()))),
+                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "pop")),
+                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Doc()))),
                         $and(
-                          $lte($literal(Bson.Bool(false)), $field("__tmp12", "right", "pop")),
-                          $lt($field("__tmp12", "right", "pop"), $literal(Bson.Regex("", ""))))),
+                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "pop")),
+                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Regex("", ""))))),
                       $cond(
                         $and(
-                          $lte($literal(Bson.Doc()), $field("__tmp12", "left")),
-                          $lt($field("__tmp12", "left"), $literal(Bson.Arr(List())))),
+                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
                         $cond(
                           $or(
                             $and(
-                              $lt($literal(Bson.Null), $field("__tmp12", "left", "pop")),
-                              $lt($field("__tmp12", "left", "pop"), $literal(Bson.Doc()))),
+                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "pop")),
+                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Doc()))),
                             $and(
-                              $lte($literal(Bson.Bool(false)), $field("__tmp12", "left", "pop")),
-                              $lt($field("__tmp12", "left", "pop"), $literal(Bson.Regex("", ""))))),
-                          $lt($field("__tmp12", "left", "pop"), $field("__tmp12", "right", "pop")),
+                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "pop")),
+                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Regex("", ""))))),
+                          $lt($field(JoinDir.Left.name, "pop"), $field(JoinDir.Right.name, "pop")),
                           $literal(Bson.Undefined)),
                         $literal(Bson.Undefined)),
                       $literal(Bson.Undefined)),
@@ -3502,9 +3529,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               IgnoreId),
             $match(
               Selector.Doc(
-                BsonField.Name("__tmp13") -> Selector.Eq(Bson.Bool(true)))),
+                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("city" -> $field("city")),
+              reshape("value" -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
     }
@@ -3657,7 +3684,6 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)
 
-  val noGroupBy = Gen.const[Option[GroupBy[Fix[Sql]]]](None)
   val groupBySeveral = Gen.nonEmptyListOf(Gen.oneOf(
     sql.IdentR("state"),
     sql.IdentR("territory"))).map(keys => GroupBy(keys.distinct, None))
@@ -3669,14 +3695,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR(StdLib.string.Like.name, List(x, sql.StringLiteralR("BOULDER%"), sql.StringLiteralR(""))),
+    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
-  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.nonEmptyListOf(for {
-    x <- Gen.oneOf(genInnerInt, genInnerStr)
-    t <- Gen.oneOf(ASC, DESC)
-  } yield (t, x)).map(ps => Some(OrderBy(ps)))
+
+  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = {
+    val order = Gen.oneOf(ASC, DESC) tuple Gen.oneOf(genInnerInt, genInnerStr)
+    (order |@| Gen.listOf(order))((h, t) => Some(OrderBy(NonEmptyList(h, t: _*))))
+  }
 
   val maybeReducingExpr = Gen.oneOf(genOuterInt, genOuterStr)
 
@@ -3752,18 +3779,17 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   "plan from LogicalPlan" should {
     import StdLib._
 
-    "plan simple OrderBy" in {
+    "plan simple Sort" in {
       val lp =
-        LogicalPlan.Let(
+        lpf.let(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
-            'tmp1, makeObj("bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
-            LogicalPlan.Let('tmp2,
-              s.OrderBy[FLP](
-                Free('tmp1),
-                MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
-                MakeArrayN(Constant(Data.Str("ASC")))),
-              Free('tmp2))))
+          lpf.let(
+            'tmp1, makeObj("bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+            lpf.let('tmp2,
+              lpf.sort(
+                lpf.free('tmp1),
+                (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel),
+              lpf.free('tmp2))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3773,16 +3799,15 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression" in {
+    "plan Sort with expression" in {
       val lp =
-        LogicalPlan.Let(
+        lpf.let(
           'tmp0, read("db/foo"),
-          s.OrderBy[FLP](
-            Free('tmp0),
-            MakeArrayN[Fix](math.Divide[FLP](
-              ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
-              Constant(Data.Dec(10.0)))),
-            MakeArrayN(Constant(Data.Str("ASC")))))
+          lpf.sort(
+            lpf.free('tmp0),
+            (math.Divide[Fix[LP]](
+              lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+              lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3797,21 +3822,20 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           ExcludeId)))
     }
 
-    "plan OrderBy with expression and earlier pipeline op" in {
+    "plan Sort with expression and earlier pipeline op" in {
       val lp =
-        LogicalPlan.Let(
+        lpf.let(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
+          lpf.let(
             'tmp1,
-            s.Filter[FLP](
-              Free('tmp0),
-              relations.Eq[FLP](
-                ObjectProject(Free('tmp0), Constant(Data.Str("baz"))),
-                Constant(Data.Int(0)))),
-            s.OrderBy[FLP](
-              Free('tmp1),
-              MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
-              MakeArrayN(Constant(Data.Str("ASC"))))))
+            lpf.invoke2(s.Filter,
+              lpf.free('tmp0),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
+                lpf.constant(Data.Int(0)))),
+            lpf.sort(
+              lpf.free('tmp1),
+              (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3820,20 +3844,19 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
-    "plan OrderBy with expression (and extra project)" in {
+    "plan Sort expression (and extra project)" in {
       val lp =
-        LogicalPlan.Let(
+        lpf.let(
           'tmp0, read("db/foo"),
-          LogicalPlan.Let(
+          lpf.let(
             'tmp9,
             makeObj(
-              "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))),
-            s.OrderBy[FLP](
-              Free('tmp9),
-              MakeArrayN[Fix](math.Divide[FLP](
-                ObjectProject(Free('tmp9), Constant(Data.Str("bar"))),
-                Constant(Data.Dec(10.0)))),
-              MakeArrayN(Constant(Data.Str("ASC"))))))
+              "bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+            lpf.sort(
+              lpf.free('tmp9),
+              (math.Divide[Fix[LP]](
+                lpf.invoke2(ObjectProject, lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
+                lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel)))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -3849,7 +3872,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan distinct on full collection" in {
-      plan(s.Distinct(read("db/cities"))) must
+      plan(lpf.invoke1(s.Distinct, read("db/cities"))) must
         beWorkflow(chain[Workflow](
           $read(collection("db", "cities")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -3870,89 +3893,97 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
   "alignJoinsƒ" should {
     "leave well enough alone" in {
       MongoDbPlanner.alignJoinsƒ(
-        InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("foo"))),
-                ObjectProject(Free('right), Constant(Data.Str("bar")))),
-              relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+        lp.Invoke(s.InnerJoin,
+          Func.Input3(lpf.free('left), lpf.free('right),
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTreeEqual(
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap a reversed condition" in {
       MongoDbPlanner.alignJoinsƒ(
-        InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+        lp.Invoke(s.InnerJoin,
+          Func.Input3(lpf.free('left), lpf.free('right),
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTreeEqual(
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "swap multiple reversed conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(Free('right), Constant(Data.Str("zab"))),
-                ObjectProject(Free('left), Constant(Data.Str("baz")))))))) must
-      beRightDisjunction(
-        Fix(s.InnerJoin[FLP](Free('left), Free('right),
-          relations.And[FLP](
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("foo"))),
-              ObjectProject(Free('right), Constant(Data.Str("bar")))),
-            relations.Eq[FLP](
-              ObjectProject(Free('left), Constant(Data.Str("baz"))),
-              ObjectProject(Free('right), Constant(Data.Str("zab"))))))))
+        lp.Invoke(s.InnerJoin,
+          Func.Input3(lpf.free('left), lpf.free('right),
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))))))) must beLike {
+        case \/-(plan) =>
+          plan must beTreeEqual(
+            Fix(s.InnerJoin[Fix[LP]](lpf.free('left), lpf.free('right),
+              lpf.invoke2(relations.And,
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar")))),
+                lpf.invoke2(relations.Eq,
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab"))))))))
+      }
     }
 
     "fail with “mixed” conditions" in {
       MongoDbPlanner.alignJoinsƒ(
-        InvokeF(s.InnerJoin,
-          Func.Input3(Free('left), Free('right),
-            relations.And[FLP](
-              relations.Eq[FLP](
-                math.Add[FLP](
-                  ObjectProject(Free('right), Constant(Data.Str("bar"))),
-                  ObjectProject(Free('left), Constant(Data.Str("baz")))),
-                ObjectProject(Free('left), Constant(Data.Str("foo")))),
-              relations.Eq[FLP](
-                ObjectProject(Free('left), Constant(Data.Str("baz"))),
-                ObjectProject(Free('right), Constant(Data.Str("zab")))))))) must
-      beLeftDisjunction(UnsupportedJoinCondition(
-        relations.Eq[FLP](
-          math.Add[FLP](
-            ObjectProject(Free('right), Constant(Data.Str("bar"))),
-            ObjectProject(Free('left), Constant(Data.Str("baz")))),
-          ObjectProject(Free('left), Constant(Data.Str("foo"))))))
+        lp.Invoke(s.InnerJoin,
+          Func.Input3(lpf.free('left), lpf.free('right),
+            lpf.invoke2(relations.And,
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(math.Add,
+                  lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))),
+              lpf.invoke2(relations.Eq,
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("zab")))))))) must beLike {
+        case -\/(UnsupportedJoinCondition(cond)) =>
+          cond must beTreeEqual(
+            lpf.invoke2(relations.Eq,
+              lpf.invoke2(math.Add,
+                lpf.invoke2(ObjectProject, lpf.free('right), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("baz")))),
+              lpf.invoke2(ObjectProject, lpf.free('left), lpf.constant(Data.Str("foo")))))
+      }
     }
 
     "plan with extra squash and flattening" in {
@@ -3960,36 +3991,36 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       // because type-checks are inserted into the inner and outer queries separately.
 
       val lp =
-        LogicalPlan.Let(
+        lpf.let(
           'tmp0,
-          LogicalPlan.Let(
+          lpf.let(
             'check0,
-            identity.Squash(read("db/zips")),
-            LogicalPlan.Typecheck(
-              Free('check0),
+            lpf.invoke1(identity.Squash, read("db/zips")),
+            lpf.typecheck(
+              lpf.free('check0),
               Type.Obj(Map(), Some(Type.Top)),
-              Free('check0),
-              Constant(Data.NA))),
-          s.Distinct[FLP](
-            identity.Squash[FLP](
+              lpf.free('check0),
+              lpf.constant(Data.NA))),
+          lpf.invoke1(s.Distinct,
+            lpf.invoke1(identity.Squash,
               makeObj(
                 "city" ->
-                ObjectProject[FLP](
-                  s.Filter[FLP](
-                    Free('tmp0),
-                    string.Search[FLP](
-                      FlattenArray[FLP](
-                        LogicalPlan.Let(
+                lpf.invoke2(ObjectProject,
+                  lpf.invoke2(s.Filter,
+                    lpf.free('tmp0),
+                    lpf.invoke3(string.Search,
+                      lpf.invoke1(FlattenArray,
+                        lpf.let(
                           'check1,
-                          ObjectProject(Free('tmp0), Constant(Data.Str("loc"))),
-                          LogicalPlan.Typecheck(
-                            Free('check1),
+                          lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
+                          lpf.typecheck(
+                            lpf.free('check1),
                             Type.FlexArr(0, None, Type.Str),
-                            Free('check1),
-                            Constant(Data.Arr(List(Data.NA)))))),
-                      Constant(Data.Str("^.*MONT.*$")),
-                      Constant(Data.Bool(false)))),
-                  Constant(Data.Str("city")))))))
+                            lpf.free('check1),
+                            lpf.constant(Data.Arr(List(Data.NA)))))),
+                      lpf.constant(Data.Str("^.*MONT.*$")),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.constant(Data.Str("city")))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),

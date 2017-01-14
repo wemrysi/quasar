@@ -18,17 +18,19 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.SortDir
-
-import matryoshka._, FunctorT.ops._, Recursive.ops._
-import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
+
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import scalaz._, Scalaz._
 
 class WorkflowBuilderSpec extends quasar.Qspec {
   import WorkflowBuilder._
@@ -39,7 +41,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
   import fixExprOp._
 
   val readZips = read(collection("db", "zips"))
-  def pureInt(n: Int) = pure(Bson.Int32(n))
 
   implicit val workflowEqual: Equal[Fix[WorkflowF]] = Equal.equalA
 
@@ -114,7 +115,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
         city   <- lift(projectField(read, "city"))
         array  <- arrayConcat(makeArray(city), pureArr)
         state2 <- lift(projectIndex(array, 2))
-      } yield (state2: Fix[WorkflowBuilderF[WorkflowF, ?]]).transCata(normalize[WorkflowF])).evalZero
+      } yield (state2: Fix[WorkflowBuilderF[WorkflowF, ?]]).transCata[Fix[WorkflowBuilderF[WorkflowF, ?]]](normalize)).evalZero
 
       op must beRightDisjunction(ExprBuilder(read, $literal(Bson.Int32(1)).right))
     }
@@ -141,7 +142,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       } yield state2).evalZero
 
       op must beLeftDisjunction(UnsupportedFunction(
-        quasar.std.StdLib.structural.ArrayProject.name,
+        quasar.std.StdLib.structural.ArrayProject,
         Some("array does not contain index ‘2’.")))
     }
 

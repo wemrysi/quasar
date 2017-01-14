@@ -1,10 +1,13 @@
 {
     "name": "flatten a grouped object with filter",
     "backends": {
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending",
+        "couchbase":         "skip",
         "marklogic":         "skip",
-        "couchbase":         "skip"
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "postgresql":        "pending",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",

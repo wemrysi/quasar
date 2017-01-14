@@ -2,9 +2,12 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
-        "postgresql": "pending",
+        "couchbase":  "skip",
         "marklogic":  "skip",
-        "couchbase":  "skip"
+        "mongodb_q_3_2": "skip",
+        "postgresql": "pending",
+        "spark_local": "skip",
+        "spark_hdfs": "skip"
     },
 
     "data": "zips.data",
