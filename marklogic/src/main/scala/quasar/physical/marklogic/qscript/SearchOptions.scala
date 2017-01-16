@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.physical.marklogic.xquery.syntax._
 
@@ -30,13 +30,13 @@ trait SearchOptions[A] {
 }
 
 object SearchOptions {
-  implicit val xmlOptions: SearchOptions[fmt.XML] =
-    new SearchOptions[fmt.XML] {
+  implicit val xmlOptions: SearchOptions[DocType.Xml] =
+    new SearchOptions[DocType.Xml] {
       val searchOptions = IList("format-xml".xs)
     }
 
-  implicit val jsonOptions: SearchOptions[fmt.JSON] =
-    new SearchOptions[fmt.JSON] {
+  implicit val jsonOptions: SearchOptions[DocType.Json] =
+    new SearchOptions[DocType.Json] {
       val searchOptions = IList("format-json".xs)
     }
 }

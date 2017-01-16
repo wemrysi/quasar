@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.physical.marklogic.MonadErrMsgs
+import quasar.physical.marklogic.{DocType, MonadErrMsgs}
 
 import java.net.URI
 
@@ -25,31 +25,9 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class MarkLogicConfig(xccUri: URI, docType: MarkLogicConfig.DocType)
+final case class MarkLogicConfig(xccUri: URI, docType: DocType)
 
 object MarkLogicConfig {
-  sealed abstract class DocType {
-    def fold[A](json: => A, xml: => A): A =
-      this match {
-        case DocType.Json => json
-        case DocType.Xml  => xml
-      }
-  }
-
-  object DocType {
-    case object Json extends DocType
-    case object Xml  extends DocType
-
-    val json: DocType = Json
-    val xml:  DocType = Xml
-
-    implicit val equal: Equal[DocType] =
-      Equal.equalA
-
-    implicit val show: Show[DocType] =
-      Show.showFromToString
-  }
-
   def fromUriString[F[_]: MonadErrMsgs](str: String): F[MarkLogicConfig] = {
     def ensureScheme(u: URI): ValidationNel[String, Unit] =
       Option(u.getScheme).exists(_ === "xcc").unlessM("Unrecognized URI scheme, expected 'xcc'.".failureNel)

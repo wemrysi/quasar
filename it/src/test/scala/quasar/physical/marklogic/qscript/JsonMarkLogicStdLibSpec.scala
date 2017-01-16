@@ -19,7 +19,7 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.effect._
 import quasar.fp.eitherT._
-import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xquery._
 
 import matryoshka._
@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 import JsonMarkLogicStdLibSpec.SLib
 
-final class JsonMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, fmt.JSON] {
+final class JsonMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, DocType.Json] {
   def toMain[G[_]: Monad: Capture](xqy: SLib[XQuery]): RunT[G, MainModule] = {
     val (prologs, q) = xqy.leftMap(e => ko(e.shows).toResult).run.run.eval(1)
     EitherT.fromDisjunction[G](q map (MainModule(Version.`1.0-ml`, prologs, _)))

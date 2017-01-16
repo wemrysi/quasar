@@ -16,10 +16,29 @@
 
 package quasar.physical.marklogic
 
-object fmt {
-  /** XML format. */
-  sealed abstract class XML
+import scalaz._
 
-  /** JSON format. */
-  sealed abstract class JSON
+sealed abstract class DocType {
+  def fold[A](json: => A, xml: => A): A =
+    this match {
+      case DocType.JsonDoc => json
+      case DocType.XmlDoc  => xml
+    }
+}
+
+object DocType {
+  case object JsonDoc extends DocType
+  case object XmlDoc  extends DocType
+
+  type Json = JsonDoc.type
+  type Xml  = XmlDoc.type
+
+  val json: DocType = JsonDoc
+  val xml:  DocType = XmlDoc
+
+  implicit val equal: Equal[DocType] =
+    Equal.equalA
+
+  implicit val show: Show[DocType] =
+    Show.showFromToString
 }
