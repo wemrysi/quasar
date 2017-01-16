@@ -18,6 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.{Data, TestConfig}
+import quasar.contrib.scalacheck.gen
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.fp.eitherT._
@@ -88,7 +89,7 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     def intDomain    = arbitrary[Long]   map (BigInt(_))
     def decDomain    = arbitrary[Double] map (BigDecimal(_))
-    def stringDomain = StdLibTestRunner.genPrintableAscii
+    def stringDomain = gen.printableAsciiString
 
     ////
 

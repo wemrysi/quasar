@@ -156,16 +156,19 @@ package object sql {
   private def pprintRelationƒ[T]
     (r: SqlRelation[(T, String)])
     (implicit T: Recursive.Aux[T, Sql])
-      : String =
+      : String = {
+
+    def ppalias(a: String): String = "as " + _qq("`", a)
+
     (r match {
       case IdentRelationAST(name, alias) =>
-        _qq("`", name) :: alias.map("as " + _).toList
+        _qq("`", name) :: alias.map(ppalias).toList
       case VariRelationAST(vari, alias) =>
-        (":" + vari.symbol) :: alias.map("as " + _).toList
+        pprintƒ.apply(vari) :: alias.map(ppalias).toList
       case TableRelationAST(path, alias) =>
-        _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
+        _qq("`", prettyPrint(path)) :: alias.map(ppalias).toList
       case ExprRelationAST(expr, aliasName) =>
-        List(expr._2, "as", aliasName)
+        List(expr._2, ppalias(aliasName))
       case JoinRelation(left, right, tpe, clause) =>
         (tpe, clause._1) match {
           case (InnerJoin, Embed(BoolLiteral(true))) =>
@@ -174,6 +177,7 @@ package object sql {
             List("(", pprintRelationƒ(left), tpe.sql, pprintRelationƒ(right), "on", clause._2, ")")
         }
     }).mkString(" ")
+  }
 
   def pprintRelation[T](r: SqlRelation[T])(implicit T: Recursive.Aux[T, Sql]) =
     pprintRelationƒ(traverseRelation[Id, T, (T, String)](r, x => (x, pprint(x))))

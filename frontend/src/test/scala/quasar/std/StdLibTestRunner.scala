@@ -72,7 +72,3 @@ trait StdLibTestRunner {
     */
   def stringDomain: Gen[String]
 }
-
-object StdLibTestRunner {
-  val genPrintableAscii: Gen[String] = Gen.listOf(Gen.choose('\u0020', '\u007e')).map(_.mkString)
-}
