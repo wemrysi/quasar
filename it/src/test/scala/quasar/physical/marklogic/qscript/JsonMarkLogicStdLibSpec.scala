@@ -27,7 +27,6 @@ import scalaz._, Scalaz._
 
 import JsonMarkLogicStdLibSpec.SLib
 
-// FIXME: DRY this up with the XML one
 final class JsonMarkLogicStdLibSpec extends MarkLogicStdLibSpec[SLib, fmt.JSON] {
   def toMain[G[_]: Monad: Capture](xqy: SLib[XQuery]): RunT[G, MainModule] = {
     val (prologs, q) = xqy.leftMap(e => ko(e.shows).toResult).run.run.eval(1)
