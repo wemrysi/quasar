@@ -110,7 +110,7 @@ object Zip {
     }
   }
 
-  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, List[(AbsFile[Sandboxed], ByteVector)]] = {
+  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, Map[AbsFile[Sandboxed], ByteVector]] = {
     def entry(zis: jzip.ZipInputStream): OptionT[Task, (String, ByteVector)] =
       for {
         entry <- OptionT(Task.delay(Option(zis.getNextEntry())))
@@ -143,7 +143,7 @@ object Zip {
       zis <- Task.delay(new jzip.ZipInputStream(is))
       es  <- entries(zis).runLog
       rez <- es.traverse { case (n: String, bs) => toPath(n).strengthR(bs) }
-    } yield rez.toList).attempt.map(_.leftMap {
+    } yield rez.toMap).attempt.map(_.leftMap {
       case x: jzip.ZipException => s"zip decoding error: $x"
       case x => s"$x"
     }))

@@ -25,6 +25,7 @@ import quasar.fs._
 
 import java.nio.charset.StandardCharsets
 
+import argonaut.Parse
 import argonaut.Argonaut._
 import argonaut.ArgonautScalaz._
 import eu.timepit.refined.auto._
@@ -174,36 +175,55 @@ object data {
         : EitherT[Task, DecodeFailure, Process[Task, DecodeError \/ Data]] =
       EitherT(format.decode(strs).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg): DecodeFailure)))
 
-    def handleOne(fPath: AFile, fmt: MessageFormat, strs: Process[Task, String])
+    def writeOne(fPath: AFile, fmt: MessageFormat, strs: Process[Task, String])
         : EitherT[FreeS, QResponse[S], Unit] = {
       hoist(decodeContent(fmt, strs).leftMap(_.toResponse[S]))
         .flatMap(dataStream => EitherT(inj(dataStream.runLog).flatMap(write(fPath, _))))
     }
 
+    // We only support uploading zip files into directory paths
+    val uploadFormats = Set(MediaType.`application/zip`: MediaRange)
+
     refineType(path).fold[EitherT[FreeS, QResponse[S], Unit]](
+      // Client is attempting to upload a directory
       aDir =>
         for {
-          files <- hoist(Zip.unzipFiles(req.body)
+          // Make sure the request content-type is zip
+          _ <- EitherT((req.headers.get(`Content-Type`) \/> (MediaTypeMissing(uploadFormats): DecodeFailure)).flatMap { contentType =>
+            val mdType = contentType.mediaType
+            if (mdType == MediaType.`application/zip`) ().right else MediaTypeMismatch(mdType, uploadFormats).left
+          }.leftMap(_.toResponse[S]).point[FreeS])
+          // Unzip the uploaded archive
+          filesToContent <- hoist(Zip.unzipFiles(req.body)
                    .leftMap(err => InvalidMessageBodyFailure(err).toResponse[S]))
-          t <- files.partition(_._1 ≟ ArchiveMetadata.HiddenFile) match {
-            case ((_, meta) :: Nil, other) =>
-              decodeUtf8(meta).strengthR(other)
-            case _ =>
-              ???
-              // EitherT.left(InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S])
+          // Seperate metadata file from all others
+          tuple <- filesToContent.get(ArchiveMetadata.HiddenFile).cata(
+            meta => decodeUtf8(meta).strengthR(filesToContent - ArchiveMetadata.HiddenFile),
+            EitherT.left[FreeS, QResponse[S], (String, Map[AbsFile[Sandboxed], ByteVector])](InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S].point[FreeS]))
+          (metaString, restOfFilesToContent) = tuple
+           meta <- EitherT((Parse.decodeOption[ArchiveMetadata](metaString) \/> (InvalidMessageBodyFailure("metadata file has incorrect format").toResponse[S])).point[FreeS])
+          // Write each file if we can determine a format
+          _     <- restOfFilesToContent.toList.traverse { case (aFile, contentBytes) =>
+            for {
+              // What's the metadata for this file
+              fileMetadata  <- EitherT((meta.files.get(aFile) \/> InvalidMessageBodyFailure(s"metadata file does not contain metadata for ${posixCodec.printPath(aFile)}").toResponse[S]).point[FreeS])
+              mdType        =  fileMetadata.contentType.mediaType
+              // Do we have a quasar format that corresponds to the content-type in the metadata
+              fmt           <- EitherT((MessageFormat.fromMediaType(mdType) \/> (InvalidMessageBodyFailure(s"Unsupported media type: $mdType for file: ${posixCodec.printPath(aFile)}").toResponse[S])).point[FreeS])
+              // Transform content from bytes to a String
+              content       <- decodeUtf8(contentBytes)
+              // Write a single file with the specified format
+              _             <- writeOne(rebaseA(aDir)(aFile), fmt, Process.emit(content))
+            } yield ()
           }
-          (meta, other) = t
-          _     <- other.traverse { case (aFile, bytes) =>
-                   // EitherT(bytes.decodeUtf8.disjunction.point[FreeS])
-                   //   .leftMap(err => InvalidMessageBodyFailure(err.toString).toResponse[S])
-                   decodeUtf8(bytes)
-                     .flatMap(str => handleOne(rebaseA(aDir)(aFile), fmt, Process.emit(str)))
-                  }
         } yield (),
+      // Client is attempting to upload a single file
       aFile => for {
+        // What's the format they want to upload
         fmt <- EitherT(MessageFormat.forMessage(req).point[FreeS]).leftMap(_.toResponse[S])
-        _   <- handleOne(aFile, fmt, req.bodyAsText)
-      } yield ()).as(QResponse.ok[S]).run.map(_.merge)
+        // Write a single file with the specified format
+        _   <- writeOne(aFile, fmt, req.bodyAsText)
+      } yield ()).as(QResponse.ok[S]).run.map(_.merge) // Return 200 Ok if everything goes smoothly
   }
 
   private def zippedContents[S[_]](

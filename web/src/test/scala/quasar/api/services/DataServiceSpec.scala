@@ -478,8 +478,8 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           val (service2, ref2) = serviceRef(InMemState.empty)
           val response2 = service2(request2).unsafePerformSync
 
-          response2.status must_== Status.Ok
           response2.as[String].unsafePerformSync must_== ""
+          response2.status must_== Status.Ok
           ref2.unsafePerformSync.contents must_== contentMap
         }
       }
