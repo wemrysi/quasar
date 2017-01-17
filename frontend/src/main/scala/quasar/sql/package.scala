@@ -221,6 +221,7 @@ package object sql {
           case _                   => "(" + lhs._2 + "){" + rhs._2 + "}"
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
+        case UnshiftMap => "{" + lhs._2 + " : " + rhs._2 + " ...}"
         case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
       }
       case Unop(expr, op) => op match {
@@ -232,6 +233,7 @@ package object sql {
         case FlattenArrayValues  => "(" + expr._2 + ")[:*]"
         case ShiftArrayIndices   => "(" + expr._2 + ")[_:]"
         case ShiftArrayValues    => "(" + expr._2 + ")[:_]"
+        case UnshiftArray        => "[" + expr._2 + " ...]"
         case _ =>
           val s = List(op.sql, "(", expr._2, ")") mkString " "
           // NB: dis-ambiguates the query in case this is the leading projection

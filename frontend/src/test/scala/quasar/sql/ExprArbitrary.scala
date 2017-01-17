@@ -109,9 +109,8 @@ trait ExprArbitrary {
       1 -> exprGen(depth) ∘ (expr => SpliceR(Some(expr))),
       3 -> (exprGen(depth) ⊛ exprGen(depth) ⊛
         Gen.oneOf(
-          Or, And, Eq, Neq, Ge, Gt, Le, Lt,
-          Plus, Minus, Mult, Div, Mod, Pow,
-          In))(
+          IfUndefined, Range, Or, And, Eq, Neq, Ge, Gt, Le, Lt,
+          Concat, Plus, Minus, Mult, Div, Mod, Pow, In, UnshiftMap))(
         BinopR(_, _, _)),
       1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, FieldDeref)),
       1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, IndexDeref)),
@@ -121,7 +120,8 @@ trait ExprArbitrary {
           FlattenMapKeys,   FlattenArrayIndices,
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
-          ShiftMapValues,   ShiftArrayValues))(
+          ShiftMapValues,   ShiftArrayValues,
+          UnshiftArray))(
         UnopR(_, _)),
       2 -> (Gen.oneOf("sum", "count", "avg", "length", "make_array") ⊛ exprGen(depth))(
         (fn, arg) => InvokeFunctionR(fn, List(arg))),
