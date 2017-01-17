@@ -1,7 +1,8 @@
 {
     "name": "filter on field comparison",
     "backends": {
-        "marklogic":         "skip",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
