@@ -44,7 +44,7 @@ object RenderQuery {
     case Data(QData.Str(v)) =>
       ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
     case Data(v) =>
-      DataCodec.render(v).leftAs(NonRepresentableData(v))
+      DataCodec.render(v) \/> NonRepresentableData(v)
     case Id(v) =>
       s"`$v`".right
     case Obj(m) =>

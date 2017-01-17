@@ -128,8 +128,23 @@ object FuncHandler {
           case ToTimestamp(a1) =>
             $add($literal(Bson.Date(0)), a1)
 
-          case Between(a1, a2, a3)   => $and($lte(a2, a1),
-                                              $lte(a1, a3))
+          case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
+          // TODO: With type info, we could reduce the number of comparisons necessary.
+          case TypeOf(a1) =>
+            $cond($lt(a1, $literal(Bson.Null)),                             $literal(Bson.Undefined),
+              $cond($eq(a1, $literal(Bson.Null)),                           $literal(Bson.Text("null")),
+                // TODO: figure out how to distinguish integer
+                $cond($lt(a1, $literal(Bson.Text(""))),                     $literal(Bson.Text("decimal")),
+                  // TODO: Once we’re encoding richer types, we need to check for metadata here.
+                  $cond($lt(a1, $literal(Bson.Doc())),                      $literal(Bson.Text("array")),
+                    $cond($lt(a1, $literal(Bson.Arr())),                    $literal(Bson.Text("map")),
+                      $cond($lt(a1, $literal(Bson.ObjectId(Check.minOid))), $literal(Bson.Text("array")),
+                        $cond($lt(a1, $literal(Bson.Bool(false))),          $literal(Bson.Text("_bson.objectid")),
+                          $cond($lt(a1, $literal(Check.minDate)),           $literal(Bson.Text("boolean")),
+                            $cond($lt(a1, $literal(Check.minTimestamp)),    $literal(Bson.Text("_ejson.timestamp")),
+                              // FIXME: This only sorts distinct from Date in 3.0+, so we have to be careful … somehow.
+                              $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
+                                                                            $literal(Bson.Text("_bson.regularexpression"))))))))))))
         }
       }
     })
