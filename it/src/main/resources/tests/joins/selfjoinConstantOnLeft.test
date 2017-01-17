@@ -1,5 +1,5 @@
 {
-    "name": "join where the left hand side is constant",
+    "name": "self-join where the left hand side is constant",
 
     "backends": {
         "couchbase":         "skip",
@@ -12,13 +12,11 @@
         "spark_hdfs":        "skip"
     },
 
-    "data": ["../smallZips.data", "../zips.data"],
+    "data": "../largeZips.data",
 
-    "query": "select smallZips.city, zips.state from `../smallZips`, `../zips` where smallZips._id = zips._id
-            and \"MA\" = zips.state",
+    "query": "select a.city, b.state from `../largeZips` as a, `../largeZips` as b where a._id = b._id
+            and \"CA\" = b.state",
 
     "predicate": "containsAtLeast",
-
-    "expected": [{ "city": "AGAWAM",  "state": "MA" },
-                 { "city": "CUSHMAN", "state": "MA" }]
+    "expected": [{ "city": "REDONDO BEACH", "state": "CA" }]
 }
