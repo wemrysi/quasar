@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.{Data, TestConfig}
+import quasar.effect._
 import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.fp.eitherT._
 import quasar.physical.marklogic.fs._
-import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.testing
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
@@ -36,13 +36,16 @@ import org.specs2.execute._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class MarkLogicStdLibSpec extends StdLibSpec {
+abstract class MarkLogicStdLibSpec[F[_]: Monad, FMT](
+  implicit
+  MP: Planner[F, FMT, MapFunc[Fix, ?]],
+  DP: Planner[F, FMT, Const[Data, ?]]
+) extends StdLibSpec {
+  type RunT[X[_], A] = EitherT[X, Result, A]
+
+  def toMain[G[_]: Monad: Capture](xqy: F[XQuery]): RunT[G, MainModule]
 
   def runner(contentSource: ContentSource) = new MapFuncStdLibTestRunner {
-    type F[A] = WriterT[State[Long, ?], Prologs, A]
-    type G[A] = EitherT[F, MarkLogicPlannerError, A]
-    type H[A] = EitherT[F, Result, A]
-
     def nullaryMapFunc(
       prg: FreeMapA[Fix, Nothing],
       expected: Data
@@ -94,38 +97,26 @@ class MarkLogicStdLibSpec extends StdLibSpec {
 
     private val cpColl = Prolog.defColl(DefaultCollationDecl(Collation.codepoint))
 
-    private def planFreeMap[A](
-      freeMap: FreeMapA[Fix, A])(
-      recover: A => XQuery
-    ): H[XQuery] =
-      planMapFunc[Fix, G, A](freeMap)(recover) leftMap (e => ko(e.shows).toResult)
+    private def planFreeMap[A](freeMap: FreeMapA[Fix, A])(recover: A => XQuery): F[XQuery] =
+      planMapFunc[Fix, F, FMT, A](freeMap)(recover)
 
-    private def run(plan: H[XQuery], expected: Data): Result = {
-      val (prologs, xqy) = plan.run.run.eval(1) leftMap (_ insert cpColl)
+    private def run(plan: F[XQuery], expected: Data): Result = {
+      val result = for {
+        main <- toMain[Task](plan) map (MainModule.prologs.modify(_ insert cpColl))
+        mr   <- testing.moduleResults[ReaderT[RunT[Task, ?], ContentSource, ?]](main)
+                  .run(contentSource)
+        r    =  mr.toOption.join
+                  .fold(ko("No results found."))(_ must beCloseTo(expected))
+                  .toResult
+      } yield r
 
-      val result = xqy.traverse(body => for {
-        qr <- SessionIO.evaluateModule_(MainModule(Version.`1.0-ml`, prologs, body))
-        rs <- SessionIO.liftT(qr.toImmutableArray)
-      } yield {
-        rs.headOption
-          .flatMap(xdmitem.toData[ErrorMessages \/ ?](_).toOption)
-          .fold(ko("No results found."))(_ must beCloseTo(expected))
-          .toResult
-      })
-
-      runSession(result).unsafePerformSync.merge
+      result.run.unsafePerformSync.merge
     }
 
-    private val runSession: SessionIO ~> Task =
-      ContentSourceIO.runNT(contentSource) compose ContentSourceIO.runSessionIO
-
-    private def asXqy(d: Data): H[XQuery] =
-      EncodeXQuery[EitherT[F, ErrorMessages, ?], Const[Data, ?]]
-        .encodeXQuery(Const(d))
-        .leftMap(errs => ko(errs intercalate ", ").toResult)
+    private def asXqy(d: Data): F[XQuery] = DP.plan(Const(d))
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-    contentSourceAt(uri).map(cs => backend.name.shows should tests(runner(cs))).void
+    contentSourceConnection[Task](uri).map(cs => backend.name.shows >> tests(runner(cs))).void
   }).unsafePerformSync
 }

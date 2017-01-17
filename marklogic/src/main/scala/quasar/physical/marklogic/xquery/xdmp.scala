@@ -42,6 +42,9 @@ object xdmp {
   def documentProperties(uris: XQuery*): XQuery =
     XQuery(s"xdmp:document-properties${mkSeq(uris)}")
 
+  def fromJson(node: XQuery): XQuery =
+    XQuery(s"xdmp:from-json($node)")
+
   def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
     XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
 
@@ -54,11 +57,16 @@ object xdmp {
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
 
+  // TODO: Works, but has a bug that reorders `where` and `order by` clausees
+  //       in FLWOR expressions, causing them to be malformed.
   def prettyPrint(qstring: XQuery): XQuery =
     XQuery(s"xdmp:pretty-print($qstring)")
 
   def quarterFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:quarter-from-date($date)")
+
+  def toJson(serialized: XQuery): XQuery =
+    XQuery(s"xdmp:to-json($serialized)")
 
   def weekFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:week-from-date($date)")

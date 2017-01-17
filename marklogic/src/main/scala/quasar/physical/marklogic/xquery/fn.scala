@@ -22,6 +22,9 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def abs(num: XQuery): XQuery =
+    XQuery(s"fn:abs($num)")
+
   def avg(seq: XQuery): XQuery =
     XQuery(s"fn:avg($seq)")
 
