@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.physical.marklogic.ErrorMessages
+import quasar.physical.marklogic.{DocType, ErrorMessages}
 
 import java.net.URI
 
@@ -26,8 +26,6 @@ import scalaz._
 import scalaz.std.option._
 
 final class MarkLogicConfigSpec extends quasar.Qspec {
-  import MarkLogicConfig.DocType
-
   "fromUriString" >> {
     val validUri = "xcc://user:pass@ml.example.com/somedb/foo/bar?format=json"
 

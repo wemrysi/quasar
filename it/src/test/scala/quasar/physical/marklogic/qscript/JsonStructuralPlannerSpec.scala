@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.fp.eitherT._
-import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -27,7 +27,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 final class JsonStructuralPlannerSpec
-  extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, fmt.JSON] {
+  extends StructuralPlannerSpec[JsonStructuralPlannerSpec.JsonPlan, DocType.Json] {
 
   import JsonStructuralPlannerSpec.JsonPlan
 

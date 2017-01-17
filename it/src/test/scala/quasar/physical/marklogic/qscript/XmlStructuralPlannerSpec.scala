@@ -19,7 +19,7 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.Data
 import quasar.fp.eitherT._
-import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -28,13 +28,13 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 final class XmlStructuralPlannerSpec
-  extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, fmt.XML] {
+  extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, DocType.Xml] {
 
   import XmlStructuralPlannerSpec.XmlPlan
   import expr._
 
-  val SP  = StructuralPlanner[XmlPlan, fmt.XML]
-  val DP  = Planner[XmlPlan, fmt.XML, Const[Data, ?]]
+  val SP  = StructuralPlanner[XmlPlan, DocType.Xml]
+  val DP  = Planner[XmlPlan, DocType.Xml, Const[Data, ?]]
   val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
   def asMapKey(qn: QName) = qn.xqy.point[XmlPlan]
 

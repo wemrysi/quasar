@@ -18,7 +18,7 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy._
-import quasar.physical.marklogic.MonadErrMsgs
+import quasar.physical.marklogic.{DocType, MonadErrMsgs}
 
 import java.net.URI
 
@@ -27,37 +27,9 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class MarkLogicConfig(
-  xccUri: URI,
-  rootDir: ADir,
-  docType: MarkLogicConfig.DocType
-) {
-  def database: String = xccUri.getPath.drop(1)
-}
+final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType)
 
 object MarkLogicConfig {
-  sealed abstract class DocType {
-    def fold[A](json: => A, xml: => A): A =
-      this match {
-        case DocType.Json => json
-        case DocType.Xml  => xml
-      }
-  }
-
-  object DocType {
-    case object Json extends DocType
-    case object Xml  extends DocType
-
-    val json: DocType = Json
-    val xml:  DocType = Xml
-
-    implicit val equal: Equal[DocType] =
-      Equal.equalA
-
-    implicit val show: Show[DocType] =
-      Show.showFromToString
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def fromUriString[F[_]: MonadErrMsgs](str: String): F[MarkLogicConfig] = {
     def ensureScheme(u: URI): ValidationNel[String, Unit] =

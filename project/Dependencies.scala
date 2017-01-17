@@ -12,12 +12,12 @@ object Dependencies {
   private val http4sVersion     = "0.15.2a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
-  private val monocleVersion    = "1.2.2"
+  private val monocleVersion    = "1.3.2"
   private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
-  private val scalazVersion     = "7.2.4"
+  private val scalazVersion     = "7.2.8"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slcVersion        = "0.4"
@@ -49,6 +49,11 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
   )
+
+  def frontend = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion
+  )
+
   def ejson = Seq(
     "io.argonaut"                %% "argonaut"    % argonautVersion,
     "org.spire-math"             %% "jawn-parser" % jawnVersion

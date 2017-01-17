@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.fp.liftMT
 import quasar.fp.ski.κ
-import quasar.physical.marklogic.fmt
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xml.namespaces._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.expr._
@@ -253,10 +253,10 @@ object StructuralPlanner extends StructuralPlannerInstances {
 }
 
 sealed abstract class StructuralPlannerInstances extends StructuralPlannerInstances0 {
-  implicit def jsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.JSON] =
+  implicit def jsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Json] =
     new JsonStructuralPlanner[F]
 
-  implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, fmt.XML] =
+  implicit def xmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]: StructuralPlanner[F, DocType.Xml] =
     new XmlStructuralPlanner[F]
 }
 

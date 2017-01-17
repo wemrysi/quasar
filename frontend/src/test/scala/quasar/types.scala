@@ -22,8 +22,6 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.specs2._, QuasarMatchers._
 
-import scala.Right
-
 import argonaut._, Argonaut._
 import argonaut.JsonScalaz._
 import scalaz.Scalaz._
@@ -736,9 +734,9 @@ class TypesSpec extends quasar.Qspec {
 
     "encode constant types as their data encoding" >> prop { data: Data =>
       val exp = DataCodec.Precise.encode(data)
-      exp.isRight ==> {
-        (Right(typJson(Const(data))): scala.Either[DataEncodingError, Json]) must_===
-          exp.map(jd => Json((("Const", jd)))).toEither
+      exp.isDefined ==> {
+        (typJson(Const(data)).some: Option[Json]) must_===
+          exp.map(jd => Json((("Const", jd))))
       }
     }
 

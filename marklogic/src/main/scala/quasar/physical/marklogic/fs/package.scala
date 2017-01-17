@@ -27,7 +27,6 @@ import quasar.fp.numeric.Positive
 import quasar.frontend.logicalplan
 import quasar.fs._
 import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefinitionResult, DefErrT}
-import quasar.physical.marklogic.fmt._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc.AsContent
 import quasar.physical.marklogic.xquery.Prologs
@@ -103,8 +102,8 @@ package object fs {
         MarkLogicConfig.fromUriString[EitherT[Free[S, ?], ErrorMessages, ?]](uri.value)
           .leftMap(_.left[EnvironmentError])
           .flatMap(cfg => cfg.docType.fold(
-            fileSystem[S, fmt.JSON](cfg.xccUri, cfg.rootDir, readChunkSize),
-            fileSystem[S, fmt.XML](cfg.xccUri, cfg.rootDir, readChunkSize)))
+            fileSystem[S, DocType.Json](cfg.xccUri, cfg.rootDir, readChunkSize),
+            fileSystem[S, DocType.Xml](cfg.xccUri, cfg.rootDir, readChunkSize)))
     }
 
   /** The MarkLogic FileSystem definition.
@@ -256,8 +255,8 @@ package object fs {
         EnvironmentError.connectionFailed(XccError.cause.get(other))
     }
 
-  implicit val dataAsXmlContent: AsContent[XML, Data] =
-    new AsContent[XML, Data] {
+  implicit val dataAsXmlContent: AsContent[DocType.Xml, Data] =
+    new AsContent[DocType.Xml, Data] {
       def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] =
         data.encodeXml[F](d) map { elem =>
           val opts = new ContentCreateOptions
@@ -266,8 +265,8 @@ package object fs {
         }
     }
 
-  implicit val dataAsJsonContent: AsContent[JSON, Data] =
-    new AsContent[JSON, Data] {
+  implicit val dataAsJsonContent: AsContent[DocType.Json, Data] =
+    new AsContent[DocType.Json, Data] {
       def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] = {
         val opts = new ContentCreateOptions
         opts.setFormatJson()
