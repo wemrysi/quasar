@@ -7,9 +7,14 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
-  private val argonautVersion   = "6.2-RC2"
+  // Switch to `6.2-RC2` once http4s can be upgraded (see below)
+  private val argonautVersion   = "6.2-M3"
   private val doobieVersion     = "0.3.0"
-  private val http4sVersion     = "0.15.2a"
+  // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
+  // https://github.com/quasar-analytics/quasar/issues/1852
+  // Although this issue will be closed by the current commit that downgrades it,
+  // it's still an issue that needs to be considered for anyone attempting to upgrade
+  private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.3.2"
@@ -129,7 +134,8 @@ object Dependencies {
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,
-    "org.http4s"     %% "http4s-argonaut"   %   http4sVersion,
+    // TODO: Switch to `http4s-argonaut` once http4s can be upgraded (see above)
+    "org.http4s"     %% "http4s-argonaut62"   %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-server" %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-client" %   http4sVersion    % Test,
     "com.propensive" %% "rapture-json"        %   raptureVersion   % Test,
