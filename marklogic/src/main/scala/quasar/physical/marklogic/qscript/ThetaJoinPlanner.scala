@@ -24,8 +24,11 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ThetaJoinPlanner[F[_]: QNameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: Corecursive]
-  extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
+private[qscript] final class ThetaJoinPlanner[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
+  implicit
+  QTP: Planner[F, FMT, QScriptTotal[T, ?]],
+  MFP: Planner[F, FMT, MapFunc[T, ?]]
+) extends Planner[F, FMT, ThetaJoin[T, ?]] {
   import expr.let_
 
   // FIXME: Handle `JoinType`
@@ -38,10 +41,10 @@ private[qscript] final class ThetaJoinPlanner[F[_]: QNameGenerator: PrologW: Mon
         l      <- freshName[F]
         r      <- freshName[F]
         s      <- freshName[F]
-        lhs    <- rebaseXQuery(lBranch, ~s)
-        rhs    <- rebaseXQuery(rBranch, ~s)
-        filter <- mergeXQuery(on, ~l, ~r)
-        body   <- mergeXQuery(combine, ~l, ~r)
+        lhs    <- rebaseXQuery[T, F, FMT](lBranch, ~s)
+        rhs    <- rebaseXQuery[T, F, FMT](rBranch, ~s)
+        filter <- mergeXQuery[T, F, FMT](on, ~l, ~r)
+        body   <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
       } yield (lhs, rhs) match {
         case (IterativeFlwor(lcs, None, INil(), _, lr), IterativeFlwor(rcs, None, INil(), _, rr)) =>
           thetaJoinFlwor(

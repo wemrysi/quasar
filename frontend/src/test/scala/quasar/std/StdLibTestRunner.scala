@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.specs2.execute._
 import org.scalacheck.Gen
 
@@ -71,8 +71,4 @@ trait StdLibTestRunner {
     * well-behaved.
     */
   def stringDomain: Gen[String]
-}
-
-object StdLibTestRunner {
-  val genPrintableAscii: Gen[String] = Gen.listOf(Gen.choose('\u0020', '\u007e')).map(_.mkString)
 }

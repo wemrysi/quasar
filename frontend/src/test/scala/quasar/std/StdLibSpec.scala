@@ -22,11 +22,12 @@ import quasar.frontend.logicalplan._
 
 import scala.math.abs
 
-import matryoshka.Fix
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute.Result
 import org.specs2.matcher.{Expectable, Matcher}
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
+import java.time.{Instant, LocalDate, ZoneOffset}
 import scalaz.Equal
 
 /** Abstract spec for the standard library, intended to be implemented for each
@@ -1034,6 +1035,11 @@ abstract class StdLibSpec extends Qspec {
         "string || string" >> prop { (x: String, y: String) =>
           binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
         }
+      }
+
+      "Meta" >> {
+        // FIXME: Implement once we've switched to EJson in LogicalPlan.
+        "returns metadata associated with a value" >> skipped("Requires EJson.")
       }
     }
   }

@@ -25,7 +25,9 @@ import quasar.physical.mongodb.fs._
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import org.specs2.execute._
 import scalaz._, Scalaz._
 import shapeless.Nat
@@ -38,8 +40,6 @@ import shapeless.Nat
   * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
-  import quasar.frontend.fixpoint.lpf
-
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
@@ -68,7 +68,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
         lpf.constant(Data.Str("result")),
         lp))
 
-    val ctx = QueryContext(queryModel, κ(None), κ(None))
+    val ctx = QueryContext(queryModel, κ(None), κ(None), listContents)
 
     MongoDbPlanner.plan(wrapped, ctx).run.value
       .flatMap { wf =>

@@ -23,13 +23,18 @@ import quasar.fs._
 import quasar.regression._
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
-    QueryRegressionTest.externalFS.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
+    QueryRegressionTest.externalFS.map(_.filter(fs =>
+      fs.ref.supports(BackendCapability.query()) &&
+      fs.ref.supports(BackendCapability.write()) &&
+      // NB: These are prohibitively slow on Couchbase
+      !TestConfig.isCouchbase(fs.ref)))
+  ) {
 
   val read = ReadFile.Ops[FileSystemIO]
 

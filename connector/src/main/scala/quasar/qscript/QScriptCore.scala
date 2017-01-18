@@ -18,10 +18,11 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
-import quasar.contrib.matryoshka._
+import quasar.common.SortDir
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.data._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -85,28 +86,31 @@ object ReduceIndex {
   * expression, `reducers` applies the provided reduction to each expression,
   * and repair finally turns those reduced expressions into a final value.
   *
+  * ReduceIndex is guaranteed to be a valid index into `reducers`.
   * @group MRA
   */
 // TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
-  reducers: List[ReduceFunc[FreeMap[T]]],
+  reducers: List[ReduceFunc[FreeMap[T]]], // FIXME: Use Vector instead
   repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
-/** Sorts values within a bucket. This could be represented with
-  *     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
-  *               RightSide)
-  * but backends tend to provide sort directly, so this avoids backends having
-  * to recognize the pattern. We could provide an algebra
-  *     (Sort :+: QScript)#λ => QScript
-  * so that a backend without a native sort could eliminate this node.
+/** Sorts values within a bucket. This can be an _unstable_ sort, but the
+  * elements of `order` must be stably sorted.
   */
+// NB: This could be represented with
+//     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
+//               RightSide)
+// but backends tend to provide sort directly, so this avoids backends having
+// to recognize the pattern. We could provide an algebra
+//     (Sort :+: QScript)#λ => QScript
+// so that a backend without a native sort could eliminate this node.
 @Lenses final case class Sort[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
-  order: List[(FreeMap[T], SortDir)])
+  order: NonEmptyList[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
 /** Creates a new dataset that contains the elements from the datasets created
@@ -121,12 +125,17 @@ object ReduceIndex {
 /** Eliminates some values from a dataset, based on the result of `f` (which
   * must evaluate to a boolean value for each element in the set).
   */
-@Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
+@Lenses final case class Filter[T[_[_]], A](
+  src: A,
+  f: FreeMap[T])
     extends QScriptCore[T, A]
 
 /** Chooses a subset of values from a dataset, given a count. */
-@Lenses final case class Subset[T[_[_]], A]
-  (src: A, from: FreeQS[T], op: SelectionOp, count: FreeQS[T])
+@Lenses final case class Subset[T[_[_]], A](
+  src: A,
+  from: FreeQS[T],
+  op: SelectionOp,
+  count: FreeQS[T])
     extends QScriptCore[T, A]
 
 /** A placeholder value that can appear in plans, but will never be referenced
@@ -247,7 +256,7 @@ object QScriptCore {
                 NonTerminal("Sort" :: nt, None,
                   RA.render(src) :: nested("Bucket", bucket) ::
                     NonTerminal("Order" :: "Sort" :: nt, None, order.map { case (x, dir) =>
-                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }) ::
+                      NonTerminal(dir.shows :: "Sort" :: nt, None, nested("By", x) :: Nil) }.toList) ::
                     Nil)
               case Union(src, lBranch, rBranch) =>
                 NonTerminal("Union" :: nt, None, List(
@@ -269,7 +278,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]

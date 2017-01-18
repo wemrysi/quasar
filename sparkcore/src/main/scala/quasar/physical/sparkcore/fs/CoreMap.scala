@@ -16,18 +16,18 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef.{ Eq => _, _ }
-import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}
+import quasar.Predef.{Eq => _, _}
 import quasar.Data
-import quasar.qscript._
 import quasar.Planner._
 import quasar.fp.ski._
+import quasar.qscript._, MapFuncs._
+import quasar.std.{DateLib, StringLib}
 
+import java.time._
 import scala.math
 
-import org.threeten.bp._
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
@@ -35,7 +35,7 @@ object CoreMap extends Serializable {
   private val undefined = Data.NA
 
   // TODO: replace Data.NA with something safer
-  def change[T[_[_]] : Recursive]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
+  def change[T[_[_]]: RecursiveT]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
     case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
     case Undefined() => κ[Data, Data](Data.NA).right // TODO compback to this one, needs reviewv
 
@@ -369,6 +369,8 @@ object CoreMap extends Serializable {
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) < b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a < BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
@@ -384,6 +386,8 @@ object CoreMap extends Serializable {
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a <= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a <= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) <= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a <= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
@@ -399,6 +403,8 @@ object CoreMap extends Serializable {
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a > b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a > b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) > b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a > BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
@@ -414,6 +420,8 @@ object CoreMap extends Serializable {
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a >= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a >= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) >= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a >= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)

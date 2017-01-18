@@ -18,12 +18,11 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
-import quasar.frontend.fixpoint.lpf
 import quasar.frontend.logicalplan._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.Arbitrary
-import org.threeten.bp.{Instant, Duration}
+import java.time.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
@@ -31,6 +30,8 @@ import shapeless._
 class MathSpec extends quasar.Qspec with TypeArbitrary {
   import MathLib._
   import quasar.Data._
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   "MathLib" should {
     "type simple add with ints" in {

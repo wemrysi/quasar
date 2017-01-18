@@ -22,6 +22,9 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def abs(num: XQuery): XQuery =
+    XQuery(s"fn:abs($num)")
+
   def avg(seq: XQuery): XQuery =
     XQuery(s"fn:avg($seq)")
 
@@ -48,6 +51,9 @@ object fn {
 
   def distinctValues(seq: XQuery): XQuery =
     XQuery(s"fn:distinct-values($seq)")
+
+  def data(item: XQuery): XQuery =
+    XQuery(s"fn:data($item)")
 
   def doc(): XQuery =
     XQuery("fn:doc()")
