@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.std.StdLibTestRunner.genPrintableAscii
+import quasar.contrib.scalacheck.gen
 
 import java.time.LocalDate
 
@@ -37,7 +37,7 @@ trait MongoDbDomain {
 
   // NB: restricted to printable ASCII only because most functions are not
   // well-defined for the rest (e.g. $toLower, $toUpper, $substr)
-  val stringDomain = genPrintableAscii
+  val stringDomain = gen.printableAsciiString
 
   val dateDomain: Gen[LocalDate] =
     Gen.choose(

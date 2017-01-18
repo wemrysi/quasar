@@ -11,11 +11,14 @@
                 where state != \"MI\"
                 group by length(city)",
     "predicate": "containsExactly",
-    "ignoreFieldOrder": ["couchbase",
-                         "mongodb_2_6",
-                         "mongodb_3_0",
-                         "mongodb_3_2",
-                         "mongodb_q_3_2"],
+    "ignoreFieldOrder": [
+      "couchbase",
+      "marklogic_json",
+      "mongodb_2_6",
+      "mongodb_3_0",
+      "mongodb_3_2",
+      "mongodb_q_3_2"
+    ],
     "expected": [{ "len":  3, "cnt":   2 },
                  { "len":  4, "cnt":  65 },
                  { "len":  5, "cnt": 206 },

@@ -41,7 +41,8 @@ object TestConfig {
 
   /** External Backends. */
   val COUCHBASE       = BackendRef(BackendName("couchbase")        , BackendCapability.All)
-  val MARKLOGIC       = BackendRef(BackendName("marklogic")        , BackendCapability.All)
+  val MARKLOGIC_JSON  = BackendRef(BackendName("marklogic_json")   , BackendCapability.All)
+  val MARKLOGIC_XML   = BackendRef(BackendName("marklogic_xml")    , BackendCapability.All)
   val MONGO_2_6       = BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All)
   val MONGO_3_0       = BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All)
   val MONGO_3_2       = BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All)
@@ -56,7 +57,7 @@ object TestConfig {
 
   lazy val backendRefs: List[BackendRef] = List(
     COUCHBASE,
-    MARKLOGIC,
+    MARKLOGIC_JSON, MARKLOGIC_XML,
     MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY,
     MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2,
     POSTGRESQL,

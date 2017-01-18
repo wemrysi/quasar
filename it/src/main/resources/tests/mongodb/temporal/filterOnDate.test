@@ -2,7 +2,8 @@
     "name": "filter with date literals",
     "backends": {
         "couchbase":         "skip",
-        "marklogic":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
         "mongodb_q_3_2":     "skip",
         "postgresql":        "skip",
         "spark_local":       "skip",
