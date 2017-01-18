@@ -63,7 +63,7 @@ package object hdfs {
           val conf = SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar"), hdfsUriStr, sandboxAbs(prefix))
           (conf.sparkConf, conf)
         }
-      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+      }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
     uri.value.split('|').toList match {
       case master :: hdfsUriStr :: prefixPath :: Nil => forge(master, hdfsUriStr, prefixPath)

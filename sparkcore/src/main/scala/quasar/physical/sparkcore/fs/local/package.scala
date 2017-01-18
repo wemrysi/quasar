@@ -59,7 +59,7 @@ package object local {
           .map { prefix =>
           val sc = new SparkConf().setMaster(master)
           (sc, SparkFSConf(sc, sandboxAbs(prefix)))
-        }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+        }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
       uri.value.split('|').toList match {
         case master :: prefixPath :: Nil => forge(master, prefixPath)
