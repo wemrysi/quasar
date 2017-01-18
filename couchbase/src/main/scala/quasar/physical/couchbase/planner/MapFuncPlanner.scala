@@ -320,6 +320,9 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
     case MF.StartOfDay(a1) =>
         Case(
           WhenThen(
+            SelectField(a1, str(TimestampKey)).embed,
+            Timestamp(trunc(Day, SelectField(a1, str(TimestampKey)).embed)).embed),
+          WhenThen(
             SelectField(a1, str(DateKey)).embed,
             Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(DateKey)).embed, zeroTimeSuffix).embed)).embed)
         )(

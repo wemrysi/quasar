@@ -270,15 +270,20 @@ trait DateLib extends Library {
 
   val StartOfDay = UnaryFunc(
     Mapping,
-    "Converts a date to a time at start of day.",
+    "Converts a Date or Timestamp to a Timestamp at the start of that day.",
     Type.Timestamp,
-    Func.Input1(Type.Date),
+    Func.Input1(Type.Date ⨿ Type.Timestamp),
     noSimplification,
-    partialTyper[nat._1] {
+    partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Date(v))) =>
-        Type.Const(Data.Timestamp(startOfDayInstant(v)))
+        success(Type.Const(Data.Timestamp(startOfDayInstant(v))))
       case Sized(Type.Date) =>
-        Type.Timestamp
+        success(Type.Timestamp)
+      case Sized(Type.Const(Data.Timestamp(v))) =>
+        truncZonedDateTime(TemporalPart.Day, v.atZone(UTC))
+          .map(t => Type.Const(Data.Timestamp(t.toInstant))).validation.toValidationNel
+      case Sized(Type.Timestamp) =>
+        success(Type.Timestamp)
     },
     untyper[nat._1] {
       case Type.Const(Data.Timestamp(ts)) => success(Func.Input1(Type.Const(Data.Date(ts.atZone(UTC).toLocalDate))))

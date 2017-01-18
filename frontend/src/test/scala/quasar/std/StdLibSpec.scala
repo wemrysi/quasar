@@ -573,7 +573,18 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "StartOfDay" >> {
-        "timestamp" >> prop { (x: LocalDate) =>
+        "timestamp" >> prop { (x: Instant) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(TemporalPart.Day, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              StartOfDay(_).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
           unary(
             StartOfDay(_).embed,
             Data.Date(x),

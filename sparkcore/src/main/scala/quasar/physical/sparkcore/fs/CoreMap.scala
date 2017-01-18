@@ -64,7 +64,8 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case StartOfDay(f) => (f >>> {
-      case Data.Date(v) => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
+      case d @ Data.Timestamp(_) => temporalTrunc(TemporalPart.Day, d).fold(κ(undefined), ι)
+      case Data.Date(v)          => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
       case _ => undefined
     }).right
     case TemporalTrunc(p, f) => (f >>> (d => temporalTrunc(p, d).fold(κ(undefined), ι))).right
