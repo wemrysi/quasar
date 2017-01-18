@@ -38,7 +38,7 @@ import scala.util.control.NonFatal
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions._
 import matryoshka.data.Fix
-import pathy.Path._
+import pathy.Path.{rootDir => pRootDir, _}
 import scalaz.{Failure => _, _}, Scalaz.{ToIdOps => _, _}
 import scalaz.concurrent.Task
 
@@ -102,17 +102,20 @@ package object fs {
         MarkLogicConfig.fromUriString[EitherT[Free[S, ?], ErrorMessages, ?]](uri.value)
           .leftMap(_.left[EnvironmentError])
           .flatMap(cfg => cfg.docType.fold(
-            fileSystem[S, DocType.Json](cfg.xccUri, readChunkSize),
-            fileSystem[S, DocType.Xml](cfg.xccUri, readChunkSize)))
+            fileSystem[S, DocType.Json](cfg.xccUri, cfg.rootDir, readChunkSize),
+            fileSystem[S, DocType.Xml](cfg.xccUri, cfg.rootDir, readChunkSize)))
     }
 
   /** The MarkLogic FileSystem definition.
     *
     * @tparam FMT           type representing the document format for the filesystem
+    * @param  xccUri        the URI describing the details of the connection to the XCC server
+    * @param  rootDir       the MarkLogic directory upon which to base the mount
     * @param  readChunkSize the size of a single chunk when streaming records from MarkLogic
     */
   def fileSystem[S[_], FMT](
     xccUri: URI,
+    rootDir: ADir,
     readChunkSize: Positive
   )(implicit
     S0: Task :<: S,
@@ -122,14 +125,19 @@ package object fs {
     SP: StructuralPlanner[MLFSQ, FMT]
   ): DefErrT[Free[S, ?], DefinitionResult[Free[S, ?]]] = {
     val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
+
+    val xformPaths =
+      if (rootDir === pRootDir) liftFT[FileSystem]
+      else chroot.fileSystem[FileSystem](rootDir)
+
     runMarkLogicFs(xccUri) map { case (run, shutdown) =>
       DefinitionResult[Free[S, ?]](
-        flatMapSNT(run) compose dropWritten compose interpretFileSystem(
+        flatMapSNT(run) compose dropWritten compose foldMapNT(interpretFileSystem(
           handleMLPlannerErrors(queryfile.interpret[MLFSQ, FMT](readChunkSize)),
           readfile.interpret[MLFS](readChunkSize),
           writefile.interpret[MLFS, FMT],
-          managefile.interpret[MLFS]),
-        shutdown)
+          managefile.interpret[MLFS]
+        )) compose xformPaths, shutdown)
     }
   }
 

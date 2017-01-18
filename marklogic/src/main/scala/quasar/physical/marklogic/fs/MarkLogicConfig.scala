@@ -17,22 +17,38 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.physical.marklogic.{DocType, MonadErrMsgs}
 
 import java.net.URI
 
+import pathy.Path.{rootDir => rtDir, _}
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class MarkLogicConfig(xccUri: URI, docType: DocType)
+final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType)
 
 object MarkLogicConfig {
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def fromUriString[F[_]: MonadErrMsgs](str: String): F[MarkLogicConfig] = {
     def ensureScheme(u: URI): ValidationNel[String, Unit] =
-      Option(u.getScheme).exists(_ === "xcc").unlessM("Unrecognized URI scheme, expected 'xcc'.".failureNel)
+      Option(u.getScheme).exists(_ === "xcc")
+        .unlessM("Missing or unrecognized scheme, expected 'xcc'.".failureNel)
 
-    def extractDocType(u: URI): ValidationNel[String, DocType] =
+    def dbAndRest(u: URI): ValidationNel[String, (String, ADir)] =
+      Option(u.getPath).flatMap(posixCodec.parseAbsAsDir).map(sandboxAbs).flatMap { d =>
+        firstSegmentName(d) map (_.bimap(_.value, _.value).merge) map { db =>
+          (db, stripPrefixA(rtDir </> dir(db))(d))
+        }
+      } toSuccessNel "No database specified."
+
+    def xccUriAndRoot(u: URI): ValidationNel[String, (URI, ADir)] =
+      ensureScheme(u) *> dbAndRest(u) map { case (db, dir) =>
+        (new URI(u.getScheme, u.getUserInfo, u.getHost, u.getPort, "/" + db, null, null), dir)
+      }
+
+    def docType(u: URI): ValidationNel[String, DocType] =
       Option(u.getQuery).toList
         .flatMap(_ split '&')
         .flatMap(_ split '=' match {
@@ -48,7 +64,15 @@ object MarkLogicConfig {
 
     \/.fromTryCatchNonFatal(new URI(str))
       .leftMap(_.getMessage.wrapNel)
-      .flatMap(u => (ensureScheme(u) *> extractDocType(u) map (MarkLogicConfig(u, _))).disjunction)
+      .flatMap(u => (xccUriAndRoot(u) |@| docType(u))((a, t) => MarkLogicConfig(a._1, a._2, t)).disjunction)
       .fold(_.raiseError[F, MarkLogicConfig], _.point[F])
   }
+
+  implicit val equal: Equal[MarkLogicConfig] = {
+    implicit val uriEq: Equal[URI] = Equal.equalA[URI]
+    Equal.equalBy(c => (c.xccUri, c.rootDir, c.docType))
+  }
+
+  implicit val show: Show[MarkLogicConfig] =
+    Show.showFromToString[MarkLogicConfig]
 }
