@@ -175,6 +175,8 @@ object Planner {
             Data.Arr(List(Data.Dec(s1 + s2), Data.Int(c1 + c2)))
         }
         case Arbitrary(_) => (d1: Data, d2: Data) => d1
+        case First(_)     => (d1: Data, d2: Data) => d1
+        case Last(_)      => (d1: Data, d2: Data) => d2
         case UnshiftArray(a) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Arr(a), Data.Arr(b)) => Data.Arr(a ++ b)
           case _ => Data.NA
@@ -214,6 +216,8 @@ object Planner {
               case _ => Data.NA
             }
             case Arbitrary(a) => a
+            case First(a) => a
+            case Last(a) => a
             case UnshiftArray(a) => a >>> ((d: Data) => Data.Arr(List(d)))
             case UnshiftMap(a1, a2) => ((d: Data) => a1(d) match {
               case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))

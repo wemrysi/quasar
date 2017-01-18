@@ -188,14 +188,6 @@ object MapFunc {
         }
     }
 
-    object EjConstExtension {
-      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Extension[T[EJson]]] =
-        tco match {
-          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-          case _                                                      => None
-        }
-    }
-
     _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
       κ(None),
       {
@@ -327,6 +319,7 @@ object MapFunc {
         case Interval(a1) => f(a1) ∘ (Interval(_))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
         case Length(a1) => f(a1) ∘ (Length(_))
@@ -410,6 +403,7 @@ object MapFunc {
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
         case (Length(a1), Length(b1)) => in.equal(a1, b1)
@@ -498,6 +492,7 @@ object MapFunc {
           case Interval(a1) => shz("Interval", a1)
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case TypeOf(a1) => shz("TypeOf", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
           case Length(a1) => shz("Length", a1)
@@ -596,6 +591,7 @@ object MapFunc {
           case Interval(a1) => nAry("Interval", a1)
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case TypeOf(a1) => nAry("TypeOf", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
           case Length(a1) => nAry("Length", a1)
@@ -677,6 +673,7 @@ object MapFunc {
     case date.Interval => Interval(_)
     case date.TimeOfDay => TimeOfDay(_)
     case date.ToTimestamp => ToTimestamp(_)
+    case identity.TypeOf => TypeOf(_)
     case math.Negate => Negate(_)
     case relations.Not => Not(_)
     case string.Length => Length(_)
@@ -777,6 +774,13 @@ object MapFuncs {
   /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
 
+  // identity
+  /** Returns a string describing the type of the value. If the value has a
+    * metadata map containing an "_ejson.type" entry, that value is returned.
+    * Otherwise, it returns a string naming a [[quasar.common.PrimaryType]].
+    */
+  @Lenses final case class TypeOf[T[_[_]], A](a1: A) extends Unary[T, A]
+
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Add[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
@@ -825,7 +829,12 @@ object MapFuncs {
   }
 
   // structural
+
+  /** Makes a single-element [[ejson.Arr]] containing `a1`.
+    */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Makes a single-element [[ejson.Map]] with key `key` and value `value`.
+    */
   @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
     def a1 = key
     def a2 = value

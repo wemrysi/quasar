@@ -70,9 +70,6 @@ package object ejson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
 
-    def fromJsonT[T[_[_]]: BirecursiveT]: T[Json] => T[EJson] =
-      _.transAna[T[EJson]](fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
-
     def fromCommon[T](implicit T: Corecursive.Aux[T, EJson]): Common[T] => T =
       CommonEJson.inj(_).embed
 

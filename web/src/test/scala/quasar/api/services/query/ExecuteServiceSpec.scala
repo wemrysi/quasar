@@ -21,7 +21,7 @@ import quasar._
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
 import quasar.api.services.Fixture._
-import quasar.common._
+import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
@@ -40,7 +40,6 @@ import org.http4s._
 import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import pathy.Path._
-import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
 // TODO: Consider if possible to use argonaut backend and avoid printing followed by parsing
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
@@ -55,8 +54,6 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import FileSystemError.executionFailed_
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
-
-  type FileOf[A] = AbsFileOf[A] \/ RelFileOf[A]
 
   // Remove if eventually included in upstream scala-pathy
   implicit val arbitraryFileName: Arbitrary[FileName] =

@@ -20,12 +20,6 @@ import _root_.scalaz.{MonadError, MonadTell, StateT}
 import _root_.scalaz.syntax.monad._
 
 package object scalaz {
-  implicit def toMonadError[F[_], E](me: MonadError_[F, E]): MonadError[F, E] =
-    me.ME
-
-  implicit def toMonadError_Ops[F[_], S, A](v: F[A])(implicit F0: MonadError_[F, S]) =
-    new MonadError_Ops[F, S, A](v)
-
   implicit def stateTMonadError[F[_], E, S](implicit F: MonadError[F, E])
       : MonadError[StateT[F, S, ?], E] =
     new MonadError[StateT[F, S, ?], E] {
@@ -60,4 +54,10 @@ package object scalaz {
       def writer[A](w: W, v: A): StateT[F, S, A] =
         F.writer(w, v).liftM[StateT[?[_], S, ?]]
     }
+
+  implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]) =
+    new MonadTell_Ops[F, W, A](fa)
+
+  implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(implicit F: MonadError_[F, E]) =
+    new MonadError_Ops[F, E, A](fa)
 }

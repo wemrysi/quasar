@@ -18,13 +18,14 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
-import quasar.common._
+import quasar.common.{Map => _, _}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.specs2.QuasarMatchers._
@@ -95,8 +96,8 @@ class PlannerSpec extends
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
-        e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats, indexes)).leftMap(CPlannerError(_))))
+        _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
+        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents)).leftMap(CPlannerError(_))))
 
   def plan0(query: String, model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -136,7 +137,7 @@ class PlannerSpec extends
       _          <- emit(Vector(PhaseResult.tree("Input", logical)), ().right)
       simplified <- emit(Vector.empty, \/-(optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LP]]
       _          <- emit(Vector(PhaseResult.tree("Simplified", logical)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
+      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
     } yield phys).run.value.toEither
   }
 
@@ -224,7 +225,7 @@ class PlannerSpec extends
                      $lt($literal(Bson.Null), $field("foo")),
                      $lt($field("foo"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Bson.Date(Check.minInstant)), $field("foo")),
+                     $lte($literal(Check.minDate), $field("foo")),
                      $lt($field("foo"), $literal(Bson.Regex("", ""))))),
                  $add($field("foo"), $field("bar")),
                  $literal(Bson.Undefined)),
@@ -355,7 +356,7 @@ class PlannerSpec extends
            reshape("value" ->
              $cond(
                $and(
-                 $lte($literal(Bson.Date(Check.minInstant)), $field("baz")),
+                 $lte($literal(Check.minDate), $field("baz")),
                  $lt($field("baz"), $literal(Bson.Regex("", "")))),
                $dayOfMonth($field("baz")),
                $literal(Bson.Undefined))),
@@ -371,7 +372,7 @@ class PlannerSpec extends
              "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Check.minInstant)), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $trunc(
                    $add(
@@ -392,7 +393,7 @@ class PlannerSpec extends
              "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Check.minInstant)), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $add($dayOfWeek($field("baz")), $literal(Bson.Int32(-1))),
                  $literal(Bson.Undefined))),
@@ -408,7 +409,7 @@ class PlannerSpec extends
              "value" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Check.minInstant)), $field("baz")),
+                   $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $cond($eq($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
@@ -426,7 +427,7 @@ class PlannerSpec extends
              "__tmp2" ->
                $cond(
                  $and(
-                   $lte($literal(Bson.Date(Check.minInstant)), $field("ts")),
+                   $lte($literal(Check.minDate), $field("ts")),
                    $lt($field("ts"), $literal(Bson.Regex("", "")))),
                  $eq($year($field("ts")), $literal(Bson.Int32(2016))),
                  $literal(Bson.Undefined)),
@@ -592,7 +593,7 @@ class PlannerSpec extends
                      $lt($literal(Bson.Null), $field("a")),
                      $lt($field("a"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Bson.Date(Check.minInstant)), $field("a")),
+                     $lte($literal(Check.minDate), $field("a")),
                      $lt($field("a"), $literal(Bson.Regex("", ""))))),
                  $add($field("a"), $field("b")),
                  $literal(Bson.Undefined)),
@@ -1102,7 +1103,7 @@ class PlannerSpec extends
                       $lt($literal(Bson.Null), $field("bar")),
                       $lt($field("bar"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Check.minInstant)), $field("bar")),
+                      $lte($literal(Check.minDate), $field("bar")),
                       $lt($field("bar"), $literal(Bson.Regex("", ""))))),
                   $divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined))),
@@ -1244,7 +1245,7 @@ class PlannerSpec extends
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Check.minInstant)), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -1286,7 +1287,7 @@ class PlannerSpec extends
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Check.minInstant)), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -1469,7 +1470,7 @@ class PlannerSpec extends
               "0" ->
                 $cond(
                   $and(
-                    $lte($literal(Bson.Date(Check.minInstant)), $field("date")),
+                    $lte($literal(Check.minDate), $field("date")),
                     $lt($field("date"), $literal(Bson.Regex("", "")))),
                   $month($field("date")),
                   $literal(Bson.Undefined))))),
@@ -1609,7 +1610,7 @@ class PlannerSpec extends
                         $lt($literal(Bson.Null), $field("pop")),
                         $lt($field("pop"), $literal(Bson.Text("")))),
                       $and(
-                        $lte($literal(Bson.Date(Check.minInstant)), $field("pop")),
+                        $lte($literal(Check.minDate), $field("pop")),
                         $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                     $field("pop"),
                     $literal(Bson.Undefined))),
@@ -1691,7 +1692,7 @@ class PlannerSpec extends
                       $lt($literal(Bson.Null), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Check.minInstant)), $field("pop")),
+                      $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
@@ -2516,6 +2517,9 @@ class PlannerSpec extends
     }.pendingUntilFixed
 
     "plan filter with timestamp and interval" in {
+      val date0 = Bson.Date.fromInstant(Instant.parse("2014-11-17T00:00:00Z")).get
+      val date22 = Bson.Date.fromInstant(Instant.parse("2014-11-17T22:00:00Z")).get
+
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "days")),
@@ -2528,7 +2532,7 @@ class PlannerSpec extends
                       $lt($literal(Bson.Null), $field("date")),
                       $lt($field("date"), $literal(Bson.Text("")))),
                     $and(
-                      $lte($literal(Bson.Date(Check.minInstant)), $field("date")),
+                      $lte($literal(Check.minDate), $field("date")),
                       $lt($field("date"), $literal(Bson.Regex("", ""))))),
                   $cond(
                     $or(
@@ -2539,10 +2543,10 @@ class PlannerSpec extends
                         $lte($literal(Bson.Bool(false)), $field("date")),
                         $lt($field("date"), $literal(Bson.Regex("", ""))))),
                     $and(
-                      $lt($field("date"), $literal(Bson.Date(Instant.parse("2014-11-17T22:00:00Z")))),
+                      $lt($field("date"), $literal(date22)),
                       $gt(
                         $subtract($field("date"), $literal(Bson.Dec(12*60*60*1000))),
-                        $literal(Bson.Date(Instant.parse("2014-11-17T00:00:00Z"))))),
+                        $literal(date0))),
                     $literal(Bson.Undefined)),
                   $literal(Bson.Undefined)),
               "__tmp7" -> $$ROOT),
@@ -2570,7 +2574,7 @@ class PlannerSpec extends
             reshape("value" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Date(Check.minInstant)), $field("ts")),
+                  $lte($literal(Check.minDate), $field("ts")),
                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
                 $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
                 $literal(Bson.Undefined))),
@@ -2578,6 +2582,14 @@ class PlannerSpec extends
     }
 
     "plan filter on date" in {
+      val date23 = Bson.Date.fromInstant(Instant.parse("2015-01-23T00:00:00Z")).get
+      val date25 = Bson.Date.fromInstant(Instant.parse("2015-01-25T00:00:00Z")).get
+      val date26 = Bson.Date.fromInstant(Instant.parse("2015-01-26T00:00:00Z")).get
+      val date28 = Bson.Date.fromInstant(Instant.parse("2015-01-28T00:00:00Z")).get
+      val date29 = Bson.Date.fromInstant(Instant.parse("2015-01-29T00:00:00Z")).get
+      val date30 = Bson.Date.fromInstant(Instant.parse("2015-01-30T00:00:00Z")).get
+
+
       // Note: both of these boundaries require comparing with the start of the *next* day.
       plan("select * from logs " +
         "where ((ts > date(\"2015-01-22\") and ts <= date(\"2015-01-27\")) and ts != date(\"2015-01-25\")) " +
@@ -2593,19 +2605,19 @@ class PlannerSpec extends
                 Selector.And(
                   Selector.And(
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-23T00:00:00Z")))),
+                      BsonField.Name("ts") -> Selector.Gte(date23)),
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-28T00:00:00Z"))))),
+                      BsonField.Name("ts") -> Selector.Lt(date28))),
                   Selector.Or(
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-25T00:00:00Z")))),
+                      BsonField.Name("ts") -> Selector.Lt(date25)),
                     Selector.Doc(
-                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-26T00:00:00Z")))))))),
+                      BsonField.Name("ts") -> Selector.Gte(date26)))))),
             Selector.And(
               Selector.Doc(
-                BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-29T00:00:00Z")))),
+                BsonField.Name("ts") -> Selector.Gte(date29)),
               Selector.Doc(
-                BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-30T00:00:00Z")))))))))
+                BsonField.Name("ts") -> Selector.Lt(date30)))))))
     }
 
     "plan js and filter with id" in {
@@ -2647,7 +2659,7 @@ class PlannerSpec extends
                   $and(
                     $lt($literal(Bson.Null), $field("epoch")),
                     $lt($field("epoch"), $literal(Bson.Text("")))),
-                  $add($literal(Bson.Date(Instant.ofEpochMilli(0))), $field("epoch")),
+                  $add($literal(Bson.Date(0)), $field("epoch")),
                   $literal(Bson.Undefined))),
             ExcludeId))
       }
@@ -3672,7 +3684,6 @@ class PlannerSpec extends
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)
 
-  val noGroupBy = Gen.const[Option[GroupBy[Fix[Sql]]]](None)
   val groupBySeveral = Gen.nonEmptyListOf(Gen.oneOf(
     sql.IdentR("state"),
     sql.IdentR("territory"))).map(keys => GroupBy(keys.distinct, None))

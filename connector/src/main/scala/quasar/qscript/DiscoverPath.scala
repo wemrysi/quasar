@@ -38,7 +38,7 @@ trait DiscoverPath[IN[_]] {
   type IT[F[_]]
   type OUT[A]
 
-  def discoverPath[M[_]: MonadFsErr](g: DiscoverPath.ListContents[M])
+  def discoverPath[M[_]: Monad: MonadFsErr](g: DiscoverPath.ListContents[M])
       : AlgebraM[M, IN, List[ADir] \&/ IT[OUT]]
 }
 
@@ -84,18 +84,18 @@ abstract class DiscoverPathInstances {
 
   // TODO: Some connectors (notably MongoDB) could provide more efficient
   //       implementations of this.
-  private def allDescendents[T[_[_]]: CorecursiveT, M[_]: MonadFsErr, F[_]: Functor](
+  private def allDescendents[T[_[_]]: CorecursiveT, M[_]: Monad: MonadFsErr, F[_]: Functor](
     listContents: ListContents[M])(
     implicit R: Const[Read, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
       ADir => M[List[F[T[F]]]] =
-    dir => (listContents(dir) >>=
+    dir => MonadFsErr[M].handleError(listContents(dir) >>=
       (ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
         d => allDescendents[T, M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
-      .handleError(κ(List.empty[F[T[F]]].point[M]))
+        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))(
+      κ(List.empty[F[T[F]]].point[M]))
 
-  private def unionDirs[T[_[_]]: CorecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
+  private def unionDirs[T[_[_]]: CorecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
     (implicit R: Const[Read, ?] :<: OUT, QC: QScriptCore[T, ?] :<: OUT)
       : List[ADir] => M[Option[NonEmptyList[T[OUT]]]] =
@@ -104,7 +104,7 @@ abstract class DiscoverPathInstances {
       case h :: t => NonEmptyList.nel(h, t.toIList).some
     })
 
-  def unionAll[T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
+  def unionAll[T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
     (implicit
       R:     Const[Read, ?] :<: OUT,
@@ -113,13 +113,13 @@ abstract class DiscoverPathInstances {
       : List[ADir] \&/ T[OUT] => M[T[OUT]] =
     _.fold(
       ds => unionDirs[T, M, OUT](g).apply(ds) >>= (_.fold[M[T[OUT]]](
-        MonadError[M, FileSystemError].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
+        MonadFsErr[M].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
         union(_).point[M])),
       _.point[M],
       (ds, qs) => unionDirs[T, M, OUT](g).apply(ds) ∘ (_.fold(qs)(d => union(qs <:: d))))
 
   private def convertBranch
-    [T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
+    [T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], branch: FreeQS[T])
     (f: ListContents[M])
     (implicit
@@ -135,7 +135,7 @@ abstract class DiscoverPathInstances {
 
 
   private def convertBranchingOp
-    [T[_[_]]: BirecursiveT, M[_]: MonadFsErr, OUT[_]: Functor]
+    [T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[OUT], FreeQS[T], FreeQS[T]) => OUT[T[OUT]])
     (implicit
@@ -146,9 +146,9 @@ abstract class DiscoverPathInstances {
     (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
       \&/-(op(QC.inj(Unreferenced[T, T[OUT]]()).embed, l, r).embed))
 
-  def fileType[M[_]: MonadFsErr](listContents: ListContents[M]):
+  def fileType[M[_]: Monad: MonadFsErr](listContents: ListContents[M]):
       (ADir, String) => OptionT[M, ADir \/ AFile] =
-    (dir, name) => OptionT(listContents(dir).map(_.some).handleError(κ(none.point[M]))) >>=
+    (dir, name) => OptionT(MonadFsErr[M].handleError(listContents(dir).map(_.some))(κ(none.point[M]))) >>=
       (cont => OptionT((cont.find(_.fold(_.value ≟ name, _.value ≟ name)) ∘
         (_.bimap(dir </> dir1(_), dir </> file1(_)))).point[M]))
 
@@ -159,7 +159,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) =
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
         κ(-\&/[List[ADir], T[OUT]](List(rootDir)).point[M])
     }
 
@@ -174,7 +174,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def handleDirs[M[_]: MonadFsErr](g: ListContents[M], dirs: List[ADir], field: String) =
+      def handleDirs[M[_]: Monad: MonadFsErr](g: ListContents[M], dirs: List[ADir], field: String) =
         dirs.traverseM(fileType(g).apply(_, field).fold(
           df => List(df ∘ (file => R.inj(Const[Read, T[OUT]](Read(file))).embed)),
           Nil)) ∘ {
@@ -196,7 +196,7 @@ abstract class DiscoverPathInstances {
       def rebucket(out: T[OUT], value: FreeMap[T], field: String) =
         PB.inj(BucketField(out, value, StrLit(field))).embed
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
         // FIXME: `value` must be `HoleF`.
         case BucketField(src, value, StrLit(field)) =>
           src.fold(
@@ -221,7 +221,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
         case Union(src, lb, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Union(s, l, r)))
@@ -246,7 +246,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
         case ThetaJoin(src, lb, rb, on, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
@@ -265,7 +265,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
         case EquiJoin(src, lb, rb, lk, rk, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, lk, rk, jType, combine)))
@@ -280,7 +280,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = H[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) =
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
         _.run.fold(F.discoverPath(g), G.discoverPath(g))
     }
 
@@ -295,7 +295,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: MonadFsErr](g: ListContents[M]) =
+      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
         _.traverse(unionAll(g)) ∘ (in => \&/-(IN.inj(in).embed))
     }
 

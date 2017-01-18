@@ -167,7 +167,7 @@ trait OptionTInstances {
     }
 }
 
-trait StateTInstances {
+sealed trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
       def attempt[A](fa: StateT[F, S, A]) =
@@ -179,21 +179,6 @@ trait StateTInstances {
 
       def fail[A](t: Throwable) =
         StateT[F, S, A](_ => Catchable[F].fail(t))
-    }
-}
-
-trait WriterTInstances {
-  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
-    new Catchable[WriterT[F, W, ?]] {
-      def attempt[A](fa: WriterT[F, W, A]) =
-        WriterT[F, W, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)      => (mzero[W], t.left)
-            case \/-((w, a)) => (w, a.right)
-          })
-
-      def fail[A](t: Throwable) =
-        WriterT(Catchable[F].fail(t).strengthL(mzero[W]))
     }
 }
 
@@ -209,13 +194,6 @@ trait ToCatchableOps {
       self.attempt.flatMap(_.fold(
         err => cleanup.attempt.flatMap(κ(FC.fail(err))),
         _.point[F]))
-
-    /** A new task that ignores the result of this task, and runs another task
-      * no matter what.
-      */
-    final def ignoreAndThen[B](t: F[B])(implicit FB: Bind[F], FC: Catchable[F]):
-        F[B] =
-      self.attempt.flatMap(κ(t))
   }
 
   implicit def ToCatchableOpsFromCatchable[F[_], A](a: F[A]):
@@ -305,7 +283,6 @@ trait DebugOps {
   }
 }
 
-
 package object fp
     extends TreeInstances
     with ListMapInstances
@@ -320,7 +297,6 @@ package object fp
     with DebugOps
     with CatchableInstances {
 
-
   import ski._
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
@@ -334,14 +310,6 @@ package object fp
   // TODO generalize this and matryoshka.Delay into
   // `type KleisliK[M[_], F[_], G[_]] = F ~> (M ∘ G)#λ`
   type NTComp[F[X], G[Y]] = scalaz.NaturalTransformation[F, matryoshka.∘[G, F]#λ]
-
-  def unzipDisj[A, B](ds: List[A \/ B]): (List[A], List[B]) = {
-    val (as, bs) = ds.foldLeft((List[A](), List[B]())) {
-      case ((as, bs), -\/ (a)) => (a :: as, bs)
-      case ((as, bs),  \/-(b)) => (as, b :: bs)
-    }
-    (as.reverse, bs.reverse)
-  }
 
   /** Accept a value (forcing the argument expression to be evaluated for its
     * effects), and then discard it, returning Unit. Makes it explicit that
@@ -371,6 +339,7 @@ package object fp
       G[A] => M[G[A]] =
     ftf => F.prj(ftf).fold(ftf.point[M])(orig)
 
+
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
@@ -388,7 +357,14 @@ package object fp
     orig.transAnaM[Option, T[F], F](F.prj)
 
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
-    final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
+    final def mapAccumM[B, C, M[_]: Monad](c: C)(f: (C, A) => M[(C, B)]): M[(C, List[B])] =
+      self.foldLeftM((c, List.empty[B])){ case ((c, resultList), a) =>
+        f(c, a).map { case (newC, b) =>
+          (newC, b :: resultList)
+        }
+      }
+    final def mapAccumLeftM[B, C, M[_]: Monad](c: C)(f: (C, A) => M[(C, B)]): M[(C, List[B])] =
+      mapAccumM(c)(f).map { case (c, result) => (c, result.reverse) }
   }
 
   implicit def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]): Delay[Equal, Coproduct[F, G, ?]] =

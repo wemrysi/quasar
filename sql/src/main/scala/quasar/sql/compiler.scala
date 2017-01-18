@@ -236,6 +236,7 @@ final class Compiler[M[_], T: Equal]
       "to_timestamp"            -> date.ToTimestamp,
       "squash"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
+      "type_of"                 -> identity.TypeOf,
       "between"                 -> relations.Between,
       "where"                   -> set.Filter,
       "distinct"                -> set.Distinct,
@@ -362,7 +363,7 @@ final class Compiler[M[_], T: Equal]
     def compileRelation(r: SqlRelation[CoExpr]): M[T] =
       r match {
         case IdentRelationAST(name, _) =>
-          CompilerState.subtableReq(name)
+          CompilerState.subtableReq[M, T](name)
 
         case VariRelationAST(vari, _) =>
           fail(UnboundVariable(VarName(vari.symbol)))
@@ -454,18 +455,18 @@ final class Compiler[M[_], T: Equal]
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
-                    (CompilerState.rootTableReq ⊛ compile0(filter))(
+                    (CompilerState.rootTableReq[M, T] ⊛ compile0(filter))(
                       set.Filter(_, _).embed))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
-                      (CompilerState.rootTableReq ⊛
+                      (CompilerState.rootTableReq[M, T] ⊛
                         groupBy.keys.traverse(compile0)) ((src, keys) =>
                         set.GroupBy(src, structural.MakeArrayN(keys: _*).embed).embed))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
-                        (CompilerState.rootTableReq ⊛ compile0(having))(
+                        (CompilerState.rootTableReq[M, T] ⊛ compile0(having))(
                           set.Filter(_, _).embed))
 
                       stepBuilder(having) {
@@ -473,7 +474,7 @@ final class Compiler[M[_], T: Equal]
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
-                            CompilerState.rootTableReq >>= (t =>
+                            CompilerState.rootTableReq[M, T] >>= (t =>
                               nam.fold(
                                 orderBy.keys.traverse(p => (t, p._1).point[M]))(
                                 n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
@@ -485,7 +486,7 @@ final class Compiler[M[_], T: Equal]
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                CompilerState.rootTableReq.map(t =>
+                                CompilerState.rootTableReq[M, T].map(t =>
                                   if (syntheticNames.nonEmpty)
                                     set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
                                       structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed
@@ -495,7 +496,7 @@ final class Compiler[M[_], T: Equal]
 
                             stepBuilder(distincted) {
                               val pruned =
-                                CompilerState.rootTableReq.map(
+                                CompilerState.rootTableReq[M, T].map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
                                     structural.DeleteField(acc,
                                       lpr.constant(Data.Str(field))).embed))
@@ -591,12 +592,12 @@ final class Compiler[M[_], T: Equal]
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
-            CompilerState.rootTableReq ∘
+            CompilerState.rootTableReq[M, T] ∘
             (structural.ObjectProject(_, lpr.constant(Data.Str(name))).embed)
           else
             for {
               rName <- relationName(node).fold(fail, emit)
-              table <- CompilerState.subtableReq(rName)
+              table <- CompilerState.subtableReq[M, T](rName)
             } yield
               if ((rName: String) ≟ name) table
               else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
