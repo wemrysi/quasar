@@ -185,16 +185,16 @@ trait StructuralPlanner[F[_], FMT] { self =>
       $("item") as ST("item()?")
     ).as(ST("xs:string?")) { item: XQuery =>
       val (n, t) = ($("n"), $("t"))
-      (nodeToString(~n) |@| typeOf(item))((nstr, tpe) =>
+      (nodeToString(~n) |@| typeOf(item) |@| castIfNode(item))((nstr, tpe, castItem) =>
         let_(t := tpe) return_ {
           if_(fn.empty(item) or ~t eq "na".xs)
           .then_(emptySeq)
           .else_(if_(~t eq "null".xs)
           .then_("null".xs)
           .else_(if_(tpe eq "time".xs)
-          .then_(fn.formatTime(item, "[H01]:[m01]:[s01].[f001]".xs))
+          .then_(fn.formatTime(castItem, lib.timeFmt))
           .else_(if_(tpe eq "timestamp".xs)
-          .then_(fn.formatDateTime(item, lib.dateTimeFmt))
+          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt))
           .else_(typeswitch(item)(
             n as ST("node()") return_ κ(nstr)
           ) default fn.string(item)))))

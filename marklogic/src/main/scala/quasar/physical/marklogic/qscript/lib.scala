@@ -39,6 +39,7 @@ object lib {
 
   val dateFmt     = "[Y0001]-[M01]-[D01]".xs
   val dateTimeFmt = "[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z".xs
+  val timeFmt     = "[H01]:[m01]:[s01].[f001]".xs
 
   private val epoch    = xs.dateTime("1970-01-01T00:00:00Z".xs)
   private val timeZero = xs.time("00:00:00-00:00".xs)
