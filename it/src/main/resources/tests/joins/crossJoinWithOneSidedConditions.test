@@ -18,6 +18,8 @@
 
     "predicate": "equalsExactly",
 
+    "ignoreFieldOrder": ["marklogic_json"],
+
     "expected": [
         { "a": "BOULDER", "b": "CHICO", "diff": 9278 }
     ]
