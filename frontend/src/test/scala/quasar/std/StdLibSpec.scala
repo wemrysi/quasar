@@ -207,19 +207,30 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        "timestamp" >> prop { (x: Instant) =>
-          unary(ToString(_).embed, Data.Timestamp(x), Data.Str(x.toString))
+        "timestamp" >> {
+          def test(x: Instant) = unary(
+            ToString(_).embed,
+            Data.Timestamp(x),
+            Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
+
+          "zero fractional seconds" >> test(Instant.EPOCH)
+
+          "any" >> prop (test(_: Instant))
         }
 
         "date" >> prop { (x: LocalDate) =>
           unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
         }
 
-        "time" >> prop { (x: LocalTime) =>
-          unary(
+        "time" >> {
+          def test(x: LocalTime) = unary(
             ToString(_).embed,
             Data.Time(x),
-            Data.Str(x.format(DataCodec.dateTimeFormatter)))
+            Data.Str(x.format(DataCodec.timeFormatter)))
+
+          "zero fractional seconds" >> test(LocalTime.NOON)
+
+          "any" >> prop (test(_: LocalTime))
         }
 
         // TODO: Enable

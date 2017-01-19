@@ -25,7 +25,7 @@ import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
 
-import java.time._
+import java.time._, ZoneOffset.UTC
 import scala.math
 
 import matryoshka._
@@ -472,9 +472,9 @@ object CoreMap extends Serializable {
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    case Data.Timestamp(v) => Data.Str(v.toString)
+    case Data.Timestamp(v) => Data.Str(v.atZone(UTC).format(DataCodec.dateTimeFormatter))
     case Data.Date(v) => Data.Str(v.toString)
-    case Data.Time(v) => Data.Str(v.format(DataCodec.dateTimeFormatter))
+    case Data.Time(v) => Data.Str(v.format(DataCodec.timeFormatter))
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)

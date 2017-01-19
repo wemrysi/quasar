@@ -64,7 +64,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massage(expected: Data): Data = expected match {
-      case Data.Time(time) => Data.Str(time.format(DataCodec.dateTimeFormatter))
+      case Data.Time(time) => Data.Str(time.format(DataCodec.timeFormatter))
       case _               => expected
     }
 

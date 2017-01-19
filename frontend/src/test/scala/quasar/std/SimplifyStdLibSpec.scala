@@ -60,9 +60,6 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (date.ExtractWeek, _) => notHandled
     case (date.ExtractYear, _) => notHandled
 
-    case (string.ToString, Data.Time(_) :: Nil) =>
-      Skipped("Time zero fractional printing doesn't match").left
-
     case _ => ().right
   }
 
