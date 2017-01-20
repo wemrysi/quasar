@@ -20,6 +20,8 @@ import quasar.Predef._
 import quasar.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 
+import java.time.LocalDate
+
 import matryoshka.data.Fix
 import org.specs2.execute._
 import org.scalacheck.Gen
@@ -71,4 +73,9 @@ trait StdLibTestRunner {
     * well-behaved.
     */
   def stringDomain: Gen[String]
+
+  /** Defines the domain of values for `Data.Date` for which the implementation is
+    * well-behaved.
+    */
+  def dateDomain: Gen[LocalDate]
 }
