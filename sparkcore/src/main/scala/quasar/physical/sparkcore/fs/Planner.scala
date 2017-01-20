@@ -234,7 +234,7 @@ object Planner {
           val maybeRepair: PlannerError \/ (Data => Data) =
             repair.cataM(interpretM({
               case ReduceIndex(i) => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(i)
+                case Data.Arr(elems) => elems(i.fold(0)(_ + 1))
                 case _ => Data.NA
               }).right
             }, CoreMap.change))
@@ -257,7 +257,7 @@ object Planner {
                       case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
-                    repair(Data.Arr(v))
+                    repair(Data.Arr(k :: v))
                   case (_, _) => Data.NA
                 }
             }).map((sc, _)).point[Task])

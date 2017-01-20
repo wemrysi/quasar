@@ -66,7 +66,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
         QCT.inj(Reduce((),
           NullLit(),
           List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some))))))).some)
     }
   }
 }

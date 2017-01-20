@@ -96,7 +96,7 @@ package object qscript {
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](RightSide)
-  def ReduceIndexF[T[_[_]]](i: Int): FreeMapA[T, ReduceIndex] =
+  def ReduceIndexF[T[_[_]]](i: Option[Int]): FreeMapA[T, ReduceIndex] =
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])

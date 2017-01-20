@@ -231,10 +231,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     case Reduce(src, bucket, reducers, repair0) =>
       // `indices`: the indices into `reducers` that are used
-      val used    = repair0.map(_.idx).toSet
+      val Empty   = ReduceIndex(-1.some)
+      val used    = repair0.map(_.idx).toList.unite.toSet
       val indices = reducers.indices filter used
-      val repair  = repair0 map (r => r.copy(indices indexOf r.idx))
-      val done    = repair ≟ repair0 || (repair element ReduceIndex.Empty)
+      val repair  = repair0 map (r => r.copy(r.idx ∘ indices.indexOf))
+      val done    = repair ≟ repair0 || (repair element Empty)
 
       !done option Reduce(src, bucket, (indices map reducers).toList, repair)
 

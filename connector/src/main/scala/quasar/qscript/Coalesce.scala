@@ -248,13 +248,15 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lb, mf))),
                 sel,
                 rb).some
-            case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
-              case Map(doubleInner, mfInner) =>
-                Map(
-                  FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
-                  mf >> mfInner).some
-              case _ => None
-            }
+            // FIXME: This is a reasonable transformation, but can cause
+            //        problems when there is `Cond` in the `Map`.
+            // case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
+            //   case Map(doubleInner, mfInner) =>
+            //     Map(
+            //       FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
+            //       mf >> mfInner).some
+            //   case _ => None
+            // }
             case Sort(Embed(innerSrc), buckets, ordering) => FToOut.get(innerSrc) >>= QC.prj >>= {
               case Map(doubleInner, mfInner) =>
                 Map(
@@ -279,10 +281,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if normalizeMapFunc(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(id match {
                 case IncludeId =>
                   Free.roll(ConcatArrays[T, FreeMap](Free.roll(MakeArray(k)), Free.roll(MakeArray(elem))))
