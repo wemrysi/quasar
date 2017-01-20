@@ -17,10 +17,10 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar.{Data, Func, NullaryFunc, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
 
-import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
+import java.time.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
 import scalaz._, Validation.success
 import shapeless.{Data => _, _}
 
@@ -127,6 +127,12 @@ trait DateLib extends Library {
       case Sized(Type.Str)                  => success(Type.Date)
     },
     basicUntyper)
+
+  val Now = NullaryFunc(
+    Mapping,
+    "Returns the current timestamp – this must always return the same value within the same execution of a query.",
+    Type.Timestamp,
+    noSimplification)
 
   val Time = UnaryFunc(
     Mapping,

@@ -24,38 +24,41 @@ import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._
+import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly
 
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-trait QScriptHelpers extends TTypes[Fix] {
-  import quasar.frontend.fixpoint.lpf
+trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
+  type QS[A] = (
+    QScriptCore           :\:
+    ThetaJoin             :\:
+    Const[Read[APath], ?] :/:
+    Const[DeadEnd, ?]
+  )#M[A]
 
-  type QS[A] =
-    (QScriptCore :\:
-      ThetaJoin :\:
-      Const[Read[APath], ?] :/: Const[DeadEnd, ?])#M[A]
+  val DE = implicitly[Const[DeadEnd, ?]     :<: QS]
+  val R  = implicitly[Const[Read[APath], ?] :<: QS]
+  val QC = implicitly[QScriptCore           :<: QS]
+  val TJ = implicitly[ThetaJoin             :<: QS]
 
   implicit val QS: Injectable.Aux[QS, QST] =
     ::\::[QScriptCore](
       ::\::[ThetaJoin](
         ::/::[Fix, Const[Read[APath], ?], Const[DeadEnd, ?]]))
 
-  val DE =     implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  = implicitly[Const[Read[APath], ?] :<: QS]
-  val QC =           implicitly[QScriptCore :<: QS]
-  val TJ =             implicitly[ThetaJoin :<: QS]
+  val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
+  val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
+  def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
 
   type QST[A] = QScriptTotal[A]
 
   def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
-
-  val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
-  val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
-  def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
 
   val DET  =            implicitly[Const[DeadEnd, ?] :<: QST]
   val RTP  =        implicitly[Const[Read[APath], ?] :<: QST]
@@ -67,6 +70,10 @@ trait QScriptHelpers extends TTypes[Fix] {
   val SRT  = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
   val SRTF = implicitly[Const[ShiftedRead[AFile], ?] :<: QST]
 
+  val RootRT: QST[Fix[QST]] = DET.inj(Const[DeadEnd, Fix[QST]](Root))
+  val UnreferencedRT: QST[Fix[QST]] = QCT.inj(Unreferenced[Fix, Fix[QST]]())
+  def ReadRT(file: AFile): QST[Fix[QST]] = RTF.inj(Const(Read(file)))
+
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(ProjectField(src, field))
@@ -74,6 +81,26 @@ trait QScriptHelpers extends TTypes[Fix] {
   def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(ProjectIndex(src, field))
+
+  def MakeArrayR[A](src: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MakeArray(src))
+
+  def MakeMapR[A](key: FreeMapA[A], src: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MakeMap(key, src))
+
+  def ConcatArraysR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ConcatArrays(left, right))
+
+  def ConcatMapsR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ConcatMaps(left, right))
+
+  def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(Add(left, right))
 
   def lpRead(path: String): Fix[LP] =
     lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))
@@ -83,10 +110,15 @@ trait QScriptHelpers extends TTypes[Fix] {
   /** A helper when writing examples that allows them to be written in order of
     * execution.
     */
-  // NB: Would prefer this to be `ops: T[F] => F[T[F]]*`, but it makes the call
+  // NB: Would prefer this to be `ops: (T => F[T])*`, but it makes the call
   //     site too annotate-y.
-  def chain[T[_[_]]: Corecursive, F[_]: Functor](op: F[T[F]], ops: F[Unit]*):
-      T[F] =
+  // FIXME: The `Corecursive` implicit here isn’t resolved unless there are
+  //        _exactly_ two arguments passed to the function. When this is fixed,
+  //        remove the implicit lists from all of the call sites.
+  def chain[T, F[_]: Functor]
+    (op: F[T], ops: F[Unit]*)
+    (implicit T: Corecursive.Aux[T, F])
+      : T =
     ops.foldLeft(op.embed)((acc, elem) => elem.as(acc).embed)
 
   val listContents: DiscoverPath.ListContents[Id] =
@@ -151,6 +183,7 @@ trait QScriptHelpers extends TTypes[Fix] {
     ejsonMap((
       ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
       ejsonArr(l, r)))
+
   def ejsonProjectField(field: Fix[EJson]) =
     ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
 }

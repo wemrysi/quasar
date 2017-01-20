@@ -21,16 +21,21 @@ import quasar.TreeMatchers
 import quasar.sql.SemanticAnalysis._
 import quasar.sql.fixpoint._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.implicits._
 import pathy.Path._
+import scalaz._, Scalaz._
 
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
-    val compiler = Compiler.trampoline
+    val asc: OrderType = ASC
 
-    def transform[T[_[_]]: Recursive: Corecursive](q: T[Sql]): T[Sql] =
-      q.transCata(orOriginal(projectSortKeysƒ))
+    def transform[T]
+      (q: T)
+      (implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+        : T =
+      q.transCata[T](orOriginal(projectSortKeysƒ))
 
     "add single field for order by" in {
       val q = SelectR(SelectAll,
@@ -38,14 +43,14 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, IdentR("height")) :: Nil)))
+                     Some(OrderBy((asc, IdentR("height")).wrapNel)))
       transform(q) must beTree(
                SelectR(SelectAll,
                       Proj(IdentR("name"), None) :: Proj(IdentR("height"), Some("__sd__0")) :: Nil,
                       Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
-                      Some(OrderBy((ASC, IdentR("__sd__0")) :: Nil)))
+                      Some(OrderBy((asc, IdentR("__sd__0")).wrapNel)))
                )
     }
 
@@ -55,7 +60,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, IdentR("name")) :: Nil)))
+                     Some(OrderBy((asc, IdentR("name")).wrapNel)))
       transform(q) must beTree(q)
     }
 
@@ -65,7 +70,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, IdentR("name")) :: Nil)))
+                     Some(OrderBy((asc, IdentR("name")).wrapNel)))
       transform(q) must beTree(q)
     }
 
@@ -75,7 +80,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, IdentR("height")) :: Nil)))
+                     Some(OrderBy((asc, IdentR("height")).wrapNel)))
       transform(q) must beTree(q)
     }
 
@@ -85,9 +90,9 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, IdentR("height")) ::
-                                  (ASC, IdentR("name")) ::
-                                  Nil)))
+                     Some(OrderBy(NonEmptyList(
+                       (asc, IdentR("height")),
+                       (asc, IdentR("name"))))))
       transform(q) must beTree(
                SelectR(SelectAll,
                       Proj(IdentR("name"), None) ::
@@ -96,9 +101,9 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                       Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
-                      Some(OrderBy((ASC, IdentR("__sd__0")) ::
-                                   (ASC, IdentR("name")) ::
-                                   Nil))))
+                      Some(OrderBy(NonEmptyList(
+                        (asc, IdentR("__sd__0")),
+                        (asc, IdentR("name")))))))
     }
 
     "transform sub-select" in {
@@ -113,7 +118,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                                 Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
-                                Some(OrderBy((ASC, IdentR("b")) :: Nil))),
+                                Some(OrderBy((asc, IdentR("b")).wrapNel))),
                          In)),
                      None,
                      None)
@@ -131,7 +136,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
                                 Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
-                                Some(OrderBy((ASC, IdentR("__sd__0")) :: Nil))),
+                                Some(OrderBy((asc, IdentR("__sd__0")).wrapNel))),
                          In)),
                      None,
                      None))

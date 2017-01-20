@@ -7,17 +7,22 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
+  // Switch to `6.2-RC2` once http4s can be upgraded (see below)
   private val argonautVersion   = "6.2-M3"
   private val doobieVersion     = "0.3.0"
+  // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
+  // https://github.com/quasar-analytics/quasar/issues/1852
+  // Although this issue will be closed by the current commit that downgrades it,
+  // it's still an issue that needs to be considered for anyone attempting to upgrade
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
-  private val monocleVersion    = "1.2.2"
+  private val monocleVersion    = "1.3.2"
   private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
-  private val scalazVersion     = "7.2.4"
+  private val scalazVersion     = "7.2.8"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slcVersion        = "0.4"
@@ -28,7 +33,6 @@ object Dependencies {
   private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
 
   def foundation = Seq(
-    "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
@@ -37,7 +41,7 @@ object Dependencies {
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.11.1",
+    "com.slamdata"               %% "matryoshka-core"           %     "0.16.1",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,
@@ -49,6 +53,15 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-scalacheck-binding" %   scalazVersion   %     Test,
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
+  )
+
+  def frontend = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion
+  )
+
+  def ejson = Seq(
+    "io.argonaut"                %% "argonaut"    % argonautVersion,
+    "org.spire-math"             %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
@@ -67,7 +80,7 @@ object Dependencies {
   def nettyDepType = if(quasar4Spark == "yes") "provided" else "compile"
 
   def mongodb = Seq(
-    "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
+    "org.mongodb" % "mongodb-driver-async" %   "3.4.1",
     "io.netty"    % "netty-buffer"         % nettyVersion % nettyDepType,
     "io.netty"    % "netty-handler"        % nettyVersion % nettyDepType
   )
@@ -102,17 +115,18 @@ object Dependencies {
   def sparkcore = Seq(sparkDep)
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined" %  refinedVersion
+    "eu.timepit" %% "refined"     % refinedVersion,
+    "org.scalaz" %% "scalaz-core" % scalazVersion force()
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "org.spire-math"             %% "jawn-parser"         % jawnVersion,
+    "eu.timepit"                 %% "refined-scalacheck"  % refinedVersion % Test,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(
-    "com.couchbase.client" %  "java-client" % "2.3.4",
+    "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
     "org.http4s"           %% "http4s-core" % http4sVersion
   )
@@ -120,6 +134,7 @@ object Dependencies {
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,
+    // TODO: Switch to `http4s-argonaut` once http4s can be upgraded (see above)
     "org.http4s"     %% "http4s-argonaut62"   %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-server" %   http4sVersion,
     "org.http4s"     %% "http4s-blaze-client" %   http4sVersion    % Test,
@@ -127,4 +142,8 @@ object Dependencies {
     "com.propensive" %% "rapture-json-json4s" %   raptureVersion   % Test,
     "eu.timepit"     %% "refined-scalacheck"  %   refinedVersion   % Test
   )
+  def it = Seq(
+    "io.argonaut" %% "argonaut-monocle"    %  argonautVersion % Test,
+    "org.http4s"  %% "http4s-blaze-client" %   http4sVersion  % Test,
+    "eu.timepit"  %% "refined-scalacheck"  %   refinedVersion % Test)
 }

@@ -24,6 +24,7 @@ import scalaz._
 import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 import scalaz.syntax.std.option._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -60,6 +61,9 @@ object expr {
   def some(b: Binding, bs: Binding*): QuantifiedExpr =
     QuantifiedExpr(Quantifier.Some, NonEmptyList(b, bs: _*))
 
+  def try_(body: XQuery): TryCatchExpr =
+    TryCatchExpr(body)
+
   def typeswitch(on: XQuery)(cases: TypeswitchCaseClause*): TypeswitchExpr =
     TypeswitchExpr(on, cases.toList)
 
@@ -80,9 +84,6 @@ object expr {
 
     def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
       copy(orderSpecs = s :: IList.fromList(ss.toList))
-
-    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
-      orderBy(s, ss: _*).copy(orderIsStable = true)
 
     def return_(expr: XQuery): XQuery =
       XQuery.Flwor(
@@ -150,5 +151,14 @@ object expr {
       val streams = bindings map (_.render("in")) intercalate (", ")
       XQuery(s"$quantifier $streams satisfies $xqy")
     }
+  }
+
+  // TODO: Should become an XQuery node
+  final case class TryCatchExpr(body: XQuery) {
+    def catch_(e: BindingName)(f: XQuery => XQuery): XQuery =
+      catchF[Id.Id](e)(f)
+
+    def catchF[F[_]: Functor](e: BindingName)(f: XQuery => F[XQuery]): F[XQuery] =
+      f(~e) map (recover => XQuery(s"try { $body } catch(${e.render}) { $recover }"))
   }
 }

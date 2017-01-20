@@ -16,6 +16,8 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.Predef._
+import quasar.fp.ski.κ
 import quasar.contrib.pathy.AFile
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -25,32 +27,40 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadFilePlanner[F[_]: QNameGenerator: PrologW]
-  extends MarkLogicPlanner[F, Const[ShiftedRead[AFile], ?]] {
+private[qscript] final class ShiftedReadFilePlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  implicit SP: StructuralPlanner[F, FMT], O: SearchOptions[FMT]
+) extends Planner[F, FMT, Const[ShiftedRead[AFile], ?]] {
 
   import expr._, axes.child
 
   val plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      for {
-        d     <- freshName[F]
-        c     <- freshName[F]
-        b     <- freshName[F]
-        uri   =  posixCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
-        xform <- json.transformFromJson[F](~c)
-        incId <- ejson.seqToArray_[F](mkSeq_(
-                   fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, fn.documentUri(~d))),
-                   ~b))
-      } yield {
-        for_(
-          d in cts.search(fn.doc(), cts.directoryQuery(uri.xs, "1".xs)))
-        .let_(
-          c := ~d `/` child.node(),
-          b := (if_ (json.isObject(~c)) then_ xform else_ ~c))
-        .return_(idStatus match {
-          case IncludeId => incId
-          case ExcludeId => ~b
-        })
+      val uri    = posixCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
+      val dirQry = cts.directoryQuery(uri.xs, "1".xs)
+
+      idStatus match {
+        case IncludeId => search(dirQry, doc => mkId(fn.documentUri(doc)).some)
+        case ExcludeId => search(dirQry, κ(None))
+        case IdOnly    => freshName[F] map (u =>
+                            for_(u in cts.uris(start = emptySeq, query = dirQry)) return_ mkId(~u))
       }
   }
+
+  ////
+
+  private def mkId(uriStr: XQuery): XQuery =
+    fn.concat("_".xs, xdmp.hmacSha1("quasar".xs, uriStr))
+
+  private def search(ctsQuery: XQuery, extractId: XQuery => Option[XQuery]): F[XQuery] =
+    for {
+      d     <- freshName[F]
+      c     <- freshName[F]
+      incId <- extractId(~d) traverse (id => SP.seqToArray(mkSeq_(id, ~c)))
+    } yield {
+      for_(
+        d in cts.search(expr = fn.doc(), query = ctsQuery, options = O.searchOptions))
+      .let_(
+        c := ~d `/` child.node())
+      .return_(incId getOrElse ~c)
+    }
 }
