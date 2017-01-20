@@ -132,7 +132,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
         s <- freshName[F]
         l <- rebaseXQuery[T, F, FMT](lBranch, ~s)
         r <- rebaseXQuery[T, F, FMT](rBranch, ~s)
-      } yield let_(s := src) return_ (l union r)
+      } yield let_(s := src) return_ (mkSeq_(l) union mkSeq_(r))
 
     case Filter(src, f) =>
       for {

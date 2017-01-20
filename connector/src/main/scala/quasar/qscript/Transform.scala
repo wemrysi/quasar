@@ -176,7 +176,6 @@ class Transform
   }
 
   private case class AutoJoinResult(base: AutoJoinBase, lval: FreeMap, rval: FreeMap)
-
   private case class AutoJoin3Result(base: AutoJoinBase, lval: FreeMap, cval: FreeMap, rval: FreeMap)
   private case class AutoJoinNResult(base: AutoJoinBase, vals: NonEmptyList[FreeMap])
 
@@ -189,7 +188,7 @@ class Transform
       rebase(l, r).some
 
     val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
-      rewrite.unifySimpleBranches2[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
+      rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
 
     baseSrc.cata(src =>
       SrcMerge(src.embed, lacc, racc).right[PlannerError],
