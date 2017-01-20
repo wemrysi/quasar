@@ -80,7 +80,7 @@ object xdmitem {
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
     case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
-    case item: XSDateTime               => Data._timestamp(item.asDate.toInstant).point[F]
+    case item: XSDateTime               => Data._timestamp(ZonedDateTime.parse(item.asString).toInstant).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data._interval(convertDuration(item)).point[F]
