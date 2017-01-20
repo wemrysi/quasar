@@ -1102,7 +1102,7 @@ class PlannerQScriptSpec extends
                 $field("city"),
                 $literal(Bson.Undefined))),
             ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple sort with field in projection" in {
       plan("select bar from foo order by bar") must
@@ -4009,7 +4009,7 @@ class PlannerQScriptSpec extends
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked",
+          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (Mongo-specific)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)"))
     }
@@ -4024,7 +4024,7 @@ class PlannerQScriptSpec extends
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked",
+          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (Mongo-specific)"))
     }
   }

@@ -44,11 +44,17 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   val optimizer = new Optimizer[Fix[LP]]
   val lpr = optimizer.lpr
 
-  // Compile -> Optimize -> Typecheck
+  // Compile -> Optimize -> Typecheck -> Rewrite Joins
   val fullCompile: String => String \/ Fix[LP] =
-    q => compile(q).map(optimizer.optimize).flatMap(lp =>
-      lpr.ensureCorrectTypes(lp)
-        .disjunction.leftMap(_.list.toList.mkString(";")))
+    q => compile(q).flatMap { lp =>
+      val withErrors = for {
+        optimized <- optimizer.optimize(lp).right
+        typechecked <- lpr.ensureCorrectTypes(optimized).disjunction
+        rewritten <- optimizer.rewriteJoins(typechecked).right
+      } yield rewritten
+
+      withErrors.leftMap(_.list.toList.mkString(";"))
+    }
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
   // the expected result to be controlled more precisely. Assuming you know
@@ -57,16 +63,15 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def compileExp(query: String): Fix[LP] =
     compile(query).fold(
       e => throw new RuntimeException("could not compile query for expected value: " + query + "; " + e),
-      lp => (lpr.normalizeLets _ >>> lpr.normalizeTempNames _)(optimizer.simplify(lp)))
+      optimizer.optimize)
 
   // Compile the given query, including optimization and typechecking
   def fullCompileExp(query: String): Fix[LP] =
     fullCompile(query).valueOr(e =>
       throw new RuntimeException(s"could not full-compile query for expected value '$query': $e"))
 
-  def testLogicalPlanCompile(query: String, expected: Fix[LP]) = {
+  def testLogicalPlanCompile(query: String, expected: Fix[LP]) =
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
-  }
 
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))

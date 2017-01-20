@@ -2848,49 +2848,21 @@ class PlannerSpec extends
             $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
-                "__tmp11"   ->
+                "__tmp3" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
                       $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
                     $field(JoinDir.Right.name),
                     $literal(Bson.Undefined)),
-                "__tmp12" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
-                    $cond(
-                      $or(
-                        $and(
-                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "_id")),
-                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Doc()))),
-                        $and(
-                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "_id")),
-                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Regex("", ""))))),
-                      $cond(
-                        $and(
-                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
-                        $cond(
-                          $or(
-                            $and(
-                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "_id")),
-                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Doc()))),
-                            $and(
-                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "_id")),
-                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Regex("", ""))))),
-                          $lt($field(JoinDir.Left.name, "_id"), $field(JoinDir.Right.name, "_id")),
-                          $literal(Bson.Undefined)),
-                        $literal(Bson.Undefined)),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined))),
+                "__tmp4" ->
+                  $lt($field(JoinDir.Left.name, "_id"), $field(JoinDir.Right.name, "_id"))),
               IgnoreId),
             $match(
               Selector.Doc(
-                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
+                BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("value" -> $field("__tmp11", "city")),
+              reshape("value" -> $field("__tmp3", "city")),
               ExcludeId)),
           false).op)
     }
@@ -3489,49 +3461,21 @@ class PlannerSpec extends
             $unwind(DocField(JoinHandler.RightName)),
             $project(
               reshape(
-                "__tmp11"   ->
+                "__tmp3"   ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
                       $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
                     $field(JoinDir.Right.name),
                     $literal(Bson.Undefined)),
-                "__tmp12" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
-                    $cond(
-                      $or(
-                        $and(
-                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "pop")),
-                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Doc()))),
-                        $and(
-                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "pop")),
-                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Regex("", ""))))),
-                      $cond(
-                        $and(
-                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
-                        $cond(
-                          $or(
-                            $and(
-                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "pop")),
-                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Doc()))),
-                            $and(
-                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "pop")),
-                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Regex("", ""))))),
-                          $lt($field(JoinDir.Left.name, "pop"), $field(JoinDir.Right.name, "pop")),
-                          $literal(Bson.Undefined)),
-                        $literal(Bson.Undefined)),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined))),
+                "__tmp4" ->
+                  $lt($field(JoinDir.Left.name, "pop"), $field(JoinDir.Right.name, "pop"))),
               IgnoreId),
             $match(
               Selector.Doc(
-                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
+                BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
             $project(
-              reshape("value" -> $field("__tmp11", "city")),
+              reshape("value" -> $field("__tmp3", "city")),
               ExcludeId)),
           false).op)
     }
@@ -4074,8 +4018,9 @@ class PlannerSpec extends
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked",
-          "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
+          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
+          "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)", "Workflow Builder",
           "Workflow (raw)", "Workflow (crystallized)"))
     }
@@ -4090,9 +4035,9 @@ class PlannerSpec extends
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked",
-          "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
-          "Logical Plan (projections preferred)"))
+          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
+          "Logical Plan (aligned joins)", "Logical Plan (projections preferred)"))
     }
   }
 }

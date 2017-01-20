@@ -65,6 +65,9 @@ final class Check[T, EX[_]]
 
   def isDateOrTimestamp(expr: T) = between(minDate, expr, minRegex)
 
+  def isArrayOrString(expr: T) =
+    $or(isArray(expr), isString(expr))
+
   // Some types that happen to be adjacent:
   def isNumberOrString(expr: T) = betweenExcl(Bson.Null, expr, Bson.Doc())
   def isDateTimestampOrBoolean(expr: T) = between(Bson.Bool(false), expr, minRegex)

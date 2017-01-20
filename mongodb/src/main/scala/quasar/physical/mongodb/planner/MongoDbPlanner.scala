@@ -227,6 +227,8 @@ object MongoDbPlanner {
             case Type.Str              => isString
             case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _)
                                        => isObjectOrArray
+            case Type.FlexArr(_, _, _) ⨿ Type.Str
+                                       => isArrayOrString
             case Type.Obj(_, _)        => isObject
             case Type.FlexArr(_, _, _) => isArray
             case Type.Binary           => isBinary
@@ -459,6 +461,11 @@ object MongoDbPlanner {
                   Selector.Doc(f -> Selector.Type(BsonType.Int32)),
                   Selector.Doc(f -> Selector.Type(BsonType.Int64)),
                   Selector.Doc(f -> Selector.Type(BsonType.Dec))))
+            case Type.FlexArr(_, _, _) ⨿ Type.Str =>
+              ((f: BsonField) =>
+                Selector.Or(
+                  Selector.Doc(f -> Selector.Type(BsonType.Arr)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Text))))
             case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
             case Type.Obj(_, _) =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
@@ -817,6 +824,7 @@ object MongoDbPlanner {
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
             case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.FlexArr(_, _, _) ⨿ Type.Str => check.isArrayOrString
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -899,6 +907,13 @@ object MongoDbPlanner {
     }
   }
 
+  def removeTypecheckFilters:
+      AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
+    case Typecheck(_, _, t @ Embed(Constant(Data.Bool(true))), Embed(Constant(Data.Bool(false)))) =>
+      \/-(t)
+    case x => \/-(x.embed)
+  }
+
   /** To be used by backends that require collections to contain Obj, this
     * looks at type checks on `Read` then either eliminates them if they are
     * trivial, leaves them if they check field contents, or errors if they are
@@ -955,12 +970,13 @@ object MongoDbPlanner {
     val wfƒ = workflowƒ[WF, EX](joinHandler, funcHandler) ⋙ (_ ∘ (_ ∘ ((_: Fix[WorkflowBuilderF[WF, ?]]).mapR(normalize[WF]))))
 
     (for {
-      cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo[Fix[LP]](elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
-      prep <- log("Logical Plan (projections preferred)")(optimizer.preferProjections(align).point[M])
-      wb   <- log("Workflow Builder")                    (swizzle(swapM(lpr.lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
-      wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))
-      wf2  <- log("Workflow (crystallized)")             (Crystallize[WF].crystallize(wf1).point[M])
+      cleaned <- log("Logical Plan (reduced typechecks)")      (liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
+      elided  <- log("Logical Plan (remove typecheck filters)")(liftError(cleaned.cataM[PlannerError \/ ?, Fix[LP]](removeTypecheckFilters ⋘ repeatedly(optimizer.simplifyƒ))))
+      align   <- log("Logical Plan (aligned joins)")           (liftError(elided.apo[Fix[LP]](elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
+      prep    <- log("Logical Plan (projections preferred)")   (optimizer.preferProjections(align).point[M])
+      wb      <- log("Workflow Builder")                       (swizzle(swapM(lpr.lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
+      wf1     <- log("Workflow (raw)")                         (swizzle(build(wb)))
+      wf2     <- log("Workflow (crystallized)")                (Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
   }
 
