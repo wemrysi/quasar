@@ -170,10 +170,8 @@ trait ExprArbitrary {
     genIdentString map (Vari(_))
 
   private def genIdentString: Gen[String] =
-    Gen.listOf(genIdentChar) map (_.mkString)
+    Gen.listOf(gen.printableAsciiChar) map (_.filter(_ ≠ '`').mkString)
 
-  private def genIdentChar: Gen[Char] =
-    gen.printableAsciiChar filter (_ =/= '`')
 }
 
 object ExprArbitrary extends ExprArbitrary
