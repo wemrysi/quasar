@@ -841,21 +841,26 @@ object MongoDbQScriptPlanner {
               (expr, jm) => WB.jsArrayExpr(List(src, WB.flattenMap(expr)), jm)).map(liftM[M, WorkflowBuilder[WF]]).join
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
-              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) =>
-              getReduceBuilder[T, M, WF, EX](
-                funcHandler)(
-                red.map(_.sequence).sequence.fold(
-                  κ(GroupBuilder(ArrayBuilder(src, red.unite), // FIXME: Doesn’t work with UnshiftMap
-                    List(b),
-                    Contents.Doc(red.zipWithIndex.map(ai =>
-                      (BsonField.Name(ai._2.toString),
-                        accumulator(ai._1.as($field(ai._2.toString))).left[Fix[ExprOp]])).toListMap))),
-                  exprs => GroupBuilder(src,
-                    List(b),
-                    Contents.Doc(exprs.zipWithIndex.map(ai =>
-                      (BsonField.Name(ai._2.toString),
-                        accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
-                repair)).join
+              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
+                val newB = b.unFix match {
+                  case ArrayBuilderF(src, elems) => DocBuilder(src, elems.zipWithIndex.map(_.map(i => BsonField.Name(i.toString)).swap).toListMap)
+                  case _ => b
+                }
+                getReduceBuilder[T, M, WF, EX](
+                  funcHandler)(
+                  red.map(_.sequence).sequence.fold(
+                    κ(GroupBuilder(ArrayBuilder(src, red.unite), // FIXME: Doesn’t work with UnshiftMap
+                      List(newB),
+                      Contents.Doc(red.zipWithIndex.map(ai =>
+                        (BsonField.Name(ai._2.toString),
+                          accumulator(ai._1.as($field(ai._2.toString))).left[Fix[ExprOp]])).toListMap))),
+                    exprs => GroupBuilder(src,
+                      List(newB),
+                      Contents.Doc(exprs.zipWithIndex.map(ai =>
+                        (BsonField.Name(ai._2.toString),
+                          accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
+                    repair)
+              }).join
           case Sort(src, bucket, order) =>
             val (keys, dirs) = (bucket match {
               case MapFuncs.NullLit() => order
