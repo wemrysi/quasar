@@ -8,10 +8,6 @@ addons:
 services:
   - docker
   - postgresql
-before_install:
-  - openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in project/secring.pgp.enc -out project/local.secring.pgp -d
-  - openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in project/pubring.pgp.enc -out project/local.pubring.pgp -d
-  - openssl aes-256-cbc -pass pass:$ENCRYPTION_PASSWORD -in credentials.sbt.enc -out local.credentials.sbt -d
 script:
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
