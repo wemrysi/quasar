@@ -174,7 +174,7 @@ class PlannerSpec
                 results.toList must contain(exactly(Data._int(1), Data._int(3), Data._int(1)))
             })
           })
-        }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+        }
 
         "calculate sum" in {
           withSpark { sc =>
@@ -193,7 +193,7 @@ class PlannerSpec
                 results.toList must contain(exactly(Data._int(23), Data._int(84), Data._int(34)))
             })
           }
-        }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+        }
 
         "calculate arbitrary" in {
           withSpark { sc =>
@@ -212,7 +212,7 @@ class PlannerSpec
                 results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
             })
           }
-        }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+        }
 
         "calculate max" in {
           withSpark { sc =>
@@ -231,7 +231,7 @@ class PlannerSpec
                 results.toList must contain(exactly(Data._int(23), Data._int(32), Data._int(34)))
             })
           }
-        }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+        }
 
         "for avg" should {
           "calculate int values" in {
@@ -257,7 +257,7 @@ class PlannerSpec
                   results.toList must contain(exactly(Data._dec(28), Data._dec(23)))
               })
             }
-          }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+          }
 
           "calculate dec values" in {
             withSpark { sc =>
@@ -281,7 +281,7 @@ class PlannerSpec
                   results.toList must contain(exactly(Data._dec(1.71), Data._dec(1.23)))
               })
             }
-          }.pendingUntilFixed("""Failing du to something not "serializable" in a Spark closure. My hunch is a recent upgrade to Matryoshka""")
+          }
         }
       }
 
