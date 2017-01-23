@@ -255,7 +255,7 @@ package object qscript {
 }
 
 package qscript {
-  final case class SrcMerge[A, B](src: A, left: B, right: B)
+  final case class SrcMerge[A, B](src: A, lval: B, rval: B)
 
   @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 

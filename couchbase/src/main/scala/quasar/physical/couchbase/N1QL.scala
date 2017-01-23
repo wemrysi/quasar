@@ -36,6 +36,7 @@ object N1QL extends N1QLInstances {
   final case class Id[A](v: String)                               extends N1QL[A]
   final case class Obj[A](m: Map[A, A])                           extends N1QL[A]
   final case class Arr[A](l: List[A])                             extends N1QL[A]
+  final case class Date[A](a1: A)                                 extends N1QL[A]
   final case class Time[A](a1: A)                                 extends N1QL[A]
   final case class Timestamp[A](a1: A)                            extends N1QL[A]
   final case class Null[A]()                                      extends N1QL[A]
@@ -88,8 +89,11 @@ object N1QL extends N1QLInstances {
   final case class Ceil[A](a1: A)                                 extends N1QL[A]
   final case class Millis[A](a1: A)                               extends N1QL[A]
   final case class MillisToUTC[A](a1: A, a2: Option[A])           extends N1QL[A]
+  final case class DateAddStr[A](a1: A, a2: A, a3: A)             extends N1QL[A]
   final case class DatePartStr[A](a1: A, a2: A)                   extends N1QL[A]
   final case class DateDiffStr[A](a1: A, a2: A, a3: A)            extends N1QL[A]
+  final case class DateTruncStr[A](a1: A, a2: A)                  extends N1QL[A]
+  final case class StrToMillis[A](a1: A)                          extends N1QL[A]
   final case class NowStr[A]()                                    extends N1QL[A]
   final case class ArrContains[A](a1: A, a2: A)                   extends N1QL[A]
   final case class ArrRange[A](a1: A, a2: A, a3: Option[A])       extends N1QL[A]
@@ -129,6 +133,7 @@ object N1QL extends N1QLInstances {
     resultExprs: NonEmptyList[ResultExpr[A]],
     keyspace: Option[Keyspace[A]],
     unnest: Option[Unnest[A]],
+    let: List[Binding[A]],
     filter: Option[Filter[A]],
     groupBy: Option[GroupBy[A]],
     orderBy: List[OrderBy[A]]
@@ -139,6 +144,7 @@ object N1QL extends N1QLInstances {
     final case class ResultExpr[A](expr: A, alias: Option[Id[A]])
     final case class Keyspace[A](expr: A, alias: Option[Id[A]])
     final case class Unnest[A](expr: A, alias: Option[Id[A]])
+    final case class Binding[A](id: Id[A], expr: A)
     final case class Filter[A](v: A)
     final case class GroupBy[A](v: A)
     final case class OrderBy[A](a: A, sortDir: SortDir)

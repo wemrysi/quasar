@@ -197,9 +197,13 @@ e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
 ##### MarkLogic
 
-To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
-`xcc://<username>:<password>@<host>:<port>/<database>`
+`xcc://<username>:<password>@<host>:<port>/<database>[/root/dir/path]?format=[json|xml]`
+
+the mount will query either JSON or XML documents based on the value of the `format` parameter. For backwards-compatibility, if the `format` parameter is omitted then XML is assumed.
+
+If a root directory path is specified, all operations and queries within the mount will be local to the MarkLogic directory at the specified path.
 
 Prerequisites
 - MarkLogic 8.0+
@@ -208,12 +212,10 @@ Prerequisites
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
 [Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
-- Only XML documents are currently supported (JSON support is coming soon, see [#1704](https://github.com/quasar-analytics/quasar/issues/1704)).
-- It is not yet possible to reference XML attributes in queries ([#1701](https://github.com/quasar-analytics/quasar/issues/1701)).
-- Most joins do not yet work ([#1581](https://github.com/quasar-analytics/quasar/issues/1581), [#1560](https://github.com/quasar-analytics/quasar/issues/1560), [#1539](https://github.com/quasar-analytics/quasar/issues/1539), [#1505](https://github.com/quasar-analytics/quasar/issues/1505)).
-- Field aliases must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- "Default" numeric field names are prefixed with an underscore ("_") in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- Index usage is currently poor, so performance may degrade on large directories and/or complex queries. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
+- Field aliases when working with XML must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- "Default" numeric field names are prefixed with an underscore ("_") when working with XML in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
+- Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
 Quasar's data model is JSON-ish and thus there is a bit of translation required when applying it to XML. The current mapping aims to be intuitive while still taking advantage of the XDM as much as possible. Take note of the following:
 - Projecting a field will result in the child element(s) having the given name. If more than one element matches, the result will be an array.
@@ -659,7 +661,6 @@ time      | `"10:30:05"`    | `{ "$time": "10:30:05" }` | HH:MM[:SS[:.SSS]]
 interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | Note: year/month not currently supported.
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
-error     | `null`          | `{ "$na": null }` | A runtime error occurred producing or representing this value.
 
 
 ### CSV

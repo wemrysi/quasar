@@ -56,11 +56,12 @@ final class ShiftedReadPlanner[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator
           ResultExpr(r, none).wrapNel,
           Keyspace(id(bc.bucket).embed, gId.some).some,
           unnest  = none,
+          let     = nil,
           filter  = bc.collection.nonEmpty.option(
                       Eq(id("type").embed, str(bc.collection).embed).embed
                     ) ∘ (Filter(_)),
           groupBy = none,
-          orderBy = Nil).embed
+          orderBy = nil).embed
       }
   }
 

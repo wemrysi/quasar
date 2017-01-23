@@ -58,6 +58,9 @@ trait N1QLArbitrary {
   implicit def arbUnnest[A: Arbitrary]: Arbitrary[Unnest[A]] =
     Arbitrary((arb[A] ⊛ arb[Option[Id[A]]])(Unnest(_, _)))
 
+  implicit def arbBindingExpr[A: Arbitrary]: Arbitrary[Binding[A]] =
+    Arbitrary((arb[Id[A]] ⊛ arb[A])(Binding(_, _)))
+
   implicit def arbFilter[A: Arbitrary]: Arbitrary[Filter[A]] =
     Arbitrary(arb[A] ∘ (Filter(_)))
 
@@ -130,8 +133,11 @@ trait N1QLArbitrary {
     arb[A]                             ∘ (Ceil(_)),
     arb[A]                             ∘ (Millis(_)),
     (arb[A] ⊛ arb[Option[A]])            (MillisToUTC(_, _)),
+    (arb[A] ⊛ arb[A] ⊛ arb[A])           (DateAddStr(_, _, _)),
     (arb[A] ⊛ arb[A])                    (DatePartStr(_, _)),
     (arb[A] ⊛ arb[A] ⊛ arb[A])           (DateDiffStr(_, _, _)),
+    (arb[A] ⊛ arb[A])                    (DateTruncStr(_, _)),
+    arb[A]                             ∘ (StrToMillis(_)),
     Gen.const                            (NowStr[A]()),
     (arb[A] ⊛ arb[A])                    (ArrContains(_, _)),
     (arb[A] ⊛ arb[A] ⊛ arb[Option[A]])   (ArrRange(_, _, _)),
@@ -152,11 +158,12 @@ trait N1QLArbitrary {
      arb[NonEmptyList[ResultExpr[A]]] ⊛
      arb[Option[Keyspace[A]]]         ⊛
      arb[Option[Unnest[A]]]           ⊛
+     arb[List[Binding[A]]]            ⊛
      arb[Option[Filter[A]]]           ⊛
      arb[Option[GroupBy[A]]]          ⊛
      arb[List[OrderBy[A]]]
     )(
-      Select(_, _, _, _, _, _, _)
+      Select(_, _, _, _, _, _, _, _)
     ),
     (arb[NonEmptyList[WhenThen[A]]]  ⊛
      arb[Else[A]]

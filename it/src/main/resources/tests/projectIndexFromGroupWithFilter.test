@@ -2,6 +2,7 @@
     "name": "project index from group with filter",
     "backends": {
         "mongodb_read_only": "pending",
+        "mongodb_q_3_2": "skip",
         "postgresql":        "pending",
         "spark_local": "skip",
         "spark_hdfs": "skip"
@@ -10,10 +11,11 @@
     "query": "select parents[0].sha, count(*) as count from slamengine_commits where parents[0].sha like \"5%\" group by parents[0].sha",
     "predicate": "containsExactly",
     "ignoreFieldOrder": [
+      "couchbase",
+      "marklogic_json",
       "mongodb_2_6",
       "mongodb_3_0",
-      "mongodb_3_2",
-      "couchbase"
+      "mongodb_3_2"
     ],
     "expected": [
         { "sha": "53d2e5684d9403194dff1cc63423c2590038d1c0", "count": 1 },

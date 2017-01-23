@@ -85,6 +85,38 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => mf1
               case RightSide => mf2
             })).some
+          // left side maps over the data while the right side shifts the same data
+          case (Some(Map(\/-(SrcHole), mf1)), Some(LeftShift(-\/(values), struct, status, repair))) =>
+            FI.project(values) >>= QC.prj match {
+              case Some(Map(src2, mf2)) if src2 ≟ HoleQS =>
+                QC.inj(LeftShift(src,
+                  struct >> mf2,
+                  status,
+                  combine >>= {
+                    case LeftSide  => mf1 >> LeftSideF  // references `src`
+                    case RightSide => repair >>= {
+                      case LeftSide  => mf2 >> LeftSideF
+                      case RightSide => RightSideF
+                    }
+                  })).some
+              case _ => None
+            }
+          // right side maps over the data while the left side shifts the same data
+          case (Some(LeftShift(-\/(values), struct, status, repair)), Some(Map(\/-(SrcHole), mf2))) =>
+            FI.project(values) >>= QC.prj match {
+              case Some(Map(src1, mf1)) if src1 ≟ HoleQS =>
+                QC.inj(LeftShift(src,
+                  struct >> mf1,
+                  status,
+                  combine >>= {
+                    case LeftSide  => repair >>= {
+                      case LeftSide  => mf1 >> LeftSideF
+                      case RightSide => RightSideF
+                    }
+                    case RightSide => mf2 >> LeftSideF  // references `src`
+                  })).some
+              case _ => None
+            }
           // neither side references the src
           case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2)))
               if src1 ≟ UnrefedSrc && src2 ≟ UnrefedSrc =>
@@ -153,6 +185,15 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         QC.inj(Map(src, combine.as(SrcHole))).some
       case (_, _) => None
     }
+
+  def unifySimpleBranchesCoEnv[F[_], A]
+    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
+    (rebase: FreeQS => A => Option[A])
+    (implicit
+      QC: QScriptCore :<: F,
+      FI: Injectable.Aux[F, QScriptTotal])
+      : Option[CoEnv[Hole, F, A]] =
+    unifySimpleBranches(src, l, r, combine)(rebase)(QC, FI).map(fa => CoEnv(\/-(fa)))
 
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
@@ -286,7 +327,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
+  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],

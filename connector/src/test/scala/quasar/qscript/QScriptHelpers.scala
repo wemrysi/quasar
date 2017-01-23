@@ -90,6 +90,10 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(ConcatArrays(left, right))
 
+  def ConcatMapsR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(ConcatMaps(left, right))
+
   def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(Add(left, right))
@@ -173,6 +177,7 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
     ejsonMap((
       ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
       ejsonArr(l, r)))
+
   def ejsonProjectField(field: Fix[EJson]) =
     ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
 }

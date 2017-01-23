@@ -155,15 +155,6 @@ object MongoDbPlanner {
         }
       }
 
-      def makeSimpleCall(func: String, args: List[JsCore]): JsCore =
-        Call(ident(func), args)
-
-      def makeSimpleBinop(op: BinaryOperator): Output =
-        Arity2(BinOp(op, _, _))
-
-      def makeSimpleUnop(op: UnaryOperator): Output =
-        Arity1(UnOp(op, _))
-
       ((func, args) match {
         // NB: this one is missing from MapFunc.
         case (ToId, _) => None
@@ -223,6 +214,7 @@ object MongoDbPlanner {
       case Invoke(f, a)    => invoke(f, a)
       case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
       case lp.Let(_, _, body) => body
+
       case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
@@ -261,7 +253,7 @@ object MongoDbPlanner {
   type PartialSelector = Partial[BsonField, Selector]
   implicit def partialSelRenderTree(implicit S: RenderTree[Selector]): RenderTree[PartialSelector] = RenderTree.make {
     case (f, ifs) => NonTerminal(List("PartialSelector"), None,
-      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x))).render ::
+      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x.toString))).render ::
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
@@ -351,18 +343,22 @@ object MongoDbPlanner {
       }
 
       def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
-        \/-((
-          { case x :: Nil => Selector.Doc(x -> f(Bson.Date(g(date).value))) },
-          List(There(index, Here))))
+        Bson.Date.fromInstant(g(date).value).fold[Output](
+          -\/(NonRepresentableData(g(date))))(
+          d => \/-((
+            { case x :: Nil => Selector.Doc(x -> f(d)) },
+            List(There(index, Here)))))
 
       def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.Date, g1: Data.Date => Data.Timestamp, g2: Data.Date => Data.Timestamp, index: Int): Output =
-        \/-((
-          { case x :: Nil =>
-            conj(
-              Selector.Doc(x -> f1(Bson.Date(g1(date).value))),
-              Selector.Doc(x -> f2(Bson.Date(g2(date).value))))
-          },
-          List(There(index, Here))))
+        ((Bson.Date.fromInstant(g1(date).value) \/> NonRepresentableData(g1(date))) ⊛
+          (Bson.Date.fromInstant(g2(date).value) \/> NonRepresentableData(g2(date))))((d1, d2) =>
+          (
+            { case x :: Nil =>
+              conj(
+                Selector.Doc(x -> f1(d1)),
+                Selector.Doc(x -> f2(d2)))
+            },
+            List(There(index, Here))))
 
       def stringOp(f: String => Selector.Condition, arg: (Fix[LP], Output)): Output =
         arg match {
@@ -788,6 +784,8 @@ object MongoDbPlanner {
           val (keys, dirs) = os.toList.unzip
           WB.sortBy(src, keys, dirs)
         })
+      case TemporalTrunc(part, src) =>
+        state(-\/(UnsupportedPlan(node, "TemporalTrunc not supported".some)))
       case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
@@ -919,7 +917,7 @@ object MongoDbPlanner {
         case _ =>
           -\/(UnsupportedPlan(x,
             Some("collections can only contain objects, but a(n) " +
-              typ +
+              typ.shows +
               " is expected")))
       }
     case x => \/-(x.embed)
@@ -973,8 +971,8 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan(logical: Fix[LP], queryContext: fs.QueryContext)
-    : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
+  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {

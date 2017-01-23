@@ -99,12 +99,12 @@ package object api {
       def strings(json: Json): String \/ List[String] =
         json.string.map(str => \/-(str :: Nil)).getOrElse(
           json.array.map { vs =>
-            vs.traverse(v => v.string \/> ("expected string in array; found: " + v.toString))
-          }.getOrElse(-\/("expected a string or array of strings; found: " + json)))
+            vs.traverse(v => v.string \/> (s"expected string in array; found: $v"))
+          }.getOrElse(-\/(s"expected a string or array of strings; found: $json")))
 
       for {
         json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
-        obj <- json.obj \/> ("expected a JSON object; found: " + json.toString)
+        obj <- json.obj \/> (s"expected a JSON object; found: $json")
         values <- obj.toList.traverse { case (k, v) =>
           strings(v).map(CaseInsensitiveString(k) -> _)
         }
@@ -148,7 +148,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound
+          case None       => HttpService.notFound // note: This needs to change to `Response.fallthrough` when http4s is upgraded
         }
       }
     }
@@ -224,9 +224,6 @@ package object api {
       systemPath = basePath,
       pathCollector = pathCollector))
   }
-
-  def fileMediaType(file: String): Option[MediaType] =
-    MediaType.forExtension(file.split('.').last)
 
   def redirectService(basePath: String) = HttpService {
     // NB: this means we redirected to a path that wasn't handled, and need

@@ -21,6 +21,7 @@ import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
@@ -139,12 +140,12 @@ object QueryFile {
   }
 
   def convertToQScriptRead
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_], QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults],
+      merr: MonadError_[M, FileSystemError],
+      mtell: MonadTell_[M, PhaseResults],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
@@ -168,18 +169,13 @@ object QueryFile {
           Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
             Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
 
-    val qs =
-      merr.map(
-        merr.bind(
-          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize).fold(
-            perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
-            merr.point(_)))(
-          rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
-        simplifyAndNormalize[T, InterimQS, QS])
-
-    merr.bind(qs) { qs =>
-      mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs)
-    }
+    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+      .fold(
+        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
+        _.point[M])
+      .flatMap(rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents))
+      .map(simplifyAndNormalize[T, InterimQS, QS])
+      .flatMap(qs => mtell.writer(Vector(PhaseResult.tree("QScript", qs)), qs))
   }
 
   /** The result of the query is stored in an output file, overwriting any existing

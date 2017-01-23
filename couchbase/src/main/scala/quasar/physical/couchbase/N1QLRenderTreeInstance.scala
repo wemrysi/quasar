@@ -42,6 +42,8 @@ trait N1QLRenderTreeInstance {
           }.toList)
         case Arr(l) =>
           nonTerminal("Arr", l: _*)
+        case Date(a1) =>
+          nonTerminal("Date", a1)
         case Time(a1) =>
           nonTerminal("Time", a1)
         case Timestamp(a1) =>
@@ -138,10 +140,16 @@ trait N1QLRenderTreeInstance {
           nonTerminal("Millis", a1)
         case MillisToUTC(a1, a2) =>
           nonTerminal("MillisToUTC", a1 :: a2.toList: _*)
+        case DateAddStr(a1, a2, a3) =>
+          nonTerminal("DateAddStr", a1, a2, a3)
         case DatePartStr(a1, a2) =>
           nonTerminal("DatePartStr", a1, a2)
         case DateDiffStr(a1, a2, a3) =>
           nonTerminal("DateDiffStr", a1, a2, a3)
+        case DateTruncStr(a1, a2) =>
+          nonTerminal("DateTruncStr", a1, a2)
+        case StrToMillis(a1) =>
+          nonTerminal("StrToMillis", a1)
         case NowStr() =>
           Terminal("NowStr" :: Nil, none)
         case ArrContains(a1, a2) =>
@@ -174,7 +182,7 @@ trait N1QLRenderTreeInstance {
           nonTerminal("Union", a1, a2)
         case ArrFor(a1, a2, a3) =>
           nonTerminal("ArrFor", a1, a2, a3)
-        case Select(v, re, ks, un, ft, gb, ob) =>
+        case Select(v, re, ks, un, lt, ft, gb, ob) =>
           def nt(tpe: String, label: Option[String], child: A) =
             NonTerminal(
               tpe :: Nil,
@@ -186,6 +194,7 @@ trait N1QLRenderTreeInstance {
             (re ∘ (i => nt("resultExpr", i.alias ∘ (_.v), i.expr))).toList :::
             (ks ∘ (i => nt("keyspace", i.alias ∘ (_.v), i.expr))).toList   :::
             (un ∘ (i => nt("unnest", i.alias ∘ (_.v), i.expr))).toList     :::
+            (lt ∘ (i => nt("let", i.id.v.some, i.expr))).toList            :::
             (ft ∘ (f => nonTerminal("filter", f.v))).toList                :::
             (gb ∘ (g => nonTerminal("groupBy", g.v))).toList               :::
             (ob ∘ (i => nt("orderBy", i.sortDir.shows.some, i.a))).toList)

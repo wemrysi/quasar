@@ -26,7 +26,7 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib, StdLib._
+import quasar.std.StdLib, StdLib._, date.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
 import matryoshka._
@@ -232,10 +232,12 @@ final class Compiler[M[_], T: Equal]
       "time"                    -> date.Time,
       "timestamp"               -> date.Timestamp,
       "interval"                -> date.Interval,
+      "start_of_day"            -> date.StartOfDay,
       "time_of_day"             -> date.TimeOfDay,
       "to_timestamp"            -> date.ToTimestamp,
       "squash"                  -> identity.Squash,
       "oid"                     -> identity.ToId,
+      "type_of"                 -> identity.TypeOf,
       "between"                 -> relations.Between,
       "where"                   -> set.Filter,
       "distinct"                -> set.Distinct,
@@ -362,7 +364,7 @@ final class Compiler[M[_], T: Equal]
     def compileRelation(r: SqlRelation[CoExpr]): M[T] =
       r match {
         case IdentRelationAST(name, _) =>
-          CompilerState.subtableReq(name)
+          CompilerState.subtableReq[M, T](name)
 
         case VariRelationAST(vari, _) =>
           fail(UnboundVariable(VarName(vari.symbol)))
@@ -396,6 +398,62 @@ final class Compiler[M[_], T: Equal]
               lpr.let(leftName, left0,
                 lpr.let(rightName, right0, join)))
           }).join
+      }
+
+    def extractFunc(part: String): Option[UnaryFunc] =
+      part.some collect {
+        case "century"      => date.ExtractCentury
+        case "day"          => date.ExtractDayOfMonth
+        case "decade"       => date.ExtractDecade
+        case "dow"          => date.ExtractDayOfWeek
+        case "doy"          => date.ExtractDayOfYear
+        case "epoch"        => date.ExtractEpoch
+        case "hour"         => date.ExtractHour
+        case "isodow"       => date.ExtractIsoDayOfWeek
+        case "isoyear"      => date.ExtractIsoYear
+        case "microseconds" => date.ExtractMicroseconds
+        case "millennium"   => date.ExtractMillennium
+        case "milliseconds" => date.ExtractMilliseconds
+        case "minute"       => date.ExtractMinute
+        case "month"        => date.ExtractMonth
+        case "quarter"      => date.ExtractQuarter
+        case "second"       => date.ExtractSecond
+        case "week"         => date.ExtractWeek
+        case "year"         => date.ExtractYear
+      }
+
+    def temporalPart(part: String): Option[TemporalPart] = {
+      import TemporalPart._
+
+      part.some collect {
+        case "century"         => Century
+        case "day"             => Day
+        case "decade"          => Decade
+        case "hour"            => Hour
+        case "microseconds"    => Microsecond
+        case "millennium"      => Millennium
+        case "milliseconds"    => Millisecond
+        case "minute"          => Minute
+        case "month"           => Month
+        case "quarter"         => Quarter
+        case "second"          => Second
+        case "week"            => Week
+        case "year"            => Year
+      }
+    }
+
+    def temporalPartFunc[A](
+      name: String, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
+    ): M[T] =
+      args.traverse(compile0).flatMap {
+        case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
+          f1(part).cata(
+            f2(_, expr),
+            fail(UnexpectedDatePart("\"" + part + "\"")))
+        case _ :: _ :: Nil =>
+          fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](args(0)))))
+        case _ =>
+          fail(WrongArgumentCount(name.toUpperCase, 2, args.length))
       }
 
     node.tail match {
@@ -454,18 +512,18 @@ final class Compiler[M[_], T: Equal]
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
-                    (CompilerState.rootTableReq ⊛ compile0(filter))(
+                    (CompilerState.rootTableReq[M, T] ⊛ compile0(filter))(
                       set.Filter(_, _).embed))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
-                      (CompilerState.rootTableReq ⊛
+                      (CompilerState.rootTableReq[M, T] ⊛
                         groupBy.keys.traverse(compile0)) ((src, keys) =>
                         set.GroupBy(src, structural.MakeArrayN(keys: _*).embed).embed))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
-                        (CompilerState.rootTableReq ⊛ compile0(having))(
+                        (CompilerState.rootTableReq[M, T] ⊛ compile0(having))(
                           set.Filter(_, _).embed))
 
                       stepBuilder(having) {
@@ -473,7 +531,7 @@ final class Compiler[M[_], T: Equal]
 
                         stepBuilder(squashed.some) {
                           val sort = orderBy.map(orderBy =>
-                            CompilerState.rootTableReq >>= (t =>
+                            CompilerState.rootTableReq[M, T] >>= (t =>
                               nam.fold(
                                 orderBy.keys.traverse(p => (t, p._1).point[M]))(
                                 n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
@@ -485,7 +543,7 @@ final class Compiler[M[_], T: Equal]
                           stepBuilder(sort) {
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                CompilerState.rootTableReq.map(t =>
+                                CompilerState.rootTableReq[M, T].map(t =>
                                   if (syntheticNames.nonEmpty)
                                     set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
                                       structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed
@@ -495,7 +553,7 @@ final class Compiler[M[_], T: Equal]
 
                             stepBuilder(distincted) {
                               val pruned =
-                                CompilerState.rootTableReq.map(
+                                CompilerState.rootTableReq[M, T].map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
                                     structural.DeleteField(acc,
                                       lpr.constant(Data.Str(field))).embed))
@@ -591,48 +649,23 @@ final class Compiler[M[_], T: Equal]
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
-            CompilerState.rootTableReq ∘
+            CompilerState.rootTableReq[M, T] ∘
             (structural.ObjectProject(_, lpr.constant(Data.Str(name))).embed)
           else
             for {
               rName <- relationName(node).fold(fail, emit)
-              table <- CompilerState.subtableReq(rName)
+              table <- CompilerState.subtableReq[M, T](rName)
             } yield
               if ((rName: String) ≟ name) table
               else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
 
-      case InvokeFunction(name, args) if name.toLowerCase ≟ "date_part" =>
-        args.traverse(compile0).flatMap {
-          case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
-            (part.some collect {
-              case "century"      => date.ExtractCentury
-              case "day"          => date.ExtractDayOfMonth
-              case "decade"       => date.ExtractDecade
-              case "dow"          => date.ExtractDayOfWeek
-              case "doy"          => date.ExtractDayOfYear
-              case "epoch"        => date.ExtractEpoch
-              case "hour"         => date.ExtractHour
-              case "isodow"       => date.ExtractIsoDayOfWeek
-              case "isoyear"      => date.ExtractIsoYear
-              case "microseconds" => date.ExtractMicroseconds
-              case "millennium"   => date.ExtractMillennium
-              case "milliseconds" => date.ExtractMilliseconds
-              case "minute"       => date.ExtractMinute
-              case "month"        => date.ExtractMonth
-              case "quarter"      => date.ExtractQuarter
-              case "second"       => date.ExtractSecond
-              case "week"         => date.ExtractWeek
-              case "year"         => date.ExtractYear
-            }).cata(
-              f => emit(f(expr).embed),
-              fail(UnexpectedDatePart("\"" + part + "\"")))
+      case InvokeFunction(name, args) if
+          name.toLowerCase ≟ "date_part"  || name.toLowerCase ≟ "temporal_part" =>
+        temporalPartFunc(name, args, extractFunc, (f: UnaryFunc, expr: T) => emit(f(expr).embed))
 
-          case _ :: _ :: Nil =>
-            fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](args(0)))))
-
-          case _ =>
-            fail(WrongArgumentCount("DATE_PART", 2, args.length))
-        }
+      case InvokeFunction(name, args) if
+          name.toLowerCase ≟ "date_trunc" || name.toLowerCase ≟ "temporal_trunc" =>
+        temporalPartFunc(name, args, temporalPart, (p: TemporalPart, expr: T) => emit(TemporalTrunc(p, expr).embed))
 
       case InvokeFunction(name, Nil) =>
         functionMapping.get(name.toLowerCase).fold[M[T]](
