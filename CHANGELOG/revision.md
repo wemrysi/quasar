@@ -1,1 +1,0 @@
-Use configuration instead of environment variables for `it` tests
