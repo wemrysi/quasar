@@ -224,19 +224,19 @@ object lib {
 
   // qscript:inc-avg($st as map:map, $x as item()*) as map:map
   def incAvg[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    qs.declare("inc-avg") flatMap (_(
-      $("st") as ST("map:map"),
-      $("x")  as ST.Top
-    ).as(ST("map:map")) { (st: XQuery, x: XQuery) =>
-      val (c, a, y) = ($("c"), $("a"), $("y"))
-      incAvgState[F].apply(~c, ~y) map { nextSt =>
+    incAvgState.fn flatMap { incAvgSt =>
+      qs.declare("inc-avg") map (_(
+        $("st") as ST("map:map"),
+        $("x")  as ST.Top
+      ).as(ST("map:map")) { (st: XQuery, x: XQuery) =>
+        val (c, a, y) = ($("c"), $("a"), $("y"))
         let_(
           c := (map.get(st, "cnt".xs) + 1.xqy),
           a := map.get(st, "avg".xs),
           y := (~a + mkSeq_(mkSeq_(x - (~a)) div ~c)))
-        .return_(nextSt)
-      }
-    })
+        .return_(incAvgSt(~c, ~y))
+      })
+    }
 
   // qscript:inc-avg-state($cnt as xs:integer, $avg as xs:double) as map:map
   def incAvgState[F[_]: Functor: PrologW]: F[FunctionDecl2] =
@@ -302,22 +302,22 @@ object lib {
   //   $seq      as item()*
   // ) as item()*
   def reduceWith[F[_]: Bind: PrologW]: F[FunctionDecl5] =
-    qs.declare("reduce-with") flatMap (_(
-      $("initial")  as ST("function(item()*) as item()*"),
-      $("combine")  as ST("function(item()*, item()) as item()*"),
-      $("finalize") as ST("function(item()*) as item()*"),
-      $("bucket")   as ST("function(item()*) as item()"),
-      $("seq")      as ST("item()*")
-    ).as(ST("item()*")) { (initial: XQuery, combine: XQuery, finalize: XQuery, bucket: XQuery, xs: XQuery) =>
-      val (m, x, k, v, o) = ($("m"), $("x"), $("k"), $("v"), $("_"))
+    asMapKey[F].fn flatMap { asKey =>
+      qs.declare("reduce-with") map (_(
+        $("initial")  as ST("function(item()*) as item()*"),
+        $("combine")  as ST("function(item()*, item()) as item()*"),
+        $("finalize") as ST("function(item()*) as item()*"),
+        $("bucket")   as ST("function(item()*) as item()"),
+        $("seq")      as ST("item()*")
+      ).as(ST("item()*")) { (initial: XQuery, combine: XQuery, finalize: XQuery, bucket: XQuery, xs: XQuery) =>
+        val (m, x, k, v, o) = ($("m"), $("x"), $("k"), $("v"), $("_"))
 
-      asMapKey[F].apply(bucket fnapply (~x)) map { theKey =>
         let_(
           m := map.map(),
           o := for_(
                  x in xs)
                .let_(
-                 k := theKey,
+                 k := asKey(bucket fnapply ~x),
                  v := if_(map.contains(~m, ~k))
                       .then_(combine fnapply (map.get(~m, ~k), ~x))
                       .else_(initial fnapply (~x)),
@@ -328,8 +328,8 @@ object lib {
             finalize fnapply (map.get(~m, ~k))
           }
         }
-      }
-    })
+      })
+    }
 
   // NB: Copied from StringLib.safeSubstring
   // qscript:safe-substring($str as xs:string?, $start as xs:integer?, $length as xs:integer?) as xs:string?
@@ -402,21 +402,22 @@ object lib {
   ////
 
   private def mkComparisonFunction[F[_]: Bind: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
-    qs.declare(Refined.unsafeApply(s"comp-$opName")) flatMap (_(
-      $("x") as ST.Top,
-      $("y") as ST.Top
-    ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
-      (asDateTime[F].apply(x) |@| asDateTime[F].apply(y))((xdt, ydt) =>
+    asDateTime[F].fn flatMap { asDT =>
+      qs.declare(Refined.unsafeApply(s"comp-$opName")) map (_(
+        $("x") as ST.Top,
+        $("y") as ST.Top
+      ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
         try_ {
           if_(
             isCastable(x, ST("xs:date"))     or
             isCastable(y, ST("xs:date"))     or
             isCastable(x, ST("xs:dateTime")) or
             isCastable(y, ST("xs:dateTime")))
-          .then_ { op(xdt, ydt) }
+          .then_ { op(asDT(x), asDT(y)) }
           .else_ { op(x, y) }
         } .catch_($("_")) { _ =>
           recover
-        })
-    })
+        }
+      })
+    }
 }
