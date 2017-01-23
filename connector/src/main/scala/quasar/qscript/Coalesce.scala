@@ -248,15 +248,13 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lb, mf))),
                 sel,
                 rb).some
-            // FIXME: This is a reasonable transformation, but can cause
-            //        problems when there is `Cond` in the `Map`.
-            // case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
-            //   case Map(doubleInner, mfInner) =>
-            //     Map(
-            //       FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
-            //       mf >> mfInner).some
-            //   case _ => None
-            // }
+            case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj >>= {
+              case Map(doubleInner, mfInner) =>
+                Map(
+                  FToOut.reverseGet(QC.inj(Filter(doubleInner, cond >> mfInner))).embed,
+                  mf >> mfInner).some
+              case _ => None
+            }
             case Sort(Embed(innerSrc), buckets, ordering) => FToOut.get(innerSrc) >>= QC.prj >>= {
               case Map(doubleInner, mfInner) =>
                 Map(

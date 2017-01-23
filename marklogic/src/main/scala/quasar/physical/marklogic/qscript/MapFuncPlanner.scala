@@ -45,6 +45,8 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Time(s)                      => xs.time(s).point[F]
     case Timestamp(s)                 => xs.dateTime(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
+    case StartOfDay(date)             => lib.startOfDay[F] apply date
+    case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
     case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
