@@ -1,0 +1,28 @@
+{
+    "name": "distinct of one ordered field",
+    "backends": {
+        "mongodb_q_3_2": "pending",
+        "postgresql":    "pending"
+    },
+    "data": "olympics.data",
+    "NB": "The lack of alias on this field is important, as it triggers the
+           `select value` semantics of returning a value directly, not wrapped
+           in a map.",
+    "query": "select distinct discipline from olympics order by discipline",
+    "predicate": "equalsExactly",
+    "expected": ["AlpineSkiing",
+                 "Biathlon",
+                 "Bobsleigh",
+                 "CrossCountryS",
+                 "Curling",
+                 "Figureskating",
+                 "FreestyleSki.",
+                 "IceHockey",
+                 "Luge",
+                 "NordicCombined",
+                 "ShortTrackS.",
+                 "Skeleton",
+                 "SkiJumping",
+                 "Snowboard",
+                 "Speedskating"]
+}
