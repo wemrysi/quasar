@@ -176,7 +176,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           response.status must_== Status.Ok
         }
         "support disposition" >> prop { filesystem: SingleFileMemState =>
-          val disposition = ContentDispositionʹ("attachement", Map("filename" -> "data.json"))
+          val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
           val request = Request(
             uri = pathUri(filesystem.file),
             headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
@@ -184,7 +184,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           response.headers.get(`Content-Disposition`.name) must_== Some(disposition)
         }
         "support disposition non-ascii filename" >> prop { filesystem: SingleFileMemState =>
-          val disposition = ContentDispositionʹ("attachement", Map("filename*" -> "UTF-8''Na%C3%AFve%20file.txt"))
+          val disposition = `Content-Disposition`("attachement", Map("filename*" -> "UTF-8''Na%C3%AFve%20file.txt"))
           val request = Request(
             uri = pathUri(filesystem.file),
             headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
