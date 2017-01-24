@@ -75,8 +75,26 @@ trait Decoder {
   }
 }
 
+// [#1861] Workaround to support a small slice of RFC 5987 for this isolated case
+// NonUnitStatements due to http4s's Writer
+@SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+final case class ContentDispositionʹ(dispositionType: String, parameters: Map[String, String])
+  extends Header.Parsed {
+  import org.http4s.util.Writer
+  override def key = `Content-Disposition`
+  override lazy val value = super.value
+  override def renderValue(writer: Writer): writer.type = {
+    writer.append(dispositionType)
+    parameters.foreach(p =>
+      p._1.endsWith("*").fold(
+        writer << "; " << p._1 << "=" << p._2,
+        writer << "; " << p._1 << "=\"" << p._2 << '"'))
+    writer
+  }
+}
+
 sealed trait MessageFormat extends Decoder {
-  def disposition: Option[`Content-Disposition`]
+  def disposition: Option[ContentDispositionʹ]
   def encode[F[_]](data: Process[F, Data]): Process[F, String]
   protected def dispositionExtension: Map[String, String] =
     disposition.map(disp => Map("disposition" -> disp.value)).getOrElse(Map.empty)
@@ -85,7 +103,7 @@ object MessageFormat {
   final case class JsonContentType(
     mode: JsonPrecision,
     format: JsonFormat,
-    disposition: Option[`Content-Disposition`]
+    disposition: Option[ContentDispositionʹ]
   ) extends MessageFormat {
     val LineSep = "\r\n"
     def mediaType = {
@@ -129,7 +147,7 @@ object MessageFormat {
 
   val Default = JsonContentType(JsonPrecision.Readable, JsonFormat.LineDelimited, None)
 
-  final case class Csv(columnDelimiter: Char, rowDelimiter: String, quoteChar: Char, escapeChar: Char, disposition: Option[`Content-Disposition`]) extends MessageFormat {
+  final case class Csv(columnDelimiter: Char, rowDelimiter: String, quoteChar: Char, escapeChar: Char, disposition: Option[ContentDispositionʹ]) extends MessageFormat {
     import Csv._
 
     val CsvColumnsFromInitialRowsCount = 1000
@@ -205,9 +223,9 @@ object MessageFormat {
   // FIXME: I don’t know why this is triggering here.
   @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
-    val disposition = mediaType.extensions.get("disposition").flatMap { str =>
-      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption
-    }
+    val disposition = mediaType.extensions.get("disposition").flatMap(str =>
+      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption.map(cd =>
+        ContentDispositionʹ(cd.dispositionType, cd.parameters)))
     if (mediaType satisfies Csv.mediaType) {
       def toChar(str: String): Option[Char] = str.toList match {
         case c :: Nil => Some(c)
