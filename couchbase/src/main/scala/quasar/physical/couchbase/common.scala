@@ -39,6 +39,14 @@ object common {
 
   final case class BucketCollection(bucket: String, collection: String)
 
+  object BucketCollection {
+    def fromPath(p: APath): PathError \/ BucketCollection =
+      Path.flatten(None, None, None, Some(_), Some(_), p)
+        .toIList.unite.uncons(
+          PathError.invalidPath(p, "no bucket specified").left,
+          (h, t) => BucketCollection(h, t.intercalate("/")).right)
+  }
+
   // type field in Couchbase documents
   final case class DocType(v: String)
 
@@ -46,11 +54,13 @@ object common {
 
   val CBDataCodec = DataCodec.Precise
 
-  def bucketCollectionFromPath(f: APath): FileSystemError \/ BucketCollection =
-    Path.flatten(None, None, None, Some(_), Some(_), f)
-      .toIList.unite.uncons(
-        FileSystemError.pathErr(PathError.invalidPath(f, "no bucket specified")).left,
-        (h, t) => BucketCollection(h, t.intercalate("/")).right)
+  def deleteHavingPrefix(
+    bucket: Bucket,
+    prefix: String
+  ): Task[Unit] = {
+    val qStr = s"""DELETE FROM `${bucket.name}` WHERE type LIKE "${prefix}%""""
+    Task.delay(bucket.query(n1qlQuery(qStr))).void
+  }
 
   def docTypesFromPrefix(
     bucket: Bucket,

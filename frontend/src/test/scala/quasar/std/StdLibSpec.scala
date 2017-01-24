@@ -17,15 +17,20 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Qspec, Type}
+import quasar.{Data, DataCodec, Qspec, Type}
+import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
 
-import matryoshka._
-import org.specs2.execute._
-import org.specs2.matcher._
-import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
+import java.time._
+import java.time.ZoneOffset.UTC
 import scala.math.abs
+
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import org.specs2.execute.{Failure, Result}
+import org.specs2.matcher.{Expectable, Matcher}
+import org.scalacheck.{Arbitrary, Gen}
+import scalaz._, Scalaz._
 
 /** Abstract spec for the standard library, intended to be implemented for each
   * library implementation, of which there are one or more per backend.
@@ -43,7 +48,7 @@ abstract class StdLibSpec extends Qspec {
             s"$x is a Number and matches $exp",
             s"$x is a Number but does not match $exp", s)
         case _ =>
-          result(v == expected,
+          result(Equal[Data].equal(v, expected),
             s"$v matches $expected",
             s"$v does not match $expected", s)
       }
@@ -56,6 +61,7 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+    implicit val arbDate = Arbitrary[LocalDate] { runner.dateDomain }
     implicit val arbData = Arbitrary[Data] {
       Gen.oneOf(
         runner.intDomain.map(Data.Int(_)),
@@ -201,19 +207,33 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        // TODO: need `Arbitrary`s for all of these
-        // "timestamp" >> prop { (x: Instant) =>
-        //   unary(ToString(_).embed, Data.Timestamp(x), Data.Str(x.toString))
-        // }
-        //
-        // "date" >> prop { (x: LocalDate) =>
-        //   unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
-        // }
-        //
-        // "time" >> prop { (x: LocalTime) =>
-        //   unary(ToString(_).embed, Data.Time(x), Data.Str(x.toString))
-        // }
-        //
+        "timestamp" >> {
+          def test(x: Instant) = unary(
+            ToString(_).embed,
+            Data.Timestamp(x),
+            Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
+
+          "zero fractional seconds" >> test(Instant.EPOCH)
+
+          "any" >> prop (test(_: Instant))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
+          unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
+        }
+
+        "time" >> {
+          def test(x: LocalTime) = unary(
+            ToString(_).embed,
+            Data.Time(x),
+            Data.Str(x.format(DataCodec.timeFormatter)))
+
+          "zero fractional seconds" >> test(LocalTime.NOON)
+
+          "any" >> prop (test(_: LocalTime))
+        }
+
+        // TODO: Enable
         // "interval" >> prop { (x: Duration) =>
         //   unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
         // }
@@ -561,6 +581,59 @@ abstract class StdLibSpec extends Qspec {
 
         "midnight 1999-12-31" >> {
           unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+        }
+      }
+
+      "StartOfDay" >> {
+        "timestamp" >> prop { (x: Instant) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(TemporalPart.Day, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              StartOfDay(_).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate) =>
+          unary(
+            StartOfDay(_).embed,
+            Data.Date(x),
+            Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+        }
+      }
+
+      "TemporalTrunc" >> {
+        "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
+        "date" >> prop { (x: LocalDate, y: TemporalPart) =>
+          val t = x.atStartOfDay(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Date(x),
+              Data.Date(tt.toLocalDate)))
+        }
+
+        "time" >> prop { (x: LocalTime, y: TemporalPart) =>
+          truncLocalTime(y, x).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Time(x),
+              Data.Time(tt)))
         }
       }
 
@@ -1003,6 +1076,40 @@ abstract class StdLibSpec extends Qspec {
         "false" >> prop { (x: Data, y: Data) =>
           ternary(Cond(_, _, _).embed, Data.Bool(false), x, y, y)
         }
+      }
+    }
+
+    "StructuralLib" >> {
+      import StructuralLib._
+
+      // FIXME: No idea why this is necessary, but ScalaCheck arbContainer
+      //        demands it and can't seem to find one in this context.
+      implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
+
+      "ConcatOp" >> {
+        "array  || array" >> prop { (xs: List[BigInt], ys: List[BigInt]) =>
+          val (xints, yints) = (xs map (Data._int(_)), ys map (Data._int(_)))
+          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._arr(yints), Data._arr(xints ::: yints))
+        }
+
+        "array  || string" >> prop { (xs: List[BigInt], y: String) =>
+          val (xints, ystrs) = (xs map (Data._int(_)), y.toList map (c => Data._str(c.toString)))
+          binary(ConcatOp(_, _).embed, Data._arr(xints), Data._str(y), Data._arr(xints ::: ystrs))
+        }
+
+        "string || array" >> prop { (x: String, ys: List[BigInt]) =>
+          val (xstrs, yints) = (x.toList map (c => Data._str(c.toString)), ys map (Data._int(_)))
+          binary(ConcatOp(_, _).embed, Data._str(x), Data._arr(yints), Data._arr(xstrs ::: yints))
+        }
+
+        "string || string" >> prop { (x: String, y: String) =>
+          binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
+        }
+      }
+
+      "Meta" >> {
+        // FIXME: Implement once we've switched to EJson in LogicalPlan.
+        "returns metadata associated with a value" >> skipped("Requires EJson.")
       }
     }
   }

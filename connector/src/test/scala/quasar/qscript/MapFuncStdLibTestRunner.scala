@@ -17,16 +17,52 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
-import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+import quasar.fp._
+import quasar.fp.ski.κ
+import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
 import quasar.std._
 
-import matryoshka._, Recursive.ops._
+import scala.sys
+
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import org.specs2.execute.Result
+
 import scalaz._, Scalaz._
 import shapeless.Sized
 
 /** The operations needed to execute the various StdLib tests for a QScript backend. */
 trait MapFuncStdLibTestRunner extends StdLibTestRunner {
+  val lpf = new LogicalPlanR[Fix[LP]]
+
+  def nullaryMapFunc(
+    prg: FreeMapA[Fix, Nothing],
+    expected: Data
+  ): Result
+
+  def unaryMapFunc(
+    prg: FreeMapA[Fix, UnaryArg],
+    arg: Data,
+    expected: Data
+  ): Result
+
+  def binaryMapFunc(
+    prg: FreeMapA[Fix, BinaryArg],
+    arg1: Data, arg2: Data,
+    expected: Data
+  ): Result
+
+  def ternaryMapFunc(
+    prg: FreeMapA[Fix, TernaryArg],
+    arg1: Data, arg2: Data, arg3: Data,
+    expected: Data
+  ): Result
+
+  val qsr = new Transform[Fix, QScriptTotal[Fix, ?]]
+
   /** Translate to MapFunc (common to all QScript backends). */
   def translate[A](prg: Fix[LP], args: Symbol => A): Free[MapFunc[Fix, ?], A] =
     prg.cata[Free[MapFunc[Fix, ?], A]] {
@@ -43,5 +79,66 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
         Free.roll(MapFunc.translateTernaryMapping(func)(a1, a2, a3))
 
       case lp.Free(sym) => Free.pure(args(sym))
+
+      case lp.Constant(data) =>
+        qsr.fromData(data).fold(
+          _ => sys.error("invalid Data"),
+          ej => Free.roll(MapFuncs.Constant[Fix, Free[MapFunc[Fix, ?], A]](ej)))
+
+      case lp.TemporalTrunc(part, src) =>
+        Free.roll(MapFuncs.TemporalTrunc(part, src))
     }
+
+  def absurd[A, B](a: A): B = sys.error("impossible!")
+
+  def nullary(
+    prg: Fix[LP],
+    expected: Data
+  ): Result = {
+    val mf: FreeMapA[Fix, Nothing] =
+      translate[Nothing](prg, absurd)
+
+    nullaryMapFunc(mf, expected)
+  }
+
+  def unary(
+    prg: Fix[LP] => Fix[LP],
+    arg: Data,
+    expected: Data
+  ): Result = {
+    val mf: FreeMapA[Fix, UnaryArg] =
+      translate(prg(lpf.free('arg)), κ(UnaryArg._1))
+
+    unaryMapFunc(mf, arg, expected)
+  }
+
+  def binary(
+    prg: (Fix[LP], Fix[LP]) => Fix[LP],
+    arg1: Data, arg2: Data,
+    expected: Data
+  ): Result = {
+    val mf: FreeMapA[Fix, BinaryArg] =
+      translate(prg(lpf.free('arg1), lpf.free('arg2)), {
+        case 'arg1 => BinaryArg._1
+        case 'arg2 => BinaryArg._2
+      })
+
+    binaryMapFunc(mf, arg1, arg2, expected)
+  }
+
+  def ternary(
+    prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP],
+    arg1: Data, arg2: Data, arg3: Data,
+    expected: Data
+  ): Result = {
+    val mf: FreeMapA[Fix, TernaryArg] =
+      translate(prg(lpf.free('arg1), lpf.free('arg2), lpf.free('arg3)), {
+        case 'arg1 => TernaryArg._1
+        case 'arg2 => TernaryArg._2
+        case 'arg3 => TernaryArg._3
+      })
+
+    ternaryMapFunc(mf, arg1, arg2, arg3, expected)
+  }
+
 }

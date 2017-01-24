@@ -18,7 +18,6 @@ package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
-import quasar.contrib.matryoshka.ShowT
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.physical.couchbase._
 import quasar.qscript._
@@ -26,62 +25,62 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._
 
-abstract class Planner[F[_], QS[_]] {
+abstract class Planner[T[_[_]], F[_], QS[_]] {
   type M[A]  = CBPhaseLog[F, A]
   type PR[A] = PhaseResultT[F, A]
 
-  def plan: AlgebraM[M, QS, N1QL]
+  def plan: AlgebraM[M, QS, T[N1QL]]
 }
 
 object Planner {
-  def apply[F[_], QS[_]](implicit ev: Planner[F, QS]): Planner[F, QS] = ev
+  def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
-  implicit def coproduct[N[_]: Monad, F[_], G[_]](
-    implicit F: Planner[N, F], G: Planner[N, G]
-  ): Planner[N, Coproduct[F, G, ?]] =
-    new Planner[N, Coproduct[F, G, ?]] {
-      val plan: AlgebraM[M, Coproduct[F, G, ?], N1QL] =
+  implicit def coproduct[T[_[_]], N[_]: Monad, F[_], G[_]](
+    implicit F: Planner[T, N, F], G: Planner[T, N, G]
+  ): Planner[T, N, Coproduct[F, G, ?]] =
+    new Planner[T, N, Coproduct[F, G, ?]] {
+      val plan: AlgebraM[M, Coproduct[F, G, ?], T[N1QL]] =
         _.run.fold(F.plan, G.plan)
     }
 
-  implicit def constDeadEndPlanner[F[_]: Monad]
-    : Planner[F, Const[DeadEnd, ?]] =
-    new UnreachablePlanner[F, Const[DeadEnd, ?]]
+  implicit def constDeadEndPlanner[T[_[_]], F[_]: Monad]
+    : Planner[T, F, Const[DeadEnd, ?]] =
+    new UnreachablePlanner[T, F, Const[DeadEnd, ?]]
 
-  implicit def constReadPlanner[F[_]: Monad, A]
-    : Planner[F, Const[Read[A], ?]] =
-    new UnreachablePlanner[F, Const[Read[A], ?]]
+  implicit def constReadPlanner[T[_[_]], F[_]: Monad, A]
+    : Planner[T, F, Const[Read[A], ?]] =
+    new UnreachablePlanner[T, F, Const[Read[A], ?]]
 
-  implicit def constShiftedReadPathPlanner[F[_]: Monad]
-    : Planner[F, Const[ShiftedRead[APath], ?]] =
-    new UnreachablePlanner[F, Const[ShiftedRead[APath], ?]]
+  implicit def constShiftedReadPathPlanner[T[_[_]], F[_]: Monad]
+    : Planner[T, F, Const[ShiftedRead[APath], ?]] =
+    new UnreachablePlanner[T, F, Const[ShiftedRead[APath], ?]]
 
-  implicit def constShiftedReadFile[F[_]: Monad]
-    : Planner[F, Const[ShiftedRead[AFile], ?]] =
-    new ShiftedReadFilePlanner[F]
+  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
+    new ShiftedReadFilePlanner[T, F]
 
-  implicit def equiJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
-    : Planner[F, EquiJoin[T, ?]] =
-    new EquiJoinPlanner[F, T]
+  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, EquiJoin[T, ?]] =
+    new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
-    : Planner[F, MapFunc[T, ?]] =
-    new MapFuncPlanner[F, T]
+  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, MapFunc[T, ?]] =
+    new MapFuncPlanner[T, F]
 
-  implicit def projectBucketPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
-    : Planner[F, ProjectBucket[T, ?]] =
-    new UnreachablePlanner[F, ProjectBucket[T, ?]]
+  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, ProjectBucket[T, ?]] =
+    new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: Corecursive: ShowT]
-    : Planner[F, QScriptCore[T, ?]] =
-    new QScriptCorePlanner[F, T]
+  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, QScriptCore[T, ?]] =
+    new QScriptCorePlanner[T, F]
 
-  def reduceFuncPlanner[F[_]: Monad]
-    : Planner[F, ReduceFunc] =
-    new ReduceFuncPlanner[F]
+  def reduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad]
+    : Planner[T, F, ReduceFunc] =
+    new ReduceFuncPlanner[T, F]
 
-  implicit def thetaJoinPlanner[F[_]: Monad: NameGenerator, T[_[_]]: Recursive: ShowT]
-    : Planner[F, ThetaJoin[T, ?]] =
-    new UnreachablePlanner[F, ThetaJoin[T, ?]]
+  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, ThetaJoin[T, ?]] =
+    new UnreachablePlanner[T, F, ThetaJoin[T, ?]]
 
 }

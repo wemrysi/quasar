@@ -16,15 +16,16 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import quasar.Predef.String
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 
-import matryoshka._
-import scalaz._, Scalaz._
+import matryoshka.AlgebraM
 
-private[qscript] final class UnreachablePlanner[M[_]: Applicative, F[_]]
-    extends MarkLogicPlanner[M, F] {
-  val plan: AlgebraM[M, F, XQuery] = κ(s"((: Unreachable :)())".xqy.point[M])
+private[qscript] final class UnreachablePlanner[F[_]: MonadPlanErr, FMT, G[_]](
+  name: String
+) extends Planner[F, FMT, G] {
+
+  val plan: AlgebraM[F, G, XQuery] =
+    κ(MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(name)))
 }

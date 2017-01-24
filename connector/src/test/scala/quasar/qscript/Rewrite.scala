@@ -27,37 +27,34 @@ import quasar.qscript.MapFuncs._
 
 import scala.Predef.implicitly
 
-import matryoshka._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  import quasar.frontend.fixpoint.lpf
-
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[QS](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
+    expr.transCata[Fix[QS]](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[QS](rewrite.normalize[QS])
+    expr.transCata[Fix[QS]](rewrite.normalize[QS])
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
-    expr.transCata[QST](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
+    expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
-    expr.transCata(
+    expr.transCata[Fix[QST]](
       liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, APath](idPrism))))
 
   type QSI[A] =
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
 
   val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
-  val PBI =     implicitly[ProjectBucket :<: QSI]
   val QCI =       implicitly[QScriptCore :<: QSI]
-  val TJI =         implicitly[ThetaJoin :<: QSI]
 
-  val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
   implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
@@ -92,16 +89,18 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS]()))),
                 Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
                 Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
-        QCT.inj(LeftShift((), HoleF, Free.point(RightSide)))).some)
+        QCT.inj(LeftShift((), HoleF, ExcludeId, Free.point(RightSide))))(
+        implicitly, Corecursive[Fix[QST], QST]).some)
     }
 
     "coalesce a Map into a subsequent LeftShift" in {
-      val exp =
+      val exp: QScriptCore[Fix[QScriptCore]] =
         LeftShift(
           Map(
             Unreferenced[Fix, Fix[QScriptCore]]().embed,
             BoolLit[Fix, Hole](true)).embed,
           HoleF,
+          ExcludeId,
           Free.point[MapFunc, JoinSide](RightSide))
 
       Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
@@ -109,22 +108,23 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         LeftShift(
           Unreferenced[Fix, Fix[QScriptCore]]().embed,
           BoolLit[Fix, Hole](true),
+          ExcludeId,
           Free.point[MapFunc, JoinSide](RightSide)).some)
     }
 
     "fold a constant array value" in {
       val value: Fix[EJson] =
-        EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
+        EJson.fromExt[Fix[EJson]].apply(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(Free.roll(Constant(value))))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
+          RootR.embed,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value))).embed))))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -137,7 +137,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(QCT.inj(Map(
               Free.roll(DET.inj(Const[DeadEnd, FreeQS](Root))),
               ProjectFieldR(HoleF, StrLit("city"))))),
-            Free.roll(ZipMapKeys(HoleF)),
+            HoleF,
+            IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
@@ -158,22 +159,23 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           RootR,
           QC.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("city")),
+            ExcludeId,
             ProjectFieldR(Free.point(RightSide), StrLit("name"))))))
     }
 
     "fold a constant doubly-nested array value" in {
       val value: Fix[EJson] =
-        ejson.EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
+        EJson.fromExt[Fix[EJson]].apply(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(Free.roll(MakeArray(Free.roll(Constant(value))))))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
+          RootR.embed,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Arr(List(value)))))).embed))))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -189,7 +191,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(DET.inj(Const(Root))),
             Free.roll(QCT.inj(LeftShift(
               Free.point(SrcHole),
-              Free.roll(ZipMapKeys(HoleF)),
+              HoleF,
+              IncludeId,
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
                 Free.roll(MakeArray(Free.point(RightSide)))))))),
@@ -212,10 +215,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         equal(
           QC.inj(LeftShift(
             RootR.embed,
-            Free.roll(ZipMapKeys(HoleF)),
+            HoleF,
+            IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(Constant(
-                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))),
+                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)),
               Free.roll(MakeArray(
                 Free.roll(ConcatArrays(
                   Free.roll(MakeArray(
@@ -223,19 +227,19 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                       Free.roll(MakeArray(Free.point(LeftSide))),
                       Free.roll(MakeArray(Free.point(RightSide))))))),
                   Free.roll(Constant(
-                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Str[Fix[ejson.EJson]]("name"))))))))))))))).embed)
+                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))))))).embed)
     }
 
     "fold nested boolean values" in {
       val falseBool: Fix[EJson] =
-        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](false))
+        EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[EJson]](false))
 
       val trueBool: Fix[EJson] =
-        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](true))
+        EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[EJson]](true))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(MakeArray(
             // !false && (false || !true)
             Free.roll(And(
@@ -246,11 +250,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
-          RootR,
+          RootR.embed,
           Free.roll(Constant(
-            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
+            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[ejson.EJson]](false))))).embed))))
 
-      normalizeFExpr(exp) must equal(expected.embed)
+      normalizeFExpr(exp.embed) must equal(expected.embed)
     }
 
     "simplify a ThetaJoin" in {

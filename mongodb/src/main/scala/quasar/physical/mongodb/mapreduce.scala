@@ -17,8 +17,8 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.common.SortDir
 import quasar.javascript._
-import quasar.qscript._
 
 import com.mongodb.client.model.MapReduceAction
 import monocle.macros.GenLens
@@ -151,11 +151,6 @@ object MapReduce {
 
   val _map       = GenLens[MapReduce](_.map)
   val _reduce    = GenLens[MapReduce](_.reduce)
-  val _selection = GenLens[MapReduce](_.selection)
-  val _inputSort = GenLens[MapReduce](_.inputSort)
-  val _limit     = GenLens[MapReduce](_.limit)
   val _finalizer = GenLens[MapReduce](_.finalizer)
   val _scope     = GenLens[MapReduce](_.scope)
-  val _jsMode    = GenLens[MapReduce](_.jsMode)
-  val _verbose   = GenLens[MapReduce](_.verbose)
 }

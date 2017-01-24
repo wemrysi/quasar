@@ -16,18 +16,20 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef.{ Eq => _, _ }
+import quasar.Predef.{Eq => _, _}
 import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}
-import quasar.Data
-import quasar.qscript._
+import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
+import quasar.{Data, DataCodec}
 import quasar.Planner._
 import quasar.fp.ski._
+import quasar.qscript._, MapFuncs._
+import quasar.std.{DateLib, StringLib}
 
+import java.time._, ZoneOffset.UTC
 import scala.math
 
-import org.threeten.bp._
-import matryoshka.{Hole => _, _}, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
@@ -35,7 +37,7 @@ object CoreMap extends Serializable {
   private val undefined = Data.NA
 
   // TODO: replace Data.NA with something safer
-  def change[T[_[_]] : Recursive]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
+  def change[T[_[_]]: RecursiveT]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
     case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
     case Undefined() => κ[Data, Data](Data.NA).right // TODO compback to this one, needs reviewv
 
@@ -61,6 +63,12 @@ object CoreMap extends Serializable {
       case Data.Str(v) => DateLib.parseInterval(v).getOrElse(undefined)
       case _ => undefined
     }).right
+    case StartOfDay(f) => (f >>> {
+      case d @ Data.Timestamp(_) => temporalTrunc(TemporalPart.Day, d).fold(κ(undefined), ι)
+      case Data.Date(v)          => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
+      case _ => undefined
+    }).right
+    case TemporalTrunc(p, f) => (f >>> (d => temporalTrunc(p, d).fold(κ(undefined), ι))).right
     case TimeOfDay(f) => (f >>> {
       case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
       case _ => undefined
@@ -295,33 +303,11 @@ object CoreMap extends Serializable {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case DupMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj(ListMap(m.keys.toList.fproduct(Data.Str(_)): _*))
-      case _ => undefined
-    }).right
-    case DupArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.indices.map(Data.Int(_)).toList)
-      case _ => undefined
-    }).right
-    case ZipMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj {
-        m.map{
-          case (k, v) => (k, Data.Arr(List(Data.Str(k), v)))
-        }
-      }
-      case _ => undefined
-    }).right
-    case ZipArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.zipWithIndex.map {
-        case (e, i) => Data.Arr(List(Data.Int(i), e))
-      })
-      case _ => undefined
-    }).right
     case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2,ff3) => ((x:Data) => f2(x)).right
-    case _ => InternalError("not implemented").left
+    case _ => InternalError.fromMsg("not implemented").left
   }
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -391,6 +377,8 @@ object CoreMap extends Serializable {
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) < b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a < BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
@@ -406,6 +394,8 @@ object CoreMap extends Serializable {
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a <= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a <= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) <= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a <= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
@@ -421,6 +411,8 @@ object CoreMap extends Serializable {
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a > b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a > b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) > b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a > BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
@@ -436,6 +428,8 @@ object CoreMap extends Serializable {
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a >= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a >= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) >= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a >= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
@@ -472,16 +466,15 @@ object CoreMap extends Serializable {
     case _ => undefined
   }
 
-  // TODO reuse render from codec
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
     case d: Data.Str => d
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    case Data.Timestamp(v) => Data.Str(v.toString)
+    case Data.Timestamp(v) => Data.Str(v.atZone(UTC).format(DataCodec.dateTimeFormatter))
     case Data.Date(v) => Data.Str(v.toString)
-    case Data.Time(v) => Data.Str(v.toString)
+    case Data.Time(v) => Data.Str(v.format(DataCodec.timeFormatter))
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
@@ -489,6 +482,15 @@ object CoreMap extends Serializable {
   }
 
   private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
+
+  private def temporalTrunc(part: TemporalPart, src: Data): PlannerError \/ Data =
+    (src match {
+      case d @ Data.Date(_)      => DateLib.truncDate(part, d)
+      case t @ Data.Time(_)      => DateLib.truncTime(part, t)
+      case t @ Data.Timestamp(_) => DateLib.truncTimestamp(part, t)
+      case _ =>
+        undefined.right
+    }).leftMap(e => InternalError.fromMsg(e.shows))
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {

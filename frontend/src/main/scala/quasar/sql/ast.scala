@@ -86,7 +86,7 @@ object Sql {
                     case OrderBy(keys) =>
                       val nt = "OrderBy" :: astType
                       NonTerminal(nt, None,
-                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil)})
+                        keys.map { case (t, x) => NonTerminal("OrderType" :: nt, Some(t.shows), ra.render(x) :: Nil) }.toList)
                   } ::
                   Nil).foldMap(_.toList))
 
@@ -168,9 +168,6 @@ object Sql {
       }
     }
   }
-
-  implicit def toExprAlgebraOps[A](a: Algebra[Sql, A]): AlgebraOps[Sql, A] =
-    toAlgebraOps[Sql, A](a)
 }
 
 @Lenses final case class Select[A] private[sql] (
@@ -237,7 +234,7 @@ object GroupBy {
     }
 }
 
-@Lenses final case class OrderBy[A](keys: List[(OrderType, A)])
+@Lenses final case class OrderBy[A](keys: NonEmptyList[(OrderType, A)])
 object OrderBy {
   implicit val equal: Delay[Equal, OrderBy] =
     new Delay[Equal, OrderBy] {
@@ -263,4 +260,12 @@ object Proj {
         }
       }
     }
+
+  implicit val traverse1: Traverse1[Proj] = new Traverse1[Proj] {
+    def foldMapRight1[A, B](fa: Proj[A])(z: (A) ⇒ B)(f: (A, ⇒ B) ⇒ B): B =
+      z(fa.expr)
+
+    def traverse1Impl[G[_]: Apply, A, B](fa: Proj[A])(f: (A) ⇒ G[B]) =
+      f(fa.expr).map(Proj(_, fa.alias))
+  }
 }
