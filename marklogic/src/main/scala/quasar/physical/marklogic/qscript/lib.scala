@@ -316,22 +316,27 @@ object lib {
         $("bucket")   as ST("function(item()*) as item()"),
         $("seq")      as ST("item()*")
       ).as(ST("item()*")) { (initial: XQuery, combine: XQuery, finalize: XQuery, bucket: XQuery, xs: XQuery) =>
-        val (m, x, k, v, o) = ($("m"), $("x"), $("k"), $("v"), $("_"))
+        val (m, n, b, x, k, v, o) = ($("m"), $("n"), $("b"), $("x"), $("k"), $("v"), $("_"))
 
         let_(
           m := map.map(),
+          n := map.map(),
           o := for_(
                  x in xs)
                .let_(
-                 k := asKey(bucket fnapply ~x),
+                 b := bucket fnapply ~x,
+                 k := asKey(~b),
                  v := if_(map.contains(~m, ~k))
                       .then_(combine fnapply (map.get(~m, ~k), ~x))
                       .else_(initial fnapply (~x)),
-                 o := map.put(~m, ~k, ~v))
+                 o := map.put(~m, ~k, ~v),
+                 o := if_(map.contains(~n, ~k))
+                      .then_(emptySeq)
+                      .else_(map.put(~n, ~k, ~b)))
                .return_(emptySeq))
         .return_ {
-          for_ (k in map.keys(~m)) .return_ {
-            finalize fnapply (map.get(~m, ~k))
+          for_ (k in map.keys(~n)) .return_ {
+            finalize fnapply (mkSeq_(map.get(~n, ~k), map.get(~m, ~k)))
           }
         }
       })
