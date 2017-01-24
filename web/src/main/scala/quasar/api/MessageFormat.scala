@@ -206,8 +206,7 @@ object MessageFormat {
   @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
     val disposition = mediaType.extensions.get("disposition").flatMap(str =>
-      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption.map(cd =>
-        `Content-Disposition`(cd.dispositionType, cd.parameters)))
+      HttpHeaderParser.CONTENT_DISPOSITION(str).toOption)
     if (mediaType satisfies Csv.mediaType) {
       def toChar(str: String): Option[Char] = str.toList match {
         case c :: Nil => Some(c)
