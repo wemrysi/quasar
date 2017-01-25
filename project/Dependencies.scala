@@ -1,6 +1,6 @@
 package quasar.project
 
-import scala.Option
+import scala.{Option, Boolean}
 import java.lang.System
 import scala.collection.Seq
 
@@ -18,7 +18,6 @@ object Dependencies {
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.3.2"
-  private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
@@ -29,9 +28,6 @@ object Dependencies {
   private val scalacheckVersion = "1.12.5"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
-  private val buildSparkCore = Option(System.getProperty("buildSparkCore")).getOrElse("no")
-  private val quasar4Spark = Option(System.getProperty("quasar4Spark")).getOrElse("no")
-
   def foundation = Seq(
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
@@ -41,7 +37,7 @@ object Dependencies {
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.16.1",
+    "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,
@@ -77,42 +73,39 @@ object Dependencies {
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )
 
-  def nettyDepType = if(quasar4Spark == "yes") "provided" else "compile"
-
-  def mongodb = Seq(
-    "org.mongodb" % "mongodb-driver-async" %   "3.4.1",
-    "io.netty"    % "netty-buffer"         % nettyVersion % nettyDepType,
-    "io.netty"    % "netty-handler"        % nettyVersion % nettyDepType
-  )
+  def mongodb = {
+    val nettyVersion = "4.0.29.Final" // This version is set to be the same as Spark
+                                      // to avoid problems in web and it where their classpaths get merged
+                                      // In any case, it should be binary compatible with version 4.0.26 that this
+                                      // mongo release is expecting
+    Seq(
+      "org.mongodb" % "mongodb-driver-async" %   "3.3.0", // Intentionnally not upgrading to the latest 3.4.1 in order
+                                                          // to make integration easier with Spark as the latest version
+                                                          // depends on netty 4.1.x
+      // These are optional dependencies of the mongo asynchronous driver.
+      // They are needed to connect to mongodb vis SSL which we do under certain configurations
+      "io.netty"    % "netty-buffer"         % nettyVersion,
+      "io.netty"    % "netty-handler"        % nettyVersion
+    )
+  }
 
   val postgresql = Seq(
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
-  def buildSparkScope = if(buildSparkCore == "yes") "provided" else "compile"
-
-  val sparkDepCore = ("org.apache.spark" %% "spark-core" % "2.0.1")
-    .exclude("aopalliance", "aopalliance")
-    .exclude("javax.inject", "javax.inject")
-    .exclude("commons-collections", "commons-collections")
-    .exclude("commons-beanutils", "commons-beanutils-core")
-    .exclude("commons-logging", "commons-logging")
-    .exclude("commons-logging", "commons-logging")
-    .exclude("com.esotericsoftware.minlog", "minlog")
-    .exclude("org.spark-project.spark", "unused")
-    .exclude("org.scalatest", "scalatest_2.11")
-
-  val sparkDep =
-    if(quasar4Spark == "yes")
-      sparkDepCore % buildSparkScope
-    else
-      sparkDepCore
-        .exclude("io.netty", "netty-all")
-        .exclude("io.netty", "netty")
-        .excludeAll(ExclusionRule(organization = "javax.servlet")) % buildSparkScope
-
-  def sparkcore = Seq(sparkDep)
+  def sparkcore(sparkProvided: Boolean) = Seq(
+    ("org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile"))
+      .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
+      .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
+      .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
+      .exclude("commons-beanutils", "commons-beanutils-core") // we need to exclude this stuff so that we can
+      .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
+      .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
+      .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
+      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
+      .exclude("org.scalatest", "scalatest_2.11")
+  )
 
   def marklogicValidation = Seq(
     "eu.timepit" %% "refined"     % refinedVersion,
