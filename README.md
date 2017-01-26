@@ -65,24 +65,22 @@ allow you to run the integration tests offline as well as make the tests run as 
 In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
 instructions that can be found there.
 
-Once we have a MongoDB instance handy, we need to set a few
-environment variables in order to inform Quasar about where to find the backends required in order to run the integration tests.
+Once we have a MongoDB instance handy, we need to configure the integration tests
+in order to inform Quasar about where to find the backends to test.
 
-Set the following environment variables:
+Simply change the values of the config values in '/it/testing.conf'. For example:
 
-For bash this would like such,
-
-```bash
-export QUASAR_MONGODB_3_2="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-export QUASAR_MONGODB_3_0="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-export QUASAR_MONGODB_2_6="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
+```
+mongodb_3_2="mongodb://<mongoURL>"
+mongodb_3_0="mongodb://<mongoURL>"
+mongodb_2_6="mongodb://<mongoURL>"
 ```
 
-where \`mongoURL\` is the url at which one can find a Mongo database. For example \`mongoURL\` would probably look
+where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
 something like `localhost:27017` for a local installation. This means the integration tests will be run against
 both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
 tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported versions of MongoDB, as well as read-only configurations.
+server, the tests are run against all supported filesystems.
 
 #### REPL JAR
 
