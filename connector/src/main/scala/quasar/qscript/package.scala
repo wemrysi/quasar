@@ -56,13 +56,18 @@ package object qscript {
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
+    *
+    * NB: We're using the "alias" method of building the coproduct here as it
+    *     provides a modest reduction in compilation time (~15%) for this module.
     */
-  type QScriptTotal[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
-      ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
-      Const[ShiftedRead[APath], ?] :\: Const[ShiftedRead[AFile], ?] :\:
-      Const[Read[APath], ?] :\: Const[Read[AFile], ?] :/:
-      Const[DeadEnd, ?])#M[A]
+  type QScriptTotal[T[_[_]], A]  = Coproduct[QScriptCore[T, ?]           , QScriptTotal0[T, ?], A]
+  type QScriptTotal0[T[_[_]], A] = Coproduct[ProjectBucket[T, ?]         , QScriptTotal1[T, ?], A]
+  type QScriptTotal1[T[_[_]], A] = Coproduct[ThetaJoin[T, ?]             , QScriptTotal2[T, ?], A]
+  type QScriptTotal2[T[_[_]], A] = Coproduct[EquiJoin[T, ?]              , QScriptTotal3[T, ?], A]
+  type QScriptTotal3[T[_[_]], A] = Coproduct[Const[ShiftedRead[APath], ?], QScriptTotal4[T, ?], A]
+  type QScriptTotal4[T[_[_]], A] = Coproduct[Const[ShiftedRead[AFile], ?], QScriptTotal5[T, ?], A]
+  type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[APath], ?]       , QScriptTotal6[T, ?], A]
+  type QScriptTotal6[T[_[_]], A] = Coproduct[Const[Read[AFile], ?]       , Const[DeadEnd, ?]  , A]
 
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
