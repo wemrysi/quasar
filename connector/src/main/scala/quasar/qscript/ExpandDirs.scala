@@ -28,6 +28,7 @@ import quasar.qscript.MapFuncs._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns.CoEnv
 import pathy.Path.{dir1, file1, refineType}
 import scalaz._, Scalaz._
 
@@ -54,61 +55,15 @@ object ExpandDirs extends ExpandDirsInstances {
 }
 
 abstract class ExpandDirsInstances {
-  def applyToBranch[T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr]
-    (listContents: DiscoverPath.ListContents[M], branch: FreeQS[T])
-      : M[FreeQS[T]] =
-    branch.transCataM(liftCoM(
-      ExpandDirs[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].expandDirs(
-        coenvPrism[QScriptTotal[T, ?], Hole].reverseGet,
-        listContents)
-    )) ∘ (_.convertTo[FreeQS[T]])
+  def expandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor](
+    implicit
+    FI: Injectable.Aux[O, QScriptTotal[T, ?]],
+    QC: QScriptCore[T, ?] :<: O
+  ): ExpandDirsPath[T, O] =
+    new ExpandDirsPath[T, O]
 
-  def union[T[_[_]]: BirecursiveT, OUT[_]: Functor]
-    (elems: NonEmptyList[OUT[T[OUT]]])
-    (implicit
-      QC: QScriptCore[T, ?] :<: OUT,
-      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
-      : OUT[T[OUT]] =
-    elems.foldRight1(
-      (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[OUT]]()).embed,
-        elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
-        acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))))
-
-  def wrapDir[T[_[_]]: CorecursiveT, OUT[_]: Functor]
-    (name: String, d: OUT[T[OUT]])
-    (implicit QC: QScriptCore[T, ?] :<: OUT)
-      : OUT[T[OUT]] =
-    QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
-
-  def allDescendents[T[_[_]]: CorecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
-    (listContents: DiscoverPath.ListContents[M], wrapFile: AFile => OUT[T[OUT]])
-    (implicit QC: QScriptCore[T, ?] :<: OUT)
-      : ADir => M[List[OUT[T[OUT]]]] =
-    dir => (listContents(dir) >>=
-      (ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
-        d => allDescendents[T, M, OUT](listContents, wrapFile).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir(f.value, wrapFile(dir </> file1(f)))).point[M]))))
-      .handleError(κ(List.empty[OUT[T[OUT]]].point[M]))
-
-  def unionDirs[T[_[_]]: CorecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor]
-    (g: DiscoverPath.ListContents[M], wrapFile: AFile => OUT[T[OUT]])
-    (implicit QC: QScriptCore[T, ?] :<: OUT)
-      : ADir => M[Option[NonEmptyList[OUT[T[OUT]]]]] =
-    allDescendents[T, M, OUT](g, wrapFile).apply(_) ∘ {
-      case Nil    => None
-      case h :: t => NonEmptyList.nel(h, t.toIList).some
-    }
-
-  def unionAll
-    [T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr, OUT[_]: Functor, F[_]: Functor]
-    (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M], wrapFile: AFile => OUT[T[OUT]])
-    (implicit
-      QC: QScriptCore[T, ?] :<: OUT,
-      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
-      : ADir => M[F[T[F]]] =
-    dir => unionDirs[T, M, OUT](g, wrapFile).apply(dir) >>= (_.fold[M[F[T[F]]]](
-      MonadError_[M, FileSystemError].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(List(dir)))))(
-      nel => OutToF(union(nel) ∘ (_.transAna[T[F]](OutToF))).point[M]))
+  def expandDirsBranch[T[_[_]]: BirecursiveT]: ExpandDirsBranch[T] =
+    new ExpandDirsBranch[T]
 
   // real instances
 
@@ -118,19 +73,7 @@ abstract class ExpandDirsInstances {
       QC:    QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[Read[APath], ?], F] =
-    new ExpandDirs[Const[Read[APath], ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def wrapRead[F[_]](file: AFile) =
-        R.inj(Const[Read[AFile], T[F]](Read(file)))
-
-      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        r => refineType(r.getConst.path).fold(
-          unionAll(OutToF, g, wrapRead[OUT]),
-          file => OutToF(wrapRead[F](file)).point[M])
-    }
+    expandDirsPath[T, F].readPath
 
   implicit def shiftedReadPath[T[_[_]]: BirecursiveT, F[_]: Functor]
     (implicit
@@ -138,68 +81,21 @@ abstract class ExpandDirsInstances {
       QC:            QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : ExpandDirs.Aux[T, Const[ShiftedRead[APath], ?], F] =
-    new ExpandDirs[Const[ShiftedRead[APath], ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def wrapRead[F[_]](file: AFile, idStatus: IdStatus) =
-        SR.inj(Const[ShiftedRead[AFile], T[F]](ShiftedRead(file, idStatus)))
-
-      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        r => refineType(r.getConst.path).fold(
-          unionAll(OutToF, g, wrapRead[OUT](_, r.getConst.idStatus)),
-          file => (OutToF(wrapRead[F](file, r.getConst.idStatus)).point[M]))
-    }
+    expandDirsPath[T, F].shiftedReadPath
 
   // branch handling
 
   implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](implicit QC: QScriptCore[T, ?] :<: F)
       : ExpandDirs.Aux[T, QScriptCore[T, ?], F] =
-    new ExpandDirs[QScriptCore[T, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        fa => (fa match {
-          case Union(src, lb, rb) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Union(src, _, _))
-          case Subset(src, lb, o, rb) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Subset(src, _, o, _))
-          case x => x.point[M]
-        }) ∘ (OutToF.compose(QC))
-    }
+    expandDirsBranch[T].qscriptCore[F]
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F)
       : ExpandDirs.Aux[T, ThetaJoin[T, ?], F] =
-    new ExpandDirs[ThetaJoin[T, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        fa => (fa match {
-          case ThetaJoin(src, lb, rb, on, jType, combine) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
-              ThetaJoin(src, _, _, on, jType, combine))
-        }) ∘ (OutToF.compose(TJ))
-    }
+    expandDirsBranch[T].thetaJoin[F]
 
   implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](implicit EJ: EquiJoin[T, ?] :<: F)
       : ExpandDirs.Aux[T, EquiJoin[T, ?], F] =
-    new ExpandDirs[EquiJoin[T, ?]] {
-      type IT[F[_]] = T[F]
-      type OUT[A] = F[A]
-
-      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
-        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
-        fa => (fa match {
-          case EquiJoin(src, lb, rb, lk, rk, jType, combine) =>
-            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
-              EquiJoin(src, _, _, lk, rk, jType, combine))
-        }) ∘ (OutToF.compose(EJ))
-    }
+    expandDirsBranch[T].equiJoin[F]
 
   implicit def coproduct[T[_[_]], F[_], G[_], H[_]]
     (implicit F: ExpandDirs.Aux[T, F, H], G: ExpandDirs.Aux[T, G, H])
@@ -241,4 +137,134 @@ abstract class ExpandDirsInstances {
     (implicit PB: ProjectBucket[T, ?] :<: F)
       : ExpandDirs.Aux[T, ProjectBucket[T, ?], F] =
     default
+}
+
+private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor](
+  implicit FI: Injectable.Aux[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<: O
+) extends TTypes[T] {
+  def union(elems: NonEmptyList[O[T[O]]]): O[T[O]] =
+    elems.foldRight1(
+      (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[O]]()).embed,
+        elem.embed.cata[Free[QScriptTotal, Hole]](g => Free.roll(FI.inject(g))),
+        acc.embed.cata[Free[QScriptTotal, Hole]](g => Free.roll(FI.inject(g))))))
+
+  def wrapDir(name: String, d: O[T[O]]): O[T[O]] =
+    QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
+
+  def allDescendents[M[_]: Monad: MonadFsErr]
+    (listContents: DiscoverPath.ListContents[M], wrapFile: AFile => O[T[O]])
+      : ADir => M[List[O[T[O]]]] =
+    dir => (listContents(dir) >>=
+      (ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
+        d => allDescendents[M](listContents, wrapFile).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
+        f => List(wrapDir(f.value, wrapFile(dir </> file1(f)))).point[M]))))
+      .handleError(κ(List.empty[O[T[O]]].point[M]))
+
+  def unionDirs[M[_]: Monad: MonadFsErr]
+    (g: DiscoverPath.ListContents[M], wrapFile: AFile => O[T[O]])
+      : ADir => M[Option[NonEmptyList[O[T[O]]]]] =
+    allDescendents[M](g, wrapFile).apply(_) ∘ {
+      case Nil    => None
+      case h :: t => NonEmptyList.nel(h, t.toIList).some
+    }
+
+  def unionAll[M[_]: Monad: MonadFsErr, F[_]: Functor]
+    (OutToF: O ~> F, g: DiscoverPath.ListContents[M], wrapFile: AFile => O[T[O]])
+      : ADir => M[F[T[F]]] =
+    dir => unionDirs[M](g, wrapFile).apply(dir) >>= (_.fold[M[F[T[F]]]](
+      MonadError_[M, FileSystemError].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(List(dir)))))(
+      nel => OutToF(union(nel) ∘ (_.transAna[T[F]](OutToF))).point[M]))
+
+
+  def readPath(implicit R: Const[Read[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[Read[APath], ?], O] =
+    new ExpandDirs[Const[Read[APath], ?]] {
+      type IT[F[_]] = T[F]
+      type OUT[A] = O[A]
+
+      def wrapRead[F[_]](file: AFile) =
+        R.inj(Const[Read[AFile], T[F]](Read(file)))
+
+      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
+        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
+        r => refineType(r.getConst.path).fold(
+          unionAll(OutToF, g, wrapRead[OUT]),
+          file => OutToF(wrapRead[F](file)).point[M])
+    }
+
+  def shiftedReadPath(implicit SR: Const[ShiftedRead[AFile], ?] :<: O): ExpandDirs.Aux[T, Const[ShiftedRead[APath], ?], O] =
+    new ExpandDirs[Const[ShiftedRead[APath], ?]] {
+      type IT[F[_]] = T[F]
+      type OUT[A] = O[A]
+
+      def wrapRead[F[_]](file: AFile, idStatus: IdStatus) =
+        SR.inj(Const[ShiftedRead[AFile], T[F]](ShiftedRead(file, idStatus)))
+
+      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
+        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
+        r => refineType(r.getConst.path).fold(
+          unionAll(OutToF, g, wrapRead[OUT](_, r.getConst.idStatus)),
+          file => (OutToF(wrapRead[F](file, r.getConst.idStatus)).point[M]))
+    }
+}
+
+private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTypes[T] {
+  private def ExpandDirsTotal = ExpandDirs[T, QScriptTotal, QScriptTotal]
+
+  def applyToBranch[M[_]: Monad: MonadFsErr]
+    (listContents: DiscoverPath.ListContents[M], branch: FreeQS)
+      : M[FreeQS] =
+    branch.transCataM[M, T[CoEnv[Hole, QScriptTotal, ?]], CoEnv[Hole, QScriptTotal, ?]](
+      liftCoM[T, M, QScriptTotal, Hole](
+        ExpandDirsTotal.expandDirs(
+          coenvPrism[QScriptTotal, Hole].reverseGet,
+          listContents))
+    ) ∘ (_.convertTo[FreeQS])
+
+
+  def qscriptCore[O[_]](implicit QC: QScriptCore :<: O)
+      : ExpandDirs.Aux[T, QScriptCore, O] =
+    new ExpandDirs[QScriptCore] {
+      type IT[F[_]] = T[F]
+      type OUT[A] = O[A]
+
+      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
+        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
+        fa => (fa match {
+          case Union(src, lb, rb) =>
+            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Union(src, _, _))
+          case Subset(src, lb, o, rb) =>
+            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(Subset(src, _, o, _))
+          case x => x.point[M]
+        }) ∘ (OutToF.compose(QC))
+    }
+
+  def thetaJoin[O[_]](implicit TJ: ThetaJoin :<: O)
+      : ExpandDirs.Aux[T, ThetaJoin, O] =
+    new ExpandDirs[ThetaJoin] {
+      type IT[F[_]] = T[F]
+      type OUT[A] = O[A]
+
+      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
+        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
+        fa => (fa match {
+          case ThetaJoin(src, lb, rb, on, jType, combine) =>
+            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
+              ThetaJoin(src, _, _, on, jType, combine))
+        }) ∘ (OutToF.compose(TJ))
+    }
+
+  def equiJoin[O[_]](implicit EJ: EquiJoin :<: O)
+      : ExpandDirs.Aux[T, EquiJoin, O] =
+    new ExpandDirs[EquiJoin] {
+      type IT[F[_]] = T[F]
+      type OUT[A] = O[A]
+
+      def expandDirs[M[_]: Monad: MonadFsErr, F[_]: Functor]
+        (OutToF: OUT ~> F, g: DiscoverPath.ListContents[M]) =
+        fa => (fa match {
+          case EquiJoin(src, lb, rb, lk, rk, jType, combine) =>
+            (applyToBranch(g, lb) ⊛ applyToBranch(g, rb))(
+              EquiJoin(src, _, _, lk, rk, jType, combine))
+        }) ∘ (OutToF.compose(EJ))
+    }
 }

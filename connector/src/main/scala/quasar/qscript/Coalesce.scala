@@ -79,7 +79,7 @@ trait CoalesceInstances {
   implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
     (implicit EJ: EquiJoin[T, ?] :<: G)
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
-    coalesce[T].equiJoin
+    coalesce[T].equiJoin[G]
 
   implicit def coproduct[T[_[_]], F[_], G[_], H[_]]
     (implicit F: Coalesce.Aux[T, F, H], G: Coalesce.Aux[T, G, H])
