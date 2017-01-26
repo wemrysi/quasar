@@ -23,6 +23,7 @@ QUASAR_MONGODB_HOST_2_6="localhost:27018"
 QUASAR_MONGODB_HOST_3_0="localhost:27019"
 QUASAR_MONGODB_HOST_3_2="localhost:27020"
 
+TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
 
 # Enables running tests for a single mongo release by specifying an argument of
@@ -56,7 +57,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean coverage connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean coverage connector/test:compile
   else
     "$SBT" clean
   fi
@@ -80,7 +81,7 @@ else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} connector/test:compile
   fi
 
   # Not the first job in Travis; run only integration tests (no sense
