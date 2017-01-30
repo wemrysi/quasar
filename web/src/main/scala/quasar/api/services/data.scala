@@ -199,21 +199,21 @@ object data {
           // Seperate metadata file from all others
           tuple <- filesToContent.get(ArchiveMetadata.HiddenFile).cata(
             meta => decodeUtf8(meta).strengthR(filesToContent - ArchiveMetadata.HiddenFile),
-            EitherT.left[FreeS, QResponse[S], (String, Map[AbsFile[Sandboxed], ByteVector])](InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S].point[FreeS]))
+            EitherT.left[FreeS, QResponse[S], (String, Map[RelFile[Sandboxed], ByteVector])](InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S].point[FreeS]))
           (metaString, restOfFilesToContent) = tuple
            meta <- EitherT((Parse.decodeOption[ArchiveMetadata](metaString) \/> (InvalidMessageBodyFailure("metadata file has incorrect format").toResponse[S])).point[FreeS])
           // Write each file if we can determine a format
-          _     <- restOfFilesToContent.toList.traverse { case (aFile, contentBytes) =>
+          _     <- restOfFilesToContent.toList.traverse { case (rFile, contentBytes) =>
             for {
               // What's the metadata for this file
-              fileMetadata  <- EitherT((meta.files.get(aFile) \/> InvalidMessageBodyFailure(s"metadata file does not contain metadata for ${posixCodec.printPath(aFile)}").toResponse[S]).point[FreeS])
+              fileMetadata  <- EitherT((meta.files.get(rFile) \/> InvalidMessageBodyFailure(s"metadata file does not contain metadata for ${posixCodec.printPath(rFile)}").toResponse[S]).point[FreeS])
               mdType        =  fileMetadata.contentType.mediaType
               // Do we have a quasar format that corresponds to the content-type in the metadata
-              fmt           <- EitherT((MessageFormat.fromMediaType(mdType) \/> (InvalidMessageBodyFailure(s"Unsupported media type: $mdType for file: ${posixCodec.printPath(aFile)}").toResponse[S])).point[FreeS])
+              fmt           <- EitherT((MessageFormat.fromMediaType(mdType) \/> (InvalidMessageBodyFailure(s"Unsupported media type: $mdType for file: ${posixCodec.printPath(rFile)}").toResponse[S])).point[FreeS])
               // Transform content from bytes to a String
               content       <- decodeUtf8(contentBytes)
               // Write a single file with the specified format
-              _             <- writeOne(rebaseA(aDir)(aFile), fmt, Process.emit(content))
+              _             <- writeOne(aDir </> rFile, fmt, Process.emit(content))
             } yield ()
           }
         } yield (),
@@ -235,11 +235,14 @@ object data {
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S]
   ): Process[R.M, ByteVector] =
-    Process.await(Q.descendantFiles(dir)) { files =>
-      Zip.zipFiles(files.toList map { file =>
+    Process.await(Q.descendantFiles(dir)) { quasarFiles =>
+      val metadata = ArchiveMetadata(quasarFiles.toList.strengthR(FileMetadata(`Content-Type`(format.mediaType))).toMap)
+      val metaFileAndContent = (ArchiveMetadata.HiddenFile, Process.emit(metadata.asJson.spaces2))
+      val qFilesAndContent = quasarFiles.toList.map { file =>
         val data = R.scan(dir </> file, offset, limit)
-        val bytes = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
-        (rootDir </> file, bytes)
-      })
+        (file, format.encode(data))
+      }
+      val allFiles = metaFileAndContent :: qFilesAndContent
+      Zip.zipFiles(allFiles.toMap.mapValues(strContent => strContent.map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))))
     }
 }

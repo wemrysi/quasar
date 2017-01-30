@@ -18,7 +18,7 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.fp.ski._
-import quasar.contrib.pathy.sandboxAbs
+import quasar.contrib.pathy.sandboxCurrent
 
 import java.util.{zip => jzip}
 
@@ -76,15 +76,15 @@ object Zip {
     }.point[F]
   }
 
-  def zipFiles[F[_]: Monad](files: List[(AbsFile[Sandboxed], Process[F, ByteVector])]): Process[F, ByteVector] = {
+  def zipFiles[F[_]: Monad](files: Map[RelFile[Sandboxed], Process[F, ByteVector]]): Process[F, ByteVector] = {
     val ops: Process[F, Op] = {
-      def fileOps(file: AbsFile[Sandboxed], bytes: Process[F, ByteVector]) =
+      def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) =
         Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file)))) ++
           bytes.map(Op.Chunk(_)) ++
           Process.emit(Op.EndEntry)
 
       Process.emit(Op.Start) ++
-        Process.emitAll(files).flatMap((fileOps _).tupled) ++
+        Process.emitAll(files.toList).flatMap((fileOps _).tupled) ++
         Process.emit(Op.End)
     }
 
@@ -110,7 +110,7 @@ object Zip {
     }
   }
 
-  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, Map[AbsFile[Sandboxed], ByteVector]] = {
+  def unzipFiles(zippedBytes: Process[Task, ByteVector]): EitherT[Task, String, Map[RelFile[Sandboxed], ByteVector]] = {
     def entry(zis: jzip.ZipInputStream): OptionT[Task, (String, ByteVector)] =
       for {
         entry <- OptionT(Task.delay(Option(zis.getNextEntry())))
@@ -133,10 +133,10 @@ object Zip {
     def entries(zis: jzip.ZipInputStream): Process[Task, (String, ByteVector)] =
       Process.unfoldEval(zis)(z => entry(z).strengthR(z).run)
 
-    def toPath(name: String): Task[AbsFile[Sandboxed]] =
-      posixCodec.parseAbsFile(name).cata(
-        p => Task.now(sandboxAbs(p)),
-        Task.fail(new RuntimeException("absolute file path expected; found: $name")))
+    def toPath(pathString: String): Task[RelFile[Sandboxed]] =
+      posixCodec.parseRelFile(pathString).flatMap(sandboxCurrent).cata(
+        p => Task.now(p),
+        Task.fail(new RuntimeException(s"relative file path expected; found: $pathString")))
 
     val is = io.toInputStream(zippedBytes)
     EitherT((for {

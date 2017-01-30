@@ -17,7 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.contrib.pathy.{AFile, sandboxAbs}
+import quasar.contrib.pathy.{RFile, sandboxCurrent}
 
 import argonaut._, Argonaut._
 import org.http4s.headers.`Content-Type`
@@ -46,19 +46,19 @@ object FileMetadata {
       })
 }
 
-final case class ArchiveMetadata(files: Map[AFile, FileMetadata])
+final case class ArchiveMetadata(files: Map[RFile, FileMetadata])
 
 object ArchiveMetadata {
-  val HiddenFile = rootDir </> file(".quasar-metadata.json")
+  val HiddenFile: RFile = currentDir </> file(".quasar-metadata.json")
 
   implicit val codecJson: CodecJson[ArchiveMetadata] =
     CodecJson.derived(
       EncodeJson.of[Map[String, FileMetadata]].contramap(
         _.files map { case (k, v) => posixCodec.printPath(k) -> v }),
       DecodeJson.of[Map[String, FileMetadata]].flatMap { (m: Map[String, FileMetadata]) =>
-        val m1: String \/ Map[AFile, FileMetadata] = (m.toList traverse { case (k, v) =>
-          posixCodec.parseAbsFile(k)
-            .cata(p => (sandboxAbs(p) -> v).right, s"expected absolute file path; found: $k".left) }).map(_.toMap)
+        val m1: String \/ Map[RFile, FileMetadata] = (m.toList traverse { case (k, v) =>
+          posixCodec.parseRelFile(k).flatMap(sandboxCurrent)
+            .cata(p => (p -> v).right, s"expected relative file path; found: $k".left) }).map(_.toMap)
         DecodeJson(cur => DecodeResult(m1.bimap(_ -> cur.history, ArchiveMetadata(_)).toEither))
       })
 }

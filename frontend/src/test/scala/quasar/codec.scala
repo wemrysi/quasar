@@ -24,7 +24,7 @@ import java.time._
 import scalaz._, Scalaz._
 
 class DataCodecSpecs extends quasar.Qspec {
-  import DataArbitrary._
+  import DataArbitrary._, RepresentableDataArbitrary._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }
   implicit val ShowStr = new Show[String] { override def show(v: String) = v }
@@ -35,16 +35,6 @@ class DataCodecSpecs extends quasar.Qspec {
 
   "Precise" should {
     implicit val codec = DataCodec.Precise
-
-    // Identify the sub-set of values can be represented in Precise JSON in
-    // such a way that the parser recovers the original type, which is
-    // effectively everything except integer values that don't fit into
-    // Long, which Argonaut does not allow us to distinguish from decimals.
-    def representable(data: Data) = data match {
-      case Data.Int(x)    => x.isValidLong
-      case Data.Set(_)    => false
-      case _              => true
-    }
 
     "render" should {
       // NB: these tests verify that all the formatting matches our documentation
@@ -79,11 +69,13 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode NA"        in { DataCodec.render(Data.NA) must beNone }
     }
 
-    "round-trip" >> prop { (data: Data) =>
-      representable(data) ==> {
+    // NB. We don't use `RepresentableData` because it does not generate ID and Binary which
+    // we want to test here
+    "round-trip" >> prop { data: Data =>
+      DataCodec.representable(data, codec) ==> {
         roundTrip(data) must beSome(data.right[DataEncodingError])
       }
-    }.flakyTest("with arg: Interval(PT-175468H-10M-0.6S). As far as I can tell, this is a problem with java.time.Instant which is not preserving the exact nature of the Instant object through calls to toString() and parse()")
+    }
 
     "parse" should {
       // These types get lost on the way through rendering and re-parsing:
@@ -111,21 +103,6 @@ class DataCodecSpecs extends quasar.Qspec {
 
   "Readable" should {
     implicit val codec = DataCodec.Readable
-
-    // Identify the sub-set of values can be represented in Readable JSON in
-    // such a way that the parser recovers the original type.
-    // NB: this does not account for Str values that will be confused with
-    // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
-    def representable(data: Data): Boolean = data match {
-      case Data.Int(x)     => x.isValidLong
-      case Data.Set(_)     => false
-      case Data.Binary(_)  => false
-      case Data.Id(_)      => false
-      case Data.NA         => false
-      case Data.Arr(value) => value.forall(representable)
-      case Data.Obj(value) => value.values.forall(representable)
-      case _               => true
-    }
 
     "render" should {
       // NB: these tests verify that all the formatting matches our documentation
@@ -157,11 +134,9 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode NA"        in { DataCodec.render(Data.NA) must beNone }
     }
 
-    "round-trip" >> prop { (data: Data) =>
-      representable(data) ==> {
-        roundTrip(data) must beSome(data.right[DataEncodingError])
-      }
-    }.flakyTest("with arg: Interval(PT-175468H-10M-0.6S). As far as I can tell, this is a problem with java.time.Instant which is not preserving the exact nature of the Instant object through calls to toString() and parse()")
+    "round-trip" >> prop { data: RepresentableData =>
+      roundTrip(data.data) must beSome(data.data.right[DataEncodingError])
+    }
 
     "parse" should {
       // These types get inferred whenever a string matches the expected format:

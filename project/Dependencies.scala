@@ -25,14 +25,14 @@ object Dependencies {
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slcVersion        = "0.4"
-  private val scalacheckVersion = "1.12.5"
+  private val scalacheckVersion = "1.12.6"
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
   def foundation = Seq(
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
-    "org.scalaz.stream"          %% "scalaz-stream"             %     "0.8.3a",
+    "org.scalaz.stream"          %% "scalaz-stream"             %     "0.8.6a",
     "com.github.julien-truffaut" %% "monocle-core"              %  monocleVersion,
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
@@ -63,7 +63,7 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
+    "com.github.tototoshi"       %% "scala-csv"      %    "1.3.4",
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
     "com.slamdata"               %% "pathy-argonaut" %  pathyVersion

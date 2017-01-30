@@ -18,6 +18,7 @@ package quasar.api
 
 import quasar.Data
 import quasar.Predef._
+import quasar.csv.CsvParser
 
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -72,7 +73,7 @@ class MessageFormatSpec extends quasar.Qspec {
           "rowDelimiter" -> ";",
           "quoteChar" -> "'",
           "escapeChar" -> "\\")))
-      fromAccept(Some(accept)) must_== Csv('\t', ";", '\'', '\\', None)
+      fromAccept(Some(accept)) must_== Csv(CsvParser.Format('\t', '\'', '\\', ";"), None)
     }
 
     "choose format with highest QValue" in {
@@ -134,7 +135,7 @@ class MessageFormatSpec extends quasar.Qspec {
         format = Csv.Default
       )
       "alternative delimiters" >> {
-        val alternative = Csv(columnDelimiter = '\t', rowDelimiter = ";", quoteChar = '\'', escapeChar = '\\', None)
+        val alternative = Csv(CsvParser.Format(delimiter = '\t', lineTerminator = ";", quoteChar = '\'', escapeChar = '\\'), None)
         test(
           data = simpleData,
           expectedEncoding = "a\tb\tc[0];1\t\t;\t2\t;\t\t3;",

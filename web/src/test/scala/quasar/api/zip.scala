@@ -20,7 +20,7 @@ import quasar.Predef._
 import scala.Predef.$conforms
 import quasar.fp.numeric._
 import quasar.fp.ski._
-import quasar.contrib.pathy.sandboxAbs
+import quasar.contrib.pathy.sandboxCurrent
 
 import org.scalacheck.Arbitrary
 
@@ -62,27 +62,25 @@ class ZipSpecs extends quasar.Qspec {
   def f4: Task[Process[Task, ByteVector]] =
     randBytes(1000).map(bs => Process.emit(ByteVector.view(bs)).repeat.take(1000))
 
-  def unzip[A](f: java.io.InputStream => A)(p: Process[Task, ByteVector]): Task[List[(AbsFile[Sandboxed], A)]] =
+  def unzip[A](f: java.io.InputStream => A)(p: Process[Task, ByteVector]): Task[Map[RelFile[Sandboxed], A]] =
     Task.delay {
       val bytes = p.runLog.unsafePerformSync.toList.concatenate  // FIXME: this means we can't use this to test anything big
       val is = new java.io.ByteArrayInputStream(bytes.toArray)
       val zis = new java.util.zip.ZipInputStream(is)
       Stream.continually(zis.getNextEntry).takeWhile(_ != null).map { entry =>
-        sandboxAbs(posixCodec.parseAbsFile(entry.getName).get) -> f(zis)
-      }.toList
+        sandboxCurrent(posixCodec.parseRelFile(entry.getName).get).get -> f(zis)
+      }.toMap
     }
 
   // For testing, capture all the bytes from a process, parse them with a
   // ZipInputStream, and capture just the size of the contents of each file.
-  def counts(p: Process[Task, ByteVector]): Task[List[(AbsFile[Sandboxed], Natural)]] = {
-    def count(is: java.io.InputStream): Natural = {
-      def loop(n: Natural): Natural = if (is.read ≟ -1) n else loop(n |+| 1L)
-      loop(0L)
-    }
+  def counts(p: Process[Task, ByteVector]): Task[Map[RelFile[Sandboxed], Int]] = {
+    def count(is: java.io.InputStream): Int =
+      Stream.continually(is.read).takeWhile(_ != -1).size
     unzip(count)(p)
   }
 
-  def bytes(p: Process[Task, ByteVector]): Task[List[(AbsFile[Sandboxed], ByteVector)]] = {
+  def bytes(p: Process[Task, ByteVector]): Task[Map[RelFile[Sandboxed], ByteVector]] = {
     def read(is: java.io.InputStream): ByteVector = {
       def loop(acc: ByteVector): ByteVector = {
         val buffer = new Array[Byte](16*1024)
@@ -94,24 +92,24 @@ class ZipSpecs extends quasar.Qspec {
     unzip(read)(p)
   }
 
-  def bytesMapping(filesAndSize: Map[AbsFile[Sandboxed], Positive])
-      : Task[Map[AbsFile[Sandboxed], Process[Task, ByteVector]]] = {
+  def bytesMapping(filesAndSize: Map[RelFile[Sandboxed], Positive])
+      : Task[Map[RelFile[Sandboxed], Process[Task, ByteVector]]] = {
     def byteStream(size: Positive): Task[Process[Task, ByteVector]] =
       randBytes(size.toInt).map(bytes => Process.emit(ByteVector.view(bytes)))
     filesAndSize.toList.traverse { case (k, v) => byteStream(v).strengthL(k) }.map(_.toMap)
   }
 
   "zipFiles" should {
-    "zip files of constant bytes" >> prop { (filesAndSize: Map[AbsFile[Sandboxed], Positive], byte: Byte) =>
+    "zip files of constant bytes" >> prop { (filesAndSize: Map[RelFile[Sandboxed], Positive], byte: Byte) =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
-      val z = zipFiles(filesAndBytes.toList)
-      counts(z).unsafePerformSync must_== filesAndSize.toList
+      val z = zipFiles(filesAndBytes)
+      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.get.toInt)
     }.set(minTestsOk = 10) // This test is relatively slow
 
-    "zip files of random bytes" >> prop { filesAndSize: Map[AbsFile[Sandboxed], Positive] =>
+    "zip files of random bytes" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
-      val z = zipFiles(filesAndBytes.toList)
-      counts(z).unsafePerformSync must_== filesAndSize.toList
+      val z = zipFiles(filesAndBytes)
+      counts(z).unsafePerformSync must_=== filesAndSize.mapValues(_.get.toInt)
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip many large files of random bytes (100 MB)" in {
@@ -120,8 +118,8 @@ class ZipSpecs extends quasar.Qspec {
       val MaxExpectedSize = 1000L*1000L
       val MinExpectedSize = MaxExpectedSize / 2
 
-      val paths = (0 until Files).toList.map(i => rootDir[Sandboxed] </> file("foo" + i))
-      val z = zipFiles(paths.map(_ -> f4.unsafePerformSync))
+      val paths = (0 until Files).toList.map(i => currentDir[Sandboxed] </> file("foo" + i))
+      val z = zipFiles(paths.strengthR(f4.unsafePerformSync).toMap)
 
       // NB: can't use my naive `list` function on a large file
       z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
@@ -134,24 +132,24 @@ class ZipSpecs extends quasar.Qspec {
       val MaxExpectedSize = 100L*1000L*1000L
       val MinExpectedSize = MaxExpectedSize / 2
 
-      val paths = (0 until Files).toList.map(i => rootDir[Sandboxed] </> file("foo" + i))
-      val z = zipFiles(paths.map(_ -> f4.unsafePerformSync))
+      val paths = (0 until Files).toList.map(i => currentDir[Sandboxed] </> file("foo" + i))
+      val z = zipFiles(paths.strengthR(f4.unsafePerformSync).toMap)
 
       // NB: can't use my naive `list` function on a large file
       z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
-    "read twice without conflict" >> prop { filesAndSize: Map[AbsFile[Sandboxed], Positive] =>
+    "read twice without conflict" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
-      val z = zipFiles(filesAndBytes.toList)
-      bytes(z).unsafePerformSync must equal(bytes(z).unsafePerformSync)
+      val z = zipFiles(filesAndBytes)
+      bytes(z).unsafePerformSync.toList must equal(bytes(z).unsafePerformSync.toList)
     }.set(minTestsOk = 10) // This test is relatively slow
   }
 
   "unzipFiles" should {
-    "recover any input" >> prop { filesAndSize: Map[AbsFile[Sandboxed], Positive] =>
+    "recover any input" >> prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       val filesAndBytes = bytesMapping(filesAndSize).unsafePerformSync
-      val z = zipFiles(filesAndBytes.toList)
+      val z = zipFiles(filesAndBytes)
 
       val exp = filesAndBytes.mapValues(_.runFoldMap(ι).unsafePerformSync)
       unzipFiles(z).map(_.toMap).run.unsafePerformSync must beRightDisjunction(exp)

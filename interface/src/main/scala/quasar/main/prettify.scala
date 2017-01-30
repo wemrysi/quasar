@@ -20,6 +20,10 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._
+
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
 
 object Prettify {
@@ -70,9 +74,6 @@ object Prettify {
       }
     }
   }
-
-  def mergePaths(as: List[Path], bs: List[Path]): List[Path] =
-    (as ++ bs).distinct
 
   def flatten(data: Data): ListMap[Path, Data] = {
     def loop(data: Data): Data \/ List[(Path, Data)] = {
@@ -161,6 +162,11 @@ object Prettify {
     }
   }
 
+  def columnNames(rows: List[Data]): List[Path] = {
+    val columnNames = rows.map(flatten(_).keys.toList).join.distinct
+    if (columnNames.isEmpty) List(Path.singleton(FieldSeg("<empty>"))) else columnNames
+  }
+
   /**
    Render a list of non-atomic values to a table:
    - Str values are left-aligned; all other values are right-aligned
@@ -171,11 +177,8 @@ object Prettify {
     if (rows.isEmpty) Nil
     else {
       val flat = rows.map(flatten)
-      val columnNames0 = flat.map(_.keys.toList).foldLeft[List[Path]](Nil)(mergePaths)
-      val columnNames = if (columnNames0.isEmpty) List(Path.singleton(FieldSeg("<empty>"))) else columnNames0
-
       val columns: List[(Path, List[Aligned[String]])] =
-        columnNames.map(n => n -> flat.map(m => m.get(n).fold[Aligned[String]](Aligned.Left(""))(render)))
+        columnNames(rows).map(n => n -> flat.map(m => m.get(n).fold[Aligned[String]](Aligned.Left(""))(render)))
 
       val widths: List[((Path, List[Aligned[String]]), Int)] =
         columns.map { case (path, vals) => (path, vals) -> (path.label.length :: vals.map(_.value).map(_.length + 1)).max }
@@ -204,7 +207,7 @@ object Prettify {
        fields, if present.
    - If new fields appear after the first `n` rows, they're ignored.
    */
-  def renderStream[F[_]](src: Process[F, Data], n: Int): Process[F, List[String]] = {
+  def renderStream[F[_]](src: Process[F, Data], n: Int Refined Positive): Process[F, List[String]] = {
     // Combinator that handles sampling the stream, computing some value from the sample,
     // and emiting a single "header" value, followed by each transformed value. The types
     // make this look generic, but it's not clear what else this would be useful for.
@@ -222,11 +225,8 @@ object Prettify {
 
     sampleMap[Data, List[Path], List[String]](
       src,
-      n max 1,
-      { rows =>
-        val cols = rows.map(flatten(_).keys.toList).foldLeft[List[Path]](Nil)(mergePaths)
-        if (cols.isEmpty) List(Path.singleton(FieldSeg("<empty>"))) else cols
-      },
+      n,
+      rows => columnNames(rows.toList),
       _.map(_.label),
       { (row, cols) =>
         val flat = flatten(row)
@@ -234,8 +234,24 @@ object Prettify {
       })
   }
 
-  /** Pure version of `renderStream. */
-  def renderValues(src: List[Data]): List[List[String]] = {
-    renderStream(Process.emitAll(src), src.length).toList
+// TODO: Use this implementation once we upgrade to fs2
+//  def renderStream[F[_]](src: Process[F, Data], n: Int Refined Positive): Process[F, List[String]] = {
+//    Process.await(src.chunk(n.get).unconsOption.map {
+//      case Some((firstRows, tail)) =>
+//        dataAsColumns(firstRows.toList, Process.emitAll(firstRows) ++ tail.flatMap(Process.emitAll))
+//      case None => Process.emit(List(Path.singleton(FieldSeg("<empty>")).label))
+//    })(ι)
+//  }
+
+  private def dataAsColumns[F[_]:Monad:Plus](preview: List[Data], all: F[Data]): F[List[String]] = {
+    val cols = columnNames(preview)
+    val header = cols.map(_.label)
+    val columnarData = all.map(data => cols.map(c => flatten(data).get(c).fold("")(render(_).value)))
+    header.point[F] <+> columnarData
   }
+
+  /** Pure version of `renderStream. */
+  def renderValues(src: List[Data]): List[List[String]] =
+    dataAsColumns(src, src)
+
 }

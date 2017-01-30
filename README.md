@@ -691,7 +691,15 @@ foo.bar,foo.baz
 
 Data is formatted the same way as the "Readable" JSON format, except that all values including `null`, `true`, `false`, and numbers are indistinguishable from their string representations.
 
-It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv.
+It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv. If some or all of these extensions are not specified, they will default to the following values:
+
+- columnDelimiter: `,`
+- rowDelimiter: `\r\n`
+- quoteChar: `"`
+- escapeChar: `"`
+
+Note: Due to [the following issue](https://github.com/tototoshi/scala-csv/issues/97) in one of our dependencies. The `rowDelimiter` extension will be ignored for any CSV being uploaded. The `rowDelimiter` extension will, however, be observed for downloaded data.
+      Also due to [this issue](https://github.com/tototoshi/scala-csv/issues/98) best to avoid non "standard" csv formats. See the `MessageFormatGen.scala` file for examples of which csv formats we test against.
 
 When data is uploaded in CSV format, the headers are interpreted as field names in the same way. As with the Readable JSON format, any string that can be interpreted as another kind of value will be, so for example there's no way to specify the string `"null"`.
 

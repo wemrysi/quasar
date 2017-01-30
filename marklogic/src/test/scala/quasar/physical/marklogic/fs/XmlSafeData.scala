@@ -27,7 +27,7 @@ import quasar.pkg.tests._
 final case class XmlSafeData(data: Data) extends AnyVal
 
 object XmlSafeData {
-  implicit val arbitrary: Arbitrary[XmlSafeData] = genData(
+  implicit val arbitrary: Arbitrary[XmlSafeData] = genNested(
     genKey = Gen.nonEmptyListOf(Gen.alphaChar) ^^ (_.mkString),
     genAtomicData = genAtomicData(
       strSrc = genAlphaNumString,

@@ -23,12 +23,12 @@ trait DataArbitrary {
   import DataArbitrary._
   import Data.Obj
 
-  private def genKey = Gen.alphaChar ^^ (_.toString)
+  def genKey = Gen.alphaChar ^^ (_.toString)
 
   implicit val dataArbitrary: Arbitrary[Data] = Arbitrary(
     Gen.oneOf(
       simpleData,
-      genData(genKey, simpleData),
+      genNested(genKey, simpleData),
       // Tricky cases: (TODO: These belong in MongoDB tests somewhere.)
       const(Obj("$date" -> Data.Str("Jan 1"))),
       SafeInt ^^ (x => Obj("$obj" -> Obj("$obj" -> Data.Int(x))))
@@ -66,8 +66,7 @@ object DataArbitrary extends DataArbitrary {
   // TODO: make this very conservative so as likely to work with as many backends as possible
   val simpleData: Gen[Data] = genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
 
-  def genData(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
-    genAtomicData,
+  def genNested(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
     (genKey, genAtomicData).zip.list ^^ (xs => Data.Obj(xs: _*)),
     genAtomicData.list ^^ Data.Arr
   )

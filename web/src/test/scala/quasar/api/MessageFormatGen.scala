@@ -17,6 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
+import quasar.csv.CsvParser
 
 import org.scalacheck.{Arbitrary, Gen}
 import quasar.api.MessageFormat.{JsonContentType, Csv}
@@ -27,17 +28,28 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
 
 object MessageFormatGen {
-  implicit val arbCSV: Arbitrary[Csv] = Arbitrary(
-    (Arbitrary.arbitrary[Char]   |@|
-     Arbitrary.arbitrary[String] |@|
-     Arbitrary.arbitrary[Char]   |@|
-     Arbitrary.arbitrary[Char])(Csv.apply(_,_,_,_,None)))
+
+  // The Content-Type spec specifies that control characters are not allowed which is
+  // why we use alphaChar here
+  // See https://github.com/tototoshi/scala-csv/issues/98 for why actually let's avoid alphaChar for now
+  // and go with relatively "standard" csv formats
+  implicit val arbFormat: Arbitrary[CsvParser.Format] = Arbitrary(
+    for {
+      del   <- Gen.oneOf(List(',', '\t', '|', ':', ';'))
+      quote <- Gen.oneOf(List('"', '\''))
+      esc   <- Gen.oneOf(quote, '\\')
+      term  <- Gen.oneOf(List("\r\n")) // See https://github.com/tototoshi/scala-csv/issues/97 for why `lineTerminator` must be constant for now
+    } yield CsvParser.Format(del,quote,esc,term))
+
+  implicit val arbCSV: Arbitrary[Csv] = arbFormat.map(Csv.apply(_,None))
+
   implicit val arbJsonContentType: Arbitrary[JsonContentType] = Arbitrary(
     Gen.oneOf(
       JsonContentType(Readable, LineDelimited),
       JsonContentType(Readable,SingleArray),
       JsonContentType(Precise,LineDelimited),
       JsonContentType(Precise,SingleArray)))
+
   implicit val arbMessageFormat: Arbitrary[MessageFormat] =
     Arbitrary(Gen.oneOf(arbCSV.arbitrary, arbJsonContentType.arbitrary))
 }
