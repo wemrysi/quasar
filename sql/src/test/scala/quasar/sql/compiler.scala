@@ -1361,7 +1361,6 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = "select foo.name, bar.address from foo, bar where foo.id = bar.foo_id"
       val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
 
-      // call preparePlan on both sides
       testLogicalPlanCompile(query, compileExp(equiv))
     }
 
