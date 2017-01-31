@@ -18,6 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.physical.couchbase._
 import quasar.qscript._
 
@@ -46,13 +47,17 @@ object Planner {
     : Planner[T, F, Const[DeadEnd, ?]] =
     new UnreachablePlanner[T, F, Const[DeadEnd, ?]]
 
-  implicit def constReadPlanner[T[_[_]], F[_]: Monad]
-    : Planner[T, F, Const[Read, ?]] =
-    new UnreachablePlanner[T, F, Const[Read, ?]]
+  implicit def constReadPlanner[T[_[_]], F[_]: Monad, A]
+    : Planner[T, F, Const[Read[A], ?]] =
+    new UnreachablePlanner[T, F, Const[Read[A], ?]]
 
-  implicit def constShiftedRead[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
-    : Planner[T, F, Const[ShiftedRead, ?]] =
-    new ShiftedReadPlanner[T, F]
+  implicit def constShiftedReadPathPlanner[T[_[_]], F[_]: Monad]
+    : Planner[T, F, Const[ShiftedRead[APath], ?]] =
+    new UnreachablePlanner[T, F, Const[ShiftedRead[APath], ?]]
+
+  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
+    : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
+    new ShiftedReadFilePlanner[T, F]
 
   implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
     : Planner[T, F, EquiJoin[T, ?]] =

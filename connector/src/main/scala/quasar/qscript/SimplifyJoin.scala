@@ -177,13 +177,13 @@ object SimplifyJoin {
       : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def read[T[_[_]], F[_]](implicit R: Const[Read, ?] :<: F)
-      : SimplifyJoin.Aux[T, Const[Read, ?], F] =
+  implicit def read[T[_[_]], F[_], A](implicit R: Const[Read[A], ?] :<: F)
+      : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_]]
-    (implicit SR: Const[ShiftedRead, ?] :<: F)
-      : SimplifyJoin.Aux[T, Const[ShiftedRead, ?], F] =
+  implicit def shiftedRead[T[_[_]], F[_], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
+      : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
   implicit def projectBucket[T[_[_]], F[_]]

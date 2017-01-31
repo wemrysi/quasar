@@ -16,10 +16,13 @@
 
 package quasar.contrib
 
-import _root_.scalaz.{MonadError, MonadTell, StateT}
+import _root_.scalaz._, \&/._
 import _root_.scalaz.syntax.monad._
 
 package object scalaz {
+  def -\&/[A, B](a: A): These[A, B] = This(a)
+  def \&/-[A, B](b: B): These[A, B] = That(b)
+
   implicit def stateTMonadError[F[_], E, S](implicit F: MonadError[F, E])
       : MonadError[StateT[F, S, ?], E] =
     new MonadError[StateT[F, S, ?], E] {
