@@ -206,7 +206,7 @@ object DataCodec {
     case Data.Int(x)                                        => x.isValidLong
     case Data.Arr(list)                                     => list.forall(representable(_, codec))
     case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
-    // Unfortunatly currently there is a bug where intervals do not serialize/desiarilize properly
+    // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
     // and although it would appear to work for a human observer,
     // the runtime instances are not found to be "equal" which is breaking tests
     case Data.Interval(_)                                   => false

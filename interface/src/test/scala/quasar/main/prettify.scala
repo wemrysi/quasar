@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.RepresentableDataArbitrary._
 
 import java.time._
-import scalaz._
+import scalaz._, Scalaz._
 import org.scalacheck.Arbitrary
 import eu.timepit.refined.auto._
 
@@ -222,7 +222,7 @@ class PrettifySpecs extends quasar.Qspec {
       case Data.Binary(_)   => false
       case Data.Id(_)       => false
       case Data.NA          => false
-      // Unfortunatly currently there is a bug where intervals do not serialize/desiarilize properly
+      // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
       // and although it would appear to work for a human observer,
       // the runtime instances are not found to be "equal" which is breaking tests
       case Data.Interval(_) => false
@@ -244,10 +244,10 @@ class PrettifySpecs extends quasar.Qspec {
 
     "round-trip all flat rendered values that aren't \"\"" >> prop { (data: Data) =>
       val r = render(data).value
-      // Unfortunatly currently there is a bug where intervals do not serialize/desiarilize properly
+      // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
       // and although it would appear to work for a human observer,
       // the runtime instances are not found to be "equal" which is breaking tests
-      (isFlat(data) && r != "" && !data.isInstanceOf[Data.Interval]) ==> {
+      (isFlat(data) && r ≠ "" && !Data._interval.isMatching(data)) ==> {
         parse(r).map(render(_).value) must beSome(r)
       }
       // Test will sometimes fail due to to many generator failures without this

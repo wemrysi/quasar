@@ -181,6 +181,21 @@ object data {
         .flatMap(dataStream => EitherT(inj(dataStream.runLog).flatMap(write(fPath, _))))
     }
 
+    def writeAll(files: Map[RFile, ByteVector], meta: ArchiveMetadata, aDir: ADir) =
+      files.toList.traverse { case (rFile, contentBytes) =>
+        for {
+        // What's the metadata for this file
+          fileMetadata <- EitherT((meta.files.get(rFile) \/> InvalidMessageBodyFailure(s"metadata file does not contain metadata for ${posixCodec.printPath(rFile)}").toResponse[S]).point[FreeS])
+          mdType       =  fileMetadata.contentType.mediaType
+          // Do we have a quasar format that corresponds to the content-type in the metadata
+          fmt          <- EitherT((MessageFormat.fromMediaType(mdType) \/> (InvalidMessageBodyFailure(s"Unsupported media type: $mdType for file: ${posixCodec.printPath(rFile)}").toResponse[S])).point[FreeS])
+          // Transform content from bytes to a String
+          content      <- decodeUtf8(contentBytes)
+          // Write a single file with the specified format
+          _            <- writeOne(aDir </> rFile, fmt, Process.emit(content))
+        } yield ()
+      }
+
     // We only support uploading zip files into directory paths
     val uploadFormats = Set(MediaType.`application/zip`: MediaRange)
 
@@ -203,19 +218,7 @@ object data {
           (metaString, restOfFilesToContent) = tuple
            meta <- EitherT((Parse.decodeOption[ArchiveMetadata](metaString) \/> (InvalidMessageBodyFailure("metadata file has incorrect format").toResponse[S])).point[FreeS])
           // Write each file if we can determine a format
-          _     <- restOfFilesToContent.toList.traverse { case (rFile, contentBytes) =>
-            for {
-              // What's the metadata for this file
-              fileMetadata  <- EitherT((meta.files.get(rFile) \/> InvalidMessageBodyFailure(s"metadata file does not contain metadata for ${posixCodec.printPath(rFile)}").toResponse[S]).point[FreeS])
-              mdType        =  fileMetadata.contentType.mediaType
-              // Do we have a quasar format that corresponds to the content-type in the metadata
-              fmt           <- EitherT((MessageFormat.fromMediaType(mdType) \/> (InvalidMessageBodyFailure(s"Unsupported media type: $mdType for file: ${posixCodec.printPath(rFile)}").toResponse[S])).point[FreeS])
-              // Transform content from bytes to a String
-              content       <- decodeUtf8(contentBytes)
-              // Write a single file with the specified format
-              _             <- writeOne(aDir </> rFile, fmt, Process.emit(content))
-            } yield ()
-          }
+          _     <- writeAll(restOfFilesToContent, meta, aDir)
         } yield (),
       // Client is attempting to upload a single file
       aFile => for {
