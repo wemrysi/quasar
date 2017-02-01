@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.fp.ski.κ
+import quasar.contrib.pathy.AFile
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -26,13 +27,13 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+private[qscript] final class ShiftedReadFilePlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
   implicit SP: StructuralPlanner[F, FMT], O: SearchOptions[FMT]
-) extends Planner[F, FMT, Const[ShiftedRead, ?]] {
+) extends Planner[F, FMT, Const[ShiftedRead[AFile], ?]] {
 
   import expr._, axes.child
 
-  val plan: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
+  val plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val uri    = posixCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
       val dirQry = cts.directoryQuery(uri.xs, "1".xs)

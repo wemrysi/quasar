@@ -27,8 +27,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import scalaz._,
-  Scalaz._
+import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 object PATypes {
@@ -164,8 +163,8 @@ object PruneArrays {
           })
     }
 
-  implicit def read: PruneArrays[Const[Read, ?]] = default
-  implicit def shiftedRead: PruneArrays[Const[ShiftedRead, ?]] = default
+  implicit def read[A]: PruneArrays[Const[Read[A], ?]] = default
+  implicit def shiftedRead[A]: PruneArrays[Const[ShiftedRead[A], ?]] = default
   implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
   // TODO examine branches

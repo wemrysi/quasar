@@ -17,9 +17,11 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
-import quasar.common.PhaseResultT
 import quasar.{Data => QData, NameGenerator}
 import quasar.Planner.{PlannerError, PlanPathError}
+import quasar.common.PhaseResultT
+import quasar.contrib.pathy.AFile
+import quasar.fp.eitherT._
 import quasar.physical.couchbase._, N1QL.{Eq, Id, _}, Select.{Filter, Value, _}
 import quasar.physical.couchbase.common.BucketCollection
 import quasar.qscript, qscript._
@@ -28,13 +30,13 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ShiftedReadPlanner[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
-  extends Planner[T, F, Const[ShiftedRead, ?]] {
+final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Monad: NameGenerator]
+  extends Planner[T, F, Const[ShiftedRead[AFile], ?]] {
 
   def str(v: String) = Data[T[N1QL]](QData.Str(v))
   def id(v: String)  = Id[T[N1QL]](v)
 
-  val plan: AlgebraM[M, Const[ShiftedRead, ?], T[N1QL]] = {
+  val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], T[N1QL]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       (genId[T[N1QL], M] ⊛
        EitherT(

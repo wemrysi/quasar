@@ -9,6 +9,9 @@ services:
   - docker
   - postgresql
 script:
+  # Export color variables needed by travis_wait and travis_jigger
+  - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
+  - export -f travis_wait travis_jigger
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"

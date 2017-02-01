@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.contrib.scalaz._
 import quasar.fp._, eitherT._
 import quasar.fp.ski._
@@ -786,8 +787,8 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
-      new Planner[Const[ShiftedRead, ?]] {
+    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+      new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -975,8 +976,11 @@ object MongoDbQScriptPlanner {
     implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
       default("DeadEnd")
 
-    implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
+    implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
       default("Read")
+
+    implicit def shiftedReadPath[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[APath], ?]] =
+      default("ShiftedRead[APath]")
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
       default("ThetaJoin")
@@ -1152,7 +1156,7 @@ object MongoDbQScriptPlanner {
     (implicit
       merr: MonadError_[M, FileSystemError],
       QC: QScriptCore[T, ?] :<: F,
-      SR: Const[ShiftedRead, ?] :<: F)
+      SR: Const[ShiftedRead[AFile], ?] :<: F)
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
       SR.prj(src.project) match {
@@ -1216,25 +1220,32 @@ object MongoDbQScriptPlanner {
     val rewrite = new Rewrite[T]
 
     type MongoQScript[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+
+    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript, QScriptTotal[T, ?]] =
+      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+
+    // NB: Intermediate form of QScript between the standard form and Mongo’s.
+    type MongoQScript0[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
 
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
+      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, APath, ?]](listContents)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
-          .transHylo(
+        simplifyRead[T, QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], MongoQScript0].apply(qs)
+          .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
+          .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
-            repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
-              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
-              repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
-              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
-          .transCataM(liftFGM(assumeReadType[GenT[M, ?], T, MongoQScript](Type.AnyObject))))
+            repeatedly(C.coalesceQC[MongoQScript](idPrism))          ⋙
+              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get))    ⋙
+              repeatedly(C.coalesceSR[MongoQScript, AFile](idPrism)) ⋙
+              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]]))))
+          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",
         opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))

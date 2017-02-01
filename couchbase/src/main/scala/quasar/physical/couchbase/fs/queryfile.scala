@@ -227,22 +227,28 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Plan[S, T[N1QL]] = {
-    type CBQS[A] = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+    type CBQS0[A] = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
+    type CBQS[A]  = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+
+    implicit val couchbaseQScriptToQSTotal: Injectable.Aux[CBQS, QScriptTotal[T, ?]] =
+      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
     val rewrite = new Rewrite[T]
     val C = Coalesce[T, CBQS, CBQS]
 
     for {
-      qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
+      qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, APath, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
-      shft =  simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS].apply(qs)
+      shft <- simplifyRead[T, QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], CBQS0]
+                .apply(qs)
+                .transCataM(ExpandDirs[T, CBQS0, CBQS].expandDirs(idPrism.reverseGet, lc))
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(C.coalesceQC[CBQS](idPrism))       >>>
-                  repeatedly(C.coalesceEJ[CBQS](idPrism.get)) >>>
-                  repeatedly(C.coalesceSR[CBQS](idPrism))     >>>
+                repeatedly(C.coalesceQC[CBQS](idPrism))          >>>
+                  repeatedly(C.coalesceEJ[CBQS](idPrism.get))    >>>
+                  repeatedly(C.coalesceSR[CBQS, AFile](idPrism)) >>>
                   repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(

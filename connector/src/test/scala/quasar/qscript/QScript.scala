@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
 import quasar.common.SortDir
+import quasar.contrib.pathy.APath
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncs._
@@ -44,7 +45,7 @@ class QScriptSpec
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
-       convert(listContents.some, lpf.constant(Data.Bool(true))) must
+       convert(lc.some, lpf.constant(Data.Bool(true))) must
          beSome(beTreeEqual(chain(
            UnreferencedR,
            QC.inj(Map((), BoolLit(true))))))
@@ -53,14 +54,14 @@ class QScriptSpec
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
       convert(
-        listContents.some,
+        lc.some,
         lpf.constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
           Data.Obj(ListMap("0" -> Data.Int(3))))))) must beNone
     }
 
     "convert a simple read" in {
-      convert(listContents.some, lpRead("/foo/bar")) must
+      convert(lc.some, lpRead("/foo/bar")) must
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
@@ -69,25 +70,15 @@ class QScriptSpec
     // FIXME: This can be simplified to a Union of the Reads - the LeftShift
     //        cancels out the MakeMaps.
     "convert a directory read" in {
-      convert(listContents.some, lpRead("/foo")) must
+      convert(lc.some, lpRead("/foo")) must
       beSome(beTreeEqual(chain(
-        UnreferencedR,
-        QC.inj(Union((),
-          Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF))))),
-          Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
-            Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
-            Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
-              Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
-              Free.roll(QCT.inj(Union(Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
-                Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
-                Free.roll(QCT.inj(Map(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))),
-        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))(
-        implicitly, Corecursive[Fix[QS], QS])))
+        ReadR(rootDir </> dir("foo")),
+        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
     }
 
     "convert a squashed read" in {
       // "select * from foo"
-      convert(listContents.some, identity.Squash(lpRead("/foo/bar")).embed) must
+      convert(lc.some, identity.Squash(lpRead("/foo/bar")).embed) must
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))))
@@ -95,7 +86,7 @@ class QScriptSpec
 
     "convert a basic select with type checking" in {
       val lp = fullCompileExp("select foo as foo from bar")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
         QC.inj(LeftShift((),
@@ -113,7 +104,7 @@ class QScriptSpec
     // TODO: This would benefit from better normalization around Sort (#1545)
     "convert a basic order by" in {
       val lp = fullCompileExp("select * from zips order by city")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((),
@@ -143,7 +134,7 @@ class QScriptSpec
 
     "convert a basic reduction" in {
       val lp = fullCompileExp("select sum(pop) as pop from bar")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
@@ -164,27 +155,27 @@ class QScriptSpec
 
     "convert a simple wildcard take" in {
       val lp = fullCompileExp("select * from bar limit 10")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(
         QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+          Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
           Take,
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
 
     "convert a simple take through a path" in {
-      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), lpf.constant(Data.Int(10))).embed) must
+      convert(lc.some, StdLib.set.Take(lpRead("/foo/bar"), lpf.constant(Data.Int(10))).embed) must
         beSome(beTreeEqual(
           QC.inj(Subset(
             QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-            Free.roll(QCT.inj(LeftShift(Free.roll(RT.inj(Const[Read, FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+            Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
             Take,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
 
     "convert a multi-field select" in {
       val lp = fullCompileExp("select city, state from bar")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("bar")),
         QC.inj(LeftShift((),
@@ -212,7 +203,7 @@ class QScriptSpec
     }
 
     "convert a simple read with path projects" in {
-      convert(listContents.some, lpRead("/some/bar/car")) must
+      convert(lc.some, lpRead("/some/bar/car")) must
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> dir("some") </> file("bar")),
         QC.inj(LeftShift((),
@@ -271,7 +262,7 @@ class QScriptSpec
 
     "convert a basic reduction" in {
       convert(
-        listContents.some,
+        lc.some,
         agg.Sum(lpRead("/person")).embed) must
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("person")),
@@ -407,7 +398,7 @@ class QScriptSpec
     "convert a shift/unshift array" in {
       // "select [loc[_:] * 10 ...] from zips",
       convert(
-        listContents.some,
+        lc.some,
         makeObj(
           "0" ->
             structural.UnshiftArray(
@@ -459,7 +450,7 @@ class QScriptSpec
     "convert a filter" in {
       // "select * from foo where baz between 1 and 10"
       convert(
-        listContents.some,
+        lc.some,
         StdLib.set.Filter(
           lpRead("/bar"),
           relations.Between(
@@ -489,7 +480,7 @@ class QScriptSpec
     "convert magical query" in {
       // "select * from person, car",
       convert(
-        listContents.some,
+        lc.some,
         lp.let('__tmp0,
           StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), lpf.constant(Data.Bool(true))).embed,
           identity.Squash(
@@ -500,14 +491,14 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(LeftSideF)),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RT.inj(Const(Read(rootDir </> file("car"))))),
+            Free.roll(RTP.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
@@ -616,12 +607,12 @@ class QScriptSpec
 
     "convert union" in {
       val lp = fullCompileExp("select * from city union select * from person")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(Union((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RT.inj(Const(Read(rootDir </> file("city"))))),
+            Free.roll(RTP.inj(Const(Read(rootDir </> file("city"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
@@ -630,7 +621,7 @@ class QScriptSpec
                   ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RT.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
@@ -648,7 +639,7 @@ class QScriptSpec
 
     "convert distinct by" in {
       val lp = fullCompileExp("select distinct(city) from zips order by pop")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((),
@@ -696,7 +687,7 @@ class QScriptSpec
 
     "convert a multi-field reduce" in {
       val lp = fullCompileExp("select max(pop), min(city) from zips")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
@@ -747,7 +738,7 @@ class QScriptSpec
 
     "convert a filter followed by a reduce" in {
       val lp = fullCompileExp("select count(*) from zips where pop > 1000")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -792,7 +783,7 @@ class QScriptSpec
 
     "convert a non-static array projection" in {
       val lp = fullCompileExp("select (loc || [7, 8])[0] from zips")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -816,7 +807,7 @@ class QScriptSpec
 
     "convert a static array projection prefix" in {
       val lp = fullCompileExp("select ([7, 8] || loc)[1] from zips")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -836,7 +827,7 @@ class QScriptSpec
 
     "convert a group by with reduction" in {
       val lp = fullCompileExp("select (loc[0] > -78.0) as l, count(*) as c from zips group by (loc[0] > -78.0)")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
 
       val inner: FreeMap =
         Free.roll(Guard(
@@ -883,7 +874,7 @@ class QScriptSpec
 
     "convert a flattened array" in {
       val lp = fullCompileExp("select city, loc[*] from zips")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
