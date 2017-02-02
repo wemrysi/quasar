@@ -35,14 +35,26 @@ class DataReadSupportSpec extends QuasarSpecification {
   }
 
   "DataReadSupport " should {
-    "read simple file with int32 field" in {
+    "read primitive types" in {
       val path = new Path("parquet/src/test/resources/test-data-1.parquet")
       val readSupport = new DataReadSupport()
       val reader = ParquetReader.builder[Data](readSupport, path).build()
       val data = readAll(reader)
       data must_== List(
-        Data.Obj("id" -> Data.Int(1)),
-        Data.Obj("id" -> Data.Int(2))
+        Data.Obj(
+          "score" -> Data.Dec(13.9),
+          "age" -> Data.Int(11),
+          "id" -> Data.Int(1),
+          "active" -> Data.Bool(false),
+          "height" -> Data.Dec(101.19999694824219)
+        ),
+         Data.Obj(
+          "score" -> Data.Dec(14.9),
+          "age" -> Data.Int(12),
+          "id" -> Data.Int(2),
+          "active" -> Data.Bool(true),
+          "height" -> Data.Dec(102.19999694824219)
+        )
       )
       ok
     }

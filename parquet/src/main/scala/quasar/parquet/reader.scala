@@ -111,10 +111,33 @@ class DataGroupConverter(schema: MessageType) extends GroupConverter {
 class DataPrimitiveConverter(name: String, values: MListMap[String, Data])
     extends PrimitiveConverter {
 
+
+  override def addBoolean(v: Boolean): Unit = {
+    values += ((name, Data.Bool(v) : Data))
+    ()
+  }
+
   override def addLong(v: Long): Unit = {
     values += ((name, Data.Int(v) : Data))
     ()
   }
+
+  override def addInt(v: Int): Unit = {
+    values += ((name, Data.Int(v) : Data))
+    ()
+  }
+
+  override def addDouble(v: Double): Unit = {
+    values += ((name, Data.Dec(v) : Data))
+    ()
+  }
+
+  override def addFloat(v: scala.Float): Unit = {
+    values += ((name, Data.Dec(v) : Data))
+    ()
+  }
+
+
 }
 
 
