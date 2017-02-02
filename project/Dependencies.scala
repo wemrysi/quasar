@@ -94,6 +94,12 @@ object Dependencies {
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
+  def parquet = Seq(
+    "org.apache.parquet" % "parquet-format" % "2.3.1",
+    "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
+    "org.apache.hadoop" % "hadoop-client" % "2.3.0"
+  )
+
   def sparkcore(sparkProvided: Boolean) = Seq(
     ("org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,

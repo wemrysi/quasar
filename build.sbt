@@ -198,7 +198,7 @@ lazy val root = project.in(file("."))
 //       \  /         // sql       core      marklogic  mongodb  ...
         common,       //  └──────────┼───────────┴─────────┴──────┘
 //        |           //         interface
-    frontend, effect,
+    frontend, effect, 
 //   |    \   |
     sql, connector, marklogicValidation,
 //   |  /   | | \ \      |
@@ -239,6 +239,20 @@ lazy val ejson = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val parquet = project
+  .settings(name := "quasar-parquet-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.parquet)
+  .settings(commonSettings)
+  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
+    Wart.NoNeedForMonad,
+    Wart.Overloading,
+    Wart.Var,
+    Wart.MutableDataStructures,
+    Wart.NonUnitStatements
+  ))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
@@ -418,7 +432,9 @@ lazy val skeleton = project
   */
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    parquet % BothScopes)
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(
