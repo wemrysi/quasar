@@ -74,7 +74,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
       genDuration            map Data.Interval,
       arbitrary[Array[Byte]] map Data.Binary.fromArray)
 
-    Arbitrary(DataArbitrary.genData(genKey, genAtomic))
+    Arbitrary(DataArbitrary.genNested(genKey, genAtomic))
   }
 
   val emptyArr: Data              = Data._arr(List())

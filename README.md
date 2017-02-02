@@ -491,7 +491,26 @@ A successful upload will replace any previous contents atomically, leaving them 
 
 If an error occurs when reading data from the request body, the response will contain a summary in the common `error` field and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
+
+#### Uploading multpile files
+
+If the supplied path represents a directory (ends with a slash), the request body must contain a `zip` archive containing the contents of the named directory, database, etc., and a special file, `/.quasar-metadata.json`, which specifies the format for each file, as it would be provided in a `Content-Type` header if the file was individually uploaded:
+
+```json
+{
+  "/foo": {
+    "Content-Type": "application/ldjson"
+  },
+  "/foo/bar": {
+    "Content-Type": "application/json; mode=precise"
+  }
+}
+```
+
+Note: if the zip archive was created by downloading a directory from Quasar, then it will already have this hidden file.
+
+Each file in the archive is written as if it was uploaded separately. The write is _not_ atomic; if an error occurs after some files are written, the file system is not restored to its previous state.
 
 ### POST /data/fs/[path]
 
@@ -499,7 +518,7 @@ Append data to the specified path. Uploaded data may be in any of the [supported
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
 
 ### DELETE /data/fs/[path]
 
@@ -672,7 +691,15 @@ foo.bar,foo.baz
 
 Data is formatted the same way as the "Readable" JSON format, except that all values including `null`, `true`, `false`, and numbers are indistinguishable from their string representations.
 
-It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv.
+It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv. If some or all of these extensions are not specified, they will default to the following values:
+
+- columnDelimiter: `,`
+- rowDelimiter: `\r\n`
+- quoteChar: `"`
+- escapeChar: `"`
+
+Note: Due to [the following issue](https://github.com/tototoshi/scala-csv/issues/97) in one of our dependencies. The `rowDelimiter` extension will be ignored for any CSV being uploaded. The `rowDelimiter` extension will, however, be observed for downloaded data.
+      Also due to [this issue](https://github.com/tototoshi/scala-csv/issues/98) best to avoid non "standard" csv formats. See the `MessageFormatGen.scala` file for examples of which csv formats we test against.
 
 When data is uploaded in CSV format, the headers are interpreted as field names in the same way. As with the Readable JSON format, any string that can be interpreted as another kind of value will be, so for example there's no way to specify the string `"null"`.
 

@@ -42,7 +42,6 @@ trait CsvParser {
 }
 
 object CsvParser {
-  import com.github.tototoshi.csv._
 
   final case class TototoshiCsvParser(format: CSVFormat) extends CsvParser {
     def parse(text: String) = {

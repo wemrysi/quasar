@@ -24,6 +24,9 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.main.Prettify
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.parser.HttpHeaderParser
 import org.http4s.headers._
@@ -129,30 +132,49 @@ object MessageFormat {
 
   val Default = JsonContentType(JsonPrecision.Readable, JsonFormat.LineDelimited, None)
 
-  final case class Csv(columnDelimiter: Char, rowDelimiter: String, quoteChar: Char, escapeChar: Char, disposition: Option[`Content-Disposition`]) extends MessageFormat {
+  final case class Csv(format: CsvParser.Format, disposition: Option[`Content-Disposition`]) extends MessageFormat {
     import Csv._
 
-    val CsvColumnsFromInitialRowsCount = 1000
+    val CsvColumnsFromInitialRowsCount: Int Refined Positive = 1000
 
     def mediaType = {
       val alwaysExtensions = Map(
-        "columnDelimiter" -> escapeNewlines(columnDelimiter.toString),
-        "rowDelimiter" -> escapeNewlines(rowDelimiter),
-        "quoteChar" -> escapeNewlines(quoteChar.toString),
-        "escapeChar" -> escapeNewlines(escapeChar.toString))
+        "columnDelimiter" -> escapeNewlines(format.delimiter.toString),
+        "rowDelimiter" -> escapeNewlines(format.lineTerminator),
+        "quoteChar" -> escapeNewlines(format.quoteChar.toString),
+        "escapeChar" -> escapeNewlines(format.escapeChar.toString))
       val extensions = alwaysExtensions ++ dispositionExtension
       Csv.mediaType.withExtensions(extensions)
     }
+
     override def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
-      val writer = CsvWriter(Some(CsvParser.Format(columnDelimiter, quoteChar, escapeChar, rowDelimiter)))
+      val writer = CsvWriter(Some(format))
       Prettify.renderStream(data, CsvColumnsFromInitialRowsCount).map(writer(_))
     }
-    override def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] = Csv.decode(txt)
+
+    override def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] = {
+      val lines = CsvParser.TototoshiCsvParser(format).parse(txt)
+      val data = lines.headOption.map { header =>
+        val paths = header.fold(κ(Nil), _.fields.map(Prettify.Path.parse(_).toOption))
+        lines.drop(1).map(_.bimap(
+          err => DecodeError("parse error: " + err),
+          rec => {
+            val pairs = paths zip rec.fields.map(Prettify.parse)
+            val good = pairs.map { case (p, s) => (p |@| s).tupled }.foldMap(_.toList)
+            Prettify.unflatten(good.toListMap)
+          }
+        ))
+      }.getOrElse(Stream.empty)
+      Process.emitAll(data).right
+    }
+
   }
-  object Csv extends Decoder {
+
+  object Csv {
+
     val mediaType = MediaType.`text/csv`
 
-    val Default = Csv(',', "\r\n", '"', '"', None)
+    val Default = Csv(CsvParser.Format(',', '"', '"', "\r\n"), None)
 
     def escapeNewlines(str: String): String =
       str.replace("\r", "\\r").replace("\n", "\\n")
@@ -160,25 +182,6 @@ object MessageFormat {
     def unescapeNewlines(str: String): String =
       str.replace("\\r", "\r").replace("\\n", "\n")
 
-    override def decode(txt: String): (DecodeError \/ Process[Task, DecodeError \/ Data]) = {
-      CsvDetect.parse(txt).fold(
-        err => DecodeError("parse error: " + err).left,
-        lines => {
-          val data = lines.headOption.map { header =>
-            val paths = header.fold(κ(Nil), _.fields.map(Prettify.Path.parse(_).toOption))
-            lines.drop(1).map(_.bimap(
-              err => DecodeError("parse error: " + err),
-              rec => {
-                val pairs = paths zip rec.fields.map(Prettify.parse)
-                val good = pairs.map { case (p, s) => (p |@| s).tupled }.foldMap(_.toList)
-                Prettify.unflatten(good.toListMap)
-              }
-            ))
-          }.getOrElse(Stream.empty)
-          Process.emitAll(data).right
-        }
-      )
-    }
   }
 
   val supportedMediaTypes: Set[MediaRange] = Set(
@@ -187,20 +190,11 @@ object MessageFormat {
     JsonFormat.SingleArray.mediaType,
     Csv.mediaType)
 
-  val decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = {
-    type Result = Process[Task, DecodeError \/ Data]
-    new EntityDecoder[Result] {
-      override def decode(msg: Message, strict: Boolean): DecodeResult[Result] = {
-        msg.headers.get(`Content-Type`).map { contentType =>
-          fromMediaType(contentType.mediaType).map { format =>
-            EitherT[Task, DecodeFailure, Result](format.decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
-          }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMismatch(contentType.mediaType, consumes).point[Task]))
-        }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMissing(consumes).point[Task]))
-      }
-
-      override val consumes: Set[MediaRange] = supportedMediaTypes
-    }
-  }
+  def forMessage(msg: Message): DecodeFailure \/ MessageFormat =
+    for {
+      cType <- msg.headers.get(`Content-Type`) \/> (MediaTypeMissing(supportedMediaTypes): DecodeFailure)
+      fmt   <- fromMediaType(cType.mediaType) \/> MediaTypeMismatch(cType.mediaType, supportedMediaTypes)
+    } yield fmt
 
   // FIXME: I don’t know why this is triggering here.
   @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
@@ -212,11 +206,12 @@ object MessageFormat {
         case c :: Nil => Some(c)
         case _ => None
       }
-      Some(Csv(mediaType.extensions.get("columnDelimiter").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse(','),
-        mediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n"),
-        mediaType.extensions.get("quoteChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-        mediaType.extensions.get("escapeChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
-        disposition))
+      val format = CsvParser.Format(
+        delimiter      = mediaType.extensions.get("columnDelimiter").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse(','),
+        quoteChar      = mediaType.extensions.get("quoteChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
+        escapeChar     = mediaType.extensions.get("escapeChar").map(Csv.unescapeNewlines).flatMap(toChar).getOrElse('"'),
+        lineTerminator = mediaType.extensions.get("rowDelimiter").map(Csv.unescapeNewlines).getOrElse("\r\n"))
+      Some(Csv(format, disposition))
     }
     else {
       val format =
