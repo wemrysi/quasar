@@ -27,107 +27,6 @@ import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
-sealed trait LowerPriorityTreeInstances {
-  implicit def Tuple2RenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
-      RenderTree[(A, B)] =
-    new RenderTree[(A, B)] {
-      def render(t: (A, B)) =
-        NonTerminal("tuple" :: Nil, None,
-          RA.render(t._1) ::
-            RB.render(t._2) ::
-            Nil)
-    }
-}
-
-sealed trait LowPriorityTreeInstances extends LowerPriorityTreeInstances {
-  implicit def LeftTuple3RenderTree[A, B, C](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C]):
-      RenderTree[((A, B), C)] =
-    new RenderTree[((A, B), C)] {
-      def render(t: ((A, B), C)) =
-        NonTerminal("tuple" :: Nil, None,
-          RA.render(t._1._1) ::
-            RB.render(t._1._2) ::
-            RC.render(t._2) ::
-            Nil)
-    }
-}
-
-sealed trait TreeInstances extends LowPriorityTreeInstances {
-  implicit def LeftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
-      RenderTree[(((A, B), C), D)] =
-    new RenderTree[(((A, B), C), D)] {
-      def render(t: (((A, B), C), D)) =
-        NonTerminal("tuple" :: Nil, None,
-           RA.render(t._1._1._1) ::
-            RB.render(t._1._1._2) ::
-            RC.render(t._1._2) ::
-            RD.render(t._2) ::
-            Nil)
-    }
-
-  implicit def EitherRenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
-      RenderTree[A \/ B] =
-    new RenderTree[A \/ B] {
-      def render(v: A \/ B) =
-        v match {
-          case -\/ (a) => NonTerminal("-\\/" :: Nil, None, RA.render(a) :: Nil)
-          case \/- (b) => NonTerminal("\\/-" :: Nil, None, RB.render(b) :: Nil)
-        }
-    }
-
-  implicit def OptionRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[Option[A]] =
-    new RenderTree[Option[A]] {
-      def render(o: Option[A]) = o match {
-        case Some(a) => RA.render(a)
-        case None => Terminal("None" :: "Option" :: Nil, None)
-      }
-    }
-
-  implicit def ListRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[List[A]] =
-    new RenderTree[List[A]] {
-      def render(v: List[A]) = NonTerminal(List("List"), None, v.map(RA.render))
-    }
-
-  implicit def ListMapRenderTree[K: Show, V](implicit RV: RenderTree[V]):
-      RenderTree[ListMap[K, V]] =
-    new RenderTree[ListMap[K, V]] {
-      def render(v: ListMap[K, V]) =
-        NonTerminal("Map" :: Nil, None,
-          v.toList.map { case (k, v) =>
-            NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
-          })
-    }
-
-  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
-    Equal.equalBy(_.toList)
-
-  implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[Vector[A]] =
-    new RenderTree[Vector[A]] {
-      def render(v: Vector[A]) = NonTerminal(List("Vector"), None, v.map(RA.render).toList)
-    }
-
-  implicit val BooleanRenderTree: RenderTree[Boolean] =
-    RenderTree.fromShow[Boolean]("Boolean")
-  implicit val IntRenderTree: RenderTree[Int] =
-    RenderTree.fromShow[Int]("Int")
-  implicit val DoubleRenderTree: RenderTree[Double] =
-    RenderTree.fromShow[Double]("Double")
-  implicit val StringRenderTree: RenderTree[String] =
-    RenderTree.fromShow[String]("String")
-
-  implicit val SymbolEqual: Equal[Symbol] = Equal.equalA
-
-  implicit def PathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
-    new RenderTree[pathy.Path[B,T,S]] {
-      // NB: the implicit Show instance in scope here ends up being a circular
-      // call, so an explicit reference to pathy's Show is needed.
-      def render(v: pathy.Path[B,T,S]) = Terminal(List("Path"), pathy.Path.PathShow.shows(v).some)
-    }
-}
-
 sealed trait ListMapInstances {
   implicit def seqW[A](xs: Seq[A]): SeqW[A] = new SeqW(xs)
   class SeqW[A](xs: Seq[A]) {
@@ -150,6 +49,9 @@ sealed trait ListMapInstances {
         scalaz.std.list.listInstance.traverseImpl(m.toList)({ case (k, v) => f(v) map (k -> _) }) map (_.toListMap)
       }
     }
+
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
 }
 
 trait OptionTInstances {
@@ -284,8 +186,7 @@ trait DebugOps {
 }
 
 package object fp
-    extends TreeInstances
-    with ListMapInstances
+    extends ListMapInstances
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
@@ -402,6 +303,8 @@ package object fp
     Equal.equal((a, b) => true)
 
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
+
+  implicit val symbolEqual: Equal[Symbol] = Equal.equalA
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]

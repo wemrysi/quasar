@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._
-import quasar.fp._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
