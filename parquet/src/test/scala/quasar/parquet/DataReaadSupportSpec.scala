@@ -20,9 +20,10 @@ import quasar.Predef._
 import quasar.Data
 import quasar.QuasarSpecification
 
+import java.time._
+
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.ParquetReader
-
 import scalaz._
 
 class DataReadSupportSpec extends QuasarSpecification {
@@ -58,6 +59,22 @@ class DataReadSupportSpec extends QuasarSpecification {
            "active" -> Data.Bool(true),
            "height" -> Data.Dec(102.19999694824219),
            "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](2, 2, 2, 2)))
+        )
+      )
+      ok
+    }
+
+    "read logical types" in {
+      val path = new Path("parquet/src/test/resources/test-data-2.parquet")
+      val readSupport = new DataReadSupport()
+      val reader = ParquetReader.builder[Data](readSupport, path).build()
+      val data = readAll(reader)
+      data must_== List(
+        Data.Obj(
+          "description" -> Data.Str("this is a description"),
+          "creation" -> Data.Date(LocalDate.of(2017,2,3)),
+          "creationTimestamp" -> Data.Timestamp(Instant.parse("2017-02-03T15:53:44.851Z")),
+          "meetingTime" -> Data.Time(LocalTime.of(0,0,0,400000))
         )
       )
       ok

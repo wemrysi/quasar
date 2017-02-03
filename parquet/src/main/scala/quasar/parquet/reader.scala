@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.Data
 
 import java.util.{Map => JMap}
+import java.time._
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ListMap => MListMap}
 
@@ -28,7 +29,7 @@ import org.apache.parquet.hadoop.api.InitContext
 import org.apache.parquet.hadoop.api.ReadSupport
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api._
-import org.apache.parquet.schema.MessageType
+import org.apache.parquet.schema.{OriginalType, MessageType}
 import scalaz._
 
 /** 
@@ -83,10 +84,14 @@ class DataGroupConverter(schema: MessageType) extends GroupConverter {
   val values: MListMap[String, Data] = MListMap()
   var record: Data = Data.Null
 
-  val converters: List[DataPrimitiveConverter] =
-    schema.getFields().asScala.map { field =>
-      new DataPrimitiveConverter(field.getName(), values)
-    }.toList
+  val converters: List[Converter] =
+    schema.getFields().asScala.map(field => field.getOriginalType() match {
+      case OriginalType.UTF8 => new DataStringConverter(field.getName(), values)
+      case OriginalType.DATE => new DataDateConverter(field.getName(), values)
+      case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), values)
+      case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), values)
+      case _ => new DataPrimitiveConverter(field.getName(), values)
+    }).toList
 
   /**
     * Must return SAME object for given column (based on schema)
@@ -108,6 +113,41 @@ class DataGroupConverter(schema: MessageType) extends GroupConverter {
 
   def getCurrentRecord(): Data = record
 }
+
+class DataStringConverter(name: String, values: MListMap[String, Data])
+    extends PrimitiveConverter {
+
+  override def addBinary(v: Binary): Unit = {
+    values += ((name, Data.Str(new String(v.getBytes())) : Data))
+    ()
+  }
+}
+
+class DataDateConverter(name: String, values: MListMap[String, Data])
+    extends PrimitiveConverter {
+  override def addInt(v: Int): Unit = {
+    val date = LocalDate.of(1970,1,1).plusDays(v.toLong)
+    values += ((name, Data.Date(date) : Data))
+    ()
+  }
+}
+
+class DataTimestampConverter(name: String, values: MListMap[String, Data])
+    extends PrimitiveConverter {
+  override def addLong(v: Long): Unit = {
+    values += ((name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data))
+    ()
+  }
+}
+
+class DataTimeConverter(name: String, values: MListMap[String, Data])
+    extends PrimitiveConverter {
+  override def addInt(v: Int): Unit = {
+    values += ((name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data))
+    ()
+  }
+}
+
 
 class DataPrimitiveConverter(name: String, values: MListMap[String, Data])
     extends PrimitiveConverter {
@@ -142,7 +182,6 @@ class DataPrimitiveConverter(name: String, values: MListMap[String, Data])
     values += ((name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data))
     ()
   }
-
 }
 
 
