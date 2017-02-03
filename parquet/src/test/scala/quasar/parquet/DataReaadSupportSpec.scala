@@ -23,6 +23,8 @@ import quasar.QuasarSpecification
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.ParquetReader
 
+import scalaz._
+
 class DataReadSupportSpec extends QuasarSpecification {
 
   def readAll(reader: ParquetReader[Data]): List[Data] = {
@@ -46,14 +48,16 @@ class DataReadSupportSpec extends QuasarSpecification {
           "age" -> Data.Int(11),
           "id" -> Data.Int(1),
           "active" -> Data.Bool(false),
-          "height" -> Data.Dec(101.19999694824219)
+          "height" -> Data.Dec(101.19999694824219),
+          "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](1, 1, 1, 1)))
         ),
          Data.Obj(
-          "score" -> Data.Dec(14.9),
-          "age" -> Data.Int(12),
-          "id" -> Data.Int(2),
-          "active" -> Data.Bool(true),
-          "height" -> Data.Dec(102.19999694824219)
+           "score" -> Data.Dec(14.9),
+           "age" -> Data.Int(12),
+           "id" -> Data.Int(2),
+           "active" -> Data.Bool(true),
+           "height" -> Data.Dec(102.19999694824219),
+           "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](2, 2, 2, 2)))
         )
       )
       ok

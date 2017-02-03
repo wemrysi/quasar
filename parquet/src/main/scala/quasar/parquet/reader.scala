@@ -27,8 +27,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.InitContext
 import org.apache.parquet.hadoop.api.ReadSupport
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.io.api.{PrimitiveConverter, GroupConverter, Converter, RecordMaterializer}
+import org.apache.parquet.io.api._
 import org.apache.parquet.schema.MessageType
+import scalaz._
 
 /** 
   * Read support is an entry point in conversion between stream of data from
@@ -137,6 +138,10 @@ class DataPrimitiveConverter(name: String, values: MListMap[String, Data])
     ()
   }
 
+  override def addBinary(v: Binary): Unit = {
+    values += ((name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data))
+    ()
+  }
 
 }
 
