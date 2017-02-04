@@ -21,11 +21,10 @@ import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._
+import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fp.eitherT._
 import quasar.frontend.SemanticErrsT
 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._

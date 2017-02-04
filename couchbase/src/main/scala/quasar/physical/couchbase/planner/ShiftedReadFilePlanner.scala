@@ -21,7 +21,7 @@ import quasar.{Data => QData, NameGenerator}
 import quasar.Planner.{PlannerError, PlanPathError}
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.AFile
-import quasar.fp.eitherT._
+import quasar.contrib.scalaz.eitherT._
 import quasar.physical.couchbase._, N1QL.{Eq, Id, _}, Select.{Filter, Value, _}
 import quasar.physical.couchbase.common.BucketCollection
 import quasar.qscript, qscript._

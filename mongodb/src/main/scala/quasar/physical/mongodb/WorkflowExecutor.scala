@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{NameGenerator => QNameGenerator}
 import quasar.connector.{EnvironmentError, EnvErrT}
-import quasar.fp.eitherT._
+import quasar.contrib.scalaz.eitherT._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._

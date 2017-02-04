@@ -19,8 +19,9 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.ejson, ejson.EJson
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._

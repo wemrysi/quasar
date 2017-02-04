@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.effect.Capture
-import quasar.fp.eitherT._
+import quasar.contrib.scalaz.eitherT._
 import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
 
 import scala.collection.JavaConverters._

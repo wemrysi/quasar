@@ -20,8 +20,9 @@ import quasar.Predef._
 
 import quasar._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}

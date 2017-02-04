@@ -20,7 +20,8 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz.eitherT._
+import quasar.fp._
 import quasar.fp.kleisli._
 import quasar.fp.ski._
 import quasar.fs._
@@ -57,7 +58,6 @@ object queryfile {
     new QueryFileInterpreter(
       execMongo,
       (lp, qc) => EitherT(WriterT(MongoDbPlanner.plan(lp, qc).leftMap(FileSystemError.planningFailed(lp, _)).run.run.point[MongoDbIO])))
-  
 
   def interpretQ[C]
     (execMongo: WorkflowExecutor[MongoDbIO, C])
