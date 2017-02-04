@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.contrib.scalaz
 
 import quasar.fp.ski._
 

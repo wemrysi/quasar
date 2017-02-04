@@ -21,8 +21,8 @@ import quasar._, RenderTree.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.kleisli._
 import quasar.fp._
-import quasar.fp.kleisli._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.javascript._
