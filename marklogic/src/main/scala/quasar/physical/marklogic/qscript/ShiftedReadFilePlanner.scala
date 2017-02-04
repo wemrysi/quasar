@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.fp.ski.κ
-import quasar.contrib.pathy.AFile
+import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -35,7 +35,7 @@ private[qscript] final class ShiftedReadFilePlanner[F[_]: Monad: QNameGenerator:
 
   val plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      val uri    = posixCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
+      val uri    = UriPathCodec.printPath(fileParent(absFile) </> dir(fileName(absFile).value))
       val dirQry = cts.directoryQuery(uri.xs, "1".xs)
 
       idStatus match {

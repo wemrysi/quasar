@@ -41,6 +41,9 @@ object cts {
   ): XQuery =
     XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
+  def uriMatch(pattern: XQuery, options: IList[XQuery]): XQuery =
+    XQuery(s"cts:uri-match($pattern, ${mkSeq(options)})")
+
   val uriReference: XQuery =
     XQuery("cts:uri-reference()")
 

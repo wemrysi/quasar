@@ -29,16 +29,8 @@ object testing {
   /** Returns the results, as `Data`, of evaluating the module or `None` if
     * evaluation succeded without producing any results.
     */
-  def moduleResults[F[_]: Monad: Capture: CSourceReader](main: MainModule): F[ErrorMessages \/ Option[Data]] = {
-    type G[A] = ReaderT[EitherT[F, XccError, ?], Session, A]
-
-    val result = for {
-      qr <- session.evaluateModule_[G](main)
-      rs <- qr.toImmutableArray[G]
-    } yield rs.headOption traverse xdmitem.toData[ErrorMessages \/ ?] _
-
-    (contentsource.defaultSession[EitherT[F, XccError, ?]] >>= result)
-      .leftMap(_.shows.wrapNel)
-      .run.map(_.join)
-  }
+  def moduleResults[F[_]: Monad: Capture: Catchable: CSourceReader](main: MainModule): F[ErrorMessages \/ Option[Data]] =
+    contentsource.defaultSession[F] >>= Xcc[ReaderT[F, Session, ?]].results(main) map { items =>
+      items.headOption traverse xdmitem.toData[ErrorMessages \/ ?] _
+    }
 }

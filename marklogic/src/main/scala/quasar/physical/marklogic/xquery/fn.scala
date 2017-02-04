@@ -61,6 +61,9 @@ object fn {
   def doc(uri: XQuery): XQuery =
     XQuery(s"fn:doc($uri)")
 
+  def docAvailable(uri: XQuery): XQuery =
+    XQuery(s"fn:doc-available($uri)")
+
   def documentUri(node: XQuery): XQuery =
     XQuery(s"fn:document-uri($node)")
 
@@ -162,6 +165,9 @@ object fn {
 
   def substringAfter(input: XQuery, after: XQuery): XQuery =
     XQuery(s"fn:substring-after($input, $after)")
+
+  def substringBefore(input: XQuery, after: XQuery): XQuery =
+    XQuery(s"fn:substring-before($input, $after)")
 
   def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")
