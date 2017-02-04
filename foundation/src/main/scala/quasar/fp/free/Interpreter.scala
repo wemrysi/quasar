@@ -18,7 +18,7 @@ package quasar.fp.free
 
 import quasar.Predef._
 import quasar.contrib.scalaz.eitherT._
-import quasar.fp._
+import quasar.contrib.scalaz.writerT._
 
 import scalaz._
 import scalaz.stream.Process

@@ -170,7 +170,6 @@ package object fp
     extends ListMapInstances
     with OptionTInstances
     with StateTInstances
-    with WriterTInstances
     with PartialFunctionOps
     with JsonOps
     with ProcessOps

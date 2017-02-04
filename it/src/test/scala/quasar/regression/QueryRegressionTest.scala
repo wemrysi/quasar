@@ -22,6 +22,7 @@ import quasar.build.BuildInfo
 import quasar.common._
 import quasar.contrib.argonaut._
 import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.writerT._
 import quasar.ejson
 import quasar.frontend._
 import quasar.contrib.pathy._
