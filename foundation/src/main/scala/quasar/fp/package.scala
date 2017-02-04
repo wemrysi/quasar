@@ -84,25 +84,6 @@ sealed trait StateTInstances {
     }
 }
 
-trait ToCatchableOps {
-  trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
-    import fp.ski._
-
-    /** A new task which runs a cleanup task only in the case of failure, and
-      * ignores any result from the cleanup task.
-      */
-    final def onFailure(cleanup: F[_])(implicit FM: Monad[F], FC: Catchable[F]):
-        F[A] =
-      self.attempt.flatMap(_.fold(
-        err => cleanup.attempt.flatMap(κ(FC.fail(err))),
-        _.point[F]))
-  }
-
-  implicit def ToCatchableOpsFromCatchable[F[_], A](a: F[A]):
-      CatchableOps[F, A] =
-    new CatchableOps[F, A] { val self = a }
-}
-
 trait PartialFunctionOps {
   implicit class PFOps[A, B](self: PartialFunction[A, B]) {
     def |?| [C](that: PartialFunction[A, C]): PartialFunction[A, B \/ C] =
@@ -190,13 +171,11 @@ package object fp
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
-    with ToCatchableOps
     with PartialFunctionOps
     with JsonOps
     with ProcessOps
     with QFoldableOps
-    with DebugOps
-    with CatchableInstances {
+    with DebugOps {
 
   import ski._
 
