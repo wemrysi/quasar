@@ -20,8 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.eitherT._
-import quasar.contrib.scalaz.stateT._
+import quasar.contrib.scalaz._, eitherT._, stateT._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.scalacheck._
