@@ -20,7 +20,7 @@ import quasar.Predef._
 
 import scalaz._, Scalaz._
 
-trait StateTInstances extends StateTInstances0 {
+trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable: Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
       def attempt[A](fa: StateT[F, S, A]) =
@@ -32,21 +32,6 @@ trait StateTInstances extends StateTInstances0 {
 
       def fail[A](t: Throwable) =
         StateT[F, S, A](_ => Catchable[F].fail(t))
-    }
-}
-
-trait StateTInstances0 {
-  implicit def stateTMonadTell[F[_], W, S](implicit F: MonadTell[F, W])
-      : MonadTell[StateT[F, S, ?], W] =
-    new MonadTell[StateT[F, S, ?], W] {
-      def point[A](a: => A) =
-        a.point[StateT[F, S, ?]]
-
-      def bind[A, B](fa: StateT[F, S, A])(f: A => StateT[F, S, B]) =
-        fa flatMap f
-
-      def writer[A](w: W, v: A): StateT[F, S, A] =
-        F.writer(w, v).liftM[StateT[?[_], S, ?]]
     }
 }
 

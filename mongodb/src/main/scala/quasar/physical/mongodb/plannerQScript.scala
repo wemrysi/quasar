@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.pathy.{AFile, APath}
-import quasar.contrib.scalaz._, eitherT._, stateT._
+import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
@@ -1194,15 +1194,15 @@ object MongoDbQScriptPlanner {
   type GenT[X[_], A]  = StateT[X, NameGen, A]
 
   // TODO: This should perhaps be _in_ PhaseResults or something
-  def log[M[_], A: RenderTree]
+  def log[M[_]: Monad, A: RenderTree]
     (label: String, ma: M[A])
-    (implicit mtell: MonadTell[M, PhaseResults])
+    (implicit mtell: MonadTell_[M, PhaseResults])
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      M[_],
+      M[_]: Monad,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
@@ -1211,7 +1211,7 @@ object MongoDbQScriptPlanner {
     (lp: T[LogicalPlan])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults],
+      mtell: MonadTell_[M, PhaseResults],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
       ev2: EX :<: ExprOp,
@@ -1263,11 +1263,11 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults])
+      mtell: MonadTell_[M, PhaseResults])
       : M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
