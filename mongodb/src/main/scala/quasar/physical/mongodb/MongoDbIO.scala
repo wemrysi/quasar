@@ -17,6 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.contrib.scalaz.optionT._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.ski._

@@ -54,21 +54,6 @@ sealed trait ListMapInstances {
     Equal.equalBy(_.toList)
 }
 
-trait OptionTInstances {
-  implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
-    new Catchable[OptionT[F, ?]] {
-      def attempt[A](fa: OptionT[F, A]) =
-        OptionT[F, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)  => Some(\/.left(t))
-            case \/-(oa) => oa map (\/.right)
-          })
-
-      def fail[A](t: Throwable) =
-        OptionT[F, A](Catchable[F].fail(t))
-    }
-}
-
 sealed trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
@@ -168,7 +153,6 @@ trait DebugOps {
 
 package object fp
     extends ListMapInstances
-    with OptionTInstances
     with StateTInstances
     with PartialFunctionOps
     with JsonOps
