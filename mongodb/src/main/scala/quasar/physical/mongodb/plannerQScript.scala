@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.pathy.{AFile, APath}
-import quasar.contrib.scalaz._
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz._, eitherT._, stateT._
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._

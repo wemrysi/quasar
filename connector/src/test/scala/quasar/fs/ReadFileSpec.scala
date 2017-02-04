@@ -20,6 +20,7 @@ import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.stateT._
 import quasar.fp._
 
 import pathy.scalacheck.PathyArbitrary._

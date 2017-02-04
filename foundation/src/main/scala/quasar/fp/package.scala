@@ -54,21 +54,6 @@ sealed trait ListMapInstances {
     Equal.equalBy(_.toList)
 }
 
-sealed trait StateTInstances {
-  implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
-    new Catchable[StateT[F, S, ?]] {
-      def attempt[A](fa: StateT[F, S, A]) =
-        StateT[F, S, Throwable \/ A](s =>
-          Catchable[F].attempt(fa.run(s)) map {
-            case -\/(t)       => (s, t.left)
-            case \/-((s1, a)) => (s1, a.right)
-          })
-
-      def fail[A](t: Throwable) =
-        StateT[F, S, A](_ => Catchable[F].fail(t))
-    }
-}
-
 trait PartialFunctionOps {
   implicit class PFOps[A, B](self: PartialFunction[A, B]) {
     def |?| [C](that: PartialFunction[A, C]): PartialFunction[A, B \/ C] =
@@ -153,7 +138,6 @@ trait DebugOps {
 
 package object fp
     extends ListMapInstances
-    with StateTInstances
     with PartialFunctionOps
     with JsonOps
     with ProcessOps
