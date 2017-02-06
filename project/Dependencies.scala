@@ -97,7 +97,7 @@ object Dependencies {
   def parquet = Seq(
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
-    "org.apache.hadoop" % "hadoop-client" % "2.3.0"
+    "org.apache.hadoop" % "hadoop-client" % "2.3.0" % "provided"
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
