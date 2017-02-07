@@ -14,16 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.contrib.scalaz
 
-import java.lang.RuntimeException
+import quasar.Predef._
+
 import scalaz._, Scalaz._
 
-trait CatchableInstances {
-  implicit class CatchableOfDisjunctionOps[F[_]: Catchable, A, B](self: F[A \/ B]) {
-    def unattempt(implicit ev0: Monad[F], ev1: Show[A]): F[B] =
-      self.flatMap(_.fold(a => Catchable[F].fail(new RuntimeException(a.shows)), _.point[F]))
-  }
+trait OptionTInstances {
+  implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
+    new Catchable[OptionT[F, ?]] {
+      def attempt[A](fa: OptionT[F, A]) =
+        OptionT[F, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)  => Some(\/.left(t))
+            case \/-(oa) => oa map (\/.right)
+          })
+
+      def fail[A](t: Throwable) =
+        OptionT[F, A](Catchable[F].fail(t))
+    }
 }
 
-object catchable extends CatchableInstances
+object optionT extends OptionTInstances

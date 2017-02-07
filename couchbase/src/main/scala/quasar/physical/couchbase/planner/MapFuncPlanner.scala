@@ -19,7 +19,8 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz.eitherT._
+import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}

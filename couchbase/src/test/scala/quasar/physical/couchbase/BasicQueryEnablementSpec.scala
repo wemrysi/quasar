@@ -20,8 +20,9 @@ import quasar.Predef._
 import quasar.{Planner => _, _}
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, PathSegment}
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan

@@ -22,9 +22,9 @@ import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.connector.PlannerErrT
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
-import quasar.fp.eitherT._
 import quasar.fp.free._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._, FileSystemError._, QueryFile._

@@ -17,8 +17,9 @@
 package quasar.api
 
 import quasar.Predef._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure
-import quasar.fp._, eitherT._
+import quasar.fp._
 
 import argonaut._, Argonaut._
 import monocle._, macros.Lenses

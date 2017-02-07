@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.tree._
@@ -80,8 +81,8 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
-        exc <- WorkflowExecutor.mongoDb.run.unattempt
-        v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattempt
+        exc <- WorkflowExecutor.mongoDb.run.unattemptRuntime
+        v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattemptRuntime
         rez <- v.fold(
                 _.map(BsonCodec.toData(_)).point[MongoDbIO],
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
@@ -111,7 +112,7 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
           (for {
             coll <- MongoDbSpec.tempColl(prefix)
             argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
-              BsonCodec.fromData(arg).point[Task].unattempt.strengthL("arg" + idx) }
+              BsonCodec.fromData(arg).point[Task].unattemptRuntime.strengthL("arg" + idx) }
             _     <- insert(
               coll,
               List(Bson.Doc(argsBson.toListMap)).map(_.repr)).run(setupClient)
@@ -123,7 +124,7 @@ abstract class MongoDbQStdLibSpec extends StdLibSpec {
                 Fix(StructuralLib.ObjectProject(
                   lpf.free('hole),
                   lpf.constant(Data.Str("arg" + idx))))))
-            t  <- compile(qm, coll, translate[Hole](lp, _ => SrcHole)).point[Task].unattempt
+            t  <- compile(qm, coll, translate[Hole](lp, _ => SrcHole)).point[Task].unattemptRuntime
             (wf, resultField) = t
             rez <- evaluate(wf, coll).run(testClient)
 

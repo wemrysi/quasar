@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.contrib.scalaz
 
-import quasar.Predef.Throwable
+import quasar.Predef._
 
 import scalaz._, Scalaz._
 
-trait WriterTInstances {
-  implicit def writerTCatchable[F[_]: Catchable : Functor, W: Monoid]: Catchable[WriterT[F, W, ?]] =
-    new Catchable[WriterT[F, W, ?]] {
-      def attempt[A](fa: WriterT[F, W, A]) =
-        WriterT[F, W, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)      => (mzero[W], t.left)
-            case \/-((w, a)) => (w, a.right)
+trait StateTInstances {
+  implicit def stateTCatchable[F[_]: Catchable: Monad, S]: Catchable[StateT[F, S, ?]] =
+    new Catchable[StateT[F, S, ?]] {
+      def attempt[A](fa: StateT[F, S, A]) =
+        StateT[F, S, Throwable \/ A](s =>
+          Catchable[F].attempt(fa.run(s)) map {
+            case -\/(t)       => (s, t.left)
+            case \/-((s1, a)) => (s1, a.right)
           })
 
       def fail[A](t: Throwable) =
-        WriterT(Catchable[F].fail(t).strengthL(mzero[W]))
+        StateT[F, S, A](_ => Catchable[F].fail(t))
     }
 }
 
-object writerT extends WriterTInstances
+object stateT extends StateTInstances

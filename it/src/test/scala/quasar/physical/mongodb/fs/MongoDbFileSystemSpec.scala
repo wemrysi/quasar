@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, DataArbitrary._
 import quasar.common._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.writerT._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend._

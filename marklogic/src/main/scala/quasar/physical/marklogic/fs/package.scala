@@ -21,8 +21,9 @@ import quasar.{Data, Planner => QPlanner}
 import quasar.common._
 import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
-import quasar.fp._, eitherT._, free._
+import quasar.fp._, free._
 import quasar.fp.numeric.Positive
 import quasar.frontend.logicalplan
 import quasar.fs._
