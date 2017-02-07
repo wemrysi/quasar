@@ -907,6 +907,7 @@ object MongoDbPlanner {
     }
   }
 
+  /** In QScript mongo we will not remove typecheck filters and this will be deleted. */
   def removeTypecheckFilters:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
     case Typecheck(_, _, t @ Embed(Constant(Data.Bool(true))), Embed(Constant(Data.Bool(false)))) =>

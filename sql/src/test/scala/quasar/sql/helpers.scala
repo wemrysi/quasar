@@ -47,6 +47,8 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   // Compile -> Optimize -> Typecheck -> Rewrite Joins
   val fullCompile: String => String \/ Fix[LP] =
     q => compile(q).flatMap { lp =>
+      // TODO we should just call `quasar.preparePlan` here
+      // but we need to remove core's dependency on sql first
       val withErrors = for {
         optimized <- optimizer.optimize(lp).right
         typechecked <- lpr.ensureCorrectTypes(optimized).disjunction

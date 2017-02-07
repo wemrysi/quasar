@@ -359,6 +359,11 @@ final class Optimizer[T: Equal]
 
     ).foldLeft1(_ >>> _)
 
+  /** In `rewriteJoins` we maintain the association and nested level of let bindings
+    * by not calling `normalizeLets` (as we do in `optimize`). We would like `rewriteJoins`
+    * to be identical to `optimize`, but can only begin to address this after old mongo
+    * is deleted.
+    */
   val rewriteJoins: T => T =
     NonEmptyList[T => T](
       // Eliminate extraneous constants, etc.:
