@@ -18,142 +18,20 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fp.ski._
-import RenderTree.make, RenderTree.ops._
 
-import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
-final case class RenderedTree(nodeType: List[String], label: Option[String], children: List[RenderedTree]) {
-  def simpleType: Option[String] = nodeType.headOption
-
-  def retype(f: List[String] => List[String]) = this.copy(nodeType = f(nodeType))
-
-  /**
-   A tree that describes differences between two trees:
-   - If the two trees are identical, the result is the same as (either) input.
-   - If the trees differ only in the labels on nodes, then the result has those
-      nodes decorated with "[Changed] old -> new".
-   - If a single node is unmatched on either side, it is decorated with "[Added]"
-      or "[Deleted]".
-   As soon as a difference is found and decorated, the subtree(s) beneath the
-   decorated nodes are not inspected.
-
-   Node types are not compared or necessarily preserved.
-   */
-  def diff(that: RenderedTree): RenderedTree = {
-    def prefixedType(t: RenderedTree, p: String): List[String] = t.nodeType match {
-      case first :: rest => (p + " " + first) :: rest
-      case Nil           => p :: Nil
-    }
-
-    def prefixType(t: RenderedTree, p: String): RenderedTree = t.copy(nodeType = prefixedType(t, p))
-    val deleted = ">>>"
-    val added = "<<<"
-
-    (this, that) match {
-      case (RenderedTree(nodeType1, l1, children1), RenderedTree(nodeType2, l2, children2)) => {
-        if (nodeType1 =/= nodeType2 || l1 =/= l2)
-          RenderedTree(List("[Root differs]"), None,
-            prefixType(this, deleted) ::
-            prefixType(that, added) ::
-            Nil)
-        else {
-          def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
-            case (Nil, Nil)     => Nil
-            case (x :: xs, Nil) => prefixType(x, deleted) :: matchChildren(xs, Nil)
-            case (Nil, x :: xs) => prefixType(x, added) :: matchChildren(Nil, xs)
-
-            case (a :: as, b :: bs)        if a.typeAndLabel ≟ b.typeAndLabel  => a.diff(b) :: matchChildren(as, bs)
-            case (a1 :: a2 :: as, b :: bs) if a2.typeAndLabel ≟ b.typeAndLabel => prefixType(a1, deleted) :: a2.diff(b) :: matchChildren(as, bs)
-            case (a :: as, b1 :: b2 :: bs) if a.typeAndLabel ≟ b2.typeAndLabel => prefixType(b1, added) :: a.diff(b2) :: matchChildren(as, bs)
-
-            case (a :: as, b :: bs) => prefixType(a, deleted) :: prefixType(b, added) :: matchChildren(as, bs)
-          }
-          RenderedTree(nodeType1, l1, matchChildren(children1, children2))
-        }
-      }
-    }
-  }
-
-  /**
-  A 2D String representation of this Tree, separated into lines. Based on
-  scalaz Tree's show, but improved to use a single line per node, use
-  unicode box-drawing glyphs, and to handle newlines in the rendered
-  nodes.
-  */
-  def draw: Stream[String] = {
-    def drawSubTrees(s: List[RenderedTree]): Stream[String] = s match {
-      case Nil      => Stream.Empty
-      case t :: Nil => shift("╰─ ", "   ", t.draw)
-      case t :: ts  => shift("├─ ", "│  ", t.draw) append drawSubTrees(ts)
-    }
-    def shift(first: String, other: String, s: Stream[String]): Stream[String] =
-      (first #:: Stream.continually(other)).zip(s).map {
-        case (a, b) => a + b
-      }
-
-    val (prefix, body, suffix) = (simpleType, label) match {
-      case (None,             None)        => ("", "", "")
-      case (None,             Some(label)) => ("", label, "")
-      case (Some(simpleType), None)        => ("", simpleType, "")
-      case (Some(simpleType), Some(label)) => (simpleType + "(",  label, ")")
-    }
-    val indent = " " * (prefix.length-2)
-    val lines = body.split("\n")
-    lines.zipWithIndex.map { case (a, index) =>
-      def first = index == 0
-      def last = index == lines.length - 1
-      val pre = if (first) prefix else indent
-      val suf = if (last) suffix else ""
-      pre + a + suf
-    } ++: drawSubTrees(children)
-  }
-
-  private def typeAndLabel: String = (simpleType, label) match {
-    case (None,             None)        => ""
-    case (None,             Some(label)) => label
-    case (Some(simpleType), None)        => simpleType
-    case (Some(simpleType), Some(label)) => simpleType + "(" + label + ")"
-  }
-}
-object RenderedTree {
-  implicit val RenderedTreeShow: Show[RenderedTree] = new Show[RenderedTree] {
-    override def show(t: RenderedTree) = t.draw.mkString("\n")
-  }
-
-  implicit val RenderedTreeEncodeJson: EncodeJson[RenderedTree] = EncodeJson {
-    case RenderedTree(nodeType, label, children) =>
-      Json.obj((
-        (nodeType match {
-          case Nil => None
-          case _   => Some("type" := nodeType.reverse.mkString("/"))
-        }) ::
-          Some("label" := label) ::
-          {
-            if (children.empty) None
-            else Some("children" := children.map(RenderedTreeEncodeJson.encode(_)))
-          } ::
-          Nil).foldMap(_.toList): _*)
-  }
-
-  implicit val renderTree: RenderTree[RenderedTree] =
-    RenderTree.make(ι)
-}
-object Terminal {
-  def apply(nodeType: List[String], label: Option[String]): RenderedTree = RenderedTree(nodeType, label, Nil)
-}
-object NonTerminal {
-  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree]): RenderedTree = RenderedTree(nodeType, label, children)
-}
+import RenderTree.make
+import RenderTree.ops._
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
 }
+
 @SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
 object RenderTree extends RenderTreeInstances {
   def make[A](f: A => RenderedTree): RenderTree[A] =
@@ -188,7 +66,6 @@ object RenderTree extends RenderTreeInstances {
   def print[A: RenderTree](label: String, a: A): Unit =
     println(label + ":\n" + a.render.shows)
 
-  // TODO: Should this be necessary given RenderTreeT?
   def recursive[T, F[_]](implicit T: Recursive.Aux[T, F], FD: Delay[RenderTree, F], FF: Functor[F]): RenderTree[T] =
     make(_.cata(FD(RenderTree[RenderedTree]).render))
 }
