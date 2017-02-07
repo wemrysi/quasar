@@ -97,5 +97,22 @@ class DataReadSupportSpec extends QuasarSpecification {
       )
       ok
     }
+
+    "read lists alternative" in {
+      val path = new Path("parquet/src/test/resources/test-data-3.parquet")
+      val readSupport = new DataReadSupport()
+      val reader = ParquetReader.builder[Data](readSupport, path).build()
+      val data = readAll(reader)
+      data must_== List(
+        Data.Obj(
+          "skills" -> Data.Arr(List(
+            Data.Obj("element" -> Data.Str("scala")),
+            Data.Obj("element" -> Data.Str("FP")),
+            Data.Obj("element" -> Data.Str("spillikins"))
+          ))
+        )
+      )
+      ok
+    }
   }
 }
