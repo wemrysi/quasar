@@ -38,6 +38,7 @@ class DataReadSupportSpec extends QuasarSpecification {
   }
 
   "DataReadSupport " should {
+
     "read primitive types" in {
       val path = new Path("parquet/src/test/resources/test-data-1.parquet")
       val readSupport = new DataReadSupport()
@@ -75,6 +76,23 @@ class DataReadSupportSpec extends QuasarSpecification {
           "creation" -> Data.Date(LocalDate.of(2017,2,3)),
           "creationTimestamp" -> Data.Timestamp(Instant.parse("2017-02-03T15:53:44.851Z")),
           "meetingTime" -> Data.Time(LocalTime.of(0,0,0,400000))
+        )
+      )
+      ok
+    }
+
+    "read lists" in {
+      val path = new Path("parquet/src/test/resources/test-data-4.parquet")
+      val readSupport = new DataReadSupport()
+      val reader = ParquetReader.builder[Data](readSupport, path).build()
+      val data = readAll(reader)
+      data must_== List(
+        Data.Obj(
+          "skills" -> Data.Arr(List(
+            Data.Str("scala"),
+            Data.Str("FP"),
+            Data.Str("spillikins")
+          ))
         )
       )
       ok

@@ -22,14 +22,14 @@ import quasar.Data
 import java.util.{Map => JMap}
 import java.time._
 import scala.collection.JavaConverters._
-import scala.collection.mutable.{ListMap => MListMap}
+import scala.collection.mutable.{ListMap => MListMap, MutableList => MList}
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.InitContext
 import org.apache.parquet.hadoop.api.ReadSupport
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api._
-import org.apache.parquet.schema.{OriginalType, MessageType}
+import org.apache.parquet.schema.{OriginalType, MessageType, GroupType}
 import scalaz._
 
 /** 
@@ -60,11 +60,31 @@ class DataReadSupport extends ReadSupport[Data] {
   */
 class DataRecordMaterializer(schema: MessageType) extends RecordMaterializer[Data] {
 
-  val rootConverter = new DataGroupConverter(schema)
+  val rootConverter = new DataGroupConverter(schema, None)
 
   override def getCurrentRecord(): Data = rootConverter.getCurrentRecord()
 
   override def getRootConverter(): GroupConverter = rootConverter
+}
+
+trait ConverterLike {
+
+  def schema: GroupType
+
+  def save: (String, Data) => Unit
+
+  val converters: List[Converter] =
+    schema.getFields().asScala.map(field => field.getOriginalType() match {
+      case OriginalType.UTF8 => new DataStringConverter(field.getName(), save)
+      case OriginalType.DATE => new DataDateConverter(field.getName(), save)
+      case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), save)
+      case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), save)
+      case OriginalType.LIST =>
+        new DataListConverter(field.asGroupType(), field.getName(), this)
+      case a if !field.isPrimitive() =>
+        new DataGroupConverter(field.asGroupType(), Some((field.getName(), this)))
+      case _ => new DataPrimitiveConverter(field.getName(), save)
+    }).toList
 }
 
 /** 
@@ -73,7 +93,10 @@ class DataRecordMaterializer(schema: MessageType) extends RecordMaterializer[Dat
   * 2. fetch converter for each of the columns
   * 3. call end()
   */
-class DataGroupConverter(schema: MessageType) extends GroupConverter {
+class DataGroupConverter(
+  val schema: GroupType,
+  parent: Option[(String, ConverterLike)]
+) extends GroupConverter with ConverterLike {
 
   /**
     * I'm using mutable data structures and var for which I should
@@ -84,19 +107,15 @@ class DataGroupConverter(schema: MessageType) extends GroupConverter {
   val values: MListMap[String, Data] = MListMap()
   var record: Data = Data.Null
 
-  val converters: List[Converter] =
-    schema.getFields().asScala.map(field => field.getOriginalType() match {
-      case OriginalType.UTF8 => new DataStringConverter(field.getName(), values)
-      case OriginalType.DATE => new DataDateConverter(field.getName(), values)
-      case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), values)
-      case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), values)
-      case _ => new DataPrimitiveConverter(field.getName(), values)
-    }).toList
+  def save: (String, Data) => Unit = (name: String, data: Data) => {
+    values += ((name, data))
+    ()
+  }
 
   /**
     * Must return SAME object for given column (based on schema)
     */
-  override def getConverter(fieldIndex: Int): Converter = converters(fieldIndex)
+  override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
 
   /**
     * Called for every row, at the start of processing
@@ -107,81 +126,87 @@ class DataGroupConverter(schema: MessageType) extends GroupConverter {
     * Called for every row, at the end of processing
     */
   override def end(): Unit = {
-    record = Data.Obj(values.toSeq:_*)
+    parent.fold {
+      record = Data.Obj(values.toSeq:_*)
+      ()
+    } { case (name, p) =>
+        p.save(name, Data.Obj(values.toSeq:_*))
+    }
     values.clear()
   }
 
   def getCurrentRecord(): Data = record
+
 }
 
-class DataStringConverter(name: String, values: MListMap[String, Data])
+class DataListConverter(
+  val schema: GroupType,
+  name: String,
+  parent: ConverterLike
+) extends GroupConverter with ConverterLike {
+
+  val values: MList[Data] = MList()
+
+  def save: (String, Data) => Unit = (name: String, data: Data) => {
+    values += data
+    ()
+  }
+
+  override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
+
+  override def start(): Unit = {}
+
+  override def end(): Unit = {
+    parent.save(name, Data.Arr(values.toList))
+    values.clear()
+  }
+}
+
+
+class DataStringConverter(name: String, save: (String, Data) => Unit)
     extends PrimitiveConverter {
 
-  override def addBinary(v: Binary): Unit = {
-    values += ((name, Data.Str(new String(v.getBytes())) : Data))
-    ()
-  }
+  override def addBinary(v: Binary): Unit =
+    save(name, Data.Str(new String(v.getBytes())) : Data)
 }
 
-class DataDateConverter(name: String, values: MListMap[String, Data])
+class DataDateConverter(name: String, save: (String, Data) => Unit)
     extends PrimitiveConverter {
-  override def addInt(v: Int): Unit = {
-    val date = LocalDate.of(1970,1,1).plusDays(v.toLong)
-    values += ((name, Data.Date(date) : Data))
-    ()
-  }
+  override def addInt(v: Int): Unit =
+    save(name, Data.Date(LocalDate.of(1970,1,1).plusDays(v.toLong)) : Data)
 }
 
-class DataTimestampConverter(name: String, values: MListMap[String, Data])
+class DataTimestampConverter(name: String, save: (String, Data) => Unit)
     extends PrimitiveConverter {
-  override def addLong(v: Long): Unit = {
-    values += ((name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data))
-    ()
-  }
+  override def addLong(v: Long): Unit =
+    save(name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data)
 }
 
-class DataTimeConverter(name: String, values: MListMap[String, Data])
+class DataTimeConverter(name: String, save: (String, Data) => Unit)
     extends PrimitiveConverter {
-  override def addInt(v: Int): Unit = {
-    values += ((name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data))
-    ()
-  }
+  override def addInt(v: Int): Unit =
+    save(name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data)
 }
 
 
-class DataPrimitiveConverter(name: String, values: MListMap[String, Data])
+class DataPrimitiveConverter(name: String, save: (String, Data) => Unit)
     extends PrimitiveConverter {
 
+  override def addBoolean(v: Boolean): Unit =
+    save(name, Data.Bool(v) : Data)
 
-  override def addBoolean(v: Boolean): Unit = {
-    values += ((name, Data.Bool(v) : Data))
-    ()
-  }
+  override def addLong(v: Long): Unit = 
+    save(name, Data.Int(v) : Data)
 
-  override def addLong(v: Long): Unit = {
-    values += ((name, Data.Int(v) : Data))
-    ()
-  }
+  override def addInt(v: Int): Unit =
+    save(name, Data.Int(v) : Data)
 
-  override def addInt(v: Int): Unit = {
-    values += ((name, Data.Int(v) : Data))
-    ()
-  }
+  override def addDouble(v: Double): Unit =
+    save(name, Data.Dec(v) : Data)
 
-  override def addDouble(v: Double): Unit = {
-    values += ((name, Data.Dec(v) : Data))
-    ()
-  }
+  override def addFloat(v: scala.Float): Unit =
+    save(name, Data.Dec(v) : Data)
 
-  override def addFloat(v: scala.Float): Unit = {
-    values += ((name, Data.Dec(v) : Data))
-    ()
-  }
-
-  override def addBinary(v: Binary): Unit = {
-    values += ((name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data))
-    ()
-  }
+  override def addBinary(v: Binary): Unit =
+    save(name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data)
 }
-
-
