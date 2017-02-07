@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.stateT._
-import quasar.fp._, ski._
+import quasar.fp.ski._
 
 import scala.Predef.$conforms
 
