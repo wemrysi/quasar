@@ -228,7 +228,7 @@ class Transform
 
     AutoJoinResult(
       AutoJoinBase(
-        rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rewrite.rebaseT).getOrElse(
+        rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
           TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), Inner, combine))).embed,
         prov.joinProvenances(newLprov, newRprov)),
       lacc,
