@@ -198,7 +198,7 @@ lazy val root = project.in(file("."))
 //       \  /         // sql       core      marklogic  mongodb  ...
         common,       //  └──────────┼───────────┴─────────┴──────┘
 //        |           //         interface
-    frontend, effect, 
+    frontend, effect,
 //   |    \   |
     sql, connector, marklogicValidation,
 //   |  /   | | \ \      |

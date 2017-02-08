@@ -31,182 +31,195 @@ import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema.{OriginalType, MessageType, GroupType}
 import scalaz._
+import scalaz.concurrent.Task
 
-/** 
-  * Read support is an entry point in conversion between stream of data from
-  * parquet file and final type to which data is being transformed to (in our 
-  * case it's Data). 
-  * Method prepareForRead is the right place to do the projection of columns if
-  * we are only interested in subset of coulmns being read.
-  * It returns a RecordMaterializer that continues protocol conversation for the whole
-  * file
- */
-class DataReadSupport extends ReadSupport[Data] {
-
-  override def prepareForRead(conf: Configuration,
-    metaData: JMap[String, String],
-    schema: MessageType,
-    context: ReadContext
-  ) = new DataRecordMaterializer(schema)
-
-  override def init(context: InitContext): ReadContext =
-    new ReadContext(context.getFileSchema())
-
+object ReadSupportProvider extends ReadSupportProvider {
+  // NB: ReadSupport[Data] is still mutable. This is just a step towards
+  //     encapsulation behind ParquetRDD.
+  val rs: Task[ReadSupport[Data]] = Task.delay(new DataReadSupport)
 }
 
-/** 
-  * Is being instantiated for every row group in the parquet file. Requires returning
-  * a GroupConverter that will continue the protocol conversation.
-  */
-class DataRecordMaterializer(schema: MessageType) extends RecordMaterializer[Data] {
+sealed abstract class ReadSupportProvider {
 
-  val rootConverter = new DataGroupConverter(schema, None)
-
-  override def getCurrentRecord(): Data = rootConverter.getCurrentRecord()
-
-  override def getRootConverter(): GroupConverter = rootConverter
-}
-
-trait ConverterLike {
-
-  def schema: GroupType
-
-  def save: (String, Data) => Unit
-
-  val converters: List[Converter] =
-    schema.getFields().asScala.map(field => field.getOriginalType() match {
-      case OriginalType.UTF8 => new DataStringConverter(field.getName(), save)
-      case OriginalType.DATE => new DataDateConverter(field.getName(), save)
-      case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), save)
-      case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), save)
-      case OriginalType.LIST =>
-        new DataListConverter(field.asGroupType(), field.getName(), this)
-      case a if !field.isPrimitive() =>
-        new DataGroupConverter(field.asGroupType(), Some((field.getName(), this)))
-      case _ => new DataPrimitiveConverter(field.getName(), save)
-    }).toList
-}
-
-/** 
-  * Converts the group row into data. Protocol is following:
-  * 1. call start()
-  * 2. fetch converter for each of the columns
-  * 3. call end()
-  */
-class DataGroupConverter(
-  val schema: GroupType,
-  parent: Option[(String, ConverterLike)]
-) extends GroupConverter with ConverterLike {
+  def rs: Task[ReadSupport[Data]]
 
   /**
-    * I'm using mutable data structures and var for which I should
-    * commit https://en.wikipedia.org/wiki/Seppuku#/media/File:Seppuku-2.jpg
-    * however for the time being I don't have idea how to adhere to
-    * parquet API in pure FP way :( -  #needhelp
-    */
-  val values: MListMap[String, Data] = MListMap()
-  var record: Data = Data.Null
+    * Read support is an entry point in conversion between stream of data from
+    * parquet file and final type to which data is being transformed to (in our
+    * case it's Data).
+    * Method prepareForRead is the right place to do the projection of columns if
+    * we are only interested in subset of columns being read.
+    * It returns a RecordMaterializer that continues protocol conversation for the whole
+    * file
+   */
+  protected class DataReadSupport extends ReadSupport[Data] {
 
-  def save: (String, Data) => Unit = (name: String, data: Data) => {
-    values += ((name, data))
-    ()
+    override def prepareForRead(conf: Configuration,
+      metaData: JMap[String, String],
+      schema: MessageType,
+      context: ReadContext
+    ): RecordMaterializer[Data] =
+      new DataRecordMaterializer(schema)
+
+    override def init(context: InitContext): ReadContext =
+      new ReadContext(context.getFileSchema())
+
   }
 
   /**
-    * Must return SAME object for given column (based on schema)
+    * Is being instantiated for every row group in the parquet file. Requires returning
+    * a GroupConverter that will continue the protocol conversation.
     */
-  override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
+  private class DataRecordMaterializer(schema: MessageType) extends RecordMaterializer[Data] {
+
+    val rootConverter = new DataGroupConverter(schema, None)
+
+    override def getCurrentRecord(): Data = rootConverter.getCurrentRecord()
+
+    override def getRootConverter(): GroupConverter = rootConverter
+  }
+
+  private trait ConverterLike {
+
+    def schema: GroupType
+
+    def save: (String, Data) => Unit
+
+    val converters: List[Converter] =
+      schema.getFields().asScala.map(field => field.getOriginalType() match {
+        case OriginalType.UTF8 => new DataStringConverter(field.getName(), save)
+        case OriginalType.DATE => new DataDateConverter(field.getName(), save)
+        case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), save)
+        case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), save)
+        case OriginalType.LIST =>
+          new DataListConverter(field.asGroupType(), field.getName(), this)
+        case a if !field.isPrimitive() =>
+          new DataGroupConverter(field.asGroupType(), Some((field.getName(), this)))
+        case _ => new DataPrimitiveConverter(field.getName(), save)
+      }).toList
+  }
 
   /**
-    * Called for every row, at the start of processing
+    * Converts the group row into data. Protocol is following:
+    * 1. call start()
+    * 2. fetch converter for each of the columns
+    * 3. call end()
     */
-  override def start(): Unit = {}
+  private class DataGroupConverter(
+    val schema: GroupType,
+    parent: Option[(String, ConverterLike)]
+  ) extends GroupConverter with ConverterLike {
 
-  /**
-    * Called for every row, at the end of processing
-    */
-  override def end(): Unit = {
-    parent.fold {
-      record = Data.Obj(values.toSeq:_*)
+    /**
+      * I'm using mutable data structures and var for which I should
+      * commit https://en.wikipedia.org/wiki/Seppuku#/media/File:Seppuku-2.jpg
+      * however for the time being I don't have idea how to adhere to
+      * parquet API in pure FP way :( -  #needhelp
+      */
+    val values: MListMap[String, Data] = MListMap()
+    var record: Data = Data.Null
+
+    def save: (String, Data) => Unit = (name: String, data: Data) => {
+      values += ((name, data))
       ()
-    } { case (name, p) =>
-        p.save(name, Data.Obj(values.toSeq:_*))
     }
-    values.clear()
+
+    /**
+      * Must return SAME object for given column (based on schema)
+      */
+    override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
+
+    /**
+      * Called for every row, at the start of processing
+      */
+    override def start(): Unit = {}
+
+    /**
+      * Called for every row, at the end of processing
+      */
+    override def end(): Unit = {
+      parent.fold {
+        record = Data.Obj(values.toSeq:_*)
+        ()
+      } { case (name, p) =>
+          p.save(name, Data.Obj(values.toSeq:_*))
+      }
+      values.clear()
+    }
+
+    def getCurrentRecord(): Data = record
+
   }
 
-  def getCurrentRecord(): Data = record
+  private class DataListConverter(
+    val schema: GroupType,
+    name: String,
+    parent: ConverterLike
+  ) extends GroupConverter with ConverterLike {
 
-}
+    val values: MList[Data] = MList()
 
-class DataListConverter(
-  val schema: GroupType,
-  name: String,
-  parent: ConverterLike
-) extends GroupConverter with ConverterLike {
+    def save: (String, Data) => Unit = (name: String, data: Data) => {
+      values += data
+      ()
+    }
 
-  val values: MList[Data] = MList()
+    override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
 
-  def save: (String, Data) => Unit = (name: String, data: Data) => {
-    values += data
-    ()
+    override def start(): Unit = {}
+
+    override def end(): Unit = {
+      parent.save(name, Data.Arr(values.toList))
+      values.clear()
+    }
   }
 
-  override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
 
-  override def start(): Unit = {}
+  private class DataStringConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
 
-  override def end(): Unit = {
-    parent.save(name, Data.Arr(values.toList))
-    values.clear()
+    override def addBinary(v: Binary): Unit =
+      save(name, Data.Str(new String(v.getBytes())) : Data)
   }
-}
+
+  private class DataDateConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+    override def addInt(v: Int): Unit =
+      save(name, Data.Date(LocalDate.of(1970,1,1).plusDays(v.toLong)) : Data)
+  }
+
+  private class DataTimestampConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+    override def addLong(v: Long): Unit =
+      save(name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data)
+  }
+
+  private class DataTimeConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+    override def addInt(v: Int): Unit =
+      save(name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data)
+  }
 
 
-class DataStringConverter(name: String, save: (String, Data) => Unit)
-    extends PrimitiveConverter {
+  private class DataPrimitiveConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
 
-  override def addBinary(v: Binary): Unit =
-    save(name, Data.Str(new String(v.getBytes())) : Data)
-}
+    override def addBoolean(v: Boolean): Unit =
+      save(name, Data.Bool(v) : Data)
 
-class DataDateConverter(name: String, save: (String, Data) => Unit)
-    extends PrimitiveConverter {
-  override def addInt(v: Int): Unit =
-    save(name, Data.Date(LocalDate.of(1970,1,1).plusDays(v.toLong)) : Data)
-}
+    override def addLong(v: Long): Unit =
+      save(name, Data.Int(v) : Data)
 
-class DataTimestampConverter(name: String, save: (String, Data) => Unit)
-    extends PrimitiveConverter {
-  override def addLong(v: Long): Unit =
-    save(name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data)
-}
+    override def addInt(v: Int): Unit =
+      save(name, Data.Int(v) : Data)
 
-class DataTimeConverter(name: String, save: (String, Data) => Unit)
-    extends PrimitiveConverter {
-  override def addInt(v: Int): Unit =
-    save(name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data)
-}
+    override def addDouble(v: Double): Unit =
+      save(name, Data.Dec(v) : Data)
 
+    override def addFloat(v: scala.Float): Unit =
+      save(name, Data.Dec(v) : Data)
 
-class DataPrimitiveConverter(name: String, save: (String, Data) => Unit)
-    extends PrimitiveConverter {
-
-  override def addBoolean(v: Boolean): Unit =
-    save(name, Data.Bool(v) : Data)
-
-  override def addLong(v: Long): Unit = 
-    save(name, Data.Int(v) : Data)
-
-  override def addInt(v: Int): Unit =
-    save(name, Data.Int(v) : Data)
-
-  override def addDouble(v: Double): Unit =
-    save(name, Data.Dec(v) : Data)
-
-  override def addFloat(v: scala.Float): Unit =
-    save(name, Data.Dec(v) : Data)
-
-  override def addBinary(v: Binary): Unit =
-    save(name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data)
+    override def addBinary(v: Binary): Unit =
+      save(name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data)
+  }
 }
