@@ -64,6 +64,11 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
       isObjectOrArray(expr),
       UnOp(Not, isArray(expr)))
 
+  def isArrayOrString(expr: R): R =
+    BinOp(Or,
+      isArray(expr),
+      isString(expr))
+
   def isBoolean(expr: R): R =
     BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))
 
