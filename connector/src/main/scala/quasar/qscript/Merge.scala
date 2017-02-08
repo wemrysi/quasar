@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.Planner._
 import quasar.fp.{ ExternallyManaged => EM, _ }
 
 import matryoshka._
@@ -118,7 +119,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   }
 
   // TODO remove duplication between `mergeFreeQS` and `mergeT`
-  def mergeFreeQS(left: FreeQS, right: FreeQS): SrcMerge[FreeQS, FreeQS] = {
+  private def mergeFreeQS(left: FreeQS, right: FreeQS): SrcMerge[FreeQS, FreeQS] = {
     val lLin: List[CoEnv[Hole, QScriptTotal, EM]] = left.cata(linearize).reverse
     val rLin: List[CoEnv[Hole, QScriptTotal, EM]] = right.cata(linearize).reverse
 
@@ -139,5 +140,20 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       mergeSrc,
       rebaseBranch(leftF, lMap),
       rebaseBranch(rightF, rMap))
+  }
+
+  def mergeBranches(rewrite: Rewrite[T])(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] = {
+    val SrcMerge(src, lBranch, rBranch) = mergeFreeQS(left, right)
+    val (combine, lacc, racc) = concat(LeftSideF[T], RightSideF[T])
+
+    def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] =
+      rebase(l, r).some
+
+    val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
+      rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
+
+    baseSrc.cata(src =>
+      SrcMerge(src.embed, lacc, racc).right[PlannerError],
+      InternalError.fromMsg(s"failed autojoin").left[SrcMerge[FreeQS, FreeMap]])
   }
 }

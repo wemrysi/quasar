@@ -305,21 +305,6 @@ class Transform
     }
   }
 
-  private def joinBranches(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] = {
-    val SrcMerge(src, lBranch, rBranch) = merge.mergeFreeQS(left, right)
-    val (combine, lacc, racc) = concat(LeftSideF[T], RightSideF[T])
-
-    def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] =
-      rebase(l, r).some
-
-    val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
-      rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
-
-    baseSrc.cata(src =>
-      SrcMerge(src.embed, lacc, racc).right[PlannerError],
-      InternalError.fromMsg(s"failed autojoin").left[SrcMerge[FreeQS, FreeMap]])
-  }
-
   private def invokeThetaJoin(values: Func.Input[Target[F], nat._3], tpe: JoinType)
       : PlannerError \/ Target[F] = {
     val joinError: PlannerError \/ (ThetaJoin[T[F]] \/ JoinFunc) = {
@@ -366,16 +351,16 @@ class Transform
         // FIXME: We shouldn't have to guess which side is which.
         // Fixing #1556 should address this issue.
         val pair: PlannerError \/ (SrcMerge[FreeQS, FreeMap], SrcMerge[FreeQS, FreeMap]) =
-          joinBranches(inL, condL).fold(
+          merge.mergeBranches(rewrite)(inL, condL).fold(
             {
               _ => for {
-                resL <- joinBranches(inL, condR)
-                resR <- joinBranches(inR, condL)
+                resL <- merge.mergeBranches(rewrite)(inL, condR)
+                resR <- merge.mergeBranches(rewrite)(inR, condL)
               } yield (resL, resR)
             },
             {
               resL => for {
-                resR <- joinBranches(inR, condR)
+                resR <- merge.mergeBranches(rewrite)(inR, condR)
               } yield (resL, resR)
             })
 
