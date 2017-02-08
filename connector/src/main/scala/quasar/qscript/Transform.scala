@@ -348,23 +348,7 @@ class Transform
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
           Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
 
-        // FIXME: We shouldn't have to guess which side is which.
-        // Fixing #1556 should address this issue.
-        val pair: PlannerError \/ (SrcMerge[FreeQS, FreeMap], SrcMerge[FreeQS, FreeMap]) =
-          merge.mergeBranches(rewrite)(inL, condL).fold(
-            {
-              _ => for {
-                resL <- merge.mergeBranches(rewrite)(inL, condR)
-                resR <- merge.mergeBranches(rewrite)(inR, condL)
-              } yield (resL, resR)
-            },
-            {
-              resL => for {
-                resR <- merge.mergeBranches(rewrite)(inR, condR)
-              } yield (resL, resR)
-            })
-
-        pair.map {
+        merge.tryMergeBranches(rewrite)(inL, inR, condL, condR).map {
           case (resL, resR) =>
             // FIXME: The provenances are not correct here - need to use `resL` and `resR` provs
             Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
@@ -384,7 +368,7 @@ class Transform
         }
 
       case -\/(tj) =>
-        InternalError.fromMsg(s"incompatible theta join found with condition ${tj.on} and join type ${tj.f}").left[Target[F]]
+        InternalError.fromMsg(s"incompatible theta join found with condition ${tj.on.shows} and join type ${tj.f}").left[Target[F]]
 
       case \/-(cond) =>
         val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(values(0).value, values(1).value)

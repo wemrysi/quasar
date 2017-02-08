@@ -142,18 +142,36 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       rebaseBranch(rightF, rMap))
   }
 
-  def mergeBranches(rewrite: Rewrite[T])(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] = {
-    val SrcMerge(src, lBranch, rBranch) = mergeFreeQS(left, right)
-    val (combine, lacc, racc) = concat(LeftSideF[T], RightSideF[T])
+  private def mergeBranches(rewrite: Rewrite[T])(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] =
+    (left ≟ right).fold(SrcMerge(left, HoleF[T], HoleF[T]).right[PlannerError],
+      {
+        val SrcMerge(src, lBranch, rBranch) = mergeFreeQS(left, right)
+        val (combine, lacc, racc) = concat(LeftSideF[T], RightSideF[T])
 
-    def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] =
-      rebase(l, r).some
+        def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] = rebase(l, r).some
 
-    val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
-      rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
+        val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
+          rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
 
-    baseSrc.cata(src =>
-      SrcMerge(src.embed, lacc, racc).right[PlannerError],
-      InternalError.fromMsg(s"failed autojoin").left[SrcMerge[FreeQS, FreeMap]])
-  }
+        baseSrc.cata(src =>
+          SrcMerge(src.embed, lacc, racc).right[PlannerError],
+          InternalError.fromMsg(s"failed to merge branches").left[SrcMerge[FreeQS, FreeMap]])
+      })
+
+  // FIXME: We shouldn't have to guess which side is which.
+  // Fixing #1556 should address this issue.
+  def tryMergeBranches(rewrite: Rewrite[T])(left1: FreeQS, right1: FreeQS, left2: FreeQS, right2: FreeQS):
+      PlannerError \/ (SrcMerge[FreeQS, FreeMap], SrcMerge[FreeQS, FreeMap]) =
+    mergeBranches(rewrite)(left1, left2).fold(
+      {
+        _ => for {
+          resL <- mergeBranches(rewrite)(left1, right2)
+          resR <- mergeBranches(rewrite)(right1, left2)
+        } yield (resL, resR)
+      },
+      {
+        resL => for {
+          resR <- mergeBranches(rewrite)(right1, right2)
+        } yield (resL, resR)
+      })
 }
