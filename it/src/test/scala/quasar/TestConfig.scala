@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, MountConfig}
+import quasar.physical.{couchbase, marklogic, mongodb, postgresql, sparkcore}
 
 import pathy.Path._
 import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}
@@ -40,19 +41,19 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
-  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), FileSystemType("mongodb"))
-  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), FileSystemType("mongodb"))
-  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
-  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
-  val MONGO_Q_2_6     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_2_6")    , BackendCapability.All), FileSystemType("mongodbq"))
-  val MONGO_Q_3_0     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All), FileSystemType("mongodbq"))
-  val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), FileSystemType("mongodbq"))
-  val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), FileSystemType("postgresql"))
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), FileSystemType("spark"))
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), FileSystemType("spark"))
+  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
+  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
+  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
+  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.fs.FsType)
+  val MONGO_Q_2_6     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_2_6")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_0     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), postgresql.fs.FsType)
+  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
