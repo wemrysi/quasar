@@ -32,7 +32,7 @@ object TestConfig {
   /** The directory under which test data may be found as well as where tests
     * can write test data/output.
     */
-  val DefaultTestPrefix: ADir = rootDir </> dir("quasar-test")
+  val DefaultTestPrefix: ADir = rootDir </> dir("quasartest")
 
   /** The environment variable used to externally specify the test path prefix.
     *
@@ -54,6 +54,7 @@ object TestConfig {
   val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), postgresql.fs.FsType)
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
   val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
+  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
@@ -61,7 +62,7 @@ object TestConfig {
     MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY,
     MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2,
     POSTGRESQL,
-    SPARK_HDFS, SPARK_LOCAL)
+    SPARK_HDFS, SPARK_LOCAL, SPARK_CASSANDRA)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
