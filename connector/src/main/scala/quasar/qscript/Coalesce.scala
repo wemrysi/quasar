@@ -486,9 +486,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
               case (\/-(Some(Map(innerLSrc, lmf))), \/-(Some(Map(innerRSrc, rmf)))) =>
                 val newLKey = ej.lKey >> lmf
                 val newRKey = ej.rKey >> rmf
-                val newCombine = ej.combine >>=[JoinSide] {
-                  case LeftSide  => lmf.as(LeftSide)
-                  case RightSide => rmf.as(RightSide)
+                val newCombine = ej.combine >>= {
+                  case LeftSide  => lmf.as[JoinSide](LeftSide)
+                  case RightSide => rmf.as[JoinSide](RightSide)
                 }
                 EquiJoin(ej.src, innerLSrc, innerRSrc, newLKey, newRKey, ej.f, newCombine).some
               case _ => none
