@@ -136,13 +136,18 @@ object TestConfig {
     }))
 
   val confFile: String = "it/testing.conf"
+  val defaultConfFile: String = "it/testing.conf.example"
 
   /** Load backend config from environment variable.
     *
     * Fails if it cannot parse the config and returns None if there is no config.
     */
   def loadConnectionUri(name: String): OptionT[Task, ConnectionUri] = {
-    val config = knobs.loadImmutable(Optional(SysPropsResource(Prefix(""))) :: Required(FileResource(new java.io.File(confFile))) :: Nil)
+    val config = knobs.loadImmutable(
+      Optional(SysPropsResource(Prefix("")))                    ::
+      Optional(FileResource(new java.io.File(confFile)))        ::
+      Required(FileResource(new java.io.File(defaultConfFile))) ::
+      Nil)
     OptionT(config.map(_.lookup[String](name))).map(ConnectionUri(_))
   }
 

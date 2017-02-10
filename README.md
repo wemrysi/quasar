@@ -68,7 +68,7 @@ instructions that can be found there.
 Once we have a MongoDB instance handy, we need to configure the integration tests
 in order to inform Quasar about where to find the backends to test.
 
-Simply change the values of the config values in '/it/testing.conf'. For example:
+Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
 
 ```
 mongodb_3_2="mongodb://<mongoURL>"
