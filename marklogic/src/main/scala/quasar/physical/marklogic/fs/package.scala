@@ -208,7 +208,7 @@ package object fs {
       KeyValueStore.impl.empty[ReadHandle, Option[ResultCursor]] |@|
       KeyValueStore.impl.empty[ResultHandle, ResultCursor]       |@|
       MonotonicSeq.fromZero                                      |@|
-      GenUUID.type1
+      GenUUID.type1[Task]
     ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
       contentSource flatMapF { cs =>
         val runCSrc = Read.constant[Free[S, ?], ContentSource](cs)
