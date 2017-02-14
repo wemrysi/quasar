@@ -17,34 +17,34 @@
 package quasar.parquet
 
 import quasar.Predef._
-import quasar.Data
-import quasar.QuasarSpecification
+import quasar.{Data, Qspec}
+import quasar.fp._
 
 import java.time._
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.ParquetReader
-import scalaz._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
-class DataReadSupportSpec extends QuasarSpecification {
+class DataReadSupportSpec extends Qspec {
 
-  def readAll(reader: ParquetReader[Data]): List[Data] = {
-    val data: Data = reader.read()
-    if(data != null) data :: readAll(reader) else Nil
+  def readAll(p: Path): Task[Vector[Data]] = {
+    for {
+      rs <- ReadSupportProvider.rs
+      pr <- Task.delay(ParquetReader.builder[Data](rs, p).build())
+      r  <- Process.repeatEval(Task.delay(pr.read())).takeWhile(Option(_).isDefined).runLog
+    } yield r
   }
 
-  def read(reader: ParquetReader[Data]): Unit = {
-    println(reader.read())
-  }
+  def path(path: String): Path = new Path(getClass.getResource(path).toString)
 
   "DataReadSupport " should {
 
     "read primitive types" in {
-      val path = new Path("parquet/src/test/resources/test-data-1.parquet")
-      val readSupport = new DataReadSupport()
-      val reader = ParquetReader.builder[Data](readSupport, path).build()
-      val data = readAll(reader)
-      data must_== List(
+      val data = readAll(path("/test-data-1.parquet")).unsafePerformSync
+      data must_= Vector(
         Data.Obj(
           "score" -> Data.Dec(13.9),
           "age" -> Data.Int(11),
@@ -62,15 +62,11 @@ class DataReadSupportSpec extends QuasarSpecification {
            "key" -> Data.Binary(ImmutableArray.fromArray(scala.Array[Byte](2, 2, 2, 2)))
         )
       )
-      ok
     }
 
     "read logical types" in {
-      val path = new Path("parquet/src/test/resources/test-data-2.parquet")
-      val readSupport = new DataReadSupport()
-      val reader = ParquetReader.builder[Data](readSupport, path).build()
-      val data = readAll(reader)
-      data must_== List(
+      val data = readAll(path("/test-data-2.parquet")).unsafePerformSync
+      data must_= Vector(
         Data.Obj(
           "description" -> Data.Str("this is a description"),
           "creation" -> Data.Date(LocalDate.of(2017,2,3)),
@@ -78,15 +74,11 @@ class DataReadSupportSpec extends QuasarSpecification {
           "meetingTime" -> Data.Time(LocalTime.of(0,0,0,400000))
         )
       )
-      ok
     }
 
     "read lists" in {
-      val path = new Path("parquet/src/test/resources/test-data-4.parquet")
-      val readSupport = new DataReadSupport()
-      val reader = ParquetReader.builder[Data](readSupport, path).build()
-      val data = readAll(reader)
-      data must_== List(
+      val data = readAll(path("/test-data-4.parquet")).unsafePerformSync
+      data must_= Vector(
         Data.Obj(
           "skills" -> Data.Arr(List(
             Data.Str("scala"),
@@ -95,15 +87,11 @@ class DataReadSupportSpec extends QuasarSpecification {
           ))
         )
       )
-      ok
     }
 
     "read lists alternative" in {
-      val path = new Path("parquet/src/test/resources/test-data-3.parquet")
-      val readSupport = new DataReadSupport()
-      val reader = ParquetReader.builder[Data](readSupport, path).build()
-      val data = readAll(reader)
-      data must_== List(
+      val data = readAll(path("/test-data-3.parquet")).unsafePerformSync
+      data must_= Vector(
         Data.Obj(
           "skills" -> Data.Arr(List(
             Data.Obj("element" -> Data.Str("scala")),
@@ -112,7 +100,6 @@ class DataReadSupportSpec extends QuasarSpecification {
           ))
         )
       )
-      ok
     }
   }
 }
