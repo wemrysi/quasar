@@ -46,7 +46,7 @@ object queryfile {
     ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead, ?]])
 
   final case class Input(
-    fromFile: (SparkContext, AFile) => Task[RDD[String]],
+    fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Task[Unit],
     fileExists: AFile => Task[Boolean],
     listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]],
