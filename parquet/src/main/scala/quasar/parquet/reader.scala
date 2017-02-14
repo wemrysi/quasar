@@ -52,7 +52,7 @@ sealed abstract class ReadSupportProvider {
     * It returns a RecordMaterializer that continues protocol conversation for the whole
     * file
    */
-  protected class DataReadSupport extends ReadSupport[Data] {
+  protected class DataReadSupport extends ReadSupport[Data] with Serializable {
 
     override def prepareForRead(conf: Configuration,
       metaData: JMap[String, String],
