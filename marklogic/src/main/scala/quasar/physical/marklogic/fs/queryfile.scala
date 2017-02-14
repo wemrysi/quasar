@@ -44,8 +44,17 @@ object queryfile {
   import QueryFile._
   import FileSystemError._, PathError._
 
-  type QKvs[F[_], G[_]]      = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
-  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, A]
+  type QKvs[F[_], G[_]] = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
+
+  type MLQScript[T[_[_]], A] = (
+    QScriptCore[T, ?]           :\:
+    ThetaJoin[T, ?]             :\:
+    Const[ShiftedRead[ADir], ?] :/:
+    Const[Read[AFile], ?]
+  )#M[A]
+
+  implicit def mlQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
 
   def interpret[
     F[_]: Monad: Catchable: Xcc,
@@ -117,7 +126,6 @@ object queryfile {
   ): F[MainModule] = {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
-    type QSSR[A] = QScriptShiftRead[T, A]
 
     val C = Coalesce[T, MLQ, MLQ]
     val N = Normalizable[MLQ]
@@ -131,7 +139,7 @@ object queryfile {
 
     for {
       qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F])(lp)
-      shifted =  R.shiftRead[QSR, QSSR].apply(qs)
+      shifted =  shiftReadDir[T, QSR, MLQ].apply(qs)
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(
                    R.optimize(reflNT[MLQ]),
@@ -139,7 +147,6 @@ object queryfile {
                      C.coalesceQC[MLQ](idPrism),
                      C.coalesceTJ[MLQ](idPrism.get),
                      C.coalesceSR[MLQ, ADir](idPrism),
-                     C.coalesceSR[MLQ, AFile](idPrism),
                      N.normalizeF(_: MLQ[T[MLQ]]))))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)

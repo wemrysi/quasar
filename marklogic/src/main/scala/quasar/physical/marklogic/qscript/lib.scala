@@ -213,13 +213,6 @@ object lib {
       elt `/` child.element()
     })
 
-  def isMlDirectory[F[_]: PrologW: Functor]: F[FunctionDecl1] =
-    qs.declare[F]("is-ml-directory") map (_(
-      $("uri") as ST("xs:string")
-    ).as(ST("xs:boolean")) { uri: XQuery =>
-      fn.exists(xdmp.documentProperties(uri) `/` child(propProperties) `/` child(propDirectory))
-    })
-
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
   def isoyearFromDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(

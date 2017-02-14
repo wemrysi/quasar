@@ -17,11 +17,16 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
+import eu.timepit.refined.auto._
+
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  val ns = Namespace(NSPrefix(NCName("fn")), NSUri("http://www.w3.org/2005/xpath-functions"))
+
   def abs(num: XQuery): XQuery =
     XQuery(s"fn:abs($num)")
 
