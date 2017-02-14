@@ -38,6 +38,7 @@ object readfile {
   import ParquetRDD._
 
   def fetchRdd(sc: SparkContext, pathStr: String): Task[RDD[Data]] = Task.delay {
+    // TODO add magic number support to distinguish
     if(pathStr.endsWith(".parquet"))
       sc.parquet(pathStr)
     else
