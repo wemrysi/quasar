@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.parquet
+package quasar.physical.sparkcore.fs.hdfs.parquet
 
 import quasar.Predef._
 import quasar.Data
@@ -31,45 +31,36 @@ import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema.{OriginalType, MessageType, GroupType}
 import scalaz._
-import scalaz.concurrent.Task
 
-object ReadSupportProvider extends ReadSupportProvider {
-  // NB: ReadSupport[Data] is still mutable. This is just a step towards
-  //     encapsulation behind ParquetRDD.
-  val rs: Task[ReadSupport[Data]] = Task.delay(new DataReadSupport)
-}
+/**
+  * Parquet Mutable Dragons
+  * 
+  * Due to the nature of java-like parquet-mr API we need to deal
+  * with mutable datastrucutres and "protocol" that requries 
+  * mutability (e.g see method getCurrentRecord())
+  * 
+  * This is private to ParquetRDD as to not expose mutability
+  * 
+  */
+@SuppressWarnings(Array(
+  "org.wartremover.warts.NoNeedForMonad",
+  "org.wartremover.warts.Overloading",
+  "org.wartremover.warts.Var",
+  "org.wartremover.warts.MutableDataStructures",
+  "org.wartremover.warts.NonUnitStatements"
+))
+private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializable {
 
-sealed abstract class ReadSupportProvider {
+  override def prepareForRead(conf: Configuration,
+    metaData: JMap[String, String],
+    schema: MessageType,
+    context: ReadContext
+  ): RecordMaterializer[Data] =
+    new DataRecordMaterializer(schema)
 
-  def rs: Task[ReadSupport[Data]]
+  override def init(context: InitContext): ReadContext =
+    new ReadContext(context.getFileSchema())
 
-  /**
-    * Read support is an entry point in conversion between stream of data from
-    * parquet file and final type to which data is being transformed to (in our
-    * case it's Data).
-    * Method prepareForRead is the right place to do the projection of columns if
-    * we are only interested in subset of columns being read.
-    * It returns a RecordMaterializer that continues protocol conversation for the whole
-    * file
-   */
-  protected class DataReadSupport extends ReadSupport[Data] with Serializable {
-
-    override def prepareForRead(conf: Configuration,
-      metaData: JMap[String, String],
-      schema: MessageType,
-      context: ReadContext
-    ): RecordMaterializer[Data] =
-      new DataRecordMaterializer(schema)
-
-    override def init(context: InitContext): ReadContext =
-      new ReadContext(context.getFileSchema())
-
-  }
-
-  /**
-    * Is being instantiated for every row group in the parquet file. Requires returning
-    * a GroupConverter that will continue the protocol conversation.
-    */
   private class DataRecordMaterializer(schema: MessageType) extends RecordMaterializer[Data] {
 
     val rootConverter = new DataGroupConverter(schema, None)
@@ -99,23 +90,11 @@ sealed abstract class ReadSupportProvider {
       }).toList
   }
 
-  /**
-    * Converts the group row into data. Protocol is following:
-    * 1. call start()
-    * 2. fetch converter for each of the columns
-    * 3. call end()
-    */
   private class DataGroupConverter(
     val schema: GroupType,
     parent: Option[(String, ConverterLike)]
   ) extends GroupConverter with ConverterLike {
 
-    /**
-      * I'm using mutable data structures and var for which I should
-      * commit https://en.wikipedia.org/wiki/Seppuku#/media/File:Seppuku-2.jpg
-      * however for the time being I don't have idea how to adhere to
-      * parquet API in pure FP way :( -  #needhelp
-      */
     val values: MListMap[String, Data] = MListMap()
     var record: Data = Data.Null
 
@@ -124,19 +103,8 @@ sealed abstract class ReadSupportProvider {
       ()
     }
 
-    /**
-      * Must return SAME object for given column (based on schema)
-      */
     override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
-
-    /**
-      * Called for every row, at the start of processing
-      */
     override def start(): Unit = {}
-
-    /**
-      * Called for every row, at the end of processing
-      */
     override def end(): Unit = {
       parent.fold {
         record = Data.Obj(values.toSeq:_*)
@@ -165,9 +133,7 @@ sealed abstract class ReadSupportProvider {
     }
 
     override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
-
     override def start(): Unit = {}
-
     override def end(): Unit = {
       parent.save(name, Data.Arr(values.toList))
       values.clear()
@@ -222,4 +188,8 @@ sealed abstract class ReadSupportProvider {
     override def addBinary(v: Binary): Unit =
       save(name, Data.Binary(ImmutableArray.fromArray(v.getBytes())) : Data)
   }
+
+
+
+
 }

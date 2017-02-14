@@ -46,8 +46,7 @@ class RecordReaderIterator[T](prr: ParquetRecordReader[T]) extends Iterator[T] {
 
 class ParquetRDD[T: ClassTag](
     @transient private val _sc: SparkContext,
-    pathStr: String,
-    @transient private val readSupport: ReadSupport[T]
+    pathStr: String
 ) extends RDD[T](_sc, Nil) {
 
   override def compute(raw: Partition, context: TaskContext): Iterator[T] = {
@@ -63,6 +62,7 @@ class ParquetRDD[T: ClassTag](
     val fs         = path.getFileSystem(conf)
     val fileStatus = fs.getFileStatus(path)
     val blocks     = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen())
+    val readSupport = new DataReadSupport
     blocks.zipWithIndex.map {
       case (b, i) =>
         val split =
@@ -74,10 +74,7 @@ class ParquetRDD[T: ClassTag](
 
 object ParquetRDD {
   implicit class SparkContextOps(sc: SparkContext) {
-    def parquet[T: ClassTag](
-        pathStr: String,
-        readSupport: ReadSupport[T]
-    ): ParquetRDD[T] =
-      new ParquetRDD[T](sc, pathStr, readSupport)
+    def parquet[T: ClassTag](pathStr: String): ParquetRDD[T] =
+      new ParquetRDD[T](sc, pathStr)
   }
 }

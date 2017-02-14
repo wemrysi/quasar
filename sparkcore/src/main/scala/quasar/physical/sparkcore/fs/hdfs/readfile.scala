@@ -24,7 +24,6 @@ import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
-import quasar.parquet.ReadSupportProvider
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 
 import org.apache.hadoop.fs.FileSystem;
@@ -38,23 +37,20 @@ object readfile {
 
   import ParquetRDD._
 
-  def fetchRdd(sc: SparkContext, pathStr: String): Task[RDD[Data]] =
+  def fetchRdd(sc: SparkContext, pathStr: String): Task[RDD[Data]] = Task.delay {
     if(pathStr.endsWith(".parquet"))
-      ReadSupportProvider.rs.map(rs => sc.parquet(pathStr, rs))
+      sc.parquet(pathStr)
     else
-      Task.delay {
-        sc.textFile(pathStr)
-          .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
-      }
+      sc.textFile(pathStr)
+        .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+  }
 
   def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => Task[String])(implicit
     read: Read.Ops[SparkContext, S],
     s1: Task :<: S
   ): Free[S, RDD[(Data, Long)]] = {
-
     for {
       pathStr <- lift(hdfsPathStr(f)).into[S]
-      readSupport <- lift(ReadSupportProvider.rs).into[S]
       sc <- read.asks(ι)
       rdd <- lift(fetchRdd(sc, pathStr)).into[S]
     } yield {

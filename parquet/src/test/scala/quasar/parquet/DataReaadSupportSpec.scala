@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.parquet
+package quasar.physical.sparkcore.fs.hdfs.parquet
 
 import quasar.Predef._
 import quasar.{Data, Qspec}
@@ -32,8 +32,7 @@ class DataReadSupportSpec extends Qspec {
 
   def readAll(p: Path): Task[Vector[Data]] = {
     for {
-      rs <- ReadSupportProvider.rs
-      pr <- Task.delay(ParquetReader.builder[Data](rs, p).build())
+      pr <- Task.delay(ParquetReader.builder[Data](new DataReadSupport, p).build())
       r  <- Process.repeatEval(Task.delay(pr.read())).takeWhile(Option(_).isDefined).runLog
     } yield r
   }

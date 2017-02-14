@@ -18,30 +18,11 @@ package quasar.physical.sparkcore.fs.hdfs.parquet
 
 import quasar.Predef._
 import quasar.Qspec
+import quasar.Data
 
 import org.apache.spark._
 import org.apache.spark.rdd._
-import org.apache.parquet.schema.MessageTypeParser
-import org.apache.parquet.schema.MessageType
-import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.hadoop.example.GroupReadSupport
-import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.example.data.Group
 import scalaz._, Scalaz._
-
-class SerializableGroupReadSupport extends GroupReadSupport with Serializable
-
-class ProjectableGroupReadSupport(projection: MessageType)
-    extends GroupReadSupport
-    with Serializable {
-
-  private val projectionStr: String = projection.toString
-
-  override def init(configuration: Configuration,
-                    keyValueMetaData: java.util.Map[String, String],
-                    fileSchema: MessageType): ReadContext =
-    new ReadContext(MessageTypeParser.parseMessageType(projectionStr))
-}
 
 class ParquetRDDSpec extends Qspec {
 
@@ -56,33 +37,16 @@ class ParquetRDDSpec extends Qspec {
     "should read parquet files by using sc.parquet" in {
       withinSpark(sc => {
         // when
-        val rdd: RDD[Group] =
-          sc.parquet(path, new SerializableGroupReadSupport())
+        val rdd: RDD[Data] = sc.parquet(path)
         // then
-        val login =
-          rdd.filter(_.getLong("id", 0) == 20).map(_.getString("login", 0)).first()
-        login must_= "login20"
-      })
-    }
-
-    "should be returned from sc.parquet with schema projection" in {
-      withinSpark(sc => {
-        // given
-        val projection = MessageTypeParser.parseMessageType(
-          "message User {\n" +
-            "   required int32 age;\n" +
-            "}")
-        //when
-        val rdd: RDD[Group] =
-          sc.parquet(path, new ProjectableGroupReadSupport(projection))
-        // then
-        val result: String =
-          rdd.filter(_.getInteger("age", 0) == 30).map(_.toString).first()
-        result must_= "age: 30\n"
+        rdd.first must_= Data.Obj(ListMap(
+          "id" -> Data.Int(1),
+          "login" -> Data.Str("login1"),
+          "age" -> Data.Int(11)
+        ))
       })
     }
   }
-
 
   def withinSpark[T](runnable: SparkContext => T): T = {
     val sc = new SparkContext(config)
@@ -92,3 +56,4 @@ class ParquetRDDSpec extends Qspec {
   }
 
 }
+ 

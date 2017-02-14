@@ -246,13 +246,6 @@ lazy val parquet = project
   .dependsOn(frontend % BothScopes)
   .settings(libraryDependencies ++= Dependencies.parquet)
   .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.NoNeedForMonad,
-    Wart.Overloading,
-    Wart.Var,
-    Wart.MutableDataStructures,
-    Wart.NonUnitStatements
-  ))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
