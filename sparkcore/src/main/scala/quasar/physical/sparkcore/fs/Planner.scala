@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs
 import quasar.Predef._
 import quasar._, quasar.Planner._
 import quasar.common.SortDir
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
 
@@ -85,7 +85,7 @@ object Planner {
 
   implicit def deadEnd: Planner[Const[DeadEnd, ?]] = unreachable("deadEnd")
   implicit def read[A]: Planner[Const[Read[A], ?]] = unreachable("read")
-  implicit def shiftedReadPath: Planner[Const[ShiftedRead[APath], ?]] = unreachable("shifted read of a path")
+  implicit def shiftedReadPath: Planner[Const[ShiftedRead[ADir], ?]] = unreachable("shifted read of a dir")
   implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
   implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
 

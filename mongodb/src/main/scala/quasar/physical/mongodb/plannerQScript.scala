@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.ski._
@@ -787,7 +787,7 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+    implicit def shiftedReadFile[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
@@ -979,8 +979,8 @@ object MongoDbQScriptPlanner {
     implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
       default("Read")
 
-    implicit def shiftedReadPath[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[APath], ?]] =
-      default("ShiftedRead[APath]")
+    implicit def shiftedReadDir[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[ADir], ?]] =
+      default("ShiftedRead[ADir]")
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
       default("ThetaJoin")
@@ -1226,18 +1226,18 @@ object MongoDbQScriptPlanner {
       ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
     // NB: Intermediate form of QScript between the standard form and Mongo’s.
-    type MongoQScript0[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
+    type MongoQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: MongoQScript)#M[A]
 
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, APath, ?]](listContents)(lp).liftM[GenT]
+      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], MongoQScript0].apply(qs)
+        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript0].apply(qs)
           .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),

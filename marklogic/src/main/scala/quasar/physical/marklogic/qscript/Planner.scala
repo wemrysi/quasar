@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Data
-import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
@@ -91,8 +91,8 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
   implicit def constRead[F[_]: MonadPlanErr, FMT, A]: Planner[F, FMT, Const[Read[A], ?]] =
     new UnreachablePlanner[F, FMT, Const[Read[A], ?]]("[A]Read[A]")
 
-  implicit def constShiftedReadPath[F[_]: MonadPlanErr, FMT]: Planner[F, FMT, Const[ShiftedRead[APath], ?]] =
-    new UnreachablePlanner[F, FMT, Const[ShiftedRead[APath], ?]]("ShiftedRead[APath]")
+  implicit def constShiftedReadDir[F[_]: MonadPlanErr, FMT]: Planner[F, FMT, Const[ShiftedRead[ADir], ?]] =
+    new UnreachablePlanner[F, FMT, Const[ShiftedRead[ADir], ?]]("ShiftedRead[ADir]")
 
   implicit def projectBucket[F[_]: MonadPlanErr, FMT, T[_[_]]]: Planner[F, FMT, ProjectBucket[T, ?]] =
     new UnreachablePlanner[F, FMT, ProjectBucket[T, ?]]("ProjectBucket")

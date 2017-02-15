@@ -45,7 +45,7 @@ object queryfile {
   import FileSystemError._, PathError._
 
   type QKvs[F[_], G[_]]      = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
-  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, APath, A]
+  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, A]
 
   def interpret[
     F[_]: Monad: Catchable: Xcc,
@@ -116,8 +116,8 @@ object queryfile {
     planner: Planner[F, FMT, MLQScript[T, ?]]
   ): F[MainModule] = {
     type MLQ[A]  = MLQScript[T, A]
-    type QSR[A]  = QScriptRead[T, APath, A]
-    type QSSR[A] = QScriptShiftRead[T, APath, A]
+    type QSR[A]  = QScriptRead[T, A]
+    type QSSR[A] = QScriptShiftRead[T, A]
 
     val C = Coalesce[T, MLQ, MLQ]
     val N = Normalizable[MLQ]
@@ -138,7 +138,8 @@ object queryfile {
                    repeatedly(R.applyTransforms(
                      C.coalesceQC[MLQ](idPrism),
                      C.coalesceTJ[MLQ](idPrism.get),
-                     C.coalesceSR[MLQ, APath](idPrism),
+                     C.coalesceSR[MLQ, ADir](idPrism),
+                     C.coalesceSR[MLQ, AFile](idPrism),
                      N.normalizeF(_: MLQ[T[MLQ]]))))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)
