@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.fp.{TaskRef, reflNT}
-import quasar.fp.eitherT._
 import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._

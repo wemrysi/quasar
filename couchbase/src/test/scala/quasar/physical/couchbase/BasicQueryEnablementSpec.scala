@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,9 @@ import quasar.Predef._
 import quasar.{Planner => _, _}
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, PathSegment}
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
@@ -55,7 +56,7 @@ class BasicQueryEnablementSpec
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =
     compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
 
-  def lc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
+  def listc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
     Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName("beer-sample").right))
       .transform(λ[Id ~> Plan[S, ?]](_.η[Plan[S, ?]]))
       .run
@@ -63,7 +64,7 @@ class BasicQueryEnablementSpec
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), lc) >>= (RenderQuery.compact(_).liftPE))
+    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (RenderQuery.compact(_).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
@@ -119,7 +120,7 @@ class BasicQueryEnablementSpec
       // select (a + b) from foo
       val qs =
         chain[Fix[QST], QST](
-          SRT.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
+          SRTF.inj(Const(ShiftedRead(rootDir </> file("foo"), ExcludeId))),
           QCT.inj(qscript.Map((),
             Free.roll(Add(
               ProjectFieldR(HoleF, StrLit("a")),

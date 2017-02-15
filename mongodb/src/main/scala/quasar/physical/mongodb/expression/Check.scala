@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,9 @@ final class Check[T, EX[_]]
     between(minTimestamp, expr, minRegex)
 
   def isDateOrTimestamp(expr: T) = between(minDate, expr, minRegex)
+
+  def isArrayOrString(expr: T) =
+    $or(isArray(expr), isString(expr))
 
   // Some types that happen to be adjacent:
   def isNumberOrString(expr: T) = betweenExcl(Bson.Null, expr, Bson.Doc())

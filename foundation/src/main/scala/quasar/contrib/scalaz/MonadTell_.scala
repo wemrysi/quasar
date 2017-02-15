@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,11 @@ sealed abstract class MonadTell_Instances extends MonadTell_Instances0 {
   implicit def writerTMonadTell[F[_]: Functor, W1, W2: Monoid](implicit T: MonadTell_[F, W1]): MonadTell_[WriterT[F, W2, ?], W1] =
     new MonadTell_[WriterT[F, W2, ?], W1] {
       def writer[A](w: W1, a: A) = WriterT(T.writer(w, a) strengthL mzero[W2])
+    }
+
+  implicit def stateTMonadTell[F[_]: Monad, W, S](implicit T: MonadTell_[F, W]): MonadTell_[StateT[F, S, ?], W] =
+    new MonadTell_[StateT[F, S, ?], W] {
+      def writer[A](w: W, a: A) = StateT(T.writer(w, a) strengthL _)
     }
 }
 

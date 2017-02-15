@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@ import quasar._
 import quasar.build.BuildInfo
 import quasar.common._
 import quasar.contrib.argonaut._
+import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.writerT._
 import quasar.ejson
 import quasar.frontend._
 import quasar.contrib.pathy._
-import quasar.fp._, eitherT._, free._
+import quasar.fp._, free._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.FilesystemQueries

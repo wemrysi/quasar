@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ class PlannerSpec
 
   "Planner" should {
 
-    "shiftedread" in {
+    "shiftedReadFile" in {
       withSpark { sc =>
         val input: ListMap[String, Data] = ListMap(
               "name" -> Data.Str("tom"),
@@ -97,7 +97,7 @@ class PlannerSpec
           (sc: SparkContext, file: AFile) => Task.delay {
             sc.parallelize(List(Data.Obj(input)))
           }
-        val compile: AlgebraM[SparkState, Const[ShiftedRead, ?], RDD[Data]] = sr.plan(fromFile)
+        val compile: AlgebraM[SparkState, Const[ShiftedRead[AFile], ?], RDD[Data]] = sr.plan(fromFile)
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
 
         val program: SparkState[RDD[Data]] = compile(Const(ShiftedRead(afile, ExcludeId)))

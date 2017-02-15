@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,9 @@ import quasar.Predef._
 
 import quasar._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}

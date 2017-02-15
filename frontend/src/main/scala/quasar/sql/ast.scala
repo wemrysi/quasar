@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar._
+import quasar._, RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
@@ -65,6 +65,8 @@ object Sql {
   implicit val SqlRenderTree: Delay[RenderTree, Sql] =
     new Delay[RenderTree, Sql] {
       def apply[A](ra: RenderTree[A]): RenderTree[Sql[A]] = new RenderTree[Sql[A]] {
+        implicit val rtA: RenderTree[A] = ra
+
         def renderCase(c: Case[A]): RenderedTree =
           NonTerminal("Case" :: astType, None, ra.render(c.cond) :: ra.render(c.expr) :: Nil)
 
@@ -92,7 +94,7 @@ object Sql {
 
           case SetLiteral(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
           case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
-          case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
+          case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(_.render))
 
           case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
 

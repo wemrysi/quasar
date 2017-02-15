@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.pathy.APath
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
@@ -331,8 +332,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],
-      R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore :<: OUT,
+      R:  Const[Read[APath], ?] :<: OUT,
+      QC:           QScriptCore :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal])
       : T[IN] => M[T[OUT]] =
     _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)

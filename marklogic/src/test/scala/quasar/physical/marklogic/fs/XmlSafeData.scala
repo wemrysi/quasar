@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import quasar.pkg.tests._
 final case class XmlSafeData(data: Data) extends AnyVal
 
 object XmlSafeData {
-  implicit val arbitrary: Arbitrary[XmlSafeData] = genData(
+  implicit val arbitrary: Arbitrary[XmlSafeData] = genNested(
     genKey = Gen.nonEmptyListOf(Gen.alphaChar) ^^ (_.mkString),
     genAtomicData = genAtomicData(
       strSrc = genAlphaNumString,

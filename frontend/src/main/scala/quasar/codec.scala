@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,5 +191,25 @@ object DataCodec {
         },
         arr => arr.traverse(decode).map(Data.Arr(_)),
         obj => obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*))))
+  }
+
+  // Identify the sub-set of values that can be represented in Precise JSON in
+  // such a way that the parser recovers the original type. These are:
+  // - integer values that don't fit into Long, which Argonaut does not allow us to distinguish from decimals
+  // - Data.Set
+  // - Data.NA
+  // NB: For Readable, this does not account for Str values that will be confused with
+  // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
+  def representable(data: Data, codec: DataCodec): Boolean = data match {
+    case (Data.Binary(_) | Data.Id(_)) if codec == Readable => false
+    case Data.Set(_) | Data.NA                              => false
+    case Data.Int(x)                                        => x.isValidLong
+    case Data.Arr(list)                                     => list.forall(representable(_, codec))
+    case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
+    // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
+    // and although it would appear to work for a human observer,
+    // the runtime instances are not found to be "equal" which is breaking tests
+    case Data.Interval(_)                                   => false
+    case _                                                  => true
   }
 }

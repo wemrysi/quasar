@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.Data
+import quasar.{ Data, Type }
 import quasar.common.SortDir
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
@@ -96,6 +96,320 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple constant from collection" in {
       testTypedLogicalPlanCompile("select 1 from zips",
         lpf.constant(Data.Int(1)))
+    }
+
+    "compile with typecheck in join condition" in {
+      testTypedLogicalPlanCompile("select * from zips join smallZips on zips.x = smallZips.foo.bar",
+        lpf.let('__tmp0,
+          lpf.let('__tmp1,
+            read("zips"),
+            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
+          lpf.let('__tmp2,
+            lpf.let('__tmp3,
+              read("smallZips"),
+              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+            lpf.let('__tmp4,
+              lpf.let('__tmp5,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp2),
+                  lpf.typecheck(
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("foo"))),
+                    Type.Obj(Map(), Some(Type.Top)),
+                    lpf.constant(Data.Bool(true)),
+                    lpf.constant(Data.Bool(false)))),
+                lpf.invoke3(InnerJoin,
+                  lpf.free('__tmp0),
+                  lpf.free('__tmp5),
+                  lpf.invoke2(Eq,
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
+                    lpf.invoke2(ObjectProject,
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("foo"))),
+                      lpf.constant(Data.Str("bar")))))),
+              lpf.invoke1(Squash,
+                lpf.let('__tmp6,
+                  lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
+                  lpf.typecheck(
+                    lpf.free('__tmp6),
+                    Type.Obj(Map(), Some(Type.Top)),
+                    lpf.let('__tmp7,
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                      lpf.typecheck(
+                        lpf.free('__tmp7),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.invoke2(ObjectConcat, lpf.free('__tmp7), lpf.free('__tmp6)),
+                        lpf.constant(Data.NA))),
+                      lpf.constant(Data.NA))))))))
+
+    }
+
+    "compile with typecheck in multiple join condition" in {
+      testTypedLogicalPlanCompile("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits_dup as r on r.sha = l.parents[0].sha and l.author.login = r.author.login",
+        lpf.let('__tmp0,
+          lpf.let('__tmp1,
+            read("slamengine_commits"),
+            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
+          lpf.let('__tmp2,
+            lpf.let('__tmp3,
+              read("slamengine_commits_dup"),
+              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+            lpf.let('__tmp4,
+              lpf.let('__tmp5,
+                lpf.invoke2(Filter, // filter left side types
+                  lpf.free('__tmp0),
+                  lpf.invoke2(And,
+                    lpf.invoke2(And,
+                      lpf.typecheck(
+                        lpf.invoke2(ArrayProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
+                          lpf.constant(Data.Int(0))),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.constant(Data.Bool(true)),
+                        lpf.constant(Data.Bool(false))),
+                      lpf.typecheck(
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
+                        Type.FlexArr(0, None, Type.Top),
+                        lpf.constant(Data.Bool(true)),
+                        lpf.constant(Data.Bool(false)))),
+                    lpf.typecheck(
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("author"))),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.constant(Data.Bool(true)),
+                      lpf.constant(Data.Bool(false))))),
+                lpf.let('__tmp6,
+                  lpf.invoke2(Filter, // filter right side types
+                    lpf.free('__tmp2),
+                    lpf.typecheck(
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("author"))),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.constant(Data.Bool(true)),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.invoke3(InnerJoin, // join post type filters
+                    lpf.free('__tmp5),
+                    lpf.free('__tmp6),
+                    lpf.invoke2(And,
+                      lpf.invoke2(Eq,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("sha"))),
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ArrayProject,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("parents"))),
+                            lpf.constant(Data.Int(0))),
+                          lpf.constant(Data.Str("sha")))),
+                      lpf.invoke2(Eq,
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("author"))),
+                          lpf.constant(Data.Str("login"))),
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
+                          lpf.constant(Data.Str("login")))))))),
+              lpf.invoke1(Squash,
+                lpf.invoke2(ObjectConcat,
+                  lpf.invoke2(ObjectConcat,
+                    lpf.invoke2(ObjectConcat,
+                      lpf.invoke2(MakeObject,
+                        lpf.constant(Data.Str("child")),
+                        lpf.let('__tmp7,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                          lpf.typecheck(
+                            lpf.free('__tmp7),
+                            Type.Obj(Map(), Some(Type.Top)),
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("sha"))),
+                            lpf.constant(Data.NA)))),
+                      lpf.invoke2(MakeObject,
+                        lpf.constant(Data.Str("c_auth")),
+                        lpf.let('__tmp8,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                          lpf.typecheck(
+                            lpf.free('__tmp8),
+                            Type.Obj(Map(), Some(Type.Top)),
+                            lpf.let('__tmp9,
+                              lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("author"))),
+                              lpf.typecheck(
+                                lpf.free('__tmp9),
+                                Type.Obj(Map(), Some(Type.Top)),
+                                lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("login"))),
+                                lpf.constant(Data.NA))),
+                            lpf.constant(Data.NA))))),
+                    lpf.invoke2(MakeObject,
+                      lpf.constant(Data.Str("parent")),
+                      lpf.let('__tmp10,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
+                        lpf.typecheck(
+                          lpf.free('__tmp10),
+                          Type.Obj(Map(), Some(Type.Top)),
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("sha"))),
+                          lpf.constant(Data.NA))))),
+                  lpf.invoke2(MakeObject,
+                    lpf.constant(Data.Str("p_auth")),
+                    lpf.let('__tmp11,
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
+                      lpf.typecheck(
+                        lpf.free('__tmp11),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.let('__tmp12,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp11), lpf.constant(Data.Str("author"))),
+                          lpf.typecheck(
+                            lpf.free('__tmp12),
+                            Type.Obj(Map(), Some(Type.Top)),
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("login"))),
+                            lpf.constant(Data.NA))),
+                        lpf.constant(Data.NA))))))))))
+    }
+
+    "compile with typecheck in multiple join condition followed by filter" in {
+      testTypedLogicalPlanCompile("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits_dup as r on r.sha = l.parents[0].sha and l.author.login = r.author.login where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\"",
+        lpf.let('__tmp0,
+          lpf.let('__tmp1,
+            read("slamengine_commits"),
+            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
+          lpf.let('__tmp2,
+            lpf.let('__tmp3,
+              read("slamengine_commits_dup"),
+              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+            lpf.let('__tmp4,
+              lpf.let('__tmp5,
+                lpf.invoke2(Filter, // filter left side types
+                  lpf.free('__tmp0),
+                  lpf.invoke2(And,
+                    lpf.invoke2(And,
+                      lpf.typecheck(
+                        lpf.invoke2(ArrayProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
+                          lpf.constant(Data.Int(0))),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.constant(Data.Bool(true)),
+                        lpf.constant(Data.Bool(false))),
+                      lpf.typecheck(
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
+                        Type.FlexArr(0, None, Type.Top),
+                        lpf.constant(Data.Bool(true)),
+                        lpf.constant(Data.Bool(false)))),
+                    lpf.typecheck(
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("author"))),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.constant(Data.Bool(true)),
+                      lpf.constant(Data.Bool(false))))),
+                lpf.let('__tmp6,
+                  lpf.invoke2(Filter, // filter right side types
+                    lpf.free('__tmp2),
+                    lpf.typecheck(
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("author"))),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.constant(Data.Bool(true)),
+                      lpf.constant(Data.Bool(false)))),
+                  lpf.invoke3(InnerJoin, // join post type filters
+                    lpf.free('__tmp5),
+                    lpf.free('__tmp6),
+                    lpf.invoke2(And,
+                      lpf.invoke2(Eq,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("sha"))),
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ArrayProject,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("parents"))),
+                            lpf.constant(Data.Int(0))),
+                          lpf.constant(Data.Str("sha")))),
+                      lpf.invoke2(Eq,
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("author"))),
+                          lpf.constant(Data.Str("login"))),
+                        lpf.invoke2(ObjectProject,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
+                          lpf.constant(Data.Str("login")))))))),
+              lpf.let('__tmp7,
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp4),
+                  lpf.let('__tmp8,
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                    lpf.typecheck(
+                      lpf.free('__tmp8),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.let('__tmp9,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("author"))),
+                        lpf.typecheck(
+                          lpf.free('__tmp9),
+                          Type.Obj(Map(), Some(Type.Top)),
+                          lpf.let('__tmp10,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("login"))),
+                            lpf.typecheck(
+                              lpf.free('__tmp10),
+                              Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
+                              lpf.let('__tmp11,
+                                lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
+                                lpf.typecheck(
+                                  lpf.free('__tmp11),
+                                  Type.Obj(Map(), Some(Type.Top)),
+                                  lpf.let('__tmp12,
+                                    lpf.invoke2(ObjectProject, lpf.free('__tmp11), lpf.constant(Data.Str("author"))),
+                                    lpf.typecheck(
+                                      lpf.free('__tmp12),
+                                      Type.Obj(Map(), Some(Type.Top)),
+                                      lpf.let('__tmp13,
+                                        lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("login"))),
+                                        lpf.typecheck(
+                                          lpf.free('__tmp13),
+                                          Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
+                                          lpf.invoke2(Eq,
+                                            lpf.invoke2(Concat,
+                                              lpf.invoke2(Concat, lpf.free('__tmp13), lpf.constant(Data.Str(","))),
+                                              lpf.free('__tmp10)),
+                                            lpf.constant(Data.Str("jdegoes,jdegoes"))),
+                                          lpf.constant(Data.NA))),
+                                      lpf.constant(Data.NA))),
+                                  lpf.constant(Data.NA))),
+                              lpf.constant(Data.NA))),
+                          lpf.constant(Data.NA))),
+                      lpf.constant(Data.NA)))),
+                lpf.invoke1(Squash,
+                  lpf.invoke2(ObjectConcat,
+                    lpf.invoke2(ObjectConcat,
+                      lpf.invoke2(ObjectConcat,
+                        lpf.invoke2(MakeObject,
+                          lpf.constant(Data.Str("child")),
+                          lpf.let('__tmp14,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("left"))),
+                            lpf.typecheck(
+                              lpf.free('__tmp14),
+                              Type.Obj(Map(), Some(Type.Top)),
+                              lpf.invoke2(ObjectProject, lpf.free('__tmp14), lpf.constant(Data.Str("sha"))),
+                              lpf.constant(Data.NA)))),
+                        lpf.invoke2(MakeObject,
+                          lpf.constant(Data.Str("c_auth")),
+                          lpf.let('__tmp15,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("left"))),
+                            lpf.typecheck(
+                              lpf.free('__tmp15),
+                              Type.Obj(Map(), Some(Type.Top)),
+                              lpf.let('__tmp16,
+                                lpf.invoke2(ObjectProject, lpf.free('__tmp15), lpf.constant(Data.Str("author"))),
+                                lpf.typecheck(
+                                  lpf.free('__tmp16),
+                                  Type.Obj(Map(), Some(Type.Top)),
+                                  lpf.invoke2(ObjectProject, lpf.free('__tmp16), lpf.constant(Data.Str("login"))),
+                                  lpf.constant(Data.NA))),
+                              lpf.constant(Data.NA))))),
+                      lpf.invoke2(MakeObject,
+                        lpf.constant(Data.Str("parent")),
+                        lpf.let('__tmp17,
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("right"))),
+                          lpf.typecheck(
+                            lpf.free('__tmp17),
+                            Type.Obj(Map(), Some(Type.Top)),
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp17), lpf.constant(Data.Str("sha"))),
+                            lpf.constant(Data.NA))))),
+                    lpf.invoke2(MakeObject,
+                      lpf.constant(Data.Str("p_auth")),
+                      lpf.let('__tmp18,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("right"))),
+                        lpf.typecheck(
+                          lpf.free('__tmp18),
+                          Type.Obj(Map(), Some(Type.Top)),
+                          lpf.let('__tmp19,
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp18), lpf.constant(Data.Str("author"))),
+                            lpf.typecheck(
+                              lpf.free('__tmp19),
+                              Type.Obj(Map(), Some(Type.Top)),
+                              lpf.invoke2(ObjectProject, lpf.free('__tmp19), lpf.constant(Data.Str("login"))),
+                              lpf.constant(Data.NA))),
+                          lpf.constant(Data.NA)))))))))))
     }
 
     "compile select substring" in {

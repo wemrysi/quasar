@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,10 @@ import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._
+import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fp.eitherT._
 import quasar.frontend.SemanticErrsT
 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._
@@ -146,7 +145,7 @@ object QueryFile {
     (implicit
       merr: MonadError_[M, FileSystemError],
       mtell: MonadTell_[M, PhaseResults],
-      R:        Const[Read, ?] :<: QS,
+      R: Const[Read[APath], ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
       CQ: Coalesce.Aux[T, QS, QS],
@@ -160,14 +159,14 @@ object QueryFile {
     val rewrite = new Rewrite[T]
 
     type InterimQS[A] =
-      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
 
     implicit val interimQsToQscriptTotal
         : Injectable.Aux[InterimQS, QScriptTotal[T, ?]] =
       Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
         Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
           Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-            Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
+            Injectable.inject[Const[Read[APath], ?], QScriptTotal[T, ?]])))
 
     convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
       .fold(

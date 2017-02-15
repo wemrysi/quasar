@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,20 @@ package quasar.api.services
 
 import scala.Predef.$conforms
 import quasar.Predef._
-import quasar.Data
+import quasar.{Data, RepresentableData}
 import quasar.DataArbitrary._
+import quasar.RepresentableDataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.csv.CsvParser
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 
-import argonaut.Json
+import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
@@ -40,10 +42,11 @@ import org.specs2.matcher.MatchResult
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
+import scodec.bits.ByteVector
 
 import quasar.api.MessageFormatGen._
 
@@ -393,12 +396,13 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           }
         }
         "accept valid data" >> {
-          def accept[A: EntityEncoder](body: A, expected: List[Data]) =
+          def accept[A: EntityEncoder](body: A, expected: List[Data], mediaType: Option[MediaType] = None) =
             prop { (fileName: FileName, preExistingContent: Vector[Data]) =>
               val sampleFile = rootDir[Sandboxed] </> file1(fileName)
               val request = Request(uri = pathUri(sampleFile), method = method).withBody(body).unsafePerformSync
+              val overrideContentType = mediaType.cata(mt => request.withContentType(`Content-Type`(mt).some), request)
               val (service, ref) = serviceRef(InMemState.fromFiles(Map(sampleFile -> preExistingContent)))
-              val response = service(request).unsafePerformSync
+              val response = service(overrideContentType).unsafePerformSync
               response.as[String].unsafePerformSync must_== ""
               response.status must_== Status.Ok
               val expectedWithPreExisting =
@@ -447,10 +451,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               accept(Csv("a,b\n1,\n,12:34:56"), expectedData)
             }
             "weird" >> {
+              val specialCsvMediaType = MessageFormat.Csv(CsvParser.Format('|', ''', '"', "\n"), None).mediaType
               val weirdData = List(
                 Data.Obj(ListMap("a" -> Data.Int(1))),
                 Data.Obj(ListMap("b" -> Data.Str("[1|2|3]"))))
-              accept(Csv("a|b\n1|\n|'[1|2|3]'\n"), weirdData)
+              accept(Csv("a|b\n1|\n|'[1|2|3]'\n"), weirdData, Some(specialCsvMediaType))
             }.flakyTest
           }
         }
@@ -465,6 +470,94 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_== Status.InternalServerError
             response.as[String].unsafePerformSync must contain("anything but 4")
         }
+      }
+    }
+    "PUT" >> {
+      "download and re-upload directory" >> prop { (baseDir: ADir, rFile: RFile, content: NonEmptyList[RepresentableData]) =>
+        val initialContent = Map((baseDir </> rFile) -> content.map(_.data).toVector)
+
+        // NB: only Precise format preserves all possible Data
+        val mediaType = jsonPreciseLine.mediaType
+
+        val downloadRequest = Request(uri = pathUri(baseDir), headers = Headers(Accept(mediaType)))
+        val (originalService, _) = serviceRef(InMemState.fromFiles(initialContent))
+        val zippedResponse = originalService(downloadRequest).flatMap(_.as[ByteVector]).unsafePerformSync
+
+        val uploadRequest = Request(uri = pathUri(baseDir), method = Method.PUT)
+                              .withBody(zippedResponse).unsafePerformSync
+                              .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+        val (emptyService, getState) = serviceRef(InMemState.empty)
+        val uploadResponse = emptyService(uploadRequest).unsafePerformSync
+
+        uploadResponse.as[String].unsafePerformSync must_== ""
+        uploadResponse.status must_== Status.Ok
+        getState.unsafePerformSync.contents must_== initialContent
+      }
+
+      def utf8Bytes(str: String): Process[Task, ByteVector] =
+        Process.eval(ByteVector.encodeUtf8(str).disjunction.fold(
+          err => Task.fail(new RuntimeException(err.toString)),
+          Task.now))
+
+      "upload mixed content" >> prop { (baseDir: ADir, files: Map[RFile, MessageFormat]) =>
+        files.size > 1 ==> {
+
+          val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+
+            val metadata = ArchiveMetadata(files.map { case (p, fmt) =>
+            p -> FileMetadata(`Content-Type`(fmt.mediaType))
+          })
+
+          val metaBytes = utf8Bytes(EncodeJson.of[ArchiveMetadata].encode(metadata).pretty(minspace))
+
+          val body = Zip.zipFiles[Task](
+            files.map { case (p, fmt) =>
+              p -> fmt.encode[Task](Process.emitAll(content))
+                .flatMap(utf8Bytes)
+            } + (ArchiveMetadata.HiddenFile -> metaBytes))
+
+          val contentMap = files.map { case (p, _) => (baseDir </> p) -> content }
+
+          val (service, ref) = serviceRef(InMemState.empty)
+          (for {
+            request <- Request(uri = pathUri(baseDir), method = Method.PUT)
+              .withBody(body)
+              .map(_.withContentType(`Content-Type`(MediaType.`application/zip`).some))
+            response <- service(request)
+            body <- response.as[String]
+            state <- ref
+          } yield {
+            body must_== ""
+            response.status must_== Status.Ok
+            state.contents must_== contentMap
+          }).unsafePerformSync
+        }
+      }
+      "fail upload with no metadata" >> prop { (baseDir: ADir, files: Map[RFile, MessageFormat]) =>
+        val content = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+
+        val body = Zip.zipFiles[Task](
+          files.map { case (p, fmt) =>
+            p -> fmt.encode[Task](Process.emitAll(content))
+                  .flatMap(str => utf8Bytes(str))
+          })
+
+        val contentMap = files.map { case (p, _) => (baseDir </> p) -> content }
+
+        val (service, ref) = serviceRef(InMemState.empty)
+        (for {
+          request <- Request(uri = pathUri(baseDir), method = Method.PUT)
+                        .withBody(body)
+                        .map(_.withContentType(`Content-Type`(MediaType.`application/zip`).some))
+          response <- service(request)
+          error    <- response.as[ApiError]
+          state    <- ref
+        } yield {
+          response.status must_== Status.BadRequest
+          error must beApiErrorLike[DecodeFailure](
+            InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)))
+          state.contents must_== Map.empty
+        }).unsafePerformSync
       }
     }
     "MOVE" >> {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.ejson, ejson.EJson
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.MapFuncs._
@@ -35,40 +36,44 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
-  type QS[A] =
-    (QScriptCore :\:
-      ThetaJoin :\:
-      Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+  type QS[A] = (
+    QScriptCore           :\:
+    ThetaJoin             :\:
+    Const[Read[APath], ?] :/:
+    Const[DeadEnd, ?]
+  )#M[A]
 
-  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  =    implicitly[Const[Read, ?] :<: QS]
-  val QC =       implicitly[QScriptCore :<: QS]
-  val TJ =         implicitly[ThetaJoin :<: QS]
+  val DE = implicitly[Const[DeadEnd, ?]     :<: QS]
+  val R  = implicitly[Const[Read[APath], ?] :<: QS]
+  val QC = implicitly[QScriptCore           :<: QS]
+  val TJ = implicitly[ThetaJoin             :<: QS]
 
   implicit val QS: Injectable.Aux[QS, QST] =
     ::\::[QScriptCore](
       ::\::[ThetaJoin](
-        ::/::[Fix, Const[Read, ?], Const[DeadEnd, ?]]))
+        ::/::[Fix, Const[Read[APath], ?], Const[DeadEnd, ?]]))
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
-  def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
+  def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
 
   type QST[A] = QScriptTotal[A]
 
   def QST[F[_]](implicit ev: Injectable.Aux[F, QST]) = ev
 
-  val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
-  val RT  =        implicitly[Const[Read, ?] :<: QST]
-  val QCT =           implicitly[QScriptCore :<: QST]
-  val TJT =             implicitly[ThetaJoin :<: QST]
-  val EJT =              implicitly[EquiJoin :<: QST]
-  val PBT =         implicitly[ProjectBucket :<: QST]
-  val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
+  val DET  =            implicitly[Const[DeadEnd, ?] :<: QST]
+  val RTP  =        implicitly[Const[Read[APath], ?] :<: QST]
+  val RTF  =        implicitly[Const[Read[AFile], ?] :<: QST]
+  val QCT  =                  implicitly[QScriptCore :<: QST]
+  val TJT  =                    implicitly[ThetaJoin :<: QST]
+  val EJT  =                     implicitly[EquiJoin :<: QST]
+  val PBT  =                implicitly[ProjectBucket :<: QST]
+  val SRT  = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
+  val SRTF = implicitly[Const[ShiftedRead[AFile], ?] :<: QST]
 
   val RootRT: QST[Fix[QST]] = DET.inj(Const[DeadEnd, Fix[QST]](Root))
   val UnreferencedRT: QST[Fix[QST]] = QCT.inj(Unreferenced[Fix, Fix[QST]]())
-  def ReadRT(file: AFile): QST[Fix[QST]] = RT.inj(Const(Read(file)))
+  def ReadRT(file: AFile): QST[Fix[QST]] = RTF.inj(Const(Read(file)))
 
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
@@ -144,15 +149,17 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
           FileName("zips").right,
           FileName("car").right)
 
+  def lc = listContents >>> (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]])
+
   implicit val monadTell: MonadTell[FileSystemErrT[PhaseResultT[Id, ?], ?], PhaseResults] =
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def convert(lc: Option[DiscoverPath.ListContents[Id]], lp: Fix[LP]):
+  def convert(lc: Option[DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Id, ?], ?]]], lp: Fix[LP]):
       Option[Fix[QS]] =
     lc.fold(
       QueryFile.convertToQScript[Fix, QS](lp))(
-      f => QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](f >>> (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]]))(lp))
+      QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](_)(lp))
       .toOption.run.copoint
 
   val ejsonNull =

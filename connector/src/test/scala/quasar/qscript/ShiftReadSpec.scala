@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{Data, TreeMatchers}
 import quasar.fp._
+import quasar.contrib.pathy.APath
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._
 
@@ -48,12 +49,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       newQScript must
       beTreeEqual(
         Fix(QCT.inj(Map(
-          Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
+          Fix(SRT.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
           Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
     }
 
     "shift a simple aggregated read" in {
-      convert(listContents.some,
+      convert(lc.some,
         structural.MakeObject(
           lpf.constant(Data.Str("0")),
           agg.Count(lpRead("/foo/bar")).embed).embed).map(
@@ -61,7 +62,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           rewrite.normalize[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
       beTreeEqual(chain(
-        SRT.inj(Const[ShiftedRead, Fix[QST]](
+        SRT.inj(Const[ShiftedRead[APath], Fix[QST]](
           ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
         QCT.inj(Reduce((),
           NullLit(),
