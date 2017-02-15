@@ -36,7 +36,7 @@ import scalaz._
   * Parquet Mutable Dragons
   * 
   * Due to the nature of java-like parquet-mr API we need to deal
-  * with mutable datastrucutres and "protocol" that requries 
+  * with mutable data strucutres and "protocol" that requires
   * mutability (e.g see method getCurrentRecord())
   * 
   * This is private to ParquetRDD as to not expose mutability
