@@ -94,11 +94,9 @@ object Dependencies {
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
-  def parquet = Seq(
-    "org.apache.parquet" % "parquet-format" % "2.3.1",
-    "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
-    "org.apache.hadoop" % "hadoop-client" % "2.3.0" % "provided"
-  )
+  // def parquet = Seq(
+    // "org.apache.hadoop" % "hadoop-client" % "2.3.0" % "provided"
+  // )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
     ("org.apache.spark" %% "spark-core" % "2.0.1" % (if(sparkProvided) "provided" else "compile"))
@@ -110,7 +108,9 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
       .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      .exclude("org.scalatest", "scalatest_2.11")
+      .exclude("org.scalatest", "scalatest_2.11"),
+    "org.apache.parquet" % "parquet-format" % "2.3.1",
+    "org.apache.parquet" % "parquet-hadoop" % "1.9.0"
   )
 
   def marklogicValidation = Seq(
