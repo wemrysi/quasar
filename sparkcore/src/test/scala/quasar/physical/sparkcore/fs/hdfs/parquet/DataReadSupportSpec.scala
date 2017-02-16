@@ -75,30 +75,32 @@ class DataReadSupportSpec extends Qspec {
       )
     }
 
-    "read lists" in {
-      val data = readAll(path("/test-data-4.parquet")).unsafePerformSync
-      data must_= Vector(
-        Data.Obj(
-          "skills" -> Data.Arr(List(
-            Data.Str("scala"),
-            Data.Str("FP"),
-            Data.Str("spillikins")
-          ))
+    "lists" should {
+      "be read" in {
+        val data = readAll(path("/test-data-5.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Arr(List(
+              Data.Str("scala"),
+              Data.Str("FP"),
+              Data.Str("spillikins")
+            ))
+          )
         )
-      )
-    }
+      }
 
-    "read lists alternative" in {
-      val data = readAll(path("/test-data-3.parquet")).unsafePerformSync
-      data must_= Vector(
-        Data.Obj(
-          "skills" -> Data.Arr(List(
-            Data.Obj("element" -> Data.Str("scala")),
-            Data.Obj("element" -> Data.Str("FP")),
-            Data.Obj("element" -> Data.Str("spillikins"))
-          ))
+      "be read even if data is not following LIST specification" in {
+        val data = readAll(path("/test-data-4.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Arr(List(
+              Data.Str("scala"),
+              Data.Str("FP"),
+              Data.Str("spillikins")
+            ))
+          )
         )
-      )
+      }      
     }
   }
 }

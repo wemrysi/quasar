@@ -135,11 +135,14 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
     override def start(): Unit = {}
     override def end(): Unit = {
-      parent.save(name, Data.Arr(values.toList))
+      val normalize = values.toList.map {
+        case Data.Obj(lm) if lm.size == 1 && lm.isDefinedAt("element") => lm("element")
+        case o => o
+      }
+      parent.save(name, Data.Arr(normalize))
       values.clear()
     }
   }
-
 
   private class DataStringConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
