@@ -102,5 +102,20 @@ class DataReadSupportSpec extends Qspec {
         )
       }      
     }
+
+    "map" should {
+      "be read" in {
+        val data = readAll(path("/test-data-6.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Obj(ListMap(
+              "scala" -> Data.Str("good"),
+              "FP" -> Data.Str("very good"),
+              "spillikins" -> Data.Str("bad")
+            ))
+          )
+        )
+      }
+    }
   }
 }

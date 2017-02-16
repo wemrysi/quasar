@@ -84,6 +84,8 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
         case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), save)
         case OriginalType.LIST =>
           new DataListConverter(field.asGroupType(), field.getName(), this)
+        case OriginalType.MAP =>
+          new DataMapConverter(field.asGroupType(), field.getName(), this)
         case a if !field.isPrimitive() =>
           new DataGroupConverter(field.asGroupType(), Some((field.getName(), this)))
         case _ => new DataPrimitiveConverter(field.getName(), save)
@@ -140,6 +142,37 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
         case o => o
       }
       parent.save(name, Data.Arr(normalize))
+      values.clear()
+    }
+  }
+
+  private class DataMapConverter(
+    val schema: GroupType,
+    name: String,
+    parent: ConverterLike
+  ) extends GroupConverter with ConverterLike {
+
+    val values: MList[Data] = MList()
+
+    def save: (String, Data) => Unit = (name: String, data: Data) => {
+      values += data
+      ()
+    }
+
+    override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
+    override def start(): Unit = {}
+    override def end(): Unit = {
+      val na = ("n/a" -> Data.NA)
+      val emptyObj = Data.Obj(ListMap[String, Data]())
+      def normalize = values.filter(_ != emptyObj).map {
+        case Data.Obj(lm) => lm.toList match {
+          case ("key" -> Data.Str(k)) :: ("value" -> v) :: Nil => (k -> v)
+          case ("value" -> v) :: ("key" -> Data.Str(k)) :: Nil => (k -> v)
+          case _ => na
+        }
+        case o => ("key_value", o)
+      }
+      parent.save(name, Data.Obj(normalize:_*))
       values.clear()
     }
   }
