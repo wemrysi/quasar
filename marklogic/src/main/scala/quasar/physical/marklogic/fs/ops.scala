@@ -22,7 +22,8 @@ import quasar.contrib.scalaz._
 import quasar.effect.uuid._
 import quasar.fp.numeric._
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.qscript.StructuralPlanner
+import quasar.physical.marklogic.qscript._
+import quasar.physical.marklogic.xml.NCName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
@@ -34,12 +35,10 @@ import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 object ops {
-  import expr.func
-
-  private type W[A] = Writer[Prologs, A]
+  import expr.{func, let_}
 
   /** Appends the given contents to the file, which must already exist. */
-  def appendToFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT, A](
+  def appendToFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
     file: AFile,
     contents: A
   )(implicit
@@ -47,14 +46,13 @@ object ops {
     SP: StructuralPlanner[F, FMT]
   ): F[ErrorMessages \/ Vector[XccError]] = {
     def appendQuery(src: AFile): F[MainModule] =
-      MainModule fromWritten {
-        SP.leftShift(lib.rootNode(src))
-          .flatMap(lib.appendChildNodes[F, FMT].apply(lib.rootNode(file), _))
-          .strengthL(Version.`1.0-ml`)
+      main10ml {
+        SP.leftShift(fileRoot[FMT](src))
+          .flatMap(lib.appendChildNodes[F, FMT].apply(fileRoot[FMT](file), _))
       }
 
     val tmpFile = UuidReader[F] asks { uuid =>
-      renameFile(file, _ changeExtension (ext => s"$ext.$uuid"))
+      renameFile(file, fn => FileName(s"${fn.value}-$uuid"))
     }
 
     Xcc[F].transact(for {
@@ -68,10 +66,9 @@ object ops {
 
   /** Returns whether the server is configured to create directories automatically. */
   def automaticDirectoryCreationEnabled[F[_]: Functor: Xcc]: F[Boolean] = {
-    val main = MainModule fromWritten {
+    val main = main10ml {
       admin.getConfiguration[W]
         .flatMap(admin.databaseGetDirectoryCreation[W](_, xdmp.database()))
-        .strengthL(Version.`1.0-ml`)
     }
 
     Xcc[F].results(main.value) map {
@@ -100,26 +97,47 @@ object ops {
   }
 
   /** Deletes the given directory and all descendants, recursively. */
-  def deleteDir[F[_]: Xcc](dir: ADir): F[Executed] =
-    Xcc[F].executeQuery(xdmp.directoryDelete(pathUri(dir).xs))
+  def deleteDir[F[_]: Xcc: Applicative, FMT: SearchOptions](dir: ADir): F[Executed] = {
+    val file = $("file")
+
+    val deleteFiles =
+      fn.map(
+        func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
+        directoryDocuments[FMT](pathUri(dir).xs, true))
+
+    (Xcc[F].executeQuery(deleteFiles) *> deleteEmptyDescendantDirectories[F](dir)).transact
+  }
+
+  /** Delete all empty descendant directories. */
+  def deleteEmptyDescendantDirectories[F[_]: Xcc](dir: ADir): F[Executed] = {
+    val query =
+      lib.emptyDescendantDirectories[W].apply(pathUri(dir).xs)
+        .map(empties => fn.map(xdmp.ns(NCName("document-delete")) :# 1, empties))
+
+    Xcc[F].execute(main10ml(query).value)
+  }
 
   /** Deletes the given file, erroring if it doesn't exist. */
   def deleteFile[F[_]: Xcc](file: AFile): F[Executed] =
     Xcc[F].executeQuery(xdmp.documentDelete(pathUri(file).xs))
 
+  /** Returns whether any file descendants of the given dir have the specified format. */
+  def descendantsHavingFormatExist[F[_]: Xcc: Functor, FMT: SearchOptions](dir: ADir): F[Boolean] = {
+    val main = main10ml(lib.descendantsHavingFormatExist[W, FMT] apply pathUri(dir).xs)
+    Xcc[F].results(main.value) map booleanResult
+  }
+
   /** The set of child directories and files of the given directory. */
-  def directoryContents[F[_]: Functor: Xcc](dir: ADir): F[Set[PathSegment]] = {
+  def directoryContents[F[_]: Functor: Xcc, FMT: SearchOptions](dir: ADir): F[Set[PathSegment]] = {
     def parseDir(s: String): Option[PathSegment] =
-      UriPathCodec.parseAbsDir(s) flatMap dirName map (_.left)
+      UriPathCodec.parseRelDir(s) flatMap dirName map (_.left)
 
     def parseFile(s: String): Option[PathSegment] =
-      UriPathCodec.parseAbsFile(s) map (f => fileName(f).right)
+      UriPathCodec.parseRelFile(s) map (f => fileName(f).right)
 
-    val main = MainModule.fromWritten(
-      lib.directoryContents[W].apply(pathUri(dir).xs) strengthL Version.`1.0-ml`
-    ).value
+    val main = main10ml(lib.directoryContents[W, FMT] apply pathUri(dir).xs)
 
-    Xcc[F].results(main) map (_ foldMap {
+    Xcc[F].results(main.value) map (_ foldMap {
       case item: XSString =>
         val str = item.asString
         (parseDir(str) orElse parseFile(str)).toSet
@@ -131,10 +149,12 @@ object ops {
   /** Ensure the given directory exists, creating it if necessary. */
   def ensureDirectory[F[_]: Monad: Xcc](dir: ADir): F[Executed] = {
     import XccError.Code
+
+    def isDirExists(code: String) =
+      Code.string.getOption(code) exists (_ === Code.DirExists)
+
     Xcc[F].executeQuery(xdmp.directoryCreate(pathUri(dir).xs)) handle {
-      case XccError.QueryError(_, c)
-             if Code.string.getOption(c.getCode).exists(_ === Code.DirExists) =>
-        Executed.executed
+      case XccError.QueryError(_, c) if isDirExists(c.getCode) => Executed.executed
     }
   }
 
@@ -148,90 +168,99 @@ object ops {
       .transact
   }
 
-  /** Returns whether the given path exists. */
-  def exists[F[_]: Monad: Xcc](path: APath): F[Boolean] = {
-    def dirExists(d: ADir): XQuery   = fn.exists(cts.uriMatch(s"${pathUri(d)}*".xs, IList()))
-    def fileExists(f: AFile): XQuery = fn.docAvailable(pathUri(f).xs)
+  /** Returns whether the file exists, regardless of format. */
+  def fileExists[F[_]: Functor: Xcc](file: AFile): F[Boolean] =
+    Xcc[F].queryResults(fn.docAvailable(pathUri(file).xs)) map booleanResult
 
-    Xcc[F].queryResults(refineType(path).fold(dirExists, fileExists)) map {
-      case Vector(b: XSBoolean) => b.asPrimitiveBoolean
-      case _                    => false
-    }
-  }
+  /** Returns whether the file having the given format exists. */
+  def fileHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](file: AFile): F[Boolean] =
+    Xcc[F].queryResults(fn.exists(fileNode[FMT](file))) map booleanResult
 
   /** Move `src` to `dst` overwriting any existing contents. */
-  def moveDir[F[_]: Monad: Xcc: PrologW: PrologL](src: ADir, dst: ADir): F[Executed] = {
+  def moveDir[F[_]: Monad: Xcc, FMT: SearchOptions](src: ADir, dst: ADir): F[Executed] = {
     val decodeDir: XdmItem => Option[ADir] = {
       case str: XSString => UriPathCodec.parseAbsDir(str.asString) map (sandboxAbs(_))
       case _             => None
     }
 
-    val dstDirs =
-      lib.copyDirectory[F].apply(pathUri(src).xs, pathUri(dst).xs) map { uris =>
-        val u = $("u")
-        fn.distinctValues(fn.map(func(u.render) {
-          fn.stringJoin(
-            mkSeq_(fn.tokenize(~u, "/".xs)(1.xqy to mkSeq_(fn.last - 1.xqy)), "".xs),
-            "/".xs)
-        }, uris))
-      }
+    val (file, srcUri, dstUri) = ($("file"), $("srcUri"), $("dstUri"))
 
-    if (src === dst)
-      Executed.executed.point[F]
-    else
-      Xcc[F].transact(for {
-        query  <- MainModule.fromWritten(dstDirs strengthL Version.`1.0-ml`)
-        items  <- Xcc[F].results(query)
-        dirs   =  items.map(decodeDir).unite
-        _      <- dirs traverse_ (ensureLineage[F](_).void)
-        exec   <- deleteDir[F](src)
-      } yield exec)
+    val dstDirs = (
+      lib.moveFile[W, FMT].apply(~srcUri, ~dstUri) |@|
+      lib.fileParent[W].apply(~dstUri)
+    ) { (doMove, parentDir) =>
+        fn.distinctValues(fn.map(
+          func(file.render) {
+            let_(
+              srcUri := fn.baseUri(~file),
+              dstUri := fn.concat(
+                          pathUri(dst).xs,
+                          fn.substringAfter(~srcUri, pathUri(src).xs)),
+              $("_") := doMove)
+            .return_(parentDir)
+          },
+          directoryDocuments[FMT](pathUri(src).xs, true)))
+    }
+
+    val doMoveDir = for {
+      items <- Xcc[F].results(main10ml(dstDirs).value)
+      dirs  =  items.map(decodeDir).unite
+      _     <- dirs traverse_ (ensureLineage[F](_).void)
+      _     <- deleteEmptyDescendantDirectories[F](src)
+    } yield ()
+
+    (src =/= dst) whenM doMoveDir.transact as Executed.executed
   }
 
   /** Move `src` to `dst` overwriting any existing contents. */
-  def moveFile[F[_]: Monad: Xcc](src: AFile, dst: AFile): F[Executed] = {
-    def insertDst = Xcc[F] executeQuery {
-      xdmp.documentInsert(pathUri(dst).xs, fn.doc(pathUri(src).xs))
-    }
-
-    if (src === dst)
-      Executed.executed.point[F]
-    else
-      exists[F](src)
-        .flatMap(_ whenM (insertDst *> deleteFile(src)))
-        .transact
-        .as(Executed.executed)
+  def moveFile[F[_]: Monad: Xcc, FMT: SearchOptions](src: AFile, dst: AFile): F[Executed] = {
+    val main = main10ml(lib.moveFile[W, FMT] apply (pathUri(src).xs, pathUri(dst).xs))
+    (src =/= dst) whenM Xcc[F].execute(main.value) as Executed.executed
   }
 
+  /** Returns whether the given path exists having the specified format. */
+  def pathHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](path: APath): F[Boolean] =
+    refineType(path).fold(descendantsHavingFormatExist[F, FMT], fileHavingFormatExists[F, FMT])
+
   /** Stream of the left-shifted contents of the given file. */
-  def readFile[F[_]: Monad: Xcc: PrologL, FMT](
+  def readFile[F[_]: Monad: Xcc: PrologL, FMT: SearchOptions](
     file: AFile,
     offset: Natural,
     limit: Option[Positive]
   )(implicit
     SP: StructuralPlanner[F, FMT]
   ): Process[F, XdmItem] = {
-    val query = SP.leftShift(lib.rootNode(file)) map { items =>
+    val query = SP.leftShift(fileRoot[FMT](file)) map { items =>
       (offset.get + 1, limit.map(_.get.xqy)) match {
         case (1, None) => items
         case (o, l)    => fn.subsequence(items, o.xqy, l)
       }
     }
 
-    MainModule.fromWritten(query strengthL Version.`1.0-ml`)
-      .liftM[Process]
-      .flatMap(Xcc[F].evaluate)
+    main10ml(query).liftM[Process].flatMap(Xcc[F].evaluate)
   }
 
   /** Appends contents to an existing file, creating it otherwise. */
-  def upsertFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT, A](
+  def upsertFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
     file: AFile,
     contents: A
   )(implicit
     C:  AsContent[FMT, A],
     SP: StructuralPlanner[F, FMT]
   ): F[ErrorMessages \/ Vector[XccError]] =
-    exists[F](file).ifM(
+    fileExists[F](file).ifM(
       appendToFile[F, FMT, A](file, contents),
       createFile[F, FMT, A](file, contents))
+
+  ////
+
+  private type W[A] = Writer[Prologs, A]
+
+  private val booleanResult: Vector[XdmItem] => Boolean = {
+    case Vector(b: XSBoolean) => b.asPrimitiveBoolean
+    case _                    => false
+  }
+
+  private def main10ml[F[_]: Functor: PrologL](query: F[XQuery]): F[MainModule] =
+    MainModule fromWritten (query strengthL Version.`1.0-ml`)
 }

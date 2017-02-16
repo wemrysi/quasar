@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.uuid.UuidReader
 import quasar.fs._
+import quasar.physical.marklogic.qscript.SearchOptions
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
 
@@ -30,12 +31,12 @@ object managefile {
   import ManageFile._
   import PathError._, FileSystemError._
 
-  def interpret[F[_]: Monad: Xcc: UuidReader]: ManageFile ~> F = {
+  def interpret[F[_]: Monad: Xcc: UuidReader, FMT: SearchOptions]: ManageFile ~> F = {
     def ifExists[A](
       path: APath)(
       thenDo: => F[FileSystemError \/ A]
     ): F[FileSystemError \/ A] =
-      ops.exists[F](path)
+      ops.pathHavingFormatExists[F, FMT](path)
         .ifM(thenDo, pathErr(pathNotFound(path)).left[A].point[F])
         .transact
 
@@ -45,12 +46,12 @@ object managefile {
           ().right[FileSystemError].point[F]
 
         case MoveSemantics.FailIfExists =>
-          ops.exists[F](dst).map(_.fold(
+          ops.pathHavingFormatExists[F, FMT](dst).map(_.fold(
             pathErr(pathExists(dst)).left[Unit],
             ().right))
 
         case MoveSemantics.FailIfMissing =>
-          ops.exists[F](dst).map(_.fold(
+          ops.pathHavingFormatExists[F, FMT](dst).map(_.fold(
             ().right,
             pathErr(pathNotFound(dst)).left[Unit]))
       })
@@ -58,13 +59,13 @@ object managefile {
     def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): F[FileSystemError \/ Unit] =
       ifExists(src)((
         checkMoveSemantics(dst, sem) *>
-        ops.moveFile[F](src, dst).void.liftM[FileSystemErrT]
+        ops.moveFile[F, FMT](src, dst).void.liftM[FileSystemErrT]
       ).run)
 
     def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): F[FileSystemError \/ Unit] =
       ifExists(src)((
         checkMoveSemantics(dst, sem) *>
-        ops.moveDir[PrologT[F, ?]](src, dst).value.void.liftM[FileSystemErrT]
+        ops.moveDir[PrologT[F, ?], FMT](src, dst).value.void.liftM[FileSystemErrT]
       ).run)
 
     def move(scenario: MoveScenario, semantics: MoveSemantics): F[FileSystemError \/ Unit] =
@@ -75,7 +76,7 @@ object managefile {
 
     def delete(path: APath): F[FileSystemError \/ Unit] =
       ifExists(path)(refineType(path).fold(
-        ops.deleteDir[F],
+        ops.deleteDir[F, FMT],
         ops.deleteFile[F]
       ) as (().right[FileSystemError]))
 

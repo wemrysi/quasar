@@ -33,14 +33,14 @@ object readfile {
   def interpret[
     F[_]: Monad: Catchable: Xcc: PrologL,
     G[_]: Monad: MonoSeq: RKvs[F, ?[_]],
-    FMT
+    FMT: SearchOptions
   ](
     chunkSize: Positive, fToG: F ~> G
   )(implicit
     SP: StructuralPlanner[F, FMT]
   ): ReadFile ~> G =
     readFromProcess(fToG) { (file, opts) =>
-      fToG(ops.exists[F](file) map (_.fold(
+      fToG(ops.pathHavingFormatExists[F, FMT](file) map (_.fold(
         ops.readFile[F, FMT](file, opts.offset, opts.limit)
           .chunk(chunkSize.get.toInt)
           .map(_ traverse xdmitem.decodeForFileSystem),

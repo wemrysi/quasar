@@ -31,7 +31,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object writefile {
-  def interpret[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT](
+  def interpret[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions](
     chunkSize: Positive
   )(
     implicit

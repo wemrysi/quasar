@@ -17,13 +17,17 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
+import eu.timepit.refined.auto._
 import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
+  val ns = Namespace(NSPrefix(NCName("xdmp")), NSUri("http://marklogic.com/xdmp"))
+
   def apply(function: XQuery, params: XQuery*): XQuery =
     XQuery(s"xdmp:apply($function, ${mkSeq(params)})")
 
@@ -38,6 +42,9 @@ object xdmp {
 
   def directoryDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:directory-delete($uri)")
+
+  def directoryProperties(uris: XQuery, depth: XQuery): XQuery =
+    XQuery(s"xdmp:directory-properties($uris, $depth)")
 
   def documentDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:document-delete($uri)")

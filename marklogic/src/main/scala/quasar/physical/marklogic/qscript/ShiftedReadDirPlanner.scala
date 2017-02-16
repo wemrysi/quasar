@@ -26,10 +26,9 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadDirPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+private[qscript] final class ShiftedReadDirPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
   implicit
-  SP: StructuralPlanner[F, FMT],
-  O: SearchOptions[FMT]
+  SP: StructuralPlanner[F, FMT]
 ) extends Planner[F, FMT, Const[ShiftedRead[ADir], ?]] {
 
   import expr._, axes.child
@@ -46,11 +45,7 @@ private[qscript] final class ShiftedReadDirPlanner[F[_]: Monad: QNameGenerator: 
   }
 
   def docsOnly(uri: XQuery): XQuery =
-    cts.search(
-      expr    = fn.doc(),
-      query   = cts.directoryQuery(uri, "1".xs),
-      options = O.searchOptions
-    ) `/` child.node()
+    directoryDocuments(uri, false) `/` child.node()
 
   def urisAndDocs(uri: XQuery): F[XQuery] =
     freshName[F] >>= { d =>

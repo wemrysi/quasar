@@ -18,13 +18,41 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.Data
+import quasar.connector.EnvironmentError
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
+import quasar.fp.numeric.Positive
+import quasar.fs._
+import quasar.fs.mount._
 
 import com.marklogic.xcc._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 object testing {
   import xcc._, xquery._, fs._
+
+  def multiFormatDef(
+    uri: ConnectionUri,
+    readChunkSize: Positive,
+    writeChunkSize: Positive
+  ): Task[(FileSystem ~> Task, FileSystem ~> Task, Task[Unit])] = {
+    def failOnError[A](err: FileSystemDef.DefinitionError): Task[A] =
+      err.fold[Task[A]](
+        errs => Task.fail(new RuntimeException(errs intercalate ", ")),
+        ee   => Task.fail(new RuntimeException(ee.shows)))
+
+    MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
+      .leftMap(_.left[EnvironmentError])
+      .flatMap { cfg =>
+        val js = fileSystem[DocType.Json](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize)
+        val xml = fileSystem[DocType.Xml](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize)
+
+        js.tuple(xml) map {
+          case (jsdr, xmldr) => (jsdr.run, xmldr.run, jsdr.close *> xmldr.close)
+        }
+      } foldM (failOnError, _.point[Task])
+  }
 
   /** Returns the results, as `Data`, of evaluating the module or `None` if
     * evaluation succeded without producing any results.

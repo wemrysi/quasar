@@ -59,7 +59,7 @@ object queryfile {
   def interpret[
     F[_]: Monad: Catchable: Xcc,
     G[_]: Monad: Xcc: PrologW: PrologL: MonoSeq: QKvs[F, ?[_]],
-    FMT
+    FMT: SearchOptions
   ](
     chunkSize: Positive, fToG: F ~> G
   )(implicit
@@ -81,7 +81,7 @@ object queryfile {
         }
 
       val deleteOutIfExists =
-        ops.exists[G](out)
+        ops.pathHavingFormatExists[G, FMT](out)
           .flatMap(_.whenM(ops.deleteFile[G](out)))
           .transact
 
@@ -108,17 +108,17 @@ object queryfile {
         .run.run
 
     def listContents(dir: ADir) =
-      ops.exists[G](dir).ifM(
-        ops.directoryContents[G](dir).map(_.right[FileSystemError]),
+      ops.pathHavingFormatExists[G, FMT](dir).ifM(
+        ops.directoryContents[G, FMT](dir).map(_.right[FileSystemError]),
         pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[G])
 
-    queryFileFromProcess[F, G](fToG, exec, eval, explain, listContents, ops.exists[G])
+    queryFileFromProcess[F, G](fToG, exec, eval, explain, listContents, ops.pathHavingFormatExists[G, FMT])
   }
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    FMT
+    FMT: SearchOptions
   ](
     lp: T[LogicalPlan]
   )(implicit
@@ -138,7 +138,7 @@ object queryfile {
       MainModule.fromWritten(qs.cataM(planner.plan) strengthL Version.`1.0-ml`)
 
     for {
-      qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F])(lp)
+      qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
       shifted =  shiftReadDir[T, QSR, MLQ].apply(qs)
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(

@@ -116,7 +116,7 @@ package object fs {
     * @param  readChunkSize  the size of a single chunk when streaming records from MarkLogic
     * @param  writeChunkSize the size of a single chunk when streaming records to MarkLogic
     */
-  def fileSystem[FMT](
+  def fileSystem[FMT: SearchOptions](
     xccUri: URI,
     rootDir: ADir,
     readChunkSize: Positive,
@@ -142,7 +142,7 @@ package object fs {
           convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](
             readChunkSize, xccEvalToMLFSQ)),
           convertWriteFileErrors(writefile.interpret[MLFSQ, FMT](writeChunkSize)),
-          managefile.interpret[MLFS]
+          managefile.interpret[MLFS, FMT]
         )) compose xformPaths, shutdown)
     }
   }
@@ -166,6 +166,7 @@ package object fs {
     }
   }
 
+  /** The URI representation of the given path. */
   def pathUri(path: APath): String =
     UriPathCodec.printPath(path)
 
@@ -234,6 +235,7 @@ package object fs {
         EnvironmentError.connectionFailed(XccError.cause.get(other)).some
     })
 
+  /** Lift XccEval into MLFSQ. */
   val xccEvalToMLFSQ: XccEval ~> MLFSQ =
     Hoist[MarkLogicPlanErrT].hoist(Hoist[PrologT].hoist(mapSNT(Inject[XccEvalEff, MarkLogicFs])))
 

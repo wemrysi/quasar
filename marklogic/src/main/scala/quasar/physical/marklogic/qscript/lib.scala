@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.fp.ski.{ι, κ}
-import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 import quasar.std.DateLib.TemporalPart
 import quasar.physical.marklogic.xquery._
@@ -37,10 +36,6 @@ object lib {
   import FunctionDecl._
 
   val qs = NamespaceDecl(qscriptNs)
-
-  val prop           = NSPrefix(NCName("prop"))
-  val propProperties = prop(NCName("properties"))
-  val propDirectory  = prop(NCName("directory"))
 
   val dateFmt     = "[Y0001]-[M01]-[D01]".xs
   val dateTimeFmt = "[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01].[f001]Z".xs

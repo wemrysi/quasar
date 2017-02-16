@@ -16,25 +16,17 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.contrib.pathy.{AFile, UriPathCodec}
+import quasar.contrib.pathy.AFile
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._, Scalaz._
+import scalaz.{Applicative, Const}
 
 private[qscript] final class ReadFilePlanner[F[_]: Applicative, FMT: SearchOptions]
   extends Planner[F, FMT, Const[Read[AFile], ?]] {
 
-  import axes.child
-
   val plan: AlgebraM[F, Const[Read[AFile], ?], XQuery] = {
-    case Const(Read(file)) =>
-      (cts.search(
-        expr    = fn.doc(),
-        query   = cts.documentQuery(UriPathCodec.printPath(file).xs),
-        options = SearchOptions[FMT].searchOptions
-      ) `/` child.node()).point[F]
+    case Const(Read(file)) => Applicative[F].point(fileRoot(file))
   }
 }
