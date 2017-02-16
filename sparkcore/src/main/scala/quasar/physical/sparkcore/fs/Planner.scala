@@ -401,7 +401,6 @@ object Planner {
     implicit F: Planner[F], G: Planner[G]):
       Planner[Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
-      
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 }
