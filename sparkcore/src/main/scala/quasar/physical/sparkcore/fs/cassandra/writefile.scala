@@ -67,7 +67,7 @@ object writefile {
       val connector = CassandraConnector(sc.getConf)
       connector.withSessionDo { implicit session =>
         val k = if(!keyspaceExists(keyspace(file))) {
-          session.execute(s"CREATE KEYSPACE ${keyspace(file)} WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};")
+          session.execute(s"CREATE KEYSPACE ${keyspace(file)} WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
         }
 
         val t = if(!tableExists(keyspace(file), tableName(file)))
