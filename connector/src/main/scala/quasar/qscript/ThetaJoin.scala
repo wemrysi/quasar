@@ -121,6 +121,10 @@ object ThetaJoin {
               case (resL, resR) => {
                 val onL: JoinFunc[IT] = updateJoin(o1, resL.lval, resR.lval)
                 val onR: JoinFunc[IT] = updateJoin(o2, resL.rval, resR.rval)
+                // The implication here is that
+                // `(l join r on X) as lj inner join (l join r on Y) as rj on lj = rj`
+                // is equivalent to
+                // `l join r on X and Y`
                 val on: JoinFunc[IT] = (onL ≟ onR).fold(onL, Free.roll(MapFuncs.And(onL, onR)))
 
                 val cL: JoinFunc[IT] = updateJoin(c1, resL.lval, resR.lval)

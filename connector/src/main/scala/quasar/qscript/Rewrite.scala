@@ -86,7 +86,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
   }
 
-  def simplifyJoins[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
+  def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<: G,
               TJ: ThetaJoin :<: G,
               SR: Const[ShiftedRead[APath], ?] :<: G,

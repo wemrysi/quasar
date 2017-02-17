@@ -188,7 +188,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       case (l,    r)    => f(l.getOrElse(lOrig), r.getOrElse(rOrig)).some
     }
 
-  private def sub(elem: FreeMap): Option[FreeMap] = {
+  private def eliminateRightSideProj(elem: FreeMap): Option[FreeMap] = {
     val oneRef = Free.roll[MapFunc, Hole](ProjectIndex(HoleF, IntLit(1)))
     val rightCount: Int = elem.elgotPara(count(HoleF))
 
@@ -336,23 +336,23 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT, SR: Const[ShiftedRead[A], ?] :<: OUT) = {
         case Map(Embed(src), mf) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ sub(mf))((const, newMF) =>
+          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProj(mf))((const, newMF) =>
             Map(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
               newMF)) <+>
           (((FToOut.get(src) >>= QC.prj) match {
             case Some(Filter(Embed(innerSrc), cond)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ sub(cond))((const, newCond) =>
+              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProj(cond))((const, newCond) =>
                 Filter(
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
                   newCond))
             case _ => None
-          }) ⊛ sub(mf))((newFilter, newMF) =>
+          }) ⊛ eliminateRightSideProj(mf))((newFilter, newMF) =>
             Map(
               FToOut.reverseGet(QC.inj(newFilter)).embed,
               newMF))
         case Reduce(Embed(src), bucket, reducers, repair) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ sub(bucket) ⊛ reducers.traverse(_.traverse(sub)))(
+          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProj(bucket) ⊛ reducers.traverse(_.traverse(eliminateRightSideProj)))(
             (const, newBuck, newRed) =>
             Reduce(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
