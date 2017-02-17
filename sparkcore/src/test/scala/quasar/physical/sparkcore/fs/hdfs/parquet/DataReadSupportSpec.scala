@@ -63,7 +63,7 @@ class DataReadSupportSpec extends Qspec {
       )
     }
 
-    "read logical types" in {
+    "read logical types: UTF8, DATE, TIME_MILIS, TIME_MICROS, TIMESTAMP_MILIS, TIMESTAMP_MICROS" in {
       val data = readAll(path("/test-data-2.parquet")).unsafePerformSync
       data must_= Vector(
         Data.Obj(
@@ -73,6 +73,19 @@ class DataReadSupportSpec extends Qspec {
           "meetingTime" -> Data.Time(LocalTime.of(0,0,4,0)),
           "creationStampMicros" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
           "meetingTimeMicros" -> Data.Time(LocalTime.of(0,0,4,0))
+        )
+      )
+    }
+
+    "read JSON type" in {
+      val data = readAll(path("/test-data-9.parquet")).unsafePerformSync
+      data must_= Vector(
+        Data.Obj(
+          "document" -> Data.Obj(
+            "name" -> Data.Str("hello"),
+            "a" -> Data.Int(10)
+          ),
+          "invalid_document" -> Data.NA
         )
       )
     }

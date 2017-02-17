@@ -17,7 +17,8 @@
 package quasar.physical.sparkcore.fs.hdfs.parquet
 
 import quasar.Predef._
-import quasar.Data
+import quasar.{Data, DataCodec}
+import quasar.fp.ski._
 
 import java.util.{Map => JMap}
 import java.time._
@@ -79,6 +80,7 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     val converters: List[Converter] =
       schema.getFields().asScala.map(field => field.getOriginalType() match {
         case OriginalType.UTF8 => new DataStringConverter(field.getName(), save)
+        case OriginalType.JSON => new DataJsonConverter(field.getName(), save)
         case OriginalType.DATE => new DataDateConverter(field.getName(), save)
         case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), save)
         case OriginalType.TIME_MICROS => new DataTimeMicroConverter(field.getName(), save)
@@ -186,6 +188,13 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
 
     override def addBinary(v: Binary): Unit =
       save(name, Data.Str(new String(v.getBytes())) : Data)
+  }
+
+  private class DataJsonConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+
+    override def addBinary(v: Binary): Unit =
+      save(name, DataCodec.parse(new String(v.getBytes()))(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
   private class DataDateConverter(name: String, save: (String, Data) => Unit)
