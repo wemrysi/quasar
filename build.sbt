@@ -67,15 +67,17 @@ lazy val buildSettings = Seq(
     "-Ywarn-unused-import"),
   scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
   // NB: Some warts are disabled in specific projects. Here’s why:
-  //   • AsInstanceOf   – puffnfresh/wartremover#266
-  //   • NoNeedForMonad – puffnfresh/wartremover#268
+  //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-    Wart.Any,                   // - see puffnfresh/wartremover#263
-    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
-    Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
+    Wart.Any,                   // - see wartremover/wartremover#263
+    Wart.ExplicitImplicitTypes, // - see wartremover/wartremover#226
+    Wart.PublicInference,       // - needs to be reviewed
+    Wart.ImplicitParameter,     // - needs to be reviewed
+    Wart.StringPlusAny,         // - needs to be reviewed
+    Wart.NoNeedForMonad,        // - see wartremover/wartremover#268 - maybe causes issues compiling with scoverage
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing),              // - see puffnfresh/wartremover#263
+    Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -227,8 +229,7 @@ lazy val foundation = project
     exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    libraryDependencies ++= Dependencies.foundation,
-    wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)
+    libraryDependencies ++= Dependencies.foundation)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -247,8 +248,7 @@ lazy val effect = project
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.AsInstanceOf,
-    Wart.NoNeedForMonad))
+    Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
@@ -273,8 +273,7 @@ lazy val common = project
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
@@ -306,8 +305,7 @@ lazy val frontend = project
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -318,8 +316,7 @@ lazy val sql = project
   .settings(commonSettings)
   .settings(
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -339,8 +336,7 @@ lazy val connector = project
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.NoNeedForMonad))
+      Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -364,7 +360,6 @@ lazy val marklogic = project
     libraryDependencies ++= Dependencies.marklogic,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -390,7 +385,6 @@ lazy val mongodb = project
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
       Wart.Equals,
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -426,7 +420,8 @@ lazy val sparkcore = project
   .settings(
     sparkDependencyProvided := false,
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
-    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -474,7 +469,6 @@ lazy val web = project
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
