@@ -227,14 +227,14 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def between_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("between") ~ default_expr ~ keyword("and") ~ default_expr ^^ {
       case kw ~ lower ~ _ ~ upper =>
-        lhs => invokeFunction(kw, List(lhs, lower, upper)).embed
+        lhs => invokeFunction(Symbol.fromString(kw), List(lhs, lower, upper)).embed
     }
 
   def in_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("in") ~ default_expr ^^ { case _ ~ a => In(_, a).embed }
 
   private def LIKE(l: T[Sql], r: T[Sql], esc: Option[T[Sql]]) =
-    invokeFunction("like",
+    invokeFunction(Symbol.fromString("like"),
       List(l, r, esc.getOrElse(stringLiteral[T[Sql]]("\\").embed))).embed
 
   def like_suffix: Parser[T[Sql] => T[Sql]] =
@@ -268,16 +268,16 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def default_expr: Parser[T[Sql]] =
     concat_expr * (
       op("~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-        invokeFunction("search",
+        invokeFunction(Symbol.fromString("search"),
           List(l, r, boolLiteral[T[Sql]](false).embed)).embed) |
         op("~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          invokeFunction("search",
+          invokeFunction(Symbol.fromString("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed) |
         op("!~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(Symbol.fromString("search"),
             List(l, r, boolLiteral[T[Sql]](false).embed)).embed).embed) |
         op("!~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(Symbol.fromString("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed).embed) |
         op("~~") ^^^ ((l: T[Sql], r: T[Sql]) => LIKE(l, r, None)) |
         op("!~~") ^^^ ((l: T[Sql], r: T[Sql]) => Not(LIKE(l, r, None)).embed))
@@ -340,7 +340,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def paren_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
 
   def function_expr: Parser[T[Sql]] =
-    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(a, xs).embed }
+    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(Symbol.fromString(a), xs).embed }
 
   def primary_expr: Parser[T[Sql]] =
     case_expr |

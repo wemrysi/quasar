@@ -95,11 +95,11 @@ trait ExprArbitrary {
         Gen.const("name, address"),
         Gen.const("q: \"a\"")) ∘
         (IdentR(_)),
-      1 -> InvokeFunctionR("timestamp", List(StringLiteralR(Instant.now.toString))),
-      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunctionR("interval", List(StringLiteralR(Duration.ofMillis(millis).toString)))),
-      1 -> InvokeFunctionR("date", List(StringLiteralR("2014-11-17"))),
-      1 -> InvokeFunctionR("time", List(StringLiteralR("12:00:00"))),
-      1 -> InvokeFunctionR("oid", List(StringLiteralR("123456")))
+      1 -> InvokeFunctionR(Symbol.fromString("timestamp"), List(StringLiteralR(Instant.now.toString))),
+      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunctionR(Symbol.fromString("interval"), List(StringLiteralR(Duration.ofMillis(millis).toString)))),
+      1 -> InvokeFunctionR(Symbol.fromString("date"), List(StringLiteralR("2014-11-17"))),
+      1 -> InvokeFunctionR(Symbol.fromString("time"), List(StringLiteralR("12:00:00"))),
+      1 -> InvokeFunctionR(Symbol.fromString("oid"), List(StringLiteralR("123456")))
     )
 
   private def complexExprGen(depth: Int): Gen[Fix[Sql]] =
@@ -124,9 +124,9 @@ trait ExprArbitrary {
           UnshiftArray))(
         UnopR(_, _)),
       2 -> (Gen.oneOf("sum", "count", "avg", "length", "make_array") ⊛ exprGen(depth))(
-        (fn, arg) => InvokeFunctionR(fn, List(arg))),
+        (fn, arg) => InvokeFunctionR(Symbol.fromString(fn), List(arg))),
       1 -> exprGen(depth) ∘
-        (arg => InvokeFunctionR("like", List(arg, StringLiteralR("B%"), StringLiteralR("")))),
+        (arg => InvokeFunctionR(Symbol.fromString("like"), List(arg, StringLiteralR("B%"), StringLiteralR("")))),
       1 -> (exprGen(depth) ⊛ casesGen(depth) ⊛ Gen.option(exprGen(depth)))(
         MatchR(_, _, _)),
       1 -> (casesGen(depth) ⊛ Gen.option(exprGen(depth)))(SwitchR(_, _))

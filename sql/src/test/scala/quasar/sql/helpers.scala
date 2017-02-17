@@ -35,10 +35,19 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
 
   val compile: String => String \/ Fix[LP] = query => {
     for {
-      select <- fixParser.parse(Query(query)).leftMap(_.toString)
-      attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(_.toString)
+      attr   <- parseAndAnnotate(query)
+      cld    <- Compiler.compile[Fix[LP]](attr, Nil).leftMap(_.toString)
     } yield cld
+  }
+
+  val parseAndAnnotate: String => String \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    fixParser.parse(Query(query)).leftMap(_.toString).flatMap { select =>
+      AllPhases(select).leftMap(_.toString)
+    }
+  }
+
+  val parseAndAnnotateUnsafe: String => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    parseAndAnnotate(query).toOption.getOrElse(throw new RuntimeException("False assumption in test, could not parse and annotate: "))
   }
 
   val optimizer = new Optimizer[Fix[LP]]

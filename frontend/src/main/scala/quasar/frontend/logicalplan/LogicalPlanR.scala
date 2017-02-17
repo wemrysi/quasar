@@ -85,6 +85,12 @@ final class LogicalPlanR[T]
   def normalizeTempNames(t: T) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
+  def bindFree(vars: Map[Symbol, T])(t: T): String \/ T =
+    t.cataM[String \/ ?, T] {
+      case Free(sym) => vars.get(sym).toRightDisjunction(s"Could not find variable $sym")
+      case other     => other.embed.right
+    }
+
   /** Per the following:
     * 1. Successive Lets are re-associated to the right:
     *    (let a = (let b = x1 in x2) in x3) becomes

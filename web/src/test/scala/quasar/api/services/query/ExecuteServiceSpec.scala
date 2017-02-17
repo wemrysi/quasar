@@ -28,7 +28,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.Sql
+import quasar.sql.{Sql, Symbol}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -252,7 +252,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val q = "select sum(1, 2, 3, 4)"
 
         val err: SemanticError =
-          SemanticError.WrongArgumentCount("sum", 1, 4)
+          SemanticError.WrongArgumentCount(Symbol("sum"), 1, 4)
 
         val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))

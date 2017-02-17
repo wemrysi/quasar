@@ -40,6 +40,14 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
   type Byte = scala.Byte
   type Char = scala.Char
   type Double = scala.Double
+  trait Function[-A, +B] { self =>
+    def arity: Int
+    def apply(args: List[A]): Option[B]
+    def andThen[C](f: B => C) = new Function[A, C] {
+      def arity = self.arity
+      def apply(args: List[A]) = self.apply(args).map(f)
+    }
+  }
   val  Function = scala.Function
   type Short = scala.Short
   val  Short = scala.Short

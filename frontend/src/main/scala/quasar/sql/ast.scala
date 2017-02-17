@@ -20,12 +20,32 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 
+import argonaut._, Argonaut._
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
+@Lenses final case class FunctionDeclF[BODY](name: Symbol, args: List[Vari[Nothing]], body: BODY) {
+  def transformBody[B](f: BODY => B): FunctionDeclF[B] =
+    FunctionDeclF(name, args, f(body))
+  def transformBodyM[M[_]: Monad, B](f: BODY => M[B]) =
+    f(body).map(FunctionDeclF(name, args, _))
+}
+
+object FunctionDeclF {
+  implicit def renderTreeFunctionDecl[BODY:RenderTree]: RenderTree[FunctionDeclF[BODY]] =
+    new RenderTree[FunctionDeclF[BODY]] {
+      def render(funcDec: FunctionDeclF[BODY]) =
+        NonTerminal("Function Declaration" :: Nil, Some(funcDec.name.value), List(funcDec.body.render))
+    }
+}
+
 sealed trait Sql[A]
 object Sql {
+
+  type FunctionDecl = FunctionDeclF[Fix[Sql]]
+
   implicit val equal: Delay[Equal, Sql] =
     new Delay[Equal, Sql] {
       def apply[A](fa: Equal[A]) = {
@@ -96,7 +116,7 @@ object Sql {
           case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
           case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(_.render))
 
-          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
+          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name.value), args.map(ra.render))
 
           case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
           case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
@@ -172,6 +192,17 @@ object Sql {
   }
 }
 
+final case class Symbol private[sql](value: String)
+
+object Symbol {
+  def fromString(s: String) = new Symbol(s.toLowerCase)
+
+  implicit val equal: Equal[Symbol] = Equal.equalA
+  implicit val shows: Show[Symbol] = Show.shows(s => s.value.toUpperCase)
+
+  implicit val codec: EncodeJson[Symbol] = implicitly[EncodeJson[String]].contramap(_.value)
+}
+
 @Lenses final case class Select[A] private[sql] (
   isDistinct:  IsDistinct,
   projections: List[Proj[A]],
@@ -195,7 +226,7 @@ object Sql {
     extends Sql[A]
 @Lenses final case class Unop[A] private[sql] (expr: A, op: UnaryOperator) extends Sql[A]
 @Lenses final case class Ident[A] private[sql] (name: String) extends Sql[A]
-@Lenses final case class InvokeFunction[A] private[sql] (name: String, args: List[A])
+@Lenses final case class InvokeFunction[A] private[sql] (name: Symbol, args: List[A])
     extends Sql[A]
 @Lenses final case class Match[A] private[sql] (expr: A, cases: List[Case[A]], default: Option[A])
     extends Sql[A]

@@ -29,7 +29,7 @@ import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.specs2.QuasarMatchers._
-import quasar.sql.{fixpoint => sql, _}
+import quasar.sql.{fixpoint => sql, Symbol, _}
 import quasar.std._
 
 import java.time.Instant
@@ -3639,7 +3639,7 @@ class PlannerSpec extends
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
+    } yield sql.InvokeFunctionR(Symbol("search"), List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
@@ -3666,13 +3666,13 @@ class PlannerSpec extends
     sql.IdentR("pop"),
     // IntLiteralR(0),  // TODO: exposes bugs (see SD-478)
     sql.BinopR(sql.IdentR("pop"), sql.IntLiteralR(1), Minus), // an ExprOp
-    sql.InvokeFunctionR("length", List(sql.IdentR("city")))) // requires JS
+    sql.InvokeFunctionR(Symbol("length"), List(sql.IdentR("city")))) // requires JS
   def genReduceInt = genInnerInt.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x)),
-    sql.InvokeFunctionR("sum", List(x)),
-    sql.InvokeFunctionR("count", List(sql.SpliceR(None)))))
+    sql.InvokeFunctionR(Symbol("min"), List(x)),
+    sql.InvokeFunctionR(Symbol("max"), List(x)),
+    sql.InvokeFunctionR(Symbol("sum"), List(x)),
+    sql.InvokeFunctionR(Symbol("count"), List(sql.SpliceR(None)))))
   def genOuterInt = Gen.oneOf(
     Gen.const(sql.IntLiteralR(0)),
     genReduceInt,
@@ -3682,17 +3682,17 @@ class PlannerSpec extends
   def genInnerStr = Gen.oneOf(
     sql.IdentR("city"),
     // StringLiteralR("foo"),  // TODO: exposes bugs (see SD-478)
-    sql.InvokeFunctionR("lower", List(sql.IdentR("city"))))
+    sql.InvokeFunctionR(Symbol("lower"), List(sql.IdentR("city"))))
   def genReduceStr = genInnerStr.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x))))
+    sql.InvokeFunctionR(Symbol("min"), List(x)),
+    sql.InvokeFunctionR(Symbol("max"), List(x))))
   def genOuterStr = Gen.oneOf(
     Gen.const(sql.StringLiteralR("foo")),
     Gen.const(sql.IdentR("state")),  // possibly the grouping key, so never reduced
     genReduceStr,
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("lower", List(x))),   // an ExprOp
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("length", List(x))))  // requires JS
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(Symbol("lower"), List(x))),   // an ExprOp
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(Symbol("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
     fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
@@ -4017,7 +4017,7 @@ class PlannerSpec extends
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Functions", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)",
@@ -4034,7 +4034,7 @@ class PlannerSpec extends
     "include correct phases with planner error" in {
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Functions", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)", "Logical Plan (projections preferred)"))

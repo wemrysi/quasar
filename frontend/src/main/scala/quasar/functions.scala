@@ -16,12 +16,17 @@
 
 package quasar
 
-import quasar.Predef._
+import quasar.Predef.{Function, _}
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+
+// Needed for shapeless
+import scala.Predef._
 
 import matryoshka._
 import scalaz._
 import shapeless._
+import shapeless.syntax.sized._
+import shapeless.ops.nat.ToInt
 
 sealed trait DimensionalEffect
 /** Describes a function that reduces a set of values to a single value. */
@@ -102,7 +107,7 @@ final case class TernaryFunc(
     applyGeneric(Func.Input3[A](a1, a2, a3))
 }
 
-sealed abstract class GenericFunc[N <: Nat] {
+sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
   def effect: DimensionalEffect
   def help: String
   def codomain: Func.Codomain
@@ -114,6 +119,9 @@ sealed abstract class GenericFunc[N <: Nat] {
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
     Invoke[N, A](this, args)
 
+  def applyUnsized[A](args: List[A]): Option[LP[A]] =
+    args.sized[N].map(applyGeneric)
+
   final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
     untyper0((domain, codomain), tpe)
 
@@ -121,6 +129,11 @@ sealed abstract class GenericFunc[N <: Nat] {
     typer0(args)
 
   final def arity: Int = domain.length
+
+  def toFunction[A]: Function[A, LP[A]] = new Function[A, LP[A]] {
+    def arity = self.arity
+    def apply(args: List[A]) = self.applyUnsized(args)
+  }
 }
 
 trait GenericFuncInstances {
