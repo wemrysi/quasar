@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,7 @@
 package quasar.physical.sparkcore.fs.hdfs
 
 import quasar.Predef._
-import quasar.Data
-import quasar.DataCodec
+import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
@@ -46,14 +45,16 @@ class queryfile(fileSystem: Task[FileSystem]) {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = fileSystem.map { hdfs =>
-    val pathStr = posixCodec.unsafePrintPath(file)
-    val host = hdfs.getUri().getHost()
-    val port = hdfs.getUri().getPort()
-    val url = s"hdfs://$host:$port$pathStr"
-    hdfs.close()
-    sc.textFile(url)
-  }
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = for {
+    hdfs <- fileSystem
+    pathStr <- Task.delay {
+      val pathStr = posixCodec.unsafePrintPath(file)
+      val host = hdfs.getUri().getHost()
+      val port = hdfs.getUri().getPort()
+      s"hdfs://$host:$port$pathStr"
+    }
+    rdd <- readfile.fetchRdd(sc, pathStr)
+  } yield rdd
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = for {
     path <- toPath(out)

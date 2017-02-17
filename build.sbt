@@ -31,8 +31,8 @@ lazy val checkHeaders =
 lazy val buildSettings = Seq(
   organization := "org.quasar-analytics",
   headers := Map(
-    ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
-    ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
+    ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
+    ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
   scalaOrganization := "org.typelevel",
   outputStrategy := Some(StdoutOutput),
   initialize := {
@@ -418,7 +418,9 @@ lazy val skeleton = project
   */
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes
+    )
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(

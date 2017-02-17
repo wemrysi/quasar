@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,10 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
           case (-\/(SrcHole), _)                       => None  // non-static index
           case (_, _)                                  => (acc1 ++ acc2).some
         }
-      case f => f.foldMapM[Option, Acc](_._2)
+      // check if entire array is referenced
+      case f => f.foldMapM[Option, Acc] {
+        case (src, value) => if (src ≟ HoleF) None else value
+      }
     }
 
     // CoEnv[Hole, MapFunc, (T[CoEnv[Hole, MapFunc, ?]], StateAcc)] => StateAcc
