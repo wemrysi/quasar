@@ -81,7 +81,9 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
         case OriginalType.UTF8 => new DataStringConverter(field.getName(), save)
         case OriginalType.DATE => new DataDateConverter(field.getName(), save)
         case OriginalType.TIME_MILLIS => new DataTimeConverter(field.getName(), save)
+        case OriginalType.TIME_MICROS => new DataTimeMicroConverter(field.getName(), save)
         case OriginalType.TIMESTAMP_MILLIS => new DataTimestampConverter(field.getName(), save)
+        case OriginalType.TIMESTAMP_MICROS => new DataTimestampMicroConverter(field.getName(), save)
         case OriginalType.LIST =>
           new DataListConverter(field.asGroupType(), field.getName(), this)
         case OriginalType.MAP =>
@@ -198,12 +200,23 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
       save(name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data)
   }
 
+  private class DataTimestampMicroConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+    override def addLong(v: Long): Unit =
+      save(name, Data.Timestamp(Instant.ofEpochMilli(v / 1000)) : Data)
+  }
+
   private class DataTimeConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addInt(v: Int): Unit =
-      save(name, Data.Time(LocalTime.ofNanoOfDay((v * 100).toLong)) : Data)
+      save(name, Data.Time(LocalTime.ofNanoOfDay(v.toLong * 1000000)) : Data)
   }
 
+  private class DataTimeMicroConverter(name: String, save: (String, Data) => Unit)
+      extends PrimitiveConverter {
+    override def addLong(v: Long): Unit =
+      save(name, Data.Time(LocalTime.ofNanoOfDay(v * 1000)) : Data)
+  }
 
   private class DataPrimitiveConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {

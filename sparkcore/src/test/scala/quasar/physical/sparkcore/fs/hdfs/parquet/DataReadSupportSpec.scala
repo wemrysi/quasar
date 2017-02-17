@@ -68,9 +68,11 @@ class DataReadSupportSpec extends Qspec {
       data must_= Vector(
         Data.Obj(
           "description" -> Data.Str("this is a description"),
-          "creation" -> Data.Date(LocalDate.of(2017,2,3)),
-          "creationTimestamp" -> Data.Timestamp(Instant.parse("2017-02-03T15:53:44.851Z")),
-          "meetingTime" -> Data.Time(LocalTime.of(0,0,0,400000))
+          "creation" -> Data.Date(LocalDate.of(2017,2,17)),
+          "creationStamp" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
+          "meetingTime" -> Data.Time(LocalTime.of(0,0,4,0)),
+          "creationStampMicros" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
+          "meetingTimeMicros" -> Data.Time(LocalTime.of(0,0,4,0))
         )
       )
     }
