@@ -116,6 +116,32 @@ class DataReadSupportSpec extends Qspec {
           )
         )
       }
+
+      "be read even if data is not following MAP specification" in {
+        val data = readAll(path("/test-data-7.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Obj(ListMap(
+              "scala" -> Data.Str("good"),
+              "FP" -> Data.Str("very good"),
+              "spillikins" -> Data.Str("bad")
+            ))
+          )
+        )
+      }
+
+      "be read even if data is using outdated MAP_KEY_VALUE label" in {
+        val data = readAll(path("/test-data-8.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Obj(ListMap(
+              "scala" -> Data.Str("good"),
+              "FP" -> Data.Str("very good"),
+              "spillikins" -> Data.Str("bad")
+            ))
+          )
+        )
+      }
     }
   }
 }
