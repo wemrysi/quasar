@@ -334,6 +334,11 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 nm.freeMF(bucket >> mf),
                 reducers.map(_.map(red => nm.freeMF(red >> mf))),
                 redRepair).some
+            // NB: Sorting before a Reduce can be eliminated if none of the
+            //     reducers care about order.
+            case Sort(innerSrc, _, _)
+                if !reducers.exists(ReduceFunc.isOrderDependent) =>
+              Reduce(innerSrc, bucket, reducers, redRepair).some
             case _ => None
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {

@@ -29,27 +29,25 @@ object Dependencies {
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
   def foundation = Seq(
-    "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
-    "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
-    "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
-    "org.scalaz.stream"          %% "scalaz-stream"             %     "0.8.6a",
-    "com.github.julien-truffaut" %% "monocle-core"              %  monocleVersion,
     "io.argonaut"                %% "argonaut"                  %  argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           %  argonautVersion,
-    "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
-    "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
-    "com.slamdata"               %% "pathy-core"                %   pathyVersion,
-    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
-    "eu.timepit"                 %% "refined"                   %  refinedVersion,
-    "com.chuusai"                %% "shapeless"                 % shapelessVersion,
-    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
-    "com.github.mpilquist"       %% "simulacrum"                %      "0.8.0"      %     Test,
     "org.typelevel"              %% "discipline"                %       "0.5"       %     Test,
-    "org.specs2"                 %% "specs2-core"               %    specsVersion   %     Test,
+    "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
+    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
+    "com.slamdata"               %% "pathy-core"                %   pathyVersion,
+    "eu.timepit"                 %% "refined"                   %  refinedVersion,
+    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
+    "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
+    "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
+    "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" %   scalazVersion   %     Test,
+    "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test,
+    "org.scalaz.stream"          %% "scalaz-stream"             %     "0.8.6a",
+    "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
-    "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
-  )
+    "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
+    "org.specs2"                 %% "specs2-core"               %    specsVersion   %     Test,
+    "com.github.mpilquist"       %% "simulacrum"                %      "0.8.0"      %     Test)
 
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion

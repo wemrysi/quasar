@@ -19,6 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.{Capture, Kvs, MonoSeq}
@@ -138,7 +139,7 @@ object queryfile {
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(
                    R.optimize(reflNT[MLQ]),
-                   repeatedly(R.applyTransforms(
+                   repeatedly(applyTransforms(
                      C.coalesceQC[MLQ](idPrism),
                      C.coalesceTJ[MLQ](idPrism.get),
                      C.coalesceSR[MLQ, AFile](idPrism),

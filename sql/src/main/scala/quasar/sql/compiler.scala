@@ -240,7 +240,6 @@ final class Compiler[M[_], T: Equal]
       "type_of"                 -> identity.TypeOf,
       "between"                 -> relations.Between,
       "where"                   -> set.Filter,
-      "distinct"                -> set.Distinct,
       "within"                  -> set.Within,
       "constantly"              -> set.Constantly,
       "concat"                  -> string.Concat,
@@ -265,6 +264,10 @@ final class Compiler[M[_], T: Equal]
       "shift_map"               -> structural.ShiftMap,
       "shift_array"             -> structural.ShiftArray,
       "meta"                    -> structural.Meta)
+
+    // TODO: Once we eliminate common subexpressions, this can be simplified to
+    //       `Arbitrary(GroupBy(t, t))`, which doesn’t require state.
+    def compileDistinct(t: T) = agg.Arbitrary(set.GroupBy(t, t).embed).embed
 
     def compileCases
       (cases: List[Case[CoExpr]], default: T)
@@ -465,7 +468,7 @@ final class Compiler[M[_], T: Equal]
          * 5. Select (SELECT)
          * 6. Squash
          * 7. Sort (ORDER BY)
-         * 8. Distinct (DISTINCT/DISTINCT BY)
+         * 8. Distinct
          * 9. Prune synthetic fields
          */
 
@@ -530,24 +533,36 @@ final class Compiler[M[_], T: Equal]
                         val squashed = select.map(Squash(_).embed)
 
                         stepBuilder(squashed.some) {
-                          val sort = orderBy.map(orderBy =>
-                            CompilerState.rootTableReq[M, T] >>= (t =>
+                          def sort(ord: OrderBy[CoExpr], nu: T) =
+                            CompilerState.rootTableReq[M, T] >>= (preSorted =>
                               nam.fold(
-                                orderBy.keys.traverse(p => (t, p._1).point[M]))(
-                                n => CompilerState.addFields(n.foldMap(_.toList))(orderBy.keys.traverse { case (ot, key) => compile0(key) strengthR ot }))
-                                .map(ks => lpr.sort(t, ks map {
-                                  case (k, ASC ) => (k, SortDir.Ascending)
-                                  case (k, DESC) => (k, SortDir.Descending)
-                                }))))
+                                ord.keys.map(p => (nu, p._1)).point[M])(
+                                na => CompilerState.addFields(na.unite)(ord.keys.traverse {
+                                  case (ot, key) =>
+                                    compile0(key).map(_.transApoT(substitute(preSorted, nu))) strengthR ot
+                                })) ∘
+                                (ks =>
+                                  lpr.sort(nu,
+                                    ks.map(_.map {
+                                      case ASC  => SortDir.Ascending
+                                      case DESC => SortDir.Descending
+                                    }))))
 
-                          stepBuilder(sort) {
+                          val sorted = orderBy ∘ (ord => CompilerState.rootTableReq[M, T] >>= (sort(ord, _)))
+
+                          stepBuilder(sorted) {
+                            def distinct(aggregation: UnaryFunc, t: T) =
+                              (syntheticNames.nonEmpty).fold(
+                                aggregation(set.GroupBy(t, syntheticNames.foldLeft(t)((acc, field) =>
+                                  structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed),
+                                agg.Arbitrary(set.GroupBy(t, t).embed)).embed
+
                             val distincted = isDistinct match {
                               case SelectDistinct =>
-                                CompilerState.rootTableReq[M, T].map(t =>
-                                  if (syntheticNames.nonEmpty)
-                                    set.DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                      structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed
-                                  else set.Distinct(t).embed).some
+                                (CompilerState.rootTableReq[M, T] >>= ((t: T) =>
+                                  orderBy.fold(
+                                    distinct(agg.Arbitrary, t).point[M])(
+                                    sort(_, distinct(agg.First, t))))).some
                               case _ => None
                             }
 
@@ -633,7 +648,7 @@ final class Compiler[M[_], T: Equal]
           // TODO: NOP, but should we ensure we have a Num or Interval here?
           case Positive            => compile0(expr).right
           case Negative            => math.Negate.left
-          case Distinct            => set.Distinct.left
+          case Distinct            => (compile0(expr) ∘ compileDistinct).right
           case FlattenMapKeys      => structural.FlattenMapKeys.left
           case FlattenMapValues    => structural.FlattenMap.left
           case ShiftMapKeys        => structural.ShiftMapKeys.left
@@ -675,29 +690,63 @@ final class Compiler[M[_], T: Equal]
           case func => fail(WrongArgumentCount(name, func.arity, 0))
         }
 
-      case InvokeFunction(name, List(a1)) =>
-        functionMapping.get(name.toLowerCase).fold[M[T]](
-          fail(FunctionNotFound(name))) {
-          case func @ UnaryFunc(_, _, _, _, _, _, _) =>
-            compileFunction[nat._1](func, Func.Input1(a1))
-          case func => fail(WrongArgumentCount(name, func.arity, 1))
-        }
+      case InvokeFunction(name, List(a1)) => name.toLowerCase match {
+        case "distinct" => compile0(a1) ∘ compileDistinct
+        case fname      =>
+          functionMapping.get(fname).fold[M[T]](
+            fail(FunctionNotFound(name))) {
+            case func @ UnaryFunc(_, _, _, _, _, _, _) =>
+              compileFunction[nat._1](func, Func.Input1(a1))
+            case func => fail(WrongArgumentCount(name, func.arity, 1))
+          }
+      }
 
-      case InvokeFunction(name, List(a1, a2)) =>
-        (name.toLowerCase ≟ "coalesce").fold((CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
-          lpr.let(name, c1,
-            relations.Cond(
-              // TODO: Ideally this would use `is null`, but that doesn’t makes it
-              //       this far (but it should).
-              relations.Eq(lpr.free(name), lpr.constant(Data.Null)).embed,
-              c2,
-              lpr.free(name)).embed)),
-          functionMapping.get(name.toLowerCase).fold[M[T]](
+      case InvokeFunction(name, List(a1, a2)) => name.toLowerCase match {
+        case "coalesce" =>
+          (CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
+            lpr.let(name, c1,
+              relations.Cond(
+                // TODO: Ideally this would use `is null`, but that doesn’t makes it
+                //       this far (but it should).
+                relations.Eq(lpr.free(name), lpr.constant(Data.Null)).embed,
+                c2,
+                lpr.free(name)).embed))
+        case "date_part" =>
+          compile0(a1) >>= {
+            case Embed(Constant(Data.Str(part))) =>
+              (part.some collect {
+                case "century"      => date.ExtractCentury
+                case "day"          => date.ExtractDayOfMonth
+                case "decade"       => date.ExtractDecade
+                case "dow"          => date.ExtractDayOfWeek
+                case "doy"          => date.ExtractDayOfYear
+                case "epoch"        => date.ExtractEpoch
+                case "hour"         => date.ExtractHour
+                case "isodow"       => date.ExtractIsoDayOfWeek
+                case "isoyear"      => date.ExtractIsoYear
+                case "microseconds" => date.ExtractMicroseconds
+                case "millennium"   => date.ExtractMillennium
+                case "milliseconds" => date.ExtractMilliseconds
+                case "minute"       => date.ExtractMinute
+                case "month"        => date.ExtractMonth
+                case "quarter"      => date.ExtractQuarter
+                case "second"       => date.ExtractSecond
+                case "week"         => date.ExtractWeek
+                case "year"         => date.ExtractYear
+              }).cata(
+                f => compile0(a2) ∘ (f(_).embed),
+                fail(UnexpectedDatePart("\"" + part + "\"")))
+            case _ =>
+              fail(UnexpectedDatePart(pprint(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations](a1))))
+          }
+        case fname =>
+          functionMapping.get(fname).fold[M[T]](
             fail(FunctionNotFound(name))) {
             case func @ BinaryFunc(_, _, _, _, _, _, _) =>
               compileFunction[nat._2](func, Func.Input2(a1, a2))
             case func => fail(WrongArgumentCount(name, func.arity, 2))
-          })
+          }
+      }
 
       case InvokeFunction(name, List(a1, a2, a3)) =>
         functionMapping.get(name.toLowerCase).fold[M[T]](

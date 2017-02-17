@@ -1,0 +1,24 @@
+{
+    "name": "self-ordered distinct",
+
+    "backends": {
+        "postgresql": "pending"
+    },
+
+    "data": "zips.data",
+
+    "query": "select distinct city from zips order by city",
+
+    "predicate": "equalsInitial",
+
+    "expected": ["AARON",
+                 "AARONSBURG",
+                 "ABAC",
+                 "ABBEVILLE",
+                 "ABBOT VILLAGE",
+                 "ABBOTSFORD",
+                 "ABBOTT",
+                 "ABBOTT PARK",
+                 "ABBOTTSTOWN",
+                 "ABBYVILLE"]
+}

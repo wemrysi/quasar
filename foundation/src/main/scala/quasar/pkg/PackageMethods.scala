@@ -16,14 +16,15 @@
 
 package quasar.pkg
 
-@java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Overloading"))
 trait PackageMethods {
   self: quasar.Predef =>
 
   def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 
+  @java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Overloading"))
   def byteBuffer(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
   def byteBuffer(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
+  @java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Overloading"))
   def charBuffer(size: Int): CharBuffer                              = java.nio.CharBuffer.allocate(size)
   def charBuffer(xs: String): CharBuffer                             = java.nio.CharBuffer.wrap(xs)
   def discard[A](value: A): Unit                                     = () // for avoiding "discarding non-Unit value" warnings
@@ -31,6 +32,7 @@ trait PackageMethods {
   def jClassLoader[A: CTag]: ClassLoader                             = jClass[A].getClassLoader
   def jClass[A: CTag]: jClass                                        = classTag[A].runtimeClass
   def jPath(path: String): jPath                                     = java.nio.file.Paths get path
+  @java.lang.SuppressWarnings(scala.Array("org.wartremover.warts.Overloading"))
   def jResource(c: jClass, name: String): InputStream                = c getResourceAsStream name
   def jResource[A: CTag](name: String): InputStream                  = jResource(jClass[A], name)
   def randomBool(): Boolean                                          = scala.util.Random.nextBoolean
@@ -43,7 +45,6 @@ trait PackageMethods {
   def uuid(s: String): UUID                                          = java.util.UUID fromString s
 
   @inline final def classTag[A](implicit z: CTag[A]): CTag[A] = z
-  @inline final def implicitly[A](implicit value: A): A       = value
 
   implicit def quasarExtensionOps[A](x: A): QuasarExtensionOps[A] =
     new QuasarExtensionOps(x)

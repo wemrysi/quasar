@@ -975,37 +975,8 @@ object WorkflowBuilder {
     }
   }
 
-  private def findSort[F[_]: Coalesce]
-    (src: WorkflowBuilder[F])
-    (distincting: WorkflowBuilder[F] => M[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[WorkflowBuilder[F]] = {
-    @tailrec
-    def loop(wb: WorkflowBuilder[F]): M[WorkflowBuilder[F]] =
-      wb.unFix match {
-        case spb @ ShapePreservingBuilderF(spbSrc, sortKeys, f) =>
-          spb.dummyOp.unFix match {
-            case $sort(_, _) =>
-              foldBuilders(src, sortKeys).flatMap {
-                case (newSrc, dv, ks) =>
-                  distincting(newSrc).map { dist =>
-                    val spb = ShapePreservingBuilder(
-                      Fix(normalize[F].apply(ExprBuilderF(dist, \/-($var(dv.toDocVar))))),
-                      ks.map(k => Fix(normalize[F].apply(ExprBuilderF(dist, \/-($var(k.toDocVar)))))), f)
-                    dv match {
-                      case Subset(ks) => DocBuilder(spb, ks.toList.map(k => k -> \/-($var(DocField(k)))).toListMap)
-                      case _ => spb
-                    }
-                  }
-              }
-            case _ => loop(spbSrc)
-          }
-        case _ => distincting(src)
-      }
-    loop(src)
-  }
-
-  private def merge[F[_]: Coalesce](left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
+  private def merge[F[_]: Coalesce]
+    (left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
     (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
     : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
     def delegate =
@@ -1189,7 +1160,7 @@ object WorkflowBuilder {
                           $project[F](Reshape(shape + (rName -> \/-($var(rbase.toDocVar)))))),
                         Root(),
                         None))))
-                case _ => fail(InternalError fromMsg "couldn’t merge array")
+                case _ => fail(InternalError fromMsg s"couldn’t merge array: ArrayBuilderF($src, $shape) || $right")
               },
               {
                 // TODO: Find a way to print this without using toString
@@ -1217,8 +1188,6 @@ object WorkflowBuilder {
 
     def skip(wb: WorkflowBuilder[F], count: Long): WorkflowBuilder[F] =
       ShapePreservingBuilder(wb, Nil, { case Nil => $skip[F](count) })
-
-    def squash[F[_]](wb: WorkflowBuilder[F]): WorkflowBuilder[F] = wb
 
     def filter
       (src: WorkflowBuilder[F],
@@ -1370,36 +1339,49 @@ object WorkflowBuilder {
             jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.num(index.toLong))))).right
       }
 
-    def deleteField(wb: WorkflowBuilder[F], name: String): PlannerError \/ WorkflowBuilder[F] =
+    @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
+    def deleteField(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
         case ShapePreservingBuilderF(src, inputs, op) =>
-          deleteField(src, name).map(ShapePreservingBuilder(_, inputs, op))
+          ShapePreservingBuilder(deleteField(src, name), inputs, op)
         case ValueBuilderF(Bson.Doc(fields)) =>
-          \/-(ValueBuilder(Bson.Doc(fields - name)))
-        case ValueBuilderF(_) =>
-          -\/(UnsupportedFunction(
-            structural.DeleteField,
-            Some("value is not a document.")))
+          ValueBuilder(Bson.Doc(fields - name))
         case GroupBuilderF(wb0, key, Expr(\/-($$ROOT))) =>
-          deleteField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($$ROOT))))
+          GroupBuilder(deleteField(wb0, name), key, Expr(\/-($$ROOT)))
         case GroupBuilderF(wb0, key, Doc(doc)) =>
-          \/-(GroupBuilder(wb0, key, Doc(doc - BsonField.Name(name))))
+          GroupBuilder(wb0, key, Doc(doc - BsonField.Name(name)))
         case DocBuilderF(wb0, doc) =>
-          \/-(DocBuilder(wb0, doc - BsonField.Name(name)))
+          DocBuilder(wb0, doc - BsonField.Name(name))
         case _ => jsExpr1(wb, JsFn(jsBase,
           // FIXME: Need to pull this back up from the top level (SD-665)
           jscore.Call(jscore.ident("remove"),
-            List(jscore.Ident(jsBase), jscore.Literal(Js.Str(name)))))).right
+            List(jscore.Ident(jsBase), jscore.Literal(Js.Str(name))))))
       }
 
-    def groupBy(src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]])
-      : WorkflowBuilder[F] =
-      GroupBuilder(src, keys, Expr(\/-($$ROOT)))
+    def groupBy(src: Fix[WorkflowBuilderF[F, ?]], keys: List[Fix[WorkflowBuilderF[F, ?]]])
+        : WorkflowBuilder[F] =
+      (List(src) ≟ keys).fold(
+        findKeys(src).fold(
+          // TODO: Might not always want to delete `_id`?
+          GroupBuilder(deleteField(src, "_id"), List(deleteField(src, "_id")), Expr(\/-($$ROOT)))) {
+          case Root()   => GroupBuilder(src, keys, Expr(\/-($$ROOT)))
+          case Field(k) => GroupBuilder(src, List(Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k))))))), Expr(\/-($$ROOT)))
+          case Subset(ks) =>
+            GroupBuilder(
+              src,
+              ks.toList.map(k => Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k))))))),
+              Doc(ks.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).toListMap))
+        },
+        GroupBuilder(src, keys, Expr(\/-($$ROOT))))
 
-    def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]]): WorkflowBuilder[F] =
+    def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]])
+        : WorkflowBuilder[F] =
       wb.unFix match {
         case GroupBuilderF(wb0, keys, Expr(\/-(expr))) =>
           GroupBuilder(wb0, keys, Expr(-\/(f(expr))))
+        // FIXME: Might need to identify Arbitrary distinct from First here.
+        case GroupBuilderF(_, _, _) if f($include()) == $first($include) =>
+          wb
         case ShapePreservingBuilderF(src @ Fix(GroupBuilderF(_, _, Expr(\/-(_)))), inputs, op) =>
           ShapePreservingBuilder(reduce(src)(f), inputs, op)
         case _ =>
@@ -1417,34 +1399,6 @@ object WorkflowBuilder {
         _.zip(sortTypes) match {
           case x :: xs => $sort[F](NonEmptyList.nel(x, IList.fromList(xs)))
         })
-
-    def distinct(src: WorkflowBuilder[F])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      findKeys(src).fold(
-        lift(deleteField(src, "_id")).flatMap(del => distinctBy(del, List(del))))(
-        ks => ks match {
-          case Root() => distinctBy(src, List(src))
-          case Field(k) =>
-            distinctBy(src, List(Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k))))))))
-          case Subset(ks) =>
-            val keys = ks.toList.map(k => Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k)))))))
-            findSort(src) { newSrc =>
-              findKeys(newSrc)
-                .cata(
-                  {
-                    case Subset(fields) => fields.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).right
-                    case b => InternalError.fromMsg(s"Expected a Subset but found $b").left
-                  },
-                  List().right)
-                .fold(fail, i => GroupBuilder(newSrc, keys, Doc(i.toListMap)).point[M])
-            }
-        })
-
-    def distinctBy(src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      findSort(src)(s => reduce(groupBy(s, keys))($first(_)).point[M])
 
     // TODO: handle concating value, expr, or collection with group (#439)
     def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])

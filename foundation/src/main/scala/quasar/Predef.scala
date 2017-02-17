@@ -23,10 +23,13 @@ import scala.{runtime => R}
 
 object Predef extends Predef
 
-class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with quasar.pkg.PackageMethods {
-  /** The typelevel Predef additions which makes literal
-   *  types more reasonable to use.
-   */
+class Predef
+    extends LowPriorityImplicits
+    with quasar.pkg.PackageAliases
+    with quasar.pkg.PackageMethods {
+  /** The typelevel Predef additions which makes literal types more reasonable
+    * to use.
+    */
   type ValueOf[A]                           = scala.ValueOf[A]
   def valueOf[A](implicit z: ValueOf[A]): A = z.value
 
@@ -62,7 +65,6 @@ class Predef extends LowPriorityImplicits with quasar.pkg.PackageAliases with qu
   type BigInt = scala.math.BigInt
   val  BigInt = scala.math.BigInt
 
-  type Iterable[+A] = C.Iterable[A]
   type IndexedSeq[+A] = C.IndexedSeq[A]
 
   type ListMap[A, +B] = I.ListMap[A, B]

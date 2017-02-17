@@ -17,7 +17,7 @@
 package quasar.frontend.logicalplan
 
 import quasar.Predef._
-import quasar._
+import quasar._, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
@@ -182,7 +182,7 @@ object LogicalPlan {
             case Sort(src, ords)           =>
               NonTerminal("Sort" :: nodeType, None,
                 (ra.render(src) :: ords.list.flatMap {
-                  case (a, d) => ra.render(a) :: IList(Terminal(nodeType, Some(d.shows)))
+                  case (a, d) => IList(ra.render(a), d.render)
                 }).toList)
             case TemporalTrunc(part, src) =>
               NonTerminal("TemporalTrunc" :: nodeType, Some(part.shows), List(ra.render(src)))

@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.common
+package quasar.contrib
 
-import quasar.RenderTree
+import quasar.Predef._
 
-import scalaz._
+import _root_.matryoshka._
+import _root_.scalaz.Scalaz._
 
-sealed abstract class SortDir
-
-object SortDir {
-  final case object Ascending extends SortDir
-  final case object Descending extends SortDir
-
-  val asc: SortDir  = Ascending
-  val desc: SortDir = Descending
-
-  implicit val equal: Equal[SortDir] = Equal.equalRef
-  implicit val show: Show[SortDir] = Show.showFromToString
-  implicit val renderTree: RenderTree[SortDir] = RenderTree.fromShow("SortDir")
+object matryoshka {
+  /** Chains multiple transformations together, each of which can fail to change
+    * anything.
+    */
+  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*)
+      : A => Option[A] =
+    rest.foldLeft(
+      first)(
+      (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 }

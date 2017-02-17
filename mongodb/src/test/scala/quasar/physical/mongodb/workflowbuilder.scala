@@ -241,96 +241,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
             ExcludeId)))
     }
 
-    "distinct" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        proj <- lift(projectField(read, "city"))
-        city =  makeObject(proj, "city")
-        dist <- distinct(city)
-        rez  <- build(dist)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-          $read(collection("db", "zips")),
-          $project(Reshape(ListMap(
-            BsonField.Name("city") -> \/-($field("city")))),
-            IgnoreId),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("city") -> $first($field("city")))),
-            -\/(Reshape(ListMap(BsonField.Name("0") -> \/-($field("city"))))))))
-    }
-
-    "distinct after group" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city1   <- lift(projectField(read, "city"))
-        grouped =  groupBy(read, List(city1))
-        total   =  reduce(grouped)($sum(_))
-        proj0   =  makeObject(total, "total")
-        city2   <- lift(projectField(grouped, "city"))
-        proj1   =  makeObject(city2, "city")
-        projs   <- objectConcat(proj0,  proj1)
-        dist    <- distinct(projs)
-        rez     <- build(dist)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $group(
-          Grouped(ListMap(
-            BsonField.Name("total") -> $sum($$ROOT),
-            BsonField.Name("city")  -> $push($field("city")))),
-          -\/(Reshape(ListMap(BsonField.Name("0") -> \/-($field("city")))))),
-        $unwind(DocField(BsonField.Name("city"))),
-        $group(
-          Grouped(ListMap(
-            BsonField.Name("total") -> $first($field("total")),
-            BsonField.Name("city")  -> $first($field("city")))),
-          -\/(Reshape(ListMap(
-            BsonField.Name("0") -> \/-($field("total")),
-            BsonField.Name("1")  -> \/-($field("city"))))))))
-    }
-
-    "distinct and sort with intervening op" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city   <- lift(projectField(read, "city"))
-        state  <- lift(projectField(read, "state"))
-        left   =  makeObject(city, "city")
-        right  =  makeObject(state, "state")
-        projs  <- objectConcat(left, right)
-        sorted =  sortBy(projs, List(city, state), List(SortDir.Ascending, SortDir.Ascending))
-
-        // NB: the compiler would not generate this op between sort and distinct
-        lim    =  limit(sorted, 10)
-
-        dist   <- distinct(lim)
-        rez    <- build(dist)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $project(Reshape(ListMap(
-          BsonField.Name("city") -> \/-($field("city")),
-          BsonField.Name("state") -> \/-($field("state")))),
-          IgnoreId),
-        $sort(NonEmptyList(
-          BsonField.Name("city") -> SortDir.Ascending,
-          BsonField.Name("state") -> SortDir.Ascending)),
-        $limit(10),
-        $group(
-          Grouped(ListMap(
-            BsonField.Name("city") -> $first($field("city")),
-            BsonField.Name("state") -> $first($field("state")))),
-          -\/(Reshape(ListMap(
-            BsonField.Name("0") -> \/-($field("city")),
-            BsonField.Name("1") -> \/-($field("state")))))),
-        $sort(NonEmptyList(
-          BsonField.Name("city")  -> SortDir.Ascending,
-          BsonField.Name("state") -> SortDir.Ascending))))
-    }
-
     "group in proj" in {
       val read = builder.read(collection("db", "zips"))
       val op = (for {
@@ -353,7 +263,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       val read = builder.read(collection("db", "zips"))
       val op = (for {
         one <- expr1(read)(κ($literal(Bson.Int32(1))))
-        obj =  makeObject(reduce(groupBy(one, List(one)))($sum(_)), "total")
+        grouped = groupBy(one, List(one))
+        obj =  makeObject(reduce(grouped)($sum(_)), "total")
         rez <- build(obj)
       } yield rez).evalZero
 
@@ -432,9 +343,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
 
     "group in expression" in {
       val read    = builder.read(collection("db", "zips"))
-      val grouped = groupBy(read, List(pure(Bson.Int32(1))))
       val op = (for {
-        pop     <- lift(projectField(grouped, "pop"))
+        pop     <- lift(projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop"))
         total   =  reduce(pop)($sum(_))
         expr    <- expr2(total, pure(Bson.Int32(1000)))($divide(_, _))
         inK     =  makeObject(expr, "totalInK")
@@ -644,9 +554,8 @@ class WorkflowBuilderSpec extends quasar.Qspec {
     val read = builder.read(collection("db", "zips"))
 
     "render in-process group" in {
-      val grouped = groupBy(read, List(pure(Bson.Int32(1))))
       val op = for {
-        pop <- projectField(grouped, "pop")
+        pop     <- projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop")
       } yield reduce(pop)($sum(_))
       op.map(render) must beRightDisjunction(
         """GroupBuilder

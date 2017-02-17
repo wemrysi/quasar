@@ -23,13 +23,13 @@ import quasar.fp._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.:<:
+import scalaz.Inject
 
 final class JsonParserSpec extends Qspec {
   type J = Fix[Json]
 
-  val C = implicitly[Common :<: Json]
-  val O = implicitly[Obj    :<: Json]
+  val C = Inject[Common, Json]
+  val O = Inject[Obj,    Json]
 
   "EJson JSON parser" should {
     "properly construct values" >> {

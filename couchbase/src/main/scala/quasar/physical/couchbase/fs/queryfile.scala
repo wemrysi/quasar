@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
@@ -247,7 +248,7 @@ object queryfile {
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(rewrite.applyTransforms(
+                repeatedly(applyTransforms(
                   C.coalesceQC[CBQS](idPrism),
                   C.coalesceEJ[CBQS](idPrism.get),
                   C.coalesceSR[CBQS, AFile](idPrism),

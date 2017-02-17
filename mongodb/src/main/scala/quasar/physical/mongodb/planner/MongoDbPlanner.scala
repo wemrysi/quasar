@@ -709,16 +709,18 @@ object MongoDbPlanner {
                 })
           }
         case GroupBy =>
-          lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasKeys) ∘ (WB.groupBy(_, _)).tupled)
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
-        case Count      => groupExpr0($sum($literal(Bson.Int32(1))))
-        case Sum        => groupExpr1($sum(_))
-        case Avg        => groupExpr1($avg(_))
-        case Min        => groupExpr1($min(_))
-        case Max        => groupExpr1($max(_))
+        case Count        => groupExpr0($sum($literal(Bson.Int32(1))))
+        case Sum          => groupExpr1($sum(_))
+        case Avg          => groupExpr1($avg(_))
+        case Min          => groupExpr1($min(_))
+        case Max          => groupExpr1($max(_))
+        case First        => groupExpr1($first(_))
+        case Last         => groupExpr1($last(_))
         case UnshiftArray => groupExpr1($push(_))
-        case Arbitrary  => groupExpr1($first(_))
+        case Arbitrary    => groupExpr1($first(_))
 
         case ArrayLength =>
           lift(Arity2(HasWorkflow, HasInt)).flatMap {
@@ -747,14 +749,10 @@ object MongoDbPlanner {
             case (p, index) => WB.projectIndex(p, index.toInt)
           })
         case DeleteField  =>
-          lift(Arity2(HasWorkflow, HasText).flatMap((WB.deleteField(_, _)).tupled))
-        case FlattenMap   => lift(Arity1(HasWorkflow).map(WB.flattenMap(_)))
-        case FlattenArray => lift(Arity1(HasWorkflow).map(WB.flattenArray(_)))
-        case Squash       => lift(Arity1(HasWorkflow).map(WB.squash))
-        case Distinct     =>
-          lift(Arity1(HasWorkflow)).flatMap(WB.distinct(_))
-        case DistinctBy   =>
-          lift(Arity2(HasWorkflow, HasKeys)).flatMap((WB.distinctBy(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasText) ∘ (WB.deleteField(_, _)).tupled)
+        case FlattenMap   => lift(Arity1(HasWorkflow) ∘ WB.flattenMap)
+        case FlattenArray => lift(Arity1(HasWorkflow) ∘ WB.flattenArray)
+        case Squash       => lift(Arity1(HasWorkflow))
 
         case _ => fail(UnsupportedFunction(func, "in workflow planner".some))
       })

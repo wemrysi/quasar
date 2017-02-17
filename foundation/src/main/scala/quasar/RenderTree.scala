@@ -17,6 +17,8 @@
 package quasar
 
 import quasar.Predef._
+import quasar.RenderTree.make
+import quasar.RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
@@ -24,9 +26,6 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
-
-import RenderTree.make
-import RenderTree.ops._
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree

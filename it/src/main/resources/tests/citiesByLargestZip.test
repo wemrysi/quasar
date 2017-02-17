@@ -19,9 +19,9 @@
 
     "predicate": "equalsExactly",
 
-    "expected": [{ "city" : "CHICAGO" },
-                 { "city" : "BROOKLYN" },
-                 { "city" : "NEW YORK" },
-                 { "city" : "BELL GARDENS" },
-                 { "city" : "LOS ANGELES" }]
+    "expected": ["CHICAGO",
+                 "BROOKLYN",
+                 "NEW YORK",
+                 "BELL GARDENS",
+                 "LOS ANGELES"]
 }

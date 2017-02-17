@@ -680,8 +680,29 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
-          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))(
+          List(
+            // FIXME: Eliminate duplication
+            ReduceFuncs.Arbitrary(Free.roll(MakeArray(Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0")))))),
+            ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0))),
+            ReduceFuncs.Arbitrary(Free.roll(MakeArray(Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0")))))),
+            ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(
+                    ProjectIndexR(ReduceIndexF(0), IntLit(0)))))),
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(
+                    ProjectIndexR(ReduceIndexF(2), IntLit(0)))))))),
+              Free.roll(MakeArray(ReduceIndexF(1))))),
+            Free.roll(MakeArray(
+              ProjectFieldR(ReduceIndexF(3), StrLit("__sd__0")))))))),
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
+        QC.inj(Map((),
+          Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 

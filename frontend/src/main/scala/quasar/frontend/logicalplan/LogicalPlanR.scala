@@ -115,7 +115,7 @@ final class LogicalPlanR[T]
       case _ => None
     }
 
-    // avoid illegally rewriting the continuation
+    // NB: avoids illegally rewriting the continuation
     case InvokeUnapply(relations.Cond, Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
         lp.let(a, x1, invoke[nat._3](relations.Cond, Func.Input3(x2, a2, a3))).some
