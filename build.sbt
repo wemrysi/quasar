@@ -71,7 +71,6 @@ lazy val buildSettings = Seq(
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,                   // - see wartremover/wartremover#263
-    Wart.ExplicitImplicitTypes, // - see wartremover/wartremover#226
     Wart.PublicInference,       // - needs to be reviewed
     Wart.ImplicitParameter,     // - needs to be reviewed
     Wart.StringPlusAny,         // - needs to be reviewed

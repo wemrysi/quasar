@@ -107,7 +107,7 @@ object MessageFormat {
     def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] =
       if (txt.isEmpty) Process.empty.right
       else {
-        implicit val codec = mode.codec
+        implicit val codec: DataCodec = mode.codec
         format match {
           case JsonFormat.SingleArray =>
             DataCodec.parse(txt).fold(

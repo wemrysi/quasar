@@ -162,7 +162,7 @@ object Server {
     } yield ())
 
   def main(args: Array[String]): Unit = {
-    implicit val configOps = ConfigOps[WebConfig]
+    implicit lazy val configOps: ConfigOps[WebConfig] = ConfigOps[WebConfig]
 
     launchServer(args, durableService(_, _)).unsafePerformSync
   }
