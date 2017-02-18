@@ -91,7 +91,7 @@ class PlannerSpec extends
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, 0L, None)
+    queryPlan(expr, Variables.empty, basePath, Nil, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
