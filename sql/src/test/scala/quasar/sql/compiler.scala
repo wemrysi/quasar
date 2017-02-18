@@ -1780,6 +1780,24 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
   }
 
+  "compile expression and functions that depend on themselves" >> {
+    val expr = parseAndAnnotateUnsafe("select ROUND(10.4)")
+    val funcs = List(
+      FunctionDeclF(Symbol("floor"), List(Vari("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
+      FunctionDeclF(Symbol("round"), List(Vari("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
+    val floorArgumentLP =
+      lpf.invoke2(Add,
+        lpf.constant(Data.Dec(10.4)),
+        lpf.constant(Data.Dec(0.5)))
+    val expected =
+      lpf.invoke2(Subtract,
+        floorArgumentLP,
+        lpf.invoke2(Modulo,
+          floorArgumentLP,
+          lpf.constant(Data.Int(1))))
+    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+  }
+
   "constant folding" >> {
     def testFolding(name: String, query: String, expected: String) = {
       s"${name}" >> {
