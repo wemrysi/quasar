@@ -127,7 +127,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
                  reduceFuncPlanner[T, F].plan)
         rep <- repair.cataM(interpretM(
-                 _.idx.fold(b)(red(_)).point[M],
+                 _.idx.fold(SelectElem(ArrAgg(b).embed, int(0)).embed)(red(_)).point[M],
                  mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
