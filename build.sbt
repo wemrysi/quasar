@@ -73,7 +73,6 @@ lazy val buildSettings = Seq(
     Wart.Any,                   // - see wartremover/wartremover#263
     Wart.PublicInference,       // - needs to be reviewed
     Wart.ImplicitParameter,     // - needs to be reviewed
-    Wart.NoNeedForMonad,        // - see wartremover/wartremover#268 - maybe causes issues compiling with scoverage
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.

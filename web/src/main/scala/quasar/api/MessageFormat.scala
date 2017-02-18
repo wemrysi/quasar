@@ -196,8 +196,6 @@ object MessageFormat {
       fmt   <- fromMediaType(cType.mediaType) \/> MediaTypeMismatch(cType.mediaType, supportedMediaTypes)
     } yield fmt
 
-  // FIXME: I don’t know why this is triggering here.
-  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def fromMediaType(mediaType: MediaRange): Option[MessageFormat] = {
     val disposition = mediaType.extensions.get("disposition").flatMap(str =>
       HttpHeaderParser.CONTENT_DISPOSITION(str).toOption)
@@ -223,7 +221,7 @@ object MessageFormat {
         else None
       format.map { f =>
         val precision =
-          if (mediaType.extensions.get("mode") == Some(JsonPrecision.Precise.name))
+          if (mediaType.extensions.get("mode") ≟ Some(JsonPrecision.Precise.name))
             JsonPrecision.Precise
           else
             JsonPrecision.Readable
