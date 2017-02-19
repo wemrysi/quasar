@@ -110,15 +110,18 @@ object writefile {
     val textChunk: Vector[(DataEncodingError \/ String, Data)] = data.map(d => (DataCodec.render(d), d))
       
     CassandraConnector(sc.getConf).withSessionDo {implicit session =>
-      textChunk.flatMap{
-        case (\/-(text),data) => 
-          \/.fromTryCatchNonFatal{
-            insertData(keyspace(handle.file), tableName(handle.file), text)
-          }.fold(
-            ex => Vector(writeFailed(data, ex.getMessage)),
-            u => Vector.empty[FileSystemError]
-          )
-        case (-\/(error), data) => Vector(writeFailed(data, error.message))
+      if(!tableExists(keyspace(handle.file), tableName(handle.file))) {
+        Vector(unknownWriteHandle(handle))
+      } else {
+        textChunk.flatMap {
+          case (text,data) => 
+            \/.fromTryCatchNonFatal{
+              insertData(keyspace(handle.file), tableName(handle.file), text)
+            }.fold(
+              ex => Vector(writeFailed(data, ex.getMessage)),
+              u => Vector.empty[FileSystemError]
+            )
+        }
       }
     }
   }

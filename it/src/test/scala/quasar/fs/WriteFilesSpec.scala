@@ -37,7 +37,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
   val write  = WriteFile.Ops[FileSystem]
   val manage = ManageFile.Ops[FileSystem]
 
-  val writesPrefix: ADir = rootDir </> dir("forwriting")
+  val writesPrefix: ADir = rootDir </> dir("w")
 
   def deleteForWriting(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(writesPrefix))

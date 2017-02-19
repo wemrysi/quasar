@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendCapability, Data}
+import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -36,7 +37,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
   val write  = WriteFile.Ops[FileSystem]
   val manage = ManageFile.Ops[FileSystem]
 
-  val queryPrefix: ADir = rootDir </> dir("forquery")
+  val queryPrefix: ADir = rootDir </> dir("q")
 
   def deleteForQuery(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(queryPrefix))
@@ -81,9 +82,9 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
           Data.Obj("c" -> Data._int(2))
         )))
       }
-
+ 
       "listing directory returns immediate child nodes" >> {
-        val d = queryPrefix </> dir("lschildren")
+        val d = queryPrefix </> dir("lsch")
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
         val f2 = d1 </> dir("d2") </> file("f1")

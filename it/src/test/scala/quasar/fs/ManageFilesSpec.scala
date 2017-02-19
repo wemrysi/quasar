@@ -36,7 +36,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
   val write  = WriteFile.Ops[FileSystem]
   val manage = ManageFile.Ops[FileSystem]
 
-  val managePrefix: ADir = rootDir </> dir("formanage")
+  val managePrefix: ADir = rootDir </> dir("m")
 
   def deleteForManage(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(managePrefix))
@@ -159,19 +159,19 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
         runT(run)(manage.moveDir(d1, d2, MoveSemantics.FailIfExists))
           .runOption must beSome(pathErr(pathNotFound(d1)))
       }
-
+ 
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
         // TODO: folder filenames have been shortened to workaround PostgreSQL table name length restriction — revisit
-        val pnt = managePrefix </> dir("SD-1846")
-        val uf1 = pnt </> dir("UF")   </> file("one")
-        val uf2 = pnt </> dir("UF 1") </> file("two")
-        val uf3 = pnt </> dir("UF 2") </> file("three")
+        val pnt = managePrefix </> dir("sd1846")
+        val uf1 = pnt </> dir("uf")   </> file("one")
+        val uf2 = pnt </> dir("uf1") </> file("two")
+        val uf3 = pnt </> dir("uf2") </> file("three")
 
         val thirdDoc: Vector[Data] =
           Vector(Data.Obj(ListMap("c" -> Data.Int(1))))
 
-        val src = pnt </> dir("UF")
-        val dst = pnt </> dir("UF 1") </> dir("UF")
+        val src = pnt </> dir("uf")
+        val dst = pnt </> dir("uf1") </> dir("uf")
 
         val setupAndMove =
           write.saveThese(uf1, oneDoc)     *>
@@ -273,8 +273,8 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
           .map(_ relativeTo hintDir)
           .runEither must beRight(beSome[RFile])
       }
-
       step(deleteForManage(fs.setupInterpM).runVoid)
+ 
     }
   }
 }

@@ -49,13 +49,18 @@ object queryfile {
       val tb = tableName(out)
 
       val connector = CassandraConnector(sc.getConf)
+
       connector.withSessionDo { implicit session =>
-        rdd.map(data => DataCodec.render(data)(DataCodec.Precise)).collect().foreach {
-          case \/-(v) =>
-            insertData(ks, tb, v)
-          case -\/(der) =>
-            // what should we do with error?
+        val k = if(!keyspaceExists(ks)) {
+          session.execute(s"CREATE KEYSPACE $ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
         }
+
+
+        if(!tableExists(ks, tb)){
+            val u = session.execute(s"CREATE TABLE $ks.$tb (id timeuuid PRIMARY KEY, data text);")
+        }
+        rdd.flatMap(data =>
+          DataCodec.render(data)(DataCodec.Precise).toList).collect().foreach (v => insertData(ks, tb, v))
       }
     }
 
@@ -71,14 +76,34 @@ object queryfile {
     read: Read.Ops[SparkContext, S]
     ): Free[S, FileSystemError \/ Set[PathSegment]] = read.asks { sc =>
       CassandraConnector(sc.getConf).withSessionDo{ implicit session =>
-        if(keyspaceExists(keyspace(d))){
-          sc.cassandraTable[String]("system_schema", "tables")
+        if(d == rootDir) {
+          sc.cassandraTable[String]("system_schema", "keyspaces")
+            .select("keyspace_name")
+            .filter(!_.startsWith("system"))
+            .map { kspc =>
+              DirName(kspc).left[FileName]
+            }.collect.toSet
+          .right[FileSystemError]
+        } else if(keyspaceExists(keyspace(d))){
+          val files = sc.cassandraTable[String]("system_schema", "tables")
             .select("table_name")
             .where("keyspace_name = ?", keyspace(d))
             .map { table =>
               FileName(table).right[DirName]
             }.collect.toSet
-            .right[FileSystemError]
+          val ks = keyspace(d)
+          val dirs = sc.cassandraTable[String]("system_schema", "keyspaces")
+            .select("keyspace_name")
+            .filter(k => k.startsWith(ks))
+            .map { name =>
+              name.replace(ks,"").split("_")(0)
+            }
+            .filter(_.length > 0)
+            .collect.toSet
+            .map { kspc =>
+              DirName(kspc).left[FileName]
+            }
+          (files ++ dirs).right[FileSystemError]
         } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
       }
     }

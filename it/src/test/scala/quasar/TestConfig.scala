@@ -32,7 +32,7 @@ object TestConfig {
   /** The directory under which test data may be found as well as where tests
     * can write test data/output.
     */
-  val DefaultTestPrefix: ADir = rootDir </> dir("quasartest")
+  val DefaultTestPrefix: ADir = rootDir </> dir("t")
 
   /** The environment variable used to externally specify the test path prefix.
     *

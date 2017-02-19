@@ -76,8 +76,19 @@ object managefile {
   }
 
   private def moveTable(sf: AFile, df: AFile)(implicit sc: SparkContext) = {
-    sc.cassandraTable(keyspace(fileParent(sf)), tableName(sf))
-      .saveToCassandra(keyspace(fileParent(df)), tableName(df), SomeColumns("id", "data"))
+    val dks = keyspace(fileParent(df))
+    val dft = tableName(df)
+    val connector = CassandraConnector(sc.getConf)
+    val u = connector.withSessionDo { implicit session =>
+      val u1 = if(!keyspaceExists(dks)){
+        session.execute(s"CREATE KEYSPACE $dks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+      }
+      if(tableExists(dks, dft)) {
+        dropTable(dks, dft)
+      }
+    }
+    val rdd = sc.cassandraTable(keyspace(fileParent(sf)), tableName(sf))
+    rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = keyspace(fileParent(df)), tableName = tableName(df)))
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       val r = dropTable(keyspace(fileParent(sf)), tableName(sf))
     }
@@ -87,8 +98,17 @@ object managefile {
     read: Read.Ops[SparkContext, S]
     ): Free[S, Unit] = {
     read.asks { implicit sc =>
-      sc.cassandraTable[String]("system_schema", "tables").select("table_name").foreach {tn: String=>
-        moveTable(sd </> file(tn), dd </> file(tn))
+      val srcTables = sc.cassandraTable[String]("system_schema", "tables")
+        .select("table_name")
+        .where("keyspace_name = ?", keyspace(sd))
+        .collect.toSet
+
+        srcTables.foreach {tn: String=>
+          moveTable(sd </> file(tn), dd </> file(tn))
+        }
+      val connector = CassandraConnector(sc.getConf)
+      val u = connector.withSessionDo { implicit session =>
+        dropKeyspace(keyspace(sd))
       }
     }
   }
@@ -98,39 +118,45 @@ object managefile {
     ): Free[S, FileSystemError \/ Unit] = 
   read.asks { sc =>
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      maybeFile(path).fold(deleteDir(path))(file => deleteFile(file))
+      maybeFile(path).fold(deleteDir(path, sc))(file => deleteFile(file))
     }
   }
 
   def deleteFile(file: AFile)(implicit session: Session) = 
     if(keyspaceExists(keyspace(fileParent(file))) && tableExists(keyspace(fileParent(file)), tableName(file))) {
-      val r = dropTable(keyspace(file), tableName(file))
+      val r = dropTable(keyspace(fileParent(file)), tableName(file))
       ().right[FileSystemError]
     } else {
       pathErr(pathNotFound(file)).left[Unit]
     }
 
-  def deleteDir(dir: APath)(implicit session: Session) =  
-    if(keyspaceExists(keyspace(dir))) {
-      val r = dropKeyspace(keyspace(dir))
+  def deleteDir(dir: APath, sc: SparkContext)(implicit session: Session) = {  
+    val ks = keyspace(dir)
+    val dirs = sc.cassandraTable[String]("system_schema","keyspaces").select("keyspace_name")
+      .filter(_.startsWith(ks))
+      .collect.toSet
+
+    if(!dirs.isEmpty){
+      dirs.foreach( d => dropKeyspace(d))
       ().right[FileSystemError]
     } else {
       pathErr(pathNotFound(dir)).left[Unit]
     }
+  }
 
   def tempFile[S[_]](near: APath)(implicit
     read: Read.Ops[SparkContext, S]
     ): Free[S, FileSystemError \/ AFile] = 
     read.asks { sc =>
       CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        val randomFileName = s"quasar${scala.math.abs(scala.util.Random.nextInt())}"
+        val randomFileName = s"q${scala.math.abs(scala.util.Random.nextInt(9999))}"
         val aDir: ADir = refineType(near).fold(d => d, fileParent(_))
-        if (!keyspaceExists(keyspace(near))) {
-          val r = createTable(keyspace(near), randomFileName)
+//        if (keyspaceExists(keyspace(near))) {
+//          val r = createTable(keyspace(near), randomFileName)
           (aDir </> file(randomFileName)).right[FileSystemError]
-        } else {
-          pathErr(pathNotFound(near)).left[AFile]
-        }
+ //       } else {
+  //        pathErr(pathNotFound(near)).left[AFile]
+  //      }
       }
     }
 
@@ -151,7 +177,7 @@ object managefile {
   }
 
   private def dropKeyspace(keyspace: String)(implicit session: Session) = {
-    session.execute(s"DROP KEYSPACE $keyspace;")
+    session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
   }
 
   private def dropTable(keyspace: String, table: String)(implicit session: Session) = {
