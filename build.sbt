@@ -423,6 +423,7 @@ lazy val sparkcore = project
     )
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
+  .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
