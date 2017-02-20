@@ -71,8 +71,8 @@ lazy val buildSettings = Seq(
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,                   // - see wartremover/wartremover#263
-    Wart.PublicInference,       // - needs to be reviewed
-    Wart.ImplicitParameter,     // - needs to be reviewed
+    Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
+    Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
