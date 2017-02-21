@@ -273,7 +273,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, innerStruct, innerId, innerRepair)
-                if !shiftRepair.element(LeftSide) && struct != HoleF =>
+                if !shiftRepair.element(LeftSide) && struct ≠ HoleF =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
                   innerSrc,

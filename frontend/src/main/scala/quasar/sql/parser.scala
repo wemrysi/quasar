@@ -71,7 +71,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     def numLitParser: Parser[Token] = rep1(digit) ~ opt('.' ~> rep(digit)) ~ opt((elem('e') | 'E') ~> opt(elem('-') | '+') ~ rep(digit)) ^^ {
       case i ~ None ~ None     => NumericLit(i mkString "")
       case i ~ Some(d) ~ None  => FloatLit(i.mkString("") + "." + d.mkString(""))
-      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.getOrElse("") + e.mkString(""))
+      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.map(_.toString).getOrElse("") + e.mkString(""))
     }
 
     val hexDigit: Parser[String] = """[0-9a-fA-F]""".r
@@ -452,11 +452,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
     phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
-      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first))
+      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first.toString))
     }
 
   private def parse0(sql: Query): ParsingError \/ T[Sql] = parseExpr(sql.value)
