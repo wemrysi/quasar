@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ final case class NamedDaemonThreadFactory(name: String) extends ThreadFactory {
 
   def newThread(r: java.lang.Runnable) = {
     val thread = backingThreadFactory.newThread(r)
-    thread.setName(name + "-" + threadNo.incrementAndGet())
+    thread.setName(name + "-" + threadNo.incrementAndGet().toString)
     thread.setDaemon(true)
     thread
   }

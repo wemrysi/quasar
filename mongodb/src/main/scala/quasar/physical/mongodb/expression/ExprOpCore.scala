@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ object ExprOpCoreF {
       Delay[Equal, ExprOpCoreF] =
     new Delay[Equal, ExprOpCoreF] {
       def apply[A](eq: Equal[A]) = {
-        implicit val EQ = eq
+        implicit val EQ: Equal[A] = eq
         Equal.equal {
           case ($includeF(), $includeF())           => true
           case ($varF(dv1), $varF(dv2))             => dv1 ≟ dv2

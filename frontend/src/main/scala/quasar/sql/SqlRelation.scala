@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ object SqlRelation {
   implicit val equal: Delay[Equal, SqlRelation] =
     new Delay[Equal, SqlRelation] {
       def apply[A](fa: Equal[A]) = {
-        implicit val eqA = fa
+        implicit val eqA: Equal[A] = fa
         Equal.equal {
           case (IdentRelationAST(n1, a1), IdentRelationAST(n2, a2)) =>
             n1 ≟ n2 && a1 ≟ a2

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,7 +88,12 @@ object RestApi {
     svcs.mapValues(_.toHttpServiceF(f))
 
   def defaultMiddleware: HttpMiddleware =
-    cors compose gzip compose HeaderParam compose passOptions compose errorHandling
+    cors                            compose
+    gzip                            compose
+    RFC5987ContentDispositionRender compose
+    HeaderParam                     compose
+    passOptions                     compose
+    errorHandling
 
   val cors: HttpMiddleware =
     CORS(_, CORSConfig(

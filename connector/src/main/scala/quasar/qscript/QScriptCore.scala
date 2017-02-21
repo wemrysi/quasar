@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,6 +146,9 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
+  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
+    C.prj(fa)
+
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =

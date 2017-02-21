@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.fp.{TaskRef, reflNT}
-import quasar.fp.eitherT._
 import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
@@ -59,15 +59,15 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Fragments =
+  def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
       Fragments.foreach(fss.toList)(fs =>
-        fs.impl.map { f =>
+        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f, fʹ) =>
           s"${fs.ref.name.shows} FileSystem" >>
-            Fragments(examples(f), step(f.close.unsafePerformSync))
+            Fragments(examples(f, fʹ), step(f.close.unsafePerformSync))
         } getOrElse {
-          val envVarName = TestConfig.backendEnvName(fs.ref.name)
-          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"Environment not setup to test this file system, set environment variable $envVarName in order to do so"))
+          val confParamName = TestConfig.backendConfName(fs.ref.name)
+          Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
         })
     }.unsafePerformSync
 

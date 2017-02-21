@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,11 @@ object queryfile {
   import FunctionDecl.{FunctionDecl1, FunctionDecl3}
 
   type PrologL[F[_]]         = MonadListen_[F, Prologs]
-  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, A]
+  type MLQScript[T[_[_]], A] = QScriptShiftRead[T, AFile, A]
+
+  implicit def mlQScriptToQScriptTotal[T[_[_]]]
+      : Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def interpret[F[_]: Monad: Capture: CSourceReader: SessionReader: XccErr: MonoSeq: PrologW: PrologL, FMT](
     resultsChunkSize: Positive
@@ -110,8 +114,9 @@ object queryfile {
   )(implicit
     planner: Planner[F, FMT, MLQScript[T, ?]]
   ): F[MainModule] = {
-    type MLQ[A] = MLQScript[T, A]
-    type QSR[A] = QScriptRead[T, A]
+    type MLQ[A]  = MLQScript[T, A]
+    type QSR[A]  = QScriptRead[T, APath, A]
+    type QSSR[A] = QScriptShiftRead[T, APath, A]
 
     val C = Coalesce[T, MLQ, MLQ]
     val N = Normalizable[MLQ]
@@ -127,14 +132,17 @@ object queryfile {
 
     for {
       qs      <- convertToQScriptRead[T, F, QSR](ops.ls[F])(lp)
-      shifted =  shiftRead[T, QSR, MLQ].apply(qs)
+      shifted <- R.shiftRead[QSR, QSSR].apply(qs)
+                   // TODO: Eliminate this once the filesystem implementation is updated
+                   .transCataM(ExpandDirs[T, QSSR, MLQ].expandDirs(idPrism.reverseGet, ops.ls[F]))
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(
                    R.optimize(reflNT[MLQ]),
-                   repeatedly(C.coalesceQC[MLQ](idPrism))     ⋙
-                   repeatedly(C.coalesceTJ[MLQ](idPrism.get)) ⋙
-                   repeatedly(C.coalesceSR[MLQ](idPrism))     ⋙
-                   repeatedly(N.normalizeF(_: MLQ[T[MLQ]])))
+                   repeatedly(R.applyTransforms(
+                     C.coalesceQC[MLQ](idPrism),
+                     C.coalesceTJ[MLQ](idPrism.get),
+                     C.coalesceSR[MLQ, AFile](idPrism),
+                     N.normalizeF(_: MLQ[T[MLQ]]))))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)
       pp      <- prettyPrint[F](main.queryBody)

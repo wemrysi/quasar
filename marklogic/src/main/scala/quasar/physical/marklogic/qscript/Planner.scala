@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Data
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
@@ -63,21 +64,21 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
     MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): Planner[F, FMT, QScriptCore[T, ?]] = {
-    implicit val qtp = QTP.value
+    implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new QScriptCorePlanner[F, FMT, T]
   }
 
-  implicit def constShiftedRead[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
+  implicit def constShiftedReadFile[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT: SearchOptions](
     implicit SP: StructuralPlanner[F, FMT]
-  ): Planner[F, FMT, Const[ShiftedRead, ?]] =
-    new ShiftedReadPlanner[F, FMT]
+  ): Planner[F, FMT, Const[ShiftedRead[AFile], ?]] =
+    new ShiftedReadFilePlanner[F, FMT]
 
   implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
     implicit
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
     MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): Planner[F, FMT, ThetaJoin[T, ?]] = {
-    implicit val qtp = QTP.value
+    implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new ThetaJoinPlanner[F, FMT, T]
   }
 
@@ -87,8 +88,11 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
   implicit def constDeadEnd[F[_]: MonadPlanErr, FMT]: Planner[F, FMT, Const[DeadEnd, ?]] =
     new UnreachablePlanner[F, FMT, Const[DeadEnd, ?]]("DeadEnd")
 
-  implicit def constRead[F[_]: MonadPlanErr, FMT]: Planner[F, FMT, Const[Read, ?]] =
-    new UnreachablePlanner[F, FMT, Const[Read, ?]]("Read")
+  implicit def constRead[F[_]: MonadPlanErr, FMT, A]: Planner[F, FMT, Const[Read[A], ?]] =
+    new UnreachablePlanner[F, FMT, Const[Read[A], ?]]("[A]Read[A]")
+
+  implicit def constShiftedReadPath[F[_]: MonadPlanErr, FMT]: Planner[F, FMT, Const[ShiftedRead[APath], ?]] =
+    new UnreachablePlanner[F, FMT, Const[ShiftedRead[APath], ?]]("ShiftedRead[APath]")
 
   implicit def projectBucket[F[_]: MonadPlanErr, FMT, T[_[_]]]: Planner[F, FMT, ProjectBucket[T, ?]] =
     new UnreachablePlanner[F, FMT, ProjectBucket[T, ?]]("ProjectBucket")

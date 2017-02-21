@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ package quasar.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz.eitherT._
+import quasar.fp._
 import quasar.fp.numeric._
 
 import java.lang.RuntimeException
@@ -65,7 +66,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
 
   implicit val setDataEq = Equal.equalA[Set[Data]]
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
     "Reading Files" should {

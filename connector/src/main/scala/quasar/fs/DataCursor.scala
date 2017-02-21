@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,6 @@ trait DataCursor[F[_], C] {
 object DataCursor {
   def apply[F[_], C](implicit DC: DataCursor[F, C]): DataCursor[F, C] = DC
 
-  // FIXME: needs puffnfresh/wartremover#226 fixed
-  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
   implicit def eitherDataCursor[F[_], A, B](
     implicit A: DataCursor[F, A], B: DataCursor[F, B]
   ): DataCursor[F, A \/ B] =

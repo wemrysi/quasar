@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,107 +27,6 @@ import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
-sealed trait LowerPriorityTreeInstances {
-  implicit def Tuple2RenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
-      RenderTree[(A, B)] =
-    new RenderTree[(A, B)] {
-      def render(t: (A, B)) =
-        NonTerminal("tuple" :: Nil, None,
-          RA.render(t._1) ::
-            RB.render(t._2) ::
-            Nil)
-    }
-}
-
-sealed trait LowPriorityTreeInstances extends LowerPriorityTreeInstances {
-  implicit def LeftTuple3RenderTree[A, B, C](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C]):
-      RenderTree[((A, B), C)] =
-    new RenderTree[((A, B), C)] {
-      def render(t: ((A, B), C)) =
-        NonTerminal("tuple" :: Nil, None,
-          RA.render(t._1._1) ::
-            RB.render(t._1._2) ::
-            RC.render(t._2) ::
-            Nil)
-    }
-}
-
-sealed trait TreeInstances extends LowPriorityTreeInstances {
-  implicit def LeftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
-      RenderTree[(((A, B), C), D)] =
-    new RenderTree[(((A, B), C), D)] {
-      def render(t: (((A, B), C), D)) =
-        NonTerminal("tuple" :: Nil, None,
-           RA.render(t._1._1._1) ::
-            RB.render(t._1._1._2) ::
-            RC.render(t._1._2) ::
-            RD.render(t._2) ::
-            Nil)
-    }
-
-  implicit def EitherRenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]):
-      RenderTree[A \/ B] =
-    new RenderTree[A \/ B] {
-      def render(v: A \/ B) =
-        v match {
-          case -\/ (a) => NonTerminal("-\\/" :: Nil, None, RA.render(a) :: Nil)
-          case \/- (b) => NonTerminal("\\/-" :: Nil, None, RB.render(b) :: Nil)
-        }
-    }
-
-  implicit def OptionRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[Option[A]] =
-    new RenderTree[Option[A]] {
-      def render(o: Option[A]) = o match {
-        case Some(a) => RA.render(a)
-        case None => Terminal("None" :: "Option" :: Nil, None)
-      }
-    }
-
-  implicit def ListRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[List[A]] =
-    new RenderTree[List[A]] {
-      def render(v: List[A]) = NonTerminal(List("List"), None, v.map(RA.render))
-    }
-
-  implicit def ListMapRenderTree[K: Show, V](implicit RV: RenderTree[V]):
-      RenderTree[ListMap[K, V]] =
-    new RenderTree[ListMap[K, V]] {
-      def render(v: ListMap[K, V]) =
-        NonTerminal("Map" :: Nil, None,
-          v.toList.map { case (k, v) =>
-            NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
-          })
-    }
-
-  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
-    Equal.equalBy(_.toList)
-
-  implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
-      RenderTree[Vector[A]] =
-    new RenderTree[Vector[A]] {
-      def render(v: Vector[A]) = NonTerminal(List("Vector"), None, v.map(RA.render).toList)
-    }
-
-  implicit val BooleanRenderTree: RenderTree[Boolean] =
-    RenderTree.fromShow[Boolean]("Boolean")
-  implicit val IntRenderTree: RenderTree[Int] =
-    RenderTree.fromShow[Int]("Int")
-  implicit val DoubleRenderTree: RenderTree[Double] =
-    RenderTree.fromShow[Double]("Double")
-  implicit val StringRenderTree: RenderTree[String] =
-    RenderTree.fromShow[String]("String")
-
-  implicit val SymbolEqual: Equal[Symbol] = Equal.equalA
-
-  implicit def PathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
-    new RenderTree[pathy.Path[B,T,S]] {
-      // NB: the implicit Show instance in scope here ends up being a circular
-      // call, so an explicit reference to pathy's Show is needed.
-      def render(v: pathy.Path[B,T,S]) = Terminal(List("Path"), pathy.Path.PathShow.shows(v).some)
-    }
-}
-
 sealed trait ListMapInstances {
   implicit def seqW[A](xs: Seq[A]): SeqW[A] = new SeqW(xs)
   class SeqW[A](xs: Seq[A]) {
@@ -150,55 +49,9 @@ sealed trait ListMapInstances {
         scalaz.std.list.listInstance.traverseImpl(m.toList)({ case (k, v) => f(v) map (k -> _) }) map (_.toListMap)
       }
     }
-}
 
-trait OptionTInstances {
-  implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
-    new Catchable[OptionT[F, ?]] {
-      def attempt[A](fa: OptionT[F, A]) =
-        OptionT[F, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)  => Some(\/.left(t))
-            case \/-(oa) => oa map (\/.right)
-          })
-
-      def fail[A](t: Throwable) =
-        OptionT[F, A](Catchable[F].fail(t))
-    }
-}
-
-sealed trait StateTInstances {
-  implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
-    new Catchable[StateT[F, S, ?]] {
-      def attempt[A](fa: StateT[F, S, A]) =
-        StateT[F, S, Throwable \/ A](s =>
-          Catchable[F].attempt(fa.run(s)) map {
-            case -\/(t)       => (s, t.left)
-            case \/-((s1, a)) => (s1, a.right)
-          })
-
-      def fail[A](t: Throwable) =
-        StateT[F, S, A](_ => Catchable[F].fail(t))
-    }
-}
-
-trait ToCatchableOps {
-  trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
-    import fp.ski._
-
-    /** A new task which runs a cleanup task only in the case of failure, and
-      * ignores any result from the cleanup task.
-      */
-    final def onFailure(cleanup: F[_])(implicit FM: Monad[F], FC: Catchable[F]):
-        F[A] =
-      self.attempt.flatMap(_.fold(
-        err => cleanup.attempt.flatMap(κ(FC.fail(err))),
-        _.point[F]))
-  }
-
-  implicit def ToCatchableOpsFromCatchable[F[_], A](a: F[A]):
-      CatchableOps[F, A] =
-    new CatchableOps[F, A] { val self = a }
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
 }
 
 trait PartialFunctionOps {
@@ -228,7 +81,7 @@ trait JsonOps {
 
   def decodeJson[A](text: String)(implicit DA: DecodeJson[A]): String \/ A = \/.fromEither(for {
     json <- Parse.parse(text)
-    a <- DA.decode(json.hcursor).result.leftMap { case (exp, hist) => "expected: " + exp + "; " + hist }
+    a <- DA.decode(json.hcursor).result.leftMap { case (exp, hist) => "expected: " + exp + "; " + hist.toString }
   } yield a)
 
 
@@ -284,18 +137,12 @@ trait DebugOps {
 }
 
 package object fp
-    extends TreeInstances
-    with ListMapInstances
-    with OptionTInstances
-    with StateTInstances
-    with WriterTInstances
-    with ToCatchableOps
+    extends ListMapInstances
     with PartialFunctionOps
     with JsonOps
     with ProcessOps
     with QFoldableOps
-    with DebugOps
-    with CatchableInstances {
+    with DebugOps {
 
   import ski._
 
@@ -403,6 +250,8 @@ package object fp
 
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
+  implicit val symbolEqual: Equal[Symbol] = Equal.equalA
+
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]
     type Step[X] = F[X] \/ A
@@ -414,6 +263,11 @@ package object fp
   def liftCo[T[_[_]], F[_], A, B](f: F[B] => CoEnv[A, F, B])
       : CoEnv[A, F, B] => CoEnv[A, F, B] =
     co => co.run.fold(κ(co), f)
+
+  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A]
+    (f: F[T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]])
+      : CoEnv[A, F, T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]] =
+    co => co.run.fold(κ(co.point[M]), f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),

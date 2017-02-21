@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ object ExprOp3_2F {
   implicit val equal: Delay[Equal, ExprOp3_2F] =
     new Delay[Equal, ExprOp3_2F] {
       def apply[A](eq: Equal[A]) = {
-        implicit val EQ = eq
+        implicit val EQ: Equal[A] = eq
         Equal.equal {
           case ($sqrtF(v1), $sqrtF(v2))       => v1 ≟ v2
           case ($absF(v1), $absF(v2))         => v1 ≟ v2

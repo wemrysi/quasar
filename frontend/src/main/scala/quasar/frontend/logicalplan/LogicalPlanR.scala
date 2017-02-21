@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,6 +115,24 @@ final class LogicalPlanR[T]
       case _ => None
     }
 
+    // avoid illegally rewriting the continuation
+    case InvokeUnapply(relations.Cond, Sized(a1, a2, a3)) => (a1, a2, a3) match {
+      case (Embed(Let(a, x1, x2)), a2, a3) =>
+        lp.let(a, x1, invoke[nat._3](relations.Cond, Func.Input3(x2, a2, a3))).some
+      case _ => None
+    }
+
+    case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
+      if func == set.InnerJoin      || func == set.LeftOuterJoin ||
+         func == set.RightOuterJoin || func == set.FullOuterJoin =>
+      (a1, a2, a3) match {
+        case (Embed(Let(a, x1, x2)), a2, a3) =>
+          lp.let(a, x1, invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
+        case (a1, Embed(Let(a, x1, x2)), a3) =>
+          lp.let(a, x1, invoke[nat._3](func, Func.Input3(a1, x2, a3))).some
+        case _ => None
+      }
+
     case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
         lp.let(a, x1, invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
@@ -125,12 +143,12 @@ final class LogicalPlanR[T]
       case _ => None
     }
 
+    // we don't rewrite a `Let` as the `cont` to avoid illegally rewriting the continuation
     case Typecheck(Embed(Let(a, x1, x2)), typ, cont, fallback) =>
       lp.let(a, x1, typecheck(x2, typ, cont, fallback)).some
-    case Typecheck(expr, typ, Embed(Let(a, x1, x2)), fallback) =>
-      lp.let(a, x1, typecheck(expr, typ, x2, fallback)).some
     case Typecheck(expr, typ, cont, Embed(Let(a, x1, x2))) =>
       lp.let(a, x1, typecheck(expr, typ, cont, x2)).some
+
     case t => None
   }
 
@@ -199,7 +217,7 @@ final class LogicalPlanR[T]
         case _             => term
       }))
       else if (poss.contains(inf)) {
-        emitName(freshName("check").map(name =>
+        emitName(freshName("checku").map(name =>
           ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), free(name))))
       }
       else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
@@ -221,7 +239,7 @@ final class LogicalPlanR[T]
     val ConstrainedPlan(typ, consts, term) = constraints
       (consts match {
         case Nil =>
-          freshName("check").map(name =>
+          freshName("checke").map(name =>
             ConstrainedPlan(typ, List(NamedConstraint(name, typ, term)), free(name)))
         case _   => constraints.point[State[NameGen, ?]]
       }).map(appConst(_, fallback))
@@ -287,7 +305,21 @@ final class LogicalPlanR[T]
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           handleGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
         case Typecheck(expr, typ, cont, fallback) =>
-          unifyOrCheck(inf, Type.glb(cont.inferred, typ), typecheck(expr.plan, typ, cont.plan, fallback.plan))
+	  val typer: Func.Typer[Nat._3] = {
+            case Sized(_, t2, _) => Type.glb(t2, typ).success
+	  }
+	  val construct: Func.Input[T, Nat._3] => T = {
+            case Sized(a1, a2, a3) => typecheck(a1, typ, a2, a3)
+	  }
+	  val (constrs, plan): (List[NamedConstraint[T]], T) = expr.constraints.foldLeftM(expr.plan) {
+	    case (acc, constr) =>
+	      if ((Free(constr.name) == expr.plan) && (constr.inferred == typ))
+	        (Nil, constr.term)
+	      else
+	        (List(constr), expr.plan)
+	  }
+          val expr0 = ConstrainedPlan(expr.inferred, constrs, plan)
+          handleInvoke(inf, typer, construct, Func.Input3(expr0, cont, fallback))
         case Let(name, value, in) =>
           unifyOrCheck(inf, in.inferred, let(name, appConst(value, constant(Data.NA)), appConst(in, constant(Data.NA))))
         // TODO: Get the possible type from the LetF

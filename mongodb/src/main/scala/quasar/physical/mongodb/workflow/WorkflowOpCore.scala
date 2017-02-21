@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -959,7 +959,7 @@ object WorkflowOpCoreF {
         case $SortF(_, value)   =>
           val nt = "$SortF" :: wfType
           NonTerminal(nt, None,
-            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
+            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st.shows)) }.toList)
         case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
           val nt = "$GeoNearF" :: wfType
           NonTerminal(nt, None,

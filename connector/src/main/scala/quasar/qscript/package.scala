@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,16 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
+import quasar.qscript.MapFunc._
+import quasar.qscript.MapFuncs._
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -55,11 +59,18 @@ package object qscript {
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
+    *
+    * NB: We're using the "alias" method of building the coproduct here as it
+    *     provides a modest reduction in compilation time (~15%) for this module.
     */
-  type QScriptTotal[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
-      ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
-      Const[ShiftedRead, ?] :\: Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+  type QScriptTotal[T[_[_]], A]  = Coproduct[QScriptCore[T, ?]           , QScriptTotal0[T, ?], A]
+  type QScriptTotal0[T[_[_]], A] = Coproduct[ProjectBucket[T, ?]         , QScriptTotal1[T, ?], A]
+  type QScriptTotal1[T[_[_]], A] = Coproduct[ThetaJoin[T, ?]             , QScriptTotal2[T, ?], A]
+  type QScriptTotal2[T[_[_]], A] = Coproduct[EquiJoin[T, ?]              , QScriptTotal3[T, ?], A]
+  type QScriptTotal3[T[_[_]], A] = Coproduct[Const[ShiftedRead[APath], ?], QScriptTotal4[T, ?], A]
+  type QScriptTotal4[T[_[_]], A] = Coproduct[Const[ShiftedRead[AFile], ?], QScriptTotal5[T, ?], A]
+  type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[APath], ?]       , QScriptTotal6[T, ?], A]
+  type QScriptTotal6[T[_[_]], A] = Coproduct[Const[Read[AFile], ?]       , Const[DeadEnd, ?]  , A]
 
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
@@ -70,20 +81,19 @@ package object qscript {
     ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[DeadEnd, ?]])
 
   /** QScript that has gone through Read conversion. */
-  type QScriptRead[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+  type QScriptRead[T[_[_]], P, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[P], ?])#M[A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read, ?]])
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, APath, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read[APath], ?]])
 
   /** QScript that has gone through Read conversion and shifted conversion */
-  type QScriptShiftRead[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+  type QScriptShiftRead[T[_[_]], P, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[ShiftedRead[P], ?])#M[A]
 
   implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead, ?]])
+      : Injectable.Aux[QScriptShiftRead[T, APath, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[ShiftedRead[APath], ?]])
 
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
   type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
@@ -100,29 +110,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
-
-  def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
-
-  import MapFunc._
-  import MapFuncs._
-
-  def flattenArray[T[_[_]], A: Show](array: ConcatArrays[T, FreeMapA[T, A]]): List[FreeMapA[T, A]] = {
-    def inner(jf: FreeMapA[T, A]): List[FreeMapA[T, A]] =
-      jf.resume match {
-        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
-        case _                           => List(jf)
-      }
-    inner(Free.roll(array))
-  }
-
-  def rebuildArray[T[_[_]]: CorecursiveT, A](funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = {
-    def inner(funcs: List[FreeMapA[T, A]]): FreeMapA[T, A] = funcs match {
-      case Nil          => Free.roll(EmptyArray[T, FreeMapA[T, A]])
-      case func :: Nil  => func
-      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
-    }
-    inner(funcs.reverse)
-  }
 
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], r: FreeMapA[T, A]):
@@ -155,34 +142,34 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
 
+  def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+
   def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT]
     (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
     val rewrite = new Rewrite[T]
 
-    (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm)))).transCata[FreeQS[T]](
-      liftCo(rewrite.normalizeCoEnv[QScriptTotal[T, ?]]))
+    (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
+      Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))
+      .transCata[FreeQS[T]](liftCo(rewrite.normalizeCoEnv[QScriptTotal[T, ?]]))
   }
 
-  def rewriteShift[T[_[_]]: BirecursiveT: EqualT]
-    (idStatus: IdStatus, repair: JoinFunc[T])
-      : Option[(IdStatus, JoinFunc[T])] =
-    (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc[T])]] {
-      def makeRef(idx: Int): JoinFunc[T] =
-        Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+  def rebaseT[T[_[_]]: BirecursiveT, F[_]: Traverse](
+    target: FreeQS[T])(
+    src: T[F])(
+    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
+      Option[T[F]] =
+    target.as(src.transAna[T[QScriptTotal[T, ?]]](FI.inject)).cata(recover(_.embed)).transAnaM(FI project _)
 
-      val zeroRef: JoinFunc[T] = makeRef(0)
-      val oneRef: JoinFunc[T] = makeRef(1)
-      val rightCount: Int = repair.elgotPara(count(RightSideF))
-
-      if (repair.elgotPara(count(oneRef)) ≟ rightCount)
-        // all `RightSide` access is through `oneRef`
-        (ExcludeId, repair.transApoT(substitute[JoinFunc[T]](oneRef, RightSideF))).some
-      else if (repair.elgotPara(count(zeroRef)) ≟ rightCount)
-        // all `RightSide` access is through `zeroRef`
-        (IdOnly, repair.transApoT(substitute[JoinFunc[T]](zeroRef, RightSideF))).some
-      else
-        None
-    }.join
+  def rebaseTCo[T[_[_]]: BirecursiveT, F[_]: Traverse]
+    (target: FreeQS[T])
+    (srcCo: T[CoEnv[Hole, F, ?]])
+    (implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]])
+      : Option[T[CoEnv[Hole, F, ?]]] =
+    // TODO: with the right instances & types everywhere, this should look like
+    //       target.transAnaM(_.htraverse(FI project _)) ∘ (_ >> srcCo)
+    target.cataM[Option, T[CoEnv[Hole, F, ?]]](
+      CoEnv.htraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply(_) ∘ (_.embed)) ∘
+      (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
 
   /** A variant of `repeatedly` that works with `Inject` instances. */
   def injectRepeatedly[F [_], G[_], A]
@@ -190,38 +177,6 @@ package object qscript {
     (implicit F: F :<: G)
       : F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
-
-  // TODO: make this simply a transform itself, rather than a full traversal.
-  def shiftRead[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor, G[_]: Traverse]
-    (implicit QC: QScriptCore[T, ?] :<: G,
-              TJ: ThetaJoin[T, ?] :<: G,
-              SR: Const[ShiftedRead, ?] :<: G,
-              GI: Injectable.Aux[G, QScriptTotal[T, ?]],
-              S: ShiftRead.Aux[T, F, G],
-              C: Coalesce.Aux[T, G, G],
-              N: Normalizable[G])
-      : T[F] => T[G] = {
-    val rewrite = new Rewrite[T]
-    _.codyna(
-      rewrite.normalize[G] >>>
-        liftFG(injectRepeatedly(C.coalesceSR[G](idPrism))) >>>
-        (_.embed),
-      ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
-  }
-
-  // FIXME: This needs a better name, as it doesn’t currently reflect what it
-  //        does at all.
-  def simplifyRead[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor, G[_]: Traverse, H[_]: Functor]
-    (implicit QC: QScriptCore[T, ?] :<: G,
-              TJ: ThetaJoin[T, ?] :<: G,
-              SR: Const[ShiftedRead, ?] :<: G,
-              GI: Injectable.Aux[G, QScriptTotal[T, ?]],
-              S: ShiftRead.Aux[T, F, G],
-              J: SimplifyJoin.Aux[T, G, H],
-              C: Coalesce.Aux[T, G, G],
-              N: Normalizable[G])
-      : T[F] => T[H] =
-    shiftRead[T, F, G].apply(_).transCata[T[H]](J.simplifyJoin(idPrism.reverseGet))
 
   // Helpers for creating `Injectable` instances
 

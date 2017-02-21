@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,11 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
     BinOp(And,
       isObjectOrArray(expr),
       UnOp(Not, isArray(expr)))
+
+  def isArrayOrString(expr: R): R =
+    BinOp(Or,
+      isArray(expr),
+      isString(expr))
 
   def isBoolean(expr: R): R =
     BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))

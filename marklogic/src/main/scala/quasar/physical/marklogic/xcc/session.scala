@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.effect.Capture
-import quasar.fp.eitherT._
+import quasar.contrib.scalaz.eitherT._
 import quasar.physical.marklogic.xquery.{MainModule, Version, XQuery}
 
 import scala.collection.JavaConverters._

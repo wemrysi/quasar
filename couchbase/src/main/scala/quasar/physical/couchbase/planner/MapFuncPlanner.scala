@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ package quasar.physical.couchbase.planner
 import quasar.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz.eitherT._
+import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
@@ -481,6 +482,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             none
           ).wrapNel,
           Keyspace(a2, id1.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           filter  = none,
@@ -525,6 +527,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
                 none
               ).wrapNel,
               keyspace = none,
+              join     = none,
               unnest   = none,
               List(Binding(id1, a1), Binding(id2, a2)),
               filter   = none,
@@ -541,6 +544,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Value(true),
           ResultExpr(SelectField(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           filter  = none,
@@ -554,6 +558,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           Value(true),
           ResultExpr(SelectElem(id1.embed, a2).embed, none).wrapNel,
           Keyspace(a1, id1.some).some,
+          join    = none,
           unnest  = none,
           let     = nil,
           filter  = none,
@@ -581,6 +586,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
             Value(true),
             ResultExpr(grd(f, id.embed, id.embed), none).wrapNel,
             Keyspace(cont, id.some).some,
+            join    = none,
             unnest  = none,
             let     = nil,
             filter  = none,

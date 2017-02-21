@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
-import quasar.contrib.scalaz._
-import quasar.fp._, eitherT._
+import quasar.contrib.pathy.{AFile, APath}
+import quasar.contrib.scalaz._, eitherT._
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
@@ -786,8 +787,8 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
-      new Planner[Const[ShiftedRead, ?]] {
+    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+      new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -980,8 +981,11 @@ object MongoDbQScriptPlanner {
     implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
       default("DeadEnd")
 
-    implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
+    implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
       default("Read")
+
+    implicit def shiftedReadPath[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[APath], ?]] =
+      default("ShiftedRead[APath]")
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
       default("ThetaJoin")
@@ -1157,7 +1161,7 @@ object MongoDbQScriptPlanner {
     (implicit
       merr: MonadError_[M, FileSystemError],
       QC: QScriptCore[T, ?] :<: F,
-      SR: Const[ShiftedRead, ?] :<: F)
+      SR: Const[ShiftedRead[AFile], ?] :<: F)
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
       SR.prj(src.project) match {
@@ -1195,15 +1199,15 @@ object MongoDbQScriptPlanner {
   type GenT[X[_], A]  = StateT[X, NameGen, A]
 
   // TODO: This should perhaps be _in_ PhaseResults or something
-  def log[M[_], A: RenderTree]
+  def log[M[_]: Monad, A: RenderTree]
     (label: String, ma: M[A])
-    (implicit mtell: MonadTell[M, PhaseResults])
+    (implicit mtell: MonadTell_[M, PhaseResults])
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      M[_],
+      M[_]: Monad,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
@@ -1212,7 +1216,7 @@ object MongoDbQScriptPlanner {
     (lp: T[LogicalPlan])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults],
+      mtell: MonadTell_[M, PhaseResults],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
       ev2: EX :<: ExprOp,
@@ -1221,25 +1225,33 @@ object MongoDbQScriptPlanner {
     val rewrite = new Rewrite[T]
 
     type MongoQScript[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+
+    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript, QScriptTotal[T, ?]] =
+      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+
+    // NB: Intermediate form of QScript between the standard form and Mongo’s.
+    type MongoQScript0[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
 
     val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
+      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, APath, ?]](listContents)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        simplifyRead[T, QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript].apply(qs)
-          .transHylo(
+        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], MongoQScript0].apply(qs)
+          .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
+          .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
-            repeatedly(C.coalesceQC[MongoQScript](idPrism)) ⋙
-              repeatedly(C.coalesceEJ[MongoQScript](idPrism.get)) ⋙
-              repeatedly(C.coalesceSR[MongoQScript](idPrism)) ⋙
-              repeatedly(Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))
-          .transCataM(liftFGM(assumeReadType[GenT[M, ?], T, MongoQScript](Type.AnyObject))))
+            repeatedly(rewrite.applyTransforms(
+              C.coalesceQC[MongoQScript](idPrism),
+              C.coalesceEJ[MongoQScript](idPrism.get),
+              C.coalesceSR[MongoQScript, AFile](idPrism),
+              Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))))
+          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",
         opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
@@ -1257,11 +1269,11 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell[M, PhaseResults])
+      mtell: MonadTell_[M, PhaseResults])
       : M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 

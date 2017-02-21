@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.{Data, TestConfig}
 import quasar.contrib.scalacheck.gen
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.fp.eitherT._
 import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.testing
 import quasar.physical.marklogic.xquery._
