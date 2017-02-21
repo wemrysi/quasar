@@ -27,13 +27,12 @@ import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.fp.numeric.Positive
-import quasar.fp.ski.κ
 import quasar.frontend.logicalplan
 import quasar.fs._
 import quasar.fs.impl.DataStream
 import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefinitionResult, DefErrT}
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc.AsContent
+import quasar.physical.marklogic.xcc.{AsContent, provideSession}
 import quasar.physical.marklogic.xquery.PrologT
 
 import java.net.URI
@@ -185,11 +184,6 @@ package object fs {
         case th => th.getMessage.wrapNel.left[EnvironmentError].left
       })
 
-    def provideSession(cs: ContentSource) = λ[SR ~> Task] { fa =>
-      contentsource.defaultSession[CR].run(cs)
-        .flatMap(s => fa.run(s).ensuring(κ(Task.delay(s.close()))))
-    }
-
     val runFs = (
       KeyValueStore.impl.empty[WriteHandle, Unit]           |@|
       KeyValueStore.impl.empty[ReadHandle, XccDataStream]   |@|
@@ -206,7 +200,7 @@ package object fs {
                      (liftMT[Task, SRT] compose seq)      :+:
                      Read.toReader[SR, Session]           :+:
                      Read.constant[SR, ContentSource](cs)
-        val runML  = provideSession(cs) compose foldMapNT(mlToSR)
+        val runML  = provideSession[Task](cs) compose foldMapNT(mlToSR)
         val sdown  = Task.delay(cs.getConnectionProvider.shutdown(null))
 
         contentsource.defaultSession[CR] flatMap {

@@ -36,11 +36,9 @@ object lib {
 
   val fs = NamespaceDecl(filesystemNs)
 
-  val formatConflict = filesystemNs(NCName("format-conflict"))
-
   def formatConflictError(uri: XQuery) = {
     val msg = "A document with a different format exists at ".xs
-    fn.error(formatConflict.xqy, some(fn.concat(msg, uri)))
+    fn.error(filesystemError.xqy, some(fn.concat(msg, uri)))
   }
 
   /** Appends the given nodes as children of `dst` in a format-appropriate manner. */

@@ -18,12 +18,16 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.catchable._
+import quasar.effect.Capture
+import quasar.fp.ski.κ
 
 import com.marklogic.xcc.{ContentSource, Session}
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
 import monocle.Prism
+import scalaz._, Scalaz._
 
 package object xcc {
   type CSourceReader[F[_]] = MonadReader_[F, ContentSource]
@@ -40,4 +44,14 @@ package object xcc {
 
   type ContentUri = String Refined Uri
   val  ContentUri = Prism((s: String) => refineV[Uri](s).right.toOption)(_.get)
+
+  /** Returns a natural transformation that safely runs a `Session` reader,
+    * ensuring the provided sessions are properly closed after use.
+    */
+  def provideSession[F[_]: Monad: Capture: Catchable](cs: ContentSource): Kleisli[F, Session, ?] ~> F =
+    λ[Kleisli[F, Session, ?] ~> F] { sr =>
+      contentsource.defaultSession[Kleisli[F, ContentSource, ?]]
+        .run(cs)
+        .flatMap(s => sr.run(s).ensuring(κ(Capture[F].capture(s.close()))))
+    }
 }
