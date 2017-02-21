@@ -40,6 +40,9 @@ package object xcc {
 
   object SessionReader {
     def apply[F[_]](implicit F: SessionReader[F]): SessionReader[F] = F
+
+    def withSession[F[_]: Bind: Capture: SessionReader, A](f: Session => A): F[A] =
+      apply[F].ask >>= (s => Capture[F].capture(f(s)))
   }
 
   type ContentUri = String Refined Uri

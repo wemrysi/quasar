@@ -73,7 +73,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def mkObjectEntry(key: XQuery, value: XQuery) =
     XQuery.stringLit.getOption(key).cata(
       s => asQName(s) >>= (qn => renameOrWrap(qn.xqy, value)),
-      renameOrWrap(key, value))
+      renameOrWrap(xs.QName(key), value))
 
   def nodeCast(node: XQuery) =
     castAsAscribed(node)

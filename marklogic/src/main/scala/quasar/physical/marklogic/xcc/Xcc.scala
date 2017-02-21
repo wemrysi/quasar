@@ -34,19 +34,37 @@ import simulacrum.typeclass
 
 @typeclass
 trait Xcc[F[_]] extends MonadError_[F, XccError] {
+  /** Returns the most recent system commit timestamp. */
   def currentServerPointInTime: F[BigInt]
+
+  /** Returns the stream of `XdmItem`s resulting from evaluating the given module. */
   def evaluate(main: MainModule): Process[F, XdmItem]
+
+  /** Executes the given module on the server, ignoring any results it may produce. */
   def execute(main: MainModule): F[Executed]
+
+  /** Inserts a `Foldable` of content into the server, returning errors about
+    * any failed insertions.
+    */
   def insert[C[_]: Foldable](content: C[Content]): F[Vector[XccError]]
+
+  /** Returns the sequence of `XdmItem`s resulting from evaluating the given module. */
   def results(main: MainModule): F[Vector[XdmItem]]
+
+  /** Ensures the given operations happen transactionally, either they all
+    * succeed or none do. Any errors raised by `fa` will abort the transaction.
+    */
   def transact[A](fa: F[A]): F[A]
 
+  /** Returns the stream of `XdmItem`s resulting from evaluating the given XQuery expression. */
   def evaluateQuery(query: XQuery): Process[F, XdmItem] =
     evaluate(defaultModule(query))
 
+  /** Executes the given XQuery expression on the server, ignoring any results it may produce. */
   def executeQuery(query: XQuery): F[Executed] =
     execute(defaultModule(query))
 
+  /** Returns the sequence of `XdmItem`s resulting from evaluating the given XQuery expression. */
   def queryResults(query: XQuery): F[Vector[XdmItem]] =
     results(defaultModule(query))
 
@@ -211,7 +229,7 @@ private[xcc] final class DefaultImpl[F[_]: Monad: Capture: Catchable: SessionRea
     withSession(_.getTransactionMode)
 
   private def withSession[A](f: Session => A): F[A] =
-    SessionReader[F].ask >>= (s => Capture[F].capture(f(s)))
+    SessionReader.withSession[F, A](f)
 }
 
 private[xcc] object DefaultImpl {

@@ -49,13 +49,14 @@ object lib {
     ).as(ST.Top) { (dst: XQuery, nodes: XQuery) =>
       val (dstType, node, key, base, i) = ($("dstType"), $("node"), $("key"), $("base"), $("i"))
       val unsupportedRoot = "Unsupported root node, expected an array or object, found: "
+      val genBase = fn.string(xdmp.random(baseSeed.xqy))
 
       (
-        SP.nodeType(dst)                                                 |@|
-        SP.singletonArray(~node)                                         |@|
-        SP.singletonObject(~key, ~node)                                  |@|
-        lpadToLength[F].apply("0".xs, 12.xqy, xdmp.random(baseSeed.xqy)) |@|
-        lpadToLength[F].apply("0".xs, 8.xqy, ~i)
+        SP.nodeType(dst)                                    |@|
+        SP.singletonArray(~node)                            |@|
+        SP.singletonObject(~key, ~node)                     |@|
+        lpadToLength[F].apply("0".xs, 12.xqy, genBase)      |@|
+        lpadToLength[F].apply("0".xs, 8.xqy, fn.string(~i))
       )((typ, arr, obj, pbase, pidx) =>
         let_(dstType := typ) return_ {
           if_(~dstType eq "array".xs)
@@ -66,7 +67,7 @@ object lib {
           .then_(
             let_(base := pbase)
             .for_(node at i in nodes)
-            .let_(key := fn.concat("k".xs, ~base, "-".xs, pidx))
+            .let_(key := fn.concat("k".xs, ~base, pidx))
             .return_(xdmp.nodeInsertChild(dst, obj `/` child.node())))
           .else_(fn.error(filesystemError.xqy, some(fn.concat(unsupportedRoot.xs, ~dstType)))))
         })
