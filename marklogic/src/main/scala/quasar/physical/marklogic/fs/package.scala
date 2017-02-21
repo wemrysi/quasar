@@ -126,7 +126,8 @@ package object fs {
     P : Planner[MLFSQ, FMT, MLQScript[Fix, ?]],
     SP: StructuralPlanner[XccEval, FMT]
   ): DefErrT[Task, DefinitionResult[Task]] = {
-    implicit val mlfsqStructuralPlanner = SP.transform(xccEvalToMLFSQ)
+    implicit val mlfsqStructuralPlanner: StructuralPlanner[MLFSQ, FMT] =
+      SP.transform(xccEvalToMLFSQ)
 
     val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
 

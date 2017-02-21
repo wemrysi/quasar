@@ -178,6 +178,7 @@ private[xcc] final class DefaultImpl[F[_]: Monad: Capture: Catchable: SessionRea
 
   ////
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def beginTransaction: F[TransactionMode] =
     transactionMode >>= { mode =>
       if (mode == TransactionMode.UPDATE)
