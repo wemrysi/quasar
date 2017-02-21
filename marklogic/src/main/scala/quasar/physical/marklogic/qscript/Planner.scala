@@ -72,7 +72,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
     MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): Planner[F, FMT, QScriptCore[T, ?]] = {
-    implicit val qtp = QTP.value
+    implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new QScriptCorePlanner[F, FMT, T]
   }
 
@@ -81,7 +81,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
     MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): Planner[F, FMT, ThetaJoin[T, ?]] = {
-    implicit val qtp = QTP.value
+    implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new ThetaJoinPlanner[F, FMT, T]
   }
 
