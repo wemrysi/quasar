@@ -121,7 +121,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   ////
 
   // ejson:is-array($item as item()?) as xs:boolean
-  val isArrayFn: F[FunctionDecl1] =
+  lazy val isArrayFn: F[FunctionDecl1] =
     ejs.declare[F]("is-array") map (_(
       $("item") as ST("item()?")
     ).as(ST("xs:boolean")) { item: XQuery =>
@@ -133,7 +133,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // ejson:left-shift($node as node()?) as item()*
-  val leftShiftFn: F[FunctionDecl1] =
+  lazy val leftShiftFn: F[FunctionDecl1] =
     ejs.declare[F]("left-shift") map (_(
       $("node") as ST("node()?")
     ).as(ST("item()*")) { node =>
@@ -143,23 +143,23 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // ejson:make-array($elements as element()*) as element()
-  val mkArrayFn: F[FunctionDecl1] =
-    ejs.declare[F]("make-array") flatMap (_(
-      $("elements") as ST(s"element()*")
-    ).as(ST(s"element()")) { elts =>
-      (ejsonN.xs[F] |@| typeAttrN.xs[F])((ejsxs, tpexs) =>
-        element { ejsxs } { mkSeq_(attribute { tpexs } { "array".xs }, elts) })
-    })
+  lazy val mkArrayFn: F[FunctionDecl1] =
+    (ejsonN.xs[F] |@| typeAttrN.xs[F])((ejsxs, tpexs) =>
+      ejs.declare[F]("make-array") map (_(
+        $("elements") as ST(s"element()*")
+      ).as(ST(s"element()")) { elts: XQuery =>
+        element { ejsxs } { mkSeq_(attribute { tpexs } { "array".xs }, elts) }
+      })).join
 
-  val mkObjectFn: F[FunctionDecl1] =
-    ejs.declare[F]("make-object") flatMap (_(
-      $("entries") as ST(s"element()*")
-    ).as(ST(s"element()")) { entries =>
-      (ejsonN.xs[F] |@| typeAttrN.xs[F])((ejsxs, tpexs) =>
-        element { ejsxs } { mkSeq_(attribute { tpexs } { "object".xs }, entries) })
-    })
+  lazy val mkObjectFn: F[FunctionDecl1] =
+    (ejsonN.xs[F] |@| typeAttrN.xs[F])((ejsxs, tpexs) =>
+      ejs.declare[F]("make-object") map (_(
+        $("entries") as ST(s"element()*")
+      ).as(ST(s"element()")) { entries: XQuery =>
+        element { ejsxs } { mkSeq_(attribute { tpexs } { "object".xs }, entries) }
+      })).join
 
-  val elementMerge: F[FunctionDecl2] =
+  lazy val elementMerge: F[FunctionDecl2] =
     ejs.declare[F]("element-merge") flatMap (_(
       $("obj1") as ST("element()?"),
       $("obj2") as ST("element()?")
@@ -178,7 +178,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // ejson:many-to-array($items as item()*) as item()*
-  val manyToArray: F[FunctionDecl1] =
+  lazy val manyToArray: F[FunctionDecl1] =
     ejs.declare[F]("many-to-array") flatMap (_(
       $("items") as ST.Top
     ).as(ST.Top) { items: XQuery =>
@@ -188,7 +188,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // qscript:children-named($src as element()?, $name as xs:QName?) as item()*
-  val childrenNamed: F[FunctionDecl2] =
+  lazy val childrenNamed: F[FunctionDecl2] =
     ejs.declare[F]("children-named") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName?")
@@ -198,7 +198,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // qscript:without-named($src as element()?, $name as xs:QName) as element()?
-  val withoutNamed: F[FunctionDecl2] =
+  lazy val withoutNamed: F[FunctionDecl2] =
     ejs.declare[F]("without-named") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName")
@@ -216,7 +216,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // ejson:type-attr-for($item as item()*) as attribute()?
-  val typeAttrFor: F[FunctionDecl1] =
+  lazy val typeAttrFor: F[FunctionDecl1] =
     ejs.declare[F]("type-attr-for") flatMap (_(
       $("item") as ST.Top
     ).as(ST("attribute()?")) { (item: XQuery) =>
@@ -227,31 +227,31 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // ejson:rename-or-wrap($name as xs:QName, $value as item()*) as element()
-  val renameOrWrap: F[FunctionDecl2] =
-    ejs.declare[F]("rename-or-wrap") flatMap (_(
-      $("name")  as ST("xs:QName"),
-      $("value") as ST.Top
-    ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
-      typeAttrFor(value) map { typeAttr =>
+  lazy val renameOrWrap: F[FunctionDecl2] =
+    typeAttrFor.fn flatMap { typeAttr =>
+      ejs.declare[F]("rename-or-wrap") map (_(
+        $("name")  as ST("xs:QName"),
+        $("value") as ST.Top
+      ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { name } { mkSeq_(e `/` axes.attribute.node(), e `/` child.node()) })
-        ) default (element { name } { mkSeq_(typeAttr, value) })
-      }
-    })
+        ) default (element { name } { mkSeq_(typeAttr(value), value) })
+      })
+    }
 
-  val ascribedType: F[FunctionDecl1] =
-    ejs.declare[F]("ascribed-type") flatMap (_(
-      $("node") as ST("node()")
-    ).as(ST("xs:string?")) { (node: XQuery) =>
-      typeAttrN.qn[F] map { tname =>
+  lazy val ascribedType: F[FunctionDecl1] =
+    typeAttrN.qn[F] flatMap { tname =>
+      ejs.declare[F]("ascribed-type") map (_(
+        $("node") as ST("node()")
+      ).as(ST("xs:string?")) { (node: XQuery) =>
         typeswitch(node)(
           $("elt") as ST("element()") return_ (_ `/` axes.attribute(tname))
         ) default emptySeq
-      }
-    })
+      })
+    }
 
-  val castAsAscribed: F[FunctionDecl1] =
+  lazy val castAsAscribed: F[FunctionDecl1] =
     ejs.declare[F]("cast-as-ascribed") flatMap (_(
       $("node") as ST("node()?")
     ).as(ST("item()?")) { (node: XQuery) =>
@@ -291,7 +291,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   // qscript:attributes($node as node()) as element()?
-  val attributes: F[FunctionDecl1] =
+  lazy val attributes: F[FunctionDecl1] =
     ejs.declare[F]("attributes") flatMap (_(
       $("node") as ST("node()")
     ).as(ST("element()?")) { (node: XQuery) =>

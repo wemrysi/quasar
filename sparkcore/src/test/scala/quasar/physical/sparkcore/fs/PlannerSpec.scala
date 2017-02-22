@@ -165,7 +165,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Count(ProjectFieldR(HoleF, StrLit("country"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -184,7 +184,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Sum(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -196,14 +196,14 @@ class PlannerSpec
           }
         }
 
-        "calculate arbitrary" in {
+        "extract bucket" in {
           withSpark { sc =>
             val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-            def reducers: List[ReduceFunc[FreeMap]] = List(Arbitrary(ProjectFieldR(HoleF, StrLit("country"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+            def reducers: List[ReduceFunc[FreeMap]] = Nil
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(None))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -215,6 +215,27 @@ class PlannerSpec
           }
         }
 
+        // FIXME: This should extract some unknown age from the valid set, but
+        //        not sure how to check the result
+        // "calculate arbitrary" in {
+        //   withSpark { sc =>
+        //     val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+        //     val src: RDD[Data] = sc.parallelize(data)
+
+        //     def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+        //     def reducers: List[ReduceFunc[FreeMap]] = List(Arbitrary(ProjectFieldR(HoleF, StrLit("age"))))
+        //     def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+        //     val reduce = Reduce(src, bucket, reducers, repair)
+
+        //     val state: SparkState[RDD[Data]] = compile(reduce)
+        //     state.eval(sc).run.map(result => result must beRightDisjunction.like{
+        //       case rdd =>
+        //         val results = rdd.collect
+        //         results.toList must contain(exactly(Data._str("US"), Data._str("Poland"), Data._str("Austria")))
+        //     })
+        //   })
+        // }
+
         "calculate max" in {
           withSpark { sc =>
             val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
@@ -222,7 +243,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -248,7 +269,7 @@ class PlannerSpec
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
-              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
@@ -272,7 +293,7 @@ class PlannerSpec
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
-              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
