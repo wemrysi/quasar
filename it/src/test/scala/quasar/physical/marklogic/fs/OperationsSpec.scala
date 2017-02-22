@@ -52,12 +52,12 @@ final class OperationsSpec extends quasar.Qspec {
             "bar"  -> Data._str("baz"),
             "quux" -> Data._arr(List(Data._dec(1.234), Data._dec(452.498347))))
 
-        val createAndAppend =
-          ops.createFile[Op, T, Data](loc, Data._obj(initialMap)) *>
+        val insertAndAppend =
+          ops.insertFile[Op, T, Data](loc, Data._obj(initialMap)) *>
           ops.appendToFile[Op, T, Data](loc, append)              *>
           fileContents[T](loc)
 
-        f(createAndAppend map (check(initialMap, _)))
+        f(insertAndAppend map (check(initialMap, _)))
       }
 
       val toAppend: ListMap[String, Data] =

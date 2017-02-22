@@ -57,7 +57,7 @@ object ops {
 
     Xcc[F].transact(for {
       tmp  <- tmpFile
-      errs <- createFile[F, FMT, A](tmp, contents)
+      errs <- insertFile[F, FMT, A](tmp, contents)
       main <- appendQuery(tmp)
       _    <- Xcc[F].execute(main)
       _    <- deleteFile(tmp)
@@ -75,25 +75,6 @@ object ops {
       case Vector(createMode: XSString) => createMode.asString === "automatic"
       case _                            => false
     }
-  }
-
-  /** Creates a new file containing the given contents, overwriting any
-    * existing file. Returns any errors encountered, either with the
-    * contents or during the process of creation itself.
-    */
-  def createFile[F[_]: Monad: Xcc, FMT, A](
-    file: AFile,
-    contents: A
-  )(implicit
-    C: AsContent[FMT, A]
-  ): F[ErrorMessages \/ Vector[XccError]] = {
-    val uri         = pathUri(file)
-    val contentUri  = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
-    val content     = contentUri >>= (C.asContent[ErrorMessages \/ ?](_, contents))
-
-    EitherT.fromDisjunction[F](content)
-      .flatMapF(c => Xcc[F].insert[Id](c) map (_.right[ErrorMessages]))
-      .run
   }
 
   /** Deletes the given directory and all descendants, recursively. */
@@ -176,6 +157,25 @@ object ops {
   def fileHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](file: AFile): F[Boolean] =
     Xcc[F].queryResults(fn.exists(fileNode[FMT](file))) map booleanResult
 
+  /** Insert the given contents into the file, overwriting any existing contents
+    * and creating the file otherwise. Returns any errors encountered, either
+    * with the contents or during the process of insertion itself.
+    */
+  def insertFile[F[_]: Monad: Xcc, FMT, A](
+    file: AFile,
+    contents: A
+  )(implicit
+    C: AsContent[FMT, A]
+  ): F[ErrorMessages \/ Vector[XccError]] = {
+    val uri         = pathUri(file)
+    val contentUri  = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
+    val content     = contentUri >>= (C.asContent[ErrorMessages \/ ?](_, contents))
+
+    EitherT.fromDisjunction[F](content)
+      .flatMapF(c => Xcc[F].insert[Id](c) map (_.right[ErrorMessages]))
+      .run
+  }
+
   /** Move `src` to `dst` overwriting any existing contents. */
   def moveDir[F[_]: Monad: Xcc, FMT: SearchOptions](src: ADir, dst: ADir): F[Executed] = {
     val decodeDir: XdmItem => Option[ADir] = {
@@ -250,7 +250,7 @@ object ops {
   ): F[ErrorMessages \/ Vector[XccError]] =
     fileExists[F](file).ifM(
       appendToFile[F, FMT, A](file, contents),
-      createFile[F, FMT, A](file, contents))
+      insertFile[F, FMT, A](file, contents))
 
   ////
 
