@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, LogicalPlan, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}, LogicalPlan._
+import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
 import scalaz._, Scalaz._, Validation.success
@@ -156,10 +157,12 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.True)), Embed(r))) => r.some
-          case InvokeF(_, Sized(Embed(l), Embed(ConstantF(Data.True)))) => l.some
+          case Invoke(_, Sized(Embed(Constant(Data.True)), Embed(r))) => r.some
+          case Invoke(_, Sized(Embed(l), Embed(Constant(Data.True)))) => l.some
           case _                                                       => None
         }
     },
@@ -179,10 +182,12 @@ trait RelationsLib extends Library {
     Type.Bool,
     Func.Input2(Type.Bool, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.False)), Embed(r))) => r.some
-          case InvokeF(_, Sized(Embed(l), Embed(ConstantF(Data.False)))) => l.some
+          case Invoke(_, Sized(Embed(Constant(Data.False)), Embed(r))) => r.some
+          case Invoke(_, Sized(Embed(l), Embed(Constant(Data.False)))) => l.some
           case _                                                        => None
         }
     },
@@ -214,10 +219,12 @@ trait RelationsLib extends Library {
     Type.Bottom,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(ConstantF(Data.True)),  Embed(c), _)) => c.some
-          case InvokeF(_, Sized(Embed(ConstantF(Data.False)), _, Embed(a))) => a.some
+          case Invoke(_, Sized(Embed(Constant(Data.True)),  Embed(c), _)) => c.some
+          case Invoke(_, Sized(Embed(Constant(Data.False)), _, Embed(a))) => a.some
           case _                                                            => None
         }
     },

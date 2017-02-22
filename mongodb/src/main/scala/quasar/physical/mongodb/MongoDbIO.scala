@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.contrib.scalaz.optionT._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.ski._
@@ -73,8 +74,6 @@ object MongoDbIO {
   /** Returns the stream of results of aggregating documents according to the
     * given aggregation pipeline.
     */
-  // FIXME: I don’t know why this triggers here.
-  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   def aggregated(
     src: Collection,
     pipeline: List[Bson.Doc],
@@ -198,14 +197,6 @@ object MongoDbIO {
         .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
         .map(r => r.wasAcknowledged option r.getInsertedCount))
   }
-
-  /** Returns the results of executing the map-reduce job described by `cfg`
-    * on the documents from `src`.
-    */
-  def mapReduced(src: Collection, cfg: MapReduce): Process[MongoDbIO, BsonDocument] =
-    mapReduceIterable(src, cfg)
-      .liftM[Process]
-      .flatMap(iterableToProcess)
 
   /** Executes the map-reduce job described by `cfg`, sourcing documents from
     * `src` and writing the output to `dst`.

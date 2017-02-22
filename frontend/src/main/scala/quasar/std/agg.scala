@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar._
 
-import org.threeten.bp.Duration
+import java.time.Duration
 import scalaz._, Validation.{success, failureNel}
 import scalaz.std.list._
 import scalaz.std.option._

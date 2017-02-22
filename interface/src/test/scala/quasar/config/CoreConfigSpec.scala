@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.fs.mount._
-import quasar.physical.mongodb.fs.MongoDBFsType
+import quasar.physical.mongodb
 
 import pathy.Path._
 
@@ -30,7 +30,7 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] {
 
   def sampleConfig(uri: ConnectionUri): CoreConfig = {
     CoreConfig(MountingsConfig(Map(
-      rootDir -> MountConfig.fileSystemConfig(MongoDBFsType, uri)
+      rootDir -> MountConfig.fileSystemConfig(mongodb.fs.FsType, uri)
     )))
   }
 

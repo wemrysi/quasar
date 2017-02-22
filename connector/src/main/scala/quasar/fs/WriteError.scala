@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataCodec}
+import quasar.Data._
 
-import argonaut._, Argonaut._, EncodeJsonScalaz._
+import argonaut._, Argonaut._
 
 import scalaz.Show
 
 final case class WriteError(value: Data, hint: Option[String]) {
-  def message = hint.getOrElse("error writing data") + "; value: " + value
+  def message = hint.getOrElse("error writing data") + "; value: " + Show[Data].shows(value)
 }
 
 object WriteError {

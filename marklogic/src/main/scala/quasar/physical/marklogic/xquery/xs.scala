@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object xs {
+  def base64Binary(xqy: XQuery): XQuery =
+    XQuery(s"xs:base64Binary($xqy)")
+
   def boolean(xqy: XQuery): XQuery =
     XQuery(s"xs:boolean($xqy)")
 
@@ -31,11 +34,20 @@ object xs {
   def dateTime(xqy: XQuery): XQuery =
     XQuery(s"xs:dateTime($xqy)")
 
+  def dateTime(date: XQuery, time: XQuery): XQuery =
+    XQuery(s"xs:dateTime($date, $time)")
+
   def dayTimeDuration(xqy: XQuery): XQuery =
     XQuery(s"xs:dayTimeDuration($xqy)")
 
-  def decimal(xqy: XQuery): XQuery =
-    XQuery(s"xs:decimal($xqy)")
+  def double(xqy: XQuery): XQuery =
+    XQuery(s"xs:double($xqy)")
+
+  def duration(xqy: XQuery): XQuery =
+    XQuery(s"xs:duration($xqy)")
+
+  def hexBinary(xqy: XQuery): XQuery =
+    XQuery(s"xs:hexBinary($xqy)")
 
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")

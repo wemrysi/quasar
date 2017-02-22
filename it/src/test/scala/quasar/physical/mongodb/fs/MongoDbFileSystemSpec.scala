@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
-import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly
+import quasar._, DataArbitrary._
 import quasar.common._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.writerT._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend._
@@ -33,7 +34,7 @@ import quasar.sql, sql.Sql
 import scala.Predef.$conforms
 
 import com.mongodb.MongoException
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
@@ -46,8 +47,9 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
-class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filterNot (fs => isMongoReadOnly(fs.name))))
-        with quasar.ExclusiveQuasarSpecification {
+class MongoDbFileSystemSpec
+  extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
+  with quasar.ExclusiveQuasarSpecification {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -90,7 +92,7 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
   val tmpDir: Task[ADir] =
     NameGenerator.salt map (s => rootDir </> dir(s))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     val run = fs.testInterpM
 
     "MongoDB" should {
@@ -222,7 +224,6 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
 
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]
-            type X1[A] = FileSystemErrT[X0, A]
 
             val x0: G ~> X0 =
               Hoist[PhaseResultT].hoist(run)
@@ -368,12 +369,26 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
 object MongoDbFileSystemSpec {
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
-  val mongoFsUT: Task[IList[FileSystemUT[FileSystemIO]]] =
+  val mongoFsUT: Task[IList[SupportedFs[FileSystemIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef)
-        ).handleWith[IList[FileSystemUT[FileSystem]]] {
+          FileSystemTest.fsTestConfig(FsType, definition)
+        ).handleWith[IList[SupportedFs[FileSystem]]] {
+          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+        }
+      )(_.liftIO)
+}
+
+object MongoDbQScriptFileSystemSpec {
+  // NB: No `chroot` here as we want to test deleting top-level
+  //     dirs (i.e. databases).
+  val mongoFsUT: Task[IList[SupportedFs[FileSystemIO]]] =
+    (Functor[Task] compose Functor[IList])
+      .map(
+        TestConfig.externalFileSystems(
+          FileSystemTest.fsTestConfig(QScriptFsType, qscriptDefinition)
+        ).handleWith[IList[SupportedFs[FileSystem]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
       )(_.liftIO)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.stateT._
 import quasar.fp._
 import quasar.fp.free.{Interpreter, SpecializedInterpreter}
 import quasar.fs.SandboxedPathy._
@@ -101,8 +102,8 @@ trait FileSystemFixture {
 
   type F[A]            = Free[FileSystem, A]
   type InMemFix[A]     = ReadWriteT[InMemoryFs, A]
-  type MemStateTask[A] = StateT[Task, InMemState,A]
-  type MemStateFix[A]  = ReadWriteT[MemStateTask,A]
+  type MemStateTask[A] = StateT[Task, InMemState, A]
+  type MemStateFix[A]  = ReadWriteT[MemStateTask, A]
 
   object Mem extends Interpreter[FileSystem,InMemoryFs](
     interpretTerm = fileSystem
@@ -114,7 +115,6 @@ trait FileSystemFixture {
       type T2[M[_],A] = WriterT[M,L,A]
       interpretT2[T1,T2].apply(term).run.run
     }
-
   }
 
   val hoistTask: InMemoryFs ~> MemStateTask =
@@ -123,6 +123,7 @@ trait FileSystemFixture {
   object MemTask extends SpecializedInterpreter[FileSystem, MemStateTask](
     interpretTerm = hoistTask compose Mem.interpretTerm
   ) {
+
     def runLogEmpty[A](p: Process[FileSystemErrT[F,?],A]): Task[FileSystemError \/ IndexedSeq[A]] =
       runLogE(p).run.eval(emptyMem)
   }
@@ -144,9 +145,6 @@ trait FileSystemFixture {
   ) {
     def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       EitherT(runLogE(p).run.eval((rs, ws)))
-
-    def runLogWithReads[E,A](rs: Reads, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
-      runLogWithRW(rs, List(), p)
 
     def runLogWithWrites[E,A](ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       runLogWithRW(List(), ws, p)

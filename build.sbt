@@ -17,8 +17,6 @@ import scoverage._
 
 val BothScopes = "test->test;compile->compile"
 
-def isTravis: Boolean = sys.env contains "TRAVIS"
-
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -33,9 +31,8 @@ lazy val checkHeaders =
 lazy val buildSettings = Seq(
   organization := "org.quasar-analytics",
   headers := Map(
-    ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
-    ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
-  scalaVersion := "2.11.8",
+    ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
+    ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
   scalaOrganization := "org.typelevel",
   outputStrategy := Some(StdoutOutput),
   initialize := {
@@ -52,7 +49,7 @@ lazy val buildSettings = Seq(
     "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
     "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
     "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.0"),
+  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.3"),
   addCompilerPlugin("org.scalamacros" %  "paradise"       % "2.1.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
@@ -70,15 +67,14 @@ lazy val buildSettings = Seq(
     "-Ywarn-unused-import"),
   scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
   // NB: Some warts are disabled in specific projects. Here’s why:
-  //   • AsInstanceOf   – puffnfresh/wartremover#266
-  //   • NoNeedForMonad – puffnfresh/wartremover#268
+  //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
-    Wart.Any,                   // - see puffnfresh/wartremover#263
-    Wart.NoNeedForMonad,        // - Causes issues compiling with scoverage
-    Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
+    Wart.Any,                   // - see wartremover/wartremover#263
+    Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
+    Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing),              // - see puffnfresh/wartremover#263
+    Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -97,7 +93,7 @@ lazy val buildSettings = Seq(
 // actually available to run.
 concurrentRestrictions in Global := {
   val maxTasks = 2
-  if (isTravis)
+  if (isTravisBuild.value)
     // Recreate the default rules with the task limit hard-coded:
     Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
   else
@@ -184,9 +180,10 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
-lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
-lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
-lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
+lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
+lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -207,10 +204,10 @@ lazy val root = project.in(file("."))
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
         interface,
-//        /  \
-      repl,   web,
-//        \  /
-           it)
+//        /   \
+       repl,  web,
+//             |
+              it)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -227,10 +224,9 @@ lazy val foundation = project
     buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build",
     exclusiveTestTag := "exclusive",
-    isCIBuild := isTravis,
+    isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    libraryDependencies ++= Dependencies.foundation,
-    wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)
+    libraryDependencies ++= Dependencies.foundation)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -239,6 +235,7 @@ lazy val foundation = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -248,8 +245,7 @@ lazy val effect = project
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.AsInstanceOf,
-    Wart.NoNeedForMonad))
+    Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
@@ -271,12 +267,10 @@ lazy val common = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
@@ -304,12 +298,11 @@ lazy val frontend = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
+    libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -319,10 +312,8 @@ lazy val sql = project
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals,
-      Wart.NoNeedForMonad))
+      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -339,12 +330,10 @@ lazy val connector = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.NoNeedForMonad))
+      Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -368,7 +357,6 @@ lazy val marklogic = project
     libraryDependencies ++= Dependencies.marklogic,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -394,7 +382,6 @@ lazy val mongodb = project
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
       Wart.Equals,
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -422,12 +409,17 @@ lazy val skeleton = project
   */
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes
+    )
   .settings(commonSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
+  .settings(parallelExecution in Test := false)
   .settings(
-    libraryDependencies ++= Dependencies.sparkcore,
-    wartremoverWarnings in (Compile, compile) --= Seq(Wart.AsInstanceOf, Wart.NoNeedForMonad))
+    sparkDependencyProvided := false,
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -439,7 +431,7 @@ lazy val interface = project
   .dependsOn(
     core % BothScopes,
     couchbase,
-    marklogic,
+    marklogic % BothScopes,
     mongodb,
     postgresql,
     sparkcore,
@@ -467,7 +459,7 @@ lazy val repl = project
   */
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(interface, core % BothScopes)
+  .dependsOn(interface % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
@@ -475,7 +467,6 @@ lazy val web = project
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web,
     wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -485,10 +476,10 @@ lazy val web = project
   */
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(web, core % BothScopes)
+  .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(libraryDependencies ++= Dependencies.web)
+  .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)

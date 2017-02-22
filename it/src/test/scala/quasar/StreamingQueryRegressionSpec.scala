@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,12 @@ import quasar.sql.Sql
 import scala.None
 
 import eu.timepit.refined.auto._
-import matryoshka.Fix
+import matryoshka.data.Fix
 
 class StreamingQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS) {
+  extends QueryRegressionTest[FileSystemIO](
+    QueryRegressionTest.externalFS.map(_.filter(
+      _.ref.supports(BackendCapability.query())))) {
 
   val suiteName = "Streaming Queries"
 

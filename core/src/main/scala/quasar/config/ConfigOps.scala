@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,17 +74,6 @@ import simulacrum.typeclass
           case err             => merr.raiseError(err)
         }
       case err => merr.raiseError(err)
-    }
-  }
-
-  /** Loads the configuration from the specified file or OS-specific default
-    * paths. If no configuration file is found, and one was not specified, the
-    * default configuration is returned.
-    */
-  def fromFileOrDefaultIfUnspecified(configFile: Option[FsFile])(implicit D: DecodeJson[C]): CfgTask[C] = {
-    merr.handleError(configFile.cata(fromFile, fromDefaultPaths)) {
-      case FileNotFound(_) if configFile.isEmpty => merr.point(default)
-      case err                                   => merr.raiseError(err)
     }
   }
 

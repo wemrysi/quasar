@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef.{Map => _, _}
-import quasar.NameGenerator
-import quasar.contrib.matryoshka.ShowT
+import quasar.Predef._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -26,21 +24,62 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
-  extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
-  import expr.{for_, let_}
+private[qscript] final class ThetaJoinPlanner[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
+  implicit
+  QTP: Planner[F, FMT, QScriptTotal[T, ?]],
+  MFP: Planner[F, FMT, MapFunc[T, ?]]
+) extends Planner[F, FMT, ThetaJoin[T, ?]] {
+  import expr.let_
 
   // FIXME: Handle `JoinType`
+  // TODO:  Is it more performant to inline src into each branch than it is to
+  //        assign it to a variable? It may be necessary in order to be able to
+  //        use the cts:query features, but we'll need to profile otherwise.
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
-    case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
+    case ThetaJoin(src, lBranch, rBranch, on, _, combine) =>
       for {
-        l      <- freshVar[F]
-        r      <- freshVar[F]
-        s      <- freshVar[F]
-        lhs    <- rebaseXQuery(lBranch, s.xqy)
-        rhs    <- rebaseXQuery(rBranch, s.xqy)
-        filter <- planMapFunc(on)      { case LeftSide => l.xqy case RightSide => r.xqy }
-        body   <- planMapFunc(combine) { case LeftSide => l.xqy case RightSide => r.xqy }
-      } yield let_(s -> src) return_ (for_(l -> lhs, r -> rhs) where_ filter return_ body)
+        l      <- freshName[F]
+        r      <- freshName[F]
+        s      <- freshName[F]
+        lhs    <- rebaseXQuery[T, F, FMT](lBranch, ~s)
+        rhs    <- rebaseXQuery[T, F, FMT](rBranch, ~s)
+        filter <- mergeXQuery[T, F, FMT](on, ~l, ~r)
+        body   <- mergeXQuery[T, F, FMT](combine, ~l, ~r)
+      } yield (lhs, rhs) match {
+        case (IterativeFlwor(lcs, None, INil(), _, lr), IterativeFlwor(rcs, None, INil(), _, rr)) =>
+          thetaJoinFlwor(
+            NonEmptyList(BindingClause.let_(s := src)) |+|
+            lcs                                        |+|
+            NonEmptyList(BindingClause.let_(l := lr))  |+|
+            rcs                                        |+|
+            NonEmptyList(BindingClause.let_(r := rr)),
+            filter,
+            body)
+
+        case (IterativeFlwor(lcs, None, INil(), _, lr), _                                        ) =>
+          thetaJoinFlwor(
+            NonEmptyList(BindingClause.let_(s := src)) |+|
+            lcs                                        |+|
+            NonEmptyList(
+              BindingClause.let_(l := lr),
+              BindingClause.for_(r in rhs)),
+            filter,
+            body)
+
+        case (_                                       , IterativeFlwor(rcs, None, INil(), _, rr)) =>
+          thetaJoinFlwor(
+            NonEmptyList(
+              BindingClause.let_(s := src),
+              BindingClause.for_(l := lhs))            |+|
+            rcs                                        |+|
+            NonEmptyList(BindingClause.let_(r := rr)),
+            filter,
+            body)
+
+        case _ => let_ (s := src) for_ (l in lhs, r in rhs) where_ filter return_ body
+      }
   }
+
+  def thetaJoinFlwor(bindings: NonEmptyList[BindingClause], filter: XQuery, body: XQuery): XQuery =
+    XQuery.Flwor(bindings, Some(filter), IList.empty, false, body)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 sealed trait DerefType[T[_[_]]] extends Product with Serializable
@@ -33,7 +34,7 @@ final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
 
-private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
+private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     extends StandardTokenParsers {
   class SqlLexical extends StdLexical with RegexParsers {
     override type Elem = super.Elem
@@ -48,17 +49,12 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       override def toString = ":" + chars
     }
 
-    // NB: `Token`, which we do not control, causes this.
-    @SuppressWarnings(Array(
-      "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable"))
     override def token: Parser[Token] =
       variParser |
       numLitParser |
       charLitParser |
       stringLitParser |
-      quotedIdentParser |
-      identifierString ^^ processIdent |
+      identParser |
       EofCh ^^^ EOF |
       '\'' ~> failure("unclosed character literal") |
       '"'  ~> failure("unclosed string literal") |
@@ -70,12 +66,12 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
         case x ~ xs => (x :: xs).mkString
       }
 
-    def variParser: Parser[Token] = ':' ~> identifierString ^^ (Variable(_))
+    def variParser: Parser[Token] = ':' ~> identParser ^^ (t => Variable(t.chars))
 
     def numLitParser: Parser[Token] = rep1(digit) ~ opt('.' ~> rep(digit)) ~ opt((elem('e') | 'E') ~> opt(elem('-') | '+') ~ rep(digit)) ^^ {
       case i ~ None ~ None     => NumericLit(i mkString "")
       case i ~ Some(d) ~ None  => FloatLit(i.mkString("") + "." + d.mkString(""))
-      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.getOrElse("") + e.mkString(""))
+      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.map(_.toString).getOrElse("") + e.mkString(""))
     }
 
     val hexDigit: Parser[String] = """[0-9a-fA-F]""".r
@@ -97,6 +93,14 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
     def quotedIdentParser: Parser[Token] =
       delimitedString('`') ^^ (QuotedIdentifier(_))
+
+    // NB: `Token`, which we do not control, causes this.
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"))
+    def identParser: Parser[Token] =
+      quotedIdentParser | identifierString ^^ processIdent
+
 
     override def whitespace: Parser[scala.Any] = rep(
       whitespaceChar |
@@ -383,7 +387,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
   def relations: Parser[Option[SqlRelation[T[Sql]]]] =
     rep1sep(relation, op(",")).map(_.foldLeft[Option[SqlRelation[T[Sql]]]](None) {
       case (None, traverse) => Some(traverse)
-      case (Some(acc), traverse) => Some(CrossRelation[T](acc, traverse))
+      case (Some(acc), traverse) => Some(CrossRelation[T[Sql]](acc, traverse))
     })
 
   def std_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
@@ -392,7 +396,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
   def cross_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
     keyword("cross") ~> keyword("join") ~> simple_relation ^^ {
-      case r2 => r1 => CrossRelation[T](r1, r2)
+      case r2 => r1 => CrossRelation[T[Sql]](r1, r2)
     }
 
   def relation: Parser[SqlRelation[T[Sql]]] =
@@ -433,7 +437,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     keyword("order") ~> keyword("by") ~> rep1sep(defined_expr ~ opt(keyword("asc") | keyword("desc")) ^^ {
       case i ~ (Some("asc") | None) => (ASC, i)
       case i ~ Some("desc") => (DESC, i)
-    }, op(",")) ^^ (OrderBy(_))
+    }, op(",")) ^? { case o :: os => OrderBy(NonEmptyList(o, os: _*)) }
 
   def expr: Parser[T[Sql]] = let_expr
 
@@ -441,23 +445,23 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     (query | defined_expr) * (
       keyword("limit")                        ^^^ (Limit(_: T[Sql], _: T[Sql]).embed)        |
         keyword("offset")                     ^^^ (Offset(_: T[Sql], _: T[Sql]).embed)       |
+        keyword("sample")                     ^^^ (Sample(_: T[Sql], _: T[Sql]).embed)       |
         keyword("union") ~ keyword("all")     ^^^ (UnionAll(_: T[Sql], _: T[Sql]).embed)     |
         keyword("union")                      ^^^ (Union(_: T[Sql], _: T[Sql]).embed)        |
         keyword("intersect") ~ keyword("all") ^^^ (IntersectAll(_: T[Sql], _: T[Sql]).embed) |
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
-  private def stripQuotes(s:String) = s.substring(1, s.length-1)
-
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
     phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
-      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first))
+      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first.toString))
     }
 
   private def parse0(sql: Query): ParsingError \/ T[Sql] = parseExpr(sql.value)
 
   val parse: Query => ParsingError \/ T[Sql] =
-    parse0(_).map(_.transAna(repeatedly(normalizeƒ)).makeTables(Nil))
+    parse0(_).map(_.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil))
 }

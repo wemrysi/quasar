@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@ object map {
   def contains(map: XQuery, key: XQuery): XQuery =
     XQuery(s"map:contains($map, $key)")
 
+  def delete(map: XQuery, key: XQuery): XQuery =
+    XQuery(s"map:delete($map, $key)")
+
   def entry(key: XQuery, value: XQuery): XQuery =
     XQuery(s"map:entry($key, $value)")
 
@@ -38,8 +41,8 @@ object map {
 
   def map(): XQuery = map(IList[XQuery]())
 
-  def new_[F[_]: Foldable](entries: F[XQuery]): XQuery =
-    XQuery(s"map:new(${mkSeq(entries)})")
+  def new_(entries: XQuery): XQuery =
+    XQuery(s"map:new($entries)")
 
   def put(map: XQuery, key: XQuery, value: XQuery): XQuery =
     XQuery(s"map:put($map, $key, $value)")

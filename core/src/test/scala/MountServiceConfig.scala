@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@
 package quasar.internal
 
 import quasar._, Predef._
-import matryoshka.Fix
-import quasar.sql.{ Sql, nullLiteral }
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import quasar.sql.{nullLiteral, Sql}
 
 /** This is used in both web and it tests.
  *  If it's placed in the web test code, then it has to

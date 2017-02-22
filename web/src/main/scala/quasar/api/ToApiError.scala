@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,11 +66,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Connection to backend failed.",
           s"Connection failed: $msg.")
 
-      case InsufficientPermissions(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Insufficient backend permssions.",
-          s"Insufficient permissions: $msg.")
-
       case InvalidCredentials(msg) =>
         fromMsg_(
           InternalServerError withReason "Invalid backend credentials.",
@@ -92,12 +87,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Failed to execute SQL^2 query.",
           reason,
           det.toList : _*)            :+
-        ("logicalPlan" :=  lp.render) :?+
+        ("logicalplan" :=  lp.render) :?+
         ("cause"       :?= cause.map(_.shows))
       case PathErr(e) =>
         e.toApiError
       case PlanningFailed(lp, e) =>
-        e.toApiError :+ ("logicalPlan" := lp.render)
+        e.toApiError :+ ("logicalplan" := lp.render)
       case QScriptPlanningFailed(e) =>
         e.toApiError
       case UnknownReadHandle(ReadHandle(path, id)) =>
@@ -242,9 +237,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           InternalServerError withReason "Unsupported JavaScript in query plan.",
           err.message,
           "value" := value)
-      case InternalError(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Failed to plan query.", msg)
+      case InternalError(msg, cause) =>
+        fromMsg(
+          InternalServerError withReason "Failed to plan query.",
+          msg
+        ) :?+ ("cause" :?= cause.map(_.toString))
       case UnboundVariable(v) =>
         fromMsg_(
           InternalServerError withReason "Unbound variable.", v.toString)
@@ -342,7 +339,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
   ////
 
   private def encodeData(data: Data): Option[Json] =
-    DataCodec.Precise.encode(data).toOption
+    DataCodec.Precise.encode(data)
 }
 
 sealed abstract class ToApiErrorInstances0 {

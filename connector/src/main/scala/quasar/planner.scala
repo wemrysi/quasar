@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@ import quasar.Predef._
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fs.PathError
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
@@ -33,7 +35,7 @@ object Planner {
   }
 
   final case class NonRepresentableData(data: Data) extends PlannerError {
-    def message = "The back-end has no representation for the constant: " + data
+    def message = "The back-end has no representation for the constant: " + data.shows
   }
   final case class NonRepresentableEJson(data: String)
       extends PlannerError {
@@ -46,10 +48,11 @@ object Planner {
     def message = error.shows
   }
   final case class UnsupportedJoinCondition(cond: Fix[LogicalPlan]) extends PlannerError {
-    def message = "Joining with " + cond + " is not currently supported"
+    def message = s"Joining with ${cond.shows} is not currently supported"
   }
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
-    def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan
+    def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan.toString
   }
   final case class FuncApply[N <: Nat](func: GenericFunc[N], expected: String, actual: String) extends PlannerError {
     def message = "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual
@@ -78,7 +81,13 @@ object Planner {
       }
   }
 
-  final case class InternalError(message: String) extends PlannerError
+  final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
+    def message = msg + ~cause.map(ex => s" (caused by: $ex)")
+  }
+
+  object InternalError {
+    def fromMsg(msg: String): PlannerError = apply(msg, None)
+  }
 
   implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {
     def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))

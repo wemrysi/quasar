@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,35 +22,68 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.{xs => xxs}
 
 import scala.math.Integral
+import scala.xml.Utility
 
 import eu.timepit.refined.api.Refined
-import scalaz.{Functor, ISet, Id}
+import scalaz._, Scalaz._
 import scalaz.std.iterable._
-import scalaz.syntax.either._
-import scalaz.syntax.functor._
-import scalaz.syntax.show._
 
 object syntax {
   import FunctionDecl._
   import expr.TypeswitchCaseClause
 
+  val ST = SequenceType
+
   final case class NameBuilder(decl: NamespaceDecl, local: NCName) {
     def qn[F[_]](implicit F: PrologW[F]): F[QName] =
       F.writer(ISet singleton Prolog.nsDecl(decl), decl.ns(local))
 
-    def xqy[F[_]: PrologW]: F[XQuery] =
-      xs map (fn.QName(decl.ns.uri.xs, _))
+    def xqy[F[_]: Functor: PrologW]: F[XQuery] =
+      qn map (_.xqy)
 
-    def xs[F[_]: PrologW]: F[XQuery] =
+    def xs[F[_]: Functor: PrologW]: F[XQuery] =
       qn map (_.xs)
+  }
+
+  final case class PositionalBuilder(name: BindingName \/ TypedBindingName, at: BindingName) {
+    def := (expression: XQuery): PositionalBinding =
+      PositionalBinding(Binding(name, expression), Some(at))
+
+    def in(expression: XQuery): PositionalBinding =
+      this := expression
   }
 
   def $(bindingName: String Refined IsNCName): BindingName =
     BindingName(QName.local(NCName(bindingName)))
 
-  final implicit class TypedBindingOps(val tb: TypedBinding) extends scala.AnyVal {
+  // NB: Not ideal, but only used for syntatic purposes. A proper encoding of
+  //     the XQuery AST should obviate this.
+  implicit def bindingAsPositional(binding: Binding): PositionalBinding =
+    PositionalBinding(binding, None)
+
+  final implicit class BindingNameOps(val bn: BindingName) extends scala.AnyVal {
+    def := (expression: XQuery): Binding =
+      Binding(bn.left, expression)
+
+    def at(pos: BindingName): PositionalBuilder =
+      PositionalBuilder(bn.left, pos)
+
+    def in(expression: XQuery): Binding =
+      this := expression
+  }
+
+  final implicit class TypedBindingNameOps(val tb: TypedBindingName) extends scala.AnyVal {
+    def := (expression: XQuery): Binding =
+      Binding(tb.right, expression)
+
+    def at(pos: BindingName): PositionalBuilder =
+      PositionalBuilder(tb.right, pos)
+
+    def in(expression: XQuery): Binding =
+      this := expression
+
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
-      result(tb.name.xqy) map (TypeswitchCaseClause(tb.left, _))
+      result(~tb) map (TypeswitchCaseClause(tb.left, _))
 
     def return_(result: XQuery => XQuery): TypeswitchCaseClause =
       return_[Id.Id](result)
@@ -63,7 +96,7 @@ object syntax {
 
   final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
     def xqy: XQuery = XQuery(str)
-    def xs: XQuery = XQuery.StringLit(str)
+    def xs: XQuery = XQuery.StringLit(Utility.escape(str))
   }
 
   final implicit class XQueryIntegralOps[N](val num: N)(implicit N: Integral[N]) {
@@ -92,6 +125,9 @@ object syntax {
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)
+
+    def declare[F[_]: Functor: PrologW](local: String Refined IsNCName): F[FunctionDeclDsl] =
+      name(local).qn[F] map (quasar.physical.marklogic.xquery.declare)
   }
 
   final implicit class ModuleImportOps(val mod: ModuleImport) extends scala.AnyVal {
@@ -110,10 +146,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl1FOps[F[_]](val funcF: F[FunctionDecl1]) extends scala.AnyVal {
-    def apply(p1: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1))
-    def getApply(implicit F: PrologW[F]): F[XQuery => XQuery] =
-      F.bind(funcF)(f => F.writer(ISet singleton Prolog.funcDecl(f), xqy => f.name(xqy)))
+    def apply(p1: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1))
   }
 
   final implicit class FunctionDecl2Ops(val func: FunctionDecl2) extends scala.AnyVal {
@@ -122,8 +156,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl2FOps[F[_]](val funcF: F[FunctionDecl2]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2))
+    def apply(p1: XQuery, p2: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2))
   }
 
   final implicit class FunctionDecl3Ops(val func: FunctionDecl3) extends scala.AnyVal {
@@ -132,8 +166,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl3FOps[F[_]](val funcF: F[FunctionDecl3]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3))
   }
 
   final implicit class FunctionDecl4Ops(val func: FunctionDecl4) extends scala.AnyVal {
@@ -142,8 +176,8 @@ object syntax {
   }
 
   final implicit class FunctionDecl4FOps[F[_]](val funcF: F[FunctionDecl4]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3, p4))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3, p4))
   }
 
   final implicit class FunctionDecl5Ops(val func: FunctionDecl5) extends scala.AnyVal {
@@ -152,7 +186,7 @@ object syntax {
   }
 
   final implicit class FunctionDecl5FOps[F[_]](val funcF: F[FunctionDecl5]) extends scala.AnyVal {
-    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery, p5: XQuery)(implicit F: PrologW[F]): F[XQuery] =
-      F.bind(funcF)(_(p1, p2, p3, p4, p5))
+    def apply(p1: XQuery, p2: XQuery, p3: XQuery, p4: XQuery, p5: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+      F0.bind(funcF)(_(p1, p2, p3, p4, p5))
   }
 }

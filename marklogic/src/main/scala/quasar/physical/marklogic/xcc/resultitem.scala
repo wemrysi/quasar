@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,14 @@
 
 package quasar.physical.marklogic.xcc
 
+import quasar.effect.Capture
+
 import com.marklogic.xcc._
 import com.marklogic.xcc.types.XdmItem
-import scalaz.concurrent.Task
 
 object resultitem {
-  def loadItem(ritem: ResultItem): Task[XdmItem] =
-    Task delay {
+  def loadItem[F[_]: Capture](ritem: ResultItem): F[XdmItem] =
+    Capture[F] delay {
       ritem.cache()
       ritem.getItem
     }

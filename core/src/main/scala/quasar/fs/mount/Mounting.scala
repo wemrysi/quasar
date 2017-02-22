@@ -1,21 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +24,7 @@ import quasar.fp.ski._
 import quasar.fs._
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import pathy._, Path._
@@ -100,10 +84,6 @@ object Mounting {
     /** The views mounted at paths having the given prefix. */
     def viewsHavingPrefix(dir: ADir): F[Set[AFile]] =
       rPathsHavingPrefix(dir).map(_.foldMap(_.toSet))
-
-    /** The filesystems mounted at paths having the given prefix. */
-    def fsHavingPrefix(dir: ADir): F[Set[ADir]] =
-      rPathsHavingPrefix(dir).map(_.foldMap(_.swap.toSet))
 
     /** Whether the given path refers to a mount. */
     def exists(path: APath): F[Boolean] =
@@ -192,8 +172,6 @@ object Mounting {
     private val notFound: Prism[MountingError, APath] =
       MountingError.pathError composePrism PathError.pathNotFound
 
-    // TODO: look at this for comprehension more closely
-    @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
     private def modify[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],

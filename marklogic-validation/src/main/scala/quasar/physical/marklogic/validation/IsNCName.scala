@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,21 @@
 
 package quasar.physical.marklogic.validation
 
-import scala.Predef.String
-import scala.StringContext
+import scala.Predef._
+import scala.{Boolean, StringContext}
 
 import eu.timepit.refined.api.Validate
-import org.apache.xerces.util.XMLChar
+import scalaz.std.anyVal._
 
 /** Refined predicate that checks if a `String` is a valid XML NCName.
-  * @see https://www.w3.org/TR/xml-names/#NT-NCName
+  * @see https://www.w3.org/TR/2009/REC-xml-names-20091208/#NT-NCName
   */
-final case class IsNCName()
+sealed abstract class IsNCName()
 
-object IsNCName {
-  implicit def isNCNameValidate: Validate.Plain[String, IsNCName] =
-    Validate.fromPredicate(XMLChar.isValidNCName(_), s => s"""isValidNCName("$s")""", IsNCName())
+object IsNCName extends (String => Boolean) {
+  def apply(s: String): Boolean =
+    s.headOption.exists(NCNameStartChars member _) && s.tail.forall(NCNameChars member _)
+
+  implicit val isNCNameValidate: Validate.Plain[String, IsNCName] =
+    Validate.fromPredicate(this, s => s"""IsNCName("$s")""", new IsNCName {})
 }

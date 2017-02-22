@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,9 @@
 package quasar.fp
 
 import quasar.Predef._
-
 import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
 /** Just like Prism, but operates over Functors.
   */
-final case class PrismNT[F[_], G[_]]
-  (get: F ~> (Option ∘ G)#λ, reverseGet: G ~> F) {
-
-  val getOrModify: F ~> λ[α => F[α] \/ G[α]] =
-    new (F ~> λ[α => F[α] \/ G[α]]) {
-      def apply[A](fa: F[A]) = get(fa).fold(fa.left[G[A]])(_.right)
-    }
-}
+final case class PrismNT[F[_], G[_]](get: F ~> (Option ∘ G)#λ, reverseGet: G ~> F)

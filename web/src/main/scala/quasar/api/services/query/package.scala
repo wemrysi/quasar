@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,14 +26,14 @@ import quasar.sql.{Sql, Query}
 import scala.collection.Seq
 
 import argonaut._, Argonaut._
-import matryoshka._
+import matryoshka.data.Fix
 import org.http4s._, dsl._
 import scalaz._, Scalaz._
 
 package object query {
   import ToApiError.ops._
 
-  implicit val QueryDecoder = new QueryParamDecoder[Query] {
+  implicit val QueryDecoder: QueryParamDecoder[Query] = new QueryParamDecoder[Query] {
     def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Query] =
       Query(value.value).successNel[ParseFailure]
   }

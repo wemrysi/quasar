@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,29 +17,30 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
+import quasar.effect.Capture
 import quasar.fp.numeric.Positive
 
 import com.marklogic.xcc.{ResultItem, ResultSequence, Session}
 import com.marklogic.xcc.types.XdmItem
 import scalaz._, Scalaz._
-import scalaz.stream.Process
-import scalaz.concurrent.Task
 
 final class ResultCursor private[xcc] (val chunkSize: Positive, s: Session, rs: ResultSequence) {
+  def close[F[_]: Capture: Functor]: F[Executed] =
+    Capture[F].delay(s.close()).as(Executed.executed)
 
-  def close: Task[Executed] =
-    Task.delay(s.close()).as(Executed.executed)
+  def nextChunk[F[_]: Capture: Monad]: F[Vector[XdmItem]] = {
+    def nextChunk0(size: Long, xs: Vector[XdmItem]): F[Vector[XdmItem]] =
+      if (size === 0) xs.point[F]
+      else next >>= (_.cata(x => nextChunk0(size - 1, xs :+ x), xs.point[F]))
 
-  def nextChunk: Task[Vector[XdmItem]] =
-    Process.unfoldEval(())(_ => next.map(_ strengthR (())))
-      .take(chunkSize.get.toInt)
-      .runLog
+    nextChunk0(chunkSize.get, Vector())
+  }
 
   ////
 
-  private def next: Task[Option[XdmItem]] =
-    nextItem >>= (_ traverse resultitem.loadItem)
+  private def next[F[_]: Capture: Monad]: F[Option[XdmItem]] =
+    nextItem >>= (_ traverse resultitem.loadItem[F])
 
-  private def nextItem: Task[Option[ResultItem]] =
-    Task.delay(if (rs.hasNext) Some(rs.next) else None)
+  private def nextItem[F[_]: Capture]: F[Option[ResultItem]] =
+    Capture[F].delay(if (rs.hasNext) Some(rs.next) else None)
 }

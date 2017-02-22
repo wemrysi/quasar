@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,20 @@ package quasar
 
 import quasar.RenderTree.ops._
 import quasar.fp._
+import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 
 import matryoshka._
+import matryoshka.data.Fix
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
 trait TermLogicalPlanMatchers {
   case class equalToPlan(expected: Fix[LogicalPlan])
       extends Matcher[Fix[LogicalPlan]] {
+    val optimizer = new Optimizer[Fix[LogicalPlan]]
+
     def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
-      val normed = Optimizer.simplify[Fix](s.value)
+      val normed = optimizer.simplify(s.value)
       val diff = (normed.render diff expected.render).shows
       result(
         expected ≟ normed,

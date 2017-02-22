@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import quasar.VariablesArbitrary._
 import quasar.fs._, FileSystemTypeArbitrary._
 import quasar.sql._, ExprArbitrary._
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
 
 trait MountConfigArbitrary {

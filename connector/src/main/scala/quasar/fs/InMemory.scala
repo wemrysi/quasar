@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,18 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
+import quasar.Planner.UnsupportedPlan
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.numeric._
 import quasar.fp.ski._
-import numeric._
-import quasar.Optimizer
-import quasar.Planner.UnsupportedPlan
+import quasar.frontend.{logicalplan => lp}, lp._
 
-import matryoshka.{Fix, Recursive}, Recursive.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -49,7 +51,6 @@ object InMemory {
   type ResultMap = Map[ResultHandle, Vector[Data]]
 
   type InMemoryFs[A]  = State[InMemState, A]
-  type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 
@@ -205,32 +206,37 @@ object InMemory {
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
 
+    private val optimizer = new Optimizer[Fix[LogicalPlan]]
+
     private def simpleEvaluation(lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
-      val optLp = Optimizer.optimize(lp0)
+      val optLp = optimizer.optimize(lp0)
       EitherT[InMemoryFs, FileSystemError, Vector[Data]](State.gets { mem =>
-        import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
         optLp.para[FileSystemError \/ Vector[Data]] {
-          case ReadF(path) =>
+          case lp.Read(path) =>
             // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
             val aPath = mkAbsolute(rootDir, path)
             fileL(aPath).get(mem).toRightDisjunction(pathErr(pathNotFound(aPath)))
-          case InvokeFUnapply(Drop, Sized((_,src), (Fix(ConstantF(Data.Int(skip))),_))) =>
+          case InvokeUnapply(Drop, Sized((_,src), (Fix(Constant(Data.Int(skip))),_))) =>
             (src ⊛ skip.safeToInt.toRightDisjunction(unsupported(optLp)))(_.drop(_))
-          case InvokeFUnapply(Take, Sized((_,src), (Fix(ConstantF(Data.Int(limit))),_))) =>
+          case InvokeUnapply(Take, Sized((_,src), (Fix(Constant(Data.Int(limit))),_))) =>
             (src ⊛ limit.safeToInt.toRightDisjunction(unsupported(optLp)))(_.take(_))
-          case InvokeFUnapply(Squash, Sized((_,src))) => src
-          case ConstantF(data) => Vector(data).right
+          case InvokeUnapply(Squash, Sized((_,src))) => src
+          case Constant(data) => Vector(data).right
           case other =>
-            queryResponsesL.get(mem).mapKeys(Optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))
+            queryResponsesL
+              .get(mem)
+              .mapKeys(optimizer.optimize)
+              .get(Fix(other.map(_._1)))
+              .toRightDisjunction(unsupported(optLp))
         }
       })
     }
 
     private def unsupported(lp: Fix[LogicalPlan]) =
       planningFailed(lp, UnsupportedPlan(
-        lp.unFix,
+        lp.project,
         some("In Memory interpreter does not currently support this plan")))
   }
 

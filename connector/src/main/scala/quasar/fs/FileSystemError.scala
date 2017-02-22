@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,20 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, LogicalPlan}
+import quasar.Data
 import quasar.Planner.PlannerError
 import quasar.fp._
+import quasar.frontend.logicalplan.LogicalPlan
 
 import argonaut.JsonObject
 import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._
 import scalaz.syntax.show._
 
-sealed trait FileSystemError
+sealed abstract class FileSystemError
 
 object FileSystemError {
   import QueryFile.ResultHandle

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,21 @@
 
 package quasar.physical.mongodb
 
-import quasar._
 import quasar.Predef.{ Eq => _, _ }
-import quasar.jscore._
+import quasar._
 import quasar.javascript.Js
+import quasar.jscore._
 
-import matryoshka._
+import java.time.Instant
 
-final case class javascript[T[_[_]]: Corecursive]() {
-  private type R = T[JsCoreF]
-
-  @inline private implicit def convert(x: JsCoreF[R]): R =
-    x.embed
-
-  private val jsFp = jscore.fixpoint[T]
-  import jsFp._
+final case class javascript[R](embed: JsCoreF[R] => R) {
+  val js = jscore.fixpoint[R](embed)
+  import js._
 
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
   def toJsDate(value: Bson.Date): R =
-    New(Name("Date"), List(Literal(Js.Str(value.value.toString))))
+    New(Name("Date"), List(
+      Literal(Js.Str(Instant.ofEpochMilli(value.millis).toString))))
 
   /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
   def toJsObjectId(value: Bson.ObjectId): R =
@@ -67,6 +63,11 @@ final case class javascript[T[_[_]]: Corecursive]() {
     BinOp(And,
       isObjectOrArray(expr),
       UnOp(Not, isArray(expr)))
+
+  def isArrayOrString(expr: R): R =
+    BinOp(Or,
+      isArray(expr),
+      isString(expr))
 
   def isBoolean(expr: R): R =
     BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))

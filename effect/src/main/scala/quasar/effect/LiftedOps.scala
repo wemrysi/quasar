@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import scalaz._
   * monads over effect algebras.
   */
 abstract class LiftedOps[G[_], S[_]](implicit S: G :<: S) {
+  // FIXME: Rename this to something that wont be confused with a type parameter
   type F[A] = Free[S, A]
 
   def lift[A](ga: G[A]): F[A] =

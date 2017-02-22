@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@
 
 package quasar.regression
 
-import scala.Predef.$conforms
 import quasar.Predef._
 
 import quasar.{Data, DataCodec}
 import quasar.DataArbitrary.dataArbitrary
 import quasar.fp._
 
-import argonaut._
+import scala.Predef.$conforms
+
+import argonaut._, Argonaut._
 import org.scalacheck.Prop
 import org.specs2.execute._
 import org.specs2.matcher._
@@ -36,7 +37,7 @@ class PredicateSpec extends quasar.Qspec {
   import Predicate._
 
   implicit val jsonArbitrary: Arbitrary[Json] = Arbitrary {
-    arbitrary[Data].map(DataCodec.Precise.encode(_).toOption.get)
+    arbitrary[Data].map(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
   }
 
   // NB: for debugging, prints nicely and preserves field order

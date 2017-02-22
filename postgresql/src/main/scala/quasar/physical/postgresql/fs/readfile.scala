@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import scalaz.stream.Process
 
 object readfile {
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec: DataCodec = DataCodec.Precise
 
   def interpret[S[_]](
     implicit

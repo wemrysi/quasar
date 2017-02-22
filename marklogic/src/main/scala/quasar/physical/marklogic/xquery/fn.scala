@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,9 @@ import java.lang.SuppressWarnings
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  def abs(num: XQuery): XQuery =
+    XQuery(s"fn:abs($num)")
+
   def avg(seq: XQuery): XQuery =
     XQuery(s"fn:avg($seq)")
 
@@ -30,6 +33,9 @@ object fn {
 
   def ceiling(n: XQuery): XQuery =
     XQuery(s"fn:ceiling($n)")
+
+  def codepointsToString(cps: XQuery): XQuery =
+    XQuery(s"fn:codepoints-to-string($cps)")
 
   def concat(x: XQuery, xs: XQuery*): XQuery =
     XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
@@ -45,6 +51,9 @@ object fn {
 
   def distinctValues(seq: XQuery): XQuery =
     XQuery(s"fn:distinct-values($seq)")
+
+  def data(item: XQuery): XQuery =
+    XQuery(s"fn:data($item)")
 
   def doc(): XQuery =
     XQuery("fn:doc()")
@@ -73,6 +82,12 @@ object fn {
   def floor(n: XQuery): XQuery =
     XQuery(s"fn:floor($n)")
 
+  def formatDateTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-dateTime($value, $picture)")
+
+  def formatTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-time($value, $picture)")
+
   def head(seq: XQuery): XQuery =
     XQuery(s"fn:head($seq)")
 
@@ -81,6 +96,9 @@ object fn {
 
   def hoursFromDuration(dur: XQuery): XQuery =
     XQuery(s"fn:hours-from-duration($dur)")
+
+  def indexOf(seq: XQuery, elt: XQuery): XQuery =
+    XQuery(s"fn:index-of($seq, $elt)")
 
   val last: XQuery =
     XQuery("fn:last()")
@@ -135,6 +153,9 @@ object fn {
 
   def stringJoin(strs: XQuery, sep: XQuery): XQuery =
     XQuery(s"fn:string-join($strs, $sep)")
+
+  def stringToCodepoints(str: XQuery): XQuery =
+    XQuery(s"fn:string-to-codepoints($str)")
 
   def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:substring($str, ${startLoc}${asArg(length)})")

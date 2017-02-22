@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import quasar.fs.FileSystemType
 import quasar.sql, sql.Sql
 
 import argonaut._, Argonaut._
-import matryoshka._
+import matryoshka.data.Fix
 import monocle.Prism
 import scalaz._, Scalaz._
 
@@ -91,6 +91,8 @@ object MountConfig {
 
   private val VarPrefix = "var."
 
+  // FIXME
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def viewCfgFromUri(uri: String): String \/ (Fix[Sql], Variables) = {
     import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
 

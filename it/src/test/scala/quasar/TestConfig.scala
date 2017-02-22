@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@ package quasar
 import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
-import quasar.fs.mount.MountConfig
+import quasar.fs.mount.{ConnectionUri, MountConfig}
+import quasar.physical.{couchbase, marklogic, mongodb, postgresql, sparkcore}
 
-import argonaut._
 import pathy.Path._
+import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
@@ -40,56 +41,66 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
-  val MONGO_2_6       = BackendName("mongodb_2_6")
-  val MONGO_3_0       = BackendName("mongodb_3_0")
-  val MONGO_3_2       = BackendName("mongodb_3_2")
-  val MONGO_READ_ONLY = BackendName("mongodb_read_only")
-  val SKELETON = BackendName("skeleton")
-  val POSTGRESQL = BackendName("postgresql")
-  val SPARK_LOCAL = BackendName("spark_local")
-  val SPARK_HDFS = BackendName("spark_hdfs")
-  val MARKLOGIC       = BackendName("marklogic")
-  val COUCHBASE       = BackendName("couchbase")
+  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
+  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
+  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
+  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.fs.FsType)
+  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.fs.FsType)
+  val MONGO_Q_2_6     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_2_6")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_0     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_0")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val MONGO_Q_3_2     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_2")    , BackendCapability.All), mongodb.fs.QScriptFsType)
+  val POSTGRESQL      = ExternalBackendRef(BackendRef(BackendName("postgresql")       , ISet singleton BackendCapability.write()), postgresql.fs.FsType)
+  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
 
-  lazy val backendNames: List[BackendName] =
-    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL, SPARK_HDFS, MARKLOGIC, COUCHBASE)
+  lazy val backendRefs: List[ExternalBackendRef] = List(
+    COUCHBASE,
+    MARKLOGIC_JSON, MARKLOGIC_XML,
+    MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY,
+    MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2,
+    POSTGRESQL,
+    SPARK_HDFS, SPARK_LOCAL)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
 
-  /** True if this backend configuration is for a mongo connection where the
-    * user has the "read-only" role.
+  /** True if this backend configuration is for a couchbase connection.
     */
-  def isMongoReadOnly(backendName: BackendName): Boolean =
-    backendName == MONGO_READ_ONLY
+  def isCouchbase(backendRef: BackendRef): Boolean =
+    backendRef === COUCHBASE.ref
 
   /** Returns the name of the environment variable used to configure the
     * given backend.
     */
-  def backendEnvName(backendName: BackendName): String =
-    "QUASAR_" + backendName.name.toUpperCase
+  def backendConfName(backendName: BackendName): String =
+    backendName.name
 
-  /** The name of the environment variable to configure the insert connection
-    * for a read-only backend.
+  /** The name of the configuration parameter that points to uri that should be
+    *  used for inserting
     */
-  def insertEnvName(b: BackendName) = backendEnvName(b) + "_INSERT"
+  def insertConfName(b: BackendName) = backendConfName(b) + "_insert"
 
   /** Returns the list of filesystems to test, using the provided function
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
     pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
-  ): Task[IList[FileSystemUT[S]]] = {
+  ): Task[IList[SupportedFs[S]]] = {
     def fs(
       envName: String,
-      p: ADir
+      p: ADir,
+      typ: FileSystemType
     ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
-      TestConfig.loadConfig(envName) flatMapF (c =>
-        pf.lift((c, p)).cata(
+      TestConfig.loadConnectionUri(envName) flatMapF { uri =>
+        val config = MountConfig.fileSystemConfig(typ, uri)
+        pf.lift((config, p)).cata(
           Task.delay(_),
-          Task.fail(new UnsupportedFileSystemConfig(c))))
+          Task.fail(new UnsupportedFileSystemConfig(config)))
+      }
 
-    def fileSystemNamed(n: BackendName, p: ADir): OptionT[Task, FileSystemUT[S]] = {
+    def lookupFileSystem(r: ExternalBackendRef, p: ADir): OptionT[Task, FileSystemUT[S]] = {
       def rsrc(connect: Task[(S ~> Task, Task[Unit])]): Task[TaskResource[(S ~> Task, Task[Unit])]] =
         TaskResource(connect, Strategy.DefaultStrategy)(_._2)
 
@@ -100,47 +111,55 @@ object TestConfig {
       }
 
       for {
-        test     <- fs(backendEnvName(n), p)
-        setup    <- fs(insertEnvName(n), p).run.liftM[OptionT]
+        test     <- fs(backendConfName(r.ref.name), p, r.fsType)
+        setup    <- fs(insertConfName(r.ref.name), p, r.fsType).run.liftM[OptionT]
         s        <- NameGenerator.salt.liftM[OptionT]
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
-      } yield FileSystemUT(n,
+      } yield FileSystemUT(r.ref,
           embed(testRef.get.map(_._1)),
           embed(setupRef.get.map(_._1)),
           p </> dir("run_" + s),
           testRef.release *> setupRef.release)
     }
 
-    def noBackendsFound: Throwable = new RuntimeException(
-      "No external backends to test. Consider setting one of these environment variables: " +
-      TestConfig.backendNames.map(TestConfig.backendEnvName).mkString(", ")
-    )
-
     TestConfig.testDataPrefix flatMap { prefix =>
-      TestConfig.backendNames.toIList
-        .traverse(n => fileSystemNamed(n, prefix).run)
-        .map(_.unite)
-        .flatMap(uts => if (uts.isEmpty) Task.fail(noBackendsFound) else Task.now(uts))
+      TestConfig.backendRefs.toIList
+        .traverse(r => lookupFileSystem(r, prefix).run.map(SupportedFs(r.ref,_)))
     }
   }
+
+  /** Loads all the configurations for a particular type of FileSystem. */
+  def fileSystemConfigs(tpe: FileSystemType): Task[List[(BackendRef, ConnectionUri, ConnectionUri)]] =
+    backendRefs.filter(_.fsType === tpe).foldMapM(r => TestConfig.loadConnectionUriPair(r.name).run map (_.toList map {
+      case (testUri, setupUri) => (r.ref, testUri, setupUri)
+    }))
+
+  val confFile: String = "it/testing.conf"
+  val defaultConfFile: String = "it/testing.conf.example"
 
   /** Load backend config from environment variable.
     *
     * Fails if it cannot parse the config and returns None if there is no config.
     */
-  def loadConfig(envName: String): OptionT[Task, MountConfig] =
-    console.readEnv(envName).flatMapF(value =>
-      Parse.decodeEither[MountConfig](value).fold(
-        e => fail("Failed to parse $" + envName + ": " + e),
-        _.point[Task]))
+  def loadConnectionUri(name: String): OptionT[Task, ConnectionUri] = {
+    val config = knobs.loadImmutable(
+      Optional(SysPropsResource(Prefix("")))                    ::
+      Optional(FileResource(new java.io.File(confFile)))        ::
+      Required(FileResource(new java.io.File(defaultConfFile))) ::
+      Nil)
+    OptionT(config.map(_.lookup[String](name))).map(ConnectionUri(_))
+  }
+
+  def loadConnectionUri(ref: BackendRef): OptionT[Task, ConnectionUri] =
+    loadConnectionUri(backendConfName(ref.name))
 
   /** Load a pair of backend configs, the first for inserting test data, and
     * the second for actually running tests. If no config is specified for
     * inserting, then the test config is just returned twice.
     */
-  def loadConfigPair(name: BackendName): OptionT[Task, (MountConfig, MountConfig)] = {
-    OptionT((loadConfig(insertEnvName(name)).run |@| loadConfig(backendEnvName(name)).run) { (c1, c2) =>
+  def loadConnectionUriPair(name: BackendName): OptionT[Task, (ConnectionUri, ConnectionUri)] = {
+    OptionT((loadConnectionUri(insertConfName(name)).run |@| loadConnectionUri(backendConfName(name)).run) { (c1, c2) =>
       c2.map(c2 => (c1.getOrElse(c2), c2))
     })
   }

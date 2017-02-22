@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.FileSystemType
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import matryoshka.data.Fix
 import monocle.Prism
 
 sealed trait MountRequest {

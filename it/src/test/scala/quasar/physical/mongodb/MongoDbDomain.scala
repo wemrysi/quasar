@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.contrib.scalacheck.gen
 
-import org.scalacheck.{Arbitrary, Gen}, Arbitrary._
+import java.time.LocalDate
+
+import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import scalaz._, Scalaz._
+import scalaz.scalacheck.ScalaCheckBinding._
 
 /** Defines the domains of values for which the MongoDb connector is expected
   * to behave properly. May be mixed in when implementing `StdLibTestRunner`.
@@ -33,5 +37,11 @@ trait MongoDbDomain {
 
   // NB: restricted to printable ASCII only because most functions are not
   // well-defined for the rest (e.g. $toLower, $toUpper, $substr)
-  val stringDomain = Gen.listOf(Gen.choose('\u0020', '\u007e')).map(_.mkString)
+  val stringDomain = gen.printableAsciiString
+
+  val dateDomain: Gen[LocalDate] =
+    Gen.choose(
+      LocalDate.of(1, 1, 1).toEpochDay,
+      LocalDate.of(9999, 12, 31).toEpochDay
+    ) ∘ (LocalDate.ofEpochDay(_))
 }

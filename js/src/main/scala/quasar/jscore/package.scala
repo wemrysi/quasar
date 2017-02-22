@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@ import quasar.Predef._
 import quasar.javascript.Js
 import quasar.fp._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object jscore {
@@ -43,7 +45,10 @@ package object jscore {
 
   val findFunctionsƒ: JsCoreF[(Fix[JsCoreF], Set[String])] => Set[String] = {
     case CallF((Fix(IdentF(Name(name))), _), args) =>
-      Foldable[List].fold(args.map(_._2)) + name
+      // WartRemover seems to be confused by the `+` method on `Set`
+      @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+      val result = Foldable[List].fold(args.map(_._2)) + name
+      result
     case js => js.map(_._2).fold
   }
 
@@ -66,9 +71,12 @@ package object jscore {
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
     Js.BinOp("=", lhs.toJs, rhs.toJs)
 
+  val meh = implicitly[EqualT[Fix]]
+  val meh2 = implicitly[Delay[Equal, JsCoreF]]
+
   private def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore):
       Option[JsCore] =
-    in.para(count(oldForm)) match {
+    in.elgotPara(count(oldForm)) match {
       case 0 => in.some
       case 1 => in.substitute(oldForm, newForm).some
       case _ => None
@@ -94,14 +102,14 @@ package object jscore {
     }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
-    case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
+    case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 ≟ alt1 =>
       IfF(BinOp(And, cond0, cond1), cons, alt0).some
     case LetF(name, expr, body) =>
       maybeReplace(Ident(name), expr, body).fold(expr.project match {
         case ObjF(values) =>
           // TODO: inline _part_ of the object when possible
           values.toList.foldRightM(body)((v, bod) =>
-            maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.para(count(Ident(name))) match {
+            maybeReplace(Select(Ident(name), v._1.value), v._2, bod)).flatMap(finalBody => finalBody.elgotPara(count(Ident(name))) match {
               case 0 => finalBody.project.some
               case _ => None
             })
@@ -166,7 +174,7 @@ package object jscore {
           Ident(tmp).toJs)
     }
 
-    val simplify = expr.transCata(repeatedly(simplifyƒ))
+    val simplify = expr.transCata[JsCore](repeatedly(simplifyƒ))
 
     def substitute(oldExpr: JsCore, newExpr: JsCore): JsCore = {
       @SuppressWarnings(Array("org.wartremover.warts.Equals"))
@@ -222,13 +230,13 @@ package object jscore {
       case IdentF(_)            => true
       case LiteralF(_)          => true
 
-      case ArrF(values)         => values.all(_ == true)
+      case ArrF(values)         => values.all(_ ≟ true)
       case AccessF(expr, key)   => expr && key
       case BinOpF(_, l, r)      => l && r
-      case CallF(callee, args)  => callee && args.all(_ == true)
+      case CallF(callee, args)  => callee && args.all(_ ≟ true)
       case IfF(cond, cons, alt) => cond && cons && alt
       case LetF(_, expr, body)  => expr && body
-      case NewF(_, args)        => args.all(_ == true)
+      case NewF(_, args)        => args.all(_ ≟ true)
       case UnOpF(_, x)          => x
 
       case FunF(_, body)        => false

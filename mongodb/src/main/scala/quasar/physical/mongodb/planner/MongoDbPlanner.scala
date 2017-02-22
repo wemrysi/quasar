@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.physical.mongodb.planner
 
 import scala.Predef.$conforms
 import quasar.Predef._
-import quasar.{fs => _, LogicalPlan => LP, _}, RenderTree.ops._, Type._
+import quasar.{fs => _, _}, RenderTree.ops._, Type._
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.shapeless._
@@ -27,21 +27,26 @@ import quasar.fp.ski._
 import quasar.fp.tree._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.{MapFunc, SortDir}
+import quasar.qscript.MapFunc
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path.rootDir
-import scalaz._, Scalaz._
+import scalaz.{Free => _, _}, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
 object MongoDbPlanner {
-  import LP._
   import Planner._
   import WorkflowBuilder._
+
+  private val optimizer = new Optimizer[Fix[LP]]
+  private val lpr = optimizer.lpr
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -101,7 +106,7 @@ object MongoDbPlanner {
       And => _, Or => _, Not => _,
       _}
 
-    val mjs = quasar.physical.mongodb.javascript[Fix]
+    val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
 
     val HasJs: Output => OutputM[PartialJs] =
@@ -149,15 +154,6 @@ object MongoDbPlanner {
               p1.map(There(0, _)) ++ p2.map(There(1, _)) ++ p3.map(There(2, _)))
         }
       }
-
-      def makeSimpleCall(func: String, args: List[JsCore]): JsCore =
-        Call(ident(func), args)
-
-      def makeSimpleBinop(op: BinaryOperator): Output =
-        Arity2(BinOp(op, _, _))
-
-      def makeSimpleUnop(op: UnaryOperator): Output =
-        Arity1(UnOp(op, _))
 
       ((func, args) match {
         // NB: this one is missing from MapFunc.
@@ -214,11 +210,12 @@ object MongoDbPlanner {
     }
 
     {
-      case c @ ConstantF(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
-      case InvokeF(f, a)    => invoke(f, a)
-      case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
-      case LP.LetF(_, _, body) => body
-      case x @ TypecheckF(expr, typ, cont, fallback) =>
+      case c @ Constant(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
+      case Invoke(f, a)    => invoke(f, a)
+      case Free(_)         => \/-(({ case List(x) => x }, List(Here)))
+      case lp.Let(_, _, body) => body
+
+      case x @ Typecheck(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
             case Type.Null             => isNull
@@ -230,6 +227,8 @@ object MongoDbPlanner {
             case Type.Str              => isString
             case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _)
                                        => isObjectOrArray
+            case Type.FlexArr(_, _, _) ⨿ Type.Str
+                                       => isArrayOrString
             case Type.Obj(_, _)        => isObject
             case Type.FlexArr(_, _, _) => isArray
             case Type.Binary           => isBinary
@@ -256,7 +255,7 @@ object MongoDbPlanner {
   type PartialSelector = Partial[BsonField, Selector]
   implicit def partialSelRenderTree(implicit S: RenderTree[Selector]): RenderTree[PartialSelector] = RenderTree.make {
     case (f, ifs) => NonTerminal(List("PartialSelector"), None,
-      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x))).render ::
+      f(List.range(0, ifs.length).map(x => BsonField.Name("_" + x.toString))).render ::
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
@@ -283,10 +282,10 @@ object MongoDbPlanner {
     object IsBson {
       def unapply(v: (Fix[LP], Output)): Option[Bson] =
         v._1.unFix match {
-          case ConstantF(b) => BsonCodec.fromData(b).toOption
-          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
-          case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
+          case Constant(b) => BsonCodec.fromData(b).toOption
+          case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          case InvokeUnapply(Negate, Sized(Fix(Constant(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          case InvokeUnapply(ToId, Sized(Fix(Constant(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
           case _ => None
         }
     }
@@ -310,7 +309,7 @@ object MongoDbPlanner {
     object IsDate {
       def unapply(v: (Fix[LP], Output)): Option[Data.Date] =
         v._1.unFix match {
-          case ConstantF(d @ Data.Date(_)) => Some(d)
+          case Constant(d @ Data.Date(_)) => Some(d)
           case _                           => None
         }
     }
@@ -346,18 +345,22 @@ object MongoDbPlanner {
       }
 
       def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
-        \/-((
-          { case x :: Nil => Selector.Doc(x -> f(Bson.Date(g(date).value))) },
-          List(There(index, Here))))
+        Bson.Date.fromInstant(g(date).value).fold[Output](
+          -\/(NonRepresentableData(g(date))))(
+          d => \/-((
+            { case x :: Nil => Selector.Doc(x -> f(d)) },
+            List(There(index, Here)))))
 
       def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.Date, g1: Data.Date => Data.Timestamp, g2: Data.Date => Data.Timestamp, index: Int): Output =
-        \/-((
-          { case x :: Nil =>
-            conj(
-              Selector.Doc(x -> f1(Bson.Date(g1(date).value))),
-              Selector.Doc(x -> f2(Bson.Date(g2(date).value))))
-          },
-          List(There(index, Here))))
+        ((Bson.Date.fromInstant(g1(date).value) \/> NonRepresentableData(g1(date))) ⊛
+          (Bson.Date.fromInstant(g2(date).value) \/> NonRepresentableData(g2(date))))((d1, d2) =>
+          (
+            { case x :: Nil =>
+              conj(
+                Selector.Doc(x -> f1(d1)),
+                Selector.Doc(x -> f2(d2)))
+            },
+            List(There(index, Here))))
 
       def stringOp(f: String => Selector.Condition, arg: (Fix[LP], Output)): Output =
         arg match {
@@ -377,7 +380,7 @@ object MongoDbPlanner {
       }
 
       def reversibleRelop(f: GenericFunc[nat._2]): Output =
-        (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+        (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       (func, args) match {
         case (Gt, Sized(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
@@ -440,10 +443,10 @@ object MongoDbPlanner {
       List(Here))
 
     node match {
-      case ConstantF(_)   => \/-(default)
-      case InvokeF(f, a)  => invoke(f, a) <+> \/-(default)
-      case LetF(_, _, in) => in._2
-      case TypecheckF(_, typ, cont, _) =>
+      case Constant(_)   => \/-(default)
+      case Invoke(f, a)  => invoke(f, a) <+> \/-(default)
+      case Let(_, _, in) => in._2
+      case Typecheck(_, typ, cont, _) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -458,6 +461,11 @@ object MongoDbPlanner {
                   Selector.Doc(f -> Selector.Type(BsonType.Int32)),
                   Selector.Doc(f -> Selector.Type(BsonType.Int64)),
                   Selector.Doc(f -> Selector.Type(BsonType.Dec))))
+            case Type.FlexArr(_, _, _) ⨿ Type.Str =>
+              ((f: BsonField) =>
+                Selector.Or(
+                  Selector.Doc(f -> Selector.Type(BsonType.Arr)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Text))))
             case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
             case Type.Obj(_, _) =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
@@ -493,12 +501,11 @@ object MongoDbPlanner {
       ev2: ExprOpCoreF :<: EX,
       inj: EX :<: ExprOp,
       WB: WorkflowBuilder.Ops[F])
-    : LP[
-        Cofree[LP, (
-          (OutputM[PartialSelector],
-           OutputM[PartialJs]),
-          OutputM[WorkflowBuilder[F]])]] =>
-      State[NameGen, OutputM[Fix[WorkflowBuilderF[F, ?]]]] = {
+      : LP[
+          Cofree[LP, (
+            (OutputM[PartialSelector], OutputM[PartialJs]),
+            OutputM[WorkflowBuilder[F]])]] =>
+          State[NameGen, OutputM[WorkflowBuilder[F]]] = {
     import WorkflowBuilder._
 
     type Input  = (OutputM[PartialSelector], OutputM[PartialJs])
@@ -509,36 +516,16 @@ object MongoDbPlanner {
 
     // NB: it's only safe to emit "core" expr ops here, but we always use the
     // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-    import fixExprOp.{ I => _, _ }
-    val check = Check[Fix, ExprOp]
+    import fixExprOp._
+    val check = new Check[Fix[ExprOp], ExprOp]
 
     object HasData {
-      def unapply(node: LP[Ann]): Option[Data] = node match {
-        case LP.ConstantF(data) => Some(data)
-        case _                           => None
-      }
+      def unapply(node: LP[Ann]): Option[Data] = constant.getOption(node)
     }
 
     val HasKeys: Ann => OutputM[List[WorkflowBuilder[F]]] = {
       case MakeArrayN.Attr(array) => array.traverse(_.head._2)
       case n                      => n.head._2.map(List(_))
-    }
-
-    val HasSortDirs: Ann => OutputM[List[SortDir]] = {
-      def isSortDir(node: LP[Ann]): OutputM[SortDir] =
-        node match {
-          case HasData(Data.Str("ASC"))  => \/-(SortDir.Ascending)
-          case HasData(Data.Str("DESC")) => \/-(SortDir.Descending)
-          case x => -\/(InternalError("malformed sort dir: " + x))
-        }
-
-      _ match {
-        case MakeArrayN.Attr(array) =>
-          array.traverse(d => isSortDir(d.tail))
-        case Cofree(_, ConstantF(Data.Arr(dirs))) =>
-          dirs.traverse(d => isSortDir(ConstantF(d)))
-        case n => isSortDir(n.tail).map(List(_))
-      }
     }
 
     val HasSelector: Ann => OutputM[PartialSelector] = _.head._1._1
@@ -603,15 +590,15 @@ object MongoDbPlanner {
             })
 
         (ann.tail, f) match {
-          case (TypecheckF(_, _, _, _), There(1, _)) => !isSimpleRef
-          case (InvokeFUnapply(Cond, _), There(x, _))
-              if x == 1 || x == 2                    => !isSimpleRef
-          case _                                     => false
+          case (Typecheck(_, _, _, _), There(1, _)) => !isSimpleRef
+          case (InvokeUnapply(Cond, _), There(x, _))
+              if x ≟ 1 || x ≟ 2                     => !isSimpleRef
+          case _                                    => false
         }
       }
 
-      def createOp[A](f: Free[EX, A]): Free[ExprOp, A] =
-        FunctorT[Free[?[_], A]].transCata[EX, ExprOp](f)(inj)
+      def createOp[A](f: scalaz.Free[EX, A]): scalaz.Free[ExprOp, A] =
+        f.mapSuspension(inj)
 
       ((func, args) match {
         // NB: this one is missing from MapFunc.
@@ -644,7 +631,7 @@ object MongoDbPlanner {
             funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
             val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
-              case List(_1, _2, _3) => exp.eval[Fix](_1, _2, _3)
+              case List(_1, _2, _3) => exp.eval[Fix[ExprOp]](_1, _2, _3)
             }
           }
         case _ => None
@@ -678,6 +665,9 @@ object MongoDbPlanner {
           }
         case Drop =>
           lift(Arity2(HasWorkflow, HasInt).map((WB.skip(_, _)).tupled))
+        case Sample =>
+          // TODO: Use Mongo’s $sample operation when possible.
+          lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
         case Take =>
           lift(Arity2(HasWorkflow, HasInt).map((WB.limit(_, _)).tupled))
         case Union =>
@@ -686,7 +676,7 @@ object MongoDbPlanner {
           args match {
             case Sized(left, right, comp) =>
               splitConditions(comp).fold[M[WorkflowBuilder[F]]](
-                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder[F]])]].convertTo[LP, Fix](comp))))(
+                fail(UnsupportedJoinCondition(forgetAnnotation[Cofree[LP, (Input, OutputM[WorkflowBuilder[F]])], Fix[LP], LP, (Input, OutputM[WorkflowBuilder[F]])](comp))))(
                 c => {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
@@ -701,10 +691,6 @@ object MongoDbPlanner {
           }
         case GroupBy =>
           lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
-        case OrderBy =>
-          lift(Arity3(HasWorkflow, HasKeys, HasSortDirs).map {
-            case (p1, p2, dirs) => WB.sortBy(p1, p2, dirs)
-          })
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
         case Count      => groupExpr1(κ($sum($literal(Bson.Int32(1)))))
@@ -756,10 +742,10 @@ object MongoDbPlanner {
     }
 
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
-      case InvokeFUnapply(relations.And, terms) =>
+      case InvokeUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
-      case InvokeFUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
-      case ConstantF(Data.Bool(true)) => Some(List())
+      case InvokeUnapply(relations.Eq, Sized(left, right)) => Some(List((left, right)))
+      case Constant(Data.Bool(true)) => Some(List())
       case _ => None
     }
 
@@ -781,14 +767,14 @@ object MongoDbPlanner {
     // for an individual node without failing the fold. This code takes care of
     // mapping from one to the other.
     node => node match {
-      case ReadF(path) =>
+      case Read(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         state(Collection.fromFile(mkAbsolute(rootDir, path)).bimap(PlanPathError, WB.read))
-      case ConstantF(data) =>
+      case Constant(data) =>
         state(BsonCodec.fromData(data).bimap(
           κ(NonRepresentableData(data)),
           WB.pure))
-      case InvokeF(func, args) =>
+      case Invoke(func, args) =>
         val wb: Output = invoke(func, args)
         val js: Output = lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
             lift(pjs._2.traverse(_(Cofree(UnsupportedPlan(node, None).left, node.map(_.map(_._2)))))).flatMap(args =>
@@ -797,10 +783,17 @@ object MongoDbPlanner {
         def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
-      case FreeF(name) =>
-        state(-\/(InternalError("variable " + name + " is unbound")))
-      case LetF(_, _, in) => state(in.head._2)
-      case TypecheckF(exp, typ, cont, fallback) =>
+      case Free(name) =>
+        state(-\/(InternalError fromMsg s"variable $name is unbound"))
+      case Let(_, _, in) => state(in.head._2)
+      case Sort(src, ords) =>
+        state((HasWorkflow(src) |@| ords.traverse { case (a, sd) => HasWorkflow(a) strengthR sd }) { (src, os) =>
+          val (keys, dirs) = os.toList.unzip
+          WB.sortBy(src, keys, dirs)
+        })
+      case TemporalTrunc(part, src) =>
+        state(-\/(UnsupportedPlan(node, "TemporalTrunc not supported".some)))
+      case Typecheck(exp, typ, cont, fallback) =>
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
@@ -831,6 +824,7 @@ object MongoDbPlanner {
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
             case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.FlexArr(_, _, _) ⨿ Type.Str => check.isArrayOrString
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -862,14 +856,14 @@ object MongoDbPlanner {
   private def elideJoin(in: Func.Input[Fix[LP], nat._3]): Func.Input[LPorLP, nat._3] =
     in match {
       case Sized(l, r, cond) =>
-        Func.Input3(\/-(l), \/-(r), -\/(cond.cata(Optimizer.elideTypeCheckƒ)))
+        Func.Input3(\/-(l), \/-(r), -\/(cond.cata(optimizer.elideTypeCheckƒ)))
     }
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.
   val elideJoinCheckƒ: Fix[LP] => LP[LPorLP] = _.unFix match {
-    case InvokeFUnapply(JoinFunc(jf), Sized(a1, a2, a3)) =>
-      InvokeF(jf, elideJoin(Func.Input3(a1, a2, a3)))
+    case InvokeUnapply(JoinFunc(jf), Sized(a1, a2, a3)) =>
+      Invoke(jf, elideJoin(Func.Input3(a1, a2, a3)))
     case x => x.map(\/-(_))
   }
 
@@ -882,35 +876,43 @@ object MongoDbPlanner {
     def alignCondition(lt: Fix[LP], rt: Fix[LP]):
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
-        case TypecheckF(expr, typ, cont, fb) =>
-          alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _, fb))
-        case InvokeFUnapply(And, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(And, _))
-        case InvokeFUnapply(Or, Sized(t1, t2)) =>
-          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
-        case InvokeFUnapply(Not, Sized(t1)) =>
-          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
-        case x @ InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
+        case Typecheck(expr, typ, cont, fb) =>
+          alignCondition(lt, rt)(cont).map(lpr.typecheck(expr, typ, _, fb))
+        case InvokeUnapply(And, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(lpr.invoke(And, _))
+        case InvokeUnapply(Or, Sized(t1, t2)) =>
+          Func.Input2(t1, t2).traverse(alignCondition(lt, rt)).map(lpr.invoke(Or, _))
+        case InvokeUnapply(Not, Sized(t1)) =>
+          Func.Input1(t1).traverse(alignCondition(lt, rt)).map(lpr.invoke(Not, _))
+        case x @ InvokeUnapply(func @ BinaryFunc(_, _, _, _, _, _, _), Sized(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
-            \/-(Invoke(func, Func.Input2(left, right)))
+            \/-(lpr.invoke(func, Func.Input2(left, right)))
           else if (containsTableRefs(left, rt, right, lt))
             flip(func).fold[PlannerError \/ Fix[LP]](
               -\/(UnsupportedJoinCondition(Fix(x))))(
-              f => \/-(Invoke[nat._2](f, Func.Input2(right, left))))
+              f => \/-(lpr.invoke(f, Func.Input2(right, left))))
           else -\/(UnsupportedJoinCondition(Fix(x)))
 
-        case LetF(name, form, in) =>
-          alignCondition(lt, rt)(in).map(Let(name, form, _))
+        case Let(name, form, in) =>
+          alignCondition(lt, rt)(in).map(lpr.let(name, form, _))
 
-        case x => \/-(Fix(x))
+        case x => \/-(x.embed)
       }
 
     {
-      case x @ InvokeFUnapply(JoinFunc(f), Sized(l, r, cond)) =>
-        alignCondition(l, r)(cond).map(c => Invoke[nat._3](f, Func.Input3(l, r, c)))
+      case x @ InvokeUnapply(JoinFunc(f), Sized(l, r, cond)) =>
+        alignCondition(l, r)(cond).map(c => lpr.invoke(f, Func.Input3(l, r, c)))
 
-      case x => \/-(Fix(x))
+      case x => \/-(x.embed)
     }
+  }
+
+  /** In QScript mongo we will not remove typecheck filters and this will be deleted. */
+  def removeTypecheckFilters:
+      AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
+    case Typecheck(_, _, t @ Embed(Constant(Data.Bool(true))), Embed(Constant(Data.Bool(false)))) =>
+      \/-(t)
+    case x => \/-(x.embed)
   }
 
   /** To be used by backends that require collections to contain Obj, this
@@ -920,21 +922,21 @@ object MongoDbPlanner {
     */
   def assumeReadObjƒ:
       AlgebraM[PlannerError \/ ?, LP, Fix[LP]] = {
-    case x @ LetF(n, r @ Fix(ReadF(_)),
-      Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
+    case x @ Let(n, r @ Embed(Read(_)),
+      Embed(Typecheck(Embed(Free(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
         case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
-          \/-(Let(n, r, cont))
+          \/-(lpr.let(n, r, cont))
         case Type.Obj(_, _) =>
-          \/-(Fix(x))
+          \/-(x.embed)
         case _ =>
           -\/(UnsupportedPlan(x,
             Some("collections can only contain objects, but a(n) " +
-              typ +
+              typ.shows +
               " is expected")))
       }
-    case x => \/-(Fix(x))
+    case x => \/-(x.embed)
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -966,15 +968,16 @@ object MongoDbPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.point[W]).liftM[GenT]
 
-    val wfƒ = workflowƒ[WF, EX](joinHandler, funcHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[WF])))
+    val wfƒ = workflowƒ[WF, EX](joinHandler, funcHandler) ⋙ (_ ∘ (_ ∘ ((_: Fix[WorkflowBuilderF[WF, ?]]).mapR(normalize[WF]))))
 
     (for {
-      cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘  Optimizer.simplifyRepeatedly[Fix])))
-      prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
-      wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
-      wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))
-      wf2  <- log("Workflow (crystallized)")             (Crystallize[WF].crystallize(wf1).point[M])
+      cleaned <- log("Logical Plan (reduced typechecks)")      (liftError(logical.cataM[PlannerError \/ ?, Fix[LP]](assumeReadObjƒ)))
+      elided  <- log("Logical Plan (remove typecheck filters)")(liftError(cleaned.cataM[PlannerError \/ ?, Fix[LP]](removeTypecheckFilters ⋘ repeatedly(optimizer.simplifyƒ))))
+      align   <- log("Logical Plan (aligned joins)")           (liftError(elided.apo[Fix[LP]](elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(optimizer.simplifyƒ))))
+      prep    <- log("Logical Plan (projections preferred)")   (optimizer.preferProjections(align).point[M])
+      wb      <- log("Workflow Builder")                       (swizzle(swapM(lpr.lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
+      wf1     <- log("Workflow (raw)")                         (swizzle(build(wb)))
+      wf2     <- log("Workflow (crystallized)")                (Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
   }
 
@@ -985,8 +988,8 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan(logical: Fix[LP], queryContext: fs.QueryContext)
-    : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
+  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+      : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package quasar.fs
 
-import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
+import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 
-import matryoshka.{FunctorT, Fix}, FunctorT.ops._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._
 import monocle.std.tuple2._
@@ -136,8 +137,8 @@ object transformPaths {
     transformIn(g, liftFT[S])
   }
 
-  private def transformFile(inPath: EndoK[AbsPath])(lp: Fix[LogicalPlan]): Fix[LogicalPlan] =
-    lp.transAna[LogicalPlan](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
+  private def transformFile(inPath: EndoK[AbsPath])(lp: Fix[LP]): Fix[LP] =
+    lp.transAna[Fix[LP]](transformLPPaths(natToFunction[AbsPath, AbsPath, File](inPath)))
 
   /** Returns a natural transformation that transforms all paths in `QueryFile`
     * operations using the given functions.
@@ -233,7 +234,7 @@ object transformPaths {
   private val fsPathError: Optional[FileSystemError, APath] =
     FileSystemError.pathErr composeLens PathError.errorPath
 
-  private val fsPlannerError: Optional[FileSystemError, Fix[LogicalPlan]] =
+  private val fsPlannerError: Optional[FileSystemError, Fix[LP]] =
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
@@ -244,9 +245,9 @@ object transformPaths {
     fsUnkWrError.modify(f(_)) compose
     fsPlannerError.modify(transformFile(f))
 
-  private def transformLPPaths(f: AFile => AFile) = λ[LogicalPlan ~> LogicalPlan] {
+  private def transformLPPaths(f: AFile => AFile) = λ[LP ~> LP] {
     // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    case ReadF(p) => ReadF(f(mkAbsolute(rootDir, p)))
-    case lp       => lp
+    case lp.Read(p) => lp.read(f(mkAbsolute(rootDir, p)))
+    case lp         => lp
   }
 }

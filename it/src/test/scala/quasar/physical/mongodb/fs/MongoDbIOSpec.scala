@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 class MongoDbIOSpec extends QuasarSpecification {
   import MongoDbSpec._
 
-  clientShould { (backend, prefix, setupClient, testClient) =>
+  clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     backend.name should {

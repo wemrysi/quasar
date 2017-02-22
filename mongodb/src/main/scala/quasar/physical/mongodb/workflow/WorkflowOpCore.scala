@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.physical.mongodb.workflow
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
@@ -28,9 +29,10 @@ import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Gro
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
-import quasar.qscript.SortDir
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** Ops that are provided by all supported MongoDB versions (since 2.6), or are
@@ -599,7 +601,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           }(ident("value")),
           Js.Return(Js.Ident("rez"))))
 
-    body(exprs.toList.zipWithIndex.map(("each" + _).second))
+    body(exprs.toList.zip(Stream.from(0).map("each" + _.toString)))
   }
 
   def >>>(that: $SimpleMapF[A]) = {
@@ -629,7 +631,10 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           scope <+> $SimpleMapF.implicitScope(funcs)
         )
       case _ =>
-        $FlatMapF(src, fn, $SimpleMapF.implicitScope(funcs + "clone") ++ scope)
+        // WartRemover seems to be confused by the `+` method on `Set`
+        @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+        val newFuncs = funcs + "clone"
+        $FlatMapF(src, fn, $SimpleMapF.implicitScope(newFuncs) ++ scope)
     }
   }
 
@@ -954,7 +959,7 @@ object WorkflowOpCoreF {
         case $SortF(_, value)   =>
           val nt = "$SortF" :: wfType
           NonTerminal(nt, None,
-            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
+            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st.shows)) }.toList)
         case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
           val nt = "$GeoNearF" :: wfType
           NonTerminal(nt, None,

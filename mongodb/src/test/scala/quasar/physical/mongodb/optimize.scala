@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.TreeMatchers
+import quasar.common.SortDir
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
 
 import scalaz._, Scalaz._
 

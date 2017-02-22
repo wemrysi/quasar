@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,8 @@ trait PackageMethods {
   @inline final def classTag[A](implicit z: CTag[A]): CTag[A] = z
   @inline final def implicitly[A](implicit value: A): A       = value
 
-  implicit def quasarExtensionOps[A](x: A) = new QuasarExtensionOps(x)
+  implicit def quasarExtensionOps[A](x: A): QuasarExtensionOps[A] =
+    new QuasarExtensionOps(x)
 
   /** Type parameter curriers. */
   def eqBy[A]   = new EqualBy[A]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,16 @@
 package quasar.std
 
 import quasar.Predef._
+import quasar._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
-import quasar._, LogicalPlan._
 
 import scala.collection.immutable.NumericRange
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.success
 import shapeless.{Data => _, _}
 
@@ -35,10 +37,37 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Take, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-            Take(src, ConstantF[T[LogicalPlan]](Data.Int(m.min(n))).embed).some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Take(src, Constant[T](Data.Int(m.min(n))).embed).some
+          case _ => None
+        }
+    },
+    partialTyper[nat._2] {
+      case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
+        Type.Const(Data.Set(Nil))
+      case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
+          if n.isValidInt =>
+        Type.Const(Data.Set(s.take(n.intValue)))
+      case Sized(t, _) => t
+    },
+    untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+
+  val Sample: BinaryFunc = BinaryFunc(
+    Sifting,
+    "Randomly selects N elements from a set",
+    Type.Top,
+    Func.Input2(Type.Top, Type.Int),
+    new Func.Simplifier {
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Take, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Take(src, Constant[T](Data.Int(m.min(n))).embed).some
           case _ => None
         }
     },
@@ -58,14 +87,17 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Int(n)))))
-            if n == 0 =>
-          set.some
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Drop, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
-          Drop(src, ConstantF[T[LogicalPlan]](Data.Int(m + n)).embed).some
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Int(n)))))
+              if n == 0 =>
+            set.some
+          case InvokeUnapply(_, Sized(Embed(InvokeUnapply(Drop, Sized(src, Embed(Constant(Data.Int(m)))))), Embed(Constant(Data.Int(n))))) =>
+            Drop(src, Constant[T](Data.Int(m + n)).embed).some
+          case _ => None
+        }
     },
     partialTyper[nat._2] {
       case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
@@ -90,27 +122,17 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
-  // TODO second param is an Array, third param is Array[String]
-  val OrderBy = TernaryFunc(
-    Sifting,
-    "Orders a set by the natural ordering of a projection on the set",
-    Type.Top,
-    Func.Input3(Type.Top, Type.Top, Type.Top),
-    noSimplification,
-    partialTyper[nat._3] {
-      case Sized(set, _, _) => set
-    },
-    untyper[nat._3](t => success(Func.Input3(t, Type.Top, Type.Top))))
-
   val Filter = BinaryFunc(
     Sifting,
     "Filters a set to include only elements where a projection is true",
     Type.Top,
     Func.Input2(Type.Top, Type.Bool),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.True)))) =>
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.True)))) =>
             set.some
           case _ => None
         }
@@ -257,11 +279,14 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Set(Nil))))) =>
-          set.some
-        case _ => None
-      }
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+        orig match {
+          case Invoke(_, Sized(Embed(set), Embed(Constant(Data.Set(Nil))))) =>
+            set.some
+          case _ => None
+        }
     },
     partialTyper[nat._2] {
       case Sized(s1, _) => s1
@@ -278,11 +303,13 @@ trait SetLib extends Library {
     Type.Bool,
     Func.Input2(Type.Top, Type.Top),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeF(_, Sized(item, set)) => set.project match {
-            case ConstantF(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
-            case ConstantF(_)           => RelationsLib.Eq(item, set).some
+          case Invoke(_, Sized(item, set)) => set.project match {
+            case Constant(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
+            case Constant(_)           => RelationsLib.Eq(item, set).some
             case lp                     => Within(item, StructuralLib.UnshiftArray(set).embed).some
           }
           case _ => None

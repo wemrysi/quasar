@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,13 +64,6 @@ object managefile {
   private def toNioPath(path: APath): nio.Path =
     nio.Paths.get(posixCodec.unsafePrintPath(path))
 
-  private def toAFile(path: nio.Path): Option[AFile] = {
-    // NB: This is `toString` on a Java object, so out of our hands.
-    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-    val maybeUnboxed = posixCodec.parseAbsFile(path.toString)
-    maybeUnboxed.map(sandboxAbs(_))
-  }
-
   private def doesPathExist[S[_]](implicit
     s0: Task :<: S
   ): APath => Free[S, Boolean] = path => lift(Task.delay {
@@ -117,7 +110,7 @@ object managefile {
     }
     Failure.Ops[PhysicalError, S].unattempt(lift(del).into[S])
   }
-  
+
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
   ): Free[S, FileSystemError \/ AFile] = injectFT[Task, S].apply{

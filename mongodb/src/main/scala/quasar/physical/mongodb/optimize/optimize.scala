@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,9 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 package object optimize {
@@ -84,7 +86,7 @@ package object optimize {
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    private def simplifyGroupƒ[F[_]: Coalesce](implicit ev: WorkflowOpCoreF :<: F):
+    private def simplifyGroupƒ[F[_]: Coalesce: Functor](implicit ev: WorkflowOpCoreF :<: F):
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case $group(src, Grouped(cont), id) =>
         val (newCont, proj) =
@@ -116,12 +118,12 @@ package object optimize {
             $group[F](Grouped(newCont), id),
             $project[F](
               Reshape(proj),
-              IgnoreId)).unFix.some
+              IgnoreId)).project.some
       case _ => None
     }
 
     def simplifyGroup[F[_]: Coalesce: Functor](op: Fix[F])(implicit ev: WorkflowOpCoreF :<: F): Fix[F] =
-      op.transCata(orOriginal(simplifyGroupƒ[F]))
+      op.transCata[Fix[F]](orOriginal(simplifyGroupƒ[F]))
 
     private def reorderOpsƒ[F[_]: Coalesce](implicit I: WorkflowOpCoreF :<: F)
         : F[Fix[F]] => Option[F[Fix[F]]] = {
@@ -189,7 +191,7 @@ package object optimize {
     def reorderOps[F[_]: Functor: Coalesce](wf: Fix[F])
       (implicit I: WorkflowOpCoreF :<: F)
       : Fix[F] = {
-      val reordered = wf.transCata(orOriginal(reorderOpsƒ[F]))
+      val reordered = wf.transCata[Fix[F]](orOriginal(reorderOpsƒ[F]))
       if (reordered == wf) wf else reorderOps(reordered)
     }
 

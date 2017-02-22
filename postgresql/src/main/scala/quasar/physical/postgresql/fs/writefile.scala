@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import shapeless.HNil
 object writefile {
   import WriteFile._
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec: DataCodec = DataCodec.Precise
 
   final case class TableName(v: String)
 
@@ -96,11 +96,7 @@ object writefile {
   ): Free[S, Vector[FileSystemError]] =
     (for {
       tbl  <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
-      data <- EitherT(chunk.foldMap(d =>
-                DataCodec.render(d).bimap(
-                  err => Vector(FileSystemError.writeFailed(d, err.shows)),
-                  List(_))
-              ).point[Free[S, ?]])
+      data =  chunk.map(DataCodec.render).unite
       qry  =  insertQueryStr(tbl.v) _
       _    <- lift(data.traverse(d =>
                 Update[HNil](qry(d), none).toUpdate0(HNil).run.void

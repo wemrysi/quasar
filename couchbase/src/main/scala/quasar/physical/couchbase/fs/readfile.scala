@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ object readfile {
     S2: Read[Context, ?] :<:  S,
     S3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
-    impl.read[S, Cursor](open, read, close)
+    impl.read[Cursor, Free[S, ?]](open, read, close)
 
   // TODO: Streaming
   def open[S[_]](
@@ -51,19 +51,19 @@ object readfile {
   ): Free[S, FileSystemError \/ Cursor] =
     (for {
       ctx     <- context.ask.liftM[FileSystemErrT]
-      bktCol  <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
+      bktCol  <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
       bkt     <- EitherT(getBucket(bktCol.bucket))
       limit   =  readOpts.limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- lift(Task.delay(
+      qResult <- EitherT(lift(Task.delay(
                    bkt.query(n1qlQuery(qStr))
                      .allRows
                      .asScala
                      .toVector
-                     .map(_.value)
-                 )).into.liftM[FileSystemErrT]
+                     .traverse(rowToData)
+                 )).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](
@@ -71,13 +71,13 @@ object readfile {
   )(implicit
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
-    resultsFromCursor(cursor).point[Free[S, ?]]
+    resultsFromCursor(cursor).right.η[Free[S, ?]]
 
   def close[S[_]](
     cursor: Cursor
   )(implicit
     S0: Task :<: S
   ): Free[S, Unit] =
-    ().point[Free[S, ?]]
+    ().η[Free[S, ?]]
 
 }

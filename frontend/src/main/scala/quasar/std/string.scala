@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,15 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, TernaryFunc, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar._, SemanticError._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+
+import java.time.ZoneOffset.UTC
+
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.{success, failureNel}
 import shapeless.{Data => _, :: => _, _}
 
@@ -41,11 +46,13 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input2(Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(ConstantF(Data.Str(""))), Embed(second))) =>
+          case InvokeUnapply(_, Sized(Embed(Constant(Data.Str(""))), Embed(second))) =>
             second.some
-          case InvokeFUnapply(_, Sized(Embed(first), Embed(ConstantF(Data.Str(""))))) =>
+          case InvokeUnapply(_, Sized(Embed(first), Embed(Constant(Data.Str(""))))) =>
             first.some
           case _ => None
         }
@@ -90,15 +97,17 @@ trait StringLib extends Library {
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Str),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeFUnapply(_, Sized(Embed(str), Embed(ConstantF(Data.Str(pat))), Embed(ConstantF(Data.Str(esc))))) =>
+          case InvokeUnapply(_, Sized(Embed(str), Embed(Constant(Data.Str(pat))), Embed(Constant(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
               Search(str.embed,
-                ConstantF[T[LogicalPlan]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
-                ConstantF[T[LogicalPlan]](Data.Bool(false)).embed).some
+                constant[T](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
+                constant[T](Data.Bool(false)).embed).some
           case _ => None
         }
     },
@@ -179,16 +188,18 @@ trait StringLib extends Library {
     Type.Str,
     Func.Input3(Type.Str, Type.Int, Type.Int),
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T]
+        (orig: LP[T])
+        (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeFUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
-            Embed(ConstantF(Data.Str(str))),
-            Embed(ConstantF(Data.Int(from))),
+          case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
+            Embed(Constant(Data.Str(str))),
+            Embed(Constant(Data.Int(from))),
             for0))
               if 0 < from =>
-            InvokeF(f, Func.Input3(
-              ConstantF[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
-              ConstantF[T[LogicalPlan]](Data.Int(0)).embed,
+            Invoke(f, Func.Input3(
+              Constant[T](Data.Str(str.substring(from.intValue))).embed,
+              Constant[T](Data.Int(0)).embed,
               for0)).some
           case _ => None
         }
@@ -310,9 +321,9 @@ trait StringLib extends Library {
         case Data.Bool(b)      => success(b.shows)
         case Data.Int(i)       => success(i.shows)
         case Data.Dec(d)       => success(d.shows)
-        case Data.Timestamp(t) => success(t.toString)
+        case Data.Timestamp(t) => success(t.atZone(UTC).format(DataCodec.dateTimeFormatter))
         case Data.Date(d)      => success(d.toString)
-        case Data.Time(t)      => success(t.toString)
+        case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
         case Data.Interval(i)  => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other             =>

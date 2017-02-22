@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,4 +18,15 @@ package quasar
 
 import quasar.Predef._
 
+import scalaz._
+import scalaz.std.string._
+
 final case class BackendName(name: String) extends scala.AnyVal
+
+object BackendName {
+  implicit val order: Order[BackendName] =
+    Order.orderBy(_.name)
+
+  implicit val show: Show[BackendName] =
+    Show.shows(_.name)
+}

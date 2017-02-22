@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,7 +135,6 @@ private object JavascriptPrinter {
     def p(ast: Js) = print(ast, indent)
     def p2(ast: Js) = ind(2) + p3(ast)
     def p3(ast: Js) = print(ast, indent + 2)
-    def p4(ast: Js) = ind(0) + p(ast)
     def s(ast: Js) = ast match {
       case _: Lit => p(ast)
       case _: Ident => p(ast)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import quasar.fs._
 import quasar.sql.Sql
 
 import eu.timepit.refined.auto._
-import matryoshka.Fix
+import matryoshka.data.Fix
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.iteratee._
 import scalaz.stream.Process

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,43 +17,47 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef.{Eq => _, _}
-import quasar.Data
+import quasar.qscript.MapFuncs._
+import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
+import quasar.{Data, DataCodec}
 import quasar.Planner._
-import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
 
+import java.time._, ZoneOffset.UTC
 import scala.math
 
-import matryoshka.{Hole => _, _}, Recursive.ops._
-import org.threeten.bp.{Instant, ZoneOffset}
+import matryoshka._
+import matryoshka.data.free._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
 
   private val undefined = Data.NA
 
-  def changeFreeMap[T[_[_]]: Recursive](f: FreeMap[T])
+  def changeFreeMap[T[_[_]]: RecursiveT](f: FreeMap[T])
       : PlannerError \/ (Data => Data) =
-    freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
+    f.cataM(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
 
-  def changeJoinFunc[T[_[_]]: Recursive](f: JoinFunc[T])
+  def changeJoinFunc[T[_[_]]: RecursiveT](f: JoinFunc[T])
       : PlannerError \/ ((Data, Data) => Data) =
-    freeCataM(f)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
+    f.cataM(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, ((Data, Data)) => Data](
       (js: JoinSide) => (js match {
         case LeftSide  => (_: (Data, Data))._1
         case RightSide => (_: (Data, Data))._2
       }).right,
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
-  def changeReduceFunc[T[_[_]]: Recursive](f: Free[MapFunc[T, ?], ReduceIndex])
+  def changeReduceFunc[T[_[_]]: RecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
       : PlannerError \/ (List[Data] => Data) =
-    freeCataM(f)(interpretM(
+    f.cataM(interpretM(
       ri => ((_: List[Data])(ri.idx)).right,
       change[T, List[Data]]))
 
-  def change[T[_[_]]: Recursive, A]
+  def change[T[_[_]]: RecursiveT, A]
       : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
     case Undefined() => κ(undefined).right
@@ -80,6 +84,12 @@ object CoreMap extends Serializable {
       case Data.Str(v) => DateLib.parseInterval(v).getOrElse(undefined)
       case _ => undefined
     }).right
+    case StartOfDay(f) => (f >>> {
+      case d @ Data.Timestamp(_) => temporalTrunc(TemporalPart.Day, d).fold(κ(undefined), ι)
+      case Data.Date(v)          => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
+      case _ => undefined
+    }).right
+    case TemporalTrunc(p, f) => (f >>> (d => temporalTrunc(p, d).fold(κ(undefined), ι))).right
     case TimeOfDay(f) => (f >>> {
       case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
       case _ => undefined
@@ -88,25 +98,127 @@ object CoreMap extends Serializable {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => undefined
     }).right
-    case ExtractCentury(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractDecade(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractDayOfYear(f) => InternalError("not implemented").left // TODO
-    case ExtractEpoch(f) => InternalError("not implemented").left // TODO
-    case ExtractHour(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoDayOfWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractIsoYear(f) => InternalError("not implemented").left // TODO
-    case ExtractMicroseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMillennium(f) => InternalError("not implemented").left // TODO
-    case ExtractMilliseconds(f) => InternalError("not implemented").left // TODO
-    case ExtractMinute(f) => InternalError("not implemented").left // TODO
-    case ExtractMonth(f) => InternalError("not implemented").left // TODO
-    case ExtractQuarter(f) => InternalError("not implemented").left // TODO
-    case ExtractSecond(f) => InternalError("not implemented").left // TODO
-    case ExtractWeek(f) => InternalError("not implemented").left // TODO
-    case ExtractYear(f) => InternalError("not implemented").left // TODO
-    case Now() => ((x: A) => Data.Timestamp(Instant.now())).right
+    case ExtractCentury(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => century(dt.getYear()))
+      case Data.Date(v) => century(v.getYear())
+      case _ => undefined
+    }).right
+    case ExtractDayOfMonth(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfMonth()))
+      case Data.Date(v) => Data.Int(v.getDayOfMonth())
+      case _ => undefined
+    }).right
+    case ExtractDecade(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear() / 10))
+      case Data.Date(v) => Data.Int(v.getYear() / 10)
+      case _ => undefined
+    }).right
+    case ExtractDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue() % 7))
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue() % 7)
+      case _ => undefined
+    }).right
+    case ExtractDayOfYear(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear()))
+      case Data.Date(v) => Data.Int(v.getDayOfYear())
+      case _ => undefined
+    }).right
+    case ExtractEpoch(f) => (f >>> {
+      case Data.Timestamp(v) => Data.Int(v.toEpochMilli() / 1000)
+      case Data.Date(v) => Data.Int(v.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
+      case _ => undefined
+    }).right
+    case ExtractHour(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getHour()))
+      case Data.Time(v) => Data.Int(v.getHour())
+      case Data.Date(_) => Data.Int(0)
+      case _ => undefined
+    }).right
+    case ExtractIsoDayOfWeek(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue()))
+      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
+      case _ => undefined
+    }).right
+    case ExtractIsoYear(f) => (f >>> {
+      case _ => undefined
+    }).right
+    case ExtractMicroseconds(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond() * 1000000
+          val milli = dt.getNano() / 1000
+          Data.Int(sec + milli)
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000000
+        val milli = v.getNano() / 1000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractMillennium(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(((dt.getYear() - 1) / 1000) + 1))
+      case Data.Date(v) => Data.Int(((v.getYear() - 1) / 1000) + 1)
+      case _ => undefined
+    }).right
+    case ExtractMilliseconds(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond() * 1000
+          val milli = dt.getNano() / 1000000
+          Data.Int(sec + milli)
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond() * 1000
+        val milli = v.getNano() / 1000000
+        Data.Int(sec + milli)
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractMinute(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMinute()))
+      case Data.Time(v) => Data.Int(v.getMinute())
+      case Data.Date(_) => Data.Int(0)
+      case _ => undefined
+    }).right
+    case ExtractMonth(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMonth().getValue()))
+      case Data.Date(v) => Data.Int(v.getMonth().getValue())
+      case _ => undefined
+    }).right
+    case ExtractQuarter(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v)(dt => Data.Int(((dt.getMonth().getValue - 1) / 3) + 1))
+      case Data.Date(v) => Data.Int(((v.getMonth().getValue - 1) / 3) + 1)
+      case _ => undefined
+    }).right
+    case ExtractSecond(f) => (f >>> {
+      case Data.Timestamp(v) =>
+        fromDateTime(v) { dt =>
+          val sec = dt.getSecond()
+          val milli = dt.getNano() / 1000
+          Data.Dec(BigDecimal(s"$sec.$milli"))
+        }
+      case Data.Time(v) =>
+        val sec = v.getSecond()
+        val milli = v.getNano() / 1000
+        Data.Dec(BigDecimal(s"$sec.$milli"))
+      case Data.Date(_) => Data.Dec(0)
+      case _ => undefined
+    }).right
+    case ExtractWeek(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear() / 7))
+      case Data.Date(v) => Data.Int(v.getDayOfYear() / 7)
+      case _ => undefined
+    }).right
+    case ExtractYear(f) => (f >>> {
+      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear()))
+      case Data.Date(v) => Data.Int(v.getYear())
+      case _ => undefined
+    }).right
+    case Now() => κ(Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
       case Data.Int(v) => Data.Int(-v)
@@ -212,33 +324,11 @@ object CoreMap extends Serializable {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case DupMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj(ListMap(m.keys.toList.fproduct(Data.Str(_)): _*))
-      case _ => undefined
-    }).right
-    case DupArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.indices.map(Data.Int(_)).toList)
-      case _ => undefined
-    }).right
-    case ZipMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj {
-        m.map{
-          case (k, v) => (k, Data.Arr(List(Data.Str(k), v)))
-        }
-      }
-      case _ => undefined
-    }).right
-    case ZipArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr(l.zipWithIndex.map {
-        case (e, i) => Data.Arr(List(Data.Int(i), e))
-      })
-      case _ => undefined
-    }).right
     case Range(fFrom, fTo) => ((x: A) => (fFrom(x), fTo(x)) match {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2, ff3) => f2.right
-    case _ => InternalError("not implemented").left
+    case _ => InternalError.fromMsg("not implemented").left
   }
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -308,6 +398,8 @@ object CoreMap extends Serializable {
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) < b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a < BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
@@ -323,6 +415,8 @@ object CoreMap extends Serializable {
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a <= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a <= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) <= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a <= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
@@ -338,6 +432,8 @@ object CoreMap extends Serializable {
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a > b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a > b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) > b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a > BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
@@ -353,6 +449,8 @@ object CoreMap extends Serializable {
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a >= b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a >= b)
+    case (Data.Int(a), Data.Dec(b)) => Data.Bool(BigDecimal(a) >= b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Bool(a >= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
@@ -389,21 +487,31 @@ object CoreMap extends Serializable {
     case _ => undefined
   }
 
-  // TODO reuse render from codec
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
     case d: Data.Str => d
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    case Data.Timestamp(v) => Data.Str(v.toString)
+    case Data.Timestamp(v) => Data.Str(v.atZone(UTC).format(DataCodec.dateTimeFormatter))
     case Data.Date(v) => Data.Str(v.toString)
-    case Data.Time(v) => Data.Str(v.toString)
+    case Data.Time(v) => Data.Str(v.format(DataCodec.timeFormatter))
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
     case _ => undefined
   }
+
+  private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
+
+  private def temporalTrunc(part: TemporalPart, src: Data): PlannerError \/ Data =
+    (src match {
+      case d @ Data.Date(_)      => DateLib.truncDate(part, d)
+      case t @ Data.Time(_)      => DateLib.truncTime(part, t)
+      case t @ Data.Timestamp(_) => DateLib.truncTimestamp(part, t)
+      case _ =>
+        undefined.right
+    }).leftMap(e => InternalError.fromMsg(e.shows))
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {
@@ -418,5 +526,8 @@ object CoreMap extends Serializable {
         \/.fromTryCatchNonFatal(Data.Str(StringLib.safeSubstring(str, from.toInt, count.toInt))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
+
+  private def fromDateTime(v: Instant)(f: ZonedDateTime => Data): Data =
+    \/.fromTryCatchNonFatal(v.atZone(ZoneOffset.UTC)).fold(κ(Data.NA), f)
 
 }
