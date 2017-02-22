@@ -36,7 +36,7 @@ object CoreMap extends Serializable {
 
   def changeFreeMap[T[_[_]]: Recursive](f: FreeMap[T])
       : PlannerError \/ (Data => Data) =
-    freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change[T, Data]))
+    freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), change[T, Data]))
 
   def changeJoinFunc[T[_[_]]: Recursive](f: JoinFunc[T])
       : PlannerError \/ ((Data, Data) => Data) =
@@ -45,16 +45,14 @@ object CoreMap extends Serializable {
         case LeftSide  => (_: (Data, Data))._1
         case RightSide => (_: (Data, Data))._2
       }).right,
-      CoreMap.change[T, (Data, Data)]))
-      .map(f => (l: Data, r: Data) => f((l, r)))
+      change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
   def changeReduceFunc[T[_[_]]: Recursive](f: Free[MapFunc[T, ?], ReduceIndex])
       : PlannerError \/ (List[Data] => Data) =
     freeCataM(f)(interpretM(
       ri => ((_: List[Data])(ri.idx)).right,
-      CoreMap.change[T, List[Data]]))
+      change[T, List[Data]]))
 
-  // TODO: replace Data.NA with something safer
   def change[T[_[_]]: Recursive, A]
       : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
