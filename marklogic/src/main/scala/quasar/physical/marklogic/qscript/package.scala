@@ -19,9 +19,9 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{Common, EJson, Str}
-import quasar.fp.{coproductShow, idPrism, liftFG}
+import quasar.fp.coproductShow
 import quasar.fp.ski.κ
-import quasar.contrib.pathy.{ADir, AFile, UriPathCodec}
+import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
@@ -139,24 +139,6 @@ package object qscript {
     QTP: Planner[F, FMT, QScriptTotal[T, ?]]
   ): F[XQuery] =
     fqs.cataM(interpretM(κ(src.point[F]), QTP.plan))
-
-  def shiftReadDir[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor, G[_]: Traverse](
-    implicit
-    QC: QScriptCore[T, ?] :<: G,
-    TJ: ThetaJoin[T, ?] :<: G,
-    SD: Const[ShiftedRead[ADir], ?] :<: G,
-    GI: Injectable.Aux[G, QScriptTotal[T, ?]],
-    S: ShiftReadDir.Aux[T, F, G],
-    C: Coalesce.Aux[T, G, G],
-    N: Normalizable[G]
-  ): T[F] => T[G] = {
-    val rewrite = new Rewrite[T]
-    _.codyna(
-      rewrite.normalize[G]                                     >>>
-      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism))) >>>
-      (_.embed),
-      ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
-  }
 
   ////
 

@@ -90,6 +90,22 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
   }
 
+  def shiftReadDir[F[_]: Functor, G[_]: Traverse](
+    implicit
+    QC: QScriptCore :<: G,
+    TJ: ThetaJoin :<: G,
+    SD: Const[ShiftedRead[ADir], ?] :<: G,
+    GI: Injectable.Aux[G, QScriptTotal],
+    S: ShiftReadDir.Aux[T, F, G],
+    C: Coalesce.Aux[T, G, G],
+    N: Normalizable[G]
+  ): T[F] => T[G] =
+    _.codyna(
+      normalize[G]                                             >>>
+      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism))) >>>
+      (_.embed),
+      ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
+
   def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<: G,
               TJ: ThetaJoin :<: G,

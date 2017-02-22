@@ -139,7 +139,7 @@ object queryfile {
 
     for {
       qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
-      shifted =  shiftReadDir[T, QSR, MLQ].apply(qs)
+      shifted =  R.shiftReadDir[QSR, MLQ].apply(qs)
       _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optmzed =  shifted.transHylo(
                    R.optimize(reflNT[MLQ]),
