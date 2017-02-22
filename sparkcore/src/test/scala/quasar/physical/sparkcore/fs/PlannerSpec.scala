@@ -487,7 +487,7 @@ class PlannerSpec
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
-                  JoinDir.Right.name -> Data.Null
+                  JoinDir.Right.name -> Data.NA
                 )),
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
@@ -523,7 +523,7 @@ class PlannerSpec
             case rdd =>
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
-                  JoinDir.Left.name ->  Data.Null,
+                  JoinDir.Left.name ->  Data.NA,
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
                 Data.Obj(ListMap(
@@ -558,12 +558,12 @@ class PlannerSpec
             case rdd =>
               rdd.collect.toList must contain(exactly(
                 Data._obj(ListMap(
-                  JoinDir.Left.name ->  Data.Null,
+                  JoinDir.Left.name ->  Data.NA,
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
                 Data._obj(ListMap(
                   JoinDir.Left.name ->  Data.Obj(ListMap(("age" -> Data.Int(27)), ("country" -> Data.Str("Poland")))),
-                  JoinDir.Right.name -> Data.Null
+                  JoinDir.Right.name -> Data.NA
                 )),
                 Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
