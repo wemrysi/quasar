@@ -81,30 +81,30 @@ object lib {
     })
 
   def directoryContents[F[_]: PrologW: Bind, T: SearchOptions]: F[FunctionDecl1] =
-    fs.declare[F]("directory-contents") flatMap (_(
-      $("uri") as ST("xs:string")
-    ).as(ST("xs:string*")) { uri: XQuery =>
-      val kid = $("kid")
+    (
+      subDirectories[F].fn                  |@|
+      descendantsHavingFormatExist[F, T].fn
+    ).tupled flatMap { case (subDirs, descsExist) =>
+      fs.declare[F]("directory-contents") map (_(
+        $("uri") as ST("xs:string")
+      ).as(ST("xs:string*")) { uri: XQuery =>
+        val (kid, sdir) = ($("kid"), $("sdir"))
 
-      val childFiles =
-        fn.map(
-          fn.ns(NCName("base-uri")) :# 1,
-          directoryDocuments[T](uri, false))
+        val childFiles =
+          fn.map(
+            fn.ns(NCName("base-uri")) :# 1,
+            directoryDocuments[T](uri, false))
 
-      val childDirs =
-        subDirectories[F].apply(uri, fn.False) flatMap { dirs =>
-          val sdir = $("sdir")
-          descendantsHavingFormatExist[F, T]
-            .apply(~sdir)
-            .map(filtered => fn.filter(func(sdir.render) { filtered }, dirs))
-        }
+        val childDirs =
+          fn.filter(
+            func(sdir.render) { descsExist(~sdir) },
+            subDirs(uri, fn.False))
 
-      childDirs map { cdirs =>
         fn.map(
           func(kid.render) { fn.substringAfter(~kid, uri) },
-          mkSeq_(cdirs, childFiles))
-      }
-    })
+          mkSeq_(childDirs, childFiles))
+      })
+    }
 
   def directoryIsEmpty[F[_]: PrologW: Functor]: F[FunctionDecl1] =
     fs.declare[F]("directory-is-empty") map (_(
@@ -114,12 +114,16 @@ object lib {
     })
 
   def emptyDescendantDirectories[F[_]: PrologW: Bind]: F[FunctionDecl1] =
-    fs.declare[F]("empty-descendant-directories") flatMap (_(
-      $("uri") as ST("xs:string")
-    ).as(ST.Top) { uri: XQuery =>
-      (subDirectories[F].apply(uri, fn.True) |@| directoryIsEmpty[F].ref)(
-        (descs, isEmpty) => fn.filter(isEmpty, descs))
-    })
+    (
+      subDirectories[F].fn    |@|
+      directoryIsEmpty[F].ref
+    ).tupled flatMap { case (subDirs, dirIsEmptyRef) =>
+      fs.declare[F]("empty-descendant-directories") map (_(
+        $("uri") as ST("xs:string")
+      ).as(ST.Top) { uri: XQuery =>
+        fn.filter(dirIsEmptyRef, subDirs(uri, fn.True))
+      })
+    }
 
   def fileInOtherFormatExists[F[_]: PrologW: Functor, T: SearchOptions]: F[FunctionDecl1] =
     fs.declare[F]("file-exists-in-other-format") map (_(
@@ -156,20 +160,20 @@ object lib {
     })
 
   def moveFile[F[_]: PrologW: Monad, T: SearchOptions]: F[FunctionDecl2] =
-    fs.declare[F]("move-file") flatMap (_(
-      $("srcUri") as ST("xs:string"),
-      $("dstUri") as ST("xs:string")
-    ).as(ST.Top) { (srcUri: XQuery, dstUri: XQuery) =>
-      fileInOtherFormatExists[F, T].apply(dstUri) map { dstExists =>
-        if_(dstExists)
+    fileInOtherFormatExists[F, T].fn flatMap { otherFmtExists =>
+      fs.declare[F]("move-file") map (_(
+        $("srcUri") as ST("xs:string"),
+        $("dstUri") as ST("xs:string")
+      ).as(ST.Top) { (srcUri: XQuery, dstUri: XQuery) =>
+        if_(otherFmtExists(dstUri))
         .then_(formatConflictError(dstUri))
         .else_(
           let_(
             $("_1") := xdmp.documentInsert(dstUri, documentNode[T](srcUri)),
             $("_2") := xdmp.documentDelete(srcUri))
           .return_(emptySeq))
-      }
-    })
+      })
+    }
 
   def subDirectories[F[_]: PrologW: Functor]: F[FunctionDecl2] =
     fs.declare[F]("sub-directories") map (_(
