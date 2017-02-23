@@ -170,8 +170,8 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
         val thirdDoc: Vector[Data] =
           Vector(Data.Obj(ListMap("c" -> Data.Int(1))))
 
-        val src = pnt </> dir("uf")
-        val dst = pnt </> dir("uf1") </> dir("uf")
+        val src = pnt </> dir("UF")
+        val dst = pnt </> dir("UF1") </> dir("UF")
 
         val setupAndMove =
           write.saveThese(uf1, oneDoc)     *>
