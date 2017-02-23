@@ -56,7 +56,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     castIfNode(item)
 
   def isArray(item: XQuery) =
-    isArrayFn(item)
+    isContainer(item)
 
   def leftShift(node: XQuery) =
     leftShiftFn(node)
@@ -73,7 +73,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def mkObjectEntry(key: XQuery, value: XQuery) =
     XQuery.stringLit.getOption(key).cata(
       s => asQName(s) >>= (qn => renameOrWrap(qn.xqy, value)),
-      renameOrWrap(key, value))
+      renameOrWrap(xs.QName(key), value))
 
   def nodeCast(node: XQuery) =
     castAsAscribed(node)
@@ -85,7 +85,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     fn.string(node).point[F]
 
   def nodeType(node: XQuery) =
-    ascribedType(node)
+    xmlNodeType(node)
 
   def objectDelete(obj: XQuery, key: XQuery) =
     XQuery.stringLit.getOption(key).cata(
@@ -120,9 +120,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   ////
 
-  // ejson:is-array($item as item()?) as xs:boolean
-  lazy val isArrayFn: F[FunctionDecl1] =
-    ejs.declare[F]("is-array") map (_(
+  // ejson:is-container($item as item()?) as xs:boolean
+  lazy val isContainer: F[FunctionDecl1] =
+    ejs.declare[F]("is-container") map (_(
       $("item") as ST("item()?")
     ).as(ST("xs:boolean")) { item: XQuery =>
       typeswitch(item)(
@@ -304,5 +304,21 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           typeswitch(node)(
             elt as ST("element()") return_ κ(attrs)
           ) default emptySeq)
+    })
+
+  val xmlNodeType: F[FunctionDecl1] =
+    ejs.declare[F]("xml-node-type") flatMap (_(
+      $("node") as ST("node()")
+    ).as(ST("xs:string?")) { node: XQuery =>
+      val (ascribed, elt) = ($("ascribed"), $("elt"))
+      (ascribedType(node) |@| isContainer(~elt))((typ, isObj) =>
+        let_(ascribed := typ) return_ {
+          if_(fn.empty(~ascribed))
+          .then_(typeswitch(node)(
+            elt as ST("element()") return_ { _ =>
+              if_(isObj) then_ "object".xs else_ emptySeq
+            }) default emptySeq)
+          .else_(~ascribed)
+        })
     })
 }

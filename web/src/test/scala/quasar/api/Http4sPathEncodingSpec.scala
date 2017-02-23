@@ -22,28 +22,31 @@ import quasar.contrib.pathy._
 import org.http4s.dsl.{Path => HPath}
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import scalaz.Scalaz._
 
-class AsPathSpec extends quasar.Qspec {
-  "AsPath" should {
-    "decode any Path we can throw at it" >> {
-      "AbsFile" >> prop { file: AFile =>
-        val httpPath = HPath(UriPathCodec.printPath(file))
-        AsFilePath.unapply(httpPath) must_== Some(file)
-      }
-      "AbsDir" >> prop { dir : ADir =>
-        val httpPath = HPath(UriPathCodec.printPath(dir))
-        AsDirPath.unapply(httpPath) must_== Some(dir)
-      }
+class Http4sPathEncodingSpec extends quasar.Qspec {
+  val codec = UriPathCodec
+
+  "print and parse through http4s should produce same Path" >> {
+    "absolute file with plus" >> {
+      val path = rootDir </> file("a+b/c")
+      val hpath = HPath(codec.printPath(path))
+      AsFilePath.unapply(hpath) must_= Some(path)
     }
 
-    "decode root" in {
-      val httpPath = HPath("/")
-      AsDirPath.unapply(httpPath) must_== Some(rootDir)
+    "absolute dir with plus" >> {
+      val path = rootDir </> dir("a+b/c")
+      val hpath = HPath(codec.printPath(path))
+      AsDirPath.unapply(hpath) must_= Some(path)
     }
 
-    "decode escaped /" in {
-      val httpPath = HPath("/foo%2Fbar/baz/")
-      AsDirPath.unapply(httpPath) must beSome(rootDir </> dir("foo/bar") </> dir("baz"))
+    "absolute file" >> prop { path: AFile =>
+      val hpath = HPath(codec.printPath(path))
+      AsFilePath.unapply(hpath) must_= Some(path)
+    }
+    "absolute dir" >> prop { path: ADir =>
+      val hpath = HPath(codec.printPath(path))
+      AsDirPath.unapply(hpath) must_= Some(path)
     }
   }
 }

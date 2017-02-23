@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xcc
+package quasar.physical.marklogic.xquery
 
-import quasar.effect.Capture
+import quasar.physical.marklogic.xquery.syntax._
 
-import com.marklogic.xcc._
-import com.marklogic.xcc.types.XdmItem
+import eu.timepit.refined.auto._
+import scalaz.Functor
 
-object resultitem {
-  def loadItem[F[_]: Capture](ritem: ResultItem): F[XdmItem] =
-    Capture[F] delay {
-      ritem.cache()
-      ritem.getItem
-    }
+object admin {
+  val m = module("admin", "http://marklogic.com/xdmp/admin", "/MarkLogic/admin.xqy")
+
+  def getConfiguration[F[_]: Functor: PrologW]: F[XQuery] =
+    m("get-configuration").apply()
+
+  def databaseGetDirectoryCreation[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery): F[XQuery] =
+    m("database-get-directory-creation") apply (config, databaseId)
 }

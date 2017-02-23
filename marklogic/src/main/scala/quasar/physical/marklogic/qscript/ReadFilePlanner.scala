@@ -14,12 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.physical.marklogic.qscript
 
-import quasar.contrib.pathy._
+import quasar.contrib.pathy.AFile
+import quasar.physical.marklogic.xquery._
+import quasar.qscript._
 
-import org.http4s.Uri
+import matryoshka._
+import scalaz.{Applicative, Const}
 
-object PathUtils {
-  def pathUri(path: APath): Uri = Uri(path = UriPathCodec.printPath(path))
+private[qscript] final class ReadFilePlanner[F[_]: Applicative, FMT: SearchOptions]
+  extends Planner[F, FMT, Const[Read[AFile], ?]] {
+
+  val plan: AlgebraM[F, Const[Read[AFile], ?], XQuery] = {
+    case Const(Read(file)) => Applicative[F].point(fileRoot(file))
+  }
 }
