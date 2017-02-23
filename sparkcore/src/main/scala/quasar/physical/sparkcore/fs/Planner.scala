@@ -219,7 +219,7 @@ object Planner {
           val reducersFuncs: List[(Data,Data) => Data] =
             reducers.map(reduceData)
 
-          val maybeRepair: PlannerError \/ (List[Data] => Data) =
+          val maybeRepair: PlannerError \/ ((Data, List[Data]) => Data) =
             CoreMap.changeReduceFunc(repair)
 
           def merge
@@ -238,7 +238,7 @@ object Planner {
                       case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
-                    repair(v)
+                    repair(k, v)
                 }
             }).map((sc, _)).point[Task])
           )

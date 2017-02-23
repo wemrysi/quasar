@@ -710,11 +710,16 @@ object WorkflowBuilder {
                     case (k, \/-(v)) =>
                       ((x: ListMap[BsonField.Name, Fix[ExprOp]]) => x + (k -> v)).second(acc)
                   })
-              if (grouped.isEmpty)
+              if (grouped.isEmpty && !ungrouped.isEmpty)
                 toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
               else
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-                  fail(InternalError fromMsg "A shape with no fields does not make sense"))(
+                  generateWorkflow(wb) ∘ { case (wf, base0) =>
+                    CollectionBuilderF(
+                      chain(wf, $group(Grouped(ListMap()), key(base0))),
+                      Field(BsonField.Name("_id")),
+                      none)
+                  })(
                   fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
                     emitSt(ungrouped.toList match {
                       case Nil =>

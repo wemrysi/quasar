@@ -290,10 +290,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, nm.freeMF(struct >> mf), id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(id match {
                 case IncludeId =>
                   Free.roll(ConcatArrays[T, FreeMap](

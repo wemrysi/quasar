@@ -149,7 +149,7 @@ class QScriptSpec
                 ProjectFieldR(HoleF, StrLit("pop")),
                 Free.roll(Undefined()))),
               Free.roll(Undefined()))))),
-          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0))))))(
+          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0.some))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -270,7 +270,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap](HoleF)),
-          ReduceIndexF(0))))(
+          ReduceIndexF(0.some))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -290,7 +290,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap](ProjectFieldR(HoleF, StrLit("height")))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))))(
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some)))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -443,7 +443,7 @@ class QScriptSpec
                 ProjectIndexR(HoleF, IntLit(2)))))),
           Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
-            ReduceIndexF(0))))))(
+            ReduceIndexF(0.some))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -632,8 +632,8 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             ProjectIndexR(HoleF, IntLit(1)))),
-          List(ReduceFuncs.Arbitrary[FreeMap](ProjectIndexR(HoleF, IntLit(1)))),
-          ReduceIndexF(0))))(
+          Nil,
+          ProjectIndexR(ReduceIndexF(None), IntLit(0)))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -681,7 +681,7 @@ class QScriptSpec
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
           List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(DeleteField(ReduceIndexF(0), StrLit("__sd__0"))))))(
+          Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -731,8 +731,8 @@ class QScriptSpec
                   StrLit("city")),
                 Free.roll(Undefined()))))),
           Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0))),
-            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1))))))))(
+            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0.some))),
+            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1.some))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -777,7 +777,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           NullLit(),
           List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
-          ReduceIndexF(0))))(
+          ReduceIndexF(0.some))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -866,8 +866,8 @@ class QScriptSpec
               HoleF,
               Free.roll(Undefined()))))),
           Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0))),
-            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1))))))))(
+            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0.some))),
+            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1.some))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
 
     }
