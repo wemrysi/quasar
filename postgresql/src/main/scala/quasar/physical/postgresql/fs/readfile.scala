@@ -32,7 +32,7 @@ import scalaz.stream.Process
 
 object readfile {
 
-  implicit val codec = DataCodec.Precise
+  implicit val codec: DataCodec = DataCodec.Precise
 
   def interpret[S[_]](
     implicit

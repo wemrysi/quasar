@@ -63,7 +63,7 @@ object queryfile {
     def liftPE[S[_]]: Plan[S, A] = d.leftMap(FileSystemError.qscriptPlanningFailed(_)).liftFE
   }
 
-  implicit val codec = CBDataCodec
+  implicit val codec: DataCodec = CBDataCodec
 
   val jsonTranscoder = new JsonTranscoder
 

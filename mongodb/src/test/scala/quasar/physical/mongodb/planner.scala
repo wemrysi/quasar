@@ -3311,6 +3311,37 @@ class PlannerSpec extends
             IgnoreId)))
     }
 
+    "plan count of $lookup" in {
+      plan3_2(
+        "select tp._id, count(*) from `zips` as tp join `largeZips` as ti on tp._id = ti.TestProgramId group by tp._id",
+        defaultStats,
+        indexes()) must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "largeZips")),
+        $match(Selector.Doc(
+          BsonField.Name("TestProgramId") -> Selector.Exists(true))),
+        $project(reshape("right" -> $$ROOT), IgnoreId),
+        $lookup(
+          CollectionName("zips"),
+          JoinHandler.RightName \ BsonField.Name("TestProgramId"),
+          BsonField.Name("_id"),
+          JoinHandler.LeftName),
+        $unwind(DocField(JoinHandler.LeftName)),
+        $group(
+          grouped("1" -> $sum($literal(Bson.Int32(1)))),
+          -\/(reshape("0" -> $cond(
+            $and(
+              $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+              $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+            $field(JoinDir.Left.name, "_id"),
+            $literal(Bson.Undefined))))),
+        $project(
+          reshape(
+            "_id" -> $field("_id", "0"),
+            "1"   -> $include),
+          IgnoreId)))
+    }
+
     "plan join with multiple conditions" in {
       plan("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
       beWorkflow(
