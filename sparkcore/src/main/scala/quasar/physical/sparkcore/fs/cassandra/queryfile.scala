@@ -21,7 +21,7 @@ import quasar.effect._
 import quasar.contrib.pathy._
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
-import quasar.fs._, 
+import quasar.fs._,
   FileSystemError._, 
   PathError._
 
@@ -74,37 +74,42 @@ object queryfile {
 
   def listContents[S[_]](d: ADir)(implicit
     read: Read.Ops[SparkContext, S]
-    ): Free[S, FileSystemError \/ Set[PathSegment]] = read.asks { sc =>
+  ): Free[S, FileSystemError \/ Set[PathSegment]] = 
+    read.asks { sc =>
       CassandraConnector(sc.getConf).withSessionDo{ implicit session =>
-        if(d == rootDir) {
-          sc.cassandraTable[String]("system_schema", "keyspaces")
+
+        val k = keyspace(d)
+        val dirsRDD = sc.cassandraTable[String]("system_schema", "keyspaces")
             .select("keyspace_name")
             .filter(!_.startsWith("system"))
+            .filter(_.startsWith(k))
             .map { kspc =>
-              DirName(kspc).left[FileName]
-            }.collect.toSet
-          .right[FileSystemError]
-        } else if(keyspaceExists(keyspace(d))){
-          val files = sc.cassandraTable[String]("system_schema", "tables")
+              val dir = kspc.replace(k, "").split("_")(0)
+              DirName(dir)
+            }
+
+        if(dirsRDD.count() > 0) {
+         val files = if(k.length > 0 && keyspaceExists(k)) {
+           sc.cassandraTable[String]("system_schema", "tables")
             .select("table_name")
             .where("keyspace_name = ?", keyspace(d))
             .map { table =>
               FileName(table).right[DirName]
             }.collect.toSet
-          val ks = keyspace(d)
-          val dirs = sc.cassandraTable[String]("system_schema", "keyspaces")
-            .select("keyspace_name")
-            .filter(k => k.startsWith(ks))
-            .map { name =>
-              name.replace(ks,"").split("_")(0)
-            }
-            .filter(_.length > 0)
+
+        } else {
+          Set[PathSegment]()
+        } 
+
+          val dirs = dirsRDD.filter(_.value.length > 0)
+            .map(_.left[FileName])
             .collect.toSet
-            .map { kspc =>
-              DirName(kspc).left[FileName]
-            }
+
           (files ++ dirs).right[FileSystemError]
-        } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
+        }else{
+          pathErr(pathNotFound(d)).left[Set[PathSegment]] 
+        }
+
       }
     }
 

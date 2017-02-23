@@ -22,7 +22,7 @@ import quasar.connector.EnvironmentError
 import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.TaskRef
-import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle
+import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, FileSystemDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
 
@@ -41,9 +41,10 @@ package object cassandra {
 
 	type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
-  type Eff1[A] = Coproduct[Task, Eff0, A]
-  type Eff2[A] = Coproduct[PhysErr, Eff1, A]
-  type Eff[A]  = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff0, A]
+  type Eff2[A] = Coproduct[Task, Eff1, A]
+  type Eff3[A] = Coproduct[PhysErr, Eff2, A]
+  type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
 
 	final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
@@ -86,12 +87,14 @@ package object cassandra {
     lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
+      TaskRef(Map.empty[WriteHandle, AFile]) |@|
       genSc) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, sc) =>
+      (genState, rddStates, sparkCursors, writehandlers, sc) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
+      (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])

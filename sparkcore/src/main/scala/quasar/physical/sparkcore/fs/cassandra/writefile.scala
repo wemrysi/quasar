@@ -33,14 +33,16 @@ import scalaz._, Scalaz._
 object writefile {
 
   def chrooted[S[_]](prefix: ADir)(implicit
-    s0: MonotonicSeq :<: S,
-    s1: Read.Ops[SparkContext, S]
+    s0: KeyValueStore.Ops[WriteHandle, AFile, S],
+    s1: MonotonicSeq :<: S,
+    s2: Read.Ops[SparkContext, S]
   ) : WriteFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.writeFile[WriteFile](prefix)
 
   def interpret[S[_]](implicit 
-    s0: MonotonicSeq :<: S,
-    s1: Read.Ops[SparkContext, S]
+    s0: KeyValueStore.Ops[WriteHandle, AFile, S],
+    s1: MonotonicSeq :<: S,
+    s2: Read.Ops[SparkContext, S]
     ): WriteFile ~> Free[S, ?] = {
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wr: WriteFile[A]): Free[S, A] = wr match {
@@ -52,13 +54,16 @@ object writefile {
   }
 
   def open[S[_]](file: AFile)(implicit 
+    writers: KeyValueStore.Ops[WriteHandle, AFile, S],
     gen: MonotonicSeq.Ops[S],
     s1: Read.Ops[SparkContext, S]
     ): Free[S, FileSystemError \/ WriteHandle] = 
     for {
       id <- gen.next
       _ <- create(file)
-    } yield (WriteHandle(file, id).right)
+      wh = WriteHandle(file, id)
+      _ <- writers.put(wh, file)
+    } yield (wh.right)
 
   def create[S[_]](file: AFile)(implicit
     read: Read.Ops[SparkContext, S]
@@ -102,29 +107,45 @@ object writefile {
     session.execute(stmt.bind(data))
   }
 
-  def write[S[_]](handle: WriteHandle, data: Vector[Data])(implicit
+  def write[S[_]](handle: WriteHandle, chunks: Vector[Data])(implicit
+    writers: KeyValueStore.Ops[WriteHandle, AFile, S],
     read: Read.Ops[SparkContext, S]
-    ): Free[S, Vector[FileSystemError]] = 
-  read.asks{ sc =>
-    implicit val codec = DataCodec.Precise
-    val textChunk: Vector[(DataEncodingError \/ String, Data)] = data.map(d => (DataCodec.render(d), d))
+  ): Free[S, Vector[FileSystemError]] = for {
+    maybeAFile <- writers.get(handle).run
+    vectors <- read.asks {
+      sc =>
+
+      implicit val codec = DataCodec.Precise
+
+      def _write(file: AFile) : Vector[FileSystemError] = {
+        val textChunk: Vector[(String, Data)] =
+          chunks.map(d => DataCodec.render(d) strengthR d).unite
       
-    CassandraConnector(sc.getConf).withSessionDo {implicit session =>
-      if(!tableExists(keyspace(handle.file), tableName(handle.file))) {
-        Vector(unknownWriteHandle(handle))
-      } else {
-        textChunk.flatMap {
-          case (text,data) => 
-            \/.fromTryCatchNonFatal{
-              insertData(keyspace(handle.file), tableName(handle.file), text)
-            }.fold(
-              ex => Vector(writeFailed(data, ex.getMessage)),
-              u => Vector.empty[FileSystemError]
-            )
+        CassandraConnector(sc.getConf).withSessionDo {implicit session =>
+          if(!tableExists(keyspace(file), tableName(file))) {
+            Vector(unknownWriteHandle(handle))
+          } else {
+            textChunk.flatMap {
+              case (text,data) => 
+                \/.fromTryCatchNonFatal{
+                  insertData(keyspace(handle.file), tableName(handle.file), text)
+                }.fold(
+                  ex => Vector(writeFailed(data, ex.getMessage)),
+                  u => Vector.empty[FileSystemError]
+                )
+            }
+          }
         }
       }
-    }
-  }
 
-  def close[S[_]](handle: WriteHandle): Free[S, Unit] = ().point[Free[S, ?]]
+      maybeAFile.map(_write).getOrElse(
+        Vector[FileSystemError](unknownWriteHandle(handle))
+      )
+    }
+  } yield vectors
+
+  def close[S[_]](handle: WriteHandle)(implicit
+    writers: KeyValueStore.Ops[WriteHandle, AFile, S]
+  ): Free[S, Unit] = 
+    writers.delete(handle)
 }

@@ -15,10 +15,11 @@
  */
 
 package quasar.physical.sparkcore.fs.cassandra
-
+/*
 import quasar.Predef._
 import quasar.Data
 import quasar.effect._
+import quasar.contrib.pathy._
 import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._, WriteFile.WriteHandle
@@ -27,10 +28,11 @@ import org.apache.spark._
 import pathy._, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
+ */
 class CassandraWritefileSpec extends quasar.Qspec {
 
-	type Eff[A] = Coproduct[MonotonicSeq, Read[SparkContext, ?], A]
+/*	type Eff0[A] = Coproduct[KeyValueStore.Ops[WriteHandle, AFile, ?], Read[SparkContext, ?], A]
+	type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
 
 	"writefile" should {
 
@@ -93,5 +95,5 @@ class CassandraWritefileSpec extends quasar.Qspec {
 
   private def user(login: String, age: Int) =
     Data.Obj(ListMap("login" -> Data.Str(login), "age" -> Data.Int(age)))
-	
+ */	
 }

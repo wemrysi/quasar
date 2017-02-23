@@ -57,7 +57,8 @@ package object main {
     postgresql.fs.definition[PhysFsEff],
     skeleton.fs.definition[PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
-    sparkcore.fs.local.definition[PhysFsEff]
+    sparkcore.fs.local.definition[PhysFsEff],
+    sparkcore.fs.cassandra.definition[PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which
