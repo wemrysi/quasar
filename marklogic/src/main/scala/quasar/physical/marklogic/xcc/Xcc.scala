@@ -30,9 +30,7 @@ import com.marklogic.xcc.exceptions._
 import com.marklogic.xcc.types.XdmItem
 import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.stream.Process
-import simulacrum.typeclass
 
-@typeclass
 trait Xcc[F[_]] extends MonadError_[F, XccError] {
   /** Returns the most recent system commit timestamp. */
   def currentServerPointInTime: F[BigInt]
@@ -74,7 +72,15 @@ trait Xcc[F[_]] extends MonadError_[F, XccError] {
     MainModule(Version.`1.0-ml`, ISet.empty, query)
 }
 
-object Xcc extends XccInstances
+object Xcc extends XccInstances {
+  def apply[F[_]](implicit instance: Xcc[F]): Xcc[F] = instance
+
+  object ops {
+    implicit final class XccOps[F[_], A](val self: F[A])(implicit F: Xcc[F]) {
+      def transact: F[A] = F.transact(self)
+    }
+  }
+}
 
 sealed abstract class XccInstances extends XccInstances0 {
   implicit def defaultXcc[F[_]: Monad: Capture: Catchable: SessionReader: CSourceReader]: Xcc[F] =
