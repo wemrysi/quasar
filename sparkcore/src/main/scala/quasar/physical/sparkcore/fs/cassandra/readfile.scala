@@ -24,17 +24,19 @@ import quasar.physical.sparkcore.fs.readfile.Input
 
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
-import pathy.Path.{ fileParent, posixCodec }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._
 import scalaz.concurrent.Task
+import pathy.Path.fileParent
 
 object readfile {
 
+  import common._
+
   def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[String]] =
     read.asks { sc =>
-      sc.cassandraTable[String](keyspace(f), tableName(f))
+      sc.cassandraTable[String](keyspace(fileParent(f)), tableName(f))
         .select("data")
         .zipWithIndex()
         .filter {
@@ -51,8 +53,7 @@ object readfile {
     read.asks { sc =>
       val connector = CassandraConnector(sc.getConf)
       connector.withSessionDo { implicit session =>
-        val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-        session.execute(stmt.bind(keyspace(f), tableName(f))).all().size() > 0
+        tableExists(keyspace(fileParent(f)), tableName(f))
       }
     }
 
@@ -65,11 +66,5 @@ object readfile {
       rddFrom(_, _, _),
       fileExists(_),
       readChunkSize _)
-
-  private def keyspace(file: AFile) =
-    posixCodec.printPath(fileParent(file)).substring(1).replace("/", "_")
-
-  private def tableName(file: AFile) =
-    posixCodec.printPath(file).split("/").reverse(0)
 
 }

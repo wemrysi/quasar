@@ -28,7 +28,6 @@ import quasar.fs._,
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import com.datastax.spark.connector._
-import com.datastax.driver.core.Session
 import com.datastax.spark.connector.cql.CassandraConnector
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -36,6 +35,8 @@ import pathy.Path._
 
 
 object queryfile {
+
+  import common._
 
   def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
     sc.cassandraTable[String](keyspace(fileParent(file)), tableName(file))
@@ -52,12 +53,11 @@ object queryfile {
 
       connector.withSessionDo { implicit session =>
         val k = if(!keyspaceExists(ks)) {
-          session.execute(s"CREATE KEYSPACE $ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+          createKeyspace(ks)
         }
 
-
-        if(!tableExists(ks, tb)){
-            val u = session.execute(s"CREATE TABLE $ks.$tb (id timeuuid PRIMARY KEY, data text);")
+        val u = if(!tableExists(ks, tb)){
+          createTable(ks, tb)
         }
         rdd.flatMap(data =>
           DataCodec.render(data)(DataCodec.Precise).toList).collect().foreach (v => insertData(ks, tb, v))
@@ -119,26 +119,5 @@ object queryfile {
     read: Read.Ops[SparkContext, S]
   ): Input[S] = 
     Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
-
-  private def insertData(keyspace: String, table: String, data: String)(implicit session: Session) = {
-    val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
-    session.execute(stmt.bind(data))
-  }
-
-  private def keyspace(dir: ADir) =
-    posixCodec.printPath(dir).substring(1).replace("/", "_")
-
-  private def tableName(file: AFile) =
-    posixCodec.printPath(file).split("/").reverse(0)
-
-  private def keyspaceExists(keyspace: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
-    session.execute(stmt.bind(keyspace)).all().size() > 0
-  }
-
-  private def tableExists(keyspace: String, table: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-    session.execute(stmt.bind(keyspace, table)).all().size() > 0
-  }
 
 }

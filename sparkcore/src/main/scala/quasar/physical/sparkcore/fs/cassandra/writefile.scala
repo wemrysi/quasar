@@ -24,13 +24,13 @@ import quasar.fs._, WriteFile._, FileSystemError._
 import quasar.fp.free._
 
 import org.apache.spark.SparkContext
-import com.datastax.driver.core.Session
 import com.datastax.spark.connector.cql.CassandraConnector
-import pathy.Path.{ fileParent, posixCodec }
+import pathy.Path.fileParent
 import scalaz._, Scalaz._
 
-
 object writefile {
+
+  import common._
 
   def chrooted[S[_]](prefix: ADir)(implicit
     s0: KeyValueStore.Ops[WriteHandle, AFile, S],
@@ -71,41 +71,14 @@ object writefile {
     read.asks { sc =>
       val connector = CassandraConnector(sc.getConf)
       connector.withSessionDo { implicit session =>
-        val k = if(!keyspaceExists(keyspace(file))) {
-          session.execute(s"CREATE KEYSPACE ${keyspace(file)} WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        val k = if(!keyspaceExists(keyspace(fileParent(file)))) {
+          createKeyspace(keyspace(fileParent(file)))
         }
 
-        val t = if(!tableExists(keyspace(file), tableName(file)))
-          createTable(keyspace(file), tableName(file))
-
-          ()
+        val t = if(!tableExists(keyspace(fileParent(file)), tableName(file)))
+          createTable(keyspace(fileParent(file)), tableName(file))
       }
     }
-
-  private def keyspace(file: AFile) =
-    posixCodec.printPath(fileParent(file)).substring(1).replace("/", "_")
-
-  private def tableName(file: AFile) =
-    posixCodec.printPath(file).split("/").reverse(0)
-
-  private def keyspaceExists(keyspace: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
-    session.execute(stmt.bind(keyspace)).all().size() > 0
-  }
-
-  private def tableExists(keyspace: String, table: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-    session.execute(stmt.bind(keyspace, table)).all().size() > 0
-  }
-
-  private def createTable(keyspace: String, table: String)(implicit session: Session) = {
-    session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
-  }
-
-  private def insertData(keyspace: String, table: String, data: String)(implicit session: Session) = {
-    val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
-    session.execute(stmt.bind(data))
-  }
 
   def write[S[_]](handle: WriteHandle, chunks: Vector[Data])(implicit
     writers: KeyValueStore.Ops[WriteHandle, AFile, S],
@@ -122,13 +95,13 @@ object writefile {
           chunks.map(d => DataCodec.render(d) strengthR d).unite
       
         CassandraConnector(sc.getConf).withSessionDo {implicit session =>
-          if(!tableExists(keyspace(file), tableName(file))) {
+          if(!tableExists(keyspace(fileParent(file)), tableName(file))) {
             Vector(unknownWriteHandle(handle))
           } else {
             textChunk.flatMap {
               case (text,data) => 
                 \/.fromTryCatchNonFatal{
-                  insertData(keyspace(handle.file), tableName(handle.file), text)
+                  insertData(keyspace(fileParent(handle.file)), tableName(handle.file), text)
                 }.fold(
                   ex => Vector(writeFailed(data, ex.getMessage)),
                   u => Vector.empty[FileSystemError]

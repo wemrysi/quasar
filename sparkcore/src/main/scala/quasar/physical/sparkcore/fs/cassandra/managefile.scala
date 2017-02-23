@@ -36,6 +36,8 @@ import scalaz._, Scalaz._
 
 object managefile {
 
+  import common._
+
   def chrooted[S[_]](prefix: ADir)(implicit
     s0: Read.Ops[SparkContext, S]
   ): ManageFile ~> Free[S, ?] =
@@ -62,8 +64,9 @@ object managefile {
     ): Free[S, Boolean] = 
     read.asks { sc =>
       CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        val aDir: ADir = refineType(path).fold(d => d, fileParent(_))
         maybeFile(path)
-          .fold(keyspaceExists(keyspace(path)))(file => tableExists(keyspace(fileParent(file)), tableName(file)))
+          .fold(keyspaceExists(keyspace(aDir)))(file => tableExists(keyspace(fileParent(file)), tableName(file)))
     }
   }
 
@@ -81,7 +84,7 @@ object managefile {
     val connector = CassandraConnector(sc.getConf)
     val u = connector.withSessionDo { implicit session =>
       val u1 = if(!keyspaceExists(dks)){
-        session.execute(s"CREATE KEYSPACE $dks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        createKeyspace(dks)
       }
       if(tableExists(dks, dft)) {
         dropTable(dks, dft)
@@ -131,7 +134,8 @@ object managefile {
     }
 
   def deleteDir(dir: APath, sc: SparkContext)(implicit session: Session) = {  
-    val ks = keyspace(dir)
+    val aDir: ADir = refineType(dir).fold(d => d, fileParent(_))
+    val ks = keyspace(aDir)
     val dirs = sc.cassandraTable[String]("system_schema","keyspaces").select("keyspace_name")
       .filter(_.startsWith(ks))
       .collect.toSet
@@ -148,43 +152,9 @@ object managefile {
     read: Read.Ops[SparkContext, S]
     ): Free[S, FileSystemError \/ AFile] = 
     read.asks { sc =>
-      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        val randomFileName = s"q${scala.math.abs(scala.util.Random.nextInt(9999))}"
-        val aDir: ADir = refineType(near).fold(d => d, fileParent(_))
-//        if (keyspaceExists(keyspace(near))) {
-//          val r = createTable(keyspace(near), randomFileName)
-          (aDir </> file(randomFileName)).right[FileSystemError]
- //       } else {
-  //        pathErr(pathNotFound(near)).left[AFile]
-  //      }
-      }
+      val randomFileName = s"q${scala.math.abs(scala.util.Random.nextInt(9999))}"
+      val aDir: ADir = refineType(near).fold(d => d, fileParent(_))
+      (aDir </> file(randomFileName)).right[FileSystemError]
     }
 
-  private def keyspace(dir: APath) =
-    posixCodec.printPath(dir).substring(1).replace("/", "_")
-
-  private def tableName(file: APath) =
-    posixCodec.printPath(file).split("/").reverse(0)
-
-  private def keyspaceExists(keyspace: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
-    session.execute(stmt.bind(keyspace)).all().size() > 0
-  }
-
-  private def tableExists(keyspace: String, table: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-    session.execute(stmt.bind(keyspace, table)).all().size() > 0
-  }
-
-  private def dropKeyspace(keyspace: String)(implicit session: Session) = {
-    session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
-  }
-
-  private def dropTable(keyspace: String, table: String)(implicit session: Session) = {
-    session.execute(s"DROP TABLE $keyspace.$table;")
-  }
-
-  private def createTable(keyspace: String, table: String)(implicit session: Session) = {
-    session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
-  }
 }
