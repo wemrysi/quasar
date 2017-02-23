@@ -162,10 +162,10 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
  
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
         // TODO: folder filenames have been shortened to workaround PostgreSQL table name length restriction — revisit
-        val pnt = managePrefix </> dir("sd1846")
-        val uf1 = pnt </> dir("uf")   </> file("one")
-        val uf2 = pnt </> dir("uf1") </> file("two")
-        val uf3 = pnt </> dir("uf2") </> file("three")
+        val pnt = managePrefix </> dir("SD1846")
+        val uf1 = pnt </> dir("UF")   </> file("one")
+        val uf2 = pnt </> dir("UF1") </> file("two")
+        val uf3 = pnt </> dir("UF2") </> file("three")
 
         val thirdDoc: Vector[Data] =
           Vector(Data.Obj(ListMap("c" -> Data.Int(1))))

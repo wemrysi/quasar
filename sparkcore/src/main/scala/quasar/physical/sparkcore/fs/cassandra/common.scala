@@ -25,10 +25,10 @@ import com.datastax.driver.core.Session
 object common {
 
   def keyspace(dir: ADir) =
-    posixCodec.printPath(dir).substring(1).replace("/", "_")
+    posixCodec.printPath(dir).substring(1).replace("/", "_").toLowerCase
 
   def tableName(file: AFile) =
-    posixCodec.printPath(file).split("/").reverse(0)
+    posixCodec.printPath(file).split("/").reverse(0).toLowerCase
 
   def keyspaceExists(keyspace: String)(implicit session: Session) = {
     val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
