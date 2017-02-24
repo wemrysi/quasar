@@ -64,9 +64,10 @@ object managefile {
     ): Free[S, Boolean] = 
     read.asks { sc =>
       CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        val aDir: ADir = refineType(path).fold(d => d, fileParent(_))
-        maybeFile(path)
-          .fold(keyspaceExists(keyspace(aDir)))(file => tableExists(keyspace(fileParent(file)), tableName(file)))
+        refineType(path).fold(
+          d => keyspaceExists(keyspace(d)),
+          f => tableExists(keyspace(fileParent(f)), tableName(f))
+        )
     }
   }
 
