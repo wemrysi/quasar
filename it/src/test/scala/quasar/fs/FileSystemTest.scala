@@ -156,6 +156,7 @@ object FileSystemTest {
       fsTestConfig(sparkcore.fs.local.FsType,      sparkcore.fs.local.definition)     orElse
       fsTestConfig(sparkcore.fs.cassandra.FsType,  sparkcore.fs.cassandra.definition)
   }
+  }
 
   def localFsUT: Task[IList[SupportedFs[FileSystem]]] =
     (inMemUT |@| hierarchicalUT |@| nullViewUT) { (mem, hier, nullUT) =>

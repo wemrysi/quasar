@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs.cassandra
 
 import quasar.Predef._
 import quasar.effect._
+import quasar.fp.ski._
 import quasar.contrib.pathy._
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
@@ -38,9 +39,12 @@ object queryfile {
 
   import common._
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
     sc.cassandraTable[String](keyspace(fileParent(file)), tableName(file))
       .select("data")
+      .map{ raw =>
+        DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
+      }
   }
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit 

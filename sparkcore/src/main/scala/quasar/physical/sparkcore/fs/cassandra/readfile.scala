@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@
 package quasar.physical.sparkcore.fs.cassandra
 
 import quasar.Predef._
+import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect.Read
+import quasar.fp.ski._
 import quasar.physical.sparkcore.fs.readfile.{ Offset, Limit }
 import quasar.physical.sparkcore.fs.readfile.Input
 
@@ -34,18 +36,21 @@ object readfile {
 
   import common._
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[String]] =
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
     read.asks { sc =>
       sc.cassandraTable[String](keyspace(fileParent(f)), tableName(f))
         .select("data")
+        .map{raw =>
+          DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
+        }
         .zipWithIndex()
         .filter {
           case (value, index) =>
             maybeLimit.fold(
               index >= offset.get)(
                 limit => index >= offset.get && index < limit.get + offset.get)
-        }.map {
-          case (value, index) => value
+        // }.map {
+          // case (value, index) => value
         }
     }
 

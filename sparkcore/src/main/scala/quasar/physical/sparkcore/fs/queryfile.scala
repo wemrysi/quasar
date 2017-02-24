@@ -49,7 +49,7 @@ object queryfile {
   type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
 
   final case class Input[S[_]](
-    fromFile: (SparkContext, AFile) => Task[RDD[String]],
+    fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Free[S, Unit],
     fileExists: AFile => Free[S, Boolean],
     listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
