@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
 import quasar.contrib.pathy._
+import quasar.contrib.pathy.order._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp._, eitherT._
@@ -86,7 +87,7 @@ object queryfile {
           .transact
 
       val resultFile = for {
-        xqy <- lpToXQuery[QG, Fix, FMT](lp)
+        xqy <- lpToXQuery[QG, Fix, FMT](lp) map (_._1)
         mm  <- saveResults(xqy)
         _   <- liftQG(deleteOutIfExists)
         _   <- liftQG(Xcc[G].execute(mm))
@@ -96,15 +97,15 @@ object queryfile {
     }
 
     def eval(lp: Fix[LogicalPlan]) =
-      lpToXQuery[QG, Fix, FMT](lp).map(main =>
+      lpToXQuery[QG, Fix, FMT](lp).map({ case (main, _) =>
         Xcc[F].evaluate(main)
           .chunk(chunkSize.get.toInt)
           .map(_ traverse xdmitem.decodeForFileSystem)
-      ).run.run
+      }).run.run
 
     def explain(lp: Fix[LogicalPlan]) =
       lpToXQuery[QG, Fix, FMT](lp)
-        .map(main => ExecutionPlan(FsType, main.render))
+        .map({ case (main, ipt) => ExecutionPlan(FsType, main.render, ipt) })
         .run.run
 
     def listContents(dir: ADir) =
@@ -123,7 +124,7 @@ object queryfile {
     lp: T[LogicalPlan]
   )(implicit
     planner: Planner[F, FMT, MLQScript[T, ?]]
-  ): F[MainModule] = {
+  ): F[(MainModule, ISet[APath])] = {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
 
@@ -150,6 +151,7 @@ object queryfile {
                      N.normalizeF(_: MLQ[T[MLQ]]))))
       _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
       main    <- plan(optmzed)
+      inputs  =  optmzed.cata(ExtractPath[MLQ, APath].extractPath[DList])
       pp      <- prettyPrint[F](main.queryBody)
       xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
       _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
@@ -157,7 +159,7 @@ object queryfile {
       //     returned for nicer error messages, we cannot as xdmp:pretty-print has
       //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,
       //     causing them to be malformed.
-    } yield main
+    } yield (main, ISet fromFoldable inputs)
   }
 
   def prettyPrint[F[_]: Monad: MonadFsErr: Xcc](xqy: XQuery): F[Option[XQuery]] = {

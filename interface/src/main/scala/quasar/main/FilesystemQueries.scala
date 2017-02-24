@@ -86,6 +86,6 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   ): CompExecM[ExecutionPlan] =
     compToCompExec(queryPlan(query, vars, basePath, Nil, 0L, None))
       .flatMap(lp => execToCompExec(lp.fold(
-        κ(ExecutionPlan(FileSystemType("none"), "Constant").point[ExecM]),
+        κ(ExecutionPlan(FileSystemType("none"), "Constant", ISet.empty).point[ExecM]),
         Q.explain(_))))
 }

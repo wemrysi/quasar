@@ -201,10 +201,13 @@ object InMemory {
 
     private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
       queryResponsesL.st map (qrs =>
-        Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).description)))
+        Vector(PhaseResult.detail("Lookup in Memory", executionPlan(lp, qrs).physicalPlan)))
 
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
-      ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
+      ExecutionPlan(
+        FileSystemType("in-memory"),
+        s"Lookup $lp in $queries",
+        lpr.absolutePaths(lp))
 
     private val optimizer = new Optimizer[Fix[LogicalPlan]]
 
@@ -260,6 +263,8 @@ object InMemory {
     runStatefully(initial).map(_ compose fileSystem)
 
   ////
+
+  private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
   private def tmpName(n: Long) = s"__quasar.gen_$n"
 

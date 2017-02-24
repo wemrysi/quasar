@@ -39,7 +39,7 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
     "com.slamdata"               %% "matryoshka-core"           %     "0.16.4",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
-    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
+    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
