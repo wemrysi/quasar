@@ -114,11 +114,11 @@ sealed abstract class GenericFunc[N <: Nat] {
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
     Invoke[N, A](this, args)
 
-  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
-    untyper0((domain, codomain), tpe)
-
   final def tpe(args: Func.Domain[N]): Func.VCodomain =
     typer0(args)
+
+  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
+    untyper0((domain, codomain), tpe)
 
   final def arity: Int = domain.length
 }
