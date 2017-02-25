@@ -247,7 +247,7 @@ class PrettifySpecs extends quasar.Qspec {
       // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
       // and although it would appear to work for a human observer,
       // the runtime instances are not found to be "equal" which is breaking tests
-      (isFlat(data) && r ≠ "" && !Data._interval.isMatching(data)) ==> {
+      (isFlat(data) && r ≠ "" && !Data._interval.nonEmpty(data)) ==> {
         parse(r).map(render(_).value) must beSome(r)
       }
       // Test will sometimes fail due to to many generator failures without this

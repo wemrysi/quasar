@@ -83,7 +83,7 @@ sealed abstract class CommonInstances0 {
     arr.getOption(c) ,
     bool.getOption(c),
     dec.getOption(c) ,
-    nul.isMatching(c),
+    nul.nonEmpty(c),
     str.getOption(c)
   )
 }

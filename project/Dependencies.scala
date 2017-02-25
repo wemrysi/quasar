@@ -5,6 +5,7 @@ import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
+import slamdata.CommonDependencies
 
 object Dependencies {
   // RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
@@ -17,7 +18,7 @@ object Dependencies {
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
-  private val monocleVersion    = "1.3.2"
+  private val monocleVersion    = CommonDependencies.monocleVersion
   private val pathyVersion      = "0.2.9"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.6.2"   // waiting for a stable release with fix for fthomas/refined#256

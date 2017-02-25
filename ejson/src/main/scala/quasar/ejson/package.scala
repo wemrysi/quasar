@@ -86,6 +86,6 @@ package object ejson {
       ExtEJson.inj(_).embed
 
     def isNull[T](ej: T)(implicit T: Recursive.Aux[T, EJson]): Boolean =
-      CommonEJson.prj(ej.project) exists (nul.isMatching(_))
+      CommonEJson.prj(ej.project) exists (nul.nonEmpty(_))
   }
 }

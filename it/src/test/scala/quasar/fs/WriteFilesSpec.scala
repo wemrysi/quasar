@@ -66,7 +66,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
         r.run.map { xs =>
           D.right
             .composeOptional(vectorFirst[FileSystemError])
-            .composePrism(unknownWriteHandle) isMatching (xs) must beTrue
+            .composePrism(unknownWriteHandle) nonEmpty (xs) must beTrue
         }
       }
 
