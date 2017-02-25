@@ -82,7 +82,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
           Data.Obj("c" -> Data._int(2))
         )))
       }
- 
+
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lsch")
         val d1 = d </> dir("d1")

@@ -159,7 +159,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
         runT(run)(manage.moveDir(d1, d2, MoveSemantics.FailIfExists))
           .runOption must beSome(pathErr(pathNotFound(d1)))
       }
- 
+
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
         // TODO: folder filenames have been shortened to workaround PostgreSQL table name length restriction — revisit
         val pnt = managePrefix </> dir("SD1846")
@@ -273,8 +273,8 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_ filter (_
           .map(_ relativeTo hintDir)
           .runEither must beRight(beSome[RFile])
       }
+
       step(deleteForManage(fs.setupInterpM).runVoid)
- 
     }
   }
 }

@@ -47,10 +47,10 @@ object readfile {
         .filter {
           case (value, index) =>
             maybeLimit.fold(
-              index >= offset.get)(
-                limit => index >= offset.get && index < limit.get + offset.get)
-        // }.map {
-          // case (value, index) => value
+              index >= offset.get
+            )(
+              limit => index >= offset.get && index < limit.get + offset.get
+            )
         }
     }
 
