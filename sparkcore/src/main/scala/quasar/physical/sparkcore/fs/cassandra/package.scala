@@ -109,8 +109,10 @@ package object cassandra {
       writefile.chrooted[Eff](sparkFsConf.prefix),
       managefile.chrooted[Eff](sparkFsConf.prefix))
 
-	def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
-      FileSystemDef[Free[S, ?]] =
+	def definition[S[_]](implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
         for {
@@ -123,6 +125,6 @@ package object cassandra {
                   close)
             }.liftM[DefErrT]
           }
-        }  yield res
+        } yield res
     }
 }

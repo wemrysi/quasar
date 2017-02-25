@@ -49,13 +49,11 @@ object queryfile {
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit 
     read: Read.Ops[SparkContext, S]
-    ): Free[S, Unit] = read.asks { sc =>
+  ): Free[S, Unit] = read.asks { sc =>
       val ks = keyspace(fileParent(out))
       val tb = tableName(out)
 
-      val connector = CassandraConnector(sc.getConf)
-
-      connector.withSessionDo { implicit session =>
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
         val k = if(!keyspaceExists(ks)) {
           createKeyspace(ks)
         }
@@ -64,7 +62,8 @@ object queryfile {
           createTable(ks, tb)
         }
         rdd.flatMap(data =>
-          DataCodec.render(data)(DataCodec.Precise).toList).collect().foreach (v => insertData(ks, tb, v))
+          DataCodec.render(data)(DataCodec.Precise).toList).collect().foreach (v => insertData(ks, tb, v)
+        )
       }
     }
 
@@ -93,24 +92,24 @@ object queryfile {
             }
 
         if(dirsRDD.count() > 0) {
-         val files = if(k.length > 0 && keyspaceExists(k)) {
-           sc.cassandraTable[String]("system_schema", "tables")
-            .select("table_name")
-            .where("keyspace_name = ?", keyspace(d))
-            .map { table =>
-              FileName(table).right[DirName]
-            }.collect.toSet
+          val files = if(k.length > 0 && keyspaceExists(k)) {
+            sc.cassandraTable[String]("system_schema", "tables")
+              .select("table_name")
+              .where("keyspace_name = ?", keyspace(d))
+              .map { table =>
+                FileName(table).right[DirName]
+              }.collect.toSet
 
-        } else {
-          Set[PathSegment]()
-        } 
+          } else {
+            Set[PathSegment]()
+          } 
 
           val dirs = dirsRDD.filter(_.value.length > 0)
-            .map(_.left[FileName])
-            .collect.toSet
+              .map(_.left[FileName])
+              .collect.toSet
 
           (files ++ dirs).right[FileSystemError]
-        }else{
+        } else {
           pathErr(pathNotFound(d)).left[Set[PathSegment]] 
         }
 

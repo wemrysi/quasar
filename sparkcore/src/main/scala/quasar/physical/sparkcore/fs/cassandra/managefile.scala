@@ -82,18 +82,16 @@ object managefile {
   private def moveTable(sf: AFile, df: AFile)(implicit sc: SparkContext) = {
     val dks = keyspace(fileParent(df))
     val dft = tableName(df)
-    val connector = CassandraConnector(sc.getConf)
-    val u = connector.withSessionDo { implicit session =>
+    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       val u1 = if(!keyspaceExists(dks)){
         createKeyspace(dks)
       }
-      if(tableExists(dks, dft)) {
+      val u2 = if(tableExists(dks, dft)) {
         dropTable(dks, dft)
       }
-    }
-    val rdd = sc.cassandraTable(keyspace(fileParent(sf)), tableName(sf))
-    rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = keyspace(fileParent(df)), tableName = tableName(df)))
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+      val rdd = sc.cassandraTable(keyspace(fileParent(sf)), tableName(sf))
+      rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = keyspace(fileParent(df)), tableName = tableName(df)))
+
       val r = dropTable(keyspace(fileParent(sf)), tableName(sf))
     }
   }
@@ -107,11 +105,11 @@ object managefile {
         .where("keyspace_name = ?", keyspace(sd))
         .collect.toSet
 
-        srcTables.foreach {tn: String=>
-          moveTable(sd </> file(tn), dd </> file(tn))
-        }
-      val connector = CassandraConnector(sc.getConf)
-      val u = connector.withSessionDo { implicit session =>
+      srcTables.foreach { tn =>
+        moveTable(sd </> file(tn), dd </> file(tn))
+      }
+
+      val _ = CassandraConnector(sc.getConf).withSessionDo { implicit session =>
         dropKeyspace(keyspace(sd))
       }
     }
