@@ -122,11 +122,11 @@ sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
   def applyUnsized[A](args: List[A]): Option[LP[A]] =
     args.sized[N].map(applyGeneric)
 
-  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
-    untyper0((domain, codomain), tpe)
-
   final def tpe(args: Func.Domain[N]): Func.VCodomain =
     typer0(args)
+
+  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
+    untyper0((domain, codomain), tpe)
 
   final def arity: Int = domain.length
 

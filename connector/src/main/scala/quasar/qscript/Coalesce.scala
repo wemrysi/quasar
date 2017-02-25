@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
@@ -163,8 +163,12 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   private def freeQC(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
 
-  private def freeSR(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceSR[CoEnv[Hole, QScriptTotal, ?], APath](coenvPrism[QScriptTotal, Hole]))
+  private def freeSR(branch: FreeQS): FreeQS = {
+    def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<: QScriptTotal): FreeQS =
+      freeTotal(b)(CoalesceTotal.coalesceSR[CoEnv[Hole, QScriptTotal, ?], A](coenvPrism[QScriptTotal, Hole]))
+
+    freeSR0[AFile](freeSR0[ADir](branch))
+  }
 
   private def freeEJ(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
