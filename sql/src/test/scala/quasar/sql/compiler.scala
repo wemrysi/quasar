@@ -1770,7 +1770,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
   "compile expression and functions" >> {
     val expr = parseAndAnnotateUnsafe("select FLOOR(10.4)")
-    val funcs = List(FunctionDeclF(Symbol("floor"), List(Vari("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")))
+    val funcs = List(FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")))
     val expected =
       lpf.invoke2(Subtract,
         lpf.constant(Data.Dec(10.4)),
@@ -1783,8 +1783,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   "compile expression and functions that depend on themselves" >> {
     val expr = parseAndAnnotateUnsafe("select ROUND(10.4)")
     val funcs = List(
-      FunctionDeclF(Symbol("floor"), List(Vari("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
-      FunctionDeclF(Symbol("round"), List(Vari("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
+      FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
+      FunctionDecl(CIName("round"), List(CIName("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
     val floorArgumentLP =
       lpf.invoke2(Add,
         lpf.constant(Data.Dec(10.4)),

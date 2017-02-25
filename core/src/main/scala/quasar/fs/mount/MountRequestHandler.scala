@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{None, Unit, Nil}
+import quasar.Predef._
 import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.FileSystem

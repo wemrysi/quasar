@@ -403,17 +403,17 @@ class SQLParserSpec extends quasar.Qspec {
     "parse basic let" in {
       parse("""foo := 5; foo""") must
         beRightDisjunction(
-          LetR("foo", IntLiteralR(5), IdentR("foo")))
+          LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
     }
 
     "parse nested lets" in {
       parse("""foo := 5; bar := "hello"; bar + foo""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             IntLiteralR(5),
             LetR(
-              "bar",
+              CIName("bar"),
               StringLiteralR("hello"),
               BinopR(IdentR("bar"), IdentR("foo"), Plus))))
     }
@@ -426,7 +426,7 @@ class SQLParserSpec extends quasar.Qspec {
             List(Proj(IdentR("foo"), None)),
             Some(ExprRelationAST(
               LetR(
-                "bar",
+                CIName("bar"),
                 IntLiteralR(12),
                 IdentR("baz")),
               "quag")),
@@ -439,7 +439,7 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := (1,2,3); select * from foo""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             SetLiteralR(
               List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
@@ -455,7 +455,7 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := (1,2,3); select foo from bar""") must
         beRightDisjunction(
           LetR(
-            "foo",
+            CIName("foo"),
             SetLiteralR(
               List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
             SelectR(
@@ -471,7 +471,7 @@ class SQLParserSpec extends quasar.Qspec {
     "parse select inside body of let inside select" in {
       val innerLet =
         LetR(
-          "foo",
+          CIName("foo"),
           SetLiteralR(
             List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
           SelectR(

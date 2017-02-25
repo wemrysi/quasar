@@ -47,7 +47,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   }
 
   val parseAndAnnotateUnsafe: String => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
-    parseAndAnnotate(query).toOption.getOrElse(throw new RuntimeException("False assumption in test, could not parse and annotate: "))
+    parseAndAnnotate(query).valueOr(err => throw new RuntimeException(s"False assumption in test, could not parse and annotate due to underlying issue: $err"))
   }
 
   val optimizer = new Optimizer[Fix[LP]]

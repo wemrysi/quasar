@@ -22,29 +22,11 @@ import quasar.fp._
 
 import argonaut._, Argonaut._
 import matryoshka._
-import matryoshka.data.Fix
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-@Lenses final case class FunctionDeclF[BODY](name: Symbol, args: List[Vari[Nothing]], body: BODY) {
-  def transformBody[B](f: BODY => B): FunctionDeclF[B] =
-    FunctionDeclF(name, args, f(body))
-  def transformBodyM[M[_]: Monad, B](f: BODY => M[B]) =
-    f(body).map(FunctionDeclF(name, args, _))
-}
-
-object FunctionDeclF {
-  implicit def renderTreeFunctionDecl[BODY:RenderTree]: RenderTree[FunctionDeclF[BODY]] =
-    new RenderTree[FunctionDeclF[BODY]] {
-      def render(funcDec: FunctionDeclF[BODY]) =
-        NonTerminal("Function Declaration" :: Nil, Some(funcDec.name.value), List(funcDec.body.render))
-    }
-}
-
 sealed trait Sql[A]
 object Sql {
-
-  type FunctionDecl = FunctionDeclF[Fix[Sql]]
 
   implicit val equal: Delay[Equal, Sql] =
     new Delay[Equal, Sql] {
@@ -135,7 +117,7 @@ object Sql {
           case Vari(name) => Terminal("Variable" :: astType, Some(":" + name))
 
           case Let(name, form, body) =>
-            NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
+            NonTerminal("Let" :: astType, Some(name.value), ra.render(form) :: ra.render(body) :: Nil)
 
           case IntLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
           case FloatLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
@@ -192,15 +174,22 @@ object Sql {
   }
 }
 
-final case class Symbol private[sql](value: String)
+final case class CIName(value: String) {
+  override def equals(other: Any) = other match {
+    case CIName(otherValue) => otherValue.toLowerCase === value.toLowerCase
+    case _                  => false
+  }
 
-object Symbol {
-  def fromString(s: String) = new Symbol(s.toLowerCase)
+  override def hashCode: Int = value.toLowerCase.hashCode
+}
 
-  implicit val equal: Equal[Symbol] = Equal.equalA
-  implicit val shows: Show[Symbol] = Show.shows(s => s.value.toUpperCase)
+object CIName {
+  def fromString(s: String) = new CIName(s)
 
-  implicit val codec: EncodeJson[Symbol] = implicitly[EncodeJson[String]].contramap(_.value)
+  implicit val equal: Equal[CIName] = Equal.equalA
+  implicit val shows: Show[CIName] = Show.shows(s => s.value)
+
+  implicit val codec: EncodeJson[CIName] = implicitly[EncodeJson[String]].contramap(_.value)
 }
 
 @Lenses final case class Select[A] private[sql] (
@@ -226,13 +215,13 @@ object Symbol {
     extends Sql[A]
 @Lenses final case class Unop[A] private[sql] (expr: A, op: UnaryOperator) extends Sql[A]
 @Lenses final case class Ident[A] private[sql] (name: String) extends Sql[A]
-@Lenses final case class InvokeFunction[A] private[sql] (name: Symbol, args: List[A])
+@Lenses final case class InvokeFunction[A] private[sql] (name: CIName, args: List[A])
     extends Sql[A]
 @Lenses final case class Match[A] private[sql] (expr: A, cases: List[Case[A]], default: Option[A])
     extends Sql[A]
 @Lenses final case class Switch[A] private[sql] (cases: List[Case[A]], default: Option[A])
     extends Sql[A]
-@Lenses final case class Let[A](name: String, form: A, body: A) extends Sql[A]
+@Lenses final case class Let[A](ident: CIName, bindTo: A, in: A) extends Sql[A]
 @Lenses final case class IntLiteral[A] private[sql] (v: Long) extends Sql[A]
 @Lenses final case class FloatLiteral[A] private[sql] (v: Double) extends Sql[A]
 @Lenses final case class StringLiteral[A] private[sql] (v: String) extends Sql[A]

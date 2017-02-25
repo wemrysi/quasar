@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef.{Function, _}
+import quasar.Predef._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 // Needed for shapeless
@@ -130,7 +130,7 @@ sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
 
   final def arity: Int = domain.length
 
-  def toFunction[A]: Function[A, LP[A]] = new Function[A, LP[A]] {
+  def toFunction[A]: HomomorphicFunction[A, LP[A]] = new HomomorphicFunction[A, LP[A]] {
     def arity = self.arity
     def apply(args: List[A]) = self.applyUnsized(args)
   }

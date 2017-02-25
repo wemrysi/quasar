@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.sql.{Symbol, _}
+import quasar.sql._
 
 import matryoshka._
 import matryoshka.data._
@@ -39,7 +39,7 @@ object SemanticError {
     def message = s"The data '${data.shows}' did not fall within its expected domain" + hint.map(": " + _).getOrElse("")
   }
 
-  final case class FunctionNotFound(name: Symbol) extends SemanticError {
+  final case class FunctionNotFound(name: CIName) extends SemanticError {
     def message = s"The function '${name.shows}' could not be found in the standard library"
   }
   final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
@@ -66,7 +66,7 @@ object SemanticError {
   final case class MissingIndex(index: Int) extends SemanticError {
     def message = s"No element exists at array index '$index"
   }
-  final case class WrongArgumentCount(funcName: Symbol, expected: Int, actual: Int) extends SemanticError {
+  final case class WrongArgumentCount(funcName: CIName, expected: Int, actual: Int) extends SemanticError {
     def message = s"Wrong number of arguments for function '${funcName.shows}': expected $expected but found $actual"
   }
   final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {

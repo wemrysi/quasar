@@ -17,7 +17,7 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.{Data, Func, GenericFunc, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
+import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
   SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
@@ -183,7 +183,7 @@ final class Compiler[M[_], T: Equal]
 
   // CORE COMPILER
   private def compile0
-    (node: CoExpr, functionDecls: Map[Symbol, Function[T, T]])
+    (node: CoExpr, functionDecls: Map[CIName, HomomorphicFunction[T, T]])
     (implicit
       MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]])
@@ -194,79 +194,79 @@ final class Compiler[M[_], T: Equal]
     // NB: When there are multiple names for the same function, we may mark one
     //     with an `*` to indicate that it’s the “preferred” name, and others
     //     are for compatibility with other SQL dialects.
-    val functionMapping = Map[Symbol, GenericFunc[_]](
-      Symbol("count")                   -> agg.Count,
-      Symbol("sum")                     -> agg.Sum,
-      Symbol("min")                     -> agg.Min,
-      Symbol("max")                     -> agg.Max,
-      Symbol("avg")                     -> agg.Avg,
-      Symbol("arbitrary")               -> agg.Arbitrary,
-      Symbol("array_length")            -> array.ArrayLength,
-      Symbol("extract_century")         -> date.ExtractCentury,
-      Symbol("extract_day_of_month")    -> date.ExtractDayOfMonth,
-      Symbol("extract_decade")          -> date.ExtractDecade,
-      Symbol("extract_day_of_week")     -> date.ExtractDayOfWeek,
-      Symbol("extract_day_of_year")     -> date.ExtractDayOfYear,
-      Symbol("extract_epoch")           -> date.ExtractEpoch,
-      Symbol("extract_hour")            -> date.ExtractHour,
-      Symbol("extract_iso_day_of_week") -> date.ExtractIsoDayOfWeek,
-      Symbol("extract_iso_year")        -> date.ExtractIsoYear,
-      Symbol("extract_microseconds")    -> date.ExtractMicroseconds,
-      Symbol("extract_millennium")      -> date.ExtractMillennium,
-      Symbol("extract_milliseconds")    -> date.ExtractMilliseconds,
-      Symbol("extract_minute")          -> date.ExtractMinute,
-      Symbol("extract_month")           -> date.ExtractMonth,
-      Symbol("extract_quarter")         -> date.ExtractQuarter,
-      Symbol("extract_second")          -> date.ExtractSecond,
-      Symbol("extract_timezone")        -> date.ExtractTimezone,
-      Symbol("extract_timezone_hour")   -> date.ExtractTimezoneHour,
-      Symbol("extract_timezone_minute") -> date.ExtractTimezoneMinute,
-      Symbol("extract_week")            -> date.ExtractWeek,
-      Symbol("extract_year")            -> date.ExtractYear,
-      Symbol("date")                    -> date.Date,
-      Symbol("clock_timestamp")         -> date.Now, // Postgres (instantaneous)
-      Symbol("current_timestamp")       -> date.Now, // *, SQL92
-      Symbol("getdate")                 -> date.Now, // SQL Server
-      Symbol("localtimestamp")          -> date.Now, // MySQL, Postgres (trans start)
-      Symbol("now")                     -> date.Now, // MySQL, Postgres (trans start)
-      Symbol("statement_timestamp")     -> date.Now, // Postgres (statement start)
-      Symbol("transaction_timestamp")   -> date.Now, // Postgres (trans start)
-      Symbol("time")                    -> date.Time,
-      Symbol("timestamp")               -> date.Timestamp,
-      Symbol("interval")                -> date.Interval,
-      Symbol("start_of_day")            -> date.StartOfDay,
-      Symbol("time_of_day")             -> date.TimeOfDay,
-      Symbol("to_timestamp")            -> date.ToTimestamp,
-      Symbol("squash")                  -> identity.Squash,
-      Symbol("oid")                     -> identity.ToId,
-      Symbol("type_of")                 -> identity.TypeOf,
-      Symbol("between")                 -> relations.Between,
-      Symbol("where")                   -> set.Filter,
-      Symbol("distinct")                -> set.Distinct,
-      Symbol("within")                  -> set.Within,
-      Symbol("constantly")              -> set.Constantly,
-      Symbol("concat")                  -> string.Concat,
-      Symbol("like")                    -> string.Like,
-      Symbol("search")                  -> string.Search,
-      Symbol("length")                  -> string.Length,
-      Symbol("lower")                   -> string.Lower,
-      Symbol("upper")                   -> string.Upper,
-      Symbol("substring")               -> string.Substring,
-      Symbol("boolean")                 -> string.Boolean,
-      Symbol("integer")                 -> string.Integer,
-      Symbol("decimal")                 -> string.Decimal,
-      Symbol("null")                    -> string.Null,
-      Symbol("to_string")               -> string.ToString,
-      Symbol("make_object")             -> structural.MakeObject,
-      Symbol("make_array")              -> structural.MakeArray,
-      Symbol("object_concat")           -> structural.ObjectConcat,
-      Symbol("array_concat")            -> structural.ArrayConcat,
-      Symbol("delete_field")            -> structural.DeleteField,
-      Symbol("flatten_map")             -> structural.FlattenMap,
-      Symbol("flatten_array")           -> structural.FlattenArray,
-      Symbol("shift_map")               -> structural.ShiftMap,
-      Symbol("shift_array")             -> structural.ShiftArray,
-      Symbol("meta")                    -> structural.Meta)
+    val functionMapping = Map[CIName, GenericFunc[_]](
+      CIName("count")                   -> agg.Count,
+      CIName("sum")                     -> agg.Sum,
+      CIName("min")                     -> agg.Min,
+      CIName("max")                     -> agg.Max,
+      CIName("avg")                     -> agg.Avg,
+      CIName("arbitrary")               -> agg.Arbitrary,
+      CIName("array_length")            -> array.ArrayLength,
+      CIName("extract_century")         -> date.ExtractCentury,
+      CIName("extract_day_of_month")    -> date.ExtractDayOfMonth,
+      CIName("extract_decade")          -> date.ExtractDecade,
+      CIName("extract_day_of_week")     -> date.ExtractDayOfWeek,
+      CIName("extract_day_of_year")     -> date.ExtractDayOfYear,
+      CIName("extract_epoch")           -> date.ExtractEpoch,
+      CIName("extract_hour")            -> date.ExtractHour,
+      CIName("extract_iso_day_of_week") -> date.ExtractIsoDayOfWeek,
+      CIName("extract_iso_year")        -> date.ExtractIsoYear,
+      CIName("extract_microseconds")    -> date.ExtractMicroseconds,
+      CIName("extract_millennium")      -> date.ExtractMillennium,
+      CIName("extract_milliseconds")    -> date.ExtractMilliseconds,
+      CIName("extract_minute")          -> date.ExtractMinute,
+      CIName("extract_month")           -> date.ExtractMonth,
+      CIName("extract_quarter")         -> date.ExtractQuarter,
+      CIName("extract_second")          -> date.ExtractSecond,
+      CIName("extract_timezone")        -> date.ExtractTimezone,
+      CIName("extract_timezone_hour")   -> date.ExtractTimezoneHour,
+      CIName("extract_timezone_minute") -> date.ExtractTimezoneMinute,
+      CIName("extract_week")            -> date.ExtractWeek,
+      CIName("extract_year")            -> date.ExtractYear,
+      CIName("date")                    -> date.Date,
+      CIName("clock_timestamp")         -> date.Now, // Postgres (instantaneous)
+      CIName("current_timestamp")       -> date.Now, // *, SQL92
+      CIName("getdate")                 -> date.Now, // SQL Server
+      CIName("localtimestamp")          -> date.Now, // MySQL, Postgres (trans start)
+      CIName("now")                     -> date.Now, // MySQL, Postgres (trans start)
+      CIName("statement_timestamp")     -> date.Now, // Postgres (statement start)
+      CIName("transaction_timestamp")   -> date.Now, // Postgres (trans start)
+      CIName("time")                    -> date.Time,
+      CIName("timestamp")               -> date.Timestamp,
+      CIName("interval")                -> date.Interval,
+      CIName("start_of_day")            -> date.StartOfDay,
+      CIName("time_of_day")             -> date.TimeOfDay,
+      CIName("to_timestamp")            -> date.ToTimestamp,
+      CIName("squash")                  -> identity.Squash,
+      CIName("oid")                     -> identity.ToId,
+      CIName("type_of")                 -> identity.TypeOf,
+      CIName("between")                 -> relations.Between,
+      CIName("where")                   -> set.Filter,
+      CIName("distinct")                -> set.Distinct,
+      CIName("within")                  -> set.Within,
+      CIName("constantly")              -> set.Constantly,
+      CIName("concat")                  -> string.Concat,
+      CIName("like")                    -> string.Like,
+      CIName("search")                  -> string.Search,
+      CIName("length")                  -> string.Length,
+      CIName("lower")                   -> string.Lower,
+      CIName("upper")                   -> string.Upper,
+      CIName("substring")               -> string.Substring,
+      CIName("boolean")                 -> string.Boolean,
+      CIName("integer")                 -> string.Integer,
+      CIName("decimal")                 -> string.Decimal,
+      CIName("null")                    -> string.Null,
+      CIName("to_string")               -> string.ToString,
+      CIName("make_object")             -> structural.MakeObject,
+      CIName("make_array")              -> structural.MakeArray,
+      CIName("object_concat")           -> structural.ObjectConcat,
+      CIName("array_concat")            -> structural.ArrayConcat,
+      CIName("delete_field")            -> structural.DeleteField,
+      CIName("flatten_map")             -> structural.FlattenMap,
+      CIName("flatten_array")           -> structural.FlattenArray,
+      CIName("shift_map")               -> structural.ShiftMap,
+      CIName("shift_array")             -> structural.ShiftArray,
+      CIName("meta")                    -> structural.Meta)
 
     def compileCases
       (cases: List[Case[CoExpr]], default: T)
@@ -445,7 +445,7 @@ final class Compiler[M[_], T: Equal]
     }
 
     def temporalPartFunc[A](
-      name: Symbol, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
+      name: CIName, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
     ): M[T] =
       args.traverse(compile1).flatMap {
         case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
@@ -572,7 +572,7 @@ final class Compiler[M[_], T: Equal]
           })
 
       case Let(name, form, body) => {
-        val rel = ExprRelationAST(form, name)
+        val rel = ExprRelationAST(form, name.value)
         step(rel)(compile1(form).some)(compile1(body))
       }
 
@@ -662,16 +662,16 @@ final class Compiler[M[_], T: Equal]
               else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
 
       case InvokeFunction(name, args) if
-          name ≟ Symbol("date_part")  || name ≟ Symbol("temporal_part") =>
+          name ≟ CIName("date_part")  || name ≟ CIName("temporal_part") =>
         temporalPartFunc(name, args, extractFunc, (f: UnaryFunc, expr: T) => emit(f(expr).embed))
 
       case InvokeFunction(name, args) if
-          name ≟ Symbol("date_trunc") || name ≟ Symbol("temporal_trunc") =>
+          name ≟ CIName("date_trunc") || name ≟ CIName("temporal_trunc") =>
         temporalPartFunc(name, args, temporalPart, (p: TemporalPart, expr: T) => emit(TemporalTrunc(p, expr).embed))
 
       // A call to the SQL coalesce function does not map to an invocation of a function in Logical Plan
       // so here we inline the logical plan that it should produce
-      case InvokeFunction(name, args) if name ≟ Symbol("coalesce") =>
+      case InvokeFunction(name, args) if name ≟ CIName("coalesce") =>
         args match {
           case List(a1, a2) =>
             (CompilerState.freshName("c") ⊛ compile1(a1) ⊛ compile1(a2))((name, c1, c2) =>
@@ -686,7 +686,7 @@ final class Compiler[M[_], T: Equal]
         }
 
       case InvokeFunction(name, args) =>
-        val function: Option[Function[T, T]] = functionDecls.orElse(functionMapping.mapValues(_.toFunction[T].andThen(_.embed))).lift.apply(name)
+        val function: Option[HomomorphicFunction[T, T]] = functionDecls.orElse(functionMapping.mapValues(_.toFunction[T].andThen(_.embed))).lift.apply(name)
         function.cata[M[T]](
           func => args.traverse(compile1).flatMap(func.apply(_).cata(
             successfulInvoke => successfulInvoke.point[M],
@@ -723,17 +723,17 @@ final class Compiler[M[_], T: Equal]
   // TODO: This could have fewer constraints if we didn’t have to use the same
   //       Monad as `compile0`.
   def compile
-    (tree: Cofree[Sql, SA.Annotations], userFuncs: List[FunctionDeclF[Cofree[Sql, SA.Annotations]]])
+    (tree: Cofree[Sql, SA.Annotations], userFuncs: List[FunctionDecl[Cofree[Sql, SA.Annotations]]])
     (implicit
       MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]])
       : M[T] = {
-    val functions = userFuncs.foldLeftM(Map.empty[Symbol, Function[T, T]]) { (map, func) =>
+    val functions = userFuncs.foldLeftM(Map.empty[CIName, HomomorphicFunction[T, T]]) { (map, func) =>
       compile0(func.body, map).map { body =>
-        val lpFunc = new Function[T, T] {
+        val lpFunc = new HomomorphicFunction[T, T] {
           def arity = func.args.size
           def apply(args: List[T]): Option[T] = {
-            val argsMap = func.args.map(vari => scala.Symbol(vari.symbol)).zip(args).toMap
+            val argsMap = func.args.map(arg => scala.Symbol(arg.value)).zip(args).toMap
             if (func.args.size != args.size) None else lpr.bindFree(argsMap)(body).toOption
           }
         }
@@ -754,7 +754,7 @@ object Compiler {
     apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
 
   def compile[T: Equal]
-    (tree: Cofree[Sql, SA.Annotations], scope: List[FunctionDeclF[Cofree[Sql, SA.Annotations]]])
+    (tree: Cofree[Sql, SA.Annotations], scope: List[FunctionDecl[Cofree[Sql, SA.Annotations]]])
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : SemanticError \/ T =
     trampoline[T].compile(tree, scope).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
