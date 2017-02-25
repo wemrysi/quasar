@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fs._
 import quasar.fs.mount._, FileSystemDef._
 

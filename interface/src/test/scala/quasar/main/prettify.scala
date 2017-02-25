@@ -17,7 +17,7 @@
 package quasar.main
 
 import quasar._
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.RepresentableDataArbitrary._
 
 import java.time._

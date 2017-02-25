@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef.{Eq => _, _}
+import slamdata.Predef.{Eq => _, _}
 import quasar.qscript.MapFuncs._
 import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
 import quasar.{Data, DataCodec}

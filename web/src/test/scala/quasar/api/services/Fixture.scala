@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import slamdata.Predef._
 import argonaut.{JsonObject, JsonNumber, Json, Argonaut}
 import Argonaut._
 import jawn.{FContext, Facade}

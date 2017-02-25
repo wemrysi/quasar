@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.expr._

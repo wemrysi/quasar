@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs.hdfs.parquet
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 
 import java.util.{Map => JMap}

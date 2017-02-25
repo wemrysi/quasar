@@ -16,11 +16,13 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
+
+import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data._

@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xml
 
-import quasar.Predef.String
+import slamdata.Predef.String
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri

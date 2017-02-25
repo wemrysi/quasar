@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.QuasarSpecification
 import quasar.connector.EnvironmentError
 import quasar.fp.ski.κ

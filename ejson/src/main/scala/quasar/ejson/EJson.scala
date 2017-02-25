@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import quasar.Predef.{Byte => SByte, Char => SChar, Map => SMap, _}
+import slamdata.Predef.{Byte => SByte, Char => SChar, Map => SMap, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 

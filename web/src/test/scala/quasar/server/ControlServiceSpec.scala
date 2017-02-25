@@ -16,7 +16,7 @@
 
 package quasar.server
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import scala.concurrent.duration._
 import scala.collection.Seq

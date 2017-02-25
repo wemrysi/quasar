@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data => QData}
 import quasar.common.SortDir
 import quasar.qscript.{Inner, LeftOuter}

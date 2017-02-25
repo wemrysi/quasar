@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef.Boolean
+import slamdata.Predef.Boolean
 import quasar.fp.ski._
 
 import java.lang.String

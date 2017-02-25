@@ -16,13 +16,14 @@
 
 package quasar.std
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec, Qspec, Type}
 import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
 
 import java.time._
 import java.time.ZoneOffset.UTC
+import scala.collection.Traversable
 import scala.math.abs
 
 import matryoshka.data.Fix

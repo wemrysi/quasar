@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow

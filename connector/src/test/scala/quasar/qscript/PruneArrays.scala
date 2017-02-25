@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef.List
+import slamdata.Predef.List
 import quasar.common.SortDir
 import quasar.fp._
 import quasar.qscript.MapFuncs._

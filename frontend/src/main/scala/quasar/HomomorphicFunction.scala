@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 
 trait HomomorphicFunction[-A, +B] { self =>
   def arity: Int

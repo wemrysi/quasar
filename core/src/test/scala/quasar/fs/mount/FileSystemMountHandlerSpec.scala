@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.String
+import slamdata.Predef.String
 import quasar.contrib.pathy.{ADir}
 import quasar.effect._
 import quasar.fp.liftMT

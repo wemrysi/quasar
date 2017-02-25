@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef.{ -> => _, _ }
+import slamdata.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
