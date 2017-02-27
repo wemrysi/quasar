@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,11 @@ trait N1QLTraverseInstance {
       case Id(v)                   => G.point(Id(v))
       case Obj(m)                  => m.toList.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l.toMap))
       case Arr(l)                  => l.traverse(f) ∘ (Arr(_))
+      case Date(a1)                => f(a1) ∘ (Date(_))
       case Time(a1)                => f(a1) ∘ (Time(_))
       case Timestamp(a1)           => f(a1) ∘ (Timestamp(_))
       case Null()                  => G.point(Null())
+      case Unreferenced()          => G.point(Unreferenced())
       case SelectField(a1, a2)     => (f(a1) ⊛ f(a2))(SelectField(_, _))
       case SelectElem(a1, a2)      => (f(a1) ⊛ f(a2))(SelectElem(_, _))
       case Slice(a1, a2)           => (f(a1) ⊛ a2.traverse(f))(Slice(_, _))
@@ -81,8 +83,11 @@ trait N1QLTraverseInstance {
       case Ceil(a1)                => f(a1) ∘ (Ceil(_))
       case Millis(a1)              => f(a1) ∘ (Millis(_))
       case MillisToUTC(a1, a2)     => (f(a1) ⊛ a2.traverse(f))(MillisToUTC(_, _))
+      case DateAddStr(a1, a2, a3)  => (f(a1) ⊛ f(a2) ⊛ f(a3))(DateAddStr(_, _, _))
       case DatePartStr(a1, a2)     => (f(a1) ⊛ f(a2))(DatePartStr(_, _))
       case DateDiffStr(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(DateDiffStr(_, _, _))
+      case DateTruncStr(a1, a2)    => (f(a1) ⊛ f(a2))(DateTruncStr(_, _))
+      case StrToMillis(a1)         => f(a1) ∘ (StrToMillis(_))
       case NowStr()                => G.point(NowStr())
       case ArrContains(a1, a2)     => (f(a1) ⊛ f(a2))(ArrContains(_, _))
       case ArrRange(a1, a2, a3)    => (f(a1) ⊛ f(a2) ⊛ a3.traverse(f))(ArrRange(_, _, _))
@@ -99,15 +104,17 @@ trait N1QLTraverseInstance {
       case ArrAgg(a1)              => f(a1) ∘ (ArrAgg(_))
       case Union(a1, a2)           => (f(a1) ⊛ f(a2))(Union(_, _))
       case ArrFor(a1, a2, a3)      => (f(a1) ⊛ f(a2) ⊛ f(a3))(ArrFor(_, _, _))
-      case Select(v, re, ks, un, fr, gb, ob) =>
-        (re.traverse(i => f(i.expr) ∘ (ResultExpr(_, i.alias ∘ (a => Id[B](a.v))))) ⊛
-         ks.traverse(i => f(i.expr) ∘ (Keyspace  (_, i.alias ∘ (a => Id[B](a.v))))) ⊛
-         un.traverse(i => f(i.expr) ∘ (Unnest    (_, i.alias ∘ (a => Id[B](a.v))))) ⊛
-         fr.traverse(i => f(i.v)    ∘ (Filter(_)))                                  ⊛
-         gb.traverse(i => f(i.v)    ∘ (GroupBy(_)))                                 ⊛
+      case Select(v, re, ks, jn, un, lt, fr, gb, ob) =>
+        (re.traverse(i => f(i.expr) ∘ (ResultExpr(_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
+         ks.traverse(i => f(i.expr) ∘ (Keyspace  (_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
+         jn.traverse(i => f(i.pred) ∘ (LookupJoin(Id[B](i.id.v), i.alias ∘ (a => Id[B](a.v)), _, i.joinType))) ⊛
+         un.traverse(i => f(i.expr) ∘ (Unnest    (_, i.alias ∘ (a => Id[B](a.v)))))                            ⊛
+         lt.traverse(i => f(i.expr) ∘ (Binding(Id[B](i.id.v), _)))                                             ⊛
+         fr.traverse(i => f(i.v)    ∘ (Filter(_)))                                                             ⊛
+         gb.traverse(i => f(i.v)    ∘ (GroupBy(_)))                                                            ⊛
          ob.traverse(i => f(i.a)    ∘ (OrderBy   (_, i.sortDir)))
         )(
-          Select(v, _, _, _, _, _, _)
+          Select(v, _, _, _, _, _, _, _, _)
         )
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛

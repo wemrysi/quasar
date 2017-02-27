@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,23 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
+import eu.timepit.refined.auto._
 import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
+  val ns = Namespace(NSPrefix(NCName("xdmp")), NSUri("http://marklogic.com/xdmp"))
+
+  def apply(function: XQuery, params: XQuery*): XQuery =
+    XQuery(s"xdmp:apply($function, ${mkSeq(params)})")
+
+  def database(): XQuery =
+    XQuery(s"xdmp:database()")
+
   def directory(uri: XQuery, depth: XQuery): XQuery =
     XQuery(s"xdmp:directory($uri, $depth)")
 
@@ -33,14 +43,11 @@ object xdmp {
   def directoryDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:directory-delete($uri)")
 
-  def directoryProperties(uri: XQuery, depth: XQuery): XQuery =
-    XQuery(s"xdmp:directory-properties($uri, $depth)")
+  def directoryProperties(uris: XQuery, depth: XQuery): XQuery =
+    XQuery(s"xdmp:directory-properties($uris, $depth)")
 
   def documentDelete(uri: XQuery): XQuery =
     XQuery(s"xdmp:document-delete($uri)")
-
-  def documentGetProperties(uri: XQuery, property: XQuery): XQuery =
-    XQuery(s"xdmp:document-get-properties($uri, $property)")
 
   def documentInsert(uri: XQuery, root: XQuery): XQuery =
     XQuery(s"xdmp:document-insert($uri, $root)")
@@ -48,11 +55,25 @@ object xdmp {
   def documentProperties(uris: XQuery*): XQuery =
     XQuery(s"xdmp:document-properties${mkSeq(uris)}")
 
+  def formatNumber(seq: XQuery, picture: XQuery): XQuery =
+    XQuery(s"xdmp:format-number($seq, $picture)")
+
+  def function(function: XQuery): XQuery =
+    XQuery(s"xdmp:function($function)")
+
+  def fromJson(node: XQuery): XQuery =
+    XQuery(s"xdmp:from-json($node)")
+
   def hmacSha1(password: XQuery, message: XQuery, encoding: Option[XQuery] = None): XQuery =
     XQuery(s"xdmp:hmac-sha1($password, ${message}${asArg(encoding)})")
 
   def integerToHex(int: XQuery): XQuery =
     XQuery(s"xdmp:integer-to-hex($int)")
+
+  // NB: This mutates state on disk, see the `mem` lib if looking for in-memory
+  //     node modification.
+  def nodeInsertChild(parent: XQuery, child: XQuery): XQuery =
+    XQuery(s"xdmp:node-insert-child($parent, $child)")
 
   def nodeKind(node: XQuery): XQuery =
     XQuery(s"xdmp:node-kind($node)")
@@ -60,11 +81,22 @@ object xdmp {
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
 
+  def parseDateTime(picture: XQuery, value: XQuery): XQuery =
+    XQuery(s"xdmp:parse-dateTime($picture, $value)")
+
+  // TODO: Works, but has a bug that reorders `where` and `order by` clausees
+  //       in FLWOR expressions, causing them to be malformed.
   def prettyPrint(qstring: XQuery): XQuery =
     XQuery(s"xdmp:pretty-print($qstring)")
 
   def quarterFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:quarter-from-date($date)")
+
+  def random(max: XQuery): XQuery =
+    XQuery(s"xdmp:random($max)")
+
+  def toJson(serialized: XQuery): XQuery =
+    XQuery(s"xdmp:to-json($serialized)")
 
   def weekFromDate(date: XQuery): XQuery =
     XQuery(s"xdmp:week-from-date($date)")

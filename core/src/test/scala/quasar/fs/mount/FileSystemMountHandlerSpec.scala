@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +34,8 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
   type Abort[A]  = Failure[String, A]
   type AbortM[A] = Free[Abort, A]
 
-  type ResMnts         = Mounts[DefinitionResult[AbortM]]
-  type ResMntsS[A]     = State[ResMnts, A]
-  type ResMntsSE[A, B] = EitherT[ResMntsS, A, B]
+  type ResMnts     = Mounts[DefinitionResult[AbortM]]
+  type ResMntsS[A] = State[ResMnts, A]
 
   type MountedFs[A]  = AtomicRef[ResMnts, A]
 

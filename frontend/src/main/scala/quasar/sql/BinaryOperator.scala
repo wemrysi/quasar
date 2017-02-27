@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ final case object FieldDeref   extends BinaryOperator("{}")
 final case object IndexDeref   extends BinaryOperator("[]")
 final case object Limit        extends BinaryOperator("limit")
 final case object Offset       extends BinaryOperator("offset")
+final case object Sample       extends BinaryOperator("sample")
 final case object Union        extends BinaryOperator("union")
 final case object UnionAll     extends BinaryOperator("union all")
 final case object Intersect    extends BinaryOperator("intersect")

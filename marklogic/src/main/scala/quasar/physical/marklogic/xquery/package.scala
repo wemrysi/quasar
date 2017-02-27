@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.common.SortDir
+import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 
@@ -36,8 +37,13 @@ package object xquery {
 
   type XPath = String
 
-  type Prologs = ISet[Prolog]
-  type PrologW[F[_]] = MonadTell[F, Prologs]
+  type Prologs          = ISet[Prolog]
+  type PrologT[F[_], A] = WriterT[F, Prologs, A]
+  type PrologW[F[_]]    = MonadTell_[F, Prologs]
+  type PrologL[F[_]]    = MonadListen_[F, Prologs]
+
+  def PrologW[F[_]](implicit F: PrologW[F]): PrologW[F] = F
+  def PrologL[F[_]](implicit F: PrologL[F]): PrologL[F] = F
 
   sealed abstract class SortDirection {
     def asOrderModifier: String = this match {
@@ -121,7 +127,7 @@ package object xquery {
     QNameGenerator[F].freshQName map (BindingName(_))
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    XQuery(s"(${fa.toList.map(_.shows).intercalate(", ")})")
+    XQuery(s"(${fa.toList.map(_.render).intercalate(", ")})")
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)

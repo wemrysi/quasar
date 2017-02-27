@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ object Empty {
 
   ////
 
-  private val lp = new LogicalPlanR[Fix]
+  private val lp = new LogicalPlanR[Fix[LogicalPlan]]
 
   private def lpResult[F[_]: Applicative, A](plan: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
     lp.paths(plan)

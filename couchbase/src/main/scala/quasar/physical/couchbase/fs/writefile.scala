@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import scalaz.concurrent.Task
 object writefile {
   import WriteFile._
 
-  implicit val codec = CBDataCodec
+  implicit val codec: DataCodec = CBDataCodec
 
   final case class State(bucket: Bucket, collection: String)
 
@@ -94,16 +94,12 @@ object writefile {
   ): Free[S, Vector[FileSystemError]] =
     (for {
       st   <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
-      data <- EitherT(lift(Task.delay(chunk.foldMap(d =>
-                DataCodec.render(d).bimap(
-                  err => Vector(FileSystemError.writeFailed(d, err.shows)),
-                  str => Vector(
-                    JsonObject
-                      .create()
-                      .put("type", st.collection)
-                      .put("value", jsonTranscoder.stringToJsonObject(str))
-                  ))
-              ))).into)
+      data <- lift(Task.delay(chunk.map(DataCodec.render).unite
+                .map(str =>
+                  JsonObject
+                    .create()
+                    .put("type", st.collection)
+                    .put("value", jsonTranscoder.stringToJsonObject(str))))).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
       docs <- data.traverse(d => GenUUID.Ops[S].asks(uuid =>
                 JsonDocument.create(uuid.toString, d)
               )).liftM[EitherT[?[_], Vector[FileSystemError], ?]]

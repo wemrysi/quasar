@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ object ExprOp3_0F {
       Delay[Equal, ExprOp3_0F] =
     new Delay[Equal, ExprOp3_0F] {
       def apply[A](eq: Equal[A]) = {
-        implicit val A = eq
+        implicit val A: Equal[A] = eq
         Equal.equal {
           case ($dateToStringF(fmt1, x1), $dateToStringF(fmt2, x2)) =>
             fmt1 ≟ fmt2 && x1 ≟ x2

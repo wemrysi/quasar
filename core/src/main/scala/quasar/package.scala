@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,9 +46,10 @@ package object quasar {
     * typechecked.
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
-  def precompile(query: Fix[Sql], vars: Variables, basePath: ADir)(
-    implicit RT: RenderTree[Fix[Sql]]):
-      CompileM[Fix[LP]] = {
+  def precompile[T: Equal: RenderTree]
+    (query: Fix[Sql], vars: Variables, basePath: ADir)
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : CompileM[T] = {
     import SemanticAnalysis.AllPhases
 
     for {
@@ -57,11 +58,11 @@ package object quasar {
                     Variables.substVars(ast, vars) leftMap (_.wrapNel))
       absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
       annTree  <- phase("Annotated Tree", AllPhases(absAst))
-      logical  <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annTree) leftMap (_.wrapNel))
     } yield logical
   }
 
-  private val optimizer = new Optimizer[Fix]
+  private val optimizer = new Optimizer[Fix[LP]]
   private val lpr = optimizer.lpr
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan.
@@ -70,7 +71,8 @@ package object quasar {
     for {
       optimized   <- phase("Optimized", optimizer.optimize(lp).right)
       typechecked <- phase("Typechecked", lpr.ensureCorrectTypes(optimized).disjunction)
-    } yield typechecked
+      rewritten   <- phase("Rewritten Joins", optimizer.rewriteJoins(typechecked).right)
+    } yield rewritten
 
   /** Identify plans which reduce to a (set of) constant value(s). */
   def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
@@ -86,7 +88,7 @@ package object quasar {
   def queryPlan(
     query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LP]] =
-    precompile(query, vars, basePath)
+    precompile[Fix[LP]](query, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 

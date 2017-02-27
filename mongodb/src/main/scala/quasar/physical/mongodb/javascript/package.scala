@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,16 @@ import quasar._
 import quasar.javascript.Js
 import quasar.jscore._
 
+import java.time.Instant
+
 final case class javascript[R](embed: JsCoreF[R] => R) {
   val js = jscore.fixpoint[R](embed)
   import js._
 
   /** Convert a `Bson.Date` to a JavaScript `Date`. */
   def toJsDate(value: Bson.Date): R =
-    New(Name("Date"), List(Literal(Js.Str(value.value.toString))))
+    New(Name("Date"), List(
+      Literal(Js.Str(Instant.ofEpochMilli(value.millis).toString))))
 
   /** Convert a `Bson.ObjectId` to a JavaScript `ObjectId`. */
   def toJsObjectId(value: Bson.ObjectId): R =
@@ -60,6 +63,11 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
     BinOp(And,
       isObjectOrArray(expr),
       UnOp(Not, isArray(expr)))
+
+  def isArrayOrString(expr: R): R =
+    BinOp(Or,
+      isArray(expr),
+      isString(expr))
 
   def isBoolean(expr: R): R =
     BinOp(Eq, UnOp(TypeOf, expr), Literal(Js.Str("boolean")))

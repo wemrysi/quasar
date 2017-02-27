@@ -3,7 +3,6 @@
     "backends": {
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
-        "marklogic":         "skip",
         "spark_local": "skip",
     "fallback": "skip",
         "spark_hdfs": "skip"
@@ -11,14 +10,14 @@
     "data": "largeZips.data",
     "query": "select ([6, 7] || loc)[1] from largeZips",
     "predicate": "containsAtLeast",
-    "expected": [{ "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 },
-                 { "0": 7 }]
+    "expected": [7,
+                 7,
+                 7,
+                 7,
+                 7,
+                 7,
+                 7,
+                 7,
+                 7,
+                 7]
 }

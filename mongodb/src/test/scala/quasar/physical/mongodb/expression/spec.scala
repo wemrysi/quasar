@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,12 +151,11 @@ class ExpressionSpec extends quasar.Qspec {
   }
 
   "toJs" should {
-    import java.time._
     import quasar.jscore._
 
     "handle addition with epoch date literal" in {
       $add(
-        $literal(Bson.Date(Instant.ofEpochMilli(0))),
+        $literal(Bson.Date(0)),
         $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
         JsFn(JsFn.defaultName, New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
     }

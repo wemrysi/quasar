@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, _}, MapFuncs._
 
-import java.time.Instant
 import matryoshka._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -92,7 +91,7 @@ object FuncHandler {
           case ExtractDayOfYear(a1) => $dayOfYear(a1)
           case ExtractEpoch(a1) =>
             $divide(
-              $subtract(a1, $literal(Bson.Date(Instant.ofEpochMilli(0)))),
+              $subtract(a1, $literal(Bson.Date(0))),
               $literal(Bson.Int32(1000)))
           case ExtractHour(a1) => $hour(a1)
           case ExtractIsoDayOfWeek(a1) =>
@@ -127,10 +126,25 @@ object FuncHandler {
           case ExtractYear(a1) => $year(a1)
 
           case ToTimestamp(a1) =>
-            $add($literal(Bson.Date(Instant.ofEpochMilli(0))), a1)
+            $add($literal(Bson.Date(0)), a1)
 
-          case Between(a1, a2, a3)   => $and($lte(a2, a1),
-                                              $lte(a1, a3))
+          case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
+          // TODO: With type info, we could reduce the number of comparisons necessary.
+          case TypeOf(a1) =>
+            $cond($lt(a1, $literal(Bson.Null)),                             $literal(Bson.Undefined),
+              $cond($eq(a1, $literal(Bson.Null)),                           $literal(Bson.Text("null")),
+                // TODO: figure out how to distinguish integer
+                $cond($lt(a1, $literal(Bson.Text(""))),                     $literal(Bson.Text("decimal")),
+                  // TODO: Once we’re encoding richer types, we need to check for metadata here.
+                  $cond($lt(a1, $literal(Bson.Doc())),                      $literal(Bson.Text("array")),
+                    $cond($lt(a1, $literal(Bson.Arr())),                    $literal(Bson.Text("map")),
+                      $cond($lt(a1, $literal(Bson.ObjectId(Check.minOid))), $literal(Bson.Text("array")),
+                        $cond($lt(a1, $literal(Bson.Bool(false))),          $literal(Bson.Text("_bson.objectid")),
+                          $cond($lt(a1, $literal(Check.minDate)),           $literal(Bson.Text("boolean")),
+                            $cond($lt(a1, $literal(Check.minTimestamp)),    $literal(Bson.Text("_ejson.timestamp")),
+                              // FIXME: This only sorts distinct from Date in 3.0+, so we have to be careful … somehow.
+                              $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
+                                                                            $literal(Bson.Text("_bson.regularexpression"))))))))))))
         }
       }
     })

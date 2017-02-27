@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -601,7 +601,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           }(ident("value")),
           Js.Return(Js.Ident("rez"))))
 
-    body(exprs.toList.zipWithIndex.map(("each" + _).second))
+    body(exprs.toList.zip(Stream.from(0).map("each" + _.toString)))
   }
 
   def >>>(that: $SimpleMapF[A]) = {
@@ -631,7 +631,10 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
           scope <+> $SimpleMapF.implicitScope(funcs)
         )
       case _ =>
-        $FlatMapF(src, fn, $SimpleMapF.implicitScope(funcs + "clone") ++ scope)
+        // WartRemover seems to be confused by the `+` method on `Set`
+        @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+        val newFuncs = funcs + "clone"
+        $FlatMapF(src, fn, $SimpleMapF.implicitScope(newFuncs) ++ scope)
     }
   }
 
@@ -956,7 +959,7 @@ object WorkflowOpCoreF {
         case $SortF(_, value)   =>
           val nt = "$SortF" :: wfType
           NonTerminal(nt, None,
-            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
+            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st.shows)) }.toList)
         case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
           val nt = "$GeoNearF" :: wfType
           NonTerminal(nt, None,

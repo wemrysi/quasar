@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,9 @@ import quasar.Predef._
 
 import quasar._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._, eitherT._
+import quasar.fp._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
@@ -41,7 +42,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   val query  = QueryFile.Ops[FileSystem]
   val read   = ReadFile.Ops[FileSystem]
@@ -134,8 +136,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     val memState = InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)
 
-    val fv: Free[ViewFileSystem, A] = f flatMapSuspension view.fileSystem[ViewFileSystem]
-
     val (vs, r) =
       f.foldMap(free.foldMapNT(viewfs) compose view.fileSystem[ViewFileSystem])
         .run.run(VS.fs.set(memState)(VS.emptyWithViews(views)))
@@ -218,7 +218,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _ <- EitherT.right(read.unsafe.close(h))
       } yield ()).run
 
-      val expQ = Fix(Squash(Fix(Squash(lpf.read(rootDir </> file("zips"))))))
+      val expQ = Fix(Squash(lpf.read(rootDir </> file("zips"))))
       val exp = (for {
         h   <- query.unsafe.eval(expQ)
         _   <- query.transforms.fsErrToExec(
@@ -611,7 +611,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile(inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
@@ -635,7 +635,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
         beRightDisjunction.like { case r => r must beTreeEqual(
-          Squash(Squash(lpf.read(rootDir </> file("zips"))).embed).embed)
+          Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
 

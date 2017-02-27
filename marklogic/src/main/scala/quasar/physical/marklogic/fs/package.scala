@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,118 +16,283 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
-import quasar.Data
+import quasar.Predef.{uuid => _, _}
+import quasar.{Data, Planner => QPlanner}
+import quasar.common._
 import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
-import quasar.effect.{KeyValueStore, MonotonicSeq, uuid}
+import quasar.contrib.scalaz.catchable._
+import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.writerT._
+import quasar.effect._
 import quasar.fp._, free._
 import quasar.fp.numeric.Positive
-import quasar.fs._, impl.ReadStream
+import quasar.frontend.logicalplan
+import quasar.fs._
+import quasar.fs.impl.DataStream
 import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefinitionResult, DefErrT}
+import quasar.physical.marklogic.qscript._
+import quasar.physical.marklogic.xcc.{AsContent, provideSession}
+import quasar.physical.marklogic.xquery.PrologT
 
 import java.net.URI
-import scala.util.control.NonFatal
+import java.util.UUID
 
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions._
-import pathy.Path._
-import scalaz._, Scalaz._
+import matryoshka.data.Fix
+import pathy.Path.{rootDir => pRootDir, _}
+import scalaz.{Failure => _, _}, Scalaz.{ToIdOps => _, _}
 import scalaz.concurrent.Task
 
 package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
-  import xcc.{ContentSourceIO, ResultCursor, SessionIO}
+  import queryfile.MLQScript
+  import xcc._
   import uuid.GenUUID
 
-  type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[ContentSourceIO], A]
-  type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
-  type MLResultHandles[A] = KeyValueStore[ResultHandle, ResultCursor, A]
+  type XccSessionR[A]       = Read[Session, A]
+  type XccContentSourceR[A] = Read[ContentSource, A]
+
+  type XccEvalEff[A] = (
+        Task
+    :\: MonotonicSeq
+    :\: XccSessionR
+    :/: XccContentSourceR
+  )#M[A]
+
+  type XccEval[A]         = MarkLogicPlanErrT[PrologT[Free[XccEvalEff, ?], ?], A]
+  type XccDataStream      = DataStream[XccEval]
+
+  type MLReadHandles[A]   = KeyValueStore[ReadHandle, XccDataStream, A]
+  type MLResultHandles[A] = KeyValueStore[ResultHandle, XccDataStream, A]
+  type MLWriteHandles[A]  = KeyValueStore[WriteHandle, Unit, A]
 
   type MarkLogicFs[A] = (
-        Task
-    :\: SessionIO
-    :\: ContentSourceIO
-    :\: GenUUID
-    :\: MonotonicSeq
+        GenUUID
     :\: MLReadHandles
+    :\: MLResultHandles
     :\: MLWriteHandles
-    :/: MLResultHandles
+    :/: XccEvalEff
   )#M[A]
+
+  type MLFS[A]  = PrologT[Free[MarkLogicFs, ?], A]
+  type MLFSQ[A] = MarkLogicPlanErrT[MLFS, A]
+
+  private implicit val xccSessionR  = Read.monadReader_[Session, XccEvalEff]
+  private implicit val xccSourceR   = Read.monadReader_[ContentSource, XccEvalEff]
+
+  private implicit val mlfsSessionR = Read.monadReader_[Session, MarkLogicFs]
+  private implicit val mlfsCSourceR = Read.monadReader_[ContentSource, MarkLogicFs]
+  private implicit val mlfsUuidR    = Read.monadReader_[UUID, MarkLogicFs]
 
   val FsType = FileSystemType("marklogic")
 
-  def contentSourceAt(connectionUri: ConnectionUri): Task[ContentSource] =
-    Task.delay(ContentSourceFactory.newContentSource(new URI(connectionUri.value)))
+  /** The `ContentSource` located at the given URI. */
+  def contentSourceAt[F[_]: Capture](uri: URI): F[ContentSource] =
+    Capture[F].capture(ContentSourceFactory.newContentSource(uri))
 
-  /** @param readChunkSize the size of a single chunk when streaming records from MarkLogic */
-  def definition[S[_]](
-    readChunkSize: Positive
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] =
-    FileSystemDef.fromPF {
+  /** The `ContentSource` located at the given ConnectionUri. */
+  def contentSourceConnection[F[_]: Capture: Bind](connectionUri: ConnectionUri): F[ContentSource] =
+    Capture[F].capture(new URI(connectionUri.value)) >>= contentSourceAt[F]
+
+  // TODO: Make these URI query parameters?
+  def definition(readChunkSize: Positive, writeChunkSize: Positive): FileSystemDef[Task] =
+    FileSystemDef fromPF {
       case (FsType, uri) =>
-        EitherT(lift(runMarkLogicFs(uri).run).into[S]) map { case (run, shutdown) =>
-          DefinitionResult[Free[S, ?]](
-            mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
-              queryfile.interpret[MarkLogicFs](readChunkSize),
-              readfile.interpret[MarkLogicFs](readChunkSize),
-              writefile.interpret[MarkLogicFs],
-              managefile.interpret[MarkLogicFs]),
-            lift(shutdown).into[S])
-        }
+        MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
+          .leftMap(_.left[EnvironmentError])
+          .flatMap(cfg => cfg.docType.fold(
+            fileSystem[DocType.Json](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize),
+            fileSystem[DocType.Xml](cfg.xccUri, cfg.rootDir, readChunkSize, writeChunkSize)))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  def runMarkLogicFs(connectionUri: ConnectionUri): DefErrT[Task, (MarkLogicFs ~> Task, Task[Unit])] = {
-    val contentSource: DefErrT[Task, ContentSource] =
-      EitherT(contentSourceAt(connectionUri) map (_.right[DefinitionError]) handle {
-        case NonFatal(t) => t.getMessage.wrapNel.left[EnvironmentError].left
-      })
+  /** The MarkLogic FileSystem definition.
+    *
+    * @tparam FMT            type representing the document format for the filesystem
+    * @param  xccUri         the URI describing the details of the connection to the XCC server
+    * @param  rootDir        the MarkLogic directory upon which to base the mount
+    * @param  readChunkSize  the size of a single chunk when streaming records from MarkLogic
+    * @param  writeChunkSize the size of a single chunk when streaming records to MarkLogic
+    */
+  def fileSystem[FMT: SearchOptions](
+    xccUri: URI,
+    rootDir: ADir,
+    readChunkSize: Positive,
+    writeChunkSize: Positive
+  )(implicit
+    C : AsContent[FMT, Data],
+    P : Planner[MLFSQ, FMT, MLQScript[Fix, ?]],
+    SP: StructuralPlanner[XccEval, FMT]
+  ): DefErrT[Task, DefinitionResult[Task]] = {
+    implicit val mlfsqStructuralPlanner: StructuralPlanner[MLFSQ, FMT] =
+      SP.transform(xccEvalToMLFSQ)
 
-    (
-      KeyValueStore.impl.empty[WriteHandle, Unit]                       |@|
-      KeyValueStore.impl.empty[ReadHandle, ReadStream[ContentSourceIO]] |@|
-      KeyValueStore.impl.empty[ResultHandle, ResultCursor]              |@|
-      MonotonicSeq.fromZero                                             |@|
-      GenUUID.type1
-    ).tupled.liftM[DefErrT].flatMap { case (whandles, rhandles, qhandles, seq, genUUID) =>
-      contentSource.flatMapF { cs =>
-        val runCSIO = ContentSourceIO.runNT(cs)
-        val runSIO  = runCSIO compose ContentSourceIO.runSessionIO
-        val runML   = reflNT[Task] :+: runSIO :+: runCSIO :+: genUUID :+: seq :+: rhandles :+: whandles :+: qhandles
-        val sdown   = Task.delay(cs.getConnectionProvider.shutdown(null))
+    val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
 
-        // NB: An innocuous operation used to test the connection.
-        runSIO(SessionIO.currentServerPointInTime)
-          .as((runML, sdown).right[DefinitionError])
-          .handle {
-            case ex: RequestPermissionException =>
-              EnvironmentError.invalidCredentials(ex.getMessage).right.left
+    val xformPaths =
+      if (rootDir === pRootDir) liftFT[FileSystem]
+      else chroot.fileSystem[FileSystem](rootDir)
 
-            case NonFatal(th) =>
-              EnvironmentError.connectionFailed(th).right.left
-          }
-      }
+    runMarkLogicFs(xccUri) map { case (run, shutdown) =>
+      DefinitionResult[Task](
+        run compose dropWritten compose foldMapNT(interpretFileSystem(
+          convertQueryFileErrors(queryfile.interpret[XccEval, MLFSQ, FMT](
+            readChunkSize, xccEvalToMLFSQ)),
+          convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](
+            readChunkSize, xccEvalToMLFSQ)),
+          convertWriteFileErrors(writefile.interpret[MLFSQ, FMT](writeChunkSize)),
+          managefile.interpret[MLFS, FMT]
+        )) compose xformPaths, shutdown)
     }
   }
 
-  implicit val resultCursorDataCursor: DataCursor[Task, ResultCursor] =
-    new DataCursor[Task, ResultCursor] {
-      def close(rc: ResultCursor) =
-        rc.close.void
+  /** Converts MarkLogicPlannerErrors into FileSystemErrors. */
+  def mlPlannerErrorToFsError(mlerr: MarkLogicPlannerError): FileSystemError = {
+    import MarkLogicPlannerError._
 
-      def nextChunk(rc: ResultCursor) =
-        TV.map(rc.nextChunk)(xdm => xdmitem.toData[ErrorMessages \/ ?](xdm) | Data.NA)
+    def unsupportedPlan(desc: String): FileSystemError =
+      FileSystemError.qscriptPlanningFailed(QPlanner.UnsupportedPlan(
+        logicalplan.constant(Data.Str(desc)), Some(mlerr.shows)))
 
-      val TV = Functor[Task].compose[Vector]
+    mlerr match {
+      case InvalidQName(s)  => unsupportedPlan(s)
+      case Unimplemented(f) => unsupportedPlan(f)
+
+      case Unreachable(d)   =>
+        FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
+          s"Should not have been reached, indicates a defect: $d.",
+          None))
+    }
+  }
+
+  /** The URI representation of the given path. */
+  def pathUri(path: APath): String =
+    UriPathCodec.printPath(path)
+
+  // TODO: Refactor effect interpreters in terms of abstractions like `Catchable` and `Capture`, etc
+  //       so this doesn't have to depend on `Task`.
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  def runMarkLogicFs(xccUri: URI): DefErrT[Task, (Free[MarkLogicFs, ?] ~> Task, Task[Unit])] = {
+    type CRT[X[_], A] = ReaderT[X, ContentSource, A]
+    type  CR[      A] = CRT[Task, A]
+    type SRT[X[_], A] = ReaderT[X, Session, A]
+    type  SR[      A] = SRT[Task, A]
+
+    val contentSource: DefErrT[Task, ContentSource] =
+      EitherT(contentSourceAt[Task](xccUri) map (_.right[DefinitionError]) handleNonFatal {
+        case th => th.getMessage.wrapNel.left[EnvironmentError].left
+      })
+
+    val runFs = (
+      KeyValueStore.impl.empty[WriteHandle, Unit]           |@|
+      KeyValueStore.impl.empty[ReadHandle, XccDataStream]   |@|
+      KeyValueStore.impl.empty[ResultHandle, XccDataStream] |@|
+      MonotonicSeq.fromZero                                 |@|
+      GenUUID.type4[Task]
+    ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
+      contentSource flatMapF { cs =>
+        val mlToSR = (liftMT[Task, SRT] compose genUUID)  :+:
+                     (liftMT[Task, SRT] compose rhandles) :+:
+                     (liftMT[Task, SRT] compose qhandles) :+:
+                     (liftMT[Task, SRT] compose whandles) :+:
+                      liftMT[Task, SRT]                   :+:
+                     (liftMT[Task, SRT] compose seq)      :+:
+                     Read.toReader[SR, Session]           :+:
+                     Read.constant[SR, ContentSource](cs)
+        val runML  = provideSession[Task](cs) compose foldMapNT(mlToSR)
+        val sdown  = Task.delay(cs.getConnectionProvider.shutdown(null))
+
+        contentsource.defaultSession[CR] flatMap {
+          testXccConnection[SRT[CR, ?]]
+            .map(_.right[NonEmptyList[String]])
+            .toLeft((runML, sdown))
+            .run
+        } handleNonFatal {
+          case th => EnvironmentError.connectionFailed(th).right.left
+        } run cs
+      }
     }
 
-  def asDir(file: AFile): ADir =
-    fileParent(file) </> dir(fileName(file).value)
+    runFs.liftM[DefErrT].join
+  }
 
-  def pathUri(path: APath): String =
-    posixCodec.printPath(path)
+  /** Returns an error describing why an XCC connection failed or `None` if it
+    * is successful.
+    */
+  def testXccConnection[F[_]: Applicative](implicit X: Xcc[F]): OptionT[F, EnvironmentError] =
+    // NB: An innocuous operation used to test the connection.
+    OptionT(X.handle(X.currentServerPointInTime as none[EnvironmentError]) {
+      case XccError.RequestError(ex: RequestPermissionException) =>
+        EnvironmentError.invalidCredentials(ex.getMessage).some
+
+      case other =>
+        EnvironmentError.connectionFailed(XccError.cause.get(other)).some
+    })
+
+  /** Lift XccEval into MLFSQ. */
+  val xccEvalToMLFSQ: XccEval ~> MLFSQ =
+    Hoist[MarkLogicPlanErrT].hoist(Hoist[PrologT].hoist(mapSNT(Inject[XccEvalEff, MarkLogicFs])))
+
+  implicit val dataAsXmlContent: AsContent[DocType.Xml, Data] =
+    new AsContent[DocType.Xml, Data] {
+      def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] =
+        data.encodeXml[F](d) map { elem =>
+          val opts = new ContentCreateOptions
+          opts.setFormatXml()
+          ContentFactory.newContent(uri.get, elem.toString, opts)
+        }
+    }
+
+  implicit val dataAsJsonContent: AsContent[DocType.Json, Data] =
+    new AsContent[DocType.Json, Data] {
+      def asContent[F[_]: MonadErrMsgs](uri: ContentUri, d: Data): F[Content] = {
+        val opts = new ContentCreateOptions
+        opts.setFormatJson()
+        ContentFactory.newContent(uri.get, data.encodeJson(d).nospaces, opts).point[F]
+      }
+    }
+
+  ////
+
+  private def asFsError[F[_]: Functor, G[_]: Applicative, A](
+    fa: MarkLogicPlanErrT[F, G[FileSystemError \/ A]]
+  ): F[G[FileSystemError \/ A]] =
+    fa.valueOr(mlerr => mlPlannerErrorToFsError(mlerr).left[A].point[G])
+
+  private def convertQueryFileErrors[F[_]: Functor](f: QueryFile ~> MarkLogicPlanErrT[F, ?]): QueryFile ~> F = {
+    import QueryFile._
+    def handleMLErr[A] = asFsError[F, (PhaseResults, ?), A](_)
+
+    λ[QueryFile ~> F] {
+      case ExecutePlan(lp, file) => handleMLErr(f(ExecutePlan(lp, file)))
+      case EvaluatePlan(lp)      => handleMLErr(f(EvaluatePlan(lp)))
+      case More(h)               => f(More(h)) | Vector[Data]().right[FileSystemError]
+      case Close(h)              => f(Close(h)) | (())
+      case Explain(lp)           => handleMLErr(f(Explain(lp)))
+      case ListContents(dir)     => f(ListContents(dir)) | Set[PathSegment]().right[FileSystemError]
+      case FileExists(file)      => f(FileExists(file)) | false
+    }
+  }
+
+  private def convertReadFileErrors[F[_]: Functor](f: ReadFile ~> MarkLogicPlanErrT[F, ?]): ReadFile ~> F = {
+    import ReadFile._
+    def handleMLErr[A] = asFsError[F, Id, A](_)
+
+    λ[ReadFile ~> F] {
+      case Open(file, off, lim) => handleMLErr(f(Open(file, off, lim)))
+      case Read(h)              => handleMLErr(f(Read(h)))
+      case Close(h)             => f(Close(h)) | (())
+    }
+  }
+
+  private def convertWriteFileErrors[F[_]: Functor](f: WriteFile ~> MarkLogicPlanErrT[F, ?]): WriteFile ~> F = {
+    import WriteFile._
+
+    λ[WriteFile ~> F] {
+      case Open(file)  => asFsError[F, Id, WriteHandle](f(Open(file)))
+      case Write(h, d) => f(Write(h, d)) valueOr (e => Vector(mlPlannerErrorToFsError(e)))
+      case Close(h)    => f(Close(h)) | (())
+    }
+  }
 }

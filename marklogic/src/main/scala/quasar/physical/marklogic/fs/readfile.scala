@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,43 +16,35 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
-import quasar.contrib.pathy._
-import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.free.lift
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl._
+import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.xquery._
 
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 object readfile {
+  type RKvs[F[_], G[_]] = Kvs[G, ReadFile.ReadHandle, DataStream[F]]
 
-  def interpret[S[_]](
-    chunkSize: Positive
-  )(
-    implicit
-    S0:    ContentSourceIO :<: S,
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[ContentSourceIO], S],
-    seq:   MonotonicSeq.Ops[S]
-  ): ReadFile ~> Free[S, ?] = {
-    def dataProcess(file: AFile, skip: Int, limit: Option[Int]): ReadStream[ContentSourceIO] = {
-      val ltd = ops.readFile(file).drop(skip)
-
-      limit.fold(ltd)(ltd.take)
-        .chunk(chunkSize.get.toInt)
-        .map(_.right[FileSystemError])
+  def interpret[
+    F[_]: Monad: Catchable: Xcc: PrologL,
+    G[_]: Monad: MonoSeq: RKvs[F, ?[_]],
+    FMT: SearchOptions
+  ](
+    chunkSize: Positive, fToG: F ~> G
+  )(implicit
+    SP: StructuralPlanner[F, FMT]
+  ): ReadFile ~> G =
+    readFromProcess(fToG) { (file, opts) =>
+      fToG(ops.pathHavingFormatExists[F, FMT](file) map (_.fold(
+        ops.readFile[F, FMT](file, opts.offset, opts.limit)
+          .chunk(chunkSize.get.toInt)
+          .map(_ traverse xdmitem.decodeForFileSystem),
+        (Process.empty: DataStream[F])
+      ))) map (_.right[FileSystemError])
     }
-
-    readFromProcess { (file, readOpts) =>
-      lift(ContentSourceIO.runSessionIO(ops.exists(file)) map { doesExist =>
-        doesExist.fold(
-          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt)),
-          (Process.empty: ReadStream[ContentSourceIO])
-        ).right[FileSystemError]
-      }).into[S]
-    }
-  }
 }

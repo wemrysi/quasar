@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,17 +49,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       override def toString = ":" + chars
     }
 
-    // NB: `Token`, which we do not control, causes this.
-    @SuppressWarnings(Array(
-      "org.wartremover.warts.Product",
-      "org.wartremover.warts.Serializable"))
     override def token: Parser[Token] =
       variParser |
       numLitParser |
       charLitParser |
       stringLitParser |
-      quotedIdentParser |
-      identifierString ^^ processIdent |
+      identParser |
       EofCh ^^^ EOF |
       '\'' ~> failure("unclosed character literal") |
       '"'  ~> failure("unclosed string literal") |
@@ -71,12 +66,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         case x ~ xs => (x :: xs).mkString
       }
 
-    def variParser: Parser[Token] = ':' ~> identifierString ^^ (Variable(_))
+    def variParser: Parser[Token] = ':' ~> identParser ^^ (t => Variable(t.chars))
 
     def numLitParser: Parser[Token] = rep1(digit) ~ opt('.' ~> rep(digit)) ~ opt((elem('e') | 'E') ~> opt(elem('-') | '+') ~ rep(digit)) ^^ {
       case i ~ None ~ None     => NumericLit(i mkString "")
       case i ~ Some(d) ~ None  => FloatLit(i.mkString("") + "." + d.mkString(""))
-      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.getOrElse("") + e.mkString(""))
+      case i ~ d ~ Some(s ~ e) => FloatLit(i.mkString("") + "." + d.map(_.mkString("")).getOrElse("0") + "e" + s.map(_.toString).getOrElse("") + e.mkString(""))
     }
 
     val hexDigit: Parser[String] = """[0-9a-fA-F]""".r
@@ -98,6 +93,14 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
     def quotedIdentParser: Parser[Token] =
       delimitedString('`') ^^ (QuotedIdentifier(_))
+
+    // NB: `Token`, which we do not control, causes this.
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"))
+    def identParser: Parser[Token] =
+      quotedIdentParser | identifierString ^^ processIdent
+
 
     override def whitespace: Parser[scala.Any] = rep(
       whitespaceChar |
@@ -442,19 +445,19 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     (query | defined_expr) * (
       keyword("limit")                        ^^^ (Limit(_: T[Sql], _: T[Sql]).embed)        |
         keyword("offset")                     ^^^ (Offset(_: T[Sql], _: T[Sql]).embed)       |
+        keyword("sample")                     ^^^ (Sample(_: T[Sql], _: T[Sql]).embed)       |
         keyword("union") ~ keyword("all")     ^^^ (UnionAll(_: T[Sql], _: T[Sql]).embed)     |
         keyword("union")                      ^^^ (Union(_: T[Sql], _: T[Sql]).embed)        |
         keyword("intersect") ~ keyword("all") ^^^ (IntersectAll(_: T[Sql], _: T[Sql]).embed) |
         keyword("intersect")                  ^^^ (Intersect(_: T[Sql], _: T[Sql]).embed)    |
         keyword("except")                     ^^^ (Except(_: T[Sql], _: T[Sql]).embed))
 
-  private def stripQuotes(s:String) = s.substring(1, s.length-1)
-
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def parseExpr(exprSql: String): ParsingError \/ T[Sql] =
     phrase(expr)(new lexical.Scanner(exprSql)) match {
       case Success(r, q)        => \/.right(r)
       case Error(msg, input)    => \/.left(GenericParsingError(msg))
-      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first))
+      case Failure(msg, input)  => \/.left(GenericParsingError(msg + "; " + input.first.toString))
     }
 
   private def parse0(sql: Query): ParsingError \/ T[Sql] = parseExpr(sql.value)

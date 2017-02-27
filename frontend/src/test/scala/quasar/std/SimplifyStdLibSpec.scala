@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, GenericFunc}
+import quasar.{Data, DateArbitrary, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -34,7 +34,7 @@ import shapeless.Nat
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
 class SimplifyStdLibSpec extends StdLibSpec {
-  import quasar.frontend.fixpoint.lpf
+  val lpf = new LogicalPlanR[Fix[LP]]
 
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 
@@ -65,8 +65,9 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
   /** Identify constructs that are expected not to be implemented. */
   def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
-    case Invoke(func, _) => shortCircuit(func, args)
-    case _               => ().right
+    case Invoke(func, _)     => shortCircuit(func, args)
+    case TemporalTrunc(_, _) => notHandled
+    case _                   => ().right
   }
 
   def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
@@ -104,6 +105,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
     def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
 
     def stringDomain = arbitrary[String]
+
+    def dateDomain = DateArbitrary.genDate
   }
 
   tests(runner)

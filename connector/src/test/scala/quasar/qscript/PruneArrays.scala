@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -186,6 +186,42 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           NonEmptyList(
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite map with entire array referenced" in {
+      val initial: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(IntLit(7))),
+              MakeArrayR(IntLit(8))))).embed,
+          HoleF)).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite map with entire array and specific index referenced" in {
+      val initial: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(LeftShift(
+            UnreferencedRT.embed,
+            HoleF,
+            ExcludeId,
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(IntLit(7))),
+              MakeArrayR(IntLit(8))))).embed,
+          ConcatArraysR(
+            MakeArrayR(ProjectIndexR(HoleF, IntLit(0))),
+            MakeArrayR(HoleF)))).embed
 
       initial.pruneArrays must equal(initial)
     }
@@ -433,7 +469,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(3)))).embed,
           NullLit(),
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(2)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
 
       val srcExpected: Fix[QST] =
         QCT.inj(LeftShift(
@@ -451,7 +487,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(1)))).embed,
           NullLit(),
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
 
       initial.embed.pruneArrays must equal(expected.embed)
     }
@@ -624,9 +660,8 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
-    "not rewrite left shift with unused array elements" in {
-      val src: Fix[QST] =
+    "rewrite left shift with array referenced through struct" in {
+      val initialSrc: Fix[QST] =
         QCT.inj(LeftShift(
           UnreferencedRT.embed,
           HoleF,
@@ -639,10 +674,266 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
 
       val initial: Fix[QST] =
         QCT.inj(LeftShift(
-          src,
+          initialSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          ExcludeId,
+          MakeMapR(StrLit("xyz"), Free.point(RightSide)))).embed
+
+      val expectedSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          MakeArrayR(IntLit(8)))).embed
+
+      val expected: Fix[QST] =
+        QCT.inj(LeftShift(
+          expectedSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          ExcludeId,
+          MakeMapR(StrLit("xyz"), Free.point(RightSide)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "not rewrite left shift with entire array referenced through left side" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
           ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
           ExcludeId,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite left shift with array referenced non-statically through struct" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          ProjectIndexR(HoleF, AddR(IntLit(0), IntLit(1))),
+          ExcludeId,
+          MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "rewrite left shift with array referenced through left side and struct" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          ExcludeId,
+          ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](1)))).embed
+
+      val expectedSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            MakeArrayR(IntLit(7)),
+            MakeArrayR(IntLit(8))))).embed
+
+      val expected: Fix[QST] =
+        QCT.inj(LeftShift(
+          expectedSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](1)),
+          ExcludeId,
+          ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](0)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "rewrite left shift with array referenced through struct with a right side reference" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(ConcatArraysR(MakeArrayR(IntLit(8)), MakeArrayR(IntLit(9))))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+          ExcludeId,
+          ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](1)))).embed
+
+      val expectedSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          MakeArrayR(ConcatArraysR(MakeArrayR(IntLit(8)), MakeArrayR(IntLit(9)))))).embed
+
+      // TODO this can be rewritten further so that `struct` is just `HoleF`
+      val expected: Fix[QST] =
+        QCT.inj(LeftShift(
+          expectedSrc,
+          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          ExcludeId,
+          ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](1)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "rewrite left shift with array referenced through left and right side" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          HoleF,
+          ExcludeId,
+          AddR(
+            ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](1)),
+            ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](2))))).embed
+
+      val expectedSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            MakeArrayR(IntLit(7)),
+            MakeArrayR(IntLit(8))))).embed
+
+      // TODO this can be rewritten further so that `struct` is just `HoleF`
+      val expected: Fix[QST] =
+        QCT.inj(LeftShift(
+          expectedSrc,
+          HoleF,
+          ExcludeId,
+          AddR(
+            ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](0)),
+            ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](1))))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "rewrite left shift with entire array unreferenced" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          HoleF,
+          ExcludeId,
+          AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
+
+      val expectedSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          Free.roll(Constant(ejsonArr())))).embed
+
+      val expected: Fix[QST] =
+        QCT.inj(LeftShift(
+          expectedSrc,
+          HoleF,
+          ExcludeId,
+          AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
+
+      initial.pruneArrays must equal(expected)
+    }
+
+    "not rewrite left shift with entire array referenced by the right side" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          HoleF,
+          ExcludeId,
+          RightSideF)).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite left shift with entire array referenced by the left side" in {
+      val initialSrc: Fix[QST] =
+        QCT.inj(LeftShift(
+          UnreferencedRT.embed,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))).embed
+
+      val initial: Fix[QST] =
+        QCT.inj(LeftShift(
+          initialSrc,
+          HoleF,
+          ExcludeId,
+          LeftSideF)).embed
 
       initial.pruneArrays must equal(initial)
     }

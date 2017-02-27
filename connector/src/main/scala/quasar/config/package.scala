@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,12 @@ package quasar
 
 import quasar.effect.Failure
 
-import pathy.Path.{File, Dir, Sandboxed}
+import pathy.Path.{File, Sandboxed}
 import scalaz.EitherT
 import scalaz.concurrent.Task
 
 package object config {
   type FsFile = FsPath[File, Sandboxed]
-  type FsDir  = FsPath[Dir, Sandboxed]
 
   type CfgErr[A]  = Failure[ConfigError, A]
 

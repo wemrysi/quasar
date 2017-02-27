@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 
 class WriteFilesSpec extends FileSystemTest[FileSystem](
-  FileSystemTest.allFsUT.map(_ filter (_ supports BackendCapability.write()))) {
+  FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
 
   import FileSystemTest._, FileSystemError._
   import WriteFile._
@@ -42,7 +42,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
   def deleteForWriting(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(writesPrefix))
 
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
     "Writing Files" should {

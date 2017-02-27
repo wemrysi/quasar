@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad] extends Planne
     case RF.Arbitrary(a1)      => Min(a1)
     case RF.Avg(a1)            => Avg(a1)
     case RF.Count(a1)          => Count(a1)
+    case RF.First(a1)          => ???
+    case RF.Last(a1)           => ???
     case RF.Max(a1)            => Max(a1)
     case RF.Min(a1)            => Min(a1)
     case RF.Sum(a1)            => Sum(a1)

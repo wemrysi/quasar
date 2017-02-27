@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,23 +35,21 @@ package object fs {
   val FsType = FileSystemType("postgresql")
 
   type Eff[A] = (
-       ConnectionIO
+        ConnectionIO
     :\: MonotonicSeq
-    :\: KeyValueStore[ReadHandle, impl.ReadStream[ConnectionIO], ?]
-    :/: KeyValueStore[WriteHandle, writefile.TableName,     ?]
+    :\: KeyValueStore[ReadHandle, impl.DataStream[ConnectionIO], ?]
+    :/: KeyValueStore[WriteHandle, writefile.TableName, ?]
   )#M[A]
 
-  def interp[S[_]](
-      uri: ConnectionUri
-    )(implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S
-    ): Free[S, Free[Eff, ?] ~> Free[S, ?]] = {
-
+  def interp[S[_]](uri: ConnectionUri)(
+    implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): Free[S, Free[Eff, ?] ~> Free[S, ?]] = {
     val transactor = DriverManagerTransactor[Task]("org.postgresql.Driver", uri.value)
 
     def taskInterp: Task[Free[Eff, ?] ~> Free[S, ?]]  =
-      (TaskRef(Map.empty[ReadHandle,  impl.ReadStream[ConnectionIO]]) |@|
+      (TaskRef(Map.empty[ReadHandle,  impl.DataStream[ConnectionIO]]) |@|
        TaskRef(Map.empty[WriteHandle, writefile.TableName])           |@|
        TaskRef(0L)
       )((kvR, kvW, i) =>
@@ -61,13 +59,14 @@ package object fs {
           KeyValueStore.impl.fromTaskRef(kvR) :+:
           KeyValueStore.impl.fromTaskRef(kvW))))
 
-    lift(taskInterp).into
+    lift(taskInterp).into[S]
   }
 
-  def definition[S[_]](implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S
-    ): FileSystemDef[Free[S, ?]] =
+  def definition[S[_]](
+    implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
         interp(uri).map { run =>

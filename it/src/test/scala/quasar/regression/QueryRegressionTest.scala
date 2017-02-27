@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,13 @@ import quasar.Predef._
 import quasar._
 import quasar.build.BuildInfo
 import quasar.common._
+import quasar.contrib.argonaut._
+import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.writerT._
+import quasar.ejson
 import quasar.frontend._
 import quasar.contrib.pathy._
-import quasar.fp._, eitherT._, free._
+import quasar.fp._, free._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.FilesystemQueries
@@ -30,11 +34,13 @@ import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
+import java.math.{MathContext, RoundingMode}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
+import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
@@ -44,9 +50,10 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 abstract class QueryRegressionTest[S[_]](
-  fileSystems: Task[IList[FileSystemUT[S]]])(
+  fileSystems: Task[IList[SupportedFs[S]]])(
   implicit S0: QueryFile :<: S, S1: ManageFile :<: S,
-           S2: WriteFile :<: S, S3: Task :<: S
+           S2: ReadFile  :<: S, S3: WriteFile  :<: S,
+           S4: Task :<: S
 ) extends FileSystemTest[S](fileSystems) {
 
   import QueryRegressionTest._
@@ -90,33 +97,20 @@ abstract class QueryRegressionTest[S[_]](
 
   lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
 
-  private var counter = 1
-  val testRegex = scala.sys.props.get("ygg.testregex") map (_.r)
-  testRegex foreach { re =>
-    step(println(s"Filtering regression tests with regex $re"))
-  }
-
   // NB: The printing is just to indicate progress (especially for travis-ci) as
   //     these tests have the potential to be slow for a backend.
   //
   //     Ideally, we'd have specs2 log each example in the suite as it finishes, but
   //     all attempts at doing this have been unsuccessful, if we succeed eventually
   //     this printing can be removed.
-  fileSystemShould { fs =>
+  fileSystemShould { (fs, fsNonChrooted) =>
     suiteName should {
       step(print(s"Running $suiteName ["))
 
       tests.toList foreach { case (f, t) =>
-        val fname: String = fileName(f).value
-        testRegex match {
-          case Some(re) if re.findFirstIn(fname).isEmpty => ()
-          case _                                         =>
-            val num = counter
-            counter += 1
-            step(scala.Console.err.println("\n" + f"[$num%03d] $fname%s: ${t.query}%s"))
-            regressionExample(f, t, fs.ref.name, fs.setupInterpM, fs.testInterpM)
-            step(scala.Console.err.println(f"[$num%03d] done."))
-        }
+        val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
+        regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
+        step(print("."))
       }
 
       step(println("]"))
@@ -135,9 +129,13 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Fragment = {
     def runTest: Result = {
-      val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
+      val data = testQuery(
+        test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
+        test.query,
+        test.variables)
 
-      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run, backendName))
+      (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
+       verifyResults(test.expected, data, run, backendName))
         .timed(5.minutes)
         .unsafePerformSync
     }
@@ -173,6 +171,30 @@ abstract class QueryRegressionTest[S[_]](
     Task.gatherUnordered(locs.toList map ensureTestFile) map (_ any ι)
   }
 
+  /** This is a workaround for issue where Mongo can only return objects. The
+    * fallback evaluator will allow us to fix this in the right way, but for now
+    * we just work around it in the tests.
+    */
+  val promoteValue: Json => Option[Json] =
+    json => json.obj.fold(
+      json.some)(
+      _.toList match {
+        case Nil                      => None
+        case ("value", result) :: Nil => result.some
+        case _                        => json.some
+      })
+
+  val TestContext = new MathContext(13, RoundingMode.DOWN)
+
+  /** This helps us get identical results on different connectors, even though
+    * they have different precisions for their floating point values.
+    */
+  val reducePrecision =
+    λ[EndoK[ejson.Common]](ejson.dec.modify(_.round(TestContext))(_))
+
+  val normalizeJson: Json => Option[Json] =
+    j => promoteValue(Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json])))
+
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
     exp: ExpectedResult,
@@ -198,7 +220,7 @@ abstract class QueryRegressionTest[S[_]](
 
     exp.predicate(
       exp.rows.toVector,
-      act.map(deleteFields.compose[Data](_.asJson)).translate[Task](liftRun),
+      act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
       exp.ignoreFieldOrderBackend match {
         case IgnoreFieldOrderAllBackends            =>
           FieldOrderIgnored
@@ -279,7 +301,7 @@ abstract class QueryRegressionTest[S[_]](
                     : RegressionTest => Task[RegressionTest] = { rt =>
 
     val unknown = rt.backends.keySet diff knownBackends
-    def errMsg = s"Unrecognized backend(s): ${unknown.mkString(", ")}"
+    def errMsg = s"Unrecognized backend(s) in '${rt.name}': ${unknown.mkString(", ")}"
 
     if (unknown.isEmpty) Task.now(rt)
     else Task.fail(new RuntimeException(errMsg))
@@ -316,13 +338,20 @@ abstract class QueryRegressionTest[S[_]](
 object QueryRegressionTest {
   lazy val knownFileSystems = TestConfig.backendRefs.map(_.name).toSet
 
-  val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] =
+  val externalFS: Task[IList[SupportedFs[FileSystemIO]]] =
     for {
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
-      hfsUts <- uts.traverse(ut => hierarchicalFSIO(mntDir, ut.testInterp) map { f =>
-                  ut.copy(testInterp = f).contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
-                })
+      hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
+                  hierarchicalFSIO(mntDir, ut.testInterp).map { f: FileSystemIO ~> Task =>
+                    SupportedFs(
+                      sb.ref,
+                      ut.copy(testInterp = f)
+                        .contramapF(chroot.fileSystem[FileSystemIO](ut.testDir))
+                        .some,
+                      ut.some)
+                  }
+                ).getOrElse(sb.point[Task]))
     } yield hfsUts
 
   private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
@@ -337,8 +366,5 @@ object QueryRegressionTest {
     }
 
   implicit val dataEncodeJson: EncodeJson[Data] =
-    EncodeJson(d =>
-      DataCodec.Precise
-        .encode(d)
-        .fold(err => scala.sys.error(err.message), ι))
+    EncodeJson(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,10 +50,6 @@ object KeyValueStore {
 
   final class Ops[K, V, S[_]](implicit S: KeyValueStore[K, V, ?] :<: S)
     extends LiftedOps[KeyValueStore[K, V, ?], S] {
-
-    /** Similar to `alterS`, but returns the updated value. */
-    def alter(k: K, f: Option[V] => V): F[V] =
-      alterS(k, v => f(v).squared)
 
     /** Atomically associates the given key with the first part of the result
       * of applying the given function to the value currently associated with
@@ -152,6 +148,8 @@ object KeyValueStore {
 
         val R = AtomicRef.Ops[Map[K, V], Ref]
 
+        // FIXME
+        @SuppressWarnings(Array("org.wartremover.warts.Equals"))
         def apply(): KeyValueStore[K, V, ?] ~> Free[Ref, ?] =
           new (KeyValueStore[K, V, ?] ~> Free[Ref, ?]) {
             def apply[A](m: KeyValueStore[K, V, A]) = m match {
@@ -190,6 +188,8 @@ object KeyValueStore {
         def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
                           : KeyValueStore[K, V, ?] ~> F =
           new(KeyValueStore[K, V, ?] ~> F) {
+            // FIXME
+            @SuppressWarnings(Array("org.wartremover.warts.Equals"))
             def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {
               case CompareAndPut(k, expect, update) =>
                 lookup(k) flatMap { cur =>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,11 +65,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg_(
           InternalServerError withReason "Connection to backend failed.",
           s"Connection failed: $msg.")
-
-      case InsufficientPermissions(msg) =>
-        fromMsg_(
-          InternalServerError withReason "Insufficient backend permssions.",
-          s"Insufficient permissions: $msg.")
 
       case InvalidCredentials(msg) =>
         fromMsg_(
@@ -344,7 +339,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
   ////
 
   private def encodeData(data: Data): Option[Json] =
-    DataCodec.Precise.encode(data).toOption
+    DataCodec.Precise.encode(data)
 }
 
 sealed abstract class ToApiErrorInstances0 {

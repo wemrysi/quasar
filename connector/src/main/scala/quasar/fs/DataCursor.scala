@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef.{Array, Nothing, SuppressWarnings, Unit, Vector}
+import quasar.Predef._
 import quasar.Data
 
 import scalaz._, Scalaz._
@@ -35,7 +35,7 @@ trait DataCursor[F[_], C] {
 
   /** Closes the cursor, freeing any resources it might be using. */
   def close(cursor: C): F[Unit]
-  
+
   def process(cursor: C)(implicit F: Applicative[F]): Process[F, Data] = {
     def closeCursor(c: C): Process[F, Nothing] =
       Process.eval_[F, Unit](close(c))
@@ -55,8 +55,6 @@ trait DataCursor[F[_], C] {
 object DataCursor {
   def apply[F[_], C](implicit DC: DataCursor[F, C]): DataCursor[F, C] = DC
 
-  // FIXME: needs puffnfresh/wartremover#226 fixed
-  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
   implicit def eitherDataCursor[F[_], A, B](
     implicit A: DataCursor[F, A], B: DataCursor[F, B]
   ): DataCursor[F, A \/ B] =
@@ -66,5 +64,14 @@ object DataCursor {
 
       def close(ab: A \/ B) =
         ab fold (A.close, B.close)
+    }
+
+  implicit def optionDataCursor[F[_]: Applicative, A](implicit C: DataCursor[F, A]): DataCursor[F, Option[A]] =
+    new DataCursor[F, Option[A]] {
+      def nextChunk(oa: Option[A]) =
+        oa.cata(C.nextChunk, Vector[Data]().point[F])
+
+      def close(oa: Option[A]) =
+        oa.traverse_(C.close)
     }
 }

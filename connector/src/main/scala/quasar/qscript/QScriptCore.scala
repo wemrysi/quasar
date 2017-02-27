@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,12 +33,11 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class ReduceIndex(idx: Int) {
-  def incr(j: Int): ReduceIndex = ReduceIndex(idx + j)
+@Lenses final case class ReduceIndex(idx: Option[Int]) {
+  def incr(j: Int): ReduceIndex = ReduceIndex(idx ∘ (_ + j))
 }
 
 object ReduceIndex {
-  val Empty = ReduceIndex(-1)
 
   implicit val equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
@@ -86,24 +85,27 @@ object ReduceIndex {
   * expression, `reducers` applies the provided reduction to each expression,
   * and repair finally turns those reduced expressions into a final value.
   *
+  * ReduceIndex is guaranteed to be a valid index into `reducers`.
   * @group MRA
   */
 // TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
-  reducers: List[ReduceFunc[FreeMap[T]]],
+  reducers: List[ReduceFunc[FreeMap[T]]], // FIXME: Use Vector instead
   repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
 
-/** Sorts values within a bucket. This could be represented with
-  *     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
-  *               RightSide)
-  * but backends tend to provide sort directly, so this avoids backends having
-  * to recognize the pattern. We could provide an algebra
-  *     (Sort :+: QScript)#λ => QScript
-  * so that a backend without a native sort could eliminate this node.
+/** Sorts values within a bucket. This can be an _unstable_ sort, but the
+  * elements of `order` must be stably sorted.
   */
+// NB: This could be represented with
+//     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
+//               RightSide)
+// but backends tend to provide sort directly, so this avoids backends having
+// to recognize the pattern. We could provide an algebra
+//     (Sort :+: QScript)#λ => QScript
+// so that a backend without a native sort could eliminate this node.
 @Lenses final case class Sort[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -144,6 +146,9 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
+  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
+    C.prj(fa)
+
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =

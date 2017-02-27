@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,18 @@
 package quasar
 
 import quasar.Predef._
-import java.time._
 import quasar.pkg.tests._
 
 trait DataArbitrary {
   import DataArbitrary._
   import Data.Obj
 
-  private def genKey = Gen.alphaChar ^^ (_.toString)
+  def genKey = Gen.alphaChar ^^ (_.toString)
 
   implicit val dataArbitrary: Arbitrary[Data] = Arbitrary(
     Gen.oneOf(
       simpleData,
-      genData(genKey, simpleData),
+      genNested(genKey, simpleData),
       // Tricky cases: (TODO: These belong in MongoDB tests somewhere.)
       const(Obj("$date" -> Data.Str("Jan 1"))),
       SafeInt ^^ (x => Obj("$obj" -> Obj("$obj" -> Data.Int(x))))
@@ -44,6 +43,8 @@ trait DataArbitrary {
 }
 
 object DataArbitrary extends DataArbitrary {
+  import DateArbitrary._
+
   // Too big for Long
   val LargeInt = BigInt(Long.MaxValue.toString + "0")
 
@@ -65,8 +66,7 @@ object DataArbitrary extends DataArbitrary {
   // TODO: make this very conservative so as likely to work with as many backends as possible
   val simpleData: Gen[Data] = genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
 
-  def genData(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
-    genAtomicData,
+  def genNested(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
     (genKey, genAtomicData).zip.list ^^ (xs => Data.Obj(xs: _*)),
     genAtomicData.list ^^ Data.Arr
   )
@@ -91,13 +91,4 @@ object DataArbitrary extends DataArbitrary {
     )
   }
 
-  private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
-  private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)
-  private def genMillis: Gen[Long]      = choose(0L, 999L)
-  private def genNanos: Gen[Long]       = genMillis ^^ (_ * 1000000)
-
-  private def genInstant: Gen[Instant]   = (genSeconds, genNanos) >> Instant.ofEpochSecond
-  private def genDuration: Gen[Duration] = (genSeconds, genNanos) >> Duration.ofSeconds
-  private def genDate: Gen[LocalDate]    = genSeconds ^^ LocalDate.ofEpochDay
-  private def genTime: Gen[LocalTime]    = genSecondOfDay ^^ LocalTime.ofSecondOfDay
 }

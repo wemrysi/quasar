@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,9 +78,6 @@ abstract class MountingSpec[S[_]](
 
   val pathExists = MountingError.pathError composePrism
                    PathError.pathExists
-
-  def maybeInvalid[A](dj: MountingError \/ A): Option[APath] =
-    D.left composeOptional invalidPath getOption dj
 
   def maybeNotFound[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism notFound getOption dj

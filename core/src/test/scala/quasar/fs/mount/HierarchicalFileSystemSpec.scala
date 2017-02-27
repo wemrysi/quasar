@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.fs._
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 
@@ -39,14 +39,13 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle
-  import quasar.frontend.fixpoint.lpf
 
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
   val transforms = QueryFile.Transforms[F]
   val unsafeq = QueryFile.Unsafe[FileSystem]
 
   type ExecM[A] = transforms.ExecM[A]
   type MountedFs[A] = State[MountedState, A]
-  type MountedFsE[E, A] = EitherT[MountedFs, E, A]
 
   type HEff0[A] = Coproduct[MountedResultH, MountedFs, A]
   type HEff[A]  = Coproduct[MonotonicSeq, HEff0, A]

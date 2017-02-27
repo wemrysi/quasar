@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ object SemanticAnalysis {
   type Failure = NonEmptyList[SemanticError]
 
   private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
-  private def succeed[A](s: A) = Validation.success[Failure, A](s)
 
   sealed trait Synthetic
   object Synthetic {
@@ -214,7 +213,7 @@ object SemanticAnalysis {
 
           def nest(l: RenderedTree, r: RenderedTree, sep: String) = (l, r) match {
             case (RenderedTree(_, ll, Nil), RenderedTree(_, rl, Nil)) =>
-              Terminal(ProvenanceNodeType, Some("(" + ll + " " + sep + " " + rl + ")"))
+              Terminal(ProvenanceNodeType, Some((ll.toList ++ rl.toList).mkString("(", s" $sep ", ")")))
             case _ => NonTerminal(ProvenanceNodeType, Some(sep), l :: r :: Nil)
           }
 

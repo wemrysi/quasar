@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar._
+import quasar.contrib.pathy.{AFile, ADir}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fs._
@@ -33,8 +34,6 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  import quasar.frontend.fixpoint.lpf
-
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
@@ -48,24 +47,19 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
-      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST](idPrism))))
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))) >>>
+      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))))
 
   type QSI[A] =
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
 
   val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
-  val PBI =     implicitly[ProjectBucket :<: QSI]
   val QCI =       implicitly[QScriptCore :<: QSI]
-  val TJI =         implicitly[ThetaJoin :<: QSI]
 
-  val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
   val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
 
   implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
-    Injectable.coproduct(Injectable.inject[QScriptCore, QST],
-      Injectable.coproduct(Injectable.inject[ProjectBucket, QST],
-        Injectable.coproduct(Injectable.inject[ThetaJoin, QST],
-          Injectable.inject[Const[DeadEnd, ?], QST])))
+    ::\::[QScriptCore](::\::[ProjectBucket](::/::[Fix, ThetaJoin, Const[DeadEnd, ?]]))
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
@@ -80,6 +74,24 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         equal(chain(
           UnreferencedI,
           QCI.inj(Map((), BoolLit(true)))).some)
+    }
+
+    "expand a directory read" in {
+      convert(lc.some, lpRead("/foo")).flatMap(
+        _.transCataM(ExpandDirs[Fix, QS, QST].expandDirs(idPrism.reverseGet, lc)).toOption.run.copoint) must
+      equal(chain(
+        QCT.inj(Unreferenced[Fix, Fix[QST]]()),
+        QCT.inj(Union((),
+          Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
+          Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS]()))),
+            Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
+            Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS]()))),
+              Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
+              Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS]()))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
+        QCT.inj(LeftShift((), HoleF, ExcludeId, Free.point(RightSide))))(
+        implicitly, Corecursive[Fix[QST], QST]).some)
     }
 
     "coalesce a Map into a subsequent LeftShift" in {
@@ -250,8 +262,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val exp: QS[Fix[QS]] =
         TJ.inj(ThetaJoin(
           QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(RT.inj(Const(Read(rootDir </> file("foo"))))),
-          Free.roll(RT.inj(Const(Read(rootDir </> file("bar"))))),
+          Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+          Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
           Free.roll(And(Free.roll(And(
             // reversed equality
             Free.roll(MapFuncs.Eq(
@@ -277,8 +289,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           QCT.inj(Filter(
             EJT.inj(EquiJoin(
               QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
-              Free.roll(RT.inj(Const(Read(rootDir </> file("foo"))))),
-              Free.roll(RT.inj(Const(Read(rootDir </> file("bar"))))),
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
                   Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
@@ -314,14 +326,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       val originalQScript =
         QCT.inj(Map(
-          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
+          SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
           Free.roll(Add(
             Free.roll(ProjectIndex(HoleF, IntLit(1))),
             Free.roll(ProjectIndex(HoleF, IntLit(1))))))).embed
 
       val expectedQScript =
         QCT.inj(Map(
-          SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
+          SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
           Free.roll(Add(HoleF, HoleF)))).embed
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript

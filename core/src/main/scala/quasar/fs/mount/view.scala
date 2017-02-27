@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 object view {
-  private val optimizer = new Optimizer[Fix]
+  private val optimizer = new Optimizer[Fix[LP]]
   private val lpr = optimizer.lpr
 
   /** Translate reads on view paths to the equivalent queries. */
@@ -341,7 +341,7 @@ object view {
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], SemanticErrors \/ Fix[LP]] =
       lookup(loc).map { case (expr, vars) =>
-         precompile(expr, vars, fileParent(loc)).run.value
+         precompile[Fix[LP]](expr, vars, fileParent(loc)).run.value
       }
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
@@ -351,7 +351,7 @@ object view {
     (Set[FPath](), cleaned).anaM[Fix[LP]] {
       case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
         refineTypeAbs(p).swap.map(f =>
-          EitherT(compiledView(f) getOrElse i.right).map(_.unFix.map((e + f, _)))
+          EitherT(compiledView(f) getOrElse i.right).map(_.project.map((e + f, _)))
         ).getOrElse(lift(e, i))
 
       case (e, i) => lift(e, i)

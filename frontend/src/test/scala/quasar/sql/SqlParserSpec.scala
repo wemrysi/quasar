@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -226,6 +226,10 @@ class SQLParserSpec extends quasar.Qspec {
 
     "parse simple query with two variables" in {
       parse("""SELECT * FROM zips WHERE zips.dt > :start_time AND zips.dt <= :end_time """).toOption should beSome
+    }
+
+    "parse variable with quoted name" in {
+      parse(""":`start time`""") should beRightDisjOrDiff(VariR("start time"))
     }
 
     "parse simple query with variable as relation" in {
@@ -559,6 +563,11 @@ class SQLParserSpec extends quasar.Qspec {
         p => if (p != node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)
+    }
+
+    "round-trip quoted variable names through the pretty-printer" >> {
+      val q = "select * from :`A.results`"
+      (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
     }
   }
 }

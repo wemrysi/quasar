@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{Data, TreeMatchers}
 import quasar.fp._
+import quasar.contrib.pathy.AFile
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._
 
@@ -29,8 +30,6 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
-  import quasar.frontend.fixpoint.lpf
-
   val rewrite = new Rewrite[Fix]
 
   "shiftRead" should {
@@ -50,12 +49,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       newQScript must
       beTreeEqual(
         Fix(QCT.inj(Map(
-          Fix(SRT.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
+          Fix(SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId)))),
           Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
     }
 
     "shift a simple aggregated read" in {
-      convert(listContents.some,
+      convert(lc.some,
         structural.MakeObject(
           lpf.constant(Data.Str("0")),
           agg.Count(lpRead("/foo/bar")).embed).embed).map(
@@ -63,12 +62,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           rewrite.normalize[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
       beTreeEqual(chain(
-        SRT.inj(Const[ShiftedRead, Fix[QST]](
+        SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](
           ShiftedRead(rootDir </> dir("foo") </> file("bar"), IncludeId))),
         QCT.inj(Reduce((),
           NullLit(),
           List(ReduceFuncs.Count(Free.roll(ProjectIndex(HoleF, IntLit[Fix, Hole](1))))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.some))))))).some)
     }
   }
 }

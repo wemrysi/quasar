@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
   import fixExprOp._
 
   val readZips = read(collection("db", "zips"))
-  def pureInt(n: Int) = pure(Bson.Int32(n))
 
   implicit val workflowEqual: Equal[Fix[WorkflowF]] = Equal.equalA
 

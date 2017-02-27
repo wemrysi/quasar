@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -434,11 +434,9 @@ trait StructuralLib extends Library {
 
   object MakeArrayN {
     def apply[T](args: T*)(implicit T: Corecursive.Aux[T, LP]): LP[T] =
-      args.map(x => MakeArray(x)) match {
-        case Nil      => Constant(Data.Arr(Nil))
-        case t :: Nil => t
-        case mas      => mas.reduce((t, ma) => ArrayConcat(t.embed, ma.embed))
-      }
+      args.map(MakeArray(_))
+        .reduceLeftOption((x, y) => ArrayConcat(x.embed, y.embed))
+        .getOrElse(Constant(Data.Arr(Nil)))
 
     def unapply[T](t: T)(implicit T: Recursive.Aux[T, LP]): Option[List[T]] =
       t.project match {
@@ -459,4 +457,3 @@ trait StructuralLib extends Library {
 }
 
 object StructuralLib extends StructuralLib
-

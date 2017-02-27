@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
-import quasar.{Data, DataCodec, DataEncodingError}
+import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
@@ -97,16 +97,15 @@ object writefile {
     s2: Task :<: S
   ): Free[S, Vector[FileSystemError]] = {
 
-    implicit val codec = DataCodec.Precise
+    implicit val codec: DataCodec = DataCodec.Precise
 
     def _write(pw: PrintWriter): Task[Vector[FileSystemError]] = {
 
-      val maybeLines: Vector[(DataEncodingError \/ String, Data)] =
-        chunks.map(data => (DataCodec.render(data), data))
+      val lines: Vector[(String, Data)] =
+        chunks.map(data => DataCodec.render(data) strengthR data).unite
 
-      Task.delay(maybeLines.flatMap {
-        case (-\/(error), data) => Vector(writeFailed(data, error.message))
-        case (\/-(line), data) =>
+      Task.delay(lines.flatMap {
+        case (line, data) =>
           \/.fromTryCatchNonFatal(pw.append(s"$line\n")).fold(
             ex => Vector(writeFailed(data, ex.getMessage)),
             u => Vector.empty[FileSystemError]

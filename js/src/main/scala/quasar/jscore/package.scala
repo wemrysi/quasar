@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,10 @@ package object jscore {
 
   val findFunctionsƒ: JsCoreF[(Fix[JsCoreF], Set[String])] => Set[String] = {
     case CallF((Fix(IdentF(Name(name))), _), args) =>
-      Foldable[List].fold(args.map(_._2)) + name
+      // WartRemover seems to be confused by the `+` method on `Set`
+      @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+      val result = Foldable[List].fold(args.map(_._2)) + name
+      result
     case js => js.map(_._2).fold
   }
 
@@ -99,7 +102,7 @@ package object jscore {
     }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
-    case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 == alt1 =>
+    case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 ≟ alt1 =>
       IfF(BinOp(And, cond0, cond1), cons, alt0).some
     case LetF(name, expr, body) =>
       maybeReplace(Ident(name), expr, body).fold(expr.project match {
@@ -227,13 +230,13 @@ package object jscore {
       case IdentF(_)            => true
       case LiteralF(_)          => true
 
-      case ArrF(values)         => values.all(_ == true)
+      case ArrF(values)         => values.all(_ ≟ true)
       case AccessF(expr, key)   => expr && key
       case BinOpF(_, l, r)      => l && r
-      case CallF(callee, args)  => callee && args.all(_ == true)
+      case CallF(callee, args)  => callee && args.all(_ ≟ true)
       case IfF(cond, cons, alt) => cond && cons && alt
       case LetF(_, expr, body)  => expr && body
-      case NewF(_, args)        => args.all(_ == true)
+      case NewF(_, args)        => args.all(_ ≟ true)
       case UnOpF(_, x)          => x
 
       case FunF(_, body)        => false

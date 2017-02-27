@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import quasar.physical.couchbase.planner.CBPhaseLog
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.qscript.{MapFunc, MapFuncStdLibTestRunner, FreeMapA}
 import quasar.std.StdLibSpec
+
+import java.time.LocalDate
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -72,7 +74,9 @@ class CouchbaseStdLibSpec extends StdLibSpec {
                 Value(false),
                 ResultExpr(qq, Id("v").some).wrapNel,
                 keyspace = None,
+                join     = None,
                 unnest   = None,
+                let      = Nil,
                 filter   = None,
                 groupBy  = None,
                 orderBy  = Nil).embed
@@ -132,6 +136,13 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     val intDomain: Gen[BigInt] = arbitrary[Int] map (BigInt(_))
     val decDomain: Gen[BigDecimal] = arbitrary[Double] map (BigDecimal(_))
     val stringDomain: Gen[String] = genPrintableAsciiSansBackslash
+
+    val dateDomain: Gen[LocalDate] =
+      Gen.choose(
+        LocalDate.of(1, 1, 1).toEpochDay,
+        LocalDate.of(9999, 12, 31).toEpochDay
+      ) ∘ (LocalDate.ofEpochDay(_))
+
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

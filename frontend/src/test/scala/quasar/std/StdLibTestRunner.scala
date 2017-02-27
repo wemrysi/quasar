@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package quasar.std
 import quasar.Predef._
 import quasar.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
+
+import java.time.LocalDate
 
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -71,8 +73,9 @@ trait StdLibTestRunner {
     * well-behaved.
     */
   def stringDomain: Gen[String]
-}
 
-object StdLibTestRunner {
-  val genPrintableAscii: Gen[String] = Gen.listOf(Gen.choose('\u0020', '\u007e')).map(_.mkString)
+  /** Defines the domain of values for `Data.Date` for which the implementation is
+    * well-behaved.
+    */
+  def dateDomain: Gen[LocalDate]
 }

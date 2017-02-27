@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ package object expression {
       // matches the pattern the planner generates for converting epoch time
       // values to timestamps. Adding numbers to dates works in ExprOp, but not
       // in Javacript.
-      case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli ≟ 0 =>
+      case $add($literal(Bson.Date(milli)), r) if milli ≟ 0 =>
         r.para(toJs[T, EX])
           .map(r => JsFn(JsFn.defaultName,
             jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
@@ -123,7 +123,7 @@ package object expression {
               isBoolean(x),
               isDate(x),
               isTimestamp(x)))
-        case _ => UnsupportedJS("type check not converted: " + typ).left
+        case _ => UnsupportedJS("type check not converted: " + typ.shows).left
       }
     }
   }

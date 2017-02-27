@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,18 +87,6 @@ object ReadFile {
       */
     def scanAll(file: AFile): Process[M, Data] =
       scan(file, 0L, None)
-
-    /** Returns a process that produces at most `limit` items from the beginning
-      * of the given file.
-      */
-    def scanTo(file: AFile, limit: Positive): Process[M, Data] =
-      scan(file, 0L, Some(limit))
-
-    /** Returns a process that produces data from the given file, beginning
-      * at the specified offset.
-      */
-    def scanFrom(file: AFile, offset: Natural): Process[M, Data] =
-      scan(file, offset, None)
   }
 
   object Ops {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ object Repl {
   import EitherT.eitherTMonad
 
   val HelpMessage =
-    """Quasar REPL, Copyright © 2014–2016 SlamData Inc.
+    """Quasar REPL, Copyright © 2014–2017 SlamData Inc.
       |
       |Available commands:
       |  exit
@@ -199,7 +199,9 @@ object Repl {
             state <- RS.get
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
-            lim   =  Positive(state.summaryCount + 1L)
+            lim   =  (state.summaryCount > 0).fold(
+                       Positive(state.summaryCount + 1L),
+                       None)
             query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim) flatMap (enum =>
                        Q.transforms.execToCompExec(enum.drainTo[Vector]))
             _     <- runQuery(state, query)(
@@ -257,13 +259,13 @@ object Repl {
       case DebugLevel.Verbose => P.println(showPhaseResults(log) + "\n")
     }
 
-  def summarize[S[_]](max: Int, format: OutputFormat)(rows: IndexedSeq[Data])(implicit
-    P: ConsoleIO.Ops[S]
-  ): Free[S, Unit] = {
-    def formatJson(codec: DataCodec)(data: Data) =
-      codec.encode(data).fold(
-        err => "error: " + err.shows,
-        _.pretty(minspace))
+  def summarize[S[_]]
+    (max: Int, format: OutputFormat)
+    (rows: IndexedSeq[Data])
+    (implicit P: ConsoleIO.Ops[S])
+      : Free[S, Unit] = {
+    def formatJson(codec: DataCodec)(data: Data): Option[String] =
+      codec.encode(data).map(_.pretty(minspace))
 
     if (rows.lengthCompare(0) <= 0) P.println("No results found")
     else {
@@ -272,9 +274,9 @@ object Repl {
         case OutputFormat.Table =>
           Prettify.renderTable(prefix)
         case OutputFormat.Precise =>
-          prefix.map(formatJson(DataCodec.Precise))
+          prefix.map(formatJson(DataCodec.Precise)).unite
         case OutputFormat.Readable =>
-          prefix.map(formatJson(DataCodec.Readable))
+          prefix.map(formatJson(DataCodec.Readable)).unite
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
       }).foldMap(P.println) *>

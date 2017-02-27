@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.api.services
 
 import quasar.Predef.{ -> => _, _ }
 import quasar.api._
-import quasar.contrib.pathy.{AbsPath, APath, sandboxAbs}
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fs.mount._
 

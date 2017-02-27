@@ -1,5 +1,6 @@
 [![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
+[![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # Thanks to Sponsors
@@ -30,19 +31,13 @@ See the instructions below for running and configuring these JARs.
 
 **Note**: This requires Java 8 and Bash (Linux, Mac, or Cygwin on Windows).
 
-### Checkout
-
-```bash
-git clone git@github.com:quasar-analytics/quasar.git
-```
-
 ### Build
 
 The following sections explain how to build and run the various subprojects.
 
 #### Basic Compile & Test
 
-To compile the project and run tests, execute the following command:
+To compile the project and run tests, first clone the quasar repo and then execute the following command:
 
 ```bash
 ./sbt test
@@ -51,7 +46,6 @@ To compile the project and run tests, execute the following command:
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-This will lead to failures in the integration test project (`it`) because there is no configured "backend" available.
 Running the full test suite can be done in two ways:
 
 ##### Testing option 1 (prerequisite: docker)
@@ -62,34 +56,31 @@ A docker container running mongodb operates for the duration of the test run.
 ./bin/full-it-tests.sh
 ```
 
-##### Testing option 2 (prerequisite: mongodb)
+##### Testing option 2
 
-Currently Quasar only supports MongoDB so in order to run the integration
-tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
+In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
 you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
 allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew or simply go to the MongDB website and follow the
+In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
 instructions that can be found there.
 
-Once we have a MongoDB instance handy, we need to set a few
-environment variables in order to inform Quasar about where to find the backends required in order to run the integration tests.
+Once we have a MongoDB instance handy, we need to configure the integration tests
+in order to inform Quasar about where to find the backends to test.
 
-Set the following environment variables:
+Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
 
-For bash this would like such,
-
-```bash
-export QUASAR_MONGODB_3_2="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-export QUASAR_MONGODB_3_0="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
-export QUASAR_MONGODB_2_6="{\"mongodb\":{\"connectionUri\":\"mongodb://`mongoURL`\"}}"
+```
+mongodb_3_2="mongodb://<mongoURL>"
+mongodb_3_0="mongodb://<mongoURL>"
+mongodb_2_6="mongodb://<mongoURL>"
 ```
 
-where \`mongoURL\` is the url at which one can find a Mongo database. For example \`mongoURL\` would probably look
+where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
 something like `localhost:27017` for a local installation. This means the integration tests will be run against
 both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
 tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported versions of MongoDB, as well as read-only configurations.
+server, the tests are run against all supported filesystems.
 
 #### REPL JAR
 
@@ -204,9 +195,13 @@ e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
 ##### MarkLogic
 
-To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) as the `connectionUri`:
+To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
-`xcc://<username>:<password>@<host>:<port>/<database>`
+`xcc://<username>:<password>@<host>:<port>/<database>[/root/dir/path]?format=[json|xml]`
+
+the mount will query either JSON or XML documents based on the value of the `format` parameter. For backwards-compatibility, if the `format` parameter is omitted then XML is assumed.
+
+If a root directory path is specified, all operations and queries within the mount will be local to the MarkLogic directory at the specified path.
 
 Prerequisites
 - MarkLogic 8.0+
@@ -215,12 +210,10 @@ Prerequisites
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
 [Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
-- Only XML documents are currently supported (JSON support is coming soon, see [#1704](https://github.com/quasar-analytics/quasar/issues/1704)).
-- It is not yet possible to reference XML attributes in queries ([#1701](https://github.com/quasar-analytics/quasar/issues/1701)).
-- Most joins do not yet work ([#1581](https://github.com/quasar-analytics/quasar/issues/1581), [#1560](https://github.com/quasar-analytics/quasar/issues/1560), [#1539](https://github.com/quasar-analytics/quasar/issues/1539), [#1505](https://github.com/quasar-analytics/quasar/issues/1505)).
-- Field aliases must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- "Default" numeric field names are prefixed with an underscore ("_") in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- Index usage is currently poor, so performance may degrade on large directories and/or complex queries. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
+- Field aliases when working with XML must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- "Default" numeric field names are prefixed with an underscore ("_") when working with XML in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+- It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
+- Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
 Quasar's data model is JSON-ish and thus there is a bit of translation required when applying it to XML. The current mapping aims to be intuitive while still taking advantage of the XDM as much as possible. Take note of the following:
 - Projecting a field will result in the child element(s) having the given name. If more than one element matches, the result will be an array.
@@ -254,15 +247,11 @@ A view can be mounted at any file path. If a view's path is nested inside the pa
 
 Because of dependencies conflicts between Mongo & Spark connectors, currently process of building Quasar for Spark requires few additional steps:
 
-1. Assemble Quasar for Spark
+1. Build sparkcore.jar
 
-```sbt web/assembly -Dquasar4Spark=yes```
+```./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly```
 
-2. Build sparkcore.jar
-
-```sbt sparkcore/assembly -DbuildSparkCore=yes```
-
-3. Set environment variable QUASAR_HOME
+2. Set environment variable QUASAR_HOME
 
 QUASAR_HOME must point to a folder holding `sparkcore.jar`
 
@@ -502,7 +491,26 @@ A successful upload will replace any previous contents atomically, leaving them 
 
 If an error occurs when reading data from the request body, the response will contain a summary in the common `error` field and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
+
+#### Uploading multpile files
+
+If the supplied path represents a directory (ends with a slash), the request body must contain a `zip` archive containing the contents of the named directory, database, etc., and a special file, `/.quasar-metadata.json`, which specifies the format for each file, as it would be provided in a `Content-Type` header if the file was individually uploaded:
+
+```json
+{
+  "/foo": {
+    "Content-Type": "application/ldjson"
+  },
+  "/foo/bar": {
+    "Content-Type": "application/json; mode=precise"
+  }
+}
+```
+
+Note: if the zip archive was created by downloading a directory from Quasar, then it will already have this hidden file.
+
+Each file in the archive is written as if it was uploaded separately. The write is _not_ atomic; if an error occurs after some files are written, the file system is not restored to its previous state.
 
 ### POST /data/fs/[path]
 
@@ -510,7 +518,7 @@ Append data to the specified path. Uploaded data may be in any of the [supported
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 
-Fails if the path identifies a view.
+Fails if the path identifies an existing view.
 
 ### DELETE /data/fs/[path]
 
@@ -670,7 +678,6 @@ time      | `"10:30:05"`    | `{ "$time": "10:30:05" }` | HH:MM[:SS[:.SSS]]
 interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | Note: year/month not currently supported.
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
-error     | `null`          | `{ "$na": null }` | A runtime error occurred producing or representing this value.
 
 
 ### CSV
@@ -684,7 +691,15 @@ foo.bar,foo.baz
 
 Data is formatted the same way as the "Readable" JSON format, except that all values including `null`, `true`, `false`, and numbers are indistinguishable from their string representations.
 
-It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv.
+It is possible to use the `columnDelimiter`, `rowDelimiter` `quoteChar` and `escapeChar` media-type extensions keys in order to customize the layout of the csv. If some or all of these extensions are not specified, they will default to the following values:
+
+- columnDelimiter: `,`
+- rowDelimiter: `\r\n`
+- quoteChar: `"`
+- escapeChar: `"`
+
+Note: Due to [the following issue](https://github.com/tototoshi/scala-csv/issues/97) in one of our dependencies. The `rowDelimiter` extension will be ignored for any CSV being uploaded. The `rowDelimiter` extension will, however, be observed for downloaded data.
+      Also due to [this issue](https://github.com/tototoshi/scala-csv/issues/98) best to avoid non "standard" csv formats. See the `MessageFormatGen.scala` file for examples of which csv formats we test against.
 
 When data is uploaded in CSV format, the headers are interpreted as field names in the same way. As with the Readable JSON format, any string that can be interpreted as another kind of value will be, so for example there's no way to specify the string `"null"`.
 
@@ -707,7 +722,7 @@ You can also discuss issues on Gitter: [quasar-analytics/quasar](https://gitter.
 
 ## Legal
 
-Copyright &copy; 2014 - 2016 SlamData Inc.
+Copyright &copy; 2014 - 2017 SlamData Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

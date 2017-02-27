@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import quasar._
 import quasar.common.SortDir
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
+import quasar.std.DateLib.TemporalPart
 
 import scala.Symbol
 
@@ -54,6 +55,11 @@ package object logicalplan {
     Prism.partial[LogicalPlan[A], (A, NonEmptyList[(A, SortDir)])] {
       case Sort(a, ords) => (a, ords)
     } ((Sort[A](_, _)).tupled)
+
+  def temporalTrunc[A] =
+    Prism.partial[LogicalPlan[A], (TemporalPart, A)] {
+      case TemporalTrunc(part, a) => (part, a)
+    } ((TemporalTrunc[A](_, _)).tupled)
 
   def typecheck[A] =
     Prism.partial[LogicalPlan[A], (A, Type, A, A)] {

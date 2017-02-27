@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,10 @@ import quasar.Planner.InternalError
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.physical.couchbase._, N1QL.{Id, Union, _}, Case._, Select.{Filter, Value, _}
+import quasar.physical.couchbase._,
+  N1QL.{Id, Union, Unreferenced, _},
+  Case._,
+  Select.{Filter, Value, _}
 import quasar.physical.couchbase.planner.Planner._
 import quasar.qscript, qscript._
 
@@ -68,10 +71,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(ff, none).wrapNel,
         Keyspace(wrapSelect(src), id1.some).some,
+        join    = none,
         unnest  = none,
+        let     = nil,
         filter  = none,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
 
     case LeftShift(src, struct, id, repair) =>
       for {
@@ -108,10 +113,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
                        Value(true),
                        ResultExpr(id2.embed, none).wrapNel,
                        Keyspace(wrapSelect(src), id1.some).some,
+                       join    = none,
                        Unnest(u, id2.some).some,
+                       let     = nil,
                        filter  = none,
                        groupBy = none,
-                       orderBy = Nil).embed.η[M]
+                       orderBy = nil).embed.η[M]
                  },
                  mapFuncPlanner[T, F].plan))
       } yield r
@@ -122,30 +129,33 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         id2 <- genId[T[N1QL], M]
         id3 <- genId[T[N1QL], M]
         b   <- processFreeMap(bucket, id1)
-        red =  reducers.map(
-                 _.traverse(
-                   red => processFreeMap(red, id1)
-                 ).flatMap(reduceFuncPlanner[T, F].plan)
-               )
-        rep <- repair.cataM(interpretM(i => red(i.idx), mapFuncPlanner[T, F].plan))
+        red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
+                 reduceFuncPlanner[T, F].plan)
+        rep <- repair.cataM(interpretM(
+                 _.idx.fold(SelectElem(ArrAgg(b).embed, int(0)).embed)(red(_)).point[M],
+                 mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
           Value(false),
           ResultExpr(rep, id2.some).wrapNel,
           Keyspace(src, id1.some).some,
-          unnest = none,
-          filter = none,
+          join    = none,
+          unnest  = none,
+          let     = nil,
+          filter  = none,
           GroupBy(b).some,
-          orderBy = Nil).embed
+          orderBy = nil).embed
 
         Select(
           Value(true),
           ResultExpr(id2.embed, none).wrapNel,
           Keyspace(s, id3.some).some,
-          unnest = none,
+          join    = none,
+          unnest  = none,
+          let     = nil,
           Filter(IsNotNull(id2.embed).embed).some,
           groupBy = none,
-          orderBy = Nil).embed
+          orderBy = nil).embed
       }
 
     case qscript.Sort(src, bucket, order) =>
@@ -162,16 +172,20 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
            Value(true),
            ResultExpr(ArrAgg(id1.embed).embed, none).wrapNel,
            Keyspace(src, id1.some).some,
+           join    = none,
            unnest  = none,
+           let     = nil,
            filter  = none,
            GroupBy(IfNull(b, id1.embed).embed).some,
-           orderBy = Nil).embed
+           orderBy = nil).embed
 
         Select(
           Value(true),
           ResultExpr(id3.embed, none).wrapNel,
           Keyspace(s, id2.some).some,
+          join    = none,
           Unnest(id2.embed, id3.some).some,
+          let     = nil,
           filter  = none,
           groupBy = none,
           orderBy = o.toList).embed
@@ -185,10 +199,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(id1.embed, none).wrapNel,
         Keyspace(src, id1.some).some,
+        join    = none,
         unnest  = none,
+        let     = nil,
         Filter(ff).some,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
@@ -211,7 +227,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
     }
 
     case qscript.Unreferenced() =>
-      wrapSelect(Arr[T[N1QL]](Nil).embed).η[M]
+      Unreferenced[T[N1QL]]().embed.η[M]
   }
 
   def takeOrDrop(src: T[N1QL], from: FreeQS[T], takeOrDrop: FreeQS[T] \/ FreeQS[T]): M[T[N1QL]] =
@@ -235,10 +251,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
             ResultExpr(f, id2.some),
             ResultExpr(c, id3.some)),
           Keyspace(src, id1.some).some,
+          join    = none,
           unnest  = none,
+          let     = nil,
           filter  = none,
           groupBy = none,
-          orderBy = Nil).embed
+          orderBy = nil).embed
 
       val cnt = SelectElem(id3.embed, int(0)).embed
 
@@ -254,10 +272,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         Value(true),
         ResultExpr(id5.embed, none).wrapNel,
         Keyspace(s, id4.some).some,
+        join    = none,
         Unnest(SelectElem(id2.embed, slc).embed, id5.some).some,
+        let     = nil,
         filter  = none,
         groupBy = none,
-        orderBy = Nil).embed
+        orderBy = nil).embed
     }
 
 }

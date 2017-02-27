@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import quasar.Type
 import quasar.fp._
 import quasar.physical.mongodb.Bson
 
-import java.time.Instant
+import scala.Long
 
 import matryoshka._
 import matryoshka.implicits._
@@ -55,7 +55,7 @@ final class Check[T, EX[_]]
     * actually use any new op here.
     */
   def isDate(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
-    between(Bson.Date(minInstant), expr, minTimestamp)
+    between(minDate, expr, minTimestamp)
   /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
     * ensures that this check is used only when it's safe, although we don't
     * actually use any new op here.
@@ -63,7 +63,10 @@ final class Check[T, EX[_]]
   def isTimestamp(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
     between(minTimestamp, expr, minRegex)
 
-  def isDateOrTimestamp(expr: T) = between(Bson.Date(minInstant), expr, minRegex)
+  def isDateOrTimestamp(expr: T) = between(minDate, expr, minRegex)
+
+  def isArrayOrString(expr: T) =
+    $or(isArray(expr), isString(expr))
 
   // Some types that happen to be adjacent:
   def isNumberOrString(expr: T) = betweenExcl(Bson.Null, expr, Bson.Doc())
@@ -109,8 +112,8 @@ object Check {
       case IsBetween(Bson.Binary(`minBinary`), x, Bson.ObjectId(`minOid`))  => (x, Type.Binary).some
       case IsBetween(Bson.ObjectId(`minOid`),  x, Bson.Bool(false))         => (x, Type.Id).some
       case IsBetweenIncl(Bson.Bool(false),     x, Bson.Bool(true))          => (x, Type.Bool).some
-      case IsBetween(Bson.Date(`minInstant`),  x, `minRegex`)               => (x, Type.Date ⨿ Type.Timestamp).some
-      case IsBetween(Bson.Date(`minInstant`),  x, `minTimestamp`)           => (x, Type.Date).some
+      case IsBetween(`minDate`,  x, `minRegex`)               => (x, Type.Date ⨿ Type.Timestamp).some
+      case IsBetween(`minDate`,  x, `minTimestamp`)           => (x, Type.Date).some
       case IsBetween(`minTimestamp`,           x, `minRegex`)               => (x, Type.Timestamp).some
 
       case IsBetween(Bson.Doc(`nilMap`),       x, Bson.Binary(`minBinary`)) => (x, Type.AnyObject ⨿ Type.AnyArray).some
@@ -174,8 +177,8 @@ object Check {
   }
 
   val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
-  val minInstant = Instant.ofEpochMilli(0)  // FIXME: should be some negative value (this will miss any date before 1970)
-  val minTimestamp = Bson.Timestamp.fromInstant(minInstant, 0)
+  val minDate = Bson.Date(Long.MinValue)
+  val minTimestamp = Bson.Timestamp(Int.MinValue, 0)
   val minOid =
     ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
   val minRegex = Bson.Regex("", "")

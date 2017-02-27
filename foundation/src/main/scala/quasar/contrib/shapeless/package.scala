@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package quasar.contrib
 
 import quasar.Predef._
 
+import _root_.scalaz._, Leibniz._, Scalaz._
 import _root_.shapeless._
-import scalaz._, Leibniz._, Scalaz._
 
 package object shapeless {
   // TODO generalize this and contribute to shapeless-contrib

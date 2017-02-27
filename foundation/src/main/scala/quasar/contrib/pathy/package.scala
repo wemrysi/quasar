@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ package quasar.contrib
 import quasar.Predef._
 import quasar.fp.ski._
 
+import java.net.{URLDecoder, URLEncoder}
+
 import argonaut._
 import _root_.pathy.Path, Path._
-import scalaz._, Scalaz._
+import _root_.scalaz._, Scalaz._
 
 package object pathy {
   type AbsPath[T] = Path[Abs,T,Sandboxed]
@@ -33,11 +35,7 @@ package object pathy {
   type RFile = RelFile[Sandboxed]
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
-
-  type FilePath[B] = Path[B,File,Sandboxed]
-  type DirPath[B]  = Path[B,Dir, Sandboxed]
-  type FPath = FilePath[scala.Any]
-  type DPath = DirPath[scala.Any]
+  type FPath = Path[scala.Any,File,Sandboxed]
 
   type PathSegment = DirName \/ FileName
 
@@ -60,6 +58,23 @@ package object pathy {
 
   }
 
+  /** PathCodec with URI-encoded segments. */
+  val UriPathCodec: PathCodec = {
+    /** This encoder translates spaces into pluses, but we want the
+      *  more rigorous %20 encoding.
+      */
+    val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
+    val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")
+
+    val escapeRel: String => String = {
+      case ".." => "%2E%2E"
+      case "."  => "%2E"
+      case s    => uriEncodeUtf8(s)
+    }
+
+    PathCodec('/', escapeRel, uriDecodeUtf8)
+  }
+
   /** Rebases absolute paths onto the provided absolute directory, so
     * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.
     */
@@ -76,12 +91,12 @@ package object pathy {
         apath.relativeTo(prefix).fold(apath)(rootDir </> _)
     }
 
-  /** Returns the first named segment of the given relative path. */
-  def firstSegmentName(f: RPath): Option[PathSegment] =
+  /** Returns the first named segment of the given path. */
+  def firstSegmentName(p: Path[_,_,_]): Option[PathSegment] =
     flatten(none, none, none,
       n => DirName(n).left.some,
       n => FileName(n).right.some,
-      f).toIList.unite.headOption
+      p).toIList.unite.headOption
 
   def prettyPrint(path: Path[_,_,_]): String =
     refineType(path).fold(

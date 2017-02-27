@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,10 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
+    case (string.ToString, Data.Date(_) :: Nil) =>
+      Skipped("Date printing doesn't match").left
+    case (string.ToString, Data.Interval(_) :: Nil) =>
+      Skipped("Interval prints numeric representation").left
 
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
@@ -61,6 +65,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case _                             => ().right
   }
+
+  def shortCircuitTC(args: List[Data]): Result \/ Unit = Skipped("TODO").left
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {

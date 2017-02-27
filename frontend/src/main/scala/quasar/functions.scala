@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,22 @@ final case object Transformation extends DimensionalEffect
 
 object DimensionalEffect {
   implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
+}
+
+final case class NullaryFunc
+  (val effect: DimensionalEffect,
+    val help: String,
+    val codomain: Func.Codomain,
+    val simplify: Func.Simplifier)
+    extends GenericFunc[nat._0] {
+  val domain = Sized[List]()
+  val typer0: Func.Typer[nat._0] = _ => Validation.success(codomain)
+  val untyper0: Func.Untyper[nat._0] = {
+    case ((funcDomain, _), _) => Validation.success(funcDomain)
+  }
+
+  def apply[A](): LP[A] =
+    applyGeneric(Sized[List]())
 }
 
 final case class UnaryFunc(
@@ -98,11 +114,11 @@ sealed abstract class GenericFunc[N <: Nat] {
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
     Invoke[N, A](this, args)
 
-  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
-    untyper0((domain, codomain), tpe)
-
   final def tpe(args: Func.Domain[N]): Func.VCodomain =
     typer0(args)
+
+  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
+    untyper0((domain, codomain), tpe)
 
   final def arity: Int = domain.length
 }
@@ -141,9 +157,11 @@ trait GenericFuncInstances {
       case date.ExtractWeek               => "ExtractWeek"
       case date.ExtractYear               => "ExtractYear"
       case date.Date                      => "Date"
+      case date.Now                       => "Now"
       case date.Time                      => "Time"
       case date.Timestamp                 => "Timestamp"
       case date.Interval                  => "Interval"
+      case date.StartOfDay                => "StartOfDay"
       case date.TimeOfDay                 => "TimeOfDay"
       case date.ToTimestamp               => "ToTimestamp"
       case identity.Squash                => "Squash"
@@ -167,6 +185,7 @@ trait GenericFuncInstances {
       case relations.Or                   => "Or"
       case relations.Not                  => "Not"
       case relations.Cond                 => "Cond"
+      case set.Sample                     => "Sample"
       case set.Take                       => "Take"
       case set.Drop                       => "Drop"
       case set.Range                      => "Range"
@@ -198,6 +217,7 @@ trait GenericFuncInstances {
       case string.ToString                => "ToString"
       case structural.MakeObject          => "MakeObject"
       case structural.MakeArray           => "MakeArray"
+      case structural.Meta                => "Meta"
       case structural.ObjectConcat        => "ObjectConcat"
       case structural.ArrayConcat         => "ArrayConcat"
       case structural.ConcatOp            => "ConcatOp"

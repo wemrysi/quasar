@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
-import quasar.frontend.fixpoint.lpf
 import quasar.frontend.logicalplan._
 
 import matryoshka.data.Fix
@@ -31,6 +30,8 @@ import shapeless._
 class MathSpec extends quasar.Qspec with TypeArbitrary {
   import MathLib._
   import quasar.Data._
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   "MathLib" should {
     "type simple add with ints" in {

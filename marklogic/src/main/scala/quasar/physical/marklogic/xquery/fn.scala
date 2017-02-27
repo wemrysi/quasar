@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,19 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
+import eu.timepit.refined.auto._
+
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
+  val ns = Namespace(NSPrefix(NCName("fn")), NSUri("http://www.w3.org/2005/xpath-functions"))
+
+  def abs(num: XQuery): XQuery =
+    XQuery(s"fn:abs($num)")
+
   def avg(seq: XQuery): XQuery =
     XQuery(s"fn:avg($seq)")
 
@@ -58,6 +66,9 @@ object fn {
   def doc(uri: XQuery): XQuery =
     XQuery(s"fn:doc($uri)")
 
+  def docAvailable(uri: XQuery): XQuery =
+    XQuery(s"fn:doc-available($uri)")
+
   def documentUri(node: XQuery): XQuery =
     XQuery(s"fn:document-uri($node)")
 
@@ -78,6 +89,12 @@ object fn {
 
   def floor(n: XQuery): XQuery =
     XQuery(s"fn:floor($n)")
+
+  def formatDateTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-dateTime($value, $picture)")
+
+  def formatTime(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-time($value, $picture)")
 
   def head(seq: XQuery): XQuery =
     XQuery(s"fn:head($seq)")
@@ -153,6 +170,9 @@ object fn {
 
   def substringAfter(input: XQuery, after: XQuery): XQuery =
     XQuery(s"fn:substring-after($input, $after)")
+
+  def substringBefore(input: XQuery, after: XQuery): XQuery =
+    XQuery(s"fn:substring-before($input, $after)")
 
   def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
     XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")

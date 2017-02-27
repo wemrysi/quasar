@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,9 +84,6 @@ object expr {
 
     def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
       copy(orderSpecs = s :: IList.fromList(ss.toList))
-
-    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): FlworExpr =
-      orderBy(s, ss: _*).copy(orderIsStable = true)
 
     def return_(expr: XQuery): XQuery =
       XQuery.Flwor(

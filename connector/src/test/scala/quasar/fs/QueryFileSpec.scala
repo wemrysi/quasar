@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,18 @@
 
 package quasar.fs
 
-import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.fp._, eitherT._
+import quasar.contrib.scalaz._, eitherT._, stateT._
+import quasar.fp._
+import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.scalacheck._
 
+import scala.Predef.$conforms
+
+import matryoshka.data.Fix
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -32,7 +36,8 @@ import scalaz.scalacheck.ScalazArbitrary._
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
-  import quasar.frontend.fixpoint.lpf
+
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   "QueryFile" should {
     "descendantFiles" >> {

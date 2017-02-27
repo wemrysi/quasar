@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import scalaz._, Scalaz._
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
-    val compiler = Compiler.trampoline
     val asc: OrderType = ASC
 
     def transform[T]

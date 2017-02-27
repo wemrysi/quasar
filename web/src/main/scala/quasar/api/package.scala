@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
+import org.http4s.headers.`Content-Disposition`
 import org.http4s.server._
 import org.http4s.server.staticcontent._
 import org.http4s.util._
@@ -99,12 +100,12 @@ package object api {
       def strings(json: Json): String \/ List[String] =
         json.string.map(str => \/-(str :: Nil)).getOrElse(
           json.array.map { vs =>
-            vs.traverse(v => v.string \/> ("expected string in array; found: " + v.toString))
-          }.getOrElse(-\/("expected a string or array of strings; found: " + json)))
+            vs.traverse(v => v.string \/> (s"expected string in array; found: $v"))
+          }.getOrElse(-\/(s"expected a string or array of strings; found: $json")))
 
       for {
         json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
-        obj <- json.obj \/> ("expected a JSON object; found: " + json.toString)
+        obj <- json.obj \/> (s"expected a JSON object; found: $json")
         values <- obj.toList.traverse { case (k, v) =>
           strings(v).map(CaseInsensitiveString(k) -> _)
         }
@@ -128,6 +129,33 @@ package object api {
       }
   }
 
+  // [#1861] Workaround to support a small slice of RFC 5987 for this isolated case
+  object RFC5987ContentDispositionRender extends HttpMiddleware {
+    // NonUnitStatements due to http4s's Writer
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    final case class ContentDisposition(dispositionType: String, parameters: Map[String, String])
+      extends Header.Parsed {
+      import org.http4s.util.Writer
+      override def key = `Content-Disposition`
+      override lazy val value = super.value
+      override def renderValue(writer: Writer): writer.type = {
+        writer.append(dispositionType)
+        parameters.foreach(p =>
+          p._1.endsWith("*").fold(
+            writer << "; " << p._1 << "=" << p._2,
+            writer << "; " << p._1 << "=\"" << p._2 << '"'))
+        writer
+      }
+    }
+
+    def apply(service: HttpService): HttpService =
+      service ∘ (resp => resp.headers.get(`Content-Disposition`).cata(
+        i => resp.copy(headers = resp.headers
+          .filter(_.name ≠ `Content-Disposition`.name)
+          .put(ContentDisposition(i.dispositionType, i.parameters))),
+        resp))
+  }
+
   object Prefix {
     def apply(prefix: String)(service: HttpService): HttpService = {
       import monocle.macros.GenLens
@@ -148,34 +176,15 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound
+          case None       => HttpService.notFound // note: This needs to change to `Response.fallthrough` when http4s is upgraded
         }
       }
     }
   }
 
-  /** This encoder translates spaces into pluses, but we want the
-   *  more rigorous encoding %20.
-   */
-  def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
-  def uriDecodeUtf8(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
-
-  private val dotdot = "%2E%2E"
-  private val dot    = "%2E"
-
-  private val escapeRel: String => String = {
-    case ".." => dotdot
-    case "."  => dot
-    case s    => uriEncodeUtf8(s)
-  }
-
-  private val unescapeRel: String => String = uriDecodeUtf8
-
-  val UriPathCodec = PathCodec('/', escapeRel, unescapeRel)
-
   // NB: HPath's own toString doesn't encode properly
   private def pathString(p: HPath) =
-    "/" + p.toList.map(escapeRel).mkString("/")
+    "/" + p.toList.map(UriPathCodec.escape).mkString("/")
 
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
@@ -207,7 +216,7 @@ package object api {
   def decodedPath(encodedPath: String): ApiError \/ APath =
     AsPath.unapply(HPath(encodedPath)) \/> ApiError.fromMsg(
       BadRequest withReason "Malformed path.",
-      s"Failed to parse '${uriDecodeUtf8(encodedPath)}' as an absolute path.",
+      s"Failed to parse '${UriPathCodec.unescape(encodedPath)}' as an absolute path.",
       "encodedPath" := encodedPath)
 
   def transcode(from: PathCodec, to: PathCodec): String => String =
@@ -224,9 +233,6 @@ package object api {
       systemPath = basePath,
       pathCollector = pathCollector))
   }
-
-  def fileMediaType(file: String): Option[MediaType] =
-    MediaType.forExtension(file.split('.').last)
 
   def redirectService(basePath: String) = HttpService {
     // NB: this means we redirected to a path that wasn't handled, and need

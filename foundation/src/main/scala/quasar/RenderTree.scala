@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,152 +18,22 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fp.ski._
 
-import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import RenderTree.make
 import simulacrum.typeclass
 
-final case class RenderedTree(nodeType: List[String], label: Option[String], children: List[RenderedTree]) {
-  def simpleType: Option[String] = nodeType.headOption
-
-  def relabel(f: String => String) = this.copy(label = label.map(f))
-  def retype(f: List[String] => List[String]) = this.copy(nodeType = f(nodeType))
-
-  /**
-   A tree that describes differences between two trees:
-   - If the two trees are identical, the result is the same as (either) input.
-   - If the trees differ only in the labels on nodes, then the result has those
-      nodes decorated with "[Changed] old -> new".
-   - If a single node is unmatched on either side, it is decorated with "[Added]"
-      or "[Deleted]".
-   As soon as a difference is found and decorated, the subtree(s) beneath the
-   decorated nodes are not inspected.
-
-   Node types are not compared or necessarily preserved.
-   */
-  def diff(that: RenderedTree): RenderedTree = {
-    def prefixedType(t: RenderedTree, p: String): List[String] = t.nodeType match {
-      case first :: rest => (p + " " + first) :: rest
-      case Nil           => p :: Nil
-    }
-
-    def prefixType(t: RenderedTree, p: String): RenderedTree = t.copy(nodeType = prefixedType(t, p))
-    val deleted = ">>>"
-    val added = "<<<"
-
-    (this, that) match {
-      case (RenderedTree(nodeType1, l1, children1), RenderedTree(nodeType2, l2, children2)) => {
-        if (nodeType1 =/= nodeType2 || l1 =/= l2)
-          RenderedTree(List("[Root differs]"), None,
-            prefixType(this, deleted) ::
-            prefixType(that, added) ::
-            Nil)
-        else {
-          def matchChildren(children1: List[RenderedTree], children2: List[RenderedTree]): List[RenderedTree] = (children1, children2) match {
-            case (Nil, Nil)     => Nil
-            case (x :: xs, Nil) => prefixType(x, deleted) :: matchChildren(xs, Nil)
-            case (Nil, x :: xs) => prefixType(x, added) :: matchChildren(Nil, xs)
-
-            case (a :: as, b :: bs)        if a.typeAndLabel ≟ b.typeAndLabel  => a.diff(b) :: matchChildren(as, bs)
-            case (a1 :: a2 :: as, b :: bs) if a2.typeAndLabel ≟ b.typeAndLabel => prefixType(a1, deleted) :: a2.diff(b) :: matchChildren(as, bs)
-            case (a :: as, b1 :: b2 :: bs) if a.typeAndLabel ≟ b2.typeAndLabel => prefixType(b1, added) :: a.diff(b2) :: matchChildren(as, bs)
-
-            case (a :: as, b :: bs) => prefixType(a, deleted) :: prefixType(b, added) :: matchChildren(as, bs)
-          }
-          RenderedTree(nodeType1, l1, matchChildren(children1, children2))
-        }
-      }
-    }
-  }
-
-  /**
-  A 2D String representation of this Tree, separated into lines. Based on
-  scalaz Tree's show, but improved to use a single line per node, use
-  unicode box-drawing glyphs, and to handle newlines in the rendered
-  nodes.
-  */
-  def draw: Stream[String] = {
-    def drawSubTrees(s: List[RenderedTree]): Stream[String] = s match {
-      case Nil      => Stream.Empty
-      case t :: Nil => shift("╰─ ", "   ", t.draw)
-      case t :: ts  => shift("├─ ", "│  ", t.draw) append drawSubTrees(ts)
-    }
-    def shift(first: String, other: String, s: Stream[String]): Stream[String] =
-      (first #:: Stream.continually(other)).zip(s).map {
-        case (a, b) => a + b
-      }
-    def mapParts[A, B](as: Stream[A])(f: (A, Boolean, Boolean) => B): Stream[B] = {
-      def loop(as: Stream[A], first: Boolean): Stream[B] =
-        if (as.isEmpty)           Stream.empty
-        else if (as.tail.isEmpty) f(as.head, first, true) #:: Stream.empty
-        else                      f(as.head, first, false) #:: loop(as.tail, false)
-      loop(as, true)
-    }
-
-    val (prefix, body, suffix) = (simpleType, label) match {
-      case (None,             None)        => ("", "", "")
-      case (None,             Some(label)) => ("", label, "")
-      case (Some(simpleType), None)        => ("", simpleType, "")
-      case (Some(simpleType), Some(label)) => (simpleType + "(",  label, ")")
-    }
-    val indent = " " * (prefix.length-2)
-    val lines = body.split("\n").toStream
-    mapParts(lines) { (a, first, last) =>
-      val pre = if (first) prefix else indent
-      val suf = if (last) suffix else ""
-      pre + a + suf
-    } ++ drawSubTrees(children)
-  }
-
-  private def typeAndLabel: String = (simpleType, label) match {
-    case (None,             None)        => ""
-    case (None,             Some(label)) => label
-    case (Some(simpleType), None)        => simpleType
-    case (Some(simpleType), Some(label)) => simpleType + "(" + label + ")"
-  }
-}
-object RenderedTree {
-  implicit val RenderedTreeShow: Show[RenderedTree] = new Show[RenderedTree] {
-    override def show(t: RenderedTree) = t.draw.mkString("\n")
-  }
-
-  implicit val RenderedTreeEncodeJson: EncodeJson[RenderedTree] = EncodeJson {
-    case RenderedTree(nodeType, label, children) =>
-      Json.obj((
-        (nodeType match {
-          case Nil => None
-          case _   => Some("type" := nodeType.reverse.mkString("/"))
-        }) ::
-          Some("label" := label) ::
-          {
-            if (children.empty) None
-            else Some("children" := children.map(RenderedTreeEncodeJson.encode(_)))
-          } ::
-          Nil).foldMap(_.toList): _*)
-  }
-
-  implicit val renderTree: RenderTree[RenderedTree] =
-    RenderTree.make(ι)
-}
-object Terminal {
-  def apply(nodeType: List[String], label: Option[String]): RenderedTree = RenderedTree(nodeType, label, Nil)
-}
-object NonTerminal {
-  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree]): RenderedTree = RenderedTree(nodeType, label, children)
-}
+import RenderTree.make
+import RenderTree.ops._
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
 }
+
 @SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
 object RenderTree extends RenderTreeInstances {
-  import RenderTree.ops._
-
   def make[A](f: A => RenderedTree): RenderTree[A] =
     new RenderTree[A] { def render(v: A) = f(v) }
 
@@ -192,28 +62,21 @@ object RenderTree extends RenderTreeInstances {
       }
     }
 
-  implicit def const[A: RenderTree]: Delay[RenderTree, Const[A, ?]] =
-    Delay.fromNT(λ[RenderTree ~> DelayedA[A]#RenderTree](_ =>
-      make(_.getConst.render)))
-
   /** For use with `<|`, mostly. */
   def print[A: RenderTree](label: String, a: A): Unit =
     println(label + ":\n" + a.render.shows)
 
-  // FIXME: needs puffnfresh/wartremover#226 fixed
-  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
-  implicit def delay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
-    F(RenderTree[A])
-
   def recursive[T, F[_]](implicit T: Recursive.Aux[T, F], FD: Delay[RenderTree, F], FF: Functor[F]): RenderTree[T] =
     make(_.cata(FD(RenderTree[RenderedTree]).render))
+}
 
-  implicit def fix[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Fix[F]] =
-    recursive
-  implicit def mu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Mu[F]] =
-    recursive
-  implicit def nu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Nu[F]] =
-    recursive
+sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
+  implicit def const[A: RenderTree]: Delay[RenderTree, Const[A, ?]] =
+    Delay.fromNT(λ[RenderTree ~> DelayedA[A]#RenderTree](_ =>
+      make(_.getConst.render)))
+
+  implicit def delay[F[_], A: RenderTree](implicit F: Delay[RenderTree, F]): RenderTree[F[A]] =
+    F(RenderTree[A])
 
   implicit def free[F[_]: Functor](implicit F: Delay[RenderTree, F]): Delay[RenderTree, Free[F, ?]] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ Free[F, ?])#λ](rt =>
@@ -225,9 +88,7 @@ object RenderTree extends RenderTreeInstances {
 
   implicit def coproduct[F[_], G[_], A](implicit RF: RenderTree[F[A]], RG: RenderTree[G[A]]): RenderTree[Coproduct[F, G, A]] =
     make(_.run.fold(RF.render, RG.render))
-}
 
-sealed abstract class RenderTreeInstances {
   implicit lazy val unit: RenderTree[Unit] =
     make(_ => Terminal(List("()", "Unit"), None))
 
@@ -237,4 +98,90 @@ sealed abstract class RenderTreeInstances {
   implicit def coproductDelay[F[_], G[_]](implicit RF: Delay[RenderTree, F], RG: Delay[RenderTree, G]): Delay[RenderTree, Coproduct[F, G, ?]] =
     Delay.fromNT(λ[RenderTree ~> DelayedFG[F, G]#RenderTree](ra =>
       make(_.run.fold(RF(ra).render, RG(ra).render))))
+
+  implicit def eitherRenderTree[A, B](implicit RA: RenderTree[A], RB: RenderTree[B]): RenderTree[A \/ B] =
+    make {
+      case -\/ (a) => NonTerminal("-\\/" :: Nil, None, RA.render(a) :: Nil)
+      case \/- (b) => NonTerminal("\\/-" :: Nil, None, RB.render(b) :: Nil)
+    }
+
+  implicit def optionRenderTree[A](implicit RA: RenderTree[A]): RenderTree[Option[A]] =
+    make {
+      case Some(a) => RA.render(a)
+      case None    => Terminal("None" :: "Option" :: Nil, None)
+    }
+
+  implicit def listRenderTree[A](implicit RA: RenderTree[A]): RenderTree[List[A]] =
+    make(v => NonTerminal(List("List"), None, v.map(RA.render)))
+
+  implicit def listMapRenderTree[K: Show, V](implicit RV: RenderTree[V]): RenderTree[ListMap[K, V]] =
+    make(v => NonTerminal("Map" :: Nil, None,
+      v.toList.map { case (k, v) =>
+        NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
+      }))
+
+  implicit def vectorRenderTree[A](implicit RA: RenderTree[A]): RenderTree[Vector[A]] =
+    make(v => NonTerminal(List("Vector"), None, v.map(RA.render).toList))
+
+  implicit lazy val booleanRenderTree: RenderTree[Boolean] =
+    RenderTree.fromShow[Boolean]("Boolean")
+
+  implicit lazy val intRenderTree: RenderTree[Int] =
+    RenderTree.fromShow[Int]("Int")
+
+  implicit lazy val doubleRenderTree: RenderTree[Double] =
+    RenderTree.fromShow[Double]("Double")
+
+  implicit lazy val stringRenderTree: RenderTree[String] =
+    RenderTree.fromShow[String]("String")
+
+  implicit def pathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
+    // NB: the implicit Show instance in scope here ends up being a circular
+    // call, so an explicit reference to pathy's Show is needed.
+    make(p => Terminal(List("Path"), pathy.Path.PathShow.shows(p).some))
+
+  implicit def leftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
+      RenderTree[(((A, B), C), D)] =
+    new RenderTree[(((A, B), C), D)] {
+      def render(t: (((A, B), C), D)) =
+        NonTerminal("tuple" :: Nil, None,
+           RA.render(t._1._1._1) ::
+            RB.render(t._1._1._2) ::
+            RC.render(t._1._2) ::
+            RD.render(t._2) ::
+            Nil)
+    }
+}
+
+sealed abstract class RenderTreeInstances0 extends RenderTreeInstances1 {
+  implicit def leftTuple3RenderTree[A, B, C](
+    implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C]
+  ): RenderTree[((A, B), C)] =
+    new RenderTree[((A, B), C)] {
+      def render(t: ((A, B), C)) =
+        NonTerminal("tuple" :: Nil, None,
+          RA.render(t._1._1) ::
+          RB.render(t._1._2) ::
+          RC.render(t._2)    ::
+          Nil)
+    }
+
+  implicit def fix[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Fix[F]] =
+    RenderTree.recursive
+
+  implicit def mu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Mu[F]] =
+    RenderTree.recursive
+
+  implicit def nu[F[_]: Functor](implicit F: Delay[RenderTree, F]): RenderTree[Nu[F]] =
+    RenderTree.recursive
+}
+
+sealed abstract class RenderTreeInstances1 {
+  implicit def tuple2RenderTree[A, B](
+    implicit RA: RenderTree[A], RB: RenderTree[B]
+  ): RenderTree[(A, B)] =
+    make(t => NonTerminal("tuple" :: Nil, None,
+      RA.render(t._1) ::
+      RB.render(t._2) ::
+      Nil))
 }

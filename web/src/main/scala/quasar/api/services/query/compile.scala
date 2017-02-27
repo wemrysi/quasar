@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import quasar.frontend._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 
-import scala.Predef.$conforms
-
 import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data.Fix
@@ -38,7 +36,7 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object compile {
-  private val lpr = new LogicalPlanR[Fix]
+  private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
   def service[S[_]](
     implicit
@@ -50,11 +48,6 @@ object compile {
         case PhaseResult.Tree(name, value)   => value.asJson
         case PhaseResult.Detail(name, value) => value.asJson
       }
-
-    def dataResponse(data: List[Data]): QResponse[S] =
-      QResponse.string(Ok,
-        "Results\n" +
-          data.map(_.toJs.toList).flatten.map(_.toJs.pprint(0)).mkString("\n"))
 
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(

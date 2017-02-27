@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -207,13 +207,12 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
-  @SuppressWarnings(Array("org.wartremover.warts.NoNeedForMonad"))
   private def freshName: MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
       (prefix, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
-    } yield prefix.run + n
+    } yield prefix.run + n.toString
 
   private def tmpPrefix: Task[TmpPrefix] =
     NameGenerator.salt map (s => TmpPrefix(s"__quasar.tmp_${s}_"))

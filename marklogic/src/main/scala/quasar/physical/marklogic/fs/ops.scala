@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,241 +17,250 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.Data
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.uuid._
-import quasar.fp.free.lift
-import quasar.fs._
+import quasar.fp.numeric._
 import quasar.physical.marklogic.ErrorMessages
-import quasar.physical.marklogic.fs.data.encodeXml
-import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.qscript._
+import quasar.physical.marklogic.xml.NCName
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.xcc._, Xcc.ops._
 
-import scala.math.{ceil, log}
-
+import com.marklogic.xcc.types.{XdmItem, XSBoolean, XSString}
 import eu.timepit.refined.auto._
-import com.marklogic.xcc._
-import com.marklogic.xcc.exceptions.XQueryException
-import com.marklogic.xcc.types.XSBoolean
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-// NB: MarkLogic appears to possibly execute independent expressions in parallel,
-//     which can cause side-effects intended to be sequenced after other operations
-//     to fail, thus it seems to be better to sequence them via `SessionIO` (i.e.
-//     make multiple requests) rather than to sequence them as expressions in XQuery.
 object ops {
-  import expr.{func, if_, for_, let_}, axes.child
+  import expr.{func, let_}
 
-  val prop           = NSPrefix(NCName("prop"))
-  val propProperties = prop(NCName("properties"))
-  val propDirectory  = prop(NCName("directory"))
-
-  def appendToFile[S[_]](
-    dstFile: AFile,
-    data: Vector[Data]
+  /** Appends the given contents to the file, which must already exist. */
+  def appendToFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
+    file: AFile,
+    contents: A
   )(implicit
-    S0: SessionIO :<: S,
-    S1: GenUUID :<: S
-  ): Free[S, Vector[FileSystemError]] = {
-    val dstDir = asDir(dstFile)
-
-    val createOptions = {
-      val copts = new ContentCreateOptions()
-      copts.setFormatXml()
-      copts
-    }
-
-    // NB: Ensures all the filenames are the same length, regardless of
-    //     the value of their sequence number, so that they compare properly.
-    val seqFmt = {
-      val width = ceil(log(data.size.toDouble) / log(16)).toInt
-      if (width === 0) "" else s"%0${width}x"
-    }
-
-    val xmlData: Vector[FileSystemError \/ String] =
-      data map { d =>
-        encodeXml[ErrorMessages \/ ?](d).bimap(
-          ms => FileSystemError.writeFailed(d, ms.intercalate(", ")),
-          _.toString)
+    C:  AsContent[FMT, A],
+    SP: StructuralPlanner[F, FMT]
+  ): F[ErrorMessages \/ Vector[XccError]] = {
+    def appendQuery(src: AFile): F[MainModule] =
+      main10ml {
+        SP.leftShift(fileRoot[FMT](src))
+          .flatMap(lib.appendChildNodes[F, FMT].apply(fileRoot[FMT](file), _))
       }
 
-    def mkContent(cid: String, seqNum: Int, str: String): Content = {
-      val fname = cid + seqFmt.format(seqNum)
-      val uri = pathUri(dstDir </> file(fname))
-      ContentFactory.newContent(uri, str, createOptions)
+    val tmpFile = UuidReader[F] asks { uuid =>
+      renameFile(file, fn => FileName(s"${fn.value}-$uuid"))
     }
 
-    val (errs, contents) = xmlData.separate
-
-    for {
-      cs   <- chunkId ∘ (cid => contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) })
-      exs  <- lift(SessionIO.insertContentCollectErrors(cs)).into[S]
-    } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(errs.length) +: errs)
+    Xcc[F].transact(for {
+      tmp  <- tmpFile
+      errs <- insertFile[F, FMT, A](tmp, contents)
+      main <- appendQuery(tmp)
+      _    <- Xcc[F].execute(main)
+      _    <- deleteFile(tmp)
+    } yield errs)
   }
 
-  def createFile(file: AFile): SessionIO[PathError \/ Unit] = {
-    val uri = pathUri(asDir(file))
+  /** Returns whether the server is configured to create directories automatically. */
+  def automaticDirectoryCreationEnabled[F[_]: Functor: Xcc]: F[Boolean] = {
+    val main = main10ml {
+      admin.getConfiguration[W]
+        .flatMap(admin.databaseGetDirectoryCreation[W](_, xdmp.database()))
+    }
 
-    // TODO: If dir exists and is empty, then shouldn't error
-    handleXcc(SessionIO.executeQuery_(xdmp.directoryCreate(uri.xs)) as ().right[PathError]) {
-      case qex: XQueryException if qex.getCode === "XDMP-DIREXISTS" => PathError.pathExists(file).left
+    Xcc[F].results(main.value) map {
+      case Vector(createMode: XSString) => createMode.asString === "automatic"
+      case _                            => false
     }
   }
 
-  def deleteFile(file: AFile): SessionIO[Unit] = {
-    val uri = pathUri(asDir(file))
+  /** Deletes the given directory and all descendants, recursively. */
+  def deleteDir[F[_]: Xcc: Applicative, FMT: SearchOptions](dir: ADir): F[Executed] = {
+    val file = $("file")
 
-    val deleteChildDocuments =
-      SessionIO.executeQuery_(
-        fn.map(
-          func("$d") { xdmp.documentDelete(fn.baseUri("$d".xqy)) },
-          xdmp.directory(uri.xs, "1".xs)))
-
-    val deleteMLDirIfEmpty =
-      SessionIO.executeQuery_(deleteIfEmptyXqy(uri.xs))
-
-    deleteChildDocuments *> deleteMLDirIfEmpty.void
-  }
-
-  def deleteDir(dir: ADir): SessionIO[Unit] =
-    SessionIO.executeQuery_(xdmp.directoryDelete(pathUri(dir).xs)).void
-
-  def exists(path: APath): SessionIO[Boolean] = {
-    val uri = pathUri(refineType(path).map(asDir).merge)
-
-    val xqy = fn.exists(fn.filter(func("$uri") { fn.startsWith("$uri".xqy, uri.xs) }, cts.uris))
-
-    SessionIO.resultsOf_(xqy) flatMap { items => SessionIO.liftT {
-      Task.delay(items(0).asInstanceOf[XSBoolean].asPrimitiveBoolean)
-    }}
-  }
-
-  def ls(dir: ADir): SessionIO[Set[PathSegment]] = {
-    val uri = pathUri(dir)
-
-    def isMLDir(u: XQuery) =
-      fn.exists(xdmp.documentProperties(u) `/` child(propProperties) `/` child(propDirectory))
-
-    val prefixPathsXqy =
-      fn.filter(
-        func("$u") { isMLDir("$u".xqy) and fn.startsWith("$u".xqy, uri.xs) },
-        cts.uris(uri.xs, IList("properties".xs)))
-
-    def childPathsXqy(prefixed: XQuery) =
-      fn.distinctValues(fn.map(
-        func("$u") {
-          fn.concat(
-            uri.xs,
-            fn.tokenize(fn.substringAfter("$u".xqy, uri.xs), "/".xs)("1".xqy),
-            "/".xs)
-        },
-        prefixed))
-
-    def isDirXqy(pathUri: XQuery) = {
-      val d = $("d")
-
-      val hasChildMLDirs =
-        fn.exists(
-          for_(d in xdmp.directory(pathUri, "1".xs))
-          .where_((~d)("property::directory".xqy))
-          .return_(~d))
-
-      fn.not(isMLDir(pathUri)) or hasChildMLDirs
-    }
-
-    def isFileXqy(pathUri: XQuery) = {
-      val d = $("d")
-
-      fn.exists(
-        for_(d in xdmp.directory(pathUri, "1".xs))
-        .where_((~d)(fn.not("property::directory".xqy)))
-        .return_(~d))
-    }
-
-    def filesXqy(dirUris: XQuery) =
+    val deleteFiles =
       fn.map(
-        func("$u") { fn.substring("$u".xqy, "1".xqy, some(fn.stringLength("$u".xqy) - "1".xqy)) },
-        fn.filter(func("$f") { isFileXqy("$f".xqy) }, dirUris))
+        func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
+        directoryDocuments[FMT](pathUri(dir).xs, true))
 
-    val (pathUris, childPathUris, dirUris, fileUris) = ($("pathUris"), $("childPathUris"), $("dirUris"), $("fileUris"))
+    (Xcc[F].executeQuery(deleteFiles) *> deleteEmptyDescendantDirectories[F](dir)).transact
+  }
 
-    val xqy = let_(
-      pathUris      := prefixPathsXqy,
-      childPathUris := childPathsXqy(~pathUris),
-      dirUris       := fn.filter(func("$u") { isDirXqy("$u".xqy) }, ~childPathUris),
-      fileUris      := filesXqy(~childPathUris)
-    ) return_ (
-      mkSeq_(~dirUris, ~fileUris)
-    )
+  /** Delete all empty descendant directories. */
+  def deleteEmptyDescendantDirectories[F[_]: Xcc](dir: ADir): F[Executed] = {
+    val query =
+      lib.emptyDescendantDirectories[W].apply(pathUri(dir).xs)
+        .map(empties => fn.map(xdmp.ns(NCName("document-delete")) :# 1, empties))
 
+    Xcc[F].execute(main10ml(query).value)
+  }
+
+  /** Deletes the given file, erroring if it doesn't exist. */
+  def deleteFile[F[_]: Xcc](file: AFile): F[Executed] =
+    Xcc[F].executeQuery(xdmp.documentDelete(pathUri(file).xs))
+
+  /** Returns whether any file descendants of the given dir have the specified format. */
+  def descendantsHavingFormatExist[F[_]: Xcc: Functor, FMT: SearchOptions](dir: ADir): F[Boolean] = {
+    val main = main10ml(lib.descendantsHavingFormatExist[W, FMT] apply pathUri(dir).xs)
+    Xcc[F].results(main.value) map booleanResult
+  }
+
+  /** The set of child directories and files of the given directory. */
+  def directoryContents[F[_]: Functor: Xcc, FMT: SearchOptions](dir: ADir): F[Set[PathSegment]] = {
     def parseDir(s: String): Option[PathSegment] =
-      posixCodec.parseAbsDir(s) flatMap dirName map (_.left)
+      UriPathCodec.parseRelDir(s) flatMap dirName map (_.left)
 
     def parseFile(s: String): Option[PathSegment] =
-      posixCodec.parseAbsFile(s) map (f => fileName(f).right)
+      UriPathCodec.parseRelFile(s) map (f => fileName(f).right)
 
-    SessionIO.resultsOf_(xqy) map (_ foldMap { item =>
-      val itemStr = item.asString
-      parseDir(itemStr).orElse(parseFile(itemStr)).toSet
+    val main = main10ml(lib.directoryContents[W, FMT] apply pathUri(dir).xs)
+
+    Xcc[F].results(main.value) map (_ foldMap {
+      case item: XSString =>
+        val str = item.asString
+        (parseDir(str) orElse parseFile(str)).toSet
+
+      case _ => Set()
     })
   }
 
-  def moveFile(src: AFile, dst: AFile): SessionIO[Unit] = {
-    val srcUri = pathUri(asDir(src))
-    val dstUri = pathUri(asDir(dst))
+  /** Ensure the given directory exists, creating it if necessary. */
+  def ensureDirectory[F[_]: Monad: Xcc](dir: ADir): F[Executed] = {
+    import XccError.Code
 
-    def doMove = {
-      val (d, oldName, newName) = ($("d"), $("oldName"), $("newName"))
+    def isDirExists(code: String) =
+      Code.string.getOption(code) exists (_ === Code.DirExists)
 
-      SessionIO.executeQuery_(mkSeq_(
-        if_(fn.exists(xdmp.documentProperties(dstUri.xs)("/prop:properties/prop:directory".xqy)))
-          .then_ {
-            for_(d in xdmp.directory(dstUri.xs, "1".xs))
-            .return_(xdmp.documentDelete(xdmp.nodeUri(~d)))
-          } else_ {
-            xdmp.directoryCreate(dstUri.xs)
-          },
+    Xcc[F].executeQuery(xdmp.directoryCreate(pathUri(dir).xs)) handle {
+      case XccError.QueryError(_, c) if isDirExists(c.getCode) => Executed.executed
+    }
+  }
 
-        for_(
-          d in xdmp.directory(srcUri.xs, "1".xs))
-        .let_(
-          oldName := xdmp.nodeUri(~d),
-          newName := fn.concat(dstUri.xs, fn.tokenize(~oldName, "/".xs)(fn.last)))
-        .return_(mkSeq_(
-          xdmp.documentInsert(~newName, fn.doc(~oldName)),
-          xdmp.documentDelete(~oldName)))))
+  /** Ensure the given directory and all ancestors exist, creating them if necessary. */
+  def ensureLineage[F[_]: Monad: Xcc](dir: ADir): F[Executed] = {
+    def ensureLineage0(d: ADir): F[Executed] =
+      ensureDirectory[F](d) <* parentDir(d).traverse(ensureLineage0)
+
+    automaticDirectoryCreationEnabled[F]
+      .ifM(ensureDirectory[F](dir), ensureLineage0(dir))
+      .transact
+  }
+
+  /** Returns whether the file exists, regardless of format. */
+  def fileExists[F[_]: Functor: Xcc](file: AFile): F[Boolean] =
+    Xcc[F].queryResults(fn.docAvailable(pathUri(file).xs)) map booleanResult
+
+  /** Returns whether the file having the given format exists. */
+  def fileHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](file: AFile): F[Boolean] =
+    Xcc[F].queryResults(fn.exists(fileNode[FMT](file))) map booleanResult
+
+  /** Insert the given contents into the file, overwriting any existing contents
+    * and creating the file otherwise. Returns any errors encountered, either
+    * with the contents or during the process of insertion itself.
+    */
+  def insertFile[F[_]: Monad: Xcc, FMT, A](
+    file: AFile,
+    contents: A
+  )(implicit
+    C: AsContent[FMT, A]
+  ): F[ErrorMessages \/ Vector[XccError]] = {
+    val uri         = pathUri(file)
+    val contentUri  = ContentUri.getOption(uri) \/> s"Malformed content URI: $uri".wrapNel
+    val content     = contentUri >>= (C.asContent[ErrorMessages \/ ?](_, contents))
+
+    EitherT.fromDisjunction[F](content)
+      .flatMapF(c => Xcc[F].insert[Id](c) map (_.right[ErrorMessages]))
+      .run
+  }
+
+  /** Move `src` to `dst` overwriting any existing contents. */
+  def moveDir[F[_]: Monad: Xcc, FMT: SearchOptions](src: ADir, dst: ADir): F[Executed] = {
+    val decodeDir: XdmItem => Option[ADir] = {
+      case str: XSString => UriPathCodec.parseAbsDir(str.asString) map (sandboxAbs(_))
+      case _             => None
     }
 
-    def deleteSrcIfEmpty =
-      SessionIO.executeQuery_(deleteIfEmptyXqy(srcUri.xs))
+    val (file, srcUri, dstUri) = ($("file"), $("srcUri"), $("dstUri"))
 
-    if (src === dst) ().point[SessionIO] else doMove *> deleteSrcIfEmpty.void
+    val dstDirs = (
+      lib.moveFile[W, FMT].apply(~srcUri, ~dstUri) |@|
+      lib.fileParent[W].apply(~dstUri)
+    ) { (doMove, parentDir) =>
+        fn.distinctValues(fn.map(
+          func(file.render) {
+            let_(
+              srcUri := fn.baseUri(~file),
+              dstUri := fn.concat(
+                          pathUri(dst).xs,
+                          fn.substringAfter(~srcUri, pathUri(src).xs)),
+              $("_") := doMove)
+            .return_(parentDir)
+          },
+          directoryDocuments[FMT](pathUri(src).xs, true)))
+    }
+
+    val doMoveDir = for {
+      items <- Xcc[F].results(main10ml(dstDirs).value)
+      dirs  =  items.map(decodeDir).unite
+      _     <- dirs traverse_ (ensureLineage[F](_).void)
+      _     <- deleteEmptyDescendantDirectories[F](src)
+    } yield ()
+
+    (src =/= dst) whenM doMoveDir.transact as Executed.executed
   }
 
-  def readFile(file: AFile): Process[ContentSourceIO, Data] = {
-    val uri = pathUri(asDir(file))
-
-    val xqy = cts.search(
-      fn.doc(),
-      cts.directoryQuery(uri.xs),
-      IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
-
-    ContentSourceIO.resultStream(SessionIO.evaluateQuery_(xqy))
-      .map(xdm => xdmitem.toData[ErrorMessages \/ ?](xdm) | Data.NA)
+  /** Move `src` to `dst` overwriting any existing contents. */
+  def moveFile[F[_]: Monad: Xcc, FMT: SearchOptions](src: AFile, dst: AFile): F[Executed] = {
+    val main = main10ml(lib.moveFile[W, FMT] apply (pathUri(src).xs, pathUri(dst).xs))
+    (src =/= dst) whenM Xcc[F].execute(main.value) as Executed.executed
   }
+
+  /** Returns whether the given path exists having the specified format. */
+  def pathHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](path: APath): F[Boolean] =
+    refineType(path).fold(descendantsHavingFormatExist[F, FMT], fileHavingFormatExists[F, FMT])
+
+  /** Stream of the left-shifted contents of the given file. */
+  def readFile[F[_]: Monad: Xcc: PrologL, FMT: SearchOptions](
+    file: AFile,
+    offset: Natural,
+    limit: Option[Positive]
+  )(implicit
+    SP: StructuralPlanner[F, FMT]
+  ): Process[F, XdmItem] = {
+    val query = SP.leftShift(fileRoot[FMT](file)) map { items =>
+      (offset.get + 1, limit.map(_.get.xqy)) match {
+        case (1, None) => items
+        case (o, l)    => fn.subsequence(items, o.xqy, l)
+      }
+    }
+
+    main10ml(query).liftM[Process].flatMap(Xcc[F].evaluate)
+  }
+
+  /** Appends contents to an existing file, creating it otherwise. */
+  def upsertFile[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions, A](
+    file: AFile,
+    contents: A
+  )(implicit
+    C:  AsContent[FMT, A],
+    SP: StructuralPlanner[F, FMT]
+  ): F[ErrorMessages \/ Vector[XccError]] =
+    fileExists[F](file).ifM(
+      appendToFile[F, FMT, A](file, contents),
+      insertFile[F, FMT, A](file, contents))
 
   ////
 
-  private def chunkId[S[_]](implicit S: GenUUID :<: S): Free[S, String] =
-    GenUUID.Ops[S].asks(id => toSequentialString(id) getOrElse toOpaqueString(id))
+  private type W[A] = Writer[Prologs, A]
 
-  private def deleteIfEmptyXqy(dirUri: XQuery): XQuery =
-    if_ (fn.not(fn.exists(xdmp.directory(dirUri, "infinity".xs))))
-      .then_ { xdmp.directoryDelete(dirUri) }
-      .else_ { expr.emptySeq }
+  private val booleanResult: Vector[XdmItem] => Boolean = {
+    case Vector(b: XSBoolean) => b.asPrimitiveBoolean
+    case _                    => false
+  }
+
+  private def main10ml[F[_]: Functor: PrologL](query: F[XQuery]): F[MainModule] =
+    MainModule fromWritten (query strengthL Version.`1.0-ml`)
 }

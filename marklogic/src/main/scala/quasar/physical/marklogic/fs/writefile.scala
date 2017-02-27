@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,38 +17,50 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.fp.free.lift
+import quasar.Data
+import quasar.contrib.pathy._
+import quasar.effect.{Kvs, MonoSeq}
+import quasar.effect.uuid.UuidReader
+import quasar.fp.numeric.Positive
 import quasar.fs._, FileSystemError._
-import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.effect.uuid.GenUUID
-import quasar.physical.marklogic.xcc.SessionIO
+import quasar.physical.marklogic.qscript._
+import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.xquery._
 
+import pathy.Path._
 import scalaz._, Scalaz._
 
 object writefile {
-
-  def interpret[S[_]](
+  def interpret[F[_]: Monad: Xcc: UuidReader: PrologW: PrologL, FMT: SearchOptions](
+    chunkSize: Positive
+  )(
     implicit
-    S0:      SessionIO :<: S,
-    S1:      GenUUID :<: S,
-    cursors: KeyValueStore.Ops[WriteFile.WriteHandle, Unit, S],
-    seq:     MonotonicSeq.Ops[S]
-  ): WriteFile ~> Free[S, ?] = new (WriteFile ~> Free[S, ?]) {
-    def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
+    C:       AsContent[FMT, Data],
+    SP:      StructuralPlanner[F, FMT],
+    cursors: Kvs[F, WriteFile.WriteHandle, Unit],
+    idSeq:   MonoSeq[F]
+  ): WriteFile ~> F = {
+    def write(dst: AFile, lines: Vector[Data]) = {
+      val chunk = Data._arr(lines.toList)
+      ops.upsertFile[F, FMT, Data](dst, chunk) map (_.fold(
+        msgs => Vector(FileSystemError.writeFailed(chunk, msgs intercalate ", ")),
+        _ map (xe => FileSystemError.writeFailed(chunk, xe.shows))))
+    }
+
+    λ[WriteFile ~> F] {
       case WriteFile.Open(file) =>
         for {
-          writeHandle <- seq.next ∘ (WriteFile.WriteHandle(file, _))
-          _  <- cursors.put(writeHandle, ())
-          r  <- lift(ops.exists(file).ifM(
-                  ().right[PathError].point[SessionIO],
-                  ops.createFile(file))
-                ).into[S]
-        } yield r.leftMap(pathErr(_)).as(writeHandle)
+          wh <- idSeq.next ∘ (WriteFile.WriteHandle(file, _))
+          _  <- cursors.put(wh, ())
+          _  <- ops.ensureLineage[F](fileParent(file))
+        } yield wh.right[FileSystemError]
 
       case WriteFile.Write(h, data) =>
-        cursors.get(h).isDefined.ifM(
-          ops.appendToFile[S](h.file, data),
-          Vector(unknownWriteHandle(h)).pure[Free[S, ?]])
+        OptionT(cursors.get(h)).isDefined.ifM(
+          data.grouped(chunkSize.get.toInt)
+            .toStream
+            .foldMapM(write(h.file, _)),
+          Vector(unknownWriteHandle(h)).point[F])
 
       case WriteFile.Close(h) =>
         cursors.delete(h)

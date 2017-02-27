@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import quasar._, RenderTree.ops._
 import quasar.ejson._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.std.StdLib._
+import quasar.std.StdLib._, date.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
@@ -188,14 +188,6 @@ object MapFunc {
         }
     }
 
-    object EjConstExtension {
-      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Extension[T[EJson]]] =
-        tco match {
-          case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(v)))))) => Some(v)
-          case _                                                      => None
-        }
-    }
-
     _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
       κ(None),
       {
@@ -252,12 +244,12 @@ object MapFunc {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
             case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Constant(src)))), Embed(value))))) if field ≟ src =>
-              value
+              value.some
             case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
-              m.find {
-                case (k, v) => k ≟ field
-              }.map(p => rollMF[T, A](Constant(p._2))).get
-          }
+              m.collectFirst {
+                case (k, v) if k ≟ field => rollMF[T, A](Constant(v))
+              }
+          }.flatten
 
         // elide Nil array on the left
         case ConcatArrays(
@@ -325,8 +317,11 @@ object MapFunc {
         case Time(a1) => f(a1) ∘ (Time(_))
         case Timestamp(a1) => f(a1) ∘ (Timestamp(_))
         case Interval(a1) => f(a1) ∘ (Interval(_))
+        case StartOfDay(a1) => f(a1) ∘ (StartOfDay(_))
+        case TemporalTrunc(a1, a2) => f(a2) ∘ (TemporalTrunc(a1, _))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
         case Length(a1) => f(a1) ∘ (Length(_))
@@ -408,8 +403,11 @@ object MapFunc {
         case (Time(a1), Time(b1)) => in.equal(a1, b1)
         case (Timestamp(a1), Timestamp(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
+        case (StartOfDay(a1), StartOfDay(b1)) => in.equal(a1, b1)
+        case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => a1 ≟ b1 && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
         case (Length(a1), Length(b1)) => in.equal(a1, b1)
@@ -423,6 +421,7 @@ object MapFunc {
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
         case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
+        //  binary
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Subtract(a1, a2), Subtract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -496,8 +495,11 @@ object MapFunc {
           case Time(a1) => shz("Time", a1)
           case Timestamp(a1) => shz("Timestamp", a1)
           case Interval(a1) => shz("Interval", a1)
+          case StartOfDay(a1) => shz("StartOfDay", a1)
+          case TemporalTrunc(a1, a2) => Cord("TemporalTrunc(", a1.show, ", ", sh.show(a2), ")")
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case TypeOf(a1) => shz("TypeOf", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
           case Length(a1) => shz("Length", a1)
@@ -594,8 +596,11 @@ object MapFunc {
           case Time(a1) => nAry("Time", a1)
           case Timestamp(a1) => nAry("Timestamp", a1)
           case Interval(a1) => nAry("Interval", a1)
+          case StartOfDay(a1) => nAry("StartOfDay", a1)
+          case TemporalTrunc(a1, a2) => NonTerminal("TemporalTrunc" :: nt, a1.shows.some, List(r.render(a2)))
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case TypeOf(a1) => nAry("TypeOf", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
           case Length(a1) => nAry("Length", a1)
@@ -645,90 +650,91 @@ object MapFunc {
       }
     }
 
+  def translateNullaryMapping[T[_[_]], A]: NullaryFunc => MapFunc[T, A] = {
+    case date.Now => Now()
+  }
+
   def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFunc[T, A] = {
-    {
-      case date.ExtractCentury => ExtractCentury(_)
-      case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
-      case date.ExtractDecade => ExtractDecade(_)
-      case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
-      case date.ExtractDayOfYear => ExtractDayOfYear(_)
-      case date.ExtractEpoch => ExtractEpoch(_)
-      case date.ExtractHour => ExtractHour(_)
-      case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
-      case date.ExtractIsoYear => ExtractIsoYear(_)
-      case date.ExtractMicroseconds => ExtractMicroseconds(_)
-      case date.ExtractMillennium => ExtractMillennium(_)
-      case date.ExtractMilliseconds => ExtractMilliseconds(_)
-      case date.ExtractMinute => ExtractMinute(_)
-      case date.ExtractMonth => ExtractMonth(_)
-      case date.ExtractQuarter => ExtractQuarter(_)
-      case date.ExtractSecond => ExtractSecond(_)
-      case date.ExtractTimezone => ExtractTimezone(_)
-      case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
-      case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
-      case date.ExtractWeek => ExtractWeek(_)
-      case date.ExtractYear => ExtractYear(_)
-      case date.Date => Date(_)
-      case date.Time => Time(_)
-      case date.Timestamp => Timestamp(_)
-      case date.Interval => Interval(_)
-      case date.TimeOfDay => TimeOfDay(_)
-      case date.ToTimestamp => ToTimestamp(_)
-      case math.Negate => Negate(_)
-      case relations.Not => Not(_)
-      case string.Length => Length(_)
-      case string.Lower => Lower(_)
-      case string.Upper => Upper(_)
-      case string.Boolean => Bool(_)
-      case string.Integer => Integer(_)
-      case string.Decimal => Decimal(_)
-      case string.Null => Null(_)
-      case string.ToString => ToString(_)
-      case structural.MakeArray => MakeArray(_)
-      case structural.Meta => Meta(_)
-    }
+    case date.ExtractCentury => ExtractCentury(_)
+    case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
+    case date.ExtractDecade => ExtractDecade(_)
+    case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
+    case date.ExtractDayOfYear => ExtractDayOfYear(_)
+    case date.ExtractEpoch => ExtractEpoch(_)
+    case date.ExtractHour => ExtractHour(_)
+    case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
+    case date.ExtractIsoYear => ExtractIsoYear(_)
+    case date.ExtractMicroseconds => ExtractMicroseconds(_)
+    case date.ExtractMillennium => ExtractMillennium(_)
+    case date.ExtractMilliseconds => ExtractMilliseconds(_)
+    case date.ExtractMinute => ExtractMinute(_)
+    case date.ExtractMonth => ExtractMonth(_)
+    case date.ExtractQuarter => ExtractQuarter(_)
+    case date.ExtractSecond => ExtractSecond(_)
+    case date.ExtractTimezone => ExtractTimezone(_)
+    case date.ExtractTimezoneHour => ExtractTimezoneHour(_)
+    case date.ExtractTimezoneMinute => ExtractTimezoneMinute(_)
+    case date.ExtractWeek => ExtractWeek(_)
+    case date.ExtractYear => ExtractYear(_)
+    case date.Date => Date(_)
+    case date.Time => Time(_)
+    case date.Timestamp => Timestamp(_)
+    case date.Interval => Interval(_)
+    case date.StartOfDay => StartOfDay(_)
+    case date.TimeOfDay => TimeOfDay(_)
+    case date.ToTimestamp => ToTimestamp(_)
+    case identity.TypeOf => TypeOf(_)
+    case math.Negate => Negate(_)
+    case relations.Not => Not(_)
+    case string.Length => Length(_)
+    case string.Lower => Lower(_)
+    case string.Upper => Upper(_)
+    case string.Boolean => Bool(_)
+    case string.Integer => Integer(_)
+    case string.Decimal => Decimal(_)
+    case string.Null => Null(_)
+    case string.ToString => ToString(_)
+    case structural.MakeArray => MakeArray(_)
+    case structural.Meta => Meta(_)
   }
 
-  def translateBinaryMapping[T[_[_]], A]: BinaryFunc => (A, A) => MapFunc[T, A] = {
-    {
-      // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
-      //     about the second. And it shouldn’t even have two in LP.
-      case array.ArrayLength => (a, b) => Length(a)
-      case math.Add => Add(_, _)
-      case math.Multiply => Multiply(_, _)
-      case math.Subtract => Subtract(_, _)
-      case math.Divide => Divide(_, _)
-      case math.Modulo => Modulo(_, _)
-      case math.Power => Power(_, _)
-      case relations.Eq => Eq(_, _)
-      case relations.Neq => Neq(_, _)
-      case relations.Lt => Lt(_, _)
-      case relations.Lte => Lte(_, _)
-      case relations.Gt => Gt(_, _)
-      case relations.Gte => Gte(_, _)
-      case relations.IfUndefined => IfUndefined(_, _)
-      case relations.And => And(_, _)
-      case relations.Or => Or(_, _)
-      case set.Within => Within(_, _)
-      case structural.MakeObject => MakeMap(_, _)
-      case structural.ObjectConcat => ConcatMaps(_, _)
-      case structural.ArrayProject => ProjectIndex(_, _)
-      case structural.ObjectProject => ProjectField(_, _)
-      case structural.DeleteField => DeleteField(_, _)
-      case string.Concat
-         | structural.ArrayConcat
-         | structural.ConcatOp => ConcatArrays(_, _)
-    }
+  def translateBinaryMapping[T[_[_]], A]
+      : BinaryFunc => (A, A) => MapFunc[T, A] = {
+    // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
+    //     about the second. And it shouldn’t even have two in LP.
+    case array.ArrayLength => (a, b) => Length(a)
+    case math.Add => Add(_, _)
+    case math.Multiply => Multiply(_, _)
+    case math.Subtract => Subtract(_, _)
+    case math.Divide => Divide(_, _)
+    case math.Modulo => Modulo(_, _)
+    case math.Power => Power(_, _)
+    case relations.Eq => Eq(_, _)
+    case relations.Neq => Neq(_, _)
+    case relations.Lt => Lt(_, _)
+    case relations.Lte => Lte(_, _)
+    case relations.Gt => Gt(_, _)
+    case relations.Gte => Gte(_, _)
+    case relations.IfUndefined => IfUndefined(_, _)
+    case relations.And => And(_, _)
+    case relations.Or => Or(_, _)
+    case set.Within => Within(_, _)
+    case structural.MakeObject => MakeMap(_, _)
+    case structural.ObjectConcat => ConcatMaps(_, _)
+    case structural.ArrayProject => ProjectIndex(_, _)
+    case structural.ObjectProject => ProjectField(_, _)
+    case structural.DeleteField => DeleteField(_, _)
+    case string.Concat
+       | structural.ArrayConcat
+       | structural.ConcatOp => ConcatArrays(_, _)
   }
 
-  def translateTernaryMapping[T[_[_]], A]:
-      TernaryFunc => (A, A, A) => MapFunc[T, A] = {
-    {
-      case relations.Between => Between(_, _, _)
-      case relations.Cond    => Cond(_, _, _)
-      case string.Search     => Search(_, _, _)
-      case string.Substring  => Substring(_, _, _)
-    }
+  def translateTernaryMapping[T[_[_]], A]
+      : TernaryFunc => (A, A, A) => MapFunc[T, A] = {
+    case relations.Between => Between(_, _, _)
+    case relations.Cond    => Cond(_, _, _)
+    case string.Search     => Search(_, _, _)
+    case string.Substring  => Substring(_, _, _)
   }
 }
 
@@ -773,10 +779,19 @@ object MapFuncs {
   @Lenses final case class Time[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class StartOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class TemporalTrunc[T[_[_]], A](part: TemporalPart, a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
+
+  // identity
+  /** Returns a string describing the type of the value. If the value has a
+    * metadata map containing an "_ejson.type" entry, that value is returned.
+    * Otherwise, it returns a string naming a [[quasar.common.PrimaryType]].
+    */
+  @Lenses final case class TypeOf[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
@@ -826,7 +841,12 @@ object MapFuncs {
   }
 
   // structural
+
+  /** Makes a single-element [[ejson.Arr]] containing `a1`.
+    */
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Makes a single-element [[ejson.Map]] with key `key` and value `value`.
+    */
   @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
     def a1 = key
     def a2 = value
@@ -878,6 +898,11 @@ object MapFuncs {
       }
       case _ => None
     }, _ => None)
+  }
+
+  object DecLit {
+    def apply[T[_[_]]: CorecursiveT, A](d: BigDecimal): FreeMapA[T, A] =
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Dec[T[EJson]](d))))
   }
 
   object IntLit {

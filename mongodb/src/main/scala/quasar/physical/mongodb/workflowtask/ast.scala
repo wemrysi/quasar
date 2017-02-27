@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ object WorkflowTaskF {
               selectorOpt.fold(Terminal("None" :: Nil, None))(RS.render(_)),
               sortOpt.fold(Terminal("None" :: Nil, None))(keys =>
                 NonTerminal("Sort" :: nt, None, keys.list.toList map { case (expr, ot) =>
-                  Terminal("Key" :: "Sort" :: nt, Some(expr.shows + " -> " + ot))
+                  Terminal("Key" :: "Sort" :: nt, Some(expr.shows + " -> " + ot.shows))
                 })),
               Terminal("Limit" :: nt, limitOpt ∘ (_.shows)),
               finalizerOpt.fold(Terminal("None" :: Nil, None))(RJ.render(_)),

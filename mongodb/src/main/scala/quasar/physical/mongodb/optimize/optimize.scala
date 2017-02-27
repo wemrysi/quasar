@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -202,10 +202,10 @@ package object optimize {
         case (Nil, r :: rs) => inlineProject0(r, rs).map(_.left)
 
         case (l :: ls, r :: rs) => r.get(l).flatMap {
-          case  -\/ (r)          => get0(ls, r :: rs)
-          case   \/-($include()) => get0(leaves, rs)
-          case   \/-($var(d))    => get0(d.path ++ ls, rs)
-          case   \/-(e) => if (ls.isEmpty) fixExpr(e, rs).map(_.right) else none
+          case -\/ (r)          => get0(ls, r :: rs)
+          case  \/-($include()) => get0(leaves, rs)
+          case  \/-($var(d))    => get0(d.path ++ ls, rs)
+          case  \/-(e) => if (ls.isEmpty) fixExpr(e, rs).map(_.right) else none
         }
       }
     }

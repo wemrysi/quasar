@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2016 SlamData Inc.
+ * Copyright 2014–2017 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,9 +95,7 @@ object JoinHandler {
     }
 
     def sourceDb: Algebra[WorkflowBuilderF[WF, ?], Option[DatabaseName]] = {
-      case CollectionBuilderF(Fix($read(Collection(db, _))), _, _) => db.some
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
-
       case ArrayBuilderF(src, _)              => src
       case ArraySpliceBuilderF(src, _)        => src
       case DocBuilderF(src, _)                => src
