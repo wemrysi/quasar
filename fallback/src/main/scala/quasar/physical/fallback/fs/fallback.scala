@@ -59,8 +59,8 @@ object PrecogEvaluator {
   }
 }
 
-object fall extends PrecogEvaluator[Id.Id] {
-  val M           = implicitly[Monad[Id.Id]]
+object fall extends PrecogEvaluator[Id] {
+  val M           = implicitly[Monad[Id]]
   val projections = Map[Path, Map[ColumnRef, Long]]()
 
   implicit class TableOps(private val self: Table) {

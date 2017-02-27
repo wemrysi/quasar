@@ -51,6 +51,8 @@ package fs {
 package object fs {
   val FsType = FileSystemType("fallback")
 
+  type Id[+X] = X
+
   def TODO: Nothing                    = scala.Predef.???
   def instantMillis(x: Instant): Long  = x.getEpochSecond * 1000
   def nowMillis(): Long                = instantMillis(Instant.now)
