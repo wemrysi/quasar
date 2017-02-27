@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 
-import argonaut._, Argonaut._
 import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
@@ -172,24 +171,6 @@ object Sql {
       }
     }
   }
-}
-
-final case class CIName(value: String) {
-  override def equals(other: Any) = other match {
-    case CIName(otherValue) => otherValue.toLowerCase === value.toLowerCase
-    case _                  => false
-  }
-
-  override def hashCode: Int = value.toLowerCase.hashCode
-}
-
-object CIName {
-  def fromString(s: String) = new CIName(s)
-
-  implicit val equal: Equal[CIName] = Equal.equalA
-  implicit val shows: Show[CIName] = Show.shows(s => s.value)
-
-  implicit val codec: EncodeJson[CIName] = implicitly[EncodeJson[String]].contramap(_.value)
 }
 
 @Lenses final case class Select[A] private[sql] (
