@@ -22,7 +22,6 @@ package security
 
 import blueeyes._
 import scalaz._
-import scalaz.Id._
 import quasar.precog.TestSupport._
 
 class AccessControlSpec extends Specification {

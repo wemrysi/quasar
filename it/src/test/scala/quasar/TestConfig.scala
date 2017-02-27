@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, MountConfig}
-import quasar.physical.{couchbase, marklogic, mongodb, postgresql, sparkcore}
+import quasar.physical.{couchbase, marklogic, mongodb, postgresql, sparkcore, fallback}
 
 import pathy.Path._
 import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}

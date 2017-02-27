@@ -52,6 +52,8 @@ trait PackageAliases {
   type SpireOrder[A]  = spire.algebra.Order[A]
   type Task[+A]       = scalaz.concurrent.Task[A]
 
+  // It looks like scalaz.Id.Id is (now?) invariant.
+  type Id[+X]        = X
   val Future         = scalaz.concurrent.Future
   val ScalazOrder    = scalaz.Order
   val ScalazOrdering = scalaz.Ordering
