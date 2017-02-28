@@ -1,7 +1,7 @@
 package quasar.project
 
 import scala.{Option, Boolean}
-import java.lang.System
+import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
@@ -20,7 +20,7 @@ object Dependencies {
   private val monocleVersion    = "1.3.2"
   private val pathyVersion      = "0.2.6"
   private val raptureVersion    = "2.0.0-M6"
-  private val refinedVersion    = "0.5.0"
+  private val refinedVersion    = "0.6.2"   // waiting for a stable release with fix for fthomas/refined#256
   private val scalazVersion     = "7.2.9"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
@@ -53,7 +53,8 @@ object Dependencies {
   )
 
   def frontend = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion
+    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+    "org.scala-lang.modules"     %% "scala-parser-combinators"  % "1.0.5"
   )
 
   def ejson = Seq(
@@ -111,8 +112,8 @@ object Dependencies {
   )
 
   def marklogicValidation = Seq(
-    "eu.timepit" %% "refined"     % refinedVersion,
-    "org.scalaz" %% "scalaz-core" % scalazVersion force()
+    "eu.timepit"     %% "refined"       % refinedVersion,
+    "org.scalaz"     %% "scalaz-core"   % scalazVersion force()
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
