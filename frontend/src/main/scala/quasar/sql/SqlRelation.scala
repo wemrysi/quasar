@@ -60,7 +60,7 @@ sealed trait NamedRelation[A] extends SqlRelation[A] {
 }
 
 /**
- * IdentRelationAST allows us to reference a let binding in relation (i.e. table)
+ * IdentRelationAST allows us to reference a let binding in a relation (i.e. table)
  * context. ExprF.IdentF allows us to reference a let binding in expression context.
  * Ideally we can unify these two contexts, providing a single way to reference a
  * let binding.

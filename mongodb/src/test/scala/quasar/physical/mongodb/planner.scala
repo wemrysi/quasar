@@ -91,7 +91,7 @@ class PlannerSpec extends
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, 0L, None)
+    queryPlan(expr, Variables.empty, basePath, Nil, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -3670,7 +3670,7 @@ class PlannerSpec extends
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
+    } yield sql.InvokeFunctionR(CIName("search"), List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
@@ -3697,13 +3697,13 @@ class PlannerSpec extends
     sql.IdentR("pop"),
     // IntLiteralR(0),  // TODO: exposes bugs (see SD-478)
     sql.BinopR(sql.IdentR("pop"), sql.IntLiteralR(1), Minus), // an ExprOp
-    sql.InvokeFunctionR("length", List(sql.IdentR("city")))) // requires JS
+    sql.InvokeFunctionR(CIName("length"), List(sql.IdentR("city")))) // requires JS
   def genReduceInt = genInnerInt.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x)),
-    sql.InvokeFunctionR("sum", List(x)),
-    sql.InvokeFunctionR("count", List(sql.SpliceR(None)))))
+    sql.InvokeFunctionR(CIName("min"), List(x)),
+    sql.InvokeFunctionR(CIName("max"), List(x)),
+    sql.InvokeFunctionR(CIName("sum"), List(x)),
+    sql.InvokeFunctionR(CIName("count"), List(sql.SpliceR(None)))))
   def genOuterInt = Gen.oneOf(
     Gen.const(sql.IntLiteralR(0)),
     genReduceInt,
@@ -3713,17 +3713,17 @@ class PlannerSpec extends
   def genInnerStr = Gen.oneOf(
     sql.IdentR("city"),
     // StringLiteralR("foo"),  // TODO: exposes bugs (see SD-478)
-    sql.InvokeFunctionR("lower", List(sql.IdentR("city"))))
+    sql.InvokeFunctionR(CIName("lower"), List(sql.IdentR("city"))))
   def genReduceStr = genInnerStr.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x))))
+    sql.InvokeFunctionR(CIName("min"), List(x)),
+    sql.InvokeFunctionR(CIName("max"), List(x))))
   def genOuterStr = Gen.oneOf(
     Gen.const(sql.StringLiteralR("foo")),
     Gen.const(sql.IdentR("state")),  // possibly the grouping key, so never reduced
     genReduceStr,
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("lower", List(x))),   // an ExprOp
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("length", List(x))))  // requires JS
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("lower"), List(x))),   // an ExprOp
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
     fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
