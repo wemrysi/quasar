@@ -303,11 +303,15 @@ object SemanticAnalysis {
           case None => ts.scope.get(name)
           case s => s
         }
-        scope.fold(
-          Provenance.anyOf[Map[String, ?]]((ts.scope ++ bs.scope) ∘ (Provenance.Relation(_))) match {
+        scope.fold({
+          // If `name` matches neither table nor binding scope we default to table scope.
+          // For example:
+          // `mystate := "CO"; select * from zips where state = mystate`
+          val localScope = if (ts.scope.isEmpty) bs.scope else ts.scope
+          Provenance.anyOf[Map[String, ?]]((localScope) ∘ (Provenance.Relation(_))) match {
             case Provenance.Empty => fail(NoTableDefined(Ident[Fix[Sql]](name).embed))
             case x                => success(x)
-          })(
+          }})(
           (Provenance.Relation(_)) ⋙ success)
       case InvokeFunction(_, args) => success(Provenance.allOf(args))
       case Match(_, cases, _)      =>
