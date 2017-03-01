@@ -113,7 +113,7 @@ sealed abstract class ExtractPathInstances0 {
   //     `ProjectBucket` as we don't want to be able to extract paths from
   //     QScript if it includes them, however QScriptTotal Knows All, so we
   //     must define them for it.
-  implicit def qScriptTotalPath[T[_[_]]: RecursiveT]: ExtractPath[QScriptTotal[T, ?], APath] = {
+  implicit def qScriptTotalPath[T[_[_]]: RecursiveT]: Lazy[ExtractPath[QScriptTotal[T, ?], APath]] = {
     implicit val constDeadEnd: ExtractPath[Const[DeadEnd, ?], APath] =
       new ExtractPath[Const[DeadEnd, ?], APath] {
         def extractPath[G[_]: ApplicativePlus] = {
@@ -129,6 +129,6 @@ sealed abstract class ExtractPathInstances0 {
         }
       }
 
-    ExtractPath[QScriptTotal[T, ?], APath]
+    Lazy(ExtractPath[QScriptTotal[T, ?], APath])
   }
 }
