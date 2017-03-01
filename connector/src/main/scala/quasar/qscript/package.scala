@@ -204,7 +204,7 @@ package object qscript {
       (implicit PA: PruneArrays[F], T: BirecursiveT[T], TF: Traverse[F])
         : T[F] = {
       val pa = new PAFindRemap[T, F]
-      self.hyloM[pa.ArrayState, pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(None)._2
+      self.hyloM[State[PATypes.KnownIndices, ?], pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(none)._2
     }
   }
 }
