@@ -21,9 +21,10 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.config._
 import quasar.console.{logErrors, stderr}
-import quasar.fp.{liftMT, TaskRef}
+import quasar.effect.Failure
+import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.Empty
+import quasar.fs.{Empty, PhysicalError}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 
@@ -31,13 +32,8 @@ import argonaut.DecodeJson
 import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
-import scalaz._
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.std.string._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
+import scalaz.{Failure => _, _}
+import Scalaz._
 import scalaz.concurrent.Task
 
 object Server {
@@ -101,7 +97,20 @@ object Server {
       "/server/info" -> info.service,
       "/server/port" -> control.service(initialPort, reload)
     ): _*)
+
   }
+
+  
+  private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
+    val tranform: PhysFsEffM ~> Task =
+      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
+
+    dr.translate(tranform).close
+  }
+    
+
+  private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] = 
+    mnts.toMap.values.toList.map(closeFileSystem(_)).sequence.void
 
   def service(
     initialPort: Int,
@@ -123,7 +132,7 @@ object Server {
     webConfig: WebConfig)(
     implicit
     ev1: ConfigOps[WebConfig]
-  ): MainTask[ServiceStarter] =
+  ): MainTask[(ServiceStarter, Task[Unit])] =
     for {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
       hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
@@ -133,6 +142,7 @@ object Server {
                         KvsMounter.ephemeralMountConfigs[Task],
                         hfsRef, mntdRef)
       initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
+
       // TODO: Still need to expose these in the HTTP API, see SD-1131
       failedMnts   <- attemptMountAll[Mounting](webConfig.mountings) foldMap initMnts
       _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
@@ -145,19 +155,27 @@ object Server {
 
       qErrsIORor   =  liftMT[Task, ResponseT] :+: qErrsToResponseOr
       coreApi      =  foldMapNT(qErrsIORor) compose foldMapNT(toQErrsIOM) compose runCore
-    } yield service(
-      webConfig.server.port,
-      qConfig.staticContent,
-      qConfig.redirect,
-      coreApi)
+    } yield {
+      val serv = service(
+        webConfig.server.port,
+        qConfig.staticContent,
+        qConfig.redirect,
+        coreApi)
+      val closeMnts = mntdRef.read >>= closeAllMounts _
+      (serv, closeMnts)
+    }
 
-  def launchServer(args: Array[String], builder: (QuasarConfig, WebConfig) => MainTask[ServiceStarter])(implicit configOps: ConfigOps[WebConfig]): Task[Unit] =
+  def launchServer(
+    args: Array[String],
+    builder: (QuasarConfig, WebConfig) => MainTask[(ServiceStarter, Task[Unit])])(
+    implicit configOps: ConfigOps[WebConfig]
+  ): Task[Unit] =
     logErrors(for {
       qCfg    <- QuasarConfig.fromArgs(args)
       wCfg    <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
                  // TODO: Find better way to do this
       updWCfg =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
-      srvc    <- builder(qCfg, updWCfg)
+      (srvc, _)    <- builder(qCfg, updWCfg)
       _       <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
     } yield ())
 
