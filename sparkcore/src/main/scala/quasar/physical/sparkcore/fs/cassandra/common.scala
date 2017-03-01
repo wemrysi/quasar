@@ -22,6 +22,9 @@ import quasar.contrib.pathy._
 import pathy.Path._
 import com.datastax.driver.core.Session
 
+/*
+ *  TODO it should be represented as algebra (e.g CassandraDDL[A]) so that it can be later used and interpreted as Free[CassandraDDL, A]
+ */
 object common {
 
   def keyspace(dir: ADir) =

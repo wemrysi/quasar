@@ -35,18 +35,18 @@ import scalaz.concurrent.Task
 
 package object cassandra {
 
-	import corequeryfile.RddState
+  import corequeryfile.RddState
 
-	val FsType = FileSystemType("spark-cassandra")
+  val FsType = FileSystemType("spark-cassandra")
 
-	type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
   type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
   type Eff3[A] = Coproduct[PhysErr, Eff2, A]
   type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
 
-	final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
+  final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
   def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
 
