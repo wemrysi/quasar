@@ -36,7 +36,7 @@ object ExtractPath extends ExtractPathInstances {
   def apply[F[_], P](implicit instance: ExtractPath[F, P]): ExtractPath[F, P] = instance
 }
 
-sealed abstract class ExtractPathInstances {
+sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   implicit def coproduct[F[_], G[_], P](
     implicit
     F: Lazy[ExtractPath[F, P]],
@@ -45,13 +45,6 @@ sealed abstract class ExtractPathInstances {
     new ExtractPath[Coproduct[F, G, ?], P] {
       def extractPath[H[_]: ApplicativePlus]: Algebra[Coproduct[F, G, ?], H[P]] =
         _.run.fold(F.value.extractPath[H], G.value.extractPath[H])
-    }
-
-  implicit def constDeadEnd[P]: ExtractPath[Const[DeadEnd, ?], P] =
-    new ExtractPath[Const[DeadEnd, ?], P] {
-      def extractPath[G[_]: ApplicativePlus] = {
-        case Const(Root) => mempty[G, P]
-      }
     }
 
   implicit def constRead[A, P >: A]: ExtractPath[Const[Read[A], ?], P] =
@@ -75,14 +68,6 @@ sealed abstract class ExtractPathInstances {
       def extractPath[G[_]: ApplicativePlus] = {
         case EquiJoin(paths, l, r, _, _, _, _) =>
           extractBranch[T, G, P](l) <+> extractBranch[T, G, P](r) <+> paths
-      }
-    }
-
-  implicit def projectBucket[T[_[_]], P]: ExtractPath[ProjectBucket[T, ?], P] =
-    new ExtractPath[ProjectBucket[T, ?], P] {
-      def extractPath[G[_]: ApplicativePlus] = {
-        case BucketField(paths, _, _) => paths
-        case BucketIndex(paths, _, _) => paths
       }
     }
 
@@ -119,4 +104,31 @@ sealed abstract class ExtractPathInstances {
   )(implicit
     QST: Lazy[ExtractPath[QScriptTotal[T, ?], P]]
   ): G[P] = branch.cata(interpret(κ(mempty[G, P]), QST.value.extractPath[G]))
+}
+
+sealed abstract class ExtractPathInstances0 {
+  import quasar.contrib.pathy.APath
+
+  // NB: This is explicit here so we can hide the instances for `DeadEnd` and
+  //     `ProjectBucket` as we don't want to be able to extract paths from
+  //     QScript if it includes them, however QScriptTotal Knows All, so we
+  //     must define them for it.
+  implicit def qScriptTotalPath[T[_[_]]: RecursiveT]: ExtractPath[QScriptTotal[T, ?], APath] = {
+    implicit val constDeadEnd: ExtractPath[Const[DeadEnd, ?], APath] =
+      new ExtractPath[Const[DeadEnd, ?], APath] {
+        def extractPath[G[_]: ApplicativePlus] = {
+          case Const(Root) => mempty[G, APath]
+        }
+      }
+
+    implicit val projectBucket: ExtractPath[ProjectBucket[T, ?], APath] =
+      new ExtractPath[ProjectBucket[T, ?], APath] {
+        def extractPath[G[_]: ApplicativePlus] = {
+          case BucketField(paths, _, _) => paths
+          case BucketIndex(paths, _, _) => paths
+        }
+      }
+
+    ExtractPath[QScriptTotal[T, ?], APath]
+  }
 }
