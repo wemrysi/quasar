@@ -25,7 +25,6 @@ object Dependencies {
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slscVersion       = "0.6"    // these are very definitely distinct!
-  private val slszVersion       = "0.4"    // note: this one might be worse-than useless since it uses old shapeless
   private val scalacheckVersion = "1.13.4"
   private val specsVersion      = "3.8.4"
 
@@ -37,7 +36,6 @@ object Dependencies {
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
     "io.argonaut"                %% "argonaut"                  % argonautVersion,
     "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
-    // "org.typelevel"              %% "shapeless-scalaz"          % slszVersion,
     "com.slamdata"               %% "matryoshka-core"           % "0.16.4",
     "com.slamdata"               %% "pathy-core"                % pathyVersion,
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion                         %     Test,
