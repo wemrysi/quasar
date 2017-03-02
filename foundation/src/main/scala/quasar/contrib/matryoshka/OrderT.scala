@@ -14,24 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.ejson
-
-import quasar.Predef._
-import quasar.contrib.matryoshka._
-import quasar.fp._, Helpers._
+package quasar.contrib.matryoshka
 
 import matryoshka._
-import org.specs2.scalaz._
-import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import matryoshka.implicits._
+import scalaz._
+import simulacrum._
 
-class EJsonSpecs extends Spec with EJsonArbitrary {
-  checkAll(order.laws[Common[String]])
-  checkAll(traverse.laws[Common])
+@typeclass
+trait OrderT[T[_[_]]] {
+  def order[F[_]: Functor](tf1: T[F], tf2: T[F])(implicit del: Delay[Order, F]): Ordering
 
-  checkAll(order.laws[Obj[String]])
-  checkAll(traverse.laws[Obj])
+  def orderT[F[_]: Functor](delay: Delay[Order, F]): Order[T[F]] =
+    Order.order[T[F]](order[F](_, _)(Functor[F], delay))
+}
 
-  checkAll(order.laws[Extension[String]])
-  checkAll(traverse.laws[Extension])
+object OrderT {
+  implicit def recursiveT[T[_[_]]: RecursiveT]: OrderT[T] =
+    new OrderT[T] {
+      def order[F[_]: Functor](tf1: T[F], tf2: T[F])(implicit del: Delay[Order, F]): Ordering =
+        del(orderT[F](del)).order(tf1.project, tf2.project)
+    }
 }
