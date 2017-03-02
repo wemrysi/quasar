@@ -7,8 +7,8 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
-  // Switch to `6.2-RC2` once http4s can be upgraded (see below)
-  private val argonautVersion   = "6.2-M3"
+  // RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
+  private val argonautVersion   = "6.2-RC2"
   private val doobieVersion     = "0.3.0"
   // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
   // https://github.com/quasar-analytics/quasar/issues/1852
@@ -111,7 +111,7 @@ object Dependencies {
 
   def marklogicValidation = Seq(
     "eu.timepit"     %% "refined"       % refinedVersion,
-    "org.scalaz"     %% "scalaz-core"   % scalazVersion force()
+    "org.scalaz"     %% "scalaz-core"   % scalazVersion
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
