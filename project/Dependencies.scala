@@ -24,7 +24,7 @@ object Dependencies {
   private val scalazVersion     = "7.2.9"
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
-  private val slscVersion       = "0.6"    // these are very definitely distinct!
+  private val slscVersion       = "0.6"
   private val scalacheckVersion = "1.13.4"
   private val specsVersion      = "3.8.4"
 
