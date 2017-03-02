@@ -111,7 +111,7 @@ object Server {
     
 
   private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] = 
-    mnts.toMap.values.toList.map(closeFileSystem(_).attemptNonFatal.void).sequence.void
+    mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
 
   def service(
     initialPort: Int,

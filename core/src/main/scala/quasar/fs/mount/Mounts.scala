@@ -68,6 +68,10 @@ final class Mounts[A] private (val toMap: Map[ADir, A]) {
   def map[B](f: A => B): Mounts[B] =
     mapWithDir((_, a) => f(a))
 
+  def foldRight[B, C](z: B)(append: (A, => B) => B): B = toMap.foldRight(z) {
+    case ((_, b), acc) => append(b, acc)
+  }
+
   /** Right-biased union of two `Mounts`. */
   def union(other: Mounts[A]): String \/ Mounts[A] =
     other.toMap.toList.foldLeftM[String \/ ?, Mounts[A]](this)(_ + _)
@@ -86,6 +90,16 @@ object Mounts {
     new Functor[Mounts] {
       def map[A, B](fa: Mounts[A])(f: A => B) = fa map f
     }
+
+  implicit val mountsFoldable: Foldable[Mounts] = new Foldable[Mounts] {
+
+    def foldMap[A, B](fa: Mounts[A])(f: A => B)(implicit F: Monoid[B]): B =
+      fa.map(f).foldRight(Monoid[B].zero)(Monoid[B].append)
+
+    def foldRight[A, B](fa: Mounts[A], z: => B)(f: (A, => B) => B): B = 
+      fa.foldRight(z)(f)
+
+  }
 
   ////
 
