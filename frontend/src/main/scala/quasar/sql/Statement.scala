@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 
 import monocle.macros.Lenses
+import monocle.Prism
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
@@ -28,12 +29,6 @@ sealed trait Statement[BODY] {
 }
 
 object Statement {
-  implicit val functor: Functor[Statement] = new Functor[Statement] {
-    def map[A, B](s: Statement[A])(f: A => B): Statement[B] = s match {
-      case funcDef: FunctionDecl[_] => funcDef.transformBody(f)
-      case Import(path)              => Import(path)
-    }
-  }
   implicit val traverse: Traverse[Statement] = new Traverse[Statement] {
     def traverseImpl[G[_]:Applicative,A,B](fa: Statement[A])(f: A => G[B]): G[Statement[B]] = fa match {
       case funcDef: FunctionDecl[_] => funcDef.transformBodyM(f).map(x => (x:Statement[B]))
@@ -47,6 +42,16 @@ object Statement {
         case Import(path) => NonTerminal("Import" :: Nil, Some(path), Nil)
       }
     }
+  implicit def equal[BODY:Equal]: Equal[Statement[BODY]] =
+    Equal.equalBy(s => (functionDecl.getOption(s), import_.getOption(s)))
+
+  def functionDecl[BODY] = Prism.partial[Statement[BODY], (CIName, List[CIName], BODY)] {
+    case FunctionDecl(name, args, body) => (name, args, body)
+  } ((FunctionDecl[BODY](_,_,_)).tupled)
+
+  def import_[BODY] = Prism.partial[Statement[BODY], String] {
+    case Import(path) => path
+  } (Import(_))
 }
 
 @Lenses final case class FunctionDecl[BODY](name: CIName, args: List[CIName], body: BODY) extends Statement[BODY] {

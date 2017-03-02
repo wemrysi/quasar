@@ -732,10 +732,10 @@ final class Compiler[M[_], T: Equal]
       compile0(func.body, map).map { body =>
         val lpFunc = new HomomorphicFunction[T, T] {
           def arity = func.args.size
-          def apply(args: List[T]): Option[T] = {
-            val argsMap = func.args.zip(args).toMap
-            if (func.args.size != args.size) None else lpr.bindFree(argsMap)(body).some
-          }
+          def apply(args: List[T]): Option[T] =
+            func.args.alignBoth(args).sequence.map { argsMap =>
+              lpr.bindFree(argsMap.toMap)(body)
+            }
         }
         map + (func.name -> lpFunc)
       }

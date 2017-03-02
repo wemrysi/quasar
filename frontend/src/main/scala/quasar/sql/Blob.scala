@@ -33,10 +33,6 @@ object Blob {
       def render(blob: Blob[T]) =
         NonTerminal("Sql Blob" :: Nil, None, List(blob.scope.render, blob.expr.render))
     }
-  implicit val functor: Functor[Blob] = new Functor[Blob] {
-    def map[A,B](b: Blob[A])(f: A => B): Blob[B] =
-      Blob(f(b.expr), b.scope.map(_.map(f)))
-  }
   implicit val traverse: Traverse[Blob] = new Traverse[Blob] {
     def traverseImpl[G[_]:Applicative,A,B](ba: Blob[A])(f: A => G[B]): G[Blob[B]] =
       (f(ba.expr) |@| ba.scope.traverse(_.traverse(f)))(Blob(_, _))

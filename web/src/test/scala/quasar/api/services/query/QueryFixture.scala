@@ -23,16 +23,12 @@ import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._, InMemory._
-import quasar.sql
 import quasar.sql._
 import quasar.sql.fixpoint._
-import quasar.Variables
 
 import org.http4s._
 import org.specs2.matcher._, MustMatchers._
-import matryoshka.data.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -95,9 +91,4 @@ object queryFixture {
     liftMT[Task, ResponseT]             :+:
     failureResponseOr[FileSystemError]  :+:
     liftMT[Task, ResponseT].compose(fs)
-
-  def compileQuery(query: quasar.sql.Query): Fix[LogicalPlan] =
-    quasar.precompile[Fix[LogicalPlan]](sql.fixParser.parse(query).toOption.get, Variables.empty, rootDir)
-    .valueOr(_ => throw new Exception("Failed test assumption"))
-    .value
 }

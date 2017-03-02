@@ -66,7 +66,7 @@ object MountConfig {
     }
 
   implicit def equal: Equal[MountConfig] =
-    Equal.equalA
+    Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
   val fromConfigPair: (String, ConnectionUri) => String \/ MountConfig = {
     case ("view", uri) =>

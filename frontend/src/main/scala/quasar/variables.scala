@@ -71,4 +71,6 @@ object Variables {
   def substVars(expr: Fix[Sql], variables: Variables)
       : SemanticError \/ Fix[Sql] =
     expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables))
+
+  implicit val equal: Equal[Variables] = Equal.equalA
 }
