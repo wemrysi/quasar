@@ -25,9 +25,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
-sealed trait AccumOp[A] {
-  def value: A
-}
+sealed trait AccumOp[A]
 
 object AccumOp {
   final case class $addToSet[A](value: A) extends AccumOp[A]

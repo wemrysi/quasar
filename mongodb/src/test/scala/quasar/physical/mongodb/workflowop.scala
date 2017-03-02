@@ -54,7 +54,7 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
     new (Cogen ~> λ[α => Cogen[CardinalExpr[α]]]) {
       def apply[α](cg: Cogen[α]): Cogen[CardinalExpr[α]] =
         Cogen { (seed: Seed, ce: CardinalExpr[α]) =>
-          cg.perturb(seed, ce.fn)
+          cg.perturb(seed, ce.copoint)
         }
     }
 

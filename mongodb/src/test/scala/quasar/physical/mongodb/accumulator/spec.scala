@@ -47,7 +47,7 @@ class AccumulatorSpec extends Spec {
     new (Cogen ~> λ[α => Cogen[AccumOp[α]]]) {
       def apply[α](cg: Cogen[α]): Cogen[AccumOp[α]] =
         Cogen { (seed: Seed, ao: AccumOp[α]) =>
-          cg.perturb(seed, ao.value)
+          cg.perturb(seed, ao.copoint)
         }
     }
 

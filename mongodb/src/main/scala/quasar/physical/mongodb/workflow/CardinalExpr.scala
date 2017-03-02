@@ -18,9 +18,7 @@ package quasar.physical.mongodb.workflow
 
 import scalaz._, Scalaz._
 
-sealed trait CardinalExpr[A] {
-  def fn: A
-}
+sealed trait CardinalExpr[A]
 
 final case class MapExpr[A](fn: A)  extends CardinalExpr[A]
 final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
