@@ -11,7 +11,7 @@
 
     "ignoredFields": ["_id"],
 
-    "ignoredFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": ["marklogic_json"],
 
     "predicate": "containsAtLeast",
 
