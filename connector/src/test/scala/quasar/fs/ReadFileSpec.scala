@@ -20,8 +20,8 @@ import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.stateT._
-import quasar.fp._
 
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._

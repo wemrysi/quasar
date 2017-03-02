@@ -25,7 +25,6 @@ import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
-import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
 sealed abstract class ListMapInstances {
@@ -117,13 +116,6 @@ trait JsonOps {
   )
 }
 
-trait QFoldableOps {
-  final implicit class ToQFoldableOps[F[_]: Foldable, A](val self: F[A]) {
-    final def toProcess: Process0[A] =
-      self.foldRight[Process0[A]](Process.halt)((a, p) => Process.emit(a) ++ p)
-  }
-}
-
 trait DebugOps {
   final implicit class ToDebugOps[A](val self: A) {
     /** Applies some operation to a value and returns the original value. Useful
@@ -142,7 +134,6 @@ package object fp
     with PartialFunctionOps
     with JsonOps
     with ProcessOps
-    with QFoldableOps
     with DebugOps {
 
   import ski._

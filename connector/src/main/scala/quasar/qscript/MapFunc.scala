@@ -124,7 +124,7 @@ object MapFunc {
 
   object EmptyArray {
     def apply[T[_[_]]: CorecursiveT, A]: Constant[T, A] =
-      Constant[T, A](EJson.fromCommon[T[EJson]].apply(ejson.Arr[T[EJson]](Nil)))
+      Constant[T, A](EJson.fromCommon(ejson.Arr[T[EJson]](Nil)))
   }
 
   // TODO: subtyping is preventing embedding of MapFuncs
@@ -162,7 +162,7 @@ object MapFunc {
         : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => rollMF[T, A](ConcatMaps(a, b)).embed).project
-        case Nil    => rollMF[T, A](Constant(EJson.fromCommon[T[EJson]].apply(ejson.Arr[T[EJson]](Nil))))
+        case Nil    => rollMF[T, A](Constant(EJson.fromCommon(ejson.Arr[T[EJson]](Nil))))
       }
     }
 
@@ -235,8 +235,7 @@ object MapFunc {
       {
         case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
           rollMF[T, A](
-            Constant(EJson.fromCommon[T[EJson]].apply(
-              ejson.Bool[T[EJson]](v1 ≟ v2)))).some
+            Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2)))).some
 
         case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Int(index)))))))) =>
           if (index.isValidInt)
@@ -887,7 +886,7 @@ object MapFuncs {
 
   object NullLit {
     def apply[T[_[_]]: CorecursiveT, A](): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Null[T[EJson]]())))
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Null[T[EJson]]())))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Boolean = mf.resume.fold ({
       case Constant(ej) => EJson.isNull(ej)
@@ -897,7 +896,7 @@ object MapFuncs {
 
   object BoolLit {
     def apply[T[_[_]]: CorecursiveT, A](b: Boolean): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Bool[T[EJson]](b))))
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Bool[T[EJson]](b))))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[Boolean] = mf.resume.fold ({
       case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
@@ -910,12 +909,12 @@ object MapFuncs {
 
   object DecLit {
     def apply[T[_[_]]: CorecursiveT, A](d: BigDecimal): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Dec[T[EJson]](d))))
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Dec[T[EJson]](d))))
   }
 
   object IntLit {
     def apply[T[_[_]]: CorecursiveT, A](i: BigInt): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt[T[EJson]].apply(ejson.Int[T[EJson]](i))))
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromExt(ejson.Int[T[EJson]](i))))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[BigInt] =
       mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
@@ -933,7 +932,7 @@ object MapFuncs {
 
   object StrLit {
     def apply[T[_[_]]: CorecursiveT, A](str: String): FreeMapA[T, A] =
-      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon[T[EJson]].apply(ejson.Str[T[EJson]](str))))
+      Free.roll(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Str[T[EJson]](str))))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]):
         Option[String] =

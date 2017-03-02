@@ -8,6 +8,7 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
+  private val algebraVersion           = "0.7.0"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.8.4"
   private val jacksonVersion           = "2.4.4"
@@ -25,6 +26,7 @@ object Dependencies {
     CommonDependencies.scalaz.iteratee,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
+    "org.typelevel" %% "algebra"         % algebraVersion,
     CommonDependencies.argonaut.argonaut,
     CommonDependencies.argonaut.scalaz,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
@@ -43,7 +45,8 @@ object Dependencies {
 
   def frontend = Seq(
     CommonDependencies.monocle.`macro`,
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "org.typelevel"          %% "algebra-laws"             % algebraVersion  % Test
   )
 
   def ejson = Seq(

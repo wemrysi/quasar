@@ -18,10 +18,19 @@ package quasar.contrib
 
 import slamdata.Predef._
 
+import monocle.Getter
 import _root_.matryoshka._
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
+
+  def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
+    Getter(T.project(_))
+
+  /** Make a partial endomorphism total by returning the argument when undefined. */
+  def totally[A](pf: PartialFunction[A, A]): A => A =
+    orOriginal(pf.lift)
+
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
     F(A)
 

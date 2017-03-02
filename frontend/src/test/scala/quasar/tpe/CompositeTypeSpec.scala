@@ -14,31 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.ejson
+package quasar.tpe
 
-import slamdata.Predef._
-import quasar.contrib.matryoshka._
-import quasar.contrib.matryoshka.arbitrary._
-import quasar.fp._, Helpers._
-
-import matryoshka._
 import org.specs2.scalaz._
-import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
-class EJsonSpecs extends Spec with EJsonArbitrary {
-  checkAll(order.laws[Common[String]])
-  checkAll(traverse.laws[Common])
-
-  checkAll(order.laws[Obj[String]])
-  checkAll(traverse.laws[Obj])
-
-  checkAll(order.laws[Extension[String]])
-  checkAll(traverse.laws[Extension])
-
-  "extension" >> {
-    "ordering ignores metadata" >> prop { (a: String, b: String, m: String, n: String) =>
-      (meta(a, m) ?|? meta(b, n)) ≟ (a ?|? b)
-    }
-  }
+final class CompositeTypeSpec extends Spec with CompositeTypeArbitrary {
+  checkAll(enum.laws[CompositeType])
 }
