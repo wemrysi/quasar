@@ -31,7 +31,7 @@ final case class Variables(value: Map[VarName, VarValue]) {
   def lookup(name: VarName): SemanticError \/ Fix[Sql] =
     value.get(name).fold[SemanticError \/ Fix[Sql]](
       UnboundVariable(name).left)(
-      varValue => sql.fixParser.parse(Query(varValue.value))
+      varValue => sql.fixParser.parseExpr(Query(varValue.value))
         .leftMap(VariableParseError(name, varValue, _)))
 }
 final case class VarName(value: String) {

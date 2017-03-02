@@ -21,10 +21,13 @@ import quasar._, RenderTree.ops._
 
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
+import scalaz.Liskov._
 
 sealed trait Statement[BODY] {
-  def pprint(implicit show: Show[BODY]): String
+  def pprint(implicit ev: BODY <~< String): String
+}
 
+object Statement {
   implicit val functor: Functor[Statement] = new Functor[Statement] {
     def map[A, B](s: Statement[A])(f: A => B): Statement[B] = s match {
       case funcDef: FunctionDecl[_] => funcDef.transformBody(f)
@@ -37,6 +40,13 @@ sealed trait Statement[BODY] {
       case Import(path)             => (Import(path):Statement[B]).point[G]
     }
   }
+  implicit def renderTreeStatement[BODY:RenderTree]: RenderTree[Statement[BODY]] =
+    new RenderTree[Statement[BODY]] {
+      def render(statement: Statement[BODY]) = statement match {
+        case func: FunctionDecl[_] => func.render
+        case Import(path) => NonTerminal("Import" :: Nil, Some(path), Nil)
+      }
+    }
 }
 
 @Lenses final case class FunctionDecl[BODY](name: CIName, args: List[CIName], body: BODY) extends Statement[BODY] {
@@ -44,8 +54,8 @@ sealed trait Statement[BODY] {
     FunctionDecl(name, args, f(body))
   def transformBodyM[M[_]: Functor, B](f: BODY => M[B]) =
     f(body).map(FunctionDecl(name, args, _))
-  override def pprint(implicit show: Show[BODY]) =
-    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${body.shows}\n  END"
+  override def pprint(implicit ev: BODY <~< String) =
+    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${ev(body)}\n  END"
 }
 
 object FunctionDecl {
@@ -57,6 +67,6 @@ object FunctionDecl {
 }
 
 @Lenses final case class Import[BODY](path: String) extends Statement[BODY] {
-  override def pprint(implicit show: Show[BODY]) =
+  override def pprint(implicit ev: BODY <~< String) =
     s"import `$path`"
 }

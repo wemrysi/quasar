@@ -55,13 +55,13 @@ object compile {
         "logicalplan" := lp.render)
 
     def explainQuery(
-      expr: Fix[sql.Sql],
+      blob: sql.Blob[Fix[sql.Sql]],
       vars: Variables,
       basePath: ADir,
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, QResponse[S]] =
-      respond(queryPlan(expr, vars, basePath, Nil, offset, limit)
+      respond(queryPlan(blob, vars, basePath, offset, limit)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
           κ(Json(
             "physicalPlan" -> jNull,

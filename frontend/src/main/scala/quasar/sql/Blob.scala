@@ -20,8 +20,12 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 
 import monocle.macros.Lenses
+import scalaz._, Scalaz._
 
-@Lenses final case class Blob[T](expr: T, scope: List[FunctionDecl[T]])
+@Lenses final case class Blob[T](expr: T, scope: List[Statement[T]]) {
+  def mapExpressionM[M[_]:Functor](f: T => M[T]) =
+    f(expr).map(Blob(_, scope))
+}
 
 object Blob {
   implicit def renderTree[T:RenderTree]: RenderTree[Blob[T]] =
@@ -29,4 +33,12 @@ object Blob {
       def render(blob: Blob[T]) =
         NonTerminal("Sql Blob" :: Nil, None, List(blob.scope.render, blob.expr.render))
     }
+  implicit val functor: Functor[Blob] = new Functor[Blob] {
+    def map[A,B](b: Blob[A])(f: A => B): Blob[B] =
+      Blob(f(b.expr), b.scope.map(_.map(f)))
+  }
+  implicit val traverse: Traverse[Blob] = new Traverse[Blob] {
+    def traverseImpl[G[_]:Applicative,A,B](ba: Blob[A])(f: A => G[B]): G[Blob[B]] =
+      (f(ba.expr) |@| ba.scope.traverse(_.traverse(f)))(Blob(_, _))
+  }
 }

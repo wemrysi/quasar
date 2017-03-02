@@ -41,7 +41,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   }
 
   val parseAndAnnotate: String => String \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
-    fixParser.parse(Query(query)).leftMap(_.toString).flatMap { select =>
+    fixParser.parseExpr(Query(query)).leftMap(_.toString).flatMap { select =>
       AllPhases(select).leftMap(_.toString)
     }
   }
