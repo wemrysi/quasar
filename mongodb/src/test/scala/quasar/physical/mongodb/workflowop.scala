@@ -30,10 +30,9 @@ import matryoshka.data.Fix
 
 import org.scalacheck._
 import org.scalacheck.rng.Seed
-
+import org.specs2.matcher.MustMatchers._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
-import org.specs2.matcher.MustMatchers._
 
 class WorkflowFSpec extends org.specs2.scalaz.Spec {
   implicit val arbIdHandling: Arbitrary[IdHandling] =
