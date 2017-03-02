@@ -60,7 +60,7 @@ class ServiceSpec extends quasar.Qspec {
       webConfig)
 
     (for {
-      (svc, close)           <- service
+      (svc, close)  <- service
       (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
       r             <- f(uri)
                           .onFinish(_ => shutdown)

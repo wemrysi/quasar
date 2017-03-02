@@ -21,6 +21,7 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.config._
 import quasar.console.{logErrors, stderr}
+import quasar.contrib.scalaz.catchable._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
@@ -110,7 +111,7 @@ object Server {
     
 
   private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] = 
-    mnts.toMap.values.toList.map(closeFileSystem(_)).sequence.void
+    mnts.toMap.values.toList.map(closeFileSystem(_).attemptNonFatal.void).sequence.void
 
   def service(
     initialPort: Int,
@@ -171,12 +172,12 @@ object Server {
     implicit configOps: ConfigOps[WebConfig]
   ): Task[Unit] =
     logErrors(for {
-      qCfg    <- QuasarConfig.fromArgs(args)
-      wCfg    <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
+      qCfg      <- QuasarConfig.fromArgs(args)
+      wCfg      <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
                  // TODO: Find better way to do this
-      updWCfg =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
-      (srvc, _)    <- builder(qCfg, updWCfg)
-      _       <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
+      updWCfg   =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
+      (srvc, _) <- builder(qCfg, updWCfg)
+      _         <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
     } yield ())
 
   def main(args: Array[String]): Unit =
