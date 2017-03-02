@@ -54,31 +54,37 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
 
+  def mergeMaps[A](a: ScalaMap[A, KnownIndices], b: ScalaMap[A, KnownIndices]) =
+    a.alignWith(b) {
+      case \&/.This(k)      => k
+      case \&/.That(k)      => k
+      case \&/.Both(k1, k2) => k1 |++| k2
+    }
+
   /** Returns `None` if a non-static non-integer index was found.
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
     */
-  def findIndicesInFunc(func: FreeMap): KnownIndices =
-    if (func ≟ HoleF)
-      None
-    else
-      findIndicesInStruct(func)
+  def findIndicesInFunc[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] =
+    func.project.run.fold(k => ScalaMap(k -> none), κ(findIndicesInStruct(func)))
 
-  def findIndicesInStruct(func: FreeMap): KnownIndices = {
-    def accumulateIndices: MapFunc[(FreeMap, KnownIndices)] => KnownIndices = {
-      case ProjectIndex((src, Some(acc1)), (value, Some(acc2))) =>
-        (src.project.run, value.project.run) match {
-          case (-\/(SrcHole), \/-(IntLitMapFunc(idx))) => ((acc1 ++ acc2) + idx).some  // static integer index
-          case (-\/(SrcHole), _)                       => None  // non-static index
-          case (_, _)                                  => (acc1 ++ acc2).some
+  def findIndicesInStruct[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] = {
+    def accumulateIndices: GAlgebra[(Free[MapFunc, A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
+      case ProjectIndex((src, acc1), (value, acc2)) =>
+        val newMap = mergeMaps(acc1, acc2)
+          (src.project.run, value.project.run) match {
+          case (-\/(k), \/-(IntLitMapFunc(idx))) => newMap + (k -> newMap.get(k).fold(Set(idx).some)(_.map(_ + idx))) // static integer index
+          case (-\/(k), _)                       => newMap + (k -> none) // non-static index
+          case (_,      _)                       => newMap
         }
       // check if entire array is referenced
-      case f => f.foldMapM[Option, SeenIndices] {
-        case (src, value) => if (src ≟ HoleF) None else value
-      }
+      case f => f.foldRight(ScalaMap.empty[A, KnownIndices])((elem, acc) => elem match {
+        case (Embed(CoEnv(-\/(k))), value) => mergeMaps(value, acc) + (k -> none)
+        case (_,                    value) => mergeMaps(value, acc)
+      })
     }
 
-    def findIndices: GAlgebra[(FreeMap, ?), CoEnv[Hole, MapFunc, ?], KnownIndices] =
-      _.run.fold(κ(Set().some), accumulateIndices)
+    def findIndices: GAlgebra[(Free[MapFunc, A], ?), CoEnv[A, MapFunc, ?], ScalaMap[A, KnownIndices]] =
+      _.run.fold(k => ScalaMap.empty, accumulateIndices)
 
     func.para(findIndices)
   }
@@ -172,7 +178,7 @@ object PruneArrays {
 
       private def findInBucket[M[_]](fm1: FreeMap, fm2: FreeMap)(implicit M: MonadState[M, KnownIndices])
           : M[KnownIndices] =
-        M.put(findIndicesInFunc(fm1) |++| findIndicesInFunc(fm2)).as(none)
+        M.put(extractFromMap(findIndicesInFunc(fm1), SrcHole) |++| extractFromMap(findIndicesInFunc(fm2), SrcHole)).as(none)
 
       def find[M[_], A](in: ProjectBucket[A])(implicit M: MonadState[M, KnownIndices]) =
         in match {
@@ -199,13 +205,8 @@ object PruneArrays {
       def find[M[_], A](in: QScriptCore[A])(implicit M: MonadState[M, KnownIndices]) =
         in match {
           case LeftShift(_, struct, _, repair) =>
-            val repairInlined: FreeMap = repair >>= {
-              case LeftSide => HoleF
-              case RightSide => struct // FIXME: Is this OK?
-            }
-
             val newState =
-              findIndicesInFunc(repairInlined) |++| findIndicesInStruct(struct)
+              extractFromMap(findIndicesInFunc(repair), LeftSide) |++| extractFromMap(findIndicesInFunc(struct), SrcHole)
 
             M.get >>= (st => M.put(newState).as(repair.resume match {
               case -\/(ConcatArrays(_, _)) => st // annotate state as environment
@@ -213,20 +214,20 @@ object PruneArrays {
             }))
 
           case Reduce(src, bucket, reducers, _) =>
-            val bucketState: KnownIndices = findIndicesInFunc(bucket)
-            val reducersState: KnownIndices = reducers.foldMap(_.foldMap[KnownIndices](findIndicesInFunc(_)))
+            val bucketState: KnownIndices = extractFromMap(findIndicesInFunc(bucket), SrcHole)
+            val reducersState: KnownIndices = reducers.foldMap(_.foldMap[KnownIndices](r => extractFromMap(findIndicesInFunc(r), SrcHole)))
             M.put(bucketState |++| reducersState).as(none)
 
           case Union(_, _, _)     => default.find(in) // TODO examine branches
           case Subset(_, _, _, _) => default.find(in) // TODO examine branches
 
-          case Map(_, func)    => M.put(findIndicesInFunc(func)).as(none)
-          case Filter(_, func) => M.modify(findIndicesInFunc(func) |++| _).as(none)
+          case Map(_, func)    => M.put(extractFromMap(findIndicesInFunc(func), SrcHole)).as(none)
+          case Filter(_, func) => M.modify(extractFromMap(findIndicesInFunc(func), SrcHole) |++| _).as(none)
 
           case Sort(_, bucket, order) =>
-            val bucketState: KnownIndices = findIndicesInFunc(bucket)
+            val bucketState: KnownIndices = extractFromMap(findIndicesInFunc(bucket), SrcHole)
             val orderState: KnownIndices = order.foldMap {
-              case (f, _) => findIndicesInFunc(f)
+              case (f, _) => extractFromMap(findIndicesInFunc(f), SrcHole)
             }
             M.modify(bucketState |++| orderState |++| _).as(none)
 
