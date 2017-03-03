@@ -59,12 +59,12 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Fragments =
+  def fileSystemShould(examples: (FileSystemUT[S], FileSystemUT[S]) => Fragment): Fragments =
     fileSystems.map { fss =>
       Fragments.foreach(fss.toList)(fs =>
-        fs.impl.map { f =>
+        (fs.impl |@| fs.implNonChrooted.orElse(fs.impl)) { (f, fʹ) =>
           s"${fs.ref.name.shows} FileSystem" >>
-            Fragments(examples(f), step(f.close.unsafePerformSync))
+            Fragments(examples(f, fʹ), step(f.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
           Fragments(s"${fs.ref.name.shows} FileSystem" >> skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
@@ -141,15 +141,20 @@ object FileSystemTest {
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
   }
 
-  def externalFsUT = TestConfig.externalFileSystems {
-    fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)         orElse
-    fsTestConfig(marklogic.fs.FsType,       marklogic.fs.definition(10000L)) orElse
-    fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)           orElse
-    fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)    orElse
-    fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)        orElse
-    fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)          orElse
-    fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)    orElse
-    fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
+  def externalFsUT = {
+    val marklogicDef =
+      marklogic.fs.definition(10000L, 10000L) translate injectFT[Task, filesystems.Eff]
+
+    TestConfig.externalFileSystems {
+      fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)       orElse
+      fsTestConfig(marklogic.fs.FsType,       marklogicDef)                  orElse
+      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
+      fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)  orElse
+      fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
+      fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)        orElse
+      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
+      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
+    }
   }
 
   def localFsUT: Task[IList[SupportedFs[FileSystem]]] =

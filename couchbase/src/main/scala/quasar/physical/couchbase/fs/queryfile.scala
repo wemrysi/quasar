@@ -63,7 +63,7 @@ object queryfile {
     def liftPE[S[_]]: Plan[S, A] = d.leftMap(FileSystemError.qscriptPlanningFailed(_)).liftFE
   }
 
-  implicit val codec = CBDataCodec
+  implicit val codec: DataCodec = CBDataCodec
 
   val jsonTranscoder = new JsonTranscoder
 
@@ -228,8 +228,8 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Plan[S, T[N1QL]] = {
-    type CBQS0[A] = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
     type CBQS[A]  = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+    type CBQS0[A] = (Const[ShiftedRead[ADir], ?] :/: CBQS)#M[A]
 
     implicit val couchbaseQScriptToQSTotal: Injectable.Aux[CBQS, QScriptTotal[T, ?]] =
       ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
@@ -239,18 +239,19 @@ object queryfile {
     val C = Coalesce[T, CBQS, CBQS]
 
     for {
-      qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, APath, ?]](lc)(lp)
+      qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
-      shft <- simplifyRead[T, QScriptRead[T, APath, ?], QScriptShiftRead[T, APath, ?], CBQS0]
+      shft <- rewrite.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS0]
                 .apply(qs)
                 .transCataM(ExpandDirs[T, CBQS0, CBQS].expandDirs(idPrism.reverseGet, lc))
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(C.coalesceQC[CBQS](idPrism))          >>>
-                  repeatedly(C.coalesceEJ[CBQS](idPrism.get))    >>>
-                  repeatedly(C.coalesceSR[CBQS, AFile](idPrism)) >>>
-                  repeatedly(Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]])))
+                repeatedly(rewrite.applyTransforms(
+                  C.coalesceQC[CBQS](idPrism),
+                  C.coalesceEJ[CBQS](idPrism.get),
+                  C.coalesceSR[CBQS, AFile](idPrism),
+                  Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]]))))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan
