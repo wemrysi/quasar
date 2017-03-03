@@ -173,6 +173,17 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     }
   }
 
+  private object MapEntries {
+    def unapply(d: Data.Obj): Boolean = d match {
+      case Data.Obj(lm) => lm.toList match {
+          case MapKey(k) :: MapValue(v) :: Nil => true
+          case MapValue(v) :: MapKey(k) :: Nil => true
+          case _ => false
+        }
+      case o => false
+    }
+  }
+
 
   private class DataMapConverter(
     val schema: GroupType,
@@ -191,15 +202,22 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     override def start(): Unit = {}
     override def end(): Unit = {
       val na = ("n/a" -> Data.NA)
+      val valid = values collect {
+        case v @ MapEntries() => v
+      }
+
       def normalize = values.map {
         case Data.Obj(lm) => lm.toList match {
           case MapKey(k) :: MapValue(v) :: Nil => (k -> v)
           case MapValue(v) :: MapKey(k) :: Nil => (k -> v)
           case _ => na
         }
-        case o => ("key_value", o)
+        case o => na
+
       }
-      parent.save(name, Data.Obj(normalize:_*))
+      val data = if(values.size === valid.size) Data.Obj(normalize:_*) else Data.Arr(values.toList)
+      parent.save(name, data)
+
       values.clear()
     }
   }

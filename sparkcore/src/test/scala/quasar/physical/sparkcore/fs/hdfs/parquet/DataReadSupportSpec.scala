@@ -132,7 +132,7 @@ class DataReadSupportSpec extends Qspec {
         )
       }
 
-      "be read even if data is not following MAP specification" in {
+      "be read even if data is not following MAP spec - it does not contain 'key_value' entry" in {
         val data = readAll(path("/test-data-7.parquet")).unsafePerformSync
         data must_= Vector(
           Data.Obj(
@@ -140,6 +140,30 @@ class DataReadSupportSpec extends Qspec {
               "scala" -> Data.Str("good"),
               "FP" -> Data.Str("very good"),
               "spillikins" -> Data.Str("bad")
+            ))
+          )
+        )
+      }
+
+
+      "be read even if data is not following MAP spec - has extrac entries beside 'key' & 'value'" in {
+        val data = readAll(path("/test-data-10.parquet")).unsafePerformSync
+        data must_= Vector(
+          Data.Obj(
+            "skills" -> Data.Arr(List(
+              Data.Obj(
+                "key" -> Data.Str("scala"),
+                "value" -> Data.Str("good"),
+                "desc" -> Data.Str("some description")
+              ),
+              Data.Obj(
+                "key" -> Data.Str("FP"),
+                "value" -> Data.Str("very good")
+              ),
+              Data.Obj(
+                "key" -> Data.Str("spillikins"),
+                "value" -> Data.Str("bad")
+              )
             ))
           )
         )
