@@ -31,7 +31,7 @@ import org.apache.parquet.hadoop.api.ReadSupport
 import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema.{OriginalType, MessageType, GroupType}
-import scalaz._
+import scalaz._, Scalaz._
 
 /**
   * Parquet Mutable Dragons
@@ -127,6 +127,13 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
 
   }
 
+  private object ListElement {
+    def unapply(d: Data): Option[Data] = d match {
+      case Data.Obj(lm) if lm.size === 1 && lm.isDefinedAt("element") => lm("element").some
+      case _ => none
+    }
+  }
+
   private class DataListConverter(
     val schema: GroupType,
     name: String,
@@ -144,13 +151,28 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     override def start(): Unit = {}
     override def end(): Unit = {
       val normalize = values.toList.map {
-        case Data.Obj(lm) if lm.size == 1 && lm.isDefinedAt("element") => lm("element")
+        case ListElement(el) => el
         case o => o
       }
       parent.save(name, Data.Arr(normalize))
       values.clear()
     }
   }
+
+  private object MapKey {
+    def unapply(t: scala.Tuple2[String, Data]): Option[String] = t match {
+      case ("key" -> Data.Str(k)) => k.some
+      case _ => none
+    }
+  }
+
+  private object MapValue {
+    def unapply(t: scala.Tuple2[String, Data]): Option[Data] = t match {
+      case ("value" -> v) => v.some
+      case _ => none
+    }
+  }
+
 
   private class DataMapConverter(
     val schema: GroupType,
@@ -169,11 +191,10 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     override def start(): Unit = {}
     override def end(): Unit = {
       val na = ("n/a" -> Data.NA)
-      val emptyObj = Data.Obj(ListMap[String, Data]())
       def normalize = values.map {
         case Data.Obj(lm) => lm.toList match {
-          case ("key" -> Data.Str(k)) :: ("value" -> v) :: Nil => (k -> v)
-          case ("value" -> v) :: ("key" -> Data.Str(k)) :: Nil => (k -> v)
+          case MapKey(k) :: MapValue(v) :: Nil => (k -> v)
+          case MapValue(v) :: MapKey(k) :: Nil => (k -> v)
           case _ => na
         }
         case o => ("key_value", o)
