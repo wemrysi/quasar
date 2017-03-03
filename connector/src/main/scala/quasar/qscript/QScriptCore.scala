@@ -33,12 +33,11 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class ReduceIndex(idx: Int) {
-  def incr(j: Int): ReduceIndex = ReduceIndex(idx + j)
+@Lenses final case class ReduceIndex(idx: Option[Int]) {
+  def incr(j: Int): ReduceIndex = ReduceIndex(idx ∘ (_ + j))
 }
 
 object ReduceIndex {
-  val Empty = ReduceIndex(-1)
 
   implicit val equal: Equal[ReduceIndex] =
     Equal.equalBy(_.idx)
@@ -147,6 +146,9 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
+  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
+    C.prj(fa)
+
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =

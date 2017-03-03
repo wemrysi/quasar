@@ -44,7 +44,6 @@ import scalaz._, Scalaz._
   * 
   */
 @SuppressWarnings(Array(
-  "org.wartremover.warts.NoNeedForMonad",
   "org.wartremover.warts.Overloading",
   "org.wartremover.warts.Var",
   "org.wartremover.warts.MutableDataStructures",

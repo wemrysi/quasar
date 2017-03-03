@@ -28,7 +28,6 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.{success, failure}
-import shapeless.contrib.scalaz._
 
 object SemanticAnalysis {
   type Failure = NonEmptyList[SemanticError]
@@ -151,7 +150,7 @@ object SemanticAnalysis {
 
       case Let(name, form, body) => {
         val bs2: BindingScope =
-          BindingScope(bs.scope ++ Map(name -> ExprRelationAST((), name)))
+          BindingScope(bs.scope ++ Map(name.value -> ExprRelationAST((), name.value)))
 
         success(Let(name, (Scope(ts, bs), form), (Scope(ts, bs2), body)))
       }
