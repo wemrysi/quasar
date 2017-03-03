@@ -28,7 +28,6 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._, Validation.{success, failure}
-import shapeless.contrib.scalaz._
 
 object SemanticAnalysis {
   type Failure = NonEmptyList[SemanticError]
