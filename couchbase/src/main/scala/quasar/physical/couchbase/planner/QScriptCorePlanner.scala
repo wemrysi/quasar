@@ -49,7 +49,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
           {
-            case Embed(ejson.Common(ejson.Str(key))) =>
+            case Embed(MapFunc.EC(ejson.Str(key))) =>
               Data[T[N1QL]](QData.Str(key)).embed.η[M]
             case key =>
               EitherT(

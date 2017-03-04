@@ -32,10 +32,6 @@ trait ExprOp3_0F[A]
 object ExprOp3_0F {
   final case class $dateToStringF[A](format: FormatString, date: A) extends ExprOp3_0F[A]
 
-  // TODO: if this is needed, comment explaining why
-  def unapply[EX[_], A](ex: EX[A])(implicit I: ExprOp3_0F :<: EX): Option[ExprOp3_0F[A]] =
-    I.prj(ex)
-
   implicit val equal:
       Delay[Equal, ExprOp3_0F] =
     new Delay[Equal, ExprOp3_0F] {
@@ -114,13 +110,4 @@ object FormatString {
 object $dateToStringF {
   def apply[EX[_], A](format: FormatString, date: A)(implicit I: ExprOp3_0F :<: EX): EX[A] =
     I.inj(ExprOp3_0F.$dateToStringF(format, date))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_0F :<: EX): Option[(FormatString, A)] =
-    I.prj(expr) collect {
-      case ExprOp3_0F.$dateToStringF(format, date) => (format, date)
-    }
-}
-
-object $dateToString {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_0F :<: EX): Option[(FormatString, T)] =
-    $dateToStringF.unapply(T.project(expr))
 }

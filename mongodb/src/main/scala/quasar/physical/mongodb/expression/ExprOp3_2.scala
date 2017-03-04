@@ -41,10 +41,6 @@ object ExprOp3_2F {
   final case class $ceilF[A](value: A)         extends ExprOp3_2F[A]
   final case class $floorF[A](value: A)        extends ExprOp3_2F[A]
 
-  // TODO: if this is needed, comment explaining why
-  def unapply[EX[_], A](ex: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[ExprOp3_2F[A]] =
-    I.prj(ex)
-
   implicit val equal: Delay[Equal, ExprOp3_2F] =
     new Delay[Equal, ExprOp3_2F] {
       def apply[A](eq: Equal[A]) = {
@@ -223,45 +219,4 @@ object $floorF {
     I.prj(expr) collect {
       case ExprOp3_2F.$floorF(value) => (value)
     }
-}
-
-object $sqrt {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $sqrtF.unapply(T.project(expr))
-}
-object $abs {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $absF.unapply(T.project(expr))
-}
-object $log {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[(T, T)] =
-    $logF.unapply(T.project(expr))
-}
-object $log10 {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $log10F.unapply(T.project(expr))
-}
-object $ln {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $lnF.unapply(T.project(expr))
-}
-object $pow {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[(T, T)] =
-    $powF.unapply(T.project(expr))
-}
-object $exp {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $expF.unapply(T.project(expr))
-}
-object $trunc {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $truncF.unapply(T.project(expr))
-}
-object $ceil {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $ceilF.unapply(T.project(expr))
-}
-object $floor {
-  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[T] =
-    $floorF.unapply(T.project(expr))
 }

@@ -833,13 +833,6 @@ object $foldLeft {
 }
 
 object WorkflowOpCoreF {
-  // NB: this extractor has to be used instead of the simpler ones provided for
-  // each op if you need to bind the op itself, and not just its fields.
-  // For example: `case $project(src, shape, id) => ` vs.
-  // `case WorkflowOpCoreF(p @ $ProjectF(_, _, _)) =>`
-  def unapply[F[_], A](fa: F[A])(implicit I: WorkflowOpCoreF :<: F): Option[WorkflowOpCoreF[A]] =
-    I.prj(fa)
-
   implicit val traverse: Traverse[WorkflowOpCoreF] =
     new Traverse[WorkflowOpCoreF] {
       def traverseImpl[G[_], A, B](fa: WorkflowOpCoreF[A])(f: A => G[B])

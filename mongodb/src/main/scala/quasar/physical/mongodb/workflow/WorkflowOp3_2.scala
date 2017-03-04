@@ -89,13 +89,6 @@ object $sample {
   }
 
 object WorkflowOp3_2F {
-  // NB: this extractor has to be used instead of the simpler ones provided for
-  // each op if you need to bind the op itself, and not just its fields.
-  // For example: `case $lookup(src, from, lf, ff, as) => ` vs.
-  // `case WorkflowOp3_2F(l @ $LookupF(_, _, _, _, _)) =>`
-  def unapply[F[_], A](fa: F[A])(implicit I: WorkflowOp3_2F :<: F): Option[WorkflowOp3_2F[A]] =
-    I.prj(fa)
-
   implicit val traverse: Traverse[WorkflowOp3_2F] =
     new Traverse[WorkflowOp3_2F] {
       def traverseImpl[G[_], A, B](fa: WorkflowOp3_2F[A])(f: A => G[B])

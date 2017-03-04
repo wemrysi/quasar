@@ -66,13 +66,13 @@ package object optimize {
           val unusedRefs =
             unused(getDefs(op.unFix), usedRefs).toList.flatMap(_.deref.toList)
           op.unFix match {
-            case WorkflowOpCoreF(p @ $ProjectF(_, _, _))   =>
+            case I(p @ $ProjectF(_, _, _))   =>
               val p1 = p.deleteAll(unusedRefs)
               if (p1.shape.value.isEmpty) p1.pipeline.src.unFix
               else I.inj(p1)
-            case WorkflowOpCoreF(g @ $GroupF(_, _, _))     => I.inj(g.deleteAll(unusedRefs.map(_.flatten.head)))
-            case WorkflowOpCoreF(s @ $SimpleMapF(_, _, _)) => I.inj(s.deleteAll(unusedRefs))
-            case o                                     => o
+            case I(g @ $GroupF(_, _, _))     => I.inj(g.deleteAll(unusedRefs.map(_.flatten.head)))
+            case I(s @ $SimpleMapF(_, _, _)) => I.inj(s.deleteAll(unusedRefs))
+            case o                           => o
           }
         }
 
@@ -156,7 +156,7 @@ package object optimize {
             $limit[F](count),
             $simpleMap[F](fn, scope)).unFix.some
 
-        case $match(Fix(WorkflowOpCoreF(p @ $ProjectF(src0, shape, id))), sel) =>
+        case $match(Fix(I(p @ $ProjectF(src0, shape, id))), sel) =>
           val defs = p.getAll.collect {
             case (n, $var(x))    => DocField(n) -> x
             case (n, $include()) => DocField(n) -> DocField(n)

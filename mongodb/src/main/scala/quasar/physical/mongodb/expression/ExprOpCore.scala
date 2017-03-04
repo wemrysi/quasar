@@ -94,12 +94,7 @@ object ExprOpCoreF {
       extends ExprOpCoreF[A]
   final case class $ifNullF[A](expr: A, replacement: A) extends ExprOpCoreF[A]
 
-  // TODO: if this is needed, comment explaining why
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[ExprOpCoreF[A]] =
-    I.prj(expr)
-
-  implicit def equal:
-      Delay[Equal, ExprOpCoreF] =
+  implicit val equal: Delay[Equal, ExprOpCoreF] =
     new Delay[Equal, ExprOpCoreF] {
       def apply[A](eq: Equal[A]) = {
         implicit val EQ: Equal[A] = eq
