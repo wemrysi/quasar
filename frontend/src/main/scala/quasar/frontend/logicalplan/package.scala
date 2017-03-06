@@ -21,7 +21,7 @@ import quasar._
 import quasar.common.SortDir
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 
 import scala.Symbol
 
