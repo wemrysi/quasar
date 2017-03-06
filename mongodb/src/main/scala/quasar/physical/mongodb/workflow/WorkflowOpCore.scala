@@ -43,24 +43,12 @@ final case class $PureF(value: Bson) extends WorkflowOpCoreF[Nothing]
 object $pure {
   def apply[F[_]: Coalesce](value: Bson)(implicit I: WorkflowOpCoreF :<: F) =
     Fix(Coalesce[F].coalesce(I.inj($PureF(value))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[Bson] =
-    I.prj(op) collect {
-      case $PureF(value) => (value)
-    }
 }
 
 final case class $ReadF(coll: Collection) extends WorkflowOpCoreF[Nothing]
 object $read {
   def apply[F[_]: Coalesce](coll: Collection)(implicit I: WorkflowOpCoreF :<: F) =
     Fix(Coalesce[F].coalesce(I.inj($ReadF(coll))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[Collection] =
-    I.prj(op) collect {
-      case $ReadF(coll) => (coll)
-    }
 }
 
 final case class $MatchF[A](src: A, selector: Selector)
@@ -79,12 +67,6 @@ object $match {
   def apply[F[_]: Coalesce](selector: Selector)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($MatchF(src, selector))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Selector)] =
-    I.prj(op) collect {
-      case $MatchF(src, sel) => (src, sel)
-    }
 }
 
 final case class $ProjectF[A](src: A, shape: Reshape[ExprOp], idExclusion: IdHandling)
@@ -173,12 +155,6 @@ object $project {
     $project[F](
       shape,
       shape.get(IdName).fold[IdHandling](IgnoreId)(κ(IncludeId)))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Reshape[ExprOp], IdHandling)] =
-    I.prj(op) collect {
-      case $ProjectF(src, shape, id) => (src, shape, id)
-    }
 }
 
 final case class $RedactF[A](src: A, value: Fix[ExprOp])
@@ -205,12 +181,6 @@ object $redact {
   def apply[F[_]: Coalesce](value: Fix[ExprOp])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($RedactF(src, value))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Fix[ExprOp])] =
-    I.prj(op) collect {
-      case $RedactF(src, value) => (src, value)
-    }
 }
 
 final case class $LimitF[A](src: A, count: Long)
@@ -229,11 +199,6 @@ object $limit {
   def apply[F[_]: Coalesce](count: Long)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($LimitF(src, count))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F): Option[(A, Long)] =
-    I.prj(op).collect {
-      case $LimitF(src, count) => (src, count)
-    }
 }
 
 final case class $SkipF[A](src: A, count: Long)
@@ -252,11 +217,6 @@ object $skip {
   def apply[F[_]: Coalesce](count: Long)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($SkipF(src, count))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F): Option[(A, Long)] =
-    I.prj(op).collect {
-      case $SkipF(src, count) => (src, count)
-    }
 }
 
 final case class $UnwindF[A](src: A, field: DocVar)
@@ -276,12 +236,6 @@ object $unwind {
   def apply[F[_]: Coalesce](field: DocVar)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($UnwindF(src, field))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, DocVar)] =
-    I.prj(op) collect {
-      case $UnwindF(src, field) => (src, field)
-    }
 }
 
 final case class $GroupF[A](src: A, grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
@@ -315,12 +269,6 @@ object $group {
   def apply[F[_]: Coalesce](grouped: Grouped[ExprOp], by: Reshape.Shape[ExprOp])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($GroupF(src, grouped, by))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Grouped[ExprOp], Reshape.Shape[ExprOp])] =
-    I.prj(op) collect {
-      case $GroupF(src, grouped, shape) => (src, grouped, shape)
-    }
 }
 
 final case class $SortF[A](src: A, value: NonEmptyList[(BsonField, SortDir)])
@@ -344,12 +292,6 @@ object $sort {
   def apply[F[_]: Coalesce](value: NonEmptyList[(BsonField, SortDir)])
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($SortF(src, value))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, NonEmptyList[(BsonField, SortDir)])] =
-    I.prj(op) collect {
-      case $SortF(src, value) => (src, value)
-    }
 }
 
 /**
@@ -377,12 +319,6 @@ object $out {
   def apply[F[_]: Coalesce](collection: CollectionName)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($OutF(src, collection))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, CollectionName)] =
-    I.prj(op) collect {
-      case $OutF(src, collection) => (src, collection)
-    }
 }
 
 final case class $GeoNearF[A](
@@ -423,15 +359,6 @@ object $geoNear {
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($GeoNearF(
         src, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, (Double, Double), BsonField, Option[Int], Option[Double],
-      Option[Selector], Option[Boolean], Option[Double], Option[BsonField],
-      Option[Boolean])] =
-    I.prj(op) collect {
-      case $GeoNearF(src, n, df, l, md, q, s, dm, il, ud) =>
-        (src, n, df, l, md, q, s, dm, il, ud)
-    }
 }
 
 sealed trait MapReduceF[A] extends WorkflowOpCoreF[A] {
@@ -514,12 +441,6 @@ object $map {
   def apply[F[_]: Coalesce](fn: Js.AnonFunDecl, scope: Scope)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($MapF(src, fn, scope))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Js.AnonFunDecl, Scope)] =
-    I.prj(op) collect {
-      case $MapF(src, fn, scope) => (src, fn, scope)
-    }
 }
 
 // FIXME: this one should become $MapF, with the other one being replaced by
@@ -681,12 +602,6 @@ object $simpleMap {
   def apply[F[_]: Coalesce](exprs: NonEmptyList[CardinalExpr[JsFn]], scope: Scope)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($SimpleMapF(src, exprs, scope))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, NonEmptyList[CardinalExpr[JsFn]], Scope)] =
-    I.prj(op) collect {
-      case $SimpleMapF(src, exprs, scope) => (src, exprs, scope)
-    }
 }
 
 /**
@@ -754,12 +669,6 @@ object $flatMap {
   def apply[F[_]: Coalesce](fn: Js.AnonFunDecl, scope: Scope)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($FlatMapF(src, fn, scope))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Js.AnonFunDecl, Scope)] =
-    I.prj(op) collect {
-      case $FlatMapF(src, fn, scope) => (src, fn, scope)
-    }
 }
 
 /** Takes a function of two parameters – a key and an array of values. The
@@ -806,12 +715,6 @@ object $reduce {
   def apply[F[_]: Coalesce](fn: Js.AnonFunDecl, scope: Scope)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($ReduceF(src, fn, scope))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Js.AnonFunDecl, Scope)] =
-    I.prj(op) collect {
-      case $ReduceF(src, fn, scope) => (src, fn, scope)
-    }
 }
 
 /** Performs a sequence of operations, sequentially, merging their results.
@@ -822,14 +725,6 @@ object $foldLeft {
   def apply[F[_]: Coalesce](first: Fix[F], second: Fix[F], rest: Fix[F]*)
     (implicit I: WorkflowOpCoreF :<: F): Fix[F] =
     Fix(Coalesce[F].coalesce(I.inj($FoldLeftF(first, NonEmptyList.nel(second, IList.fromList(rest.toList))))))
-
-  // FIXME: the result should be in NonEmptyList, but it gives a compile error
-  // saying "this is a GADT skolem"
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, List[A])] =
-    I.prj(op) collect {
-      case $FoldLeftF(head, tail) => (head, tail.toList)
-    }
 }
 
 object WorkflowOpCoreF {

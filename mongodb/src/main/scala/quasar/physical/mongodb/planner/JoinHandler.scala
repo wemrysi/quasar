@@ -89,8 +89,8 @@ object JoinHandler {
         false)
 
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
-      case $read(Collection(db, _)) => db.some
-      case op => C.pipeline(op).flatMap(_.src)
+      case ev0($ReadF(Collection(db, _))) => db.some
+      case op                             => C.pipeline(op).flatMap(_.src)
       // TODO: deal with non-pipeline sources where it's possible to identify the DB
     }
 
@@ -193,7 +193,7 @@ object JoinHandler {
       : Option[(Collection, BsonField)] =
       arg match {
         case JoinSource(
-              Fix(CollectionBuilderF(Fix($read(coll)), Root(), None)),
+              Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
               List(Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(field))))))),
               _) if src ≟ arg.src =>
           (coll, field).some

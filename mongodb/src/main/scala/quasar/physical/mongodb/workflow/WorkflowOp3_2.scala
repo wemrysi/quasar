@@ -57,12 +57,6 @@ object $lookup {
     as: BsonField)
     (implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, CollectionName, BsonField, BsonField, BsonField)] =
-    I.prj(op) collect {
-      case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
-    }
 }
 
 final case class $SampleF[A](src: A, size: Int)
@@ -80,13 +74,7 @@ final case class $SampleF[A](src: A, size: Int)
 object $sample {
   def apply[F[_]: Coalesce](size: Int)(implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($SampleF(src, size))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, Int)] =
-    I.prj(op) collect {
-      case $SampleF(src, size) => (src, size)
-    }
-  }
+}
 
 object WorkflowOp3_2F {
   implicit val traverse: Traverse[WorkflowOp3_2F] =

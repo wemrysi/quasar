@@ -99,15 +99,15 @@ package object workflow {
       Coalesce[F] = new Coalesce[F] {
     def coalesceƒ:
         F[Fix[F]] => Option[F[Fix[F]]] = {
-      case $match(src, selector) => src.project match {
-        case $sort(src0, value) =>
+      case I($MatchF(src, selector)) => src.project match {
+        case I($SortF(src0, value)) =>
           I.inj($SortF(I.inj($MatchF(src0, selector)).embed, value)).some
-        case $match(src0, sel0) =>
+        case I($MatchF(src0, sel0)) =>
           I.inj($MatchF(src0, sel0 ⊹ selector)).some
         case _ => None
       }
       case I(p @ $ProjectF(src, shape, id)) => src.project match {
-        case $project(src0, shape0, id0) =>
+        case I($ProjectF(src0, shape0, id0)) =>
           inlineProject(p, List(shape0)).map(sh => I.inj($ProjectF(src0, sh, id0 |+| id)))
         // Would like to inline a $project into a preceding $simpleMap, but
         // This is not safe, because sometimes a $project is inserted after
@@ -123,51 +123,51 @@ package object workflow {
         //             ListMap("__tmp" -> js(base)),
         //             jsShape(jscore.Ident("__tmp")))),
         //         flatten, scope)))
-        case $group(src, grouped, by) if id != ExcludeId =>
+        case I($GroupF(src, grouped, by)) if id != ExcludeId =>
           inlineProjectGroup(shape, grouped).map(gr => I.inj($GroupF(src, gr, by)))
-        case $unwind(Embed($group(src, grouped, by)), unwound)
+        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound))
             if id != ExcludeId =>
           inlineProjectUnwindGroup(shape, unwound, grouped).map { case (unwound, grouped) =>
             I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound))
           }
         case _ => None
       }
-      case $sort(Embed($sort(src, sort1)), sort2) =>
+      case I($SortF(Embed(I($SortF(src, sort1))), sort2)) =>
         I.inj($SortF(src, sort2 ⊹ sort1)).some
-      case $limit(src, count) => src.project match {
-        case $limit(src0, count0) =>
+      case I($LimitF(src, count)) => src.project match {
+        case I($LimitF(src0, count0)) =>
           I.inj($LimitF(src0, scala.math.min(count0, count))).some
-        case $skip(src0, count0) =>
+        case I($SkipF(src0, count0)) =>
           I.inj($SkipF(I.inj($LimitF(src0, count0 + count)).embed, count0)).some
         case _ => None
       }
-      case $skip(src, count) => src.project match {
-        case $skip(src0, count0) => I.inj($SkipF(src0, count0 + count)).some
-        case _                   => None
+      case I($SkipF(src, count)) => src.project match {
+        case I($SkipF(src0, count0)) => I.inj($SkipF(src0, count0 + count)).some
+        case _                       => None
       }
-      case $group(src, grouped, \/-($literal(bson))) if bson != Bson.Null =>
+      case I($GroupF(src, grouped, \/-($literal(bson)))) if bson != Bson.Null =>
         I.inj($GroupF(src, grouped, \/-($literal(Bson.Null)))).some
       case I(op0 @ $GroupF(_, _, _)) =>
         inlineGroupProjects(op0).map { case (src, gr, by) => I.inj($GroupF(src, gr, by)) }
-      case $geoNear(src, _, _, _, _, _, _, _, _, _) => src.project match {
+      case I($GeoNearF(src, _, _, _, _, _, _, _, _, _)) => src.project match {
         // FIXME: merge the params
-        case $geoNear(_, _, _, _, _, _, _, _, _, _) => None
-        case _                                      => None
+        case I($GeoNearF(_, _, _, _, _, _, _, _, _, _)) => None
+        case _                                          => None
       }
-      case $map(src, fn, scope) => src.project match {
-        case $map(src0, fn0, scope0) =>
+      case I($MapF(src, fn, scope)) => src.project match {
+        case I($MapF(src0, fn0, scope0)) =>
           Reshape.mergeMaps(scope0, scope).map(sc =>
             I.inj($MapF(src0, $MapF.compose(fn, fn0), sc)))
-        case $flatMap(src0, fn0, scope0) =>
+        case I($FlatMapF(src0, fn0, scope0)) =>
           Reshape.mergeMaps(scope0, scope).map(sc =>
             I.inj($FlatMapF(src0, $FlatMapF.mapCompose(fn, fn0), sc)))
         case _                   => None
       }
-      case $flatMap(src, fn, scope) => src.project match {
-        case $map(src0, fn0, scope0)     =>
+      case I($FlatMapF(src, fn, scope)) => src.project match {
+        case I($MapF(src0, fn0, scope0))     =>
           Reshape.mergeMaps(scope0, scope).map(sc =>
             I.inj($FlatMapF(src0, $MapF.compose(fn, fn0), sc)))
-        case $flatMap(src0, fn0, scope0) =>
+        case I($FlatMapF(src0, fn0, scope0)) =>
           Reshape.mergeMaps(scope0, scope).map(sc =>
             I.inj($FlatMapF(src0, $FlatMapF.kleisliCompose(fn, fn0), sc)))
         case _                   => None
@@ -181,9 +181,9 @@ package object workflow {
           I.inj($FoldLeftF(head0, tail0 ⊹ tail)).some
         case _                       => None
       }
-      case $out(src, _) => src.project match {
-        case $read(_) => src.project.some
-        case _        => None
+      case I($OutF(src, _)) => src.project match {
+        case I($ReadF(_)) => src.project.some
+        case _            => None
       }
       case _ => None
     }
@@ -416,8 +416,8 @@ package object workflow {
     new Crush[WorkflowF] {
       def crush[T[_[_]]: BirecursiveT](
         op: WorkflowF[(T[WorkflowF], (DocVar, WorkflowTask))]) = op match {
-        case $pure(value) => (DocVar.ROOT(), PureTask(value))
-        case $read(coll)  => (DocVar.ROOT(), ReadTask(coll))
+        case I($PureF(value)) => (DocVar.ROOT(), PureTask(value))
+        case I($ReadF(coll))  => (DocVar.ROOT(), ReadTask(coll))
         case I(op @ $MatchF((src, rez), selector)) =>
           // TODO: If we ever allow explicit request of cursors (instead of
           //       collections), we could generate a FindQuery here.
@@ -527,7 +527,7 @@ package object workflow {
         op: PipelineF[WorkflowF, T[WorkflowF]]):
           Option[(DocVar, WorkflowTask, List[PipelineOp])] =
         op.wf match {
-          case $match(src, selector) =>
+          case I($MatchF(src, selector)) =>
             def pipelinable(sel: Selector): Boolean = sel match {
               case Selector.Where(_) => false
               case comp: Selector.CompoundSelector =>
@@ -600,7 +600,7 @@ package object workflow {
 
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-            case $project(src, shape, _)  =>
+            case I($ProjectF(src, shape, _))  =>
               shape.toJs.fold(
                 κ(I.inj(mr)),
                 x => {
@@ -622,7 +622,7 @@ package object workflow {
                   Reshape(ListMap(ExprName -> \/-($$ROOT))),
                   IncludeId)),
               tail.map(x => x.project match {
-                case $reduce(_, _, _) => x
+                case I($ReduceF(_, _, _)) => x
                 case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
               })))
 
@@ -638,7 +638,7 @@ package object workflow {
             n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
 
         def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.project match {
-          case $simpleMap(_, _, _)   => fixShape(wf)
+          case I($SimpleMapF(_, _, _))   => fixShape(wf)
           case IsShapePreserving(sp) => promoteKnownShape(sp.src)
           case _                     => finished
         }
@@ -668,7 +668,7 @@ package object workflow {
         case IsSource(s)       => s.op.render
         case IsSingleSource(_) =>
           NonTerminal("Chain" :: wfType, None, chain(v))
-        case $foldLeft(_, _) =>
+        case ev0($FoldLeftF(_, _)) =>
           NonTerminal("$FoldLeftF" :: wfType, None, v.children.map(render(_)))
       }
     }

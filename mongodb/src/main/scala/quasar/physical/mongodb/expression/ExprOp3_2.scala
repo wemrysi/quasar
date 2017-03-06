@@ -134,89 +134,49 @@ object ExprOp3_2F {
 object $sqrtF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$sqrtF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$sqrtF(value) => (value)
-    }
 }
 
 object $absF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$absF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$absF(value) => (value)
-    }
 }
 
 object $logF {
   def apply[EX[_], A](value: A, base: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$logF(value, base))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[(A, A)] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$logF(value, base) => (value, base)
-    }
 }
 
 object $log10F {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$log10F(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$log10F(value) => (value)
-    }
 }
 
 object $lnF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$lnF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$lnF(value) => (value)
-    }
 }
 
 object $powF {
   def apply[EX[_], A](value: A, exp: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$powF(value, exp))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[(A, A)] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$powF(value, base) => (value, base)
-    }
 }
 
 object $expF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$expF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$expF(value) => (value)
-    }
 }
 
 object $truncF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$truncF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$truncF(value) => (value)
-    }
 }
 
 object $ceilF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$ceilF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$ceilF(value) => (value)
-    }
 }
 
 object $floorF {
   def apply[EX[_], A](value: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
     I.inj(ExprOp3_2F.$floorF(value))
-  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[A] =
-    I.prj(expr) collect {
-      case ExprOp3_2F.$floorF(value) => (value)
-    }
 }

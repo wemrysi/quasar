@@ -990,7 +990,7 @@ object WorkflowBuilder {
       wb.unFix match {
         case spb @ ShapePreservingBuilderF(spbSrc, sortKeys, f) =>
           spb.dummyOp.unFix match {
-            case $sort(_, _) =>
+            case ev0($SortF(_, _)) =>
               foldBuilders(src, sortKeys).flatMap {
                 case (newSrc, dv, ks) =>
                   distincting(newSrc).map { dist =>
