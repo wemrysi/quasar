@@ -74,7 +74,7 @@ object Repl {
       case Some( \/-(a)) => a
       case Some(-\/ (r)) =>
         (unsandbox(cwd) </> r).relativeTo(rootDir).cata(
-          rootDir </> _, rootDir)
+          (d: RDir) => rootDir </> d, rootDir)
     }
 
   def targetFile(path: XFile): AFile =
@@ -82,7 +82,7 @@ object Repl {
       case  \/-(a) => a
       case -\/ (r) =>
         (unsandbox(cwd) </> r).relativeTo(rootDir).cata(
-          rootDir </> _, rootDir </> file1(fileName(r)))
+          (d: RFile) => rootDir </> d, rootDir </> file1(fileName(r)))
     }
   }
 
