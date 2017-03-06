@@ -99,7 +99,7 @@ object queryfile {
     def eval(lp: Fix[LogicalPlan]) =
       lpToXQuery[QG, Fix, FMT](lp).map({ case (main, _) =>
         Xcc[F].evaluate(main)
-          .chunk(chunkSize.get.toInt)
+          .chunk(chunkSize.value.toInt)
           .map(_ traverse xdmitem.decodeForFileSystem)
       }).run.run
 
