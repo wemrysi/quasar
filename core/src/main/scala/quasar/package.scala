@@ -33,9 +33,9 @@ import scalaz._, Scalaz._
 package object quasar {
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
-      EitherT(r.point[PhaseResultW]) flatMap { a =>
-        (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
-      }
+    EitherT(r.point[PhaseResultW]) flatMap { a =>
+      (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
+    }
 
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
     * typechecked.
@@ -45,15 +45,16 @@ package object quasar {
     (query: Blob[Fix[Sql]], vars: Variables, basePath: ADir)
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : CompileM[T] = {
-    import SemanticAnalysis.AllPhases
-
+    import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
       substAst <- phase("Variables Substituted", ast.mapExpressionM(Variables.substVars(_, vars) leftMap (_.wrapNel)))
       absAst   <- phase("Absolutized", substAst.map(_.mkPathsAbsolute(basePath)).right)
-      annBlob  <- phase("Annotated Tree", absAst.traverse(AllPhases[Fix[Sql]]))
+      normed   <- phase("Normalized Projections", absAst.map(normalizeProjections).right)
+      sortProj <- phase("Sort Keys Projected", normed.map(projectSortKeys).right)
+      annBlob  <- phase("Annotated Tree", (sortProj.traverse(annotate)))
       scope    =  annBlob.scope.collect{ case func: FunctionDecl[_] => func }
-      logical  <- phase("Logical Plan", Compiler.compile[T](annBlob.expr, scope) leftMap (_.wrapNel))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annBlob.expr, annBlob.scope) leftMap (_.wrapNel))
     } yield logical
   }
 
