@@ -155,13 +155,15 @@ object Planner {
         case Min(_) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Int(a), Data.Int(b)) => Data.Int(a.min(b))
           case (Data.Number(a), Data.Number(b)) => Data.Dec(a.min(b))
-          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case (Data.Str(a), Data.Str(b)) if a.compare(b) < 0 => Data.Str(a)
+          case (Data.Str(a), Data.Str(b)) => Data.Str(b)
           case _ => Data.NA
         }
         case Max(_) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Int(a), Data.Int(b)) => Data.Int(a.max(b))
           case (Data.Number(a), Data.Number(b)) => Data.Dec(a.max(b))
-          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case (Data.Str(a), Data.Str(b)) if a.compare(b) > 0 => Data.Str(a)
+          case (Data.Str(a), Data.Str(b)) => Data.Str(b)
           case _ => Data.NA
         }
         case Avg(_) => (d1: Data, d2: Data) => (d1, d2) match {
