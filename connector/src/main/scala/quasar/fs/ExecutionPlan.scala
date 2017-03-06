@@ -18,7 +18,6 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy.APath
-import quasar.contrib.pathy.order._
 
 import argonaut._, Argonaut._, ArgonautScalaz._
 import monocle.macros.Lenses

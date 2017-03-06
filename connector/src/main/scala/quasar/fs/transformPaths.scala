@@ -17,7 +17,6 @@
 package quasar.fs
 
 import quasar.contrib.pathy._
-import quasar.contrib.pathy.order._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}

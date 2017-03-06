@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
 import quasar.contrib.pathy._
-import quasar.contrib.pathy.order._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp._, eitherT._
@@ -139,22 +138,22 @@ object queryfile {
       MainModule.fromWritten(qs.cataM(planner.plan) strengthL Version.`1.0-ml`)
 
     for {
-      qs      <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
-      shifted =  R.shiftReadDir[QSR, MLQ].apply(qs)
-      _       <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
-      optmzed =  shifted.transHylo(
-                   R.optimize(reflNT[MLQ]),
-                   repeatedly(R.applyTransforms(
-                     C.coalesceQC[MLQ](idPrism),
-                     C.coalesceTJ[MLQ](idPrism.get),
-                     C.coalesceSR[MLQ, ADir](idPrism),
-                     N.normalizeF(_: MLQ[T[MLQ]]))))
-      _       <- logPhase(PhaseResult.tree("QScript (Optimized)", optmzed))
-      main    <- plan(optmzed)
-      inputs  =  optmzed.cata(ExtractPath[MLQ, APath].extractPath[DList])
-      pp      <- prettyPrint[F](main.queryBody)
-      xqyLog  =  MainModule.queryBody.modify(pp getOrElse _)(main).render
-      _       <- logPhase(PhaseResult.detail("XQuery", xqyLog))
+      qs        <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
+      shifted   =  R.shiftReadDir[QSR, MLQ].apply(qs)
+      _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
+      optimized =  shifted.transHylo(
+                     R.optimize(reflNT[MLQ]),
+                     repeatedly(R.applyTransforms(
+                       C.coalesceQC[MLQ](idPrism),
+                       C.coalesceTJ[MLQ](idPrism.get),
+                       C.coalesceSR[MLQ, ADir](idPrism),
+                       N.normalizeF(_: MLQ[T[MLQ]]))))
+      _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
+      main      <- plan(optimized)
+      inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])
+      pp        <- prettyPrint[F](main.queryBody)
+      xqyLog    =  MainModule.queryBody.modify(pp getOrElse _)(main).render
+      _         <- logPhase(PhaseResult.detail("XQuery", xqyLog))
       // NB: While it would be nice to use the pretty printed body in the module
       //     returned for nicer error messages, we cannot as xdmp:pretty-print has
       //     a bug that reorders `where` and `order by` clauses in FLWOR expressions,

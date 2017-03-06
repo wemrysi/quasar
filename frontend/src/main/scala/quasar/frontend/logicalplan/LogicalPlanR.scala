@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
 import quasar.contrib.pathy._
-import quasar.contrib.pathy.order._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._

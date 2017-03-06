@@ -21,7 +21,6 @@ import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
 import quasar.contrib.pathy._
-import quasar.contrib.pathy.order._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
