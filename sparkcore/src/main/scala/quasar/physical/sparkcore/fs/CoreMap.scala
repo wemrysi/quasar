@@ -25,6 +25,7 @@ import quasar.Planner._
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
+import quasar.common.PrimaryType
 
 import java.time._, ZoneOffset.UTC
 import scala.math
@@ -329,6 +330,8 @@ object CoreMap extends Serializable {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2, ff3) => f2.right
+    case TypeOf(f) =>
+      (f >>> ((d: Data) => d.dataType.toPrimaryType.fold(Data.NA : Data)(p => Data.Str(PrimaryType.name(p))))).right[PlannerError]
     case _ => InternalError.fromMsg("not implemented").left
   }
 
