@@ -78,7 +78,7 @@ object Fixture {
   // Remove once version 0.8.4 or higher of jawn is realeased.
   implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
 
-  sealed trait JsonType
+  sealed abstract class JsonType
 
   case class PreciseJson(value: Json) extends JsonType
   object PreciseJson {

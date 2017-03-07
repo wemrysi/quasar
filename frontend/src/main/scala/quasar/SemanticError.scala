@@ -26,7 +26,7 @@ import pathy.Path, Path._
 import scalaz._, Scalaz._
 import shapeless.{Prism => _, _}
 
-sealed trait SemanticError {
+sealed abstract class SemanticError {
   def message: String
 }
 

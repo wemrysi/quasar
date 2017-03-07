@@ -16,7 +16,7 @@
 
 package quasar.regression
 
-sealed trait FieldOrder
+sealed abstract class FieldOrder
 
 final case object FieldOrderPreserved extends FieldOrder
 

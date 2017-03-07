@@ -35,7 +35,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-sealed trait WorkflowBuilderF[F[_], +A] extends Product with Serializable
+sealed abstract class WorkflowBuilderF[F[_], +A] extends Product with Serializable
 
 object WorkflowBuilderF {
   import WorkflowBuilder._
@@ -273,8 +273,8 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new ArrayBuilderF(src, shape))
   }
 
-  sealed trait Contents[+A] extends Product with Serializable
-  sealed trait DocContents[+A] extends Contents[A]
+  sealed abstract class Contents[+A] extends Product with Serializable
+  sealed abstract class DocContents[+A] extends Contents[A]
   sealed trait ArrayContents[+A] extends Contents[A]
   object Contents {
     final case class Expr[A](contents: A) extends DocContents[A] with ArrayContents[A]
@@ -315,7 +315,7 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new GroupBuilderF(src, keys, contents))
   }
 
-  sealed trait StructureType[A] {
+  sealed abstract class StructureType[A] {
     val field: A
   }
   object StructureType {
@@ -875,7 +875,7 @@ object WorkflowBuilder {
     * structures that we need to be able to extract later. This tells us how to
     * extract them.
     */
-  sealed trait Base {
+  sealed abstract class Base {
     def \ (that: Base): Base = (this, that) match {
       case (Root(),      _)            => that
       case (_,           Root())       => this

@@ -19,7 +19,7 @@ package quasar.regression
 import quasar.Predef._
 import quasar.BackendName
 
-sealed trait IgnoreFieldOrderBackend
+sealed abstract class IgnoreFieldOrderBackend
 
 final case object IgnoreFieldOrderAllBackends                           extends IgnoreFieldOrderBackend
 final case class  IgnoreFieldOrderBackends(backends: List[BackendName]) extends IgnoreFieldOrderBackend

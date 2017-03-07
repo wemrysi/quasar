@@ -22,7 +22,7 @@ import quasar.effect.LiftedOps
 
 import scalaz._
 
-sealed trait ConsoleIO[A]
+sealed abstract class ConsoleIO[A]
 object ConsoleIO {
   final case class PrintLn(message: String) extends ConsoleIO[Unit]
 

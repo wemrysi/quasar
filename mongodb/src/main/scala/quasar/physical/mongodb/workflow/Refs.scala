@@ -23,7 +23,7 @@ import quasar.physical.mongodb.expression.DocVar
 import scalaz._
 import simulacrum.typeclass
 
-@typeclass sealed trait Refs[F[_]] {
+@typeclass trait Refs[F[_]] {
   def refs[A](op: F[A]): List[DocVar]
 }
 
