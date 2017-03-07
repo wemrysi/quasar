@@ -33,12 +33,25 @@ import scalaz._, Scalaz._
 trait CompilerHelpers extends TermLogicalPlanMatchers {
   val lpf = new LogicalPlanR[Fix[LP]]
 
+  // TODO use `quasar.precompile`
   val compile: String => String \/ Fix[LP] = query => {
     for {
-      select <- fixParser.parse(Query(query)).leftMap(_.toString)
-      attr   <- AllPhases(select).leftMap(_.toString)
-      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(_.toString)
+      attr   <- parseAndAnnotate(query)
+      cld    <- Compiler.compile[Fix[LP]](attr, Nil).leftMap(_.toString)
     } yield cld
+  }
+
+  val parseAndAnnotate: String => String \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    for {
+      parsed <- fixParser.parse(Query(query)).leftMap(_.toString)
+      normed <- normalizeProjections(parsed).right
+      sort   <- projectSortKeys(normed).right
+      attr   <- annotate(sort).leftMap(_.toString)
+    } yield attr
+  }
+
+  val parseAndAnnotateUnsafe: String => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    parseAndAnnotate(query).valueOr(err => throw new RuntimeException(s"False assumption in test, could not parse and annotate due to underlying issue: $err"))
   }
 
   val optimizer = new Optimizer[Fix[LP]]

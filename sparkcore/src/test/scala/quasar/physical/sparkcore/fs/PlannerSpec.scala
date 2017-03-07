@@ -484,16 +484,16 @@ class PlannerSpec
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
             case rdd =>
-              rdd.collect.toList must_= List(
-                Data.Obj(ListMap(
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.NA
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
                 ))
-              )
+              ))
           })
         }
       }
@@ -521,16 +521,16 @@ class PlannerSpec
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
             case rdd =>
-              rdd.collect.toList must_= List(
-                Data.Obj(ListMap(
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
                   JoinDir.Left.name ->  Data.NA,
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
                 ))
-              )
+              ))
           })
         }
       }

@@ -115,11 +115,11 @@ object syntax {
   }
 
   final implicit class NCNameOps(val ncname: NCName) extends scala.AnyVal {
-    def xs: XQuery = ncname.value.get.xs
+    def xs: XQuery = ncname.value.value.xs
   }
 
   final implicit class NSUriOps(val uri: NSUri) extends scala.AnyVal {
-    def xs: XQuery = uri.value.get.xs
+    def xs: XQuery = uri.value.value.xs
   }
 
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
@@ -138,6 +138,11 @@ object syntax {
   final implicit class FunctionDeclOps[D <: FunctionDecl](val func: D) extends scala.AnyVal {
     def ref[F[_]](implicit F: PrologW[F]): F[XQuery] =
       F.writer(ISet singleton Prolog.funcDecl(func), func.name :# func.arity)
+  }
+
+  final implicit class FunctionDeclFOps[F[_], D <: FunctionDecl](val funcF: F[D]) extends scala.AnyVal {
+    def ref(implicit F0: PrologW[F], F1: Bind[F]): F[XQuery] =
+      F1.bind(funcF)(_.ref[F])
   }
 
   final implicit class FunctionDecl1Ops(val func: FunctionDecl1) extends scala.AnyVal {

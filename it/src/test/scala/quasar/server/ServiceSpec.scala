@@ -19,9 +19,8 @@ package quasar.server
 import scala.Predef.$conforms
 import quasar.Predef._
 import quasar.{TestConfig, Variables}
-import quasar.api.UriPathCodec
 import quasar.config.{ConfigOps, FsPath, WebConfig}
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.{APath, UriPathCodec}
 import quasar.internal.MountServiceConfig
 import quasar.main.MainErrT
 import quasar.fs.mount._
@@ -38,9 +37,12 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class ServiceSpec extends quasar.Qspec {
+  
   val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient
+
+  sequential
 
   def withServer[A]
     (port: Int = 8888, webConfig: WebConfig = configOps.default)
@@ -58,11 +60,12 @@ class ServiceSpec extends quasar.Qspec {
       webConfig)
 
     (for {
-      svc           <- service
+      (svc, close)  <- service
       (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
       r             <- f(uri)
                           .onFinish(_ => shutdown)
                           .onFinish(_ => p.run)
+                          .onFinish(_ => close)
                           .liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }

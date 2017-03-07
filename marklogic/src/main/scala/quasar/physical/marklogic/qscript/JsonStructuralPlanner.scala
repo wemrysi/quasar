@@ -25,7 +25,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
 
-private[qscript] final class JsonStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]
+private[qscript] final class JsonStructuralPlanner[F[_]: Monad: PrologW: QNameGenerator]
   extends StructuralPlanner[F, DocType.Json] {
 
   import StructuralPlanner.ejs, axes.child

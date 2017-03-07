@@ -19,7 +19,7 @@ package quasar.qscript
 import quasar.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
 import quasar.common.SortDir
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncs._
@@ -158,7 +158,7 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(
         QC.inj(Subset(QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+          Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
           Take,
           Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
@@ -168,7 +168,7 @@ class QScriptSpec
         beSome(beTreeEqual(
           QC.inj(Subset(
             QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-            Free.roll(QCT.inj(LeftShift(Free.roll(RTP.inj(Const[Read[APath], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
+            Free.roll(QCT.inj(LeftShift(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("bar"))))), HoleF, ExcludeId, RightSideF))),
             Take,
             Free.roll(QCT.inj(Map(Free.roll(QCT.inj(Unreferenced())), IntLit(10)))))).embed))
     }
@@ -491,14 +491,14 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         TJ.inj(ThetaJoin((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(LeftSideF)),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("car"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
             Free.roll(ConcatArrays(
@@ -612,7 +612,7 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(Union((),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("city"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("city"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
@@ -621,7 +621,7 @@ class QScriptSpec
                   ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
               Free.roll(MakeArray(RightSideF))))))),
           Free.roll(QCT.inj(LeftShift(
-            Free.roll(RTP.inj(Const(Read(rootDir </> file("person"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             ExcludeId,
             Free.roll(ConcatArrays(
