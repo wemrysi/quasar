@@ -54,7 +54,7 @@ object TraceFS {
           case EvaluatePlan(lp)     => (Vector.empty, \/-(ResultHandle(0)))
           case More(handle)         => \/-(Vector.empty)
           case Close(handle)        => ()
-          case Explain(lp)          => (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString)))
+          case Explain(lp)          => (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString, ISet.empty)))
           case ListContents(dir)    => ls(dir)
           case FileExists(file)     =>
             ls(fileParent(file)).fold(

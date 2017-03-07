@@ -64,7 +64,7 @@ class BasicQueryEnablementSpec
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (RenderQuery.compact(_).liftPE))
+    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (r => RenderQuery.compact(r._1).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
