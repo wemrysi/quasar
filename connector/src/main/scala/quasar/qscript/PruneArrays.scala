@@ -169,6 +169,9 @@ object PruneArrays {
   // TODO examine branches
   implicit def equiJoin[T[_[_]]]: PruneArrays[EquiJoin[T, ?]] = default
 
+  def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =
+    map.get(key).getOrElse(Set.empty.some)
+
   implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
