@@ -61,12 +61,7 @@ package object local {
           (sc, SparkFSConf(sc, sandboxAbs(prefix)))
         }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
-      uri.value.split('|').toList match {
-        case master :: prefixPath :: Nil => forge(master, prefixPath)
-        case _ =>
-          error("Missing master and prefixPath (seperated by |)" +
-            " e.g spark://host:port|/var/hadoop/")
-      }
+      forge("local[*]", uri.value)
     }
 
   def sparkFsDef[S[_]](implicit
