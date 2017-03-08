@@ -24,7 +24,7 @@ import monocle.Prism
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
-sealed trait Statement[BODY] {
+sealed abstract class Statement[BODY] {
   def pprint(implicit ev: BODY <~< String): String
 }
 

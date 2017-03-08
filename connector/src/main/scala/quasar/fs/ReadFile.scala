@@ -34,7 +34,7 @@ import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.stream._
 
-sealed trait ReadFile[A]
+sealed abstract class ReadFile[A]
 
 object ReadFile {
   final case class ReadHandle(file: AFile, id: Long)

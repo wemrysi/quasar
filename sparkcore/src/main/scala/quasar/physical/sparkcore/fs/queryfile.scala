@@ -138,7 +138,13 @@ object queryfile {
       injectFT.apply {
         sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(fsType, "RDD Directed Acyclic Graph"))))).map(EitherT(_))
+          rdd => {
+            val rddDebug = rdd.toDebugString
+            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
+            Task.delay(Writer(
+              Vector(PhaseResult.detail("RDD", rddDebug)),
+              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))
+          })).map(EitherT(_))
       }
     }.join
   }

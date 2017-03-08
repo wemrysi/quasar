@@ -180,7 +180,7 @@ object transformPaths {
 
       case Explain(lp) =>
         Q.explain(transformFile(inPath)(lp))
-          .leftMap(transformErrorPath(outPath))
+          .bimap(transformErrorPath(outPath), ExecutionPlan.inputs.modify(_ map outPath))
           .run.run
 
       case ListContents(d) =>

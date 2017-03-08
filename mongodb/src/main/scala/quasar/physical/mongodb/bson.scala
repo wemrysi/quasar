@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
  * A type-safe ADT for Mongo's native data format. Note that this representation
  * is not suitable for efficiently storing large quantities of data.
  */
-sealed trait Bson extends Product with Serializable {
+sealed abstract class Bson extends Product with Serializable {
   // TODO: Once Bson is fixpoint, this should be an algebra:
   //       BsonF[BsonValue] => BsonValue
   def repr: BsonValue
@@ -249,7 +249,7 @@ object BsonType {
   final case object MaxKey extends BsonType(127)
 }
 
-sealed trait BsonField {
+sealed abstract class BsonField {
   def asText  : String
   def asField : String = "$" + asText
   def asVar   : String = "$$" + asText
@@ -310,7 +310,7 @@ sealed trait BsonField {
 }
 
 object BsonField {
-  sealed trait Root
+  sealed abstract class Root
   final case object Root extends Root
 
   def apply(v: NonEmptyList[BsonField.Name]): BsonField = v match {

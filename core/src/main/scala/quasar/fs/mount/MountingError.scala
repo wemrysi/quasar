@@ -24,7 +24,7 @@ import monocle.Prism
 import scalaz.NonEmptyList
 import scalaz._, Scalaz._
 
-sealed trait MountingError
+sealed abstract class MountingError
 
 object MountingError {
   final case class PError private (err: PathError)

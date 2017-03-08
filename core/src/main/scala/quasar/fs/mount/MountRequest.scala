@@ -25,7 +25,7 @@ import quasar.sql.Sql
 import matryoshka.data.Fix
 import monocle.Prism
 
-sealed trait MountRequest {
+sealed abstract class MountRequest {
   import MountRequest._
 
   def path: APath =

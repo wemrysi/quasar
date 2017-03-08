@@ -73,16 +73,18 @@ object Repl {
       case None          => cwd
       case Some( \/-(a)) => a
       case Some(-\/ (r)) =>
-        (unsandbox(cwd) </> r).relativeTo(rootDir).cata(
-          (d: RDir) => rootDir </> d, rootDir)
+        (unsandbox(cwd) </> r)
+          .relativeTo(rootDir[Sandboxed])
+          .cata(rootDir </> _, rootDir)
     }
 
   def targetFile(path: XFile): AFile =
     path match {
       case  \/-(a) => a
       case -\/ (r) =>
-        (unsandbox(cwd) </> r).relativeTo(rootDir).cata(
-          (d: RFile) => rootDir </> d, rootDir </> file1(fileName(r)))
+        (unsandbox(cwd) </> r)
+          .relativeTo(rootDir[Sandboxed])
+          .cata(rootDir </> _, rootDir </> file1(fileName(r)))
     }
   }
 

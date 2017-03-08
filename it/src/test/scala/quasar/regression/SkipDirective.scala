@@ -20,7 +20,7 @@ import quasar.Predef._
 
 import argonaut._, Argonaut._
 
-sealed trait SkipDirective
+sealed abstract class SkipDirective
 
 object SkipDirective {
   final case object Skip    extends SkipDirective

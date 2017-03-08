@@ -29,7 +29,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-sealed trait DerefType[T[_[_]]] extends Product with Serializable
+sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
 final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]

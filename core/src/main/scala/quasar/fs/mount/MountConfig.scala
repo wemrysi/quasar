@@ -27,7 +27,7 @@ import monocle.Prism
 import scalaz._, Scalaz._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
-sealed trait MountConfig
+sealed abstract class MountConfig
 
 object MountConfig {
   final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])

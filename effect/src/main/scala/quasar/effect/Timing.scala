@@ -22,7 +22,7 @@ import java.time.{Duration, Instant}
 import scalaz._
 import scalaz.concurrent.Task
 
-sealed trait Timing[A]
+sealed abstract class Timing[A]
 object Timing {
   final case object Timestamp extends Timing[Instant]
   final case object Nanos extends Timing[Long]
