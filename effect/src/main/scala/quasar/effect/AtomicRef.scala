@@ -29,7 +29,7 @@ import scalaz.concurrent.Task
   *
   * @tparam V the type of value referenced
   */
-sealed trait AtomicRef[V, A]
+sealed abstract class AtomicRef[V, A]
 
 object AtomicRef {
   /** NB: Attempted to define this as `Get[V]() extends AtomicRef[V, V]` but

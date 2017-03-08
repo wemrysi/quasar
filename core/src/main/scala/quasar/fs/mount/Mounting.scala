@@ -30,7 +30,7 @@ import monocle.std.{disjunction => D}
 import pathy._, Path._
 import scalaz._, Scalaz._
 
-sealed trait Mounting[A]
+sealed abstract class Mounting[A]
 
 object Mounting {
 

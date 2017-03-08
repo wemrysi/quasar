@@ -32,7 +32,7 @@ import scodec.interop.scalaz._
 object Zip {
   // First construct a single Process of Ops which can be performed in
   // sequence to produce the entire archive.
-  private sealed trait Op extends Product with Serializable
+  private sealed abstract class Op extends Product with Serializable
   private object Op {
     final case object Start                           extends Op
     final case class StartEntry(entry: jzip.ZipEntry) extends Op

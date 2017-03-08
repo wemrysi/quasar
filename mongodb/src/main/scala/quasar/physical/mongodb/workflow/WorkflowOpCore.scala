@@ -434,7 +434,7 @@ object $geoNear {
     }
 }
 
-sealed trait MapReduceF[A] extends WorkflowOpCoreF[A] {
+sealed abstract class MapReduceF[A] extends WorkflowOpCoreF[A] {
   def singleSource: SingleSourceF[WorkflowOpCoreF, A]
 
   def newMR[F[_]](

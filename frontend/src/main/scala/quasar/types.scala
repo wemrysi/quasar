@@ -27,7 +27,7 @@ import scala.Any
 import argonaut._, Argonaut._, ArgonautScalaz._
 import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
 
-sealed trait Type extends Product with Serializable { self =>
+sealed abstract class Type extends Product with Serializable { self =>
   import Type._
 
   final def toPrimaryType: Option[PrimaryType] =

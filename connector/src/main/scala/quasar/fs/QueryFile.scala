@@ -38,7 +38,7 @@ import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.iteratee._
 import scalaz.stream.Process
 
-sealed trait QueryFile[A]
+sealed abstract class QueryFile[A]
 
 object QueryFile {
   final case class ResultHandle(run: Long) extends scala.AnyVal

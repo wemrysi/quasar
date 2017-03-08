@@ -34,7 +34,7 @@ object SemanticAnalysis {
 
   private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
 
-  sealed trait Synthetic
+  sealed abstract class Synthetic
   object Synthetic {
     final case object SortKey extends Synthetic
 
@@ -177,7 +177,7 @@ object SemanticAnalysis {
     }
   }
 
-  sealed trait Provenance {
+  sealed abstract class Provenance {
     import Provenance._
 
     def & (that: Provenance): Provenance = Both(this, that)
