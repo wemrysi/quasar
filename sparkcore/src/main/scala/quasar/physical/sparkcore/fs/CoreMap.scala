@@ -255,6 +255,8 @@ object CoreMap extends Serializable {
     }).right
     case Or(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
+      case (Data.NA, b) => b
+      case (a, Data.NA) => a
       case _ => undefined
     }).right
     case Between(f1, f2, f3) => ((x: A) => between(f1(x), f2(x), f3(x))).right
