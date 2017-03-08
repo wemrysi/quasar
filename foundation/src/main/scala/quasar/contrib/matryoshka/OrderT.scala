@@ -17,6 +17,7 @@
 package quasar.contrib.matryoshka
 
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._
 import simulacrum._
@@ -29,10 +30,17 @@ trait OrderT[T[_[_]]] {
     Order.order[T[F]](order[F](_, _)(Functor[F], delay))
 }
 
-object OrderT {
-  implicit def recursiveT[T[_[_]]: RecursiveT]: OrderT[T] =
+object OrderT extends OrderTInstances {
+  def recursiveT[T[_[_]]: RecursiveT]: OrderT[T] =
     new OrderT[T] {
       def order[F[_]: Functor](tf1: T[F], tf2: T[F])(implicit del: Delay[Order, F]): Ordering =
         del(orderT[F](del)).order(tf1.project, tf2.project)
     }
+}
+
+sealed abstract class OrderTInstances {
+  import OrderT._
+  implicit def fixOrderT: OrderT[Fix] = recursiveT[Fix]
+  implicit def muOrderT: OrderT[Mu]   = recursiveT[Mu]
+  implicit def nuOrderT: OrderT[Nu]   = recursiveT[Nu]
 }
