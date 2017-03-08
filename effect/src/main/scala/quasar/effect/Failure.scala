@@ -28,7 +28,7 @@ import scalaz.syntax.std.option._
   *
   * @tparam E the reason/error describing why the computation failed
   */
-sealed trait Failure[E, A]
+sealed abstract class Failure[E, A]
 
 object Failure {
   final case class Fail[E, A](e: E) extends Failure[E, A]

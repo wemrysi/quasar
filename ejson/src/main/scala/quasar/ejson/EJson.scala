@@ -22,7 +22,7 @@ import quasar.fp._
 import matryoshka._
 import scalaz._, Scalaz._
 
-sealed trait Common[A]
+sealed abstract class Common[A]
 final case class Arr[A](value: List[A])    extends Common[A]
 final case class Null[A]()                 extends Common[A]
 final case class Bool[A](value: Boolean)   extends Common[A]
@@ -110,7 +110,7 @@ object Obj {
   * bytes, and distinct integers. It also adds metadata, which allows arbitrary
   * annotations on values.
   */
-sealed trait Extension[A]
+sealed abstract class Extension[A]
 final case class Meta[A](value: A, meta: A)  extends Extension[A]
 final case class Map[A](value: List[(A, A)]) extends Extension[A]
 final case class Byte[A](value: scala.Byte)  extends Extension[A]

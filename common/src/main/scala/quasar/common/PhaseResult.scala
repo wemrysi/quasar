@@ -23,7 +23,7 @@ import argonaut._, Argonaut._
 import scalaz.Show
 import scalaz.syntax.show._
 
-sealed trait PhaseResult {
+sealed abstract class PhaseResult {
   def name: String
 }
 

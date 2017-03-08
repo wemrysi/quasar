@@ -29,7 +29,7 @@ import scalaz.concurrent.Task
   * @tparam K the type of keys used to index values
   * @tparam V the type of values in the store
   */
-sealed trait KeyValueStore[K, V, A]
+sealed abstract class KeyValueStore[K, V, A]
 
 object KeyValueStore {
   // NB: Switch to cursor style terms for Keys once backing stores exist where all keys won't fit into memory.

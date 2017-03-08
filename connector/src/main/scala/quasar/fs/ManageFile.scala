@@ -27,10 +27,10 @@ import monocle.Prism
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._
 
-sealed trait ManageFile[A]
+sealed abstract class ManageFile[A]
 
 object ManageFile {
-  sealed trait MoveSemantics
+  sealed abstract class MoveSemantics
 
   /** NB: Certain write operations' consistency is affected by faithful support
     *     of these semantics, thus their consistency/atomicity is as good as the
@@ -72,7 +72,7 @@ object ManageFile {
     implicit val show: Show[MoveSemantics] = Show.showFromToString
   }
 
-  sealed trait MoveScenario {
+  sealed abstract class MoveScenario {
     import MoveScenario._
 
     def fold[X](

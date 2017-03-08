@@ -26,7 +26,7 @@ import monocle.Iso
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-sealed trait WriteFile[A]
+sealed abstract class WriteFile[A]
 
 object WriteFile {
   final case class WriteHandle(file: AFile, id: Long)

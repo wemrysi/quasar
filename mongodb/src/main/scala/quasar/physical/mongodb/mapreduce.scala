@@ -84,7 +84,7 @@ final case class MapReduce(
 object MapReduce {
   type Scope = ListMap[String, Bson]
 
-  sealed trait Action {
+  sealed abstract class Action {
     def nonAtomic: Option[Boolean]
   }
 

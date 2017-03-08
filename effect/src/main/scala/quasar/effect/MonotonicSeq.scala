@@ -36,7 +36,7 @@ import scalaz.syntax.applicative._
   *
   * must always be true.
   */
-sealed trait MonotonicSeq[A]
+sealed abstract class MonotonicSeq[A]
 
 object MonotonicSeq {
   case object Next extends MonotonicSeq[Long]

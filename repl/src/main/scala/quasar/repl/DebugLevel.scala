@@ -18,7 +18,7 @@ package quasar.repl
 
 import quasar.Predef._
 
-sealed trait DebugLevel
+sealed abstract class DebugLevel
 object DebugLevel {
   final case object Silent extends DebugLevel
   final case object Normal extends DebugLevel
