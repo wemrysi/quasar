@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
@@ -1206,7 +1207,7 @@ object MongoDbQScriptPlanner {
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
+    [T[_[_]]: BirecursiveT: OrderT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
@@ -1269,7 +1270,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
+  def plan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],

@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef.{ Eq => _, _ }
 import quasar._, Planner._
+import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
@@ -44,7 +45,7 @@ import shapeless.{nat, Sized}
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
 class Transform
-  [T[_[_]]: BirecursiveT: EqualT: ShowT,
+  [T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT,
     F[_]: Traverse: Normalizable]
   (implicit
     C:  Coalesce.Aux[T, F, F],

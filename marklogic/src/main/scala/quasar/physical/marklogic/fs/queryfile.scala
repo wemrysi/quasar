@@ -19,6 +19,7 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
@@ -117,7 +118,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
   ](
     lp: T[LogicalPlan]

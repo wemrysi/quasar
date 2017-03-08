@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar._, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
 import quasar.fp.ski._
@@ -216,7 +217,7 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
+  def normalize[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]
       : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
     repeatedly(rewrite[T, A]) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
@@ -224,7 +225,7 @@ object MapFunc {
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
+  def rewrite[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
@@ -369,7 +370,7 @@ object MapFunc {
       }
   }
 
-  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFunc[T, ?]] =
+  implicit def equal[T[_[_]]: OrderT, A]: Delay[Equal, MapFunc[T, ?]] =
     new Delay[Equal, MapFunc[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
         // nullary

@@ -156,7 +156,7 @@ object Extension extends ExtensionInstances {
     obj => map(obj.value.toList.map(_.leftMap(f)))
 }
 
-sealed abstract class ExtensionInstances extends ExtensionInstances0 {
+sealed abstract class ExtensionInstances {
   implicit val traverse: Traverse[Extension] = new Traverse[Extension] {
     def traverseImpl[G[_], A, B](
       fa: Extension[A])(
@@ -178,7 +178,7 @@ sealed abstract class ExtensionInstances extends ExtensionInstances0 {
         implicit val ordA: Order[α] = ord
         // TODO: Not sure why this isn't found?
         implicit val ordC: Order[SChar] = scalaz.std.anyVal.char
-        Order.orderBy(generic)
+        Order.orderBy(generic[α])
       }
     }
 
@@ -192,26 +192,14 @@ sealed abstract class ExtensionInstances extends ExtensionInstances0 {
         case Int(v)     => Cord(s"Int($v)")
       })
     }
-}
-
-sealed abstract class ExtensionInstances0 {
-  implicit val equal: Delay[Equal, Extension] =
-    new Delay[Equal, Extension] {
-      def apply[α](eql: Equal[α]) = {
-        implicit val eqlA: Equal[α] = eql
-        // TODO: Not sure why this isn't found?
-        implicit val eqlC: Equal[SChar] = scalaz.std.anyVal.char
-        Equal.equalBy(generic)
-      }
-    }
 
   ////
 
-  private[ejson] def generic[A](e: Extension[A]) = (
-    byte.getOption(e) ,
-    char.getOption(e) ,
-    int.getOption(e)  ,
-    map.getOption(e)  ,
+  private[ejson] def generic[A: Order](e: Extension[A]) = (
+    byte.getOption(e)                          ,
+    char.getOption(e)                          ,
+    int.getOption(e)                           ,
+    map.getOption(e) map (IMap fromFoldable _) ,
     meta.getOption(e)
   )
 }

@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef.{ Map => ScalaMap, _ }
 import quasar.common.SortDir
+import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
@@ -57,7 +58,7 @@ object PATypes {
   def remap[A](env: StateAcc, state: StateAcc, in: F[A]): Output[F, A]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type Mapping = ScalaMap[BigInt, BigInt]
@@ -177,7 +178,7 @@ object PruneArrays {
   // TODO examine branches
   implicit def equiJoin[T[_[_]]]: PruneArrays[EquiJoin[T, ?]] = default
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -208,7 +209,7 @@ object PruneArrays {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 

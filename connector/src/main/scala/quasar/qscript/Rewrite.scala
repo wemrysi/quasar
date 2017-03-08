@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
@@ -32,7 +33,7 @@ import scalaz.{:+: => _, Divide => _, _},
   Leibniz._,
   Scalaz._
 
-class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   def flattenArray[A: Show](array: ConcatArrays[T, FreeMapA[A]]): List[FreeMapA[A]] = {
     def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
       jf.resume match {
