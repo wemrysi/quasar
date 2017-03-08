@@ -231,7 +231,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
         }
 
       val nm = new NormalizableT[T]
-
       val rewrite = new Rewrite[T]
 
       def coalesceQC[F[_]: Functor]
@@ -392,7 +391,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
         (implicit EJ: EquiJoin :<: OUT) = {
         case Map(Embed(src), mf) =>
           (FToOut(src) >>= EJ.prj).map(
-            ej => EJ.inj(EquiJoin.combine.modify(mf >> (_: JoinFunc))(ej)))
+            ej => EJ.inj(EquiJoin.combine.modify((jf: JoinFunc) => nm.freeMF(mf >> jf))(ej)))
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeEJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
         case Union(src, from, count) =>
@@ -405,7 +404,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
         (implicit TJ: ThetaJoin :<: OUT) = {
         case Map(Embed(src), mf) =>
           (FToOut(src) >>= TJ.prj).map(
-            tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc))(tj)))
+            tj => TJ.inj(ThetaJoin.combine.modify((jf: JoinFunc) => nm.freeMF(mf >> jf))(tj)))
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeTJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
         case Union(src, from, count) =>
@@ -419,17 +418,19 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
+      val nm = new NormalizableT[T]
+
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) = {
         case BucketField(Embed(src), value, field) => FToOut.get(src) >>= QC.prj >>= {
           case Map(srcInner, mf) =>
-            BucketField(srcInner, value >> mf, field >> mf).some
+            BucketField(srcInner, nm.freeMF(value >> mf), nm.freeMF(field >> mf)).some
           case _ => None
         }
         case BucketIndex(Embed(src), value, index) => FToOut.get(src) >>= QC.prj >>= {
           case Map(srcInner, mf) =>
-            BucketIndex(srcInner, value >> mf, index >> mf).some
+            BucketIndex(srcInner, nm.freeMF(value >> mf), nm.freeMF(index >> mf)).some
           case _ => None
         }
       }
@@ -493,6 +494,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
 
+      val nm = new NormalizableT[T]
+
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) =
@@ -507,8 +510,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
           def coalesceBranchMaps(ej: EquiJoin[T[F]]): Option[EquiJoin[T[F]]] =
             (ej.lBranch.project.run.map(qct.prj), ej.rBranch.project.run.map(qct.prj)) match {
               case (\/-(Some(Map(innerLSrc, lmf))), \/-(Some(Map(innerRSrc, rmf)))) =>
-                val newLKey = ej.lKey >> lmf
-                val newRKey = ej.rKey >> rmf
+                val newLKey = nm.freeMF(ej.lKey >> lmf)
+                val newRKey = nm.freeMF(ej.rKey >> rmf)
                 val newCombine = ej.combine >>= {
                   case LeftSide  => lmf.as[JoinSide](LeftSide)
                   case RightSide => rmf.as[JoinSide](RightSide)
