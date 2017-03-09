@@ -58,7 +58,10 @@ object queryfile {
           createKeyspace(ks)
         }
 
-        val u = if(!tableExists(ks, tb)){
+        val u = if(tableExists(ks, tb)){
+          val d = dropTable(ks, tb)
+          createTable(ks, tb)
+        } else {
           createTable(ks, tb)
         }
         rdd.flatMap(data =>

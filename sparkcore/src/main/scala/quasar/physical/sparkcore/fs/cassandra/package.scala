@@ -44,7 +44,8 @@ package object cassandra {
   type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
   type Eff3[A] = Coproduct[PhysErr, Eff2, A]
-  type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
+  type Eff4[A] = Coproduct[CassandraDDL, Eff3, A]
+  type Eff[A]  = Coproduct[MonotonicSeq, Eff4, A]
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
@@ -92,6 +93,7 @@ package object cassandra {
       // TODO better names!
       (genState, rddStates, sparkCursors, writehandlers, sc) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+      (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
       (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:

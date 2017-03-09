@@ -39,17 +39,19 @@ object managefile {
   import common._
 
   def chrooted[S[_]](prefix: ADir)(implicit
-    s0: Read.Ops[SparkContext, S]
+    s0: Read.Ops[SparkContext, S],
+    s1: CassandraDDL.Ops[S]
   ): ManageFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
   
   def interpret[S[_]](implicit
-    s0: Read.Ops[SparkContext, S]
+    s0: Read.Ops[SparkContext, S],
+    s1: CassandraDDL.Ops[S]
     ): ManageFile ~> Free[S, ?] = 
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
         case Move(FileToFile(sf, df), semantics) =>
-          (ensureMoveSemantics[Free[S, ?]](sf, df, pathExists _, semantics).toLeft(()) *>
+          (ensureMoveSemantics[Free[S, ?]](sf, df, pathExists[S] _, semantics).toLeft(()) *>
             moveFile(sf, df).liftM[FileSystemErrT]).run
         case Move(DirToDir(sd, dd), semantics) =>
           (ensureMoveSemantics[Free[S, ?]](sd, dd, pathExists _, semantics).toLeft(()) *>
@@ -60,16 +62,13 @@ object managefile {
     }
 
   def pathExists[S[_]](path: APath)(implicit 
-    read: Read.Ops[SparkContext, S]
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
     ): Free[S, Boolean] = 
-    read.asks { sc =>
-      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        refineType(path).fold(
-          d => keyspaceExists(keyspace(d)),
-          f => tableExists(keyspace(fileParent(f)), tableName(f))
-        )
-    }
-  }
+    refineType(path).fold(
+      d => cass.keyspaceExists(keyspace(d)),
+      f => cass.tableExists(keyspace(fileParent(f)), tableName(f))
+    )
 
   def moveFile[S[_]](sf: AFile, df: AFile)(implicit 
     read: Read.Ops[SparkContext, S]
