@@ -144,11 +144,10 @@ object queryfile {
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
                      R.optimize(reflNT[MLQ]),
-                     repeatedly(R.applyTransforms(
-                       C.coalesceQC[MLQ](idPrism),
-                       C.coalesceTJ[MLQ](idPrism.get),
-                       C.coalesceSR[MLQ, ADir](idPrism),
-                       N.normalizeF(_: MLQ[T[MLQ]]))))
+                     repeatedly(applyTransforms(
+                       C.coalesceQCNormalize[MLQ](idPrism),
+                       C.coalesceTJNormalize[MLQ](idPrism.get),
+                       C.coalesceSRNormalize[MLQ, ADir](idPrism))))
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)
       inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])
