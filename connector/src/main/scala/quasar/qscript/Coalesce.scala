@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
@@ -60,23 +61,23 @@ trait Coalesce[IN[_]] {
 }
 
 trait CoalesceInstances {
-  def coalesce[T[_[_]]: BirecursiveT: EqualT: ShowT] = new CoalesceT[T]
+  def coalesce[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] = new CoalesceT[T]
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, G[_]]
     (implicit QC: QScriptCore[T, ?] :<: G)
       : Coalesce.Aux[T, QScriptCore[T, ?], G] =
     coalesce[T].qscriptCore[G]
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, F[_]]
       : Coalesce.Aux[T, ProjectBucket[T, ?], F] =
     coalesce[T].projectBucket[F]
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, G[_]]
     (implicit TJ: ThetaJoin[T, ?] :<: G)
       : Coalesce.Aux[T, ThetaJoin[T, ?], G] =
     coalesce[T].thetaJoin[G]
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT, G[_]]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, G[_]]
     (implicit EJ: EquiJoin[T, ?] :<: G)
       : Coalesce.Aux[T, EquiJoin[T, ?], G] =
     coalesce[T].equiJoin[G]
@@ -145,7 +146,7 @@ trait CoalesceInstances {
     default
 }
 
-class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
+class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
   private def CoalesceTotal = Coalesce[T, QScriptTotal, QScriptTotal]
 
   private type QST = QScriptTotal[T[CoEnv[Hole, QScriptTotal, ?]]]

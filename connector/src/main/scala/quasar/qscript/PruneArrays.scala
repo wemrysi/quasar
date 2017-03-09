@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef.{ Map => ScalaMap, _ }
+import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
@@ -49,7 +50,7 @@ object PATypes {
       : M[F[A]]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
@@ -172,7 +173,7 @@ object PruneArrays {
   def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =
     map.get(key).getOrElse(Set.empty.some)
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -198,7 +199,7 @@ object PruneArrays {
         }))))
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 

@@ -17,51 +17,21 @@
 package quasar.ejson
 
 import quasar.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._, Helpers._
 
 import matryoshka._
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
-import quasar.pkg.tests._
 
-class EJsonSpecs extends Spec {
-  type WrapArb[F[_]] = Arbitrary ~> (Arbitrary ∘ F)#λ
-
-  implicit val arbitraryCommon = new WrapArb[Common] {
-    def apply[α](arb: Arbitrary[α]) = Arbitrary(
-      Gen.oneOf(
-        arb.list ^^ Arr[α],
-        const(Null[α]()),
-        genBool ^^ Bool[α],
-        genString map Str[α],
-        genBigDecimal map Dec[α]
-      )
-    )
-  }
-
-  implicit val arbitraryObj = new WrapArb[Obj] {
-    def apply[α](arb: Arbitrary[α]) =
-      (genString, arb.gen).zip.list ^^ (l => Obj(l.toListMap))
-  }
-
-  implicit val arbitraryExtension = new WrapArb[Extension] {
-    def apply[α](arb: Arbitrary[α]) = Arbitrary(
-      Gen.oneOf(
-        (arb.gen, arb.gen).zip.list ^^ Map[α],
-        genByte ^^ Byte[α],
-        genChar ^^ Char[α],
-        genBigInt ^^ Int[α]
-      )
-    )
-  }
-
-  checkAll(equal.laws[Common[String]])
+class EJsonSpecs extends Spec with EJsonArbitrary {
+  checkAll(order.laws[Common[String]])
   checkAll(traverse.laws[Common])
 
-  checkAll(equal.laws[Obj[String]])
+  checkAll(order.laws[Obj[String]])
   checkAll(traverse.laws[Obj])
 
-  checkAll(equal.laws[Extension[String]])
+  checkAll(order.laws[Extension[String]])
   checkAll(traverse.laws[Extension])
 }
