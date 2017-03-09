@@ -19,15 +19,14 @@ package quasar.server
 import slamdata.Predef._
 import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
+import quasar.cli.Cmd, Cmd._
 import quasar.config._
 import quasar.console.{logErrors, stderr}
-import quasar.contrib.scalaz.catchable._
-import quasar.effect.Failure
+import quasar.db.StatefulTransactor
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.{Empty, PhysicalError}
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
+import quasar.metastore.Schema
 
 import argonaut.DecodeJson
 import org.http4s.HttpService
@@ -41,6 +40,7 @@ object Server {
   type ServiceStarter = (Port => Task[Unit]) => HttpService
 
   final case class QuasarConfig(
+    cmd: Cmd,
     staticContent: List[StaticContent],
     redirect: Option[String],
     port: Option[Port],
@@ -59,7 +59,8 @@ object Server {
           FsPath.parseSystemFile(cfg)
             .toRight(s"Invalid path to config file: $cfg")
             .map(some))) ((content, cfgPath) =>
-        QuasarConfig(content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
+        QuasarConfig(
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
   }
 
   /** Attempts to load the specified config file or one found at any of the
@@ -75,11 +76,12 @@ object Server {
         codec <- FsPath.systemCodec
         fstr  =  FsPath.printFsPath(codec, f)
         _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
-      } yield cfgOps.default
+        cfg   <- cfgOps.default
+      } yield cfg
 
       case -\/(MalformedConfig(_, rsn)) =>
-        stderr(s"Error in configuration file, using default configuration: $rsn")
-          .as(cfgOps.default)
+        stderr(s"Error in configuration file, using default configuration: $rsn") *>
+        cfgOps.default
     }
   }
 
@@ -101,18 +103,6 @@ object Server {
 
   }
 
-  
-  private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
-    val tranform: PhysFsEffM ~> Task =
-      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
-
-    dr.translate(tranform).close
-  }
-    
-
-  private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] = 
-    mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
-
   def service(
     initialPort: Port,
     staticContent: List[StaticContent],
@@ -130,56 +120,49 @@ object Server {
 
   def durableService(
     qConfig: QuasarConfig,
-    webConfig: WebConfig)(
-    implicit
-    ev1: ConfigOps[WebConfig]
-  ): MainTask[(ServiceStarter, Task[Unit])] =
-    for {
-      cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
+    port: Port,
+    metastoreCtx: MetaStoreCtx
+  ): (ServiceStarter, Task[Unit]) = {
+    val f: QErrsTCnxIO ~> ResponseOr =
+      liftMT[Task, ResponseT]                                                   :+:
+      (liftMT[Task, ResponseT] compose metastoreCtx.metastore.transactor.trans) :+:
+      qErrsToResponseOr
 
-      ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](
-                        KvsMounter.ephemeralMountConfigs[Task],
-                        hfsRef, mntdRef)
-      initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
+    val serv = service(
+      port,
+      qConfig.staticContent,
+      qConfig.redirect,
+      foldMapNT(f) compose metastoreCtx.interp)
 
-      // TODO: Still need to expose these in the HTTP API, see SD-1131
-      failedMnts   <- attemptMountAll[Mounting](webConfig.mountings) foldMap initMnts
-      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-
-      durableMnt   =  KvsMounter.interpreter[Task, QErrsIO](
-                        writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath),
-                        hfsRef, mntdRef)
-      toQErrsIOM   =  injectFT[Task, QErrsIO] :+: durableMnt :+: injectFT[QErrs, QErrsIO]
-      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
-
-      qErrsIORor   =  liftMT[Task, ResponseT] :+: qErrsToResponseOr
-      coreApi      =  foldMapNT(qErrsIORor) compose foldMapNT(toQErrsIOM) compose runCore
-    } yield {
-      val serv = service(
-        webConfig.server.port,
-        qConfig.staticContent,
-        qConfig.redirect,
-        coreApi)
-      val closeMnts = mntdRef.read >>= closeAllMounts _
-      (serv, closeMnts)
-    }
+    (serv, metastoreCtx.closeMnts *> metastoreCtx.metastore.shutdown)
+  }
 
   def launchServer(
     args: Array[String],
-    builder: (QuasarConfig, WebConfig) => MainTask[(ServiceStarter, Task[Unit])])(
-    implicit configOps: ConfigOps[WebConfig]
-  ): Task[Unit] =
+    builder: (QuasarConfig, Port, MetaStoreCtx) => (ServiceStarter, Task[Unit])
+  )(implicit
+    configOps: ConfigOps[WebConfig]
+  ): Task[Unit] = {
+    def start(tx: StatefulTransactor, port: Port, qCfg: QuasarConfig) =
+      for {
+        _         <- verifySchema(Schema.schema, tx.transactor)
+        msCtx     <- metastoreCtx(tx)
+        (srvc, _) =  builder(qCfg, port, msCtx)
+        _         <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
+      } yield ()
+
     logErrors(for {
-      qCfg      <- QuasarConfig.fromArgs(args)
-      wCfg      <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
-                 // TODO: Find better way to do this
-      updWCfg   =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
-      (srvc, _) <- builder(qCfg, updWCfg)
-      _         <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
+      qCfg  <- QuasarConfig.fromArgs(args)
+      wCfg  <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
+      msCfg <- wCfg.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
+      tx    <- metastoreTransactor(msCfg)
+      _     <- qCfg.cmd match {
+                 case Start               => start(tx, qCfg.port | wCfg.server.port, qCfg)
+                 case InitUpdateMetaStore => initUpdateSchema(Schema.schema, tx.transactor)
+               }
     } yield ())
+  }
 
   def main(args: Array[String]): Unit =
-    launchServer(args, durableService(_, _)).unsafePerformSync
+    launchServer(args, durableService).unsafePerformSync
 }

@@ -14,32 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.config
+package quasar.metastore
 
 import slamdata.Predef._
-import quasar.config.WebConfigArbitrary._
-import quasar.db.DbConnectionConfig
 
-import eu.timepit.refined._
-import scalaz._, Scalaz._
+import java.sql.SQLException
 
-class WebConfigSpec extends ConfigSpec[WebConfig] {
-
-  val TestConfig: WebConfig = WebConfig(
-    server = ServerConfig(refineMV(92)),
-    metastore = MetaStoreConfig(DbConnectionConfig.H2("/h2")).some)
-
-  val TestConfigStr =
-    s"""{
-      |  "server": {
-      |    "port": 92
-      |  },
-      |  "metastore": {
-      |    "database": {
-      |      "h2": {
-      |        "file": "/h2"
-      |      }
-      |    }
-      |  }
-      |}""".stripMargin
-}
+/** Thrown when doobie applies a custom mapping to a value which should never
+  * appear in the metastore DB. */
+final class UnexpectedValueException(msg: String) extends SQLException

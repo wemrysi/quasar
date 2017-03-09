@@ -55,14 +55,20 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
-    CommonDependencies.monocle.`macro`,
+    CommonDependencies.doobie.core,
+    CommonDependencies.doobie.hikari,
+    CommonDependencies.doobie.postgres,
     CommonDependencies.http4s.core,
-    "com.slamdata"         %% "pathy-argonaut" % pathyVersion
+    CommonDependencies.monocle.`macro`,
+    "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
+    "com.slamdata"         %% "pathy-argonaut" % pathyVersion,
+    CommonDependencies.doobie.specs2                          % Test,
+    CommonDependencies.doobie.h2                              % Test
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.jboss.aesh"    % "aesh"  % "0.66.8"
+    "org.jboss.aesh"    % "aesh"  % "0.66.8",
+    "com.h2database"    % "h2"    % "1.4.192"
   )
 
   def mongodb = {
@@ -119,14 +125,14 @@ object Dependencies {
     CommonDependencies.http4s.core
   )
   def web = Seq(
-    "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",
-    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     CommonDependencies.http4s.dsl,
     CommonDependencies.http4s.argonaut62,
     "com.github.alexarchambault" %% "argonaut-shapeless_6.2" % argonautShapelessVersion,
     "com.github.alexarchambault" %% "argonaut-refined_6.2"   % argonautShapelessVersion,
     CommonDependencies.http4s.blazeClient,
     CommonDependencies.http4s.blazeServer,
+    "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",
+    "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     CommonDependencies.refined.scalacheck                          % Test

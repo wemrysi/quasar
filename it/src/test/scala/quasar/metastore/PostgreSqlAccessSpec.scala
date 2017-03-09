@@ -14,21 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.config
+package quasar.metastore
 
-import slamdata.Predef._
+import quasar.TestConfig
 
-import argonaut._, Argonaut._
-import monocle.macros.Lenses
-import scalaz._, Scalaz._
-
-@Lenses final case class CoreConfig(metastore: Option[MetaStoreConfig])
-
-object CoreConfig {
-  implicit val configOps: ConfigOps[CoreConfig] = new ConfigOps[CoreConfig] {
-    val default = MetaStoreConfig.configOps.default ∘ (ms => CoreConfig(ms.some))
-  }
-
-  implicit val codec: CodecJson[CoreConfig] =
-    casecodec1(CoreConfig.apply, CoreConfig.unapply)("metastore")
+class PostgreSqlAccessSpec extends MetaStoreAccessSpec with PostgreSqlMetaStoreFixture {
+  def postgresConfigStr = TestConfig.confValue("postgresql_metastore")
 }

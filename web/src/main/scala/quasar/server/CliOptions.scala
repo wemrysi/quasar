@@ -18,6 +18,7 @@ package quasar.server
 
 import slamdata.Predef._
 import quasar.build.BuildInfo
+import quasar.cli.Cmd, Cmd._
 import quasar.fp.ski.ι
 
 import java.lang.IllegalArgumentException
@@ -30,6 +31,7 @@ import scopt.{OptionParser, Read}
 /** Command-line options supported by Quasar. */
 @Lenses
 final case class CliOptions(
+  cmd: Cmd,
   config: Option[String],
   contentLoc: Option[String],
   contentPath: Option[String],
@@ -39,13 +41,18 @@ final case class CliOptions(
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(None, None, None, false, false, None)
+    CliOptions(Cmd.Start, None, None, None, false, false, None)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
       head("quasar", BuildInfo.version)
 
-      help("help") text("prints this usage text")
+      help("help") text("prints this usage text\n")
+
+      cmd("initUpdateMetaStore")
+        .text("Initializes the metastore schema.\n")
+        .action((_, c) =>
+          (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))

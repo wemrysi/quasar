@@ -16,30 +16,19 @@
 
 package quasar.config
 
-import slamdata.Predef._
-import quasar.config.WebConfigArbitrary._
 import quasar.db.DbConnectionConfig
 
-import eu.timepit.refined._
+import argonaut._, Argonaut._
+import monocle._, macros.Lenses
 import scalaz._, Scalaz._
 
-class WebConfigSpec extends ConfigSpec[WebConfig] {
+@Lenses final case class MetaStoreConfig(database: DbConnectionConfig)
 
-  val TestConfig: WebConfig = WebConfig(
-    server = ServerConfig(refineMV(92)),
-    metastore = MetaStoreConfig(DbConnectionConfig.H2("/h2")).some)
+object MetaStoreConfig {
+  implicit val configOps: ConfigOps[MetaStoreConfig] = new ConfigOps[MetaStoreConfig] {
+    val default = DbConnectionConfig.defaultConnectionConfig ∘ (MetaStoreConfig(_))
+  }
 
-  val TestConfigStr =
-    s"""{
-      |  "server": {
-      |    "port": 92
-      |  },
-      |  "metastore": {
-      |    "database": {
-      |      "h2": {
-      |        "file": "/h2"
-      |      }
-      |    }
-      |  }
-      |}""".stripMargin
+  implicit val codecJson: CodecJson[MetaStoreConfig] =
+    casecodec1(MetaStoreConfig.apply, MetaStoreConfig.unapply)("database")
 }

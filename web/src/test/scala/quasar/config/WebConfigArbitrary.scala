@@ -16,30 +16,20 @@
 
 package quasar.config
 
-import slamdata.Predef._
-import quasar.config.WebConfigArbitrary._
 import quasar.db.DbConnectionConfig
+import quasar.db.DbConnectionConfigArbitrary._
+import quasar.server.Port
 
-import eu.timepit.refined._
+import eu.timepit.refined.scalacheck.numeric._
+import org.scalacheck.Arbitrary
+import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
 
-class WebConfigSpec extends ConfigSpec[WebConfig] {
-
-  val TestConfig: WebConfig = WebConfig(
-    server = ServerConfig(refineMV(92)),
-    metastore = MetaStoreConfig(DbConnectionConfig.H2("/h2")).some)
-
-  val TestConfigStr =
-    s"""{
-      |  "server": {
-      |    "port": 92
-      |  },
-      |  "metastore": {
-      |    "database": {
-      |      "h2": {
-      |        "file": "/h2"
-      |      }
-      |    }
-      |  }
-      |}""".stripMargin
+trait WebConfigArbitrary {
+  implicit val webConfigArbitrary: Arbitrary[WebConfig] =
+    Arbitrary(
+      (Arbitrary.arbitrary[Port] ⊛ Arbitrary.arbitrary[DbConnectionConfig])((p, c) =>
+        WebConfig(ServerConfig(p), MetaStoreConfig(c).some)))
 }
+
+object WebConfigArbitrary extends WebConfigArbitrary

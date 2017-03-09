@@ -19,24 +19,21 @@ package quasar.config
 import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.mount.ConnectionUri
 
 import argonaut._
+import org.scalacheck.Arbitrary
 import pathy._, Path._
 import scalaz._, concurrent.Task, Scalaz._
 
-abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.Qspec {
+abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasar.Qspec {
   import FsPath._, ConfigError._
 
   sequential
 
   def configOps = ConfigOps[Config]
-  def sampleConfig(uri: ConnectionUri): Config
 
-  val host = "mongodb://foo:bar@mongo.example.com:12345"
-  val dbName = "quasar-01"
-  val testUri = ConnectionUri(s"$host/$dbName")
-  val TestConfig = sampleConfig(testUri)
+  val TestConfig: Config
+  val TestConfigStr: String
 
   def testConfigFile: Task[FsPath.Aux[Rel, File, Sandboxed]] =
     Task.delay(scala.util.Random.nextInt.toString)
@@ -54,26 +51,15 @@ abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.Qspec {
     testConfigFile >>= (fp => f(fp) onFinish κ(deleteIfExists(fp)))
   }
 
-  def ConfigStr =
-    s"""{
-      |  "mountings": {
-      |    "/": {
-      |      "mongodb": {
-      |        "connectionUri": "${testUri.value}"
-      |      }
-      |    }
-      |  }
-      |}""".stripMargin
-
   "fromString" should {
     "parse valid config" in {
-      configOps.fromString(ConfigStr) must beRightDisjunction(TestConfig)
+      configOps.fromString(TestConfigStr) must beRightDisjunction(TestConfig)
     }
   }
 
   "toString" should {
     "render same config" in {
-      configOps.asString(TestConfig) must_= ConfigStr
+      configOps.asString(TestConfig) must_= TestConfigStr
     }
   }
 
@@ -93,6 +79,14 @@ abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.Qspec {
           configOps.fromFile(fp).run.map((fp, _))
         ).unsafePerformSync
       r must beLeftDisjunction(fileNotFound(p))
+    }
+  }
+
+  "encoding" should {
+    "round-trip any well-formed config" >> prop { (cfg: Config) =>
+      val json = EncodeJson.of[Config].encode(cfg)
+      val cfg2 = DecodeJson.of[Config].decode(json.hcursor)
+      cfg2.result must beRight(cfg)
     }
   }
 }

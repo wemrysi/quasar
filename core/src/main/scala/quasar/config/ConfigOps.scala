@@ -35,7 +35,7 @@ import simulacrum.typeclass
 @typeclass trait ConfigOps[C] {
   import ConfigOps._, ConfigError._
 
-  def default: C
+  def default: Task[C]
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] = {
     def attemptReadFile(f: String): CfgTask[String] = {
