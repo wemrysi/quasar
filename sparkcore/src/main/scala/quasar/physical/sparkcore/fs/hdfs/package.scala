@@ -30,6 +30,7 @@ import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
 import java.net.URI
 import scala.sys
 
+import org.http4s.{ParseFailure, Uri}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
 import org.apache.spark._
@@ -52,25 +53,63 @@ package object hdfs {
 
   final case class SparkFSConf(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-  val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (uri: ConnectionUri) => {
+  val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (connUri: ConnectionUri) => {
 
-    def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-      NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
+    def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
-    def forge(master: String, hdfsUriStr: String, rootPath: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-      posixCodec.parseAbsDir(rootPath)
-        .map { prefix => {
-          val conf = SparkFSConf(new SparkConf().setMaster(master).setAppName("quasar"), hdfsUriStr, sandboxAbs(prefix))
-          (conf.sparkConf, conf)
-        }
-      }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
+    def master(uri: Uri): State[SparkConf, Unit] =
+      State[SparkConf, Unit](c => (c.setMaster(s"spark://${uri.host}:${uri.port}"), ()))
 
-    uri.value.split('|').toList match {
-      case master :: hdfsUriStr :: prefixPath :: Nil => forge(master, hdfsUriStr, prefixPath)
-      case _ =>
-        error("Missing master and prefixPath (seperated by |)" +
-          " e.g spark://spark_host:port|hdfs://hdfs_host:port|/user/")
-    }
+    def appName: State[SparkConf, Unit] =
+      State[SparkConf, Unit](c => (c.setAppName(s"quasar"), ()))
+
+    def config(name: String, uri: Uri): State[SparkConf, Unit] =
+      State[SparkConf, Unit] (c => uri.params.get(name).fold((c, ()))((value: String) => (c.set(name, value), ())))
+
+    val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
+
+    val sparkConfOrErr: DefinitionError \/ SparkConf = uriOrErr.map(uri => 
+      (master(uri) *> appName *>
+        config("spark.executor.memory", uri) *>
+        config("spark.executor.cores", uri) *>
+        config("spark.executor.extraJavaOptions", uri) *>
+        config("spark.default.parallelism", uri) *>
+        config("spark.files.maxPartitionBytes", uri) *>
+        config("spark.driver.cores", uri) *>
+        config("spark.driver.maxResultSize", uri) *>
+        config("spark.driver.memory", uri) *>
+        config("spark.local.dir", uri) *>
+        config("spark.reducer.maxSizeInFlight", uri) *>
+        config("spark.reducer.maxReqsInFlight", uri) *>
+        config("spark.shuffle.file.buffer", uri) *>
+        config("spark.shuffle.io.retryWait", uri) *>
+        config("spark.memory.fraction", uri) *>
+        config("spark.memory.storageFraction", uri) *>
+        config("spark.cores.max", uri) *>
+        config("spark.speculation", uri) *>
+        config("spark.task.cpus", uri)
+      ).exec(new SparkConf())
+    )
+
+    val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
+      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provider").left[String])(_.right[DefinitionError])
+    ) 
+    val rootPathOrErr: DefinitionError \/ ADir =
+      uriOrErr
+        .flatMap(uri =>
+          uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provider").left[String])(_.right[DefinitionError])
+        )
+        .flatMap(pathStr =>
+          posixCodec.parseAbsDir(pathStr)
+            .map(sandboxAbs)
+            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError])
+        )
+
+    for {
+      sparkConf <- sparkConfOrErr
+      hdfsUrl <- hdfsUrlOrErr
+      rootPath <- rootPathOrErr
+    } yield (sparkConf, SparkFSConf(sparkConf, hdfsUrl, rootPath))
   }
 
   private def fetchSparkCoreJar: Task[String] = Task.delay {
