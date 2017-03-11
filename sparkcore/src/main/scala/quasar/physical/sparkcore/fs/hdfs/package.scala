@@ -90,12 +90,12 @@ package object hdfs {
     )
 
     val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
-      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provider").left[String])(_.right[DefinitionError])
+      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
     ) 
     val rootPathOrErr: DefinitionError \/ ADir =
       uriOrErr
         .flatMap(uri =>
-          uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provider").left[String])(_.right[DefinitionError])
+          uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError])
         )
         .flatMap(pathStr =>
           posixCodec.parseAbsDir(pathStr)
