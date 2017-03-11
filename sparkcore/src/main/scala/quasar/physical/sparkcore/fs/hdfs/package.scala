@@ -57,14 +57,12 @@ package object hdfs {
 
     def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
-    def master(uri: Uri): State[SparkConf, Unit] =
-      State[SparkConf, Unit](c => (c.setMaster(s"spark://${uri.host}:${uri.port}"), ()))
+    def master(uri: Uri): State[SparkConf, Unit] = State.modify(_.setMaster(s"spark://${uri.host}:${uri.port}"))
 
-    def appName: State[SparkConf, Unit] =
-      State[SparkConf, Unit](c => (c.setAppName(s"quasar"), ()))
+    def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
 
     def config(name: String, uri: Uri): State[SparkConf, Unit] =
-      State[SparkConf, Unit] (c => uri.params.get(name).fold((c, ()))((value: String) => (c.set(name, value), ())))
+      State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
 
     val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
