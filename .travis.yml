@@ -27,6 +27,8 @@ script:
   - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
+  - sbt transferPublishAndTagResources
+  - ./scripts/publishAndTag 'quasar-analytics/quasar'
 
 after_success: ./scripts/afterSuccess
 
@@ -66,8 +68,6 @@ env:
     - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
 
   global:
-    - secure: nxTDurFKCJUnm5caGc7WGN1xJbStxtZECafvll0TClXVmgs907kRwOhL1EX3AwU2cigHI0TV1p3/ZqcSUJGQeqYHNRwxW3+N6yyg7disuDfeaPZ8/Q04SlHbG7/hp5AbZJW7hGpCHgv8cMGl9AJVTEaS+ipV5zr6Ts+JpjtOGhw=
-
     - COURSIER_PROGRESS=0
     - LOCAL_MONGODB=true
     - ISOLATED_ENV=true
