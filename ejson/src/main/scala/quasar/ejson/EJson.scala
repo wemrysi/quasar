@@ -30,10 +30,7 @@ final case class Bool[A](value: Boolean)   extends Common[A]
 final case class Str[A](value: String)     extends Common[A]
 final case class Dec[A](value: BigDecimal) extends Common[A]
 
-object Common extends CommonInstances {
-  def unapply[F[_], A](fa: F[A])(implicit C: Common :<: F): Option[Common[A]] =
-    C.prj(fa)
-}
+object Common extends CommonInstances
 
 sealed abstract class CommonInstances extends CommonInstances0 {
   implicit val traverse: Traverse[Common] = new Traverse[Common] {
@@ -93,14 +90,7 @@ sealed abstract class CommonInstances0 {
 
 final case class Obj[A](value: ListMap[String, A])
 
-object Obj extends ObjInstances {
-  // TODO: This means we have the same names for the projection and the Obj
-  //       pattern matcher. It could go away if this unapply were defined on
-  //       `scalaz.Inject`. (scalaz/scalaz#1311)
-  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def unapply[F[_], A](fa: F[A])(implicit O: Obj :<: F): Option[Obj[A]] =
-    O.prj(fa)
-}
+object Obj extends ObjInstances
 
 sealed abstract class ObjInstances extends ObjInstances0 {
   implicit val traverse: Traverse[Obj] = new Traverse[Obj] {
@@ -149,9 +139,6 @@ final case class Char[A](value: SChar)       extends Extension[A]
 final case class Int[A](value: BigInt)       extends Extension[A]
 
 object Extension extends ExtensionInstances {
-  def unapply[F[_], A](fa: F[A])(implicit E: Extension :<: F): Option[Extension[A]] =
-    E.prj(fa)
-
   def fromObj[A](f: String => A): Obj[A] => Extension[A] =
     obj => map(obj.value.toList.map(_.leftMap(f)))
 }
