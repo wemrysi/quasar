@@ -106,7 +106,8 @@ object Dependencies {
       .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
-    "org.apache.parquet" % "parquet-hadoop" % "1.9.0"
+    "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
+    "org.http4s"         %% "http4s-core"   % http4sVersion
   )
 
   def marklogicValidation = Seq(
