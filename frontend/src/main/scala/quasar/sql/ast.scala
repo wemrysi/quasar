@@ -24,7 +24,7 @@ import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait Sql[A]
+sealed abstract class Sql[A]
 object Sql {
 
   implicit val equal: Delay[Equal, Sql] =

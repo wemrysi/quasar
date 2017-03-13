@@ -27,7 +27,7 @@ import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
-sealed trait ListMapInstances {
+sealed abstract class ListMapInstances {
   implicit def seqW[A](xs: Seq[A]): SeqW[A] = new SeqW(xs)
   class SeqW[A](xs: Seq[A]) {
     def toListMap[B, C](implicit ev: A <~< (B, C)): ListMap[B, C] = {

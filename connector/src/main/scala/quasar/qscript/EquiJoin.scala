@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -41,7 +42,7 @@ import scalaz._, Scalaz._
   combine: JoinFunc[T])
 
 object EquiJoin {
-  implicit def equal[T[_[_]]: EqualT]:
+  implicit def equal[T[_[_]]: OrderT: EqualT]:
       Delay[Equal, EquiJoin[T, ?]] =
     new Delay[Equal, EquiJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
@@ -98,7 +99,7 @@ object EquiJoin {
           (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
     }
 
-  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
+  implicit def mergeable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
       : Mergeable.Aux[T, EquiJoin[T, ?]] =
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]

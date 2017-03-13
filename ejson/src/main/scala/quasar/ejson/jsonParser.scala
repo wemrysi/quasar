@@ -32,12 +32,12 @@ object jsonParser {
         new SimpleFacade[T] {
           def jarray(arr: List[T])          = C(Arr(arr)).embed
           def jobject(obj: SMap[String, T]) = O(Obj(ListMap(obj.toList: _*))).embed
-          def jnull()                          = C(Null[T]()).embed
-          def jfalse()                         = C(Bool[T](false)).embed
-          def jtrue()                          = C(Bool[T](true)).embed
-          def jnum(n: String)                  = C(Dec[T](BigDecimal(n))).embed
-          def jint(n: String)                  = C(Dec[T](BigDecimal(n))).embed
-          def jstring(s: String)               = C(Str[T](s)).embed
+          def jnull()                       = C(Null[T]()).embed
+          def jfalse()                      = C(Bool[T](false)).embed
+          def jtrue()                       = C(Bool[T](true)).embed
+          def jnum(n: String)               = C(Dec[T](BigDecimal(n))).embed
+          def jint(n: String)               = C(Dec[T](BigDecimal(n))).embed
+          def jstring(s: String)            = C(Str[T](s)).embed
         }
     }
 }

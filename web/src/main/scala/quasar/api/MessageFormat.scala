@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-sealed trait JsonPrecision extends Product with Serializable {
+sealed abstract class JsonPrecision extends Product with Serializable {
   def codec: DataCodec
   def name: String
 }
@@ -48,7 +48,7 @@ object JsonPrecision {
     val name = "precise"
   }
 }
-sealed trait JsonFormat extends Product with Serializable {
+sealed abstract class JsonFormat extends Product with Serializable {
   def mediaType: MediaType
 }
 object JsonFormat {
@@ -78,7 +78,7 @@ trait Decoder {
   }
 }
 
-sealed trait MessageFormat extends Decoder {
+sealed abstract class MessageFormat extends Decoder {
   def disposition: Option[`Content-Disposition`]
   def encode[F[_]](data: Process[F, Data]): Process[F, String]
   protected def dispositionExtension: Map[String, String] =
