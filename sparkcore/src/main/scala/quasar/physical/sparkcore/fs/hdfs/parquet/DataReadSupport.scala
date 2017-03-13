@@ -159,30 +159,18 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
   }
 
   private object MapKey {
-    def unapply(t: scala.Tuple2[String, Data]): Option[String] = t match {
+    def unapply(t: (String, Data)): Option[String] = t match {
       case ("key" -> Data.Str(k)) => k.some
       case _ => none
     }
   }
 
   private object MapValue {
-    def unapply(t: scala.Tuple2[String, Data]): Option[Data] = t match {
+    def unapply(t: (String, Data)): Option[Data] = t match {
       case ("value" -> v) => v.some
       case _ => none
     }
   }
-
-  private object MapEntries {
-    def unapply(d: Data.Obj): Boolean = d match {
-      case Data.Obj(lm) => lm.toList match {
-          case MapKey(k) :: MapValue(v) :: Nil => true
-          case MapValue(v) :: MapKey(k) :: Nil => true
-          case _ => false
-        }
-      case o => false
-    }
-  }
-
 
   private class DataMapConverter(
     val schema: GroupType,
@@ -200,21 +188,16 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
     override def getConverter(fieldIndex: Int): Converter = converters.apply(fieldIndex)
     override def start(): Unit = {}
     override def end(): Unit = {
-      val na = ("n/a" -> Data.NA)
-      val valid = values collect {
-        case v @ MapEntries() => v
-      }
-
-      def normalize = values.map {
+      val mapEntry: Data => Option[(String, Data)] = {
         case Data.Obj(lm) => lm.toList match {
-          case MapKey(k) :: MapValue(v) :: Nil => (k -> v)
-          case MapValue(v) :: MapKey(k) :: Nil => (k -> v)
-          case _ => na
+          case MapKey(k) :: MapValue(v) :: Nil => (k, v).some
+          case MapValue(v) :: MapKey(k) :: Nil => (k, v).some
+          case _ => none
         }
-        case o => na
-
+        case o => none
       }
-      val data = if(values.size === valid.size) Data.Obj(normalize:_*) else Data.Arr(values.toList)
+      val cached = values.toList
+      val data = cached.traverse(mapEntry).cata(entries => Data.Obj(entries: _*), Data.Arr(cached))
       parent.save(name, data)
 
       values.clear()
