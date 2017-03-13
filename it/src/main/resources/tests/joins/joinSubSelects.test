@@ -12,6 +12,8 @@
         "spark_hdfs":        "skip"
     },
 
+    "NB": "Skipped for all connectors due to QScript join bug #1866.",
+
     "data": ["../zips.data", "../largeZips.data"],
 
     "query": "select t1.city, t1.popCA, t2.popMA from
