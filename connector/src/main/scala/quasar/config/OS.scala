@@ -21,7 +21,7 @@ import quasar.Predef._
 import scala.util.Properties._
 import scalaz.concurrent.Task
 
-sealed trait OS {
+sealed abstract class OS {
   import OS._
 
   def fold[X](win: => X, mac: => X, posix: => X): X =

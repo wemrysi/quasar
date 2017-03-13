@@ -34,7 +34,7 @@ object SemanticAnalysis {
 
   private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
 
-  sealed trait Synthetic
+  sealed abstract class Synthetic
   object Synthetic {
     final case object SortKey extends Synthetic
 
@@ -43,6 +43,25 @@ object SemanticAnalysis {
     implicit val renderTree: RenderTree[Synthetic] =
       RenderTree.fromShow[Synthetic]("Synthetic")
   }
+
+  def normalizeProjectionsƒ[T](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+      : CoalgebraM[State[Option[String], ?], Sql, T] =
+    _.project match {
+      case sel @ Select(_, _, Some(TableRelationAST(table, alias @ Some(_))), _, _, _) =>
+        constantState(sel, alias)
+      case sel @ Select(_, _, Some(TableRelationAST(table, None)), _, _, _) =>
+        val head: Option[String] = pathy.Path.peel(table).map {
+          case (_, -\/(pathy.Path.DirName(dir))) => dir
+          case (_, \/-(pathy.Path.FileName(file))) => file
+        }
+        constantState(sel, head)
+      case op @ Binop(Embed(Ident(name)), Embed(StringLiteral(expr)), FieldDeref) =>
+        gets {
+          case Some(head) => (head === name).fold(ident[T](expr), op)
+          case None => op
+        }
+      case other => state(other)
+    }
 
   private val syntheticPrefix = "__sd__"
 
@@ -77,8 +96,7 @@ object SemanticAnalysis {
             val proj2 = Proj(expr, Some(name))
             val key2  = (orderType, ident[T](name).embed)
             (proj2 :: projs, key2 :: keys, index + 1)
-          } (
-            kExpr => (projs, (orderType, kExpr) :: keys, index))
+          } (kExpr => (projs, (orderType, kExpr) :: keys, index))
       }
       select(d, projections ⊹ projs2, r, f, g, keys2.toNel map (OrderBy(_))).some
     }
@@ -159,7 +177,7 @@ object SemanticAnalysis {
     }
   }
 
-  sealed trait Provenance {
+  sealed abstract class Provenance {
     import Provenance._
 
     def & (that: Provenance): Provenance = Both(this, that)
@@ -302,11 +320,15 @@ object SemanticAnalysis {
           case None => ts.scope.get(name)
           case s => s
         }
-        scope.fold(
-          Provenance.anyOf[Map[String, ?]]((ts.scope ++ bs.scope) ∘ (Provenance.Relation(_))) match {
+        scope.fold({
+          // If `name` matches neither table nor binding scope we default to table scope.
+          // For example:
+          // `mystate := "CO"; select * from zips where state = mystate`
+          val localScope = if (ts.scope.isEmpty) bs.scope else ts.scope
+          Provenance.anyOf[Map[String, ?]]((localScope) ∘ (Provenance.Relation(_))) match {
             case Provenance.Empty => fail(NoTableDefined(Ident[Fix[Sql]](name).embed))
             case x                => success(x)
-          })(
+          }})(
           (Provenance.Relation(_)) ⋙ success)
       case InvokeFunction(_, args) => success(Provenance.allOf(args))
       case Match(_, cases, _)      =>
@@ -339,9 +361,18 @@ object SemanticAnalysis {
         synthElgotMƒ,
         inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
 
-  // NB: projectSortKeys ⋙ (identifySynthetics &&& (scopeTables ⋙ inferProvenance))
-  def AllPhases[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]) =
-    (Scope(TableScope(Map()), BindingScope(Map())), expr.cata(orOriginal(projectSortKeysƒ) >>> (_.embed)))
-      .coelgotM[NonEmptyList[SemanticError] \/ ?](addAnnotations, scopeTablesƒ.apply(_).disjunction)
+  def normalizeProjections[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
+    expr.anaM[T](normalizeProjectionsƒ[T]).run(None)._2
 
+  def projectSortKeys[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
+    expr.transCata[T](orOriginal(projectSortKeysƒ))
+
+  // NB: identifySynthetics &&& (scopeTables >>> inferProvenance)
+  def annotate[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+      : NonEmptyList[SemanticError] \/ Cofree[Sql, Annotations] = {
+    val emptyScope: Scope = Scope(TableScope(Map()), BindingScope(Map()))
+    (emptyScope, expr).coelgotM[NonEmptyList[SemanticError] \/ ?](
+      addAnnotations,
+      scopeTablesƒ.apply(_).disjunction)
+  }
 }

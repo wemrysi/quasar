@@ -84,11 +84,10 @@ object queryfile {
                    .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
         optQS =  qs.transHylo(
                    rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(rewrite.applyTransforms(
-                     C.coalesceQC[SparkQScript](idPrism),
-                     C.coalesceEJ[SparkQScript](idPrism.get),
-                     C.coalesceSR[SparkQScript, AFile](idPrism),
-                     Normalizable[SparkQScript].normalizeF(_: SparkQScript[Fix[SparkQScript]]))))
+                   repeatedly(applyTransforms(
+                     C.coalesceQCNormalize[SparkQScript](idPrism),
+                     C.coalesceEJNormalize[SparkQScript](idPrism.get),
+                     C.coalesceSRNormalize[SparkQScript, AFile](idPrism))))
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }
@@ -138,7 +137,13 @@ object queryfile {
       injectFT.apply {
         sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(fsType, "RDD Directed Acyclic Graph"))))).map(EitherT(_))
+          rdd => {
+            val rddDebug = rdd.toDebugString
+            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
+            Task.delay(Writer(
+              Vector(PhaseResult.detail("RDD", rddDebug)),
+              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))
+          })).map(EitherT(_))
       }
     }.join
   }

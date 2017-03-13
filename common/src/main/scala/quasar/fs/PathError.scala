@@ -24,7 +24,7 @@ import monocle.{Lens, Prism}
 import pathy.Path._
 import scalaz._
 
-sealed trait PathError
+sealed abstract class PathError
 
 object PathError {
   final case class PathExists private (path: APath)

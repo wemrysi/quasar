@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
 import shapeless.Nat
 
 object Planner {
-  sealed trait PlannerError {
+  sealed abstract class PlannerError {
     def message: String
   }
 
@@ -96,7 +96,7 @@ object Planner {
   implicit val plannerErrorShow: Show[PlannerError] =
     Show.show(_.message)
 
-  sealed trait CompilationError {
+  sealed abstract class CompilationError {
     def message: String
   }
   object CompilationError {

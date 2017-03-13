@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
@@ -85,7 +86,7 @@ object queryfile {
     case FileExists(file)     => fileExists(file)
   }
 
-  def executePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def executePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan], out: AFile
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -94,7 +95,7 @@ object queryfile {
     S3: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ AFile)] =
     (for {
-      n1ql   <- lpToN1ql[T, S](lp)
+      n1ql   <- lpToN1ql[T, S](lp) map (_._1)
       r      <- n1qlResults(n1ql)
       bktCol <- bucketCollectionFromPath(out).liftFE
       docs   <- r.map(DataCodec.render).unite.traverse(d => GenUUID.Ops[S].asks(uuid =>
@@ -120,7 +121,7 @@ object queryfile {
                 ))).into.liftF
     } yield out).run.run
 
-  def evaluatePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def evaluatePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -129,7 +130,7 @@ object queryfile {
     results: KeyValueStore.Ops[ResultHandle, Cursor, S]
   ): Free[S, (PhaseResults, FileSystemError \/ ResultHandle)] =
     (for {
-      n1ql <- lpToN1ql[T, S](lp)
+      n1ql <- lpToN1ql[T, S](lp) map (_._1)
       r    <- n1qlResults(n1ql)
       i    <- MonotonicSeq.Ops[S].next.liftF
       h    =  ResultHandle(i)
@@ -154,14 +155,17 @@ object queryfile {
   ): Free[S, Unit] =
     results.delete(handle)
 
-  def explain[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def explain[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)] =
-    ((lpToN1ql[T, S](lp) >>= (RenderQuery.compact(_).liftPE)) ∘ (ExecutionPlan(FsType, _))).run.run
+    lpToN1ql[T, S](lp)
+      .flatMap(_.bitraverse(RenderQuery.compact(_).liftPE, _.point[Plan[S, ?]]))
+      .map({ case (ep, ipt) => ExecutionPlan(FsType, ep, ipt) })
+      .run.run
 
   def listContents[S[_]](
     dir: APath
@@ -208,26 +212,26 @@ object queryfile {
                  )).into.liftM[PhaseResultT])
     } yield r
 
-  def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, T[N1QL]] = {
+  ): Plan[S, (T[N1QL], ISet[APath])] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
     lpLcToN1ql[T, S](lp, lc)
   }
 
-  def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpLcToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
-  ): Plan[S, T[N1QL]] = {
+  ): Plan[S, (T[N1QL], ISet[APath])] = {
     type CBQS[A]  = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
     type CBQS0[A] = (Const[ShiftedRead[ADir], ?] :/: CBQS)#M[A]
 
@@ -247,19 +251,19 @@ object queryfile {
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(rewrite.applyTransforms(
-                  C.coalesceQC[CBQS](idPrism),
-                  C.coalesceEJ[CBQS](idPrism.get),
-                  C.coalesceSR[CBQS, AFile](idPrism),
-                  Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]]))))
+                repeatedly(applyTransforms(
+                  C.coalesceQCNormalize[CBQS](idPrism),
+                  C.coalesceEJNormalize[CBQS](idPrism.get),
+                  C.coalesceSRNormalize[CBQS, AFile](idPrism))))
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan
               ).leftMap(FileSystemError.qscriptPlanningFailed(_))
+      ipt  =  opz.cata(ExtractPath[CBQS, APath].extractPath[DList])
       q    <- RenderQuery.compact(n1ql).liftPE
       _    <- tell(Vector(detail("N1QL AST", n1ql.render.shows)))
       _    <- tell(Vector(detail("N1QL", q)))
-    } yield n1ql
+    } yield (n1ql, ISet fromFoldable ipt)
   }
 
   def listRootContents[S[_]]

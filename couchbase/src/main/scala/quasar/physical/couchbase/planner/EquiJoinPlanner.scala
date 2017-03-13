@@ -59,10 +59,12 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
     }
   }
 
+  val QC = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
+
   object BranchBucketCollection {
     def unapply(qs: FreeQS[T]): Option[BucketCollection] = (qs match {
       case Embed(CoEnv(\/-(CShiftedRead(c))))                              => c.some
-      case Embed(CoEnv(\/-(QScriptCore(
+      case Embed(CoEnv(\/-(QC(
         qscript.Filter(Embed(CoEnv(\/-(CShiftedRead(c)))),MetaGuard()))))) => c.some
       case _                                                               => none
     }) >>= (c => BucketCollection.fromPath(c.getConst.path).toOption)
@@ -72,8 +74,8 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
         case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(ejson.Common(ejson.Str(v2)))))) => true
-          case _                                                                         => false
+          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+          case _                                                                       => false
         }
         case v => false
       }

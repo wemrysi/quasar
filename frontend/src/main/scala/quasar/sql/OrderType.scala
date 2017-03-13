@@ -20,7 +20,7 @@ import quasar.Predef._
 
 import scalaz._
 
-sealed trait OrderType extends Product with Serializable
+sealed abstract class OrderType extends Product with Serializable
 
 final case object ASC extends OrderType
 final case object DESC extends OrderType

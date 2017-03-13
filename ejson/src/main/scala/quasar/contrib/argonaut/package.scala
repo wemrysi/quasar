@@ -48,14 +48,17 @@ package object argonaut {
     new Corecursive[Json] {
       type Base[A] = ejson.Json[A]
 
+      val EC = Inject[ejson.Common, ejson.Json]
+      val EO = Inject[ejson.Obj,    ejson.Json]
+
       def embed(ft: ejson.Json[Json])(implicit BF: Functor[Base]) =
         ft match {
-          case ejson.Common(ejson.Null())  => jNull
-          case ejson.Common(ejson.Bool(b)) => jBool(b)
-          case ejson.Common(ejson.Dec(d))  => jNumber(d)
-          case ejson.Common(ejson.Str(s))  => jString(s)
-          case ejson.Common(ejson.Arr(a))  => jArray(a)
-          case ejson.Obj(ejson.Obj(o))     => jObject(JsonObject.fromTraversableOnce(o))
+          case EC(ejson.Null())  => jNull
+          case EC(ejson.Bool(b)) => jBool(b)
+          case EC(ejson.Dec(d))  => jNumber(d)
+          case EC(ejson.Str(s))  => jString(s)
+          case EC(ejson.Arr(a))  => jArray(a)
+          case EO(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
         }
     }
 }

@@ -22,7 +22,7 @@ import quasar._, RenderTree.ops._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait Statement[BODY] {
+sealed abstract class Statement[BODY] {
   def pprint(implicit show: Show[BODY]): String
 
   implicit val functor: Functor[Statement] = new Functor[Statement] {

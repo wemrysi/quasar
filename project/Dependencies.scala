@@ -18,7 +18,7 @@ object Dependencies {
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.3.2"
-  private val pathyVersion      = "0.2.8"
+  private val pathyVersion      = "0.2.9"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.6.2"   // waiting for a stable release with fix for fthomas/refined#256
   private val scalazVersion     = "7.2.9"
@@ -38,7 +38,7 @@ object Dependencies {
     "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
     "com.slamdata"               %% "matryoshka-core"           % "0.16.4",
     "com.slamdata"               %% "pathy-core"                % pathyVersion,
-    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion                         %     Test,
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
     "eu.timepit"                 %% "refined"                   % refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    %     Test,
@@ -106,7 +106,8 @@ object Dependencies {
       .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
-    "org.apache.parquet" % "parquet-hadoop" % "1.9.0"
+    "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
+    "org.http4s"         %% "http4s-core"   % http4sVersion
   )
 
   def marklogicValidation = Seq(

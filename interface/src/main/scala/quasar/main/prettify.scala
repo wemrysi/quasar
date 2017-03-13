@@ -27,7 +27,7 @@ import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
 
 object Prettify {
-  sealed trait Segment extends Product with Serializable
+  sealed abstract class Segment extends Product with Serializable
   final case class FieldSeg(name: String) extends Segment
   final case class IndexSeg(index: Int) extends Segment
 
@@ -121,7 +121,7 @@ object Prettify {
     values.foldLeft[Data](init) { case (v, (p, str)) => append(v, p, str) }
   }
 
-  sealed trait Aligned[A] {
+  sealed abstract class Aligned[A] {
     def value: A
   }
   object Aligned {

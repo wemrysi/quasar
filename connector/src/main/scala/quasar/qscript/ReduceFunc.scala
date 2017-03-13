@@ -23,7 +23,7 @@ import quasar.std.StdLib._
 import matryoshka._
 import scalaz._, Scalaz._
 
-sealed trait ReduceFunc[A]
+sealed abstract class ReduceFunc[A]
 
 object ReduceFunc {
   import ReduceFuncs._

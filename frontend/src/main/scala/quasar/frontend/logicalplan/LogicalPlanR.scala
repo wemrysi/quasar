@@ -19,7 +19,7 @@ package quasar.frontend.logicalplan
 import quasar.Predef._
 import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
-import quasar.contrib.pathy.FPath
+import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
@@ -423,9 +423,13 @@ final class LogicalPlanR[T]
   def lpParaZygoHisto[A, B] = lpParaZygoHistoM[Id, A, B] _
 
   /** The set of paths referenced in the given plan. */
-  def paths(lp: T): Set[FPath] =
-    lp.foldMap(_.cata[Set[FPath]] {
-      case Read(p) => Set(p)
+  def paths(lp: T): ISet[FPath] =
+    lp.foldMap(_.cata[ISet[FPath]] {
+      case Read(p) => ISet singleton p
       case other   => other.fold
     })
+
+  /** The set of absolute paths referenced in the given plan. */
+  def absolutePaths(lp: T): ISet[APath] =
+    paths(lp) foldMap (p => ISet fromFoldable refineTypeAbs(p).swap)
 }

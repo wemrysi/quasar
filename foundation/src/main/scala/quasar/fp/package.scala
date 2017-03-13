@@ -27,7 +27,7 @@ import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
-sealed trait ListMapInstances {
+sealed abstract class ListMapInstances {
   implicit def seqW[A](xs: Seq[A]): SeqW[A] = new SeqW(xs)
   class SeqW[A](xs: Seq[A]) {
     def toListMap[B, C](implicit ev: A <~< (B, C)): ListMap[B, C] = {
@@ -297,10 +297,6 @@ package fp {
             StateT((a: A) => s.run(lens.get(a)).map(_.leftMap(lens.set(_)(a))))
         }
     }
-  }
-  object Inj {
-    def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
-      F.prj(g)
   }
 
   // type Delay[F[_], G[_]] = F ~> λ[A => F[G[A]]]
