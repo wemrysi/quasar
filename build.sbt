@@ -342,7 +342,6 @@ lazy val couchbase = project
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
