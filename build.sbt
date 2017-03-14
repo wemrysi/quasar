@@ -279,9 +279,7 @@ lazy val common = project
   .settings(publishTestsSettings)
   .settings(
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
