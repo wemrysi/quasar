@@ -98,16 +98,19 @@ package object workflowtask {
   private def shape(p: Pipeline): Option[List[BsonField.Name]] = {
     def src = shape(p.dropRight(1))
 
+    val WC = Inject[WorkflowOpCoreF, WorkflowF]
+    val W32 = Inject[WorkflowOp3_2F, WorkflowF]
+
     p.lastOption.flatMap(_.op match {
-      case IsShapePreserving(_)                    => src
+      case IsShapePreserving(_)                        => src
 
-      case $project((), Reshape(shape), _)         => Some(shape.keys.toList)
-      case $group((), Grouped(shape), _)           => Some(shape.keys.toList)
-      case $unwind((), _)                          => src
-      case $redact((), _)                          => None
-      case $geoNear((), _, _, _, _, _, _, _, _, _) => src.map(_ :+ BsonField.Name("dist"))
+      case WC($ProjectF((), Reshape(shape), _))         => Some(shape.keys.toList)
+      case WC($GroupF((), Grouped(shape), _))           => Some(shape.keys.toList)
+      case WC($UnwindF((), _))                          => src
+      case WC($RedactF((), _))                          => None
+      case WC($GeoNearF((), _, _, _, _, _, _, _, _, _)) => src.map(_ :+ BsonField.Name("dist"))
 
-      case $lookup((), _, _, _, as)                => src.map(_ :+ as.flatten.head)
+      case W32($LookupF((), _, _, _, as))               => src.map(_ :+ as.flatten.head)
     })
   }
 }

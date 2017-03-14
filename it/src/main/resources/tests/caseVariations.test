@@ -7,9 +7,11 @@
         "marklogic_xml":  "skip",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending",
-        "spark_local": "skip",
-        "spark_hdfs": "skip"
+        "spark_local": "pending",
+        "spark_hdfs": "pending"
     },
+
+    "NB": "Skipped for all connectors due to QScript bug #1915.",
 
     "data": "zips.data",
 

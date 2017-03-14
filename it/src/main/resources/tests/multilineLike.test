@@ -4,8 +4,8 @@
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
         "postgresql":     "pending",
-        "spark_hdfs":     "skip",
-        "spark_local":    "skip"
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select count(*) from slamengine_commits where commit.message like \"Merge%\"",

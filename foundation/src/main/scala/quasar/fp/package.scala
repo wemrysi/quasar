@@ -298,10 +298,6 @@ package fp {
         }
     }
   }
-  object Inj {
-    def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
-      F.prj(g)
-  }
 
   // type Delay[F[_], G[_]] = F ~> λ[A => F[G[A]]]
   trait DelayedA[A] {

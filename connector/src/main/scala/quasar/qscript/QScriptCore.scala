@@ -147,9 +147,6 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
-    C.prj(fa)
-
   implicit def equal[T[_[_]]: OrderT: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =

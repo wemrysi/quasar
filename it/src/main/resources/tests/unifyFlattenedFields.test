@@ -1,10 +1,8 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":   "skip",
-        "postgresql":  "pending",
-        "spark_hdfs":  "skip",
-        "spark_local": "skip"
+        "couchbase":  "skip",
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",

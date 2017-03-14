@@ -1025,7 +1025,7 @@ object MongoDbQScriptPlanner {
         elems.traverse(handler) ∘ (ArrayBuilder(src, _))
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
-          case Embed(ejson.Common(ejson.Str(key))) => BsonField.Name(key).point[M]
+          case Embed(MapFunc.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
           case key => merr.raiseError[BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
         },
           handler)) ∘
