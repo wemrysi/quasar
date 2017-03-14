@@ -605,6 +605,19 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "TemporalTrunc" >> {
+        "Q#1966" >> {
+          val x = Instant.parse("2000-03-01T06:15:45.204Z")
+          val y = TemporalPart.Century
+          val t = x.atZone(UTC)
+
+          truncZonedDateTime(y, t).fold(
+            e => Failure(e.shows),
+            tt => unary(
+              TemporalTrunc(y, _).embed,
+              Data.Timestamp(x),
+              Data.Timestamp(tt.toInstant)))
+        }
+
         "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
           val t = x.atZone(UTC)
 
