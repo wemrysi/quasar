@@ -291,8 +291,7 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
