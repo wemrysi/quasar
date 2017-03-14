@@ -66,8 +66,6 @@ env:
     - QUASAR_POSTGRESQL='"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"'
 
   global:
-    - secure: nxTDurFKCJUnm5caGc7WGN1xJbStxtZECafvll0TClXVmgs907kRwOhL1EX3AwU2cigHI0TV1p3/ZqcSUJGQeqYHNRwxW3+N6yyg7disuDfeaPZ8/Q04SlHbG7/hp5AbZJW7hGpCHgv8cMGl9AJVTEaS+ipV5zr6Ts+JpjtOGhw=
-
     - COURSIER_PROGRESS=0
     - LOCAL_MONGODB=true
     - ISOLATED_ENV=true
