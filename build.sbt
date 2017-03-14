@@ -332,9 +332,7 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
