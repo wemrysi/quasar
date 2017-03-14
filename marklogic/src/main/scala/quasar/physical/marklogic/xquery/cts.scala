@@ -24,7 +24,9 @@ import java.lang.SuppressWarnings
 import scalaz.{Order => _, _}
 import scalaz.std.iterable._
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+@SuppressWarnings(Array(
+  "org.wartremover.warts.DefaultArguments",
+  "org.wartremover.warts.Overloading"))
 object cts {
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
     XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")

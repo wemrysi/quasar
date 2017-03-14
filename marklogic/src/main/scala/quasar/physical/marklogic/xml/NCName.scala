@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xml
 
-import quasar.Predef.String
+import quasar.Predef._
 import quasar.physical.marklogic.validation._
 
 import eu.timepit.refined.refineV
@@ -30,6 +30,7 @@ final case class NCName(value: String Refined IsNCName) {
   override def toString = this.shows
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object NCName {
   def apply(s: String): String \/ NCName =
     refineV[IsNCName](s).disjunction map (NCName(_))

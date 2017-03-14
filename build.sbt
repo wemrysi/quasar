@@ -351,11 +351,7 @@ lazy val marklogic = project
   .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(
-    libraryDependencies ++= Dependencies.marklogic,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Overloading))
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))

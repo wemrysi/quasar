@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object xs {
   def base64Binary(xqy: XQuery): XQuery =
     XQuery(s"xs:base64Binary($xqy)")

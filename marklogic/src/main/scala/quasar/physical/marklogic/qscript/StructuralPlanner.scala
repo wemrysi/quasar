@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.Predef._
 import quasar.fp.liftMT
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.DocType
@@ -32,6 +33,7 @@ import scalaz._, Scalaz._
   * @tparam F   the effects employed by the library.
   * @tparam FMT type index representing the data format supported by the library.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 trait StructuralPlanner[F[_], FMT] { self =>
   import FunctionDecl._
   import StructuralPlanner.ejs

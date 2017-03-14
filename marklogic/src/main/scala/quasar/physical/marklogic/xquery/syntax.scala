@@ -72,6 +72,7 @@ object syntax {
       this := expression
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final implicit class TypedBindingNameOps(val tb: TypedBindingName) extends scala.AnyVal {
     def := (expression: XQuery): Binding =
       Binding(tb.right, expression)
@@ -122,6 +123,7 @@ object syntax {
     def xs: XQuery = uri.value.value.xs
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)

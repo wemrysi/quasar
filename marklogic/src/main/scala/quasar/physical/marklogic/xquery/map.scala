@@ -20,6 +20,7 @@ import quasar.Predef._
 
 import scalaz.{Foldable, IList}
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object map {
   def contains(map: XQuery, key: XQuery): XQuery =
     XQuery(s"map:contains($map, $key)")

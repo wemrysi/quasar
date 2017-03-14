@@ -26,6 +26,7 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 sealed abstract class XQuery {
   import XQuery._
 

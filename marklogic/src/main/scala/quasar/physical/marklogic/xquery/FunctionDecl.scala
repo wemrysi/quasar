@@ -39,6 +39,7 @@ sealed abstract class FunctionDecl {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object FunctionDecl {
   implicit val order: Order[FunctionDecl] =
     Order.orderBy(fd => (fd.name, fd.parameters, fd.returnType))

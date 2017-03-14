@@ -23,7 +23,9 @@ import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+@SuppressWarnings(Array(
+  "org.wartremover.warts.DefaultArguments",
+  "org.wartremover.warts.Overloading"))
 object fn {
   val ns = Namespace(NSPrefix(NCName("fn")), NSUri("http://www.w3.org/2005/xpath-functions"))
 
