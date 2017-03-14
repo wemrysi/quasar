@@ -309,9 +309,7 @@ lazy val frontend = project
   .settings(
     libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.

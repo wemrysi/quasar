@@ -69,7 +69,7 @@ package object sql {
     (implicit T: Recursive.Aux[T, Sql])
       : SemanticError \/ List[(String, T)] = {
     def extractName(expr: T): Option[String] = expr.project match {
-      case Ident(name) if Some(name) != relName          => name.some
+      case Ident(name) if name.some ≠ relName            => name.some
       case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
       case Unop(expr, FlattenMapValues)                  => extractName(expr)
       case Unop(expr, FlattenArrayValues)                => extractName(expr)
@@ -237,7 +237,7 @@ package object sql {
         case _ =>
           val s = List(op.sql, "(", expr._2, ")") mkString " "
           // NB: dis-ambiguates the query in case this is the leading projection
-          if (op == Distinct) "(" + s + ")" else s
+          if (op ≟ Distinct) "(" + s + ")" else s
       }
       case Ident(name) => _qq("`", name)
       case InvokeFunction(name, args) =>

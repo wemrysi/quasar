@@ -127,7 +127,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     elem(
       "keyword '" + name + "'",
       {
-        case lexical.Identifier(chars) => chars.toLowerCase == name
+        case lexical.Identifier(chars) => chars.toLowerCase ≟ name
         case _                         => false
       }) ^^ (κ(name))
 
@@ -141,7 +141,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     if (lexical.delimiters.contains(op))
       elem(
         "operator '" + op + "'",
-        { case lexical.Keyword(chars) => chars == op; case _ => false }) ^^ (_.chars)
+        { case lexical.Keyword(chars) => chars ≟ op; case _ => false }) ^^ (_.chars)
     else failure("You are trying to parse \""+op+"\" as an operator, but it is not contained in the operators list")
 
   def let_expr: Parser[T[Sql]] =

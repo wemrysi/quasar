@@ -123,7 +123,7 @@ sealed abstract class Type extends Product with Serializable { self =>
   }
 
   final def objectField(field: Type): SemanticResult[Type] = {
-    if (Type.lub(field, Str) != Str) failureNel(TypeError(Str, field, None))
+    if (Type.lub(field, Str) ≠ Str) failureNel(TypeError(Str, field, None))
     else (field, this) match {
       case (_, x @ Coproduct (_, _)) => {
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
@@ -155,7 +155,7 @@ sealed abstract class Type extends Product with Serializable { self =>
   }
 
   final def arrayElem(index: Type): SemanticResult[Type] = {
-    if (Type.lub(index, Int) != Int) failureNel(TypeError(Int, index, None))
+    if (Type.lub(index, Int) ≠ Int) failureNel(TypeError(Int, index, None))
     else (index, this) match {
       case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
         arr.lift(index.toInt).map(data => success(Const(data))).getOrElse(failureNel(MissingIndex(index.toInt)))
@@ -416,7 +416,7 @@ object Type extends TypeInstances {
       case Const(value) =>
          for {
           newType  <- f(value.dataType)
-          newType2 <- if (newType != value.dataType) Monad[F].point(newType)
+          newType2 <- if (newType ≠ value.dataType) Monad[F].point(newType)
                       else f(v)
         } yield newType2
 
@@ -532,13 +532,12 @@ object Type extends TypeInstances {
        | (Interval,  Interval)
        | (Id,        Id) =>
       true
-    case (Const(a), Const(b)) => a == b
+    case (Const(a), Const(b)) => a ≟ b
     case (Arr(as), Arr(bs)) => as ≟ bs
     case (FlexArr(min1, max1, t1), FlexArr(min2, max2, t2)) =>
       min1 ≟ min2 && max1 ≟ max2 && t1 ≟ t2
     case (Obj(v1, u1), Obj(v2, u2)) => v1 ≟ v2 && u1 ≟ u2
-    case (a @ Coproduct(_, _), b @ Coproduct(_, _)) =>
-      a.flatten.toSet == b.flatten.toSet
+    case (a @ Coproduct(_, _), b @ Coproduct(_, _)) => a.equals(b)
     case (_, _) => false
   })
 }
