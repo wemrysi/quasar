@@ -71,9 +71,6 @@ package object jscore {
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
     Js.BinOp("=", lhs.toJs, rhs.toJs)
 
-  val meh = implicitly[EqualT[Fix]]
-  val meh2 = implicitly[Delay[Equal, JsCoreF]]
-
   private def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore):
       Option[JsCore] =
     in.elgotPara(count(oldForm)) match {

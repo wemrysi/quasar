@@ -25,6 +25,7 @@ import quasar.physical.marklogic.xquery.syntax._
 
 import java.math.MathContext
 import java.time._
+import scala.collection.Traversable
 
 import eu.timepit.refined.auto._
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary

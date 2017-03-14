@@ -680,7 +680,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
-          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
+          List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
           Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }

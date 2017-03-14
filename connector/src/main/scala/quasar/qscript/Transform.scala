@@ -524,7 +524,7 @@ class Transform
     case lp.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       invokeReduction1(
-        agg.Arbitrary,
+        agg.First,
         Func.Input1(
           Target(
             Ann(

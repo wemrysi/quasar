@@ -152,7 +152,7 @@ object JsFuncHandler {
             BinOp(jscore.Lte, min, value),
             BinOp(jscore.Lte, value, max))
 
-      case ConcatArrays(a1, a2) => BinOp(jscore.Add, a1, a2)
+      case MakeArray(a1) => Arr(List(a1))
       case Length(str) =>
         Call(ident("NumberLong"), List(select(hole(str), "length")))
       case Substring(field, start, len) =>

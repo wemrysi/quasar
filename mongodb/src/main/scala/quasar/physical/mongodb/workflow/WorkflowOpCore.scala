@@ -30,6 +30,8 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
 
+import scala.collection.immutable.Iterable
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._

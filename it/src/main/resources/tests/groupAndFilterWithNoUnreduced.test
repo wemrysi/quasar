@@ -2,7 +2,6 @@
     "name": "explicitly grouped, with only reduced projections, and a filter",
 
     "backends": {
-        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
 

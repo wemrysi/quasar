@@ -2,7 +2,6 @@
     "name": "implicitly grouped, with filtering",
 
     "backends": {
-        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
 

@@ -205,10 +205,10 @@ class PlannerQScriptSpec extends
         chain[Workflow](
           $read(collection("db", "foo")),
           $group(
-            grouped("0" -> $sum($literal(Bson.Int32(1)))),
+            grouped("f0" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape("value" -> $field("0")),
+            reshape("value" -> $field("f0")),
             ExcludeId)))
     }
 
@@ -534,7 +534,7 @@ class PlannerQScriptSpec extends
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $group(
-          grouped("0" ->
+          grouped("f0" ->
             $sum(
               $cond(
                 $and(
@@ -544,7 +544,7 @@ class PlannerQScriptSpec extends
                 $literal(Bson.Undefined)))),
           \/-($literal(Bson.Null))),
         $project(
-          reshape("value" -> $multiply($field("0"), $literal(Bson.Int32(100)))),
+          reshape("value" -> $multiply($field("f0"), $literal(Bson.Int32(100)))),
           ExcludeId)))
     }
 

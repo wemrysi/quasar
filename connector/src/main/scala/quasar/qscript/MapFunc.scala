@@ -739,14 +739,18 @@ object MapFunc {
   }
 }
 
-// TODO we should statically verify that these have a `DimensionalEffect` of `Mapping`
 object MapFuncs {
   // nullary
   /** A value that is statically known.
     */
   @Lenses final case class Constant[T[_[_]], A](ejson: T[EJson]) extends Nullary[T, A]
   /** A value that doesn’t exist. Most operations on `Undefined` should evaluate
-    * to `Undefined`. See [[IfUndefined]] for the exception.
+    * to `Undefined`. The exceptions are
+    * - [[MakeMap]] returns `{}` if either argument is `Undefined`,
+    * - [[MakeArray]] returns `[]` if its argument is `Undefined`,
+    * - [[AddMetadata]] returns the _first_ argument if the _second_ is `Undefined`,
+    * - [[IfUndefined]] returns the _second_ argument if the _first_ is `Undefined`, and
+    * - [[Cond]] evaluates normally if neither the condition nor the taken branch are `Undefined`.
     */
   @Lenses final case class Undefined[T[_[_]], A]() extends Nullary[T, A]
 

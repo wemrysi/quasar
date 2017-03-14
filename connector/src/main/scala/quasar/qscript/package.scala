@@ -184,18 +184,6 @@ package object qscript {
       : F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
 
-  /** Chains multiple transformations together, each of which can fail to change
-    * anything.
-    */
-  def applyTransforms[T[_[_]], F[_], G[_]]
-    (transform: F[T[G]] => Option[F[T[G]]],
-      transforms: (F[T[G]] => Option[F[T[G]]])*)
-      : F[T[G]] => Option[F[T[G]]] =
-    transforms.foldLeft(
-      transform)(
-      (prev, next) => x => prev(x).fold(next(x))(y => next(y).orElse(y.some)))
-
-
   // Helpers for creating `Injectable` instances
 
   object ::\:: {

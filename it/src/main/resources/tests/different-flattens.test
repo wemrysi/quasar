@@ -1,13 +1,13 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "mongodb_q_3_2": "skip",
-        "postgresql": "pending",
+        "couchbase":      "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",
-        "couchbase":  "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_q_3_2":  "pending",
+        "postgresql":     "pending",
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

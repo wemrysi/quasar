@@ -107,6 +107,28 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
+  val First = UnaryFunc(
+    Reduction,
+    "Finds the first value in a set.",
+    Type.Top,
+    Func.Input1(Type.Top),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(t) => success(t)
+    },
+    reflexiveUntyper)
+
+  val Last = UnaryFunc(
+    Reduction,
+    "Finds the last value in a set.",
+    Type.Top,
+    Func.Input1(Type.Top),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(t) => success(t)
+    },
+    reflexiveUntyper)
+
   val Avg = UnaryFunc(
     Reduction,
     "Finds the average in a set of numeric values",
