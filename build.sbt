@@ -315,9 +315,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors

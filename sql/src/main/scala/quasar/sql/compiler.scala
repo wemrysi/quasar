@@ -650,7 +650,7 @@ final class Compiler[M[_], T: Equal]
 
       case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
-          if (fields.any(_ == name))
+          if (fields.any(_ ≟ name))
             CompilerState.rootTableReq[M, T] ∘
             (structural.ObjectProject(_, lpr.constant(Data.Str(name))).embed)
           else
@@ -734,7 +734,7 @@ final class Compiler[M[_], T: Equal]
           def arity = func.args.size
           def apply(args: List[T]): Option[T] = {
             val argsMap = func.args.map(arg => scala.Symbol(arg.value)).zip(args).toMap
-            if (func.args.size != args.size) None else lpr.bindFree(argsMap)(body).toOption
+            if (func.args.size ≠ args.size) None else lpr.bindFree(argsMap)(body).toOption
           }
         }
         map + (func.name -> lpFunc)
