@@ -255,8 +255,6 @@ lazy val effect = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
