@@ -1,3 +1,5 @@
+resolvers += Resolver.sonatypeRepo("releases")
+
 libraryDependencies += "org.kohsuke" % "github-api" % "1.59"
 
 addSbtPlugin("com.eed3si9n"    % "sbt-assembly"  % "0.14.3")
