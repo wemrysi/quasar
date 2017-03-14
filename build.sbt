@@ -14,6 +14,7 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 import slamdata.CommonDependencies
+import slamdata.SbtSlamData.transferPublishAndTagResources
 
 val BothScopes = "test->test;compile->compile"
 
@@ -139,6 +140,7 @@ lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(transferPublishAndTagResources)
   .settings(aggregate in assembly := false)
   .aggregate(
         foundation,
