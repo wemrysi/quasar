@@ -2,8 +2,13 @@
     "name": "self-ordered distinct",
 
     "backends": {
-        "mongodb_q_3_2": "pending",
-        "postgresql":    "pending"
+        "couchbase":      "skip",
+        "marklogic_json": "skip",
+        "marklogic_xml":  "skip",
+        "mongodb_q_3_2":  "skip",
+        "postgresql":     "pending",
+        "spark_hdfs":     "skip",
+        "spark_local":    "skip"
     },
 
     "data": "zips.data",
