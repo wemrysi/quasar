@@ -385,9 +385,7 @@ lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.postgresql,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
