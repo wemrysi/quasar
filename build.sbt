@@ -441,8 +441,7 @@ lazy val repl = project
   .settings(
     fork in run := true,
     connectInput in run := true,
-    outputStrategy := Some(StdoutOutput),
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    outputStrategy := Some(StdoutOutput))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
