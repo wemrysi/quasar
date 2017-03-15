@@ -88,7 +88,7 @@ sealed abstract class MessageFormat extends Decoder {
 }
 
 object MessageFormat {
-  final case class JsonContentType private (
+  final case class JsonContentType(
     mode: JsonPrecision,
     format: JsonFormat,
     disposition: Option[`Content-Disposition`]
@@ -129,8 +129,8 @@ object MessageFormat {
       }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   object JsonContentType {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def apply(mode: JsonPrecision, format: JsonFormat): JsonContentType = JsonContentType(mode, format, disposition = None)
   }
 
