@@ -8,7 +8,7 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
-  val disciplineVersion         = "0.5"
+  private val disciplineVersion = "0.5"
   // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
   // https://github.com/quasar-analytics/quasar/issues/1852
   // Although this issue will be closed by the current commit that downgrades it,
@@ -21,6 +21,9 @@ object Dependencies {
   private val pathyVersion      = "0.2.9"
   private val raptureVersion    = "2.0.0-M6"
   private val scodecBitsVersion = "1.1.0"
+  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
+  // leads to a ParquetRDDE failure under a full test run
+  private val specsVersion      = "3.8.4"
 
   def foundation = Seq(
     CommonDependencies.scalaz.core,
@@ -38,7 +41,7 @@ object Dependencies {
     CommonDependencies.scalacheck.scalacheck                  % Test,
     CommonDependencies.simulacrum.simulacrum                  % Test,
     "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
-    CommonDependencies.specs2.core                            % Test,
+    "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
     CommonDependencies.scalaz.scalacheckBinding               % Test,
     CommonDependencies.typelevel.shapelessScalacheck          % Test,
     CommonDependencies.typelevel.scalazSpecs2                 % Test
