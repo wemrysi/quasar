@@ -454,9 +454,7 @@ lazy val web = project
   .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Overloading))
+    libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests

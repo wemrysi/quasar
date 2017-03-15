@@ -51,6 +51,7 @@ object Zip {
 
     private def append(bytes: ByteVector) = chunks = chunks ++ bytes
 
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     private val sink = {
       val os = new java.io.OutputStream {
         def write(b: Int) = append(ByteVector(b.toByte))

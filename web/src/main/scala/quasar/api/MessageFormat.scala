@@ -66,6 +66,7 @@ object DecodeError {
   implicit val show: Show[DecodeError] = Show.shows(_.msg)
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 trait Decoder {
   def mediaType: MediaType
   def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data]
@@ -84,8 +85,10 @@ sealed abstract class MessageFormat extends Decoder {
   protected def dispositionExtension: Map[String, String] =
     disposition.map(disp => Map("disposition" -> disp.value)).getOrElse(Map.empty)
 }
+
+@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object MessageFormat {
-  final case class JsonContentType(
+  final case class JsonContentType private (
     mode: JsonPrecision,
     format: JsonFormat,
     disposition: Option[`Content-Disposition`]
@@ -126,6 +129,7 @@ object MessageFormat {
       }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   object JsonContentType {
     def apply(mode: JsonPrecision, format: JsonFormat): JsonContentType = JsonContentType(mode, format, disposition = None)
   }

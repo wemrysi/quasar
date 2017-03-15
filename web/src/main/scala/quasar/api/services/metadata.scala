@@ -34,8 +34,9 @@ import scalaz.syntax.std.boolean._
 
 object metadata {
 
-  final case class FsNode(name: String, typ: String, mount: Option[String])
+  final case class FsNode private (name: String, typ: String, mount: Option[String])
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   object FsNode {
     def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
       FsNode(
