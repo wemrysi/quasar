@@ -20,7 +20,6 @@ import quasar.Predef._
 
 import scalaz.{Foldable, IList}
 
-@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object map {
   def contains(map: XQuery, key: XQuery): XQuery =
     XQuery(s"map:contains($map, $key)")
@@ -37,6 +36,7 @@ object map {
   def keys(map: XQuery): XQuery =
     XQuery(s"map:keys($map)")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def map[F[_]: Foldable](maps: F[XQuery]): XQuery =
     XQuery(s"map:map${mkSeq(maps)}")
 

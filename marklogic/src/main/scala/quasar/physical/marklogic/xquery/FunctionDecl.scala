@@ -39,7 +39,6 @@ sealed abstract class FunctionDecl {
   }
 }
 
-@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object FunctionDecl {
   implicit val order: Order[FunctionDecl] =
     Order.orderBy(fd => (fd.name, fd.parameters, fd.returnType))
@@ -102,6 +101,7 @@ object FunctionDecl {
     def parameters = NonEmptyList(param1, param2, param3, param4, param5)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDeclDsl(fname: QName) {
     def apply(p1: TypedBindingName): FunctionDecl1Dsl =
       FunctionDecl1Dsl(fname, p1, SequenceType.Top)
@@ -119,6 +119,7 @@ object FunctionDecl {
       FunctionDecl5Dsl(fname, p1, p2, p3, p4, p5, SequenceType.Top)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDecl1Dsl(fn: QName, p1: TypedBindingName, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl1Dsl = copy(rt = rType)
 
@@ -129,6 +130,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDecl2Dsl(fn: QName, p1: TypedBindingName, p2: TypedBindingName, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl2Dsl = copy(rt = rType)
 
@@ -139,6 +141,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDecl3Dsl(fn: QName, p1: TypedBindingName, p2: TypedBindingName, p3: TypedBindingName, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl3Dsl = copy(rt = rType)
 
@@ -149,6 +152,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDecl4Dsl(fn: QName, p1: TypedBindingName, p2: TypedBindingName, p3: TypedBindingName, p4: TypedBindingName, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl4Dsl = copy(rt = rType)
 
@@ -159,6 +163,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class FunctionDecl5Dsl(fn: QName, p1: TypedBindingName, p2: TypedBindingName, p3: TypedBindingName, p4: TypedBindingName, p5: TypedBindingName, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl5Dsl = copy(rt = rType)
 

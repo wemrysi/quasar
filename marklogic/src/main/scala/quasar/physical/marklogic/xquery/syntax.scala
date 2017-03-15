@@ -72,7 +72,6 @@ object syntax {
       this := expression
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final implicit class TypedBindingNameOps(val tb: TypedBindingName) extends scala.AnyVal {
     def := (expression: XQuery): Binding =
       Binding(tb.right, expression)
@@ -83,6 +82,7 @@ object syntax {
     def in(expression: XQuery): Binding =
       this := expression
 
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
       result(~tb) map (TypeswitchCaseClause(tb.left, _))
 

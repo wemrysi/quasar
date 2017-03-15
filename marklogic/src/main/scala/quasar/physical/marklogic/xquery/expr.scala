@@ -108,11 +108,12 @@ object expr {
       XQuery(s"if ($cond) then $whenTrue else $whenFalse")
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final case class TypeswitchExpr(on: XQuery, cases: List[TypeswitchCaseClause]) {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def default(xqy: XQuery): XQuery =
       default(TypeswitchDefaultClause(None, xqy))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def default(binding: BindingName, f: XQuery => XQuery): XQuery =
       default(TypeswitchDefaultClause(Some(binding), f(~binding)))
 

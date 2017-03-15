@@ -26,12 +26,12 @@ import scalaz.std.string._
 import scalaz.syntax.show._
 import scalaz.syntax.std.either._
 
-final case class NCName(value: String Refined IsNCName) {
+final case class NCName private (value: String Refined IsNCName) {
   override def toString = this.shows
 }
 
-@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object NCName {
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def apply(s: String): String \/ NCName =
     refineV[IsNCName](s).disjunction map (NCName(_))
 
