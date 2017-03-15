@@ -18,6 +18,7 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar._
+import quasar.common.JoinType
 import quasar.contrib.pathy._
 
 import matryoshka._

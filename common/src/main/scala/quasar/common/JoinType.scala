@@ -21,7 +21,7 @@ import quasar.{RenderTree, Terminal}
 
 import scalaz._, Scalaz._
 
-sealed abstract class JoinType
+sealed abstract class JoinType extends Product with Serializable
 
 object JoinType {
   final case object Inner extends JoinType
