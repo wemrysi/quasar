@@ -182,11 +182,12 @@ sealed abstract class ExtensionInstances {
 
   ////
 
+  // NB: This elides metadata as it isn't considered for purposes of equality.
   private[ejson] def generic[A: Order](e: Extension[A]) = (
     byte.getOption(e)                          ,
     char.getOption(e)                          ,
     int.getOption(e)                           ,
     map.getOption(e) map (IMap fromFoldable _) ,
-    meta.getOption(e)
+    meta.getOption(e) map (_._1)
   )
 }
