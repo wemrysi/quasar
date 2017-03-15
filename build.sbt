@@ -409,9 +409,7 @@ lazy val sparkcore = project
   .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,
-    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
