@@ -16,7 +16,6 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
 import quasar.fp.liftMT
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.DocType
@@ -33,7 +32,6 @@ import scalaz._, Scalaz._
   * @tparam F   the effects employed by the library.
   * @tparam FMT type index representing the data format supported by the library.
   */
-@SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 trait StructuralPlanner[F[_], FMT] { self =>
   import FunctionDecl._
   import StructuralPlanner.ejs
@@ -132,7 +130,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
     mkObjectEntry(key, value) >>= (mkObject(_))
 
   /** Returns the string representation of the given item. */
-  def toString(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+  def asString(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     toStringFn.apply(item)
 
   /** Returns the name of the type of the given item or the empty seq if unknown. */
