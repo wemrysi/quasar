@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar._
+import quasar.common.JoinType
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.ejson.EJson
 import quasar.fp._
@@ -147,7 +148,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
-          Inner,
+          JoinType.Inner,
           ProjectFieldR(
             Free.roll(ProjectIndex(
               Free.roll(ProjectIndex(Free.point(LeftSide), IntLit(1))),
@@ -201,12 +202,12 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               Free.roll(QCT.inj(Unreferenced())),
               StrLit("name")))),
             BoolLit(true),
-            Inner,
+            JoinType.Inner,
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
               Free.roll(MakeArray(Free.point(RightSide)))))))),
           BoolLit(true),
-          Inner,
+          JoinType.Inner,
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.point(LeftSide))),
             Free.roll(MakeArray(Free.point(RightSide)))))))
@@ -281,7 +282,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(Lt(
               Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_lat"))),
               Free.roll(ProjectField(Free.point(RightSide), StrLit("r_lat"))))))),
-          Inner,
+          JoinType.Inner,
           Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide)))))
 
       simplifyJoinExpr(exp.embed) must equal(
@@ -305,7 +306,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                   Free.roll(Subtract(
                     Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_max"))),
                     Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_min"))))))))),
-              Inner,
+              JoinType.Inner,
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
                 Free.roll(MakeArray(Free.point(RightSide))))))).embed,

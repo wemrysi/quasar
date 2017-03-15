@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.common
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal}
@@ -22,12 +22,13 @@ import quasar.{RenderTree, Terminal}
 import scalaz._, Scalaz._
 
 sealed abstract class JoinType
-final case object Inner extends JoinType
-final case object FullOuter extends JoinType
-final case object LeftOuter extends JoinType
-final case object RightOuter extends JoinType
 
 object JoinType {
+  final case object Inner extends JoinType
+  final case object FullOuter extends JoinType
+  final case object LeftOuter extends JoinType
+  final case object RightOuter extends JoinType
+
   implicit val equal: Equal[JoinType] = Equal.equalRef
   implicit val show: Show[JoinType] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinType] =

@@ -38,7 +38,7 @@ package object mongodb {
   type JavaScriptLog[A] = Writer[JavaScriptPrg, A]
 
   // TODO: actually give these funcs their own type
-  type JoinType = TernaryFunc
+  type MongoJoinType = TernaryFunc
 
   // TODO: parameterize over label (SD-512)
   def freshName: State[NameGen, BsonField.Name] =

@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.common.{JoinType, PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
@@ -927,10 +927,10 @@ object MongoDbQScriptPlanner {
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
             qs.f match {
-              case Inner => set.InnerJoin
-              case FullOuter => set.FullOuterJoin
-              case LeftOuter => set.LeftOuterJoin
-              case RightOuter => set.RightOuterJoin
+              case JoinType.Inner => set.InnerJoin
+              case JoinType.FullOuter => set.FullOuterJoin
+              case JoinType.LeftOuter => set.LeftOuterJoin
+              case JoinType.RightOuter => set.RightOuterJoin
             },
             JoinSource(lb, List(lk), lj.map(List(_))),
             JoinSource(rb, List(rk), rj.map(List(_)))))).join

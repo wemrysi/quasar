@@ -141,7 +141,7 @@ object LogicalPlan {
           case Invoke(func, values) =>
             // TODO remove trailing comma
             func.show ++ Cord("(") ++
-            values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(",") } ++ Cord(")")
+            values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(", ") } ++ Cord(")")
           case Free(n) =>
             Cord("Free(") ++ Cord(n.toString) ++ Cord(")")
           case Let(n, f, b) =>

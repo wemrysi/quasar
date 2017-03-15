@@ -17,6 +17,7 @@
 package quasar.physical.couchbase.planner
 
 import quasar.Predef._
+import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson
@@ -123,10 +124,10 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
         lKey, KeyMetaId(),
         joinType, combine) =>
       joinType match {
-        case Inner     =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, Inner.right)
-        case LeftOuter =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, LeftOuter.left)
+        case JoinType.Inner     =>
+          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.Inner.right)
+        case JoinType.LeftOuter =>
+          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }
@@ -136,10 +137,10 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
         KeyMetaId(), rKey,
         joinType, combine) =>
       joinType match {
-        case Inner     =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, Inner.right)
-        case RightOuter =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, LeftOuter.left)
+        case JoinType.Inner     =>
+          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.Inner.right)
+        case JoinType.RightOuter =>
+          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }

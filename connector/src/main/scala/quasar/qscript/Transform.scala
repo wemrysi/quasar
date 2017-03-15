@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef.{ Eq => _, _ }
 import quasar._, Planner._
+import quasar.common.JoinType
 import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
@@ -106,7 +107,7 @@ class Transform
     AutoJoinResult(
       AutoJoinBase(
         rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
-          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), Inner, combine))).embed,
+          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))).embed,
         prov.joinProvenances(newLprov, newRprov)),
       lacc,
       racc)
@@ -324,7 +325,7 @@ class Transform
     }
 
     joinError.flatMap {
-      case -\/(ThetaJoin(condSrc, _condL, _condR, BoolLit(true), Inner, cond)) =>
+      case -\/(ThetaJoin(condSrc, _condL, _condR, BoolLit(true), JoinType.Inner, cond)) =>
 
         val SrcMerge(inSrc, _inL, _inR): SrcMerge[T[F], FreeQS] =
           merge.mergeT(values(0).value, values(1).value)
@@ -633,7 +634,7 @@ class Transform
           merged.lval,
           merged.rval,
           Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide))),
-          Inner,
+          JoinType.Inner,
           LeftSideF)).embed).right
 
     case lp.InvokeUnapply(set.Except, Sized(a1, a2)) =>
@@ -645,17 +646,17 @@ class Transform
           merged.lval,
           merged.rval,
           BoolLit(false),
-          LeftOuter,
+          JoinType.LeftOuter,
           LeftSideF)).embed).right
 
     case lp.InvokeUnapply(func @ TernaryFunc(Transformation, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
       invokeThetaJoin(
         Func.Input3(a1, a2, a3),
         func match {
-          case set.InnerJoin      => Inner
-          case set.LeftOuterJoin  => LeftOuter
-          case set.RightOuterJoin => RightOuter
-          case set.FullOuterJoin  => FullOuter
+          case set.InnerJoin      => JoinType.Inner
+          case set.LeftOuterJoin  => JoinType.LeftOuter
+          case set.RightOuterJoin => JoinType.RightOuter
+          case set.FullOuterJoin  => JoinType.FullOuter
         })
   }
 }

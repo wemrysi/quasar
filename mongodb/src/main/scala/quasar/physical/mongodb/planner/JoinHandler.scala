@@ -35,9 +35,9 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final case class JoinHandler[WF[_], F[_]](run: (JoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
+final case class JoinHandler[WF[_], F[_]](run: (MongoJoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
 
-  def apply(tpe: JoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
+  def apply(tpe: MongoJoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
     run(tpe, left, right)
 }
 
@@ -274,7 +274,7 @@ object JoinHandler {
       $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
 
     // TODO exhaustive pattern match
-    def buildJoin(src: Fix[WF], tpe: JoinType): Fix[WF] =
+    def buildJoin(src: Fix[WF], tpe: MongoJoinType): Fix[WF] =
       tpe match {
         case set.FullOuterJoin =>
           chain(src,
