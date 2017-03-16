@@ -53,9 +53,11 @@ object cts {
   val uris: XQuery =
     XQuery("cts:uris()")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def uris(start: XQuery, options: IList[XQuery]): XQuery =
     XQuery(s"cts:uris($start, ${mkSeq(options)})")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def uris(
     start: XQuery,
     options: IList[XQuery] = IList.empty,

@@ -111,7 +111,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Integer(s)                   => xs.integer(s).point[F]
     case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => SP.null_ map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
-    case ToString(x)                  => SP.toString(x)
+    case ToString(x)                  => SP.asString(x)
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
 

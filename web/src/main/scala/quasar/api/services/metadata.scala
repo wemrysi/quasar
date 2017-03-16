@@ -37,6 +37,7 @@ object metadata {
   final case class FsNode(name: String, typ: String, mount: Option[String])
 
   object FsNode {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
       FsNode(
         pathSegment.fold(_.value, _.value),

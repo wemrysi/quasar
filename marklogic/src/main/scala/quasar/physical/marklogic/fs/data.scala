@@ -76,7 +76,7 @@ object data {
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => for {
-          nc <- NCName(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
+          nc <- NCName.fromString(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
           el <- loop(QName.local(nc))(v).disjunction
         } yield el
       }

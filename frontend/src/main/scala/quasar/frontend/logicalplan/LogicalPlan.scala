@@ -193,6 +193,7 @@ object LogicalPlan {
         }
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit val equal: Delay[Equal, LogicalPlan] =
     new Delay[Equal, LogicalPlan] {
       def apply[A](fa: Equal[A]) = {

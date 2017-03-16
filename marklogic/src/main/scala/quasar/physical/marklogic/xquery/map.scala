@@ -36,6 +36,7 @@ object map {
   def keys(map: XQuery): XQuery =
     XQuery(s"map:keys($map)")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def map[F[_]: Foldable](maps: F[XQuery]): XQuery =
     XQuery(s"map:map${mkSeq(maps)}")
 

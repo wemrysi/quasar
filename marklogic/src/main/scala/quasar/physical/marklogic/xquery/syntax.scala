@@ -82,6 +82,7 @@ object syntax {
     def in(expression: XQuery): Binding =
       this := expression
 
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
       result(~tb) map (TypeswitchCaseClause(tb.left, _))
 
@@ -122,6 +123,7 @@ object syntax {
     def xs: XQuery = uri.value.value.xs
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)

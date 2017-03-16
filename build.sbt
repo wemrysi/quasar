@@ -197,8 +197,6 @@ lazy val effect = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
@@ -221,9 +219,7 @@ lazy val common = project
   .settings(publishTestsSettings)
   .settings(
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
@@ -237,8 +233,7 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
@@ -253,9 +248,7 @@ lazy val frontend = project
   .settings(
     libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -264,9 +257,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -284,9 +274,7 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -296,7 +284,6 @@ lazy val couchbase = project
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -306,11 +293,7 @@ lazy val marklogic = project
   .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(
-    libraryDependencies ++= Dependencies.marklogic,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Overloading))
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))
@@ -344,9 +327,7 @@ lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.postgresql,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -370,9 +351,7 @@ lazy val sparkcore = project
   .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,
-    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -404,8 +383,7 @@ lazy val repl = project
   .settings(
     fork in run := true,
     connectInput in run := true,
-    outputStrategy := Some(StdoutOutput),
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    outputStrategy := Some(StdoutOutput))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
@@ -418,9 +396,7 @@ lazy val web = project
   .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Overloading))
+    libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests

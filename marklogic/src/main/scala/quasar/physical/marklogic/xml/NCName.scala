@@ -31,7 +31,7 @@ final case class NCName(value: String Refined IsNCName) {
 }
 
 object NCName {
-  def apply(s: String): String \/ NCName =
+  def fromString(s: String): String \/ NCName =
     refineV[IsNCName](s).disjunction map (NCName(_))
 
   implicit val order: Order[NCName] =

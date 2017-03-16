@@ -31,6 +31,7 @@ object xs {
   def date(xqy: XQuery): XQuery =
     XQuery(s"xs:date($xqy)")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def dateTime(xqy: XQuery): XQuery =
     XQuery(s"xs:dateTime($xqy)")
 
