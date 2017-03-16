@@ -19,11 +19,13 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.{Data, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
+import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.logicalplan.{LogicalPlan => LP, LogicalPlanR, Optimizer}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.SemanticAnalysis._
 import quasar.std._, StdLib._, structural._
 
+import matryoshka.Algebra
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.matcher.MustThrownMatchers._
@@ -90,6 +92,24 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
 
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
+
+  def renameJoinSides
+    (result: Fix[LP])
+    (oldLeft: Symbol, newLeft: Symbol, oldRight: Symbol, newRight: Symbol):
+      Fix[LP] = {
+    val rename: Algebra[LP, Fix[LP]] = {
+      case JoinSideName(name) if name ≟ oldLeft =>
+        lpr.joinSideName(newLeft)
+      case JoinSideName(name) if name ≟ oldRight =>
+        lpr.joinSideName(newRight)
+      case Join(l, r, t, JoinCondition(lName0, rName0, c)) =>
+        val lName = (lName0 ≟ oldLeft).fold(newLeft, oldLeft)
+        val rName = (rName0 ≟ oldRight).fold(newRight, oldRight)
+        lpr.join(l, r, t, JoinCondition(lName, rName, c))
+      case lp => lp.embed
+    }
+    result.cata[Fix[LP]](rename)
+  }
 
   def read(file: String): Fix[LP] =
     lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)

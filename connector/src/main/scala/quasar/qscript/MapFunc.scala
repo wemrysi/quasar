@@ -221,9 +221,17 @@ object MapFunc {
   }
 
   def normalize[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]
-      : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
+      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     (repeatedly(rewrite[T, A]) _) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
+
+  def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
+      : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =
+    _.run match {
+      case \/-(JoinSideName(`left`)) => CoEnv(-\/(LeftSide))
+      case \/-(JoinSideName(`right`)) => CoEnv(-\/(RightSide))
+      case x => CoEnv(x)
+    }
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
@@ -293,6 +301,7 @@ object MapFunc {
         // nullary
         case Constant(v) => G.point(Constant[T, B](v))
         case Undefined() => G.point(Undefined[T, B]())
+        case JoinSideName(n) => G.point(JoinSideName[T, B](n))
         case Now() => G.point(Now[T, B]())
 
         // unary
@@ -378,6 +387,7 @@ object MapFunc {
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
         // nullary
         case (Constant(v1), Constant(v2)) => v1.equals(v2)
+        case (JoinSideName(n1), JoinSideName(n2)) => n1.equals(n2)
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
 
@@ -471,6 +481,7 @@ object MapFunc {
           // nullary
           case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
           case Undefined() => Cord("Undefined()")
+          case JoinSideName(n) => Cord("JoinSideName(") ++ n.show ++ Cord(")")
           case Now() => Cord("Now()")
 
           // unary
@@ -572,6 +583,7 @@ object MapFunc {
           // nullary
           case Constant(a1) => Terminal("Constant" :: nt, a1.shows.some)
           case Undefined() => Terminal("Undefined" :: nt, None)
+          case JoinSideName(n) => Terminal("JoinSideName(" ::nt, n.shows.some)
           case Now() => Terminal("Now" :: nt, None)
 
           // unary
@@ -756,6 +768,10 @@ object MapFuncs {
     * - [[Cond]] evaluates normally if neither the condition nor the taken branch are `Undefined`.
     */
   @Lenses final case class Undefined[T[_[_]], A]() extends Nullary[T, A]
+
+  /** A placeholder for a `JoinSide` that should never be exposed to a backend.
+    */
+  @Lenses final case class JoinSideName[T[_[_]], A](name: Symbol) extends Nullary[T, A]
 
   // array
   @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]

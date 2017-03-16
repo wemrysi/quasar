@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{JoinType, PhaseResult, PhaseResults, SortDir}
+import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
@@ -281,6 +281,8 @@ object MongoDbQScriptPlanner {
           _.point[M])
       // FIXME: Not correct
       case Undefined() => ident("undefined").point[M]
+      case JoinSideName(n) =>
+        merr.raiseError[JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => New(Name("Date"), Nil).point[M]
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
@@ -933,12 +935,8 @@ object MongoDbQScriptPlanner {
           getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-            qs.f match {
-              case JoinType.Inner => set.InnerJoin
-              case JoinType.FullOuter => set.FullOuterJoin
-              case JoinType.LeftOuter => set.LeftOuterJoin
-              case JoinType.RightOuter => set.RightOuterJoin
-            },
+            // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
+            LogicalPlan.funcFromJoinType(qs.f),
             JoinSource(lb, List(lk), lj.map(List(_))),
             JoinSource(rb, List(rk), rj.map(List(_)))))).join
       }

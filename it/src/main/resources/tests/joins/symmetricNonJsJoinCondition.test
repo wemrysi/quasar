@@ -10,7 +10,6 @@
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },
-    "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
     "data": ["../zips.data", "../largeZips.data"],
     "query": "select z1.city as city1, z1.loc as loc1, z2.city as city2, z2.loc as loc2 from `../zips` as z1 join `../largeZips` as z2 on z1.loc[*] = z2.loc[*] where z1.city < z2.city",
     "predicate": "containsExactly",

@@ -240,15 +240,13 @@ package object fp
     Show.showFromToString
 
   implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
-
   implicit def natShow[N <: Nat]: Show[N] = Show.showFromToString
 
-  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
-    Equal.equal((a, b) => true)
-
+  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] = Equal.equal((a, b) => true)
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
   implicit val symbolEqual: Equal[Symbol] = Equal.equalA
+  implicit val symbolShow: Show[Symbol] = Show.showFromToString
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]
