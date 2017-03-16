@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.Planner.UnsupportedPlan
 import quasar.common.{PhaseResult, PhaseResults}

@@ -16,7 +16,7 @@
 
 package quasar.effect
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz._
 
 import scalaz.{Failure => _, _}

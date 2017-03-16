@@ -16,7 +16,7 @@
 
 package quasar.common
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, Terminal}
 
 import scalaz._, Scalaz._

@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._, Helpers._
 

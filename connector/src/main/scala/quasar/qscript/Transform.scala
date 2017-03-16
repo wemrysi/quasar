@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef.{ Eq => _, _ }
+import slamdata.Predef.{ Eq => _, _ }
 import quasar._, Planner._
 import quasar.common.JoinType
 import quasar.contrib.matryoshka._

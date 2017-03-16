@@ -16,7 +16,7 @@
 
 package quasar.physical
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.TernaryFunc
 import quasar.common.SortDir
 import quasar.javascript.Js

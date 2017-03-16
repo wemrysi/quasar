@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
 import quasar.contrib.matryoshka._

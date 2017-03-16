@@ -5,68 +5,65 @@ import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
+import slamdata.CommonDependencies
 
 object Dependencies {
-  // RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
-  private val argonautVersion   = "6.2-RC2"
-  private val doobieVersion     = "0.3.0"
+  private val disciplineVersion = "0.5"
   // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
   // https://github.com/quasar-analytics/quasar/issues/1852
   // Although this issue will be closed by the current commit that downgrades it,
   // it's still an issue that needs to be considered for anyone attempting to upgrade
+  // NB: Argonaut RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
-  private val monocleVersion    = "1.3.2"
+  private val matryoshkaVersion = "0.16.4"
   private val pathyVersion      = "0.2.9"
   private val raptureVersion    = "2.0.0-M6"
-  private val refinedVersion    = "0.6.2"   // waiting for a stable release with fix for fthomas/refined#256
-  private val scalazVersion     = "7.2.9"
   private val scodecBitsVersion = "1.1.0"
-  private val shapelessVersion  = "2.3.1"
-  private val slscVersion       = "0.6"
-  private val scalacheckVersion = "1.13.4"
+  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
+  // leads to a ParquetRDDE failure under a full test run
   private val specsVersion      = "3.8.4"
 
   def foundation = Seq(
-    "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
-    "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
-    "org.scalaz"                 %% "scalaz-iteratee"           % scalazVersion,
-    "org.scalaz.stream"          %% "scalaz-stream"             % "0.8.6a",
-    "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
-    "io.argonaut"                %% "argonaut"                  % argonautVersion,
-    "io.argonaut"                %% "argonaut-scalaz"           % argonautVersion,
-    "com.slamdata"               %% "matryoshka-core"           % "0.16.4",
-    "com.slamdata"               %% "pathy-core"                % pathyVersion,
-    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
-    "eu.timepit"                 %% "refined"                   % refinedVersion,
-    "com.chuusai"                %% "shapeless"                 % shapelessVersion,
-    "org.scalacheck"             %% "scalacheck"                % scalacheckVersion                    %     Test,
-    "com.github.mpilquist"       %% "simulacrum"                % "0.8.0"                              %     Test,
-    "org.typelevel"              %% "discipline"                % "0.5"                                %     Test,
-    "org.specs2"                 %% "specs2-core"               % specsVersion                         %     Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") %     Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      % slscVersion                          %     Test,
-    "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              %     Test
+    CommonDependencies.scalaz.core,
+    CommonDependencies.scalaz.concurrent,
+    CommonDependencies.scalaz.iteratee,
+    CommonDependencies.scalazStream.scalazStream,
+    CommonDependencies.monocle.core,
+    CommonDependencies.argonaut.argonaut,
+    CommonDependencies.argonaut.scalaz,
+    "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
+    "com.slamdata"  %% "pathy-core"      % pathyVersion,
+    "com.slamdata"  %% "pathy-argonaut"  % pathyVersion,
+    CommonDependencies.refined.refined,
+    CommonDependencies.shapeless.shapeless,
+    CommonDependencies.scalacheck.scalacheck                  % Test,
+    CommonDependencies.simulacrum.simulacrum                  % Test,
+    "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
+    "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
+    CommonDependencies.scalaz.scalacheckBinding               % Test,
+    CommonDependencies.typelevel.shapelessScalacheck          % Test,
+    CommonDependencies.typelevel.scalazSpecs2                 % Test
   )
 
   def frontend = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
-    "org.scala-lang.modules"     %% "scala-parser-combinators"  % "1.0.5"
+    CommonDependencies.monocle.`macro`,
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
   )
 
   def ejson = Seq(
-    "io.argonaut"                %% "argonaut"    % argonautVersion,
-    "org.spire-math"             %% "jawn-parser" % jawnVersion
+    CommonDependencies.argonaut.argonaut,
+    "org.spire-math" %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    "com.github.tototoshi"       %% "scala-csv"      %    "1.3.4",
-    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
-    "org.http4s"                 %% "http4s-core"    % http4sVersion,
-    "com.slamdata"               %% "pathy-argonaut" %  pathyVersion
+    "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
+    CommonDependencies.monocle.`macro`,
+    "org.http4s"           %% "http4s-core"    % http4sVersion,
+    "com.slamdata"         %% "pathy-argonaut" % pathyVersion
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
@@ -90,8 +87,8 @@ object Dependencies {
   }
 
   val postgresql = Seq(
-    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
-    "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
+    CommonDependencies.doobie.core     % "compile, test",
+    CommonDependencies.doobie.postgres % "compile, test"
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
@@ -111,14 +108,14 @@ object Dependencies {
   )
 
   def marklogicValidation = Seq(
-    "eu.timepit"     %% "refined"       % refinedVersion,
-    "org.scalaz"     %% "scalaz-core"   % scalazVersion
+    CommonDependencies.refined.refined,
+    CommonDependencies.scalaz.core
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "eu.timepit"                 %% "refined-scalacheck"  % refinedVersion % Test,
+    CommonDependencies.refined.scalacheck                                   % Test,
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(
@@ -127,20 +124,20 @@ object Dependencies {
     "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(
-    "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
+    "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "org.http4s"     %% "http4s-dsl"          %   http4sVersion,
+    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
     // TODO: Switch to `http4s-argonaut` once http4s can be upgraded (see above)
-    "org.http4s"     %% "http4s-argonaut62"   %   http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" %   http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" %   http4sVersion    % Test,
-    "com.propensive" %% "rapture-json"        %   raptureVersion   % Test,
-    "com.propensive" %% "rapture-json-json4s" %   raptureVersion   % Test,
-    "eu.timepit"     %% "refined-scalacheck"  %   refinedVersion   % Test
+    "org.http4s"     %% "http4s-argonaut62"   % http4sVersion,
+    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
+    "org.http4s"     %% "http4s-blaze-client" % http4sVersion      % Test,
+    "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
+    "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
+    CommonDependencies.refined.scalacheck                          % Test
   )
   def it = Seq(
-    "io.argonaut"      %% "argonaut-monocle"    % argonautVersion % Test,
-    "org.http4s"       %% "http4s-blaze-client" % http4sVersion   % Test,
-    "eu.timepit"       %% "refined-scalacheck"  % refinedVersion  % Test,
-    "io.verizon.knobs" %% "core"                % "3.12.27a"      % Test)
+    CommonDependencies.argonaut.monocle                         % Test,
+    "org.http4s"       %% "http4s-blaze-client" % http4sVersion % Test,
+    CommonDependencies.refined.scalacheck                       % Test,
+    "io.verizon.knobs" %% "core"                % "3.12.27a"    % Test)
 }

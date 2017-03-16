@@ -16,7 +16,7 @@
 
 package quasar.frontend.logicalplan
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
 import quasar.contrib.shapeless._
 import quasar.fp._

@@ -16,7 +16,7 @@
 
 package quasar.fp
 
-import quasar.Predef.{Unit, Boolean}
+import slamdata.Predef.{Unit, Boolean}
 
 import java.util.concurrent.atomic.AtomicReference
 import scalaz.syntax.id._

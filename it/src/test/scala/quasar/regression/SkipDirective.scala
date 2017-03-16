@@ -16,7 +16,7 @@
 
 package quasar.regression
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import argonaut._, Argonaut._
 

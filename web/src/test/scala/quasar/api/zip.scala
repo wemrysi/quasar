@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 import scala.Predef.$conforms
 import quasar.fp.numeric._
 import quasar.fp.ski._

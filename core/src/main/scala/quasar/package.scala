@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.{PhaseResult, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir

@@ -16,7 +16,7 @@
 
 package quasar.config
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import scala.util.Properties._
 import scalaz.concurrent.Task

@@ -16,7 +16,7 @@
 
 package quasar.effect
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz._
 import quasar.fp.TaskRef
 import quasar.fp._, free._

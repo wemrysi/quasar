@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._

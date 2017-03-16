@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api._
 import quasar.effect.Failure
 import quasar.fp._, free._

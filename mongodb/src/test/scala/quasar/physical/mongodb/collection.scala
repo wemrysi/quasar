@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import org.specs2.execute.Result
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fs.SpecialStr
 
 import pathy.Path._

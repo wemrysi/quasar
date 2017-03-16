@@ -16,7 +16,7 @@
 
 package quasar.main
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, queryPlan, Variables}
 import quasar.fp.ski.κ
 import quasar.contrib.pathy._

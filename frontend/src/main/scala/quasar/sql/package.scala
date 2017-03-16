@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._

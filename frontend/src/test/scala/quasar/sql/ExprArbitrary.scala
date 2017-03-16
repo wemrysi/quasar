@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.JoinType._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalacheck.gen

@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 
 import scalaz._, Scalaz._

@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fs._, InMemory.InMemState
 
 import argonaut.{Json => AJson}

@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import quasar.Predef.{Byte => SByte, Char => SChar, Map => SMap, _}
+import slamdata.Predef.{Byte => SByte, Char => SChar, Map => SMap, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -83,7 +83,7 @@ sealed abstract class CommonInstances0 {
     arr.getOption(c) ,
     bool.getOption(c),
     dec.getOption(c) ,
-    nul.isMatching(c),
+    nul.nonEmpty(c),
     str.getOption(c)
   )
 }

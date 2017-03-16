@@ -16,7 +16,7 @@
 
 package quasar.effect
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import java.time.{Duration, Instant}
 import scalaz._

@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data => QData, NameGenerator}
 import quasar.Planner.InternalError
 import quasar.ejson
