@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef.{Map, Vector}
+import slamdata.Predef.{Map, Vector}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._

@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef.{ Map => ScalaMap, _ }
+import slamdata.Predef.{ Map => ScalaMap, _ }
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._

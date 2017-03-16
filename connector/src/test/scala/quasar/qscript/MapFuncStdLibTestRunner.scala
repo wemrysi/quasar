@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp._
 import quasar.fp.ski.κ

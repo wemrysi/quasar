@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{Some, None}
+import slamdata.Predef.{Some, None}
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.FileSystemType

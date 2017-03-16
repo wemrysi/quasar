@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec, Planner, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.connector.EnvironmentError

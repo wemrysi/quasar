@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.workflow
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.fp._
@@ -29,6 +29,8 @@ import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Gro
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
+
+import scala.collection.Iterable
 
 import matryoshka._
 import matryoshka.data.Fix

@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure
 import quasar.fp._

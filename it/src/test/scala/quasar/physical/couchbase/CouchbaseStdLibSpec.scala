@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data => QData, TestConfig}
 import quasar.common.PhaseResultT
 import quasar.effect.{MonotonicSeq, Read}

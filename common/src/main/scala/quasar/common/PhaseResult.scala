@@ -16,7 +16,7 @@
 
 package quasar.common
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, RenderedTree, RenderTree, Terminal}, RenderTree.ops._
 
 import argonaut._, Argonaut._

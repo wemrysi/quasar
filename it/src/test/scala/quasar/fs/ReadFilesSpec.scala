@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
@@ -88,7 +88,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         } yield xs
 
         r.run map { x =>
-          (D.left composePrism unknownReadHandle).isMatching(x) must beTrue
+          (D.left composePrism unknownReadHandle).nonEmpty(x) must beTrue
         }
       }
 

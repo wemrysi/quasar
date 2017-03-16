@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.workflow
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 import quasar.physical.mongodb.expression.DocVar
 

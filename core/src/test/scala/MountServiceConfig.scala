@@ -16,7 +16,8 @@
 
 package quasar.internal
 
-import quasar._, Predef._
+import slamdata.Predef._
+import quasar._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import quasar.sql.{nullLiteral, Sql}

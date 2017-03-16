@@ -16,7 +16,7 @@
 
 package quasar.qscript.provenance
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._

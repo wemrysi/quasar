@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, TreeMatchers}
 import quasar.fp._
 import quasar.contrib.pathy.AFile

@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data => QData, DataCodec}
 import quasar.fp.ski.κ
 import quasar.Planner.{NonRepresentableData, PlannerError}

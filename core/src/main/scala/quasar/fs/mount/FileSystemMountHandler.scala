@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{Unit, String}
+import slamdata.Predef.{Unit, String}
 import quasar.contrib.pathy.ADir
 import quasar.fp.numeric._
 import quasar.effect.AtomicRef

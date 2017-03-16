@@ -17,7 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import quasar._
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._

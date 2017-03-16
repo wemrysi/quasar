@@ -16,10 +16,11 @@
 
 package quasar.pkg
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import scala.Predef.$conforms
 import scala.collection.mutable.Builder
+import scala.collection.{Traversable => scTraversable}
 import scala.language.postfixOps
 import scala.{ Byte, Char }
 

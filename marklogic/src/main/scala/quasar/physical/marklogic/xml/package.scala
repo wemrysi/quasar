@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 
 import scala.collection.immutable.Seq
