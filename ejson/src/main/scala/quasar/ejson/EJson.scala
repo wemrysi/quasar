@@ -165,7 +165,14 @@ sealed abstract class ExtensionInstances {
         implicit val ordA: Order[α] = ord
         // TODO: Not sure why this isn't found?
         implicit val ordC: Order[SChar] = scalaz.std.anyVal.char
-        Order.orderBy(generic[α])
+        Order.orderBy(e => (
+          byte.getOption(e)                          ,
+          char.getOption(e)                          ,
+          int.getOption(e)                           ,
+          map.getOption(e) map (IMap fromFoldable _) ,
+          // NB: Metadata isn't considered for purposes of equality.
+          meta.getOption(e) map (_._1)
+        ))
       }
     }
 
@@ -179,15 +186,4 @@ sealed abstract class ExtensionInstances {
         case Int(v)     => Cord(s"Int($v)")
       })
     }
-
-  ////
-
-  // NB: This elides metadata as it isn't considered for purposes of equality.
-  private[ejson] def generic[A: Order](e: Extension[A]) = (
-    byte.getOption(e)                          ,
-    char.getOption(e)                          ,
-    int.getOption(e)                           ,
-    map.getOption(e) map (IMap fromFoldable _) ,
-    meta.getOption(e) map (_._1)
-  )
 }
