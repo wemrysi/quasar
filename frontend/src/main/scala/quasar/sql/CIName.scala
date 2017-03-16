@@ -16,7 +16,9 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
+
+import scala.Predef.implicitly
 
 import argonaut._
 import scalaz._, Scalaz._

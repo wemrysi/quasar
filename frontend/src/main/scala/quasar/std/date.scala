@@ -16,7 +16,7 @@
 
 package quasar.std
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, Func, NullaryFunc, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp.ski._
 

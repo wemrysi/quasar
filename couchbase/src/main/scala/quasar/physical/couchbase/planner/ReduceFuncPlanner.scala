@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._
 import quasar.qscript, qscript.{ReduceFunc, ReduceFuncs => RF}

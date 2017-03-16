@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.{PathError, FileSystemType}
@@ -28,7 +28,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
-import monocle.std.tuple2._
 import org.specs2.execute._
 import pathy.Path._
 import scalaz._, Scalaz._

@@ -16,7 +16,7 @@
 
 package quasar.frontend.logicalplan
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
 import quasar.contrib.pathy._

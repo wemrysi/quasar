@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson

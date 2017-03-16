@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM

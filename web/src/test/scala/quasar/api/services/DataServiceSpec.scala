@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, RepresentableData}
 import quasar.DataArbitrary._
 import quasar.RepresentableDataArbitrary._

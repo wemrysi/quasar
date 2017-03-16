@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs.hdfs.parquet
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fp.ski._
 
@@ -35,13 +35,13 @@ import scalaz._, Scalaz._
 
 /**
   * Parquet Mutable Dragons
-  * 
+  *
   * Due to the nature of java-like parquet-mr API we need to deal
   * with mutable data strucutres and "protocol" that requires
   * mutability (e.g see method getCurrentRecord())
-  * 
+  *
   * This is private to ParquetRDD as to not expose mutability
-  * 
+  *
   */
 @SuppressWarnings(Array(
   "org.wartremover.warts.Overloading",

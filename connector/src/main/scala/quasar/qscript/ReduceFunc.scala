@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
 import quasar.std.StdLib._
 

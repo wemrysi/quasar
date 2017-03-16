@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{ Data, Type }
 import quasar.common.SortDir
 import quasar.frontend.logicalplan.LogicalPlan

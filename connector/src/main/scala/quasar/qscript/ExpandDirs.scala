@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Planner.NoFilesFound
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._

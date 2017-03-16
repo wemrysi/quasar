@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.JsFn

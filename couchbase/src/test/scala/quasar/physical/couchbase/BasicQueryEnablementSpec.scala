@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Planner => _, _}
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, PathSegment}

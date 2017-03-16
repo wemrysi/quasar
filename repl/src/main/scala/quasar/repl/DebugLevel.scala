@@ -16,7 +16,7 @@
 
 package quasar.repl
 
-import quasar.Predef._
+import slamdata.Predef._
 
 sealed abstract class DebugLevel
 object DebugLevel {

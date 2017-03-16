@@ -16,7 +16,7 @@
 
 package quasar.server
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.config._

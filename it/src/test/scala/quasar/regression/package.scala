@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef.{Long, Map}
+import slamdata.Predef.{Long, Map}
 import quasar.contrib.pathy.ADir
 import quasar.effect._
 import quasar.fp.{TaskRef}
