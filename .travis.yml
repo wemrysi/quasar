@@ -27,6 +27,8 @@ script:
   - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
+  - sbt transferPublishAndTagResources
+  - ./scripts/publishAndTag 'quasar-analytics/quasar'
 
 after_success: ./scripts/afterSuccess
 

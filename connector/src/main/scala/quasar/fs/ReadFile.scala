@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fp.numeric.{Natural, Positive}
 import eu.timepit.refined.auto._

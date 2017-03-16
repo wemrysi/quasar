@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs.hdfs.parquet
 
-import quasar.Predef._
+import slamdata.Predef._
 import org.apache.parquet.hadoop.api.ReadSupport
 import org.apache.parquet.hadoop.ParquetRecordReader
 import org.apache.hadoop.fs.Path

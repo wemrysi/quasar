@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
@@ -83,7 +83,7 @@ object WriteFile {
           .map(PartialWrite)
 
       val dropPartialWrites =
-        process1.filter[FileSystemError](e => !partialWrite.isMatching(e))
+        process1.filter[FileSystemError](e => !partialWrite.nonEmpty(e))
 
       // NB: We don't use `through` as we want to ensure the `Open` from
       //     `appendChannel` happens even if the src process never emits.

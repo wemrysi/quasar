@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, SemanticError, Terminal, VarName},
   RenderTree.ops._,
   SemanticError._

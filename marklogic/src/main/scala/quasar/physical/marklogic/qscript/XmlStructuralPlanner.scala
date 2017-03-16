@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.xml.namespaces._
@@ -104,7 +104,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
       case XQuery.StringLit(s) =>
         (asQName[F](s) |@| freshName[F])((qn, m) =>
-          if (XQuery.flwor.isMatching(obj))
+          if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
           else
             obj `/` child(qn))

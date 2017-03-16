@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import quasar.{Data, DataCodec}
 import quasar.csv._

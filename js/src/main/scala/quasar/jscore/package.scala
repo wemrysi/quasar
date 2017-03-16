@@ -16,9 +16,11 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.fp._
+
+import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data._

@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef.{ Eq => _, _ }
+import slamdata.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
 import quasar.common.SortDir
 import quasar.contrib.pathy.AFile

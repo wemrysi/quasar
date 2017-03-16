@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xml
 
-import quasar.Predef._
+import slamdata.Predef.String
 import quasar.physical.marklogic.validation._
 
 import eu.timepit.refined.refineV

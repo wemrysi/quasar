@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}

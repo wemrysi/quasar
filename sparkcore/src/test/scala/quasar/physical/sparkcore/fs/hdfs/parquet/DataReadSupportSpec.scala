@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs.hdfs.parquet
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, Qspec}
 import quasar.fp._
 

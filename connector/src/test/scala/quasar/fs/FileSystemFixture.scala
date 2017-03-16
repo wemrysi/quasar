@@ -17,7 +17,7 @@
 package quasar.fs
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
 import quasar.contrib.pathy._, PathArbitrary._

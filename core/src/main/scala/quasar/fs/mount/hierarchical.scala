@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._

@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import quasar.Predef.{Map => SMap, _}
+import slamdata.Predef.{Map => SMap, _}
 
 import jawn.{Facade, SimpleFacade, SupportParser}
 import matryoshka._

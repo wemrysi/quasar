@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.RenderTree
 import quasar.TreeMatchers
 import quasar.common.SortDir
