@@ -47,12 +47,14 @@ object queryfile {
 
   type QKvs[F[_], G[_]] = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
 
-  type MLQScript[T[_[_]], A] = (
+  type MLQScriptCP[T[_[_]]] = (
     QScriptCore[T, ?]           :\:
     ThetaJoin[T, ?]             :\:
     Const[ShiftedRead[ADir], ?] :/:
     Const[Read[AFile], ?]
-  )#M[A]
+  )
+
+  type MLQScript[T[_[_]], A] = MLQScriptCP[T]#M[A]
 
   implicit def mlQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
@@ -128,8 +130,6 @@ object queryfile {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
 
-    val C = Coalesce[T, MLQ, MLQ]
-    val N = Normalizable[MLQ]
     val R = new Rewrite[T]
 
     def logPhase(pr: PhaseResult): F[Unit] =
@@ -144,10 +144,7 @@ object queryfile {
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
                      R.optimize(reflNT[MLQ]),
-                     repeatedly(applyTransforms(
-                       C.coalesceQCNormalize[MLQ](idPrism),
-                       C.coalesceTJNormalize[MLQ](idPrism.get),
-                       C.coalesceSRNormalize[MLQ, ADir](idPrism))))
+                     Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)
       inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])
