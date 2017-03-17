@@ -9,12 +9,6 @@ import slamdata.CommonDependencies
 
 object Dependencies {
   private val disciplineVersion = "0.5"
-  // TODO: Upgrade to `0.15.2a` (or above) once we can figure out a fix for:
-  // https://github.com/quasar-analytics/quasar/issues/1852
-  // Although this issue will be closed by the current commit that downgrades it,
-  // it's still an issue that needs to be considered for anyone attempting to upgrade
-  // NB: Argonaut RC2 conflicts with http4s 0.14.1a, but we're evicting to it anyway
-  private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val jacksonVersion    = "2.4.4"
   private val matryoshkaVersion = "0.16.4"
@@ -62,7 +56,7 @@ object Dependencies {
   def core = Seq(
     "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
     CommonDependencies.monocle.`macro`,
-    "org.http4s"           %% "http4s-core"    % http4sVersion,
+    CommonDependencies.http4s.core,
     "com.slamdata"         %% "pathy-argonaut" % pathyVersion
   )
   def interface = Seq(
@@ -104,7 +98,7 @@ object Dependencies {
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
-    "org.http4s"         %% "http4s-core"   % http4sVersion
+    CommonDependencies.http4s.core
   )
 
   def marklogicValidation = Seq(
@@ -121,23 +115,22 @@ object Dependencies {
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    "org.http4s"           %% "http4s-core" % http4sVersion
+    CommonDependencies.http4s.core
   )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
-    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
-    // TODO: Switch to `http4s-argonaut` once http4s can be upgraded (see above)
-    "org.http4s"     %% "http4s-argonaut62"   % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
-    "org.http4s"     %% "http4s-blaze-client" % http4sVersion      % Test,
+    CommonDependencies.http4s.dsl,
+    CommonDependencies.http4s.argonaut62,
+    CommonDependencies.http4s.blazeClient,
+    CommonDependencies.http4s.blazeServer,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     CommonDependencies.refined.scalacheck                          % Test
   )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,
-    "org.http4s"       %% "http4s-blaze-client" % http4sVersion % Test,
+    CommonDependencies.http4s.blazeClient                       % Test,
     CommonDependencies.refined.scalacheck                       % Test,
     "io.verizon.knobs" %% "core"                % "3.12.27a"    % Test)
 }
