@@ -18,8 +18,7 @@ package quasar.physical.couchbase
 
 import slamdata.Predef._
 import quasar.{Data => QData}
-import quasar.common.SortDir
-import quasar.qscript.{Inner, LeftOuter}
+import quasar.common.{JoinType, SortDir}
 
 import scalaz._, NonEmptyList.nels, OneAnd.oneAnd
 
@@ -143,7 +142,7 @@ object N1QL extends N1QLInstances {
   ) extends N1QL[A]
 
   object Select {
-    type LookupJoinType = LeftOuter.type \/ Inner.type
+    type LookupJoinType = JoinType.LeftOuter.type \/ JoinType.Inner.type
 
     final case class Value(v: Boolean)
     final case class ResultExpr[A](expr: A, alias: Option[Id[A]])

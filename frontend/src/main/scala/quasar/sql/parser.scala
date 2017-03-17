@@ -17,6 +17,7 @@
 package quasar.sql
 
 import slamdata.Predef._
+import quasar.common.JoinType
 import quasar.fp.ski._
 import quasar.fp._
 
@@ -392,7 +393,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def std_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
     opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ expr ^^
-      { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(InnerJoin), e) }
+      { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(JoinType.Inner), e) }
 
   def cross_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
     keyword("cross") ~> keyword("join") ~> simple_relation ^^ {
@@ -406,10 +407,10 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def join_type: Parser[JoinType] =
     (keyword("left") | keyword("right") | keyword("full")) <~ opt(keyword("outer")) ^^ {
-      case "left"  => LeftJoin
-      case "right" => RightJoin
-      case "full"  => FullJoin
-    } | keyword("inner") ^^^ (InnerJoin)
+      case "left"  => JoinType.LeftOuter
+      case "right" => JoinType.RightOuter
+      case "full"  => JoinType.FullOuter
+    } | keyword("inner") ^^^ (JoinType.Inner)
 
   def simple_relation: Parser[SqlRelation[T[Sql]]] =
     ident ~ opt(keyword("as") ~> ident) ^^ {

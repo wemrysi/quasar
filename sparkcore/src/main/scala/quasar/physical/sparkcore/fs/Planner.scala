@@ -18,7 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar._, quasar.Planner._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
@@ -344,16 +344,16 @@ object Planner {
             val krRdd = rRdd.map(d => (rk(d), d))
 
             jt match {
-              case Inner => klRdd.join(krRdd).map {
+              case JoinType.Inner => klRdd.join(krRdd).map {
                 case (_, (l, r)) => merge(l, r)
               }
-              case LeftOuter => klRdd.leftOuterJoin(krRdd).map {
+              case JoinType.LeftOuter => klRdd.leftOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
               }
-              case RightOuter => klRdd.rightOuterJoin(krRdd).map {
+              case JoinType.RightOuter => klRdd.rightOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
               }
-              case FullOuter => klRdd.fullOuterJoin(krRdd).map {
+              case JoinType.FullOuter => klRdd.fullOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
               }
             }

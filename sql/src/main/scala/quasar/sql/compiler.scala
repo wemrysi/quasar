@@ -19,6 +19,7 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
   SemanticError._
+import quasar.common.JoinType
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -391,10 +392,10 @@ final class Compiler[M[_], T: Equal]
                 compile1(clause).map(c =>
                   lpr.invoke(
                     tpe match {
-                      case LeftJoin             => set.LeftOuterJoin
-                      case quasar.sql.InnerJoin => set.InnerJoin
-                      case RightJoin            => set.RightOuterJoin
-                      case FullJoin             => set.FullOuterJoin
+                      case JoinType.Inner => set.InnerJoin
+                      case JoinType.LeftOuter => set.LeftOuterJoin
+                      case JoinType.RightOuter => set.RightOuterJoin
+                      case JoinType.FullOuter => set.FullOuterJoin
                     },
                     Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
               lpr.let(leftName, left0,

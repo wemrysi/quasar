@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
@@ -62,7 +63,7 @@ package object sql {
   def CrossRelation[T]
     (left: SqlRelation[T], right: SqlRelation[T])
     (implicit T: Corecursive.Aux[T, Sql])=
-    JoinRelation(left, right, InnerJoin, boolLiteral[T](true).embed)
+    JoinRelation(left, right, JoinType.Inner, boolLiteral[T](true).embed)
 
   def projectionNames[T]
     (projections: List[Proj[T]], relName: Option[String])
@@ -160,6 +161,13 @@ package object sql {
 
     def ppalias(a: String): String = "as " + _qq("`", a)
 
+    def ppJoinType(tpe: JoinType): String = tpe match {
+      case JoinType.Inner => "inner join"
+      case JoinType.FullOuter => "full join"
+      case JoinType.LeftOuter => "left join"
+      case JoinType.RightOuter => "right join"
+    }
+
     (r match {
       case IdentRelationAST(name, alias) =>
         _qq("`", name) :: alias.map(ppalias).toList
@@ -171,10 +179,10 @@ package object sql {
         List(expr._2, ppalias(aliasName))
       case JoinRelation(left, right, tpe, clause) =>
         (tpe, clause._1) match {
-          case (InnerJoin, Embed(BoolLiteral(true))) =>
+          case (JoinType.Inner, Embed(BoolLiteral(true))) =>
             List("(", pprintRelationƒ(left), "cross join", pprintRelationƒ(right), ")")
           case (_, _) =>
-            List("(", pprintRelationƒ(left), tpe.sql, pprintRelationƒ(right), "on", clause._2, ")")
+            List("(", pprintRelationƒ(left), ppJoinType(tpe), pprintRelationƒ(right), "on", clause._2, ")")
         }
     }).mkString(" ")
   }

@@ -18,6 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
+import quasar.common.JoinType
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
