@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
+import slamdata.Predef._
 
 object xs {
   def base64Binary(xqy: XQuery): XQuery =

@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.marklogic.xml.QName
 import quasar.physical.marklogic.xquery.syntax._
 

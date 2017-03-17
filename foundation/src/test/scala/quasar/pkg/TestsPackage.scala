@@ -16,7 +16,7 @@
 
 package quasar.pkg
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import scala.Predef.$conforms
 import scala.collection.mutable.Builder

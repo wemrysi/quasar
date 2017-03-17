@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.workflow
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.fp._

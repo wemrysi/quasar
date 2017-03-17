@@ -16,7 +16,7 @@
 
 package quasar.contrib
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import _root_.matryoshka._
 import _root_.scalaz._, Scalaz._

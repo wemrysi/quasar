@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.uuid.UuidReader
 import quasar.fs._

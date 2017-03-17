@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
@@ -275,8 +275,10 @@ object JsFuncHandler {
         dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
 
       case TemporalTrunc(Century, date) =>
+        val yr =
+          Call(select(ident("Math"), "floor"), List(BinOp(jscore.Div, year(date), litNum(100))))
         dateZ(
-          BinOp(jscore.Mult, BinOp(jscore.Sub, century(date), litNum(1)), litNum(100)),
+          BinOp(jscore.Mult, yr, litNum(100)),
           litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
       case TemporalTrunc(Day, date) =>
         dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
