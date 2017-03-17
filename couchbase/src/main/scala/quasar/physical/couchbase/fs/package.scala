@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
 import quasar.contrib.pathy.APath
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}

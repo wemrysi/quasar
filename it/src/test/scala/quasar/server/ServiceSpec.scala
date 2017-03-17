@@ -17,7 +17,7 @@
 package quasar.server
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{TestConfig, Variables}
 import quasar.config.{ConfigOps, FsPath, WebConfig}
 import quasar.contrib.pathy.{APath, UriPathCodec}

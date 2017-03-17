@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam}
 import quasar.fp.liftMT

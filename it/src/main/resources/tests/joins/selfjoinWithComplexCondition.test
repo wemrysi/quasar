@@ -10,6 +10,7 @@
         "spark_local": "skip",
         "spark_hdfs": "skip"
     },
+    "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
     "data": "../slamengine_commits.data",
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
               from `../slamengine_commits` as l join `../slamengine_commits` as r

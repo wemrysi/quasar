@@ -16,9 +16,10 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.common.{JoinType, PhaseResult, PhaseResults, SortDir}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
@@ -926,10 +927,10 @@ object MongoDbQScriptPlanner {
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
             qs.f match {
-              case Inner => set.InnerJoin
-              case FullOuter => set.FullOuterJoin
-              case LeftOuter => set.LeftOuterJoin
-              case RightOuter => set.RightOuterJoin
+              case JoinType.Inner => set.InnerJoin
+              case JoinType.FullOuter => set.FullOuterJoin
+              case JoinType.LeftOuter => set.LeftOuterJoin
+              case JoinType.RightOuter => set.RightOuterJoin
             },
             JoinSource(lb, List(lk), lj.map(List(_))),
             JoinSource(rb, List(rk), rj.map(List(_)))))).join
@@ -1020,7 +1021,7 @@ object MongoDbQScriptPlanner {
         elems.traverse(handler) ∘ (ArrayBuilder(src, _))
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
-          case Embed(ejson.Common(ejson.Str(key))) => BsonField.Name(key).point[M]
+          case Embed(MapFunc.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
           case key => merr.raiseError[BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
         },
           handler)) ∘
@@ -1206,7 +1207,7 @@ object MongoDbQScriptPlanner {
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
+    [T[_[_]]: BirecursiveT: OrderT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
@@ -1246,11 +1247,10 @@ object MongoDbQScriptPlanner {
           .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
-            repeatedly(rewrite.applyTransforms(
-              C.coalesceQC[MongoQScript](idPrism),
-              C.coalesceEJ[MongoQScript](idPrism.get),
-              C.coalesceSR[MongoQScript, AFile](idPrism),
-              Normalizable[MongoQScript].normalizeF(_: MongoQScript[T[MongoQScript]])))))
+            repeatedly(applyTransforms(
+              C.coalesceQCNormalize[MongoQScript](idPrism),
+              C.coalesceEJNormalize[MongoQScript](idPrism.get),
+              C.coalesceSRNormalize[MongoQScript, AFile](idPrism)))))
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",
@@ -1269,7 +1269,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
+  def plan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],

@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
@@ -84,11 +84,10 @@ object queryfile {
                    .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
         optQS =  qs.transHylo(
                    rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(rewrite.applyTransforms(
-                     C.coalesceQC[SparkQScript](idPrism),
-                     C.coalesceEJ[SparkQScript](idPrism.get),
-                     C.coalesceSR[SparkQScript, AFile](idPrism),
-                     Normalizable[SparkQScript].normalizeF(_: SparkQScript[Fix[SparkQScript]]))))
+                   repeatedly(applyTransforms(
+                     C.coalesceQCNormalize[SparkQScript](idPrism),
+                     C.coalesceEJNormalize[SparkQScript](idPrism.get),
+                     C.coalesceSRNormalize[SparkQScript, AFile](idPrism))))
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }

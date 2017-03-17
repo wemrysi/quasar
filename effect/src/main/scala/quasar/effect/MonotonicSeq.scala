@@ -16,7 +16,7 @@
 
 package quasar.effect
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.TaskRef
 
 import monocle.Lens
@@ -44,7 +44,7 @@ object MonotonicSeq {
   final class Ops[S[_]](implicit S: MonotonicSeq :<: S)
     extends LiftedOps[MonotonicSeq, S] {
 
-    def next: F[Long] =
+    def next: FreeS[Long] =
       lift(Next)
   }
 

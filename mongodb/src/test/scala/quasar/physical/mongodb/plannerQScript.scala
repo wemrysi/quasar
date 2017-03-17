@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.fp._
@@ -3570,14 +3570,16 @@ class PlannerQScriptSpec extends
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
     }
 
-    def countAccumOps(wf: Workflow) = countOps(wf, { case $group(_, _, _) => true })
-    def countUnwindOps(wf: Workflow) = countOps(wf, { case $unwind(_, _) => true })
-    def countMatchOps(wf: Workflow) = countOps(wf, { case $match(_, _) => true })
+    val WC = Inject[WorkflowOpCoreF, WorkflowF]
+
+    def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
+    def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
+    def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
 
     def noConsecutiveProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(Fix($project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
+      countOps(wf, { case WC($ProjectF(Embed(WC($ProjectF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
     def noConsecutiveSimpleMapOps(wf: Workflow) =
-      countOps(wf, { case $simpleMap(Fix($simpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
+      countOps(wf, { case WC($SimpleMapF(Embed(WC($SimpleMapF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
     def maxAccumOps(wf: Workflow, max: Int) =
       countAccumOps(wf) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
     def maxUnwindOps(wf: Workflow, max: Int) =
@@ -3585,7 +3587,7 @@ class PlannerQScriptSpec extends
     def maxMatchOps(wf: Workflow, max: Int) =
       countMatchOps(wf) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
     def brokenProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
+      countOps(wf, { case WC($ProjectF(_, Reshape(shape), _)) => shape.isEmpty }) aka "$project ops with no fields"
 
     def danglingReferences(wf: Workflow) =
       wf.foldMap(_.unFix match {
@@ -3601,7 +3603,7 @@ class PlannerQScriptSpec extends
 
     def rootPushes(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op @ $group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
+        case WC(op @ $GroupF(src, Grouped(map), _)) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
         case _ => Nil
       }) aka "group ops pushing $$ROOT"
 

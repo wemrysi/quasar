@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.FileSystem
@@ -25,7 +25,6 @@ import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
 import monocle.function.Field1
-import monocle.std.tuple3._
 import pathy.Path.fileParent
 import scalaz._, Scalaz._
 

@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, DataArbitrary._
 import quasar.common._
 import quasar.contrib.pathy._
@@ -38,7 +38,6 @@ import matryoshka.data.Fix
 import monocle.Prism
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
-import monocle.std.tuple2._
 import org.specs2.execute.SkipException
 import org.specs2.specification.core._
 import pathy.Path._
@@ -108,7 +107,7 @@ class MongoDbFileSystemSpec
               vectorFirst[FileSystemError]
                 .composePrism(writeFailed)
                 .composeLens(Field1.first)
-                .isMatching(errs.toVector)
+                .nonEmpty(errs.toVector)
             }.run.unsafePerformSync.toEither must beRight(true)
           }
         }
@@ -218,7 +217,7 @@ class MongoDbFileSystemSpec
         def shouldFailWithPathNotFound(f: String => String) = {
           val dne = testPrefix map (_ </> file("__DNE__"))
           val q = dne map (p => f(posixCodec.printPath(p)))
-          val xform = QueryFile.Transforms[query.F]
+          val xform = QueryFile.Transforms[query.FreeS]
 
           import xform._
 
@@ -343,7 +342,7 @@ class MongoDbFileSystemSpec
 
             runT(run)(for {
               tfile  <- manage.tempFile(pdir)
-              dbName <- EitherT.fromDisjunction[manage.F](
+              dbName <- EitherT.fromDisjunction[manage.FreeS](
                           Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
             } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
           })

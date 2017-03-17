@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fs.FileSystemType
 import quasar.sql, sql.Sql, sql.Statement

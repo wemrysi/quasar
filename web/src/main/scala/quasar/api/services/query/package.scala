@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
 import quasar.api._
 import quasar.contrib.pathy.ADir

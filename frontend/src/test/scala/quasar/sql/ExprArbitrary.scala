@@ -16,7 +16,8 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.common.JoinType._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalacheck.gen
 import quasar.sql.fixpoint._
@@ -64,7 +65,7 @@ trait ExprArbitrary {
       1 -> (selectGen(2) ⊛ genIdentString)(ExprRelationAST(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1))(CrossRelation(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1) ⊛
-        Gen.oneOf(LeftJoin, RightJoin, InnerJoin, FullJoin) ⊛
+        Gen.oneOf(LeftOuter, RightOuter, Inner, FullOuter) ⊛
         exprGen(1))(
         JoinRelation(_, _, _, _)))
   }

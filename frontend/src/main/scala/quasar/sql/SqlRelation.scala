@@ -16,8 +16,9 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
+import quasar.common.JoinType
 import quasar.contrib.pathy._
 
 import matryoshka._
@@ -86,6 +87,7 @@ sealed abstract class NamedRelation[A] extends SqlRelation[A] {
     extends SqlRelation[A]
 
 object SqlRelation {
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit val equal: Delay[Equal, SqlRelation] =
     new Delay[Equal, SqlRelation] {
       def apply[A](fa: Equal[A]) = {

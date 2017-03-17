@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.contrib.pathy.sandboxCurrent
 
@@ -53,9 +53,11 @@ object Zip {
 
     private val sink = {
       val os = new java.io.OutputStream {
+        @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
         def write(b: Int) = append(ByteVector(b.toByte))
 
         // NB: overriding here to process each buffer-worth coming from the ZipOS in one call
+        @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
         override def write(b: Array[Byte], off: Int, len: Int) = append(ByteVector(b, off, len))
       }
       new jzip.ZipOutputStream(os)

@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xml
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import monocle.macros.Lenses
 import scalaz.{Order, Show}

@@ -16,9 +16,10 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
@@ -117,7 +118,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
   ](
     lp: T[LogicalPlan]
@@ -143,11 +144,10 @@ object queryfile {
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
                      R.optimize(reflNT[MLQ]),
-                     repeatedly(R.applyTransforms(
-                       C.coalesceQC[MLQ](idPrism),
-                       C.coalesceTJ[MLQ](idPrism.get),
-                       C.coalesceSR[MLQ, ADir](idPrism),
-                       N.normalizeF(_: MLQ[T[MLQ]]))))
+                     repeatedly(applyTransforms(
+                       C.coalesceQCNormalize[MLQ](idPrism),
+                       C.coalesceTJNormalize[MLQ](idPrism.get),
+                       C.coalesceSRNormalize[MLQ, ADir](idPrism))))
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)
       inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])

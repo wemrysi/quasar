@@ -16,7 +16,7 @@
 
 package quasar.frontend.logicalplan
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
 import quasar.contrib.pathy._
@@ -103,6 +103,7 @@ final class LogicalPlanR[T]
     * it could create spurious shadowing. normalizeTempNames is recommended.
     * NB: at the moment, Lets are only hoisted one level.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val normalizeLetsƒ: LP[T] => Option[LP[T]] = {
     case Let(b, Embed(Let(a, x1, x2)), x3) =>
       lp.let(a, x1, let(b, x2, x3)).some

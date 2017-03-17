@@ -16,10 +16,13 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
+import quasar.contrib.matryoshka._
 import quasar.fp._
+
+import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data._
@@ -146,10 +149,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
-    C.prj(fa)
-
-  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
+  implicit def equal[T[_[_]]: OrderT: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -280,7 +280,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]

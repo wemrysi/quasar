@@ -16,8 +16,8 @@
 
 package quasar.qscript
 
-import quasar.Predef.List
-import quasar.common.SortDir
+import slamdata.Predef.List
+import quasar.common.{JoinType, SortDir}
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
@@ -626,7 +626,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
           HoleQS,
           BoolLit[Fix, JoinSide](true),
-          Inner,
+          JoinType.Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
       initial.pruneArrays must equal(initial)
@@ -654,7 +654,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           HoleQS,
           HoleF,
           HoleF,
-          Inner,
+          JoinType.Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
       initial.pruneArrays must equal(initial)

@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef.Boolean
+import slamdata.Predef.Boolean
 import quasar.fp.ski._
 
 import java.lang.String
@@ -27,31 +27,40 @@ import scala.math.{BigDecimal, BigInt}
 
 import matryoshka._
 import matryoshka.implicits._
-import monocle.Prism
+import monocle.{Iso, Prism}
 import scalaz._
 
 package object ejson {
-  def nul[A] =
-    Prism.partial[Common[A], Unit] { case Null() => () } (κ(Null()))
-  def bool[A] =
-    Prism.partial[Common[A], Boolean] { case Bool(b) => b } (Bool(_))
-  def dec[A] =
-    Prism.partial[Common[A], BigDecimal] { case Dec(bd) => bd } (Dec(_))
-  def str[A] = Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
   def arr[A] =
     Prism.partial[Common[A], List[A]] { case Arr(a) => a } (Arr(_))
 
+  def bool[A] =
+    Prism.partial[Common[A], Boolean] { case Bool(b) => b } (Bool(_))
+
+  def dec[A] =
+    Prism.partial[Common[A], BigDecimal] { case Dec(bd) => bd } (Dec(_))
+
+  def nul[A] =
+    Prism.partial[Common[A], Unit] { case Null() => () } (κ(Null()))
+
+  def str[A] =
+    Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
+
   def obj[A] =
-    Prism.partial[Obj[A], ListMap[String, A]] { case Obj(o) => o } (Obj(_))
+    Iso[Obj[A], ListMap[String, A]](_.value)(Obj(_))
 
   def byte[A] =
     Prism.partial[Extension[A], scala.Byte] { case Byte(b) => b } (Byte(_))
+
   def char[A] =
     Prism.partial[Extension[A], scala.Char] { case Char(c) => c } (Char(_))
+
   def int[A] =
     Prism.partial[Extension[A], BigInt] { case Int(i) => i } (Int(_))
+
   def map[A] =
     Prism.partial[Extension[A], List[(A, A)]] { case Map(m) => m } (Map(_))
+
   def meta[A] =
     Prism.partial[Extension[A], (A, A)] {
       case Meta(v, m) => (v, m)
@@ -77,9 +86,6 @@ package object ejson {
       ExtEJson.inj(_).embed
 
     def isNull[T](ej: T)(implicit T: Recursive.Aux[T, EJson]): Boolean =
-      CommonEJson.prj(ej.project).fold(false) {
-        case ejson.Null() => true
-        case _ => false
-    }
+      CommonEJson.prj(ej.project) exists (nul.nonEmpty(_))
   }
 }

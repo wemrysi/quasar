@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import quasar._
 import quasar.contrib.pathy._
@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
-import quasar.sql.{InnerJoin => _, _}, ExprArbitrary._
+import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._

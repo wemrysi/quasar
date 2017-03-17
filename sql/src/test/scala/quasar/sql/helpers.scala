@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, TermLogicalPlanMatchers}
 import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp.ski._
