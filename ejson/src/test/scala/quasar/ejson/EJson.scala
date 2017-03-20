@@ -34,4 +34,10 @@ class EJsonSpecs extends Spec with EJsonArbitrary {
 
   checkAll(order.laws[Extension[String]])
   checkAll(traverse.laws[Extension])
+
+  "extension" >> {
+    "ordering ignores metadata" >> prop { (a: String, b: String, m: String, n: String) =>
+      (meta(a, m) ?|? meta(b, n)) ≟ (a ?|? b)
+    }
+  }
 }
