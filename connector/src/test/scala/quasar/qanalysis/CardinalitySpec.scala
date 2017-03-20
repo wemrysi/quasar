@@ -92,6 +92,13 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         }
       }
       "Filter" should {
+        /** 
+          * Since filter can return cardinality of a range [0, card] a middle value 
+          * was chosen - card / 2. 
+          * It is worth considering changing signature of Cardinality typeclass to
+          * return Tuple2[Int, Int] representing range. Then the result would be
+          * range (0, card)
+          */
         "returns half of cardinality of already processed part of qscript" in {
           val cardinality = 50
           def func: FreeMap = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
@@ -105,7 +112,17 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         }
       }
       "LeftShift" should {
-        "returns cardinality of _" in {
+        /**
+          * Question why 10x not 5x or 1000x ?
+          * LeftShifts flattens the structure. Thus the range has potentail size 
+          * from [cardinality, infinity]. It is really hard to determin a concrete value
+          * just by spectating a static information. To get more accurate data we will 
+          * most probably need some statistics.
+          * Other approach is to change the Cardinality typeclss to return Option[Int]
+          * and all occurance of LeftShift would return None
+          * For now the x10 approach was proposed as a value.
+          */
+        "returns cardinality of 10 x cardinality of already processed part of qscript" in {
           pending
         }
       }
