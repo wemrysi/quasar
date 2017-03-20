@@ -161,8 +161,11 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case i => Import(i)
     }
 
+  @SuppressWarnings(Array(
+    "org.wartremover.warts.Product",
+    "org.wartremover.warts.Serializable"))
   def statements: Parser[List[Statement[T[Sql]]]] =
-    repsep(func_def |[Statement[T[Sql]]] import_, op(";"))
+    repsep(func_def | import_, op(";"))
 
   def blob: Parser[Blob[T[Sql]]] =
     opt(statements <~ op(";")) ~ expr ^^ {
