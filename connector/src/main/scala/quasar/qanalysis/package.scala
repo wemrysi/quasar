@@ -35,115 +35,137 @@ package object qanalysis {
   case object SemiInteractive extends AnalysisResult
   case object Batch extends AnalysisResult
   case object Unknown extends AnalysisResult
-}
 
-@typeclass
-trait Cardinality[F[_]] {
-  def calculate(pathCard: APath => Int): Algebra[F, Int]
-}
+  @typeclass
+  trait Cardinality[F[_]] {
+    def calculate(pathCard: APath => Int): Algebra[F, Int]
+  }
 
-@typeclass
-trait Cost[F[_]] {
-  def evaluate: GAlgebra[(Int, ?), F, Int]
-}
+  @typeclass
+  trait Cost[F[_]] {
+    def evaluate: GAlgebra[(Int, ?), F, Int]
+  }
 
-@typeclass
-trait Analyzer[F[_]] {
-  def analyze[T](t: T)(pathCard: APath => Int)(implicit
-    rec: Recursive.Aux[T, F],
-    func: Functor[F],
-    cardinalty: Cardinality[F],
-    cost: Cost[F]
-  ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate)
-}
+  @typeclass
+  trait Analyzer[F[_]] {
+    def analyze[T](t: T)(pathCard: APath => Int)(implicit
+      rec: Recursive.Aux[T, F],
+      func: Functor[F],
+      cardinalty: Cardinality[F],
+      cost: Cost[F]
+    ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate)
+  }
 
-object Cardinality {
+  object Cardinality {
 
-  implicit def read[A]: Cardinality[Const[Read[A], ?]] =
-    new Cardinality[Const[Read[A], ?]] {
-      def calculate(pathCard: APath => Int): Algebra[ Const[Read[A], ?], Int] =
-        (qs: Const[Read[A], Int]) => 1
-    }
-  implicit def shiftedReadFile: Cardinality[Const[ShiftedRead[AFile], ?]] =
-    new Cardinality[Const[ShiftedRead[AFile], ?]] {
-      def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[AFile], ?], Int] =
-        (qs: Const[ShiftedRead[AFile], Int]) => pathCard(qs.getConst.path)
-    }
-  implicit def shiftedReadDir: Cardinality[Const[ShiftedRead[ADir], ?]] =
-    new Cardinality[Const[ShiftedRead[ADir], ?]] {
-      def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[ADir], ?], Int] =
-        (qs: Const[ShiftedRead[ADir], Int]) => pathCard(qs.getConst.path)
-    }
-  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
-    new Cardinality[QScriptCore[T, ?]] {
-      def calculate(pathCard: APath => Int): Algebra[QScriptCore[T, ?], Int] = {
-        case qscript.Map(card, f) => card
-        case Reduce(card, bucket, reducers, repair) => 1
-        case Sort(card, bucket, orders) => card
-        case Filter(card, f) => card
-        case Subset(card, from, sel, count) => ???
-        case LeftShift(card, struct, id, repair) => ???
-        case Union(card, lBranch, rBranch) => {
-          val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          lBranch.cata(interpret(κ(card), compile)) + rBranch.cata(interpret(κ(card), compile))
-        }
-        case Unreferenced() => 1
+    implicit def read[A]: Cardinality[Const[Read[A], ?]] =
+      new Cardinality[Const[Read[A], ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ Const[Read[A], ?], Int] =
+          (qs: Const[Read[A], Int]) => 1
       }
-    }
-  implicit def projectBucket[T[_[_]]]: Cardinality[ProjectBucket[T, ?]] = ???
+    implicit def shiftedReadFile: Cardinality[Const[ShiftedRead[AFile], ?]] =
+      new Cardinality[Const[ShiftedRead[AFile], ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[AFile], ?], Int] =
+          (qs: Const[ShiftedRead[AFile], Int]) => pathCard(qs.getConst.path)
+      }
+    implicit def shiftedReadDir: Cardinality[Const[ShiftedRead[ADir], ?]] =
+      new Cardinality[Const[ShiftedRead[ADir], ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[ADir], ?], Int] =
+          (qs: Const[ShiftedRead[ADir], Int]) => pathCard(qs.getConst.path)
+      }
+    implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
+      new Cardinality[QScriptCore[T, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[QScriptCore[T, ?], Int] = {
+          case qscript.Map(card, f) => card
+          case Reduce(card, bucket, reducers, repair) => 1
+          case Sort(card, bucket, orders) => card
+          case Filter(card, f) => card / 2
+          case Subset(card, from, sel, count) =>
+            // val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            // val fromCard = from.cata(interpret(κ(card), compile))
 
-  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cardinality[EquiJoin[T, ?]] =
-    new Cardinality[EquiJoin[T, ?]] {
-      def calculate(pathCard: APath => Int): Algebra[ EquiJoin[T, ?], Int] = {
+            // sel ---> countVal || fromCard - countVal
+            ???
+          case LeftShift(card, struct, id, repair) => ???
+          case Union(card, lBranch, rBranch) => {
+            val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            lBranch.cata(interpret(κ(card), compile)) + rBranch.cata(interpret(κ(card), compile))
+          }
+          case Unreferenced() => 1
+        }
+      }
+    implicit def projectBucket[T[_[_]] : RecursiveT: ShowT]: Cardinality[ProjectBucket[T, ?]] =
+      new Cardinality[ProjectBucket[T, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ProjectBucket[T, ?], Int] = κ(0)
+      }
+
+    implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cardinality[EquiJoin[T, ?]] =
+      new Cardinality[EquiJoin[T, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ EquiJoin[T, ?], Int] = {
+          case EquiJoin(card, lBranch, rBranch, _, _, _, _) =>
+            val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            lBranch.cata(interpret(κ(card), compile)) * rBranch.cata(interpret(κ(card), compile))
+        }
+      }
+
+    implicit def thetaJoin[T[_[_]] : RecursiveT : ShowT]: Cardinality[ThetaJoin[T, ?]] =
+      new Cardinality[ThetaJoin[T, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ThetaJoin[T, ?], Int] = {
+          case ThetaJoin(card, lBranch, rBranch, _, _, _) =>
+            val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            lBranch.cata(interpret(κ(card), compile)) * rBranch.cata(interpret(κ(card), compile))
+        }
+      }
+
+    implicit def deadEnd: Cardinality[Const[DeadEnd, ?]] =
+      new Cardinality[Const[DeadEnd, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[Const[DeadEnd, ?], Int] = κ(1)
+      }
+
+    implicit def coproduct[F[_], G[_]](
+      implicit F: Cardinality[F], G: Cardinality[G]):
+        Cardinality[Coproduct[F, G, ?]] =
+      new Cardinality[Coproduct[F, G, ?]] {
+        def calculate(pathCard: APath => Int): Algebra[Coproduct[F, G, ?], Int] =
+          _.run.fold(F.calculate(pathCard), G.calculate(pathCard))
+      }
+  }
+
+  object Cost {
+    implicit def deadEnd: Cost[Const[DeadEnd, ?]] = ???
+    implicit def read[A]: Cost[Const[Read[A], ?]] =
+      new Cost[Const[Read[A], ?]] {
+        def evaluate: GAlgebra[(Int, ?), Const[Read[A], ?], Int] =
+          (qs: Const[Read[A], (Int, Int)]) => ???
+      }
+    implicit def shiftedRead[A]: Cost[Const[ShiftedRead[A], ?]] =
+      new Cost[Const[ShiftedRead[A], ?]] {
+        def evaluate: GAlgebra[(Int, ?), Const[ShiftedRead[A], ?], Int] =
+          (qs: Const[ShiftedRead[A], (Int, Int)]) => ???
+      }
+    implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cost[QScriptCore[T, ?]] =
+      new Cost[QScriptCore[T, ?]] {
+        def evaluate: GAlgebra[(Int, ?), QScriptCore[T, ?], Int] = {
+          case qscript.Map((card, cost), f) => ???
+          case Reduce((card, cost), bucket, reducers, repair) => ???
+          case Sort((card, cost), bucket, orders) => ???
+          case Filter((card, cost), f) => ???
+          case Subset((card, cost), from, sel, count) => ???
+          case LeftShift((card, cost), struct, id, repair) => ???
+          case Union((card, cost), lBranch, rBranch) => ???
+          case Unreferenced() => ???
+        }
+
+      }
+    implicit def projectBucket[T[_[_]]]: Cost[ProjectBucket[T, ?]] = ???
+    implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cost[EquiJoin[T, ?]] =
+      new Cost[EquiJoin[T, ?]] {
+        def evaluate: GAlgebra[(Int, ?), EquiJoin[T, ?], Int] = {
           case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) => ???
         }
       }
-  implicit def thetaJoin[T[_[_]]]: Cardinality[ThetaJoin[T, ?]] = ???
-  implicit def deadEnd: Cardinality[Const[DeadEnd, ?]] = ???
+    implicit def thetaJoin[T[_[_]]]: Cost[ThetaJoin[T, ?]] = ???
 
-  implicit def coproduct[F[_], G[_]](
-    implicit F: Cardinality[F], G: Cardinality[G]):
-      Cardinality[Coproduct[F, G, ?]] =
-    new Cardinality[Coproduct[F, G, ?]] {
-      def calculate(pathCard: APath => Int): Algebra[Coproduct[F, G, ?], Int] =
-        _.run.fold(F.calculate(pathCard), G.calculate(pathCard))
-    }
-}
-
-object Cost {
-  implicit def deadEnd: Cost[Const[DeadEnd, ?]] = ???
-  implicit def read[A]: Cost[Const[Read[A], ?]] =
-    new Cost[Const[Read[A], ?]] {
-      def evaluate: GAlgebra[(Int, ?), Const[Read[A], ?], Int] =
-        (qs: Const[Read[A], (Int, Int)]) => ???
-    }
-  implicit def shiftedRead[A]: Cost[Const[ShiftedRead[A], ?]] =
-    new Cost[Const[ShiftedRead[A], ?]] {
-      def evaluate: GAlgebra[(Int, ?), Const[ShiftedRead[A], ?], Int] =
-        (qs: Const[ShiftedRead[A], (Int, Int)]) => ???
-    }
-  implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cost[QScriptCore[T, ?]] =
-    new Cost[QScriptCore[T, ?]] {
-      def evaluate: GAlgebra[(Int, ?), QScriptCore[T, ?], Int] = {
-        case qscript.Map((card, cost), f) => ???
-        case Reduce((card, cost), bucket, reducers, repair) => ???
-        case Sort((card, cost), bucket, orders) => ???
-        case Filter((card, cost), f) => ???
-        case Subset((card, cost), from, sel, count) => ???
-        case LeftShift((card, cost), struct, id, repair) => ???
-        case Union((card, cost), lBranch, rBranch) => ???
-        case Unreferenced() => ???
-      }
-
-    }
-  implicit def projectBucket[T[_[_]]]: Cost[ProjectBucket[T, ?]] = ???
-  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cost[EquiJoin[T, ?]] =
-    new Cost[EquiJoin[T, ?]] {
-      def evaluate: GAlgebra[(Int, ?), EquiJoin[T, ?], Int] = {
-          case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) => ???
-        }
-      }
-  implicit def thetaJoin[T[_[_]]]: Cost[ThetaJoin[T, ?]] = ???
+  }
 
 }
-
