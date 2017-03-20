@@ -86,7 +86,7 @@ package object qanalysis {
 
             // sel ---> countVal || fromCard - countVal
             ???
-          case LeftShift(card, struct, id, repair) => ???
+          case LeftShift(card, struct, id, repair) => card * 10
           case Union(card, lBranch, rBranch) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
             lBranch.cata(interpret(κ(card), compile)) + rBranch.cata(interpret(κ(card), compile))

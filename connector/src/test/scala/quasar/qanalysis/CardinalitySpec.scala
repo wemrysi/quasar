@@ -123,7 +123,12 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           * For now the x10 approach was proposed as a value.
           */
         "returns cardinality of 10 x cardinality of already processed part of qscript" in {
-          pending
+          val cardinality = 60
+          val func: FreeMap =
+            Free.roll(MapFuncs.Eq(ProjectFieldR(HoleF, StrLit("field")), StrLit("value")))
+          val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
+          val leftShift = LeftShift(cardinality, func, IdOnly, joinFunc)
+          compile(leftShift) must_== cardinality * 10
         }
       }
       "Union" should {
