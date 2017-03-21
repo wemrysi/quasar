@@ -77,9 +77,25 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           compile(map) must_== cardinality
         }
       }
+      /**
+        *  Cardinality depends on how many buckets there are created. If it is Constant
+        *  then cardinality == 1 otherwise it is something in range [0, card]. Middle
+        *  value is chosen however same as with Filter we might consider returning 
+        *  a Tuple2[Int, Int] as a range of values instead of Int
+        */
       "Reduce" should {
-        "returns cardinality of 1" in {
-          pending
+        "returns cardinality of 1 when bucket is Const" in {
+          val bucket: FreeMap = Free.liftF(MapFunc.EmptyArray.apply)
+          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+          val reduce = Reduce(100, bucket, List.empty, repair)
+          compile(reduce) must_== 1
+        }
+        "returns cardinality of half fo already processed part of qscript" in {
+          val cardinality = 100
+          val bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+          val reduce = Reduce(cardinality, bucket, List.empty, repair)
+          compile(reduce) must_== cardinality / 2
         }
       }
       "Sort" should {

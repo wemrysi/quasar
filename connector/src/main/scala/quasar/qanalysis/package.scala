@@ -77,7 +77,11 @@ package object qanalysis {
       new Cardinality[QScriptCore[T, ?]] {
         def calculate(pathCard: APath => Int): Algebra[QScriptCore[T, ?], Int] = {
           case qscript.Map(card, f) => card
-          case Reduce(card, bucket, reducers, repair) => 1
+          case Reduce(card, bucket, reducers, repair) =>
+            bucket.fold(κ(card / 2), {
+              case MapFuncs.Constant(v) => 1
+              case _ => card / 2
+            })
           case Sort(card, bucket, orders) => card
           case Filter(card, f) => card / 2
           case Subset(card, from, sel, count) =>
