@@ -43,6 +43,8 @@ package object pathy {
   implicit def liftDirName(x: DirName): PathSegment = x.left
   implicit def liftFileName(x: FileName): PathSegment = x.right
 
+  def stringValue(seg: PathSegment) = seg.fold(_.value, _.value)
+
   def pathName(p: APath): Option[PathSegment] =
     refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
 

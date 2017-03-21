@@ -67,6 +67,8 @@ final class MountRequestHandler[F[_], S[_]](
 
         case MountFileSystem(d, typ, uri) =>
           fsm.mount[T](d, typ, uri)
+
+        case MountModule(d, s) => ().right.point[Free[T, ?]]
       })
 
     (handleMount *> updateHierarchy[T].liftM[MntErrT]).run

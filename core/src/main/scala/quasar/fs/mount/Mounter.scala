@@ -118,6 +118,9 @@ object Mounter {
       case MountFileSystem(loc, typ, uri) =>
         handleMount(MountRequest.mountFileSystem(loc, typ, uri)).run
 
+      case MountModule(loc, statements) =>
+        handleMount(MountRequest.mountModule(loc, statements)).run
+
       case Unmount(path) =>
         handleUnmount(path)
           .flatMapF(_ =>
@@ -195,6 +198,8 @@ object Mounter {
     refineType(path).fold(
       d => fileSystemConfig.getOption(cfg) map { case (t, u) =>
         MountRequest.mountFileSystem(d, t, u)
+      } orElse {
+        moduleConfig.getOption(cfg) map (MountRequest.mountModule(d, _))
       },
       f => viewConfig.getOption(cfg) map { case (q, vs) =>
         MountRequest.mountView(f, q, vs)
