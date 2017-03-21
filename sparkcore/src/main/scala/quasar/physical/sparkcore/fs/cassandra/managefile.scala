@@ -43,7 +43,7 @@ object managefile {
     s1: CassandraDDL.Ops[S]
   ): ManageFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
-  
+
   def interpret[S[_]](implicit
     s0: Read.Ops[SparkContext, S],
     s1: CassandraDDL.Ops[S]
@@ -70,12 +70,20 @@ object managefile {
       f => cass.tableExists(keyspace(fileParent(f)), tableName(f))
     )
 
-  def moveFile[S[_]](sf: AFile, df: AFile)(implicit 
-    read: Read.Ops[SparkContext, S]
+  def moveFile[S[_]](sf: AFile, df: AFile)(implicit
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
     ): Free[S, Unit] = {
-    read.asks { implicit sc =>
-      moveTable(sf, df)
-    }
+    val dks = keyspace(fileParent(df))
+    val dft = tableName(df)
+    for {
+      keyspaceExists <- cass.keyspaceExists(dks)
+      _ <- if (!keyspaceExists) cass.createKeyspace(dks) else Free.pure[S, Unit](())
+      tableExists <- cass.tableExists(dks, dft)
+      _ <- if(tableExists) cass.dropTable(dks, dft) else Free.pure[S, Unit](())
+      _ <- cass.moveTable(keyspace(fileParent(sf)), tableName(sf), dks, dft)
+      r <- cass.dropTable(keyspace(fileParent(sf)), tableName(sf))
+    } yield (r)
   }
 
   private def moveTable(sf: AFile, df: AFile)(implicit sc: SparkContext) = {
@@ -95,8 +103,9 @@ object managefile {
     }
   }
 
-  def moveDir[S[_]](sd: ADir, dd: ADir)(implicit 
-    read: Read.Ops[SparkContext, S]
+  def moveDir[S[_]](sd: ADir, dd: ADir)(implicit
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
     ): Free[S, Unit] = {
     read.asks { implicit sc =>
       val srcTables = sc.cassandraTable[String]("system_schema", "tables")

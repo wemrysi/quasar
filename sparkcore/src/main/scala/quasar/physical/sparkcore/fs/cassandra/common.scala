@@ -22,6 +22,7 @@ import quasar.contrib.pathy._
 import pathy.Path._
 import com.datastax.driver.core.Session
 import com.datastax.spark.connector.cql.CassandraConnector
+import com.datastax.spark.connector._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import org.apache.spark.SparkContext
@@ -35,6 +36,8 @@ final case class TableExists(keyspace: String, table: String) extends CassandraD
 final case class DropTable(keyspace: String, table: String) extends CassandraDDL[Unit]
 final case class CreateTable(keyspace: String, table: String) extends CassandraDDL[Unit]
 
+final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTable: String) extends CassandraDDL[Unit]
+
 // Functor[Cassandraddl]
 
 object CassandraDDL {
@@ -47,6 +50,7 @@ object CassandraDDL {
     def dropTable(keyspace: String, table: String): Free[S, Unit] = Free.liftF(s0.inj(DropTable(keyspace, table)))
     def createTable(keyspace: String, table: String): Free[S, Unit] = Free.liftF(s0.inj(CreateTable(keyspace, table)))
     def createKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(CreateKeyspace(keyspace)))
+    def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] = Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
   }
 
   object Ops {
@@ -70,6 +74,8 @@ object CassandraDDL {
           createTable(keyspace, table)
         case CreateKeyspace(keyspace) =>
           createKeyspace(keyspace)
+        case MoveTable(fromK, fromT, toK, toT) =>
+          moveTable(fromK, fromT, toK, toT)
       }
   }
 
@@ -107,6 +113,11 @@ object CassandraDDL {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       val _ = common.createKeyspace(keyspace)
     }
+  }
+
+  def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = Task.delay {
+    val rdd = sc.cassandraTable(fromK, fromT)
+    rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = toK, tableName = toT))
   }
 
 }
