@@ -123,35 +123,41 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         }
       }
       "Subset" should {
-        "returns cardinality equal to count if selection is Take" in {
+        "returns cardinality equal to count if sel is Take & count is constant" in {
           val count = 20
           val cardinality = 50
           def fromQS: FreeQS = Free.point(SrcHole)
           def countQS: FreeQS = constFreeQS(count)
 
           val take = quasar.qscript.Subset(cardinality, fromQS, Take, countQS)
-          // compile(take) must_== count
-          pending
+          compile(take) must_== count
         }
-        "returns cardinality equal to count if selection is Sample" in {
+        "returns cardinality equal to count if sel is Sample & count is constant" in {
           val count = 20
           val cardinality = 50
           def fromQS: FreeQS = Free.point(SrcHole)
           def countQS: FreeQS = constFreeQS(count)
 
           val take = quasar.qscript.Subset(cardinality, fromQS, Sample, countQS)
-          // compile(take) must_== count
-          pending
+          compile(take) must_== count
         }
-        "returns cardinality equal to (card - count) if selection is Drop" in {
+        "returns cardinality equal to (card - count) if sel is Drop & count is constant" in {
           val count = 20
           val cardinality = 50
           def fromQS: FreeQS = Free.point(SrcHole)
           def countQS: FreeQS = constFreeQS(count)
 
           val take = quasar.qscript.Subset(cardinality, fromQS, Drop, countQS)
-          // compile(take) must_== cardinality - count
-          pending
+          compile(take) must_== cardinality - count
+        }
+        "returns cardinality equal to card / 2 regardles of sel if count is NOT constant" in {
+          val cardinality = 50
+          def fromQS: FreeQS = Free.point(SrcHole)
+          def countQS: FreeQS = Free.point(SrcHole)
+
+          compile(quasar.qscript.Subset(cardinality, fromQS, Take, countQS)) must_== cardinality / 2
+          compile(quasar.qscript.Subset(cardinality, fromQS, Sample, countQS)) must_== cardinality / 2
+          compile(quasar.qscript.Subset(cardinality, fromQS, Drop, countQS)) must_== cardinality / 2
         }
       }
       "LeftShift" should {

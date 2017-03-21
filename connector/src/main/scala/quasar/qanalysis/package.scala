@@ -75,6 +75,9 @@ package object qanalysis {
       }
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
       new Cardinality[QScriptCore[T, ?]] {
+
+        val I = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
+
         def calculate(pathCard: APath => Int): Algebra[QScriptCore[T, ?], Int] = {
           case qscript.Map(card, f) => card
           case Reduce(card, bucket, reducers, repair) =>
@@ -84,10 +87,17 @@ package object qanalysis {
             })
           case Sort(card, bucket, orders) => card
           case Filter(card, f) => card / 2
-          case Subset(card, from, sel, count) =>
+          case Subset(card, from, sel, count) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-            // from.cata(interpret(κ(card), compile))
-            0
+            def c = count.fold(κ(card / 2), {
+              case I(qscript.Map(_, MapFuncs.IntLit(v))) => v.toInt
+              case _ => card / 2
+            })
+            sel match {
+              case Drop => card - c
+              case _ => c
+            }
+          }
           case LeftShift(card, struct, id, repair) => card * 10
           case Union(card, lBranch, rBranch) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
