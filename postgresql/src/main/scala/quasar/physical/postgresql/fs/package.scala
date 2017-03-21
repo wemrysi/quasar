@@ -16,7 +16,7 @@
 
 package quasar.physical.postgresql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle

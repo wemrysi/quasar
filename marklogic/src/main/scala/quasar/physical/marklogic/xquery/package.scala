@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 import quasar.physical.marklogic.validation._

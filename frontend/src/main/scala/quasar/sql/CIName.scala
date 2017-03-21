@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.sql
 
-import quasar.Predef._
-import quasar.{RenderTree, Terminal}
+import slamdata.Predef._
 
+import scala.Predef.implicitly
+
+import argonaut._
 import scalaz._, Scalaz._
 
-sealed abstract class JoinType
-final case object Inner extends JoinType
-final case object FullOuter extends JoinType
-final case object LeftOuter extends JoinType
-final case object RightOuter extends JoinType
+final case class CIName(value: String) {
+  override def equals(other: Any) = other match {
+    case CIName(otherValue) => otherValue.toLowerCase === value.toLowerCase
+    case _                  => false
+  }
 
-object JoinType {
-  implicit val equal: Equal[JoinType] = Equal.equalRef
-  implicit val show: Show[JoinType] = Show.showFromToString
-  implicit val renderTree: RenderTree[JoinType] =
-    RenderTree.make(t => Terminal(List(t.shows, "JoinType"), None))
+  override def hashCode: Int = value.toLowerCase.hashCode
+}
+
+object CIName {
+  implicit val equal: Equal[CIName] = Equal.equalA
+  implicit val shows: Show[CIName] = Show.shows(s => s.value)
+  implicit val codec: EncodeJson[CIName] = implicitly[EncodeJson[String]].contramap(_.value)
 }

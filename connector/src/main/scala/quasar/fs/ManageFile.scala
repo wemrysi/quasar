@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
@@ -27,10 +27,10 @@ import monocle.Prism
 import pathy.{Path => PPath}, PPath._
 import scalaz._, Scalaz._
 
-sealed trait ManageFile[A]
+sealed abstract class ManageFile[A]
 
 object ManageFile {
-  sealed trait MoveSemantics
+  sealed abstract class MoveSemantics
 
   /** NB: Certain write operations' consistency is affected by faithful support
     *     of these semantics, thus their consistency/atomicity is as good as the
@@ -72,7 +72,7 @@ object ManageFile {
     implicit val show: Show[MoveSemantics] = Show.showFromToString
   }
 
-  sealed trait MoveScenario {
+  sealed abstract class MoveScenario {
     import MoveScenario._
 
     def fold[X](
@@ -114,7 +114,7 @@ object ManageFile {
   final class Ops[S[_]](implicit S: ManageFile :<: S)
     extends LiftedOps[ManageFile, S] {
 
-    type M[A] = FileSystemErrT[F, A]
+    type M[A] = FileSystemErrT[FreeS, A]
 
     /** Request the given move scenario be applied to the file system, using the
       * given semantics.

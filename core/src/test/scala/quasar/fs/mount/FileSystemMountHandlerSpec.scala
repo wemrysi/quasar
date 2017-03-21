@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.String
+import slamdata.Predef.String
 import quasar.contrib.pathy.{ADir}
 import quasar.effect._
 import quasar.fp.liftMT
@@ -24,7 +24,6 @@ import quasar.fp.free, free._
 import quasar.fs.{FileSystem, FileSystemType, PathError}
 
 import monocle.function.Field1
-import monocle.std.tuple2._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 

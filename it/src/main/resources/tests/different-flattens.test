@@ -9,6 +9,7 @@
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
+    "NB": "Skipped for all connectors due to QScript provenance bug #1951.",
     "data": "user_comments.data",
     "query": "select profile from user_comments where (
                 userId                 LIKE \"%Dr%\" OR

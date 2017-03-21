@@ -16,8 +16,9 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Planner._
+import quasar.contrib.matryoshka._
 import quasar.fp.{ ExternallyManaged => EM, _ }
 
 import matryoshka._
@@ -26,7 +27,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
+class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
   case class ZipperSides(
     lSide: FreeMap,
     rSide: FreeMap)

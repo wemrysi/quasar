@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.connector.EnvironmentError
 import quasar.effect._

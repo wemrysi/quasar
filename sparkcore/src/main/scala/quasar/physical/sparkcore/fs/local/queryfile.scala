@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs.local
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fs.FileSystemError
 import quasar.fs.PathError._
@@ -45,7 +45,7 @@ object queryfile {
     s0: Task :<: S
     ): Free[S, Unit] = lift(Task.delay {
     val ioFile = new File(posixCodec.printPath(out))
-    val pw = new PrintWriter(new FileOutputStream(ioFile, true))
+    val pw = new PrintWriter(new FileOutputStream(ioFile, false))
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
     pw.close()
   }).into[S]

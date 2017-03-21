@@ -16,8 +16,10 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, NonTerminal, RenderTreeT}, RenderTree.ops._
+import quasar.common.JoinType
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -45,7 +47,7 @@ import scalaz._, Scalaz._
   combine: JoinFunc[T])
 
 object ThetaJoin {
-  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ThetaJoin[T, ?]] =
+  implicit def equal[T[_[_]]: OrderT: EqualT]: Delay[Equal, ThetaJoin[T, ?]] =
     new Delay[Equal, ThetaJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -91,7 +93,7 @@ object ThetaJoin {
         }
       }
 
-  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]
+  implicit def mergeable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
       : Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]

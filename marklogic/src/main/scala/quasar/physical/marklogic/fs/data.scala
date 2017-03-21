@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.optics._
@@ -76,7 +76,7 @@ object data {
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => for {
-          nc <- NCName(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
+          nc <- NCName.fromString(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
           el <- loop(QName.local(nc))(v).disjunction
         } yield el
       }

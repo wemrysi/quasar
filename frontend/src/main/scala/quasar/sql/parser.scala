@@ -16,7 +16,8 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.common.JoinType
 import quasar.fp.ski._
 import quasar.fp._
 
@@ -29,7 +30,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-sealed trait DerefType[T[_[_]]] extends Product with Serializable
+sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
 final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
@@ -127,7 +128,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     elem(
       "keyword '" + name + "'",
       {
-        case lexical.Identifier(chars) => chars.toLowerCase == name
+        case lexical.Identifier(chars) => chars.toLowerCase ≟ name
         case _                         => false
       }) ^^ (κ(name))
 
@@ -141,12 +142,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     if (lexical.delimiters.contains(op))
       elem(
         "operator '" + op + "'",
-        { case lexical.Keyword(chars) => chars == op; case _ => false }) ^^ (_.chars)
+        { case lexical.Keyword(chars) => chars ≟ op; case _ => false }) ^^ (_.chars)
     else failure("You are trying to parse \""+op+"\" as an operator, but it is not contained in the operators list")
 
   def let_expr: Parser[T[Sql]] =
     ident ~ (op(":=") ~> expr) ~ (op(";") ~> expr) ^^ {
-      case i ~ e ~ b => let(i, e, b).embed
+      case i ~ e ~ b => let(CIName(i), e, b).embed
     } | query_expr
 
   def select_expr: Parser[T[Sql]] =
@@ -227,14 +228,14 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def between_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("between") ~ default_expr ~ keyword("and") ~ default_expr ^^ {
       case kw ~ lower ~ _ ~ upper =>
-        lhs => invokeFunction(kw, List(lhs, lower, upper)).embed
+        lhs => invokeFunction(CIName(kw), List(lhs, lower, upper)).embed
     }
 
   def in_suffix: Parser[T[Sql] => T[Sql]] =
     keyword("in") ~ default_expr ^^ { case _ ~ a => In(_, a).embed }
 
   private def LIKE(l: T[Sql], r: T[Sql], esc: Option[T[Sql]]) =
-    invokeFunction("like",
+    invokeFunction(CIName("like"),
       List(l, r, esc.getOrElse(stringLiteral[T[Sql]]("\\").embed))).embed
 
   def like_suffix: Parser[T[Sql] => T[Sql]] =
@@ -268,16 +269,16 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def default_expr: Parser[T[Sql]] =
     concat_expr * (
       op("~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-        invokeFunction("search",
+        invokeFunction(CIName("search"),
           List(l, r, boolLiteral[T[Sql]](false).embed)).embed) |
         op("~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          invokeFunction("search",
+          invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed) |
         op("!~") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](false).embed)).embed).embed) |
         op("!~*") ^^^ ((l: T[Sql], r: T[Sql]) =>
-          Not(invokeFunction("search",
+          Not(invokeFunction(CIName("search"),
             List(l, r, boolLiteral[T[Sql]](true).embed)).embed).embed) |
         op("~~") ^^^ ((l: T[Sql], r: T[Sql]) => LIKE(l, r, None)) |
         op("!~~") ^^^ ((l: T[Sql], r: T[Sql]) => Not(LIKE(l, r, None)).embed))
@@ -340,7 +341,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def paren_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
 
   def function_expr: Parser[T[Sql]] =
-    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(a, xs).embed }
+    ident ~ paren_list ^^ { case a ~ xs => invokeFunction(CIName(a), xs).embed }
 
   def primary_expr: Parser[T[Sql]] =
     case_expr |
@@ -392,7 +393,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def std_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
     opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ expr ^^
-      { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(InnerJoin), e) }
+      { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(JoinType.Inner), e) }
 
   def cross_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
     keyword("cross") ~> keyword("join") ~> simple_relation ^^ {
@@ -406,10 +407,10 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def join_type: Parser[JoinType] =
     (keyword("left") | keyword("right") | keyword("full")) <~ opt(keyword("outer")) ^^ {
-      case "left"  => LeftJoin
-      case "right" => RightJoin
-      case "full"  => FullJoin
-    } | keyword("inner") ^^^ (InnerJoin)
+      case "left"  => JoinType.LeftOuter
+      case "right" => JoinType.RightOuter
+      case "full"  => JoinType.FullOuter
+    } | keyword("inner") ^^^ (JoinType.Inner)
 
   def simple_relation: Parser[SqlRelation[T[Sql]]] =
     ident ~ opt(keyword("as") ~> ident) ^^ {

@@ -16,13 +16,14 @@
 
 package quasar.contrib
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski._
 
 import java.net.{URLDecoder, URLEncoder}
 
 import argonaut._
 import _root_.pathy.Path, Path._
+import _root_.pathy.argonaut._
 import _root_.scalaz._, Scalaz._
 
 package object pathy {
@@ -45,17 +46,14 @@ package object pathy {
   def pathName(p: APath): Option[PathSegment] =
     refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
 
-  implicit val DirNameOrder: Order[DirName] = Order.orderBy(_.value)
-  implicit val FileNameOrder: Order[FileName] = Order.orderBy(_.value)
-
   object APath {
+    import PosixCodecJson._
 
     implicit val aPathDecodeJson: DecodeJson[APath] =
-      DecodeJson.of[String] flatMap (s => DecodeJson(hc =>
-        posixCodec.parseAbsFile(s).orElse(posixCodec.parseAbsDir(s))
-          .map(sandboxAbs)
-          .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
+      (absDirDecodeJson.widen[APath] ||| absFileDecodeJson).setName("APath")
 
+    implicit val aPathEncodeJson: EncodeJson[APath] =
+      pathEncodeJson
   }
 
   /** PathCodec with URI-encoded segments. */
@@ -81,14 +79,14 @@ package object pathy {
   def rebaseA(onto: ADir): AbsPath ~> AbsPath =
     new (AbsPath ~> AbsPath) {
       def apply[T](apath: AbsPath[T]) =
-        apath.relativeTo(rootDir[Sandboxed]).fold(apath)(onto </> _)
+        apath.relativeTo(root).fold(apath)(onto </> _)
     }
 
   /** Removes the given prefix from an absolute path, if present. */
   def stripPrefixA(prefix: ADir): AbsPath ~> AbsPath =
     new (AbsPath ~> AbsPath) {
       def apply[T](apath: AbsPath[T]) =
-        apath.relativeTo(prefix).fold(apath)(rootDir </> _)
+        apath.relativeTo(prefix).fold(apath)(root </> _)
     }
 
   /** Returns the first named segment of the given path. */
@@ -113,14 +111,14 @@ package object pathy {
     */
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def sandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
-    rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
+    root </> apath.relativeTo(root).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(
-      abs => (abs relativeTo rootDir).map(p => (rootDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]),
-      rel => (rel relativeTo currentDir).map(p => (currentDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]))
+      abs => (abs relativeTo root).map(p => (root </> p).asInstanceOf[Path[A,T,Sandboxed]]),
+      rel => (rel relativeTo  cur).map(p => (cur  </> p).asInstanceOf[Path[A,T,Sandboxed]]))
 
   // TODO[pathy]: Offer clean API in pathy to do this
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -131,4 +129,9 @@ package object pathy {
 
   def mkAbsolute[T,S](baseDir: AbsDir[S], path: Path[_,T,S]): Path[Abs,T,S] =
     refineTypeAbs(path).fold(ι, baseDir </> _)
+
+  ////
+
+  private val root = rootDir[Sandboxed]
+  private val cur  = currentDir[Sandboxed]
 }

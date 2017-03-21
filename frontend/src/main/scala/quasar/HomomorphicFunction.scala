@@ -14,20 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 
-import scalaz._
-
-sealed abstract class JoinType(val sql: String) extends Product with Serializable
-
-final case object LeftJoin extends JoinType("left join")
-final case object RightJoin extends JoinType("right join")
-final case object InnerJoin extends JoinType("inner join")
-final case object FullJoin extends JoinType("full join")
-
-object JoinType {
-  implicit val equal: Equal[JoinType] = Equal.equalRef
-  implicit val show: Show[JoinType] = Show.showFromToString
+trait HomomorphicFunction[-A, +B] { self =>
+  def arity: Int
+  def apply(args: List[A]): Option[B]
+  def andThen[C](f: B => C) = new HomomorphicFunction[A, C] {
+    def arity = self.arity
+    def apply(args: List[A]) = self.apply(args).map(f)
+  }
 }

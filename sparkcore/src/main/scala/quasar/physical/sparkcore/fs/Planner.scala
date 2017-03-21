@@ -16,9 +16,9 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, quasar.Planner._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
@@ -227,6 +227,11 @@ object Planner {
               : List[Data] =
             Zip[List].zipWith(f,(a.zip(b)))(_.tupled(_))
 
+          val avgReducers = reducers.map {
+            case Avg(_) => true
+            case _  => false
+          }
+
           StateT((sc: SparkContext) =>
             EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
               case (partitioner, trans, repair) =>
@@ -234,8 +239,8 @@ object Planner {
                   .reduceByKey(merge(_,_, reducersFuncs))
                   .map {
                   case (k, vs) =>
-                    val v = Zip[List].zipWith(vs, reducers) {
-                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
+                    val v = Zip[List].zipWith(vs, avgReducers) {
+                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), true) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
                     repair(k, v)
@@ -339,16 +344,16 @@ object Planner {
             val krRdd = rRdd.map(d => (rk(d), d))
 
             jt match {
-              case Inner => klRdd.join(krRdd).map {
+              case JoinType.Inner => klRdd.join(krRdd).map {
                 case (_, (l, r)) => merge(l, r)
               }
-              case LeftOuter => klRdd.leftOuterJoin(krRdd).map {
+              case JoinType.LeftOuter => klRdd.leftOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
               }
-              case RightOuter => klRdd.rightOuterJoin(krRdd).map {
+              case JoinType.RightOuter => klRdd.rightOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
               }
-              case FullOuter => klRdd.fullOuterJoin(krRdd).map {
+              case JoinType.FullOuter => klRdd.fullOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
               }
             }

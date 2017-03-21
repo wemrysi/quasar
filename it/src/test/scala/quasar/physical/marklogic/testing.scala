@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.connector.EnvironmentError
 import quasar.contrib.scalaz.eitherT._

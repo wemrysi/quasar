@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.catchable._
 import quasar.effect.Capture
@@ -46,7 +46,7 @@ package object xcc {
   }
 
   type ContentUri = String Refined Uri
-  val  ContentUri = Prism((s: String) => refineV[Uri](s).right.toOption)(_.get)
+  val  ContentUri = Prism((s: String) => refineV[Uri](s).right.toOption)(_.value)
 
   /** Returns a natural transformation that safely runs a `Session` reader,
     * ensuring the provided sessions are properly closed after use.

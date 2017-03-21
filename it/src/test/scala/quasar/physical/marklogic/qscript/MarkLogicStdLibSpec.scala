@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, TestConfig}
 import quasar.contrib.scalacheck.gen
 import quasar.contrib.scalaz.eitherT._

@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{ Data, Type }
 import quasar.common.SortDir
 import quasar.frontend.logicalplan.LogicalPlan
@@ -1133,6 +1133,17 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
+    "compile order by reusing selected field" in {
+      testLogicalPlanCompile(
+        "select name from person order by name",
+        lpf.let('__tmp0,
+          lpf.invoke1(Squash,
+            lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("name")))),
+          lpf.sort(
+            lpf.free('__tmp0),
+            (lpf.free('__tmp0), SortDir.asc).wrapNel)))
+    }
+
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
         "select name from person where gender = \"male\" order by name, height",
@@ -1766,6 +1777,36 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
+  }
+
+  "compile expression and functions" >> {
+    val expr = parseAndAnnotateUnsafe("select FLOOR(10.4)")
+    val funcs = List(FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")))
+    val expected =
+      lpf.invoke2(Subtract,
+        lpf.constant(Data.Dec(10.4)),
+        lpf.invoke2(Modulo,
+          lpf.constant(Data.Dec(10.4)),
+          lpf.constant(Data.Int(1))))
+    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+  }
+
+  "compile expression and functions that depend on themselves" >> {
+    val expr = parseAndAnnotateUnsafe("select ROUND(10.4)")
+    val funcs = List(
+      FunctionDecl(CIName("floor"), List(CIName("num")), parseAndAnnotateUnsafe(":num - (:num % 1)")),
+      FunctionDecl(CIName("round"), List(CIName("num")), parseAndAnnotateUnsafe("FLOOR(:num + 0.5)")))
+    val floorArgumentLP =
+      lpf.invoke2(Add,
+        lpf.constant(Data.Dec(10.4)),
+        lpf.constant(Data.Dec(0.5)))
+    val expected =
+      lpf.invoke2(Subtract,
+        floorArgumentLP,
+        lpf.invoke2(Modulo,
+          floorArgumentLP,
+          lpf.constant(Data.Int(1))))
+    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
   }
 
   "constant folding" >> {

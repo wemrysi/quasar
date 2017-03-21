@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.BackendCapability
 import quasar.contrib.pathy._
 import quasar.fp._
@@ -66,7 +66,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
         r.run.map { xs =>
           D.right
             .composeOptional(vectorFirst[FileSystemError])
-            .composePrism(unknownWriteHandle) isMatching (xs) must beTrue
+            .composePrism(unknownWriteHandle) nonEmpty (xs) must beTrue
         }
       }
 

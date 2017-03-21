@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
@@ -155,8 +155,10 @@ private final class QueryFileInterpreter[C](
                      .run.run(CollectionName("tmp.gen_"))
                      .eval(0).run
       out =  Js.Stmts(stmts.toList).pprint(0)
+      // TODO: Extract from QScript once legacy planner goes away.
+      ipt =  lpr.absolutePaths(lp)
       ep  <- EitherT.fromDisjunction[MongoLogWF](
-               r.as(ExecutionPlan(FsType, out)))
+               r.as(ExecutionPlan(FsType, out, ipt)))
       _   <- logProgram(stmts).liftM[FileSystemErrT]
     } yield ep).run.run
 

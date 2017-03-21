@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.numeric.Natural
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.Arbitraries._
@@ -40,7 +40,7 @@ final class AsQNameSpec extends quasar.Qspec {
     }
 
     "prefix numerals" >> prop { n: Natural =>
-      asQName[Result](n.get.toString) must_= \/.right(QName.local(NCName(Refined.unsafeApply(s"_$n"))))
+      asQName[Result](n.value.toString) must_= \/.right(QName.local(NCName(Refined.unsafeApply(s"_$n"))))
     }
 
     "error when string is not a QName" >> {

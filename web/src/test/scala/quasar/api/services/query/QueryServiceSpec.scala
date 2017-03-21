@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api.ApiError
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.PathUtils._

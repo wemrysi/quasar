@@ -17,13 +17,15 @@
 package quasar.physical.mongodb
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+
+import scala.collection.Iterable
 
 import matryoshka._
 import matryoshka.data.Fix

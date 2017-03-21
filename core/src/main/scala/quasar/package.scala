@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.{PhaseResult, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.pathy.ADir
@@ -30,35 +30,37 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Leibniz._
 import scalaz.std.vector._
+import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.nel._
 import scalaz.syntax.writer._
+import scalaz.syntax.traverse._
 
 package object quasar {
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
-      EitherT(r.point[PhaseResultW]) flatMap { a =>
-        (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
-      }
+    EitherT(r.point[PhaseResultW]) flatMap { a =>
+      (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
+    }
 
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
     * typechecked.
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
   def precompile[T: Equal: RenderTree]
-    (query: Fix[Sql], vars: Variables, basePath: ADir)
+    (query: Fix[Sql], vars: Variables, basePath: ADir, scope: List[FunctionDecl[Fix[Sql]]])
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : CompileM[T] = {
-    import SemanticAnalysis.AllPhases
-
+    import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
-      substAst <- phase("Variables Substituted",
-                    Variables.substVars(ast, vars) leftMap (_.wrapNel))
+      substAst <- phase("Variables Substituted", Variables.substVars(ast, vars) leftMap (_.wrapNel))
       absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
-      annTree  <- phase("Annotated Tree", AllPhases(absAst))
-      logical  <- phase("Logical Plan", Compiler.compile[T](annTree) leftMap (_.wrapNel))
+      normed   <- phase("Normalized Projections", normalizeProjections(absAst).right)
+      sortProj <- phase("Sort Keys Projected", projectSortKeys(normed).right)
+      annBlob  <- phase("Annotated Tree", (annotate(sortProj) |@| scope.traverse(_.transformBodyM(annotate[Fix[Sql]])))(Blob(_,_)))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annBlob.expr, annBlob.scope) leftMap (_.wrapNel))
     } yield logical
   }
 
@@ -86,9 +88,9 @@ package object quasar {
     * results, if the query was foldable to a constant.
     */
   def queryPlan(
-    query: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
+    query: Fix[Sql], vars: Variables, basePath: ADir, scope: List[FunctionDecl[Fix[Sql]]], off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LP]] =
-    precompile[Fix[LP]](query, vars, basePath)
+    precompile[Fix[LP]](query, vars, basePath, scope)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 
@@ -96,9 +98,9 @@ package object quasar {
     (lp: T, off: Natural, lim: Option[Positive])
     (implicit T: Corecursive.Aux[T, LP])
       : T = {
-    val skipped = Drop(lp, constant[T](Data.Int(off.get)).embed).embed
+    val skipped = Drop(lp, constant[T](Data.Int(off.value)).embed).embed
     lim.fold(
       skipped)(
-      l => Take(skipped, constant[T](Data.Int(l.get)).embed).embed)
+      l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
   }
 }

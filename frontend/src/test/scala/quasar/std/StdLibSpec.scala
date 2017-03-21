@@ -16,13 +16,14 @@
 
 package quasar.std
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec, Qspec, Type}
 import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
 
 import java.time._
 import java.time.ZoneOffset.UTC
+import scala.collection.Traversable
 import scala.math.abs
 
 import matryoshka.data.Fix
@@ -605,35 +606,189 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "TemporalTrunc" >> {
-        "timestamp" >> prop { (x: Instant, y: TemporalPart) =>
-          val t = x.atZone(UTC)
-
-          truncZonedDateTime(y, t).fold(
+        def truncZonedDateTimeTimestamp(p: TemporalPart, i: Instant): Result =
+          truncZonedDateTime(p, i.atZone(UTC)).fold(
             e => Failure(e.shows),
             tt => unary(
-              TemporalTrunc(y, _).embed,
-              Data.Timestamp(x),
+              TemporalTrunc(p, _).embed,
+              Data.Timestamp(i),
               Data.Timestamp(tt.toInstant)))
+
+        "Q#1966" >>
+          truncZonedDateTimeTimestamp(
+            TemporalPart.Century,
+            Instant.parse("2000-03-01T06:15:45.204Z"))
+
+        "timestamp Century" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Century, x)
         }
 
-        "date" >> prop { (x: LocalDate, y: TemporalPart) =>
-          val t = x.atStartOfDay(UTC)
+        "timestamp Day" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Day, x)
+        }
 
-          truncZonedDateTime(y, t).fold(
+        "timestamp Decade" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Decade, x)
+        }
+
+        "timestamp Hour" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Hour, x)
+        }
+
+        "timestamp Microsecond" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Microsecond, x)
+        }
+
+        "timestamp Millennium" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Millennium, x)
+        }
+
+        "timestamp Millisecond" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Millisecond, x)
+        }
+
+        "timestamp Minute" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Minute, x)
+        }
+
+        "timestamp Month" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Month, x)
+        }
+
+        "timestamp Quarter" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Quarter, x)
+        }
+
+        "timestamp Second" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Second, x)
+        }
+
+        "timestamp Week" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Week, x)
+        }
+
+        "timestamp Year" >> prop { x: Instant =>
+          truncZonedDateTimeTimestamp(TemporalPart.Year, x)
+        }
+
+        def truncZonedDateTimeDate(p: TemporalPart, d: LocalDate): Result =
+          truncZonedDateTime(p, d.atStartOfDay(UTC)).fold(
             e => Failure(e.shows),
             tt => unary(
-              TemporalTrunc(y, _).embed,
-              Data.Date(x),
+              TemporalTrunc(p, _).embed,
+              Data.Date(d),
               Data.Date(tt.toLocalDate)))
+
+        "date Century" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Century, d)
         }
 
-        "time" >> prop { (x: LocalTime, y: TemporalPart) =>
-          truncLocalTime(y, x).fold(
+        "date Day" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Day, d)
+        }
+
+        "date Decade" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Decade, d)
+        }
+
+        "date Hour" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Hour, d)
+        }
+
+        "date Microsecond" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Microsecond, d)
+        }
+
+        "date Millennium" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Millennium, d)
+        }
+
+        "date Millisecond" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Millisecond, d)
+        }
+
+        "date Minute" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Minute, d)
+        }
+
+        "date Month" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Month, d)
+        }
+
+        "date Quarter" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Quarter, d)
+        }
+
+        "date Second" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Second, d)
+        }
+
+        "date Week" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Week, d)
+        }
+
+        "date Year" >> prop { d: LocalDate =>
+          truncZonedDateTimeDate(TemporalPart.Year, d)
+        }
+
+        def truncLocalTimeʹ(p: TemporalPart, t: LocalTime): Result =
+          truncLocalTime(p, t).fold(
             e => Failure(e.shows),
             tt => unary(
-              TemporalTrunc(y, _).embed,
-              Data.Time(x),
+              TemporalTrunc(p, _).embed,
+              Data.Time(t),
               Data.Time(tt)))
+
+        "time Century" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Century, t)
+        }
+
+        "time Day" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Day, t)
+        }
+
+        "time Decade" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Decade, t)
+        }
+
+        "time Hour" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Hour, t)
+        }
+
+        "time Microsecond" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Microsecond, t)
+        }
+
+        "time Millennium" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Millennium, t)
+        }
+
+        "time Millisecond" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Millisecond, t)
+        }
+
+        "time Minute" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Minute, t)
+        }
+
+        "time Month" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Month, t)
+        }
+
+        "time Quarter" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Quarter, t)
+        }
+
+        "time Second" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Second, t)
+        }
+
+        "time Week" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Week, t)
+        }
+
+        "time Year" >> prop { t: LocalTime =>
+          truncLocalTimeʹ(TemporalPart.Year, t)
         }
       }
 

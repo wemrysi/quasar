@@ -16,7 +16,7 @@
 
 package quasar.effect
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.TaskRef
 
 import monocle.Lens
@@ -29,7 +29,7 @@ import scalaz.concurrent.Task
   * @tparam K the type of keys used to index values
   * @tparam V the type of values in the store
   */
-sealed trait KeyValueStore[K, V, A]
+sealed abstract class KeyValueStore[K, V, A]
 
 object KeyValueStore {
   // NB: Switch to cursor style terms for Keys once backing stores exist where all keys won't fit into memory.
@@ -55,16 +55,16 @@ object KeyValueStore {
       * of applying the given function to the value currently associated with
       * the key, returning the second part of the result.
       */
-    def alterS[A](k: K, f: Option[V] => (V, A)): F[A] =
+    def alterS[A](k: K, f: Option[V] => (V, A)): FreeS[A] =
       for {
         cur       <- get(k).run
         (nxt, a0) =  f(cur)
         updated   <- compareAndPut(k, cur, nxt)
-        a         <- if (updated) a0.point[F] else alterS(k, f)
+        a         <- if (updated) a0.point[FreeS] else alterS(k, f)
       } yield a
 
     /** Returns whether a value is associated with the given key. */
-    def contains(k: K): F[Boolean] =
+    def contains(k: K): FreeS[Boolean] =
       get(k).isDefined
 
     /** Associate `update` with the given key if the current value at the key
@@ -72,35 +72,35 @@ object KeyValueStore {
       * expected not to be associated with a value.
       * @return whether the value was updated.
       */
-    def compareAndPut(k: K, expect: Option[V], update: V): F[Boolean] =
+    def compareAndPut(k: K, expect: Option[V], update: V): FreeS[Boolean] =
       lift(CompareAndPut(k, expect, update))
 
     /** Remove any associated with the given key. */
-    def delete(k: K): F[Unit] =
+    def delete(k: K): FreeS[Unit] =
       lift(Delete(k))
 
     /** Returns the current value associated with the given key. */
-    def get(k: K): OptionT[F, V] =
+    def get(k: K): OptionT[FreeS, V] =
       OptionT(lift(Get[K, V](k)))
 
     /** Returns current keys */
-    val keys: F[Vector[K]] =
+    val keys: FreeS[Vector[K]] =
       lift(Keys[K, V]())
 
     /** Moves/renames key */
-    def move(src: K, dst: K): F[Unit] =
+    def move(src: K, dst: K): FreeS[Unit] =
       get(src).flatMapF(delete(src) *> put(dst, _)).run.void
 
     /** Atomically updates the value associated with the given key with the
       * result of applying the given function to the current value, if defined.
       */
-    def modify(k: K, f: V => V): F[Unit] =
+    def modify(k: K, f: V => V): FreeS[Unit] =
       get(k) flatMapF { v =>
-        compareAndPut(k, Some(v), f(v)).ifM(().point[F], modify(k, f))
+        compareAndPut(k, Some(v), f(v)).ifM(().point[FreeS], modify(k, f))
       } getOrElse (())
 
     /** Associate the given value with the given key. */
-    def put(k: K, v: V): F[Unit] =
+    def put(k: K, v: V): FreeS[Unit] =
       lift(Put(k, v))
   }
 

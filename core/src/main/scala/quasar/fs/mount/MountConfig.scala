@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fs.FileSystemType
 import quasar.sql, sql.Sql
@@ -27,7 +27,7 @@ import monocle.Prism
 import scalaz._, Scalaz._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
-sealed trait MountConfig
+sealed abstract class MountConfig
 
 object MountConfig {
   final case class ViewConfig private[mount] (query: Fix[Sql], vars: Variables)

@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.uuid._
@@ -231,7 +231,7 @@ object ops {
     SP: StructuralPlanner[F, FMT]
   ): Process[F, XdmItem] = {
     val query = SP.leftShift(fileRoot[FMT](file)) map { items =>
-      (offset.get + 1, limit.map(_.get.xqy)) match {
+      (offset.value + 1, limit.map(_.value.xqy)) match {
         case (1, None) => items
         case (o, l)    => fn.subsequence(items, o.xqy, l)
       }

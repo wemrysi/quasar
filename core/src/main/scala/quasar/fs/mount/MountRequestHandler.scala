@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{None, Unit}
+import slamdata.Predef._
 import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.FileSystem
@@ -24,7 +24,6 @@ import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
 import monocle.function.Field1
-import monocle.std.tuple3._
 import pathy.Path.fileParent
 import scalaz._, Scalaz._
 
@@ -61,7 +60,7 @@ final class MountRequestHandler[F[_], S[_]](
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
         case MountView(f, qry, vars) =>
-          queryPlan(qry, vars, fileParent(f), 0L, None).run.value
+          queryPlan(qry, vars, fileParent(f), Nil, 0L, None).run.value
             .leftMap(e => invalidConfig(viewConfig(qry, vars), e.map(_.shows)))
             .void.point[Free[T, ?]]
 

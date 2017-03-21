@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 
 import matryoshka._
@@ -138,7 +138,7 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit def pathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
     // NB: the implicit Show instance in scope here ends up being a circular
     // call, so an explicit reference to pathy's Show is needed.
-    make(p => Terminal(List("Path"), pathy.Path.PathShow.shows(p).some))
+    make(p => Terminal(List("Path"), pathy.Path.pathShow.shows(p).some))
 
   implicit def leftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
       RenderTree[(((A, B), C), D)] =

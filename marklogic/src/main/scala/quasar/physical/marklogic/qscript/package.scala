@@ -16,9 +16,9 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz.MonadError_
-import quasar.ejson.{Common, EJson, Str}
+import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
 import quasar.contrib.pathy.{AFile, UriPathCodec}
@@ -46,7 +46,7 @@ package object qscript {
   /** Matches "iterative" FLWOR expressions, those involving at least one `for` clause. */
   object IterativeFlwor {
     def unapply(xqy: XQuery): Option[(NonEmptyList[BindingClause], Option[XQuery], IList[(XQuery, SortDirection)], Boolean, XQuery)] = xqy match {
-      case XQuery.Flwor(clauses, filter, order, isStable, result) if clauses.any(BindingClause.forClause.isMatching) =>
+      case XQuery.Flwor(clauses, filter, order, isStable, result) if clauses.any(BindingClause.forClause.nonEmpty) =>
         Some((clauses, filter, order, isStable, result))
 
       case _ => None
@@ -101,8 +101,8 @@ package object qscript {
       case MapFunc.StaticMap(entries) =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     case Embed(Common(Str(s))) => s.xs.point[F]
-                     case key                   => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
+                     case Embed(MapFunc.EC(Str(s))) => s.xs.point[F]
+                     case key                       => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
                    planMapFunc[T, F, FMT, Hole](_)(κ(src))))
           elts  <- xqyKV.traverse((SP.mkObjectEntry _).tupled)

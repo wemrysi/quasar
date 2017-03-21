@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.couchbase._
 import quasar.physical.couchbase.N1QL._
 import quasar.qscript, qscript.{ReduceFunc, ReduceFuncs => RF}
@@ -39,7 +39,7 @@ final class ReduceFuncPlanner[T[_[_]]: CorecursiveT, F[_]: Monad] extends Planne
     case RF.Min(a1)            => Min(a1)
     case RF.Sum(a1)            => Sum(a1)
     case RF.UnshiftArray(a1)   => ArrAgg(a1)
-    case RF.UnshiftMap(a1, a2) => Obj(Map(a1 -> a2))
+    case RF.UnshiftMap(a1, a2) => Obj(List(a1 -> a2))
   }
 
 }

@@ -16,7 +16,8 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
@@ -32,7 +33,7 @@ import scalaz.{:+: => _, Divide => _, _},
   Leibniz._,
   Scalaz._
 
-class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   def flattenArray[A: Show](array: ConcatArrays[T, FreeMapA[A]]): List[FreeMapA[A]] = {
     def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
       jf.resume match {
@@ -84,8 +85,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       : T[F] => T[G] = {
     _.codyna(
       normalize[G]                                              >>>
-      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism)))  >>>
-      liftFG(injectRepeatedly(C.coalesceSR[G, AFile](idPrism))) >>>
+      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism)))  >>>
+      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, AFile](idPrism))) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
   }
@@ -102,7 +103,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   ): T[F] => T[G] =
     _.codyna(
       normalize[G]                                             >>>
-      liftFG(injectRepeatedly(C.coalesceSR[G, ADir](idPrism))) >>>
+      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
 
@@ -329,17 +330,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case _ => None
   }
 
-  /** Chains multiple transformations together, each of which can fail to change
-    * anything.
-    */
-  def applyTransforms[F[_]]
-    (transform: F[T[F]] => Option[F[T[F]]],
-      transforms: (F[T[F]] => Option[F[T[F]]])*)
-      : F[T[F]] => Option[F[T[F]]] =
-    transforms.foldLeft(
-      transform)(
-      (prev, next) => x => prev(x).fold(next(x))(y => next(y).orElse(y.some)))
-
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
   // - Subset can have a normalized order _if_ their counts are constant
@@ -363,8 +353,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
-      repeatedly(C.coalesceQC[G](prism)) ⋙
-      liftFG(injectRepeatedly(C.coalesceTJ[G](prism.get))) ⋙
+      repeatedly(C.coalesceQCNormalize[G](prism)) ⋙
+      liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
   def normalizeCoEnv[F[_]: Traverse: Normalizable](

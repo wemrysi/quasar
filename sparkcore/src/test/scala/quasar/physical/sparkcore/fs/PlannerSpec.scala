@@ -16,8 +16,8 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
-import quasar.common.SortDir
+import slamdata.Predef._
+import quasar.common.{JoinType, SortDir}
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
 import quasar.qscript.ReduceFuncs._
@@ -446,7 +446,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, Inner, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
@@ -479,21 +479,21 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, LeftOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.LeftOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
             case rdd =>
-              rdd.collect.toList must_= List(
-                Data.Obj(ListMap(
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.NA
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
                 ))
-              )
+              ))
           })
         }
       }
@@ -516,21 +516,21 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, RightOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.RightOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
             case rdd =>
-              rdd.collect.toList must_= List(
-                Data.Obj(ListMap(
+              rdd.collect.toList must contain(exactly(
+                Data._obj(ListMap(
                   JoinDir.Left.name ->  Data.NA,
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(32)), ("country" -> Data.Str("US"))))
                 )),
-                Data.Obj(ListMap(
+                Data._obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
                   JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
                 ))
-              )
+              ))
           })
         }
       }
@@ -551,7 +551,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, FullOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.FullOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {

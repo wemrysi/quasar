@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.marklogic.xquery.syntax._
 
 import java.lang.SuppressWarnings
@@ -53,9 +53,11 @@ object cts {
   val uris: XQuery =
     XQuery("cts:uris()")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def uris(start: XQuery, options: IList[XQuery]): XQuery =
     XQuery(s"cts:uris($start, ${mkSeq(options)})")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def uris(
     start: XQuery,
     options: IList[XQuery] = IList.empty,

@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.fs.FileSystemType
 
@@ -51,7 +51,7 @@ object MountType {
     } (κ(ViewMount))
 
   implicit val order: Order[MountType] =
-    Order.orderBy(mt => (viewMount.isMatching(mt), fileSystemMount.getOption(mt)))
+    Order.orderBy(mt => (viewMount.nonEmpty(mt), fileSystemMount.getOption(mt)))
 
   implicit val show: Show[MountType] =
     Show.shows(_.fold(t => s"FileSystemMount(${t.shows})", "ViewMount"))

@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.pkg
+package quasar.sql
 
-import scala.{ inline, AnyVal }
-import scalaz.{ Show, Equal }
+import slamdata.Predef._
+import quasar._, RenderTree.ops._
 
-final class EqualBy[A] {
-  def apply[B](f: A => B)(implicit z: Equal[B]): Equal[A] = z contramap f
-}
-final class ShowBy[A] {
-  def apply[B](f: A => B)(implicit z: Show[B]): Show[A] = Show.show[A](x => z show f(x))
-}
-final class QuasarExtensionOps[A](private val self: A) extends AnyVal {
-  @inline def |>[B](f: A => B): B = f(self)
-  @inline def ->[B](y: B): (A, B) = scala.Tuple2(self, y)
+import monocle.macros.Lenses
+
+@Lenses final case class Blob[T](expr: T, scope: List[FunctionDecl[T]])
+
+object Blob {
+  implicit def renderTree[T:RenderTree]: RenderTree[Blob[T]] =
+    new RenderTree[Blob[T]] {
+      def render(blob: Blob[T]) =
+        NonTerminal("Sql Blob" :: Nil, None, List(blob.scope.render, blob.expr.render))
+    }
 }

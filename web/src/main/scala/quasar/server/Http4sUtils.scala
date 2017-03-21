@@ -16,7 +16,7 @@
 
 package quasar.server
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.console._
 import quasar.fp._
 

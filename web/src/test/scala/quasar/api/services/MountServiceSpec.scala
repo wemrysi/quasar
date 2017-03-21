@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._

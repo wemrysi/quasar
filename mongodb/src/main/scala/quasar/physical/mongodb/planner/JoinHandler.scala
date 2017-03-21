@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.RenderTree
 import quasar.fp._
 import quasar.fp.ski._
@@ -35,9 +35,9 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final case class JoinHandler[WF[_], F[_]](run: (JoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
+final case class JoinHandler[WF[_], F[_]](run: (MongoJoinType, JoinSource[WF], JoinSource[WF]) => F[WorkflowBuilder[WF]]) {
 
-  def apply(tpe: JoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
+  def apply(tpe: MongoJoinType, left: JoinSource[WF], right: JoinSource[WF]): F[WorkflowBuilder[WF]] =
     run(tpe, left, right)
 }
 
@@ -89,8 +89,8 @@ object JoinHandler {
         false)
 
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
-      case $read(Collection(db, _)) => db.some
-      case op => C.pipeline(op).flatMap(_.src)
+      case ev0($ReadF(Collection(db, _))) => db.some
+      case op                             => C.pipeline(op).flatMap(_.src)
       // TODO: deal with non-pipeline sources where it's possible to identify the DB
     }
 
@@ -193,7 +193,7 @@ object JoinHandler {
       : Option[(Collection, BsonField)] =
       arg match {
         case JoinSource(
-              Fix(CollectionBuilderF(Fix($read(coll)), Root(), None)),
+              Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
               List(Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(field))))))),
               _) if src ≟ arg.src =>
           (coll, field).some
@@ -274,7 +274,7 @@ object JoinHandler {
       $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
 
     // TODO exhaustive pattern match
-    def buildJoin(src: Fix[WF], tpe: JoinType): Fix[WF] =
+    def buildJoin(src: Fix[WF], tpe: MongoJoinType): Fix[WF] =
       tpe match {
         case set.FullOuterJoin =>
           chain(src,

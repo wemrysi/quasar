@@ -1,6 +1,8 @@
 {
     "name": "self-join where the left hand side is constant",
 
+    "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
+
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "skip",
