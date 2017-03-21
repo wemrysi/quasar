@@ -85,11 +85,9 @@ package object qanalysis {
           case Sort(card, bucket, orders) => card
           case Filter(card, f) => card / 2
           case Subset(card, from, sel, count) =>
-            // val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-            // val fromCard = from.cata(interpret(κ(card), compile))
-
-            // sel ---> countVal || fromCard - countVal
-            ???
+            val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            // from.cata(interpret(κ(card), compile))
+            0
           case LeftShift(card, struct, id, repair) => card * 10
           case Union(card, lBranch, rBranch) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)

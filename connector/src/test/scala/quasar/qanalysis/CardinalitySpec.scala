@@ -123,7 +123,34 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         }
       }
       "Subset" should {
-        "returns cardinality of _" in {
+        "returns cardinality equal to count if selection is Take" in {
+          val count = 20
+          val cardinality = 50
+          def fromQS: FreeQS = Free.point(SrcHole)
+          def countQS: FreeQS = constFreeQS(count)
+
+          val take = quasar.qscript.Subset(cardinality, fromQS, Take, countQS)
+          // compile(take) must_== count
+          pending
+        }
+        "returns cardinality equal to count if selection is Sample" in {
+          val count = 20
+          val cardinality = 50
+          def fromQS: FreeQS = Free.point(SrcHole)
+          def countQS: FreeQS = constFreeQS(count)
+
+          val take = quasar.qscript.Subset(cardinality, fromQS, Sample, countQS)
+          // compile(take) must_== count
+          pending
+        }
+        "returns cardinality equal to (card - count) if selection is Drop" in {
+          val count = 20
+          val cardinality = 50
+          def fromQS: FreeQS = Free.point(SrcHole)
+          def countQS: FreeQS = constFreeQS(count)
+
+          val take = quasar.qscript.Subset(cardinality, fromQS, Drop, countQS)
+          // compile(take) must_== cardinality - count
           pending
         }
       }
@@ -211,5 +238,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
 
   }
 
+  private def constFreeQS(v: Int): FreeQS =
+    Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
 }
