@@ -767,6 +767,8 @@ object MongoDbQScriptPlanner {
       : M[A] =
     mst.gets(meh.eval) >>= (liftErr[M, A](_))
 
+  def createFieldName(i: Int): String = "f" + i.toString
+
   trait Planner[F[_]] {
     type IT[G[_]]
 
@@ -823,6 +825,7 @@ object MongoDbQScriptPlanner {
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
+
         def plan
           [M[_]: Monad,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
@@ -857,15 +860,15 @@ object MongoDbQScriptPlanner {
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
                   red.map(_.sequence).sequence.fold(
-                    κ(GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name("f" + i.toString)).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
+                    κ(GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
                       List(newB),
                       Contents.Doc(red.zipWithIndex.map(ai =>
-                        (BsonField.Name("f" + ai._2.toString),
-                          accumulator(ai._1.as($field("f" + ai._2.toString))).left[Fix[ExprOp]])).toListMap))),
+                        (BsonField.Name(createFieldName(ai._2)),
+                          accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap))),
                     exprs => GroupBuilder(src,
                       List(newB),
                       Contents.Doc(exprs.zipWithIndex.map(ai =>
-                        (BsonField.Name("f" + ai._2.toString),
+                        (BsonField.Name(createFieldName(ai._2)),
                           accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                     repair)
               }).join
@@ -1085,13 +1088,13 @@ object MongoDbQScriptPlanner {
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(i => "f" + i.toString)))
+    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(createFieldName)))
 
   def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Str(ri.idx.fold("_id")(i => "f" + i.toString))))) ∘
+    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Str(ri.idx.fold("_id")(createFieldName))))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
