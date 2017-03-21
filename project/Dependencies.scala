@@ -8,16 +8,17 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
-  private val disciplineVersion = "0.5"
-  private val jawnVersion       = "0.8.4"
-  private val jacksonVersion    = "2.4.4"
-  private val matryoshkaVersion = "0.16.4"
-  private val pathyVersion      = "0.2.9"
-  private val raptureVersion    = "2.0.0-M6"
-  private val scodecBitsVersion = "1.1.0"
+  private val argonautShapelessVersion = "1.2.0-M4"
+  private val disciplineVersion        = "0.5"
+  private val jawnVersion              = "0.8.4"
+  private val jacksonVersion           = "2.4.4"
+  private val matryoshkaVersion        = "0.16.4"
+  private val pathyVersion             = "0.2.9"
+  private val raptureVersion           = "2.0.0-M6"
+  private val scodecBitsVersion        = "1.1.0"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion      = "3.8.4"
+  private val specsVersion             = "3.8.4"
 
   def foundation = Seq(
     CommonDependencies.scalaz.core,
@@ -122,6 +123,8 @@ object Dependencies {
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     CommonDependencies.http4s.dsl,
     CommonDependencies.http4s.argonaut62,
+    "com.github.alexarchambault" %% "argonaut-shapeless_6.2" % argonautShapelessVersion,
+    "com.github.alexarchambault" %% "argonaut-refined_6.2"   % argonautShapelessVersion,
     CommonDependencies.http4s.blazeClient,
     CommonDependencies.http4s.blazeServer,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,

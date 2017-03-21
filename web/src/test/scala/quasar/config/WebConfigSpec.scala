@@ -22,10 +22,12 @@ import quasar.physical.mongodb
 
 import pathy.Path._
 
+import eu.timepit.refined._
+
 class WebConfigSpec extends ConfigSpec[WebConfig] {
 
   def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
-    server = ServerConfig(92),
+    server = ServerConfig(refineMV(92)),
     mountings = MountingsConfig(Map(
       rootDir -> MountConfig.fileSystemConfig(mongodb.fs.FsType, uri))))
 

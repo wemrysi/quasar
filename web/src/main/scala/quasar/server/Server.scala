@@ -38,12 +38,12 @@ import Scalaz._
 import scalaz.concurrent.Task
 
 object Server {
-  type ServiceStarter = (Int => Task[Unit]) => HttpService
+  type ServiceStarter = (Port => Task[Unit]) => HttpService
 
   final case class QuasarConfig(
     staticContent: List[StaticContent],
     redirect: Option[String],
-    port: Option[Int],
+    port: Option[Port],
     configPath: Option[FsFile],
     openClient: Boolean)
 
@@ -84,8 +84,8 @@ object Server {
   }
 
   def nonApiService(
-    initialPort: Int,
-    reload: Int => Task[Unit],
+    initialPort: Port,
+    reload: Port => Task[Unit],
     staticContent: List[StaticContent],
     redirect: Option[String]
   ): HttpService = {
@@ -114,14 +114,14 @@ object Server {
     mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
 
   def service(
-    initialPort: Int,
+    initialPort: Port,
     staticContent: List[StaticContent],
     redirect: Option[String],
     eval: CoreEff ~> ResponseOr
   ): ServiceStarter = {
     import RestApi._
 
-    (reload: Int => Task[Unit]) =>
+    (reload: Port => Task[Unit]) =>
       finalizeServices(
         toHttpServices(liftMT[Task, ResponseT] :+: eval, coreServices[CoreEffIO]) ++
         additionalServices

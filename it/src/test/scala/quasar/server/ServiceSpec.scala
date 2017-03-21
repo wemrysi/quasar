@@ -30,6 +30,7 @@ import quasar.sql.{fixParser, Query}
 import java.io.File
 
 import argonaut._, Argonaut._
+import eu.timepit.refined._
 import org.http4s._, Status._, Uri.Authority
 import org.http4s.argonaut._
 import pathy.Path._
@@ -37,7 +38,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class ServiceSpec extends quasar.Qspec {
-  
+
   val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient
@@ -45,10 +46,10 @@ class ServiceSpec extends quasar.Qspec {
   sequential
 
   def withServer[A]
-    (port: Int = 8888, webConfig: WebConfig = configOps.default)
+    (port: Port = refineMV(8888), webConfig: WebConfig = configOps.default)
     (f: Uri => Task[A])
     : String \/ A = {
-    val uri = Uri(authority = Some(Authority(port = Some(port))))
+    val uri = Uri(authority = Some(Authority(port = Some(port.value))))
 
     val service = Server.durableService(
       QuasarConfig(
