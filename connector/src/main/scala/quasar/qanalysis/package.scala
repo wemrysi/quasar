@@ -108,7 +108,10 @@ package object qanalysis {
       }
     implicit def projectBucket[T[_[_]] : RecursiveT: ShowT]: Cardinality[ProjectBucket[T, ?]] =
       new Cardinality[ProjectBucket[T, ?]] {
-        def calculate(pathCard: APath => Int): Algebra[ProjectBucket[T, ?], Int] = κ(0)
+        def calculate(pathCard: APath => Int): Algebra[ProjectBucket[T, ?], Int] = {
+          case BucketField(card, _, _) => card
+          case BucketIndex(card, _, _) => card
+        }
       }
 
     implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cardinality[EquiJoin[T, ?]] =

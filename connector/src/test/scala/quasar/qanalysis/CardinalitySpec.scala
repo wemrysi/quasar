@@ -199,11 +199,12 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
     }
 
     "ProjectBucket"  should {
-      "returns cardinality of 1" in {
+      "returns cardinality of already processed part of qscript" in {
         val compile = Cardinality.projectBucket[Fix].calculate(empty)
+        val cardinality = 45
         def func: FreeMap = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
-        val bucket = BucketField(0, func, func)
-        compile(bucket) must_== 0
+        val bucket = BucketField(cardinality, func, func)
+        compile(bucket) must_== cardinality
       }
     }
 
