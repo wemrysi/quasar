@@ -17,16 +17,11 @@
 package quasar.physical.sparkcore.fs.cassandra
 
 import slamdata.Predef._
-import quasar.{Data, DataCodec}
+import quasar.Data
 import quasar.contrib.pathy._
-import quasar.effect.Read
-import quasar.fp.ski._
 import quasar.physical.sparkcore.fs.readfile.{ Offset, Limit }
 import quasar.physical.sparkcore.fs.readfile.Input
 
-import com.datastax.spark.connector._
-import com.datastax.spark.connector.cql.CassandraConnector
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._
 import scalaz.concurrent.Task
@@ -36,13 +31,11 @@ object readfile {
 
   import common._
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
-    read.asks { sc =>
-      sc.cassandraTable[String](keyspace(fileParent(f)), tableName(f))
-        .select("data")
-        .map{raw =>
-          DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-        }
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, RDD[(Data, Long)]] =
+    cass.readTable(keyspace(fileParent(f)), tableName(f)).map{ rdd =>
+      rdd
         .zipWithIndex()
         .filter {
           case (value, index) =>
@@ -54,19 +47,16 @@ object readfile {
         }
     }
 
-  def fileExists[S[_]](f: AFile)(implicit read: Read.Ops[SparkContext, S]): Free[S, Boolean] =
-    read.asks { sc =>
-      val connector = CassandraConnector(sc.getConf)
-      connector.withSessionDo { implicit session =>
-        tableExists(keyspace(fileParent(f)), tableName(f))
-      }
-    }
+  def fileExists[S[_]](f: AFile)(implicit
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, Boolean] =
+    cass.tableExists(keyspace(fileParent(f)), tableName(f))
 
   // TODO arbitrary value, more or less a good starting point
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
+  def input[S[_]](implicit cass: CassandraDDL.Ops[S], s0: Task :<: S) =
     Input(
       rddFrom(_, _, _),
       fileExists(_),

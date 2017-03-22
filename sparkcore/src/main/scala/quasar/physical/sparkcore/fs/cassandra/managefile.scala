@@ -59,7 +59,6 @@ object managefile {
     }
 
   def pathExists[S[_]](path: APath)(implicit 
-    read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
     ): Free[S, Boolean] = 
     refineType(path).fold(
@@ -68,7 +67,6 @@ object managefile {
     )
 
   def moveFile[S[_]](sf: AFile, df: AFile)(implicit
-    read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
     ): Free[S, Unit] = {
     val dks = keyspace(fileParent(df))
@@ -84,7 +82,6 @@ object managefile {
   }
 
   def moveDir[S[_]](sd: ADir, dd: ADir)(implicit
-    read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
   ): Free[S, Unit] = {
     for {
@@ -97,7 +94,6 @@ object managefile {
   }
 
   def delete[S[_]](path: APath)(implicit
-    read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
     ): Free[S, FileSystemError \/ Unit] =
       maybeFile(path).fold(deleteDir(path))(file => deleteFile(file))

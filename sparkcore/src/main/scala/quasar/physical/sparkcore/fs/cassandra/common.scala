@@ -18,6 +18,8 @@ package quasar.physical.sparkcore.fs.cassandra
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.fp.ski._
+import quasar.{Data, DataCodec}
 
 import pathy.Path._
 import com.datastax.driver.core.Session
@@ -26,6 +28,7 @@ import com.datastax.spark.connector._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd._
 
 sealed trait CassandraDDL[A]
 final case class KeyspaceExists(keyspace: String) extends CassandraDDL[Boolean]
@@ -40,6 +43,8 @@ final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTa
 final case class ListTables(keyspace: String) extends CassandraDDL[Set[String]]
 final case class ListKeyspaces(startWith: String) extends CassandraDDL[Set[String]]
 
+final case class ReadTable(keyspace: String, table: String) extends CassandraDDL[RDD[Data]]
+
 object CassandraDDL {
 
 
@@ -53,6 +58,7 @@ object CassandraDDL {
     def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] = Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
     def listTables(keyspace: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListTables(keyspace)))
     def listKeyspaces(startWith: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListKeyspaces(startWith)))
+    def readTable(keyspace: String, table: String): Free[S, RDD[Data]] = Free.liftF(s0.inj(ReadTable(keyspace, table)))
   }
 
   object Ops {
@@ -82,6 +88,8 @@ object CassandraDDL {
           listTables(keyspace)
         case ListKeyspaces(nameStartWith) =>
           listKeyspaces(nameStartWith)
+        case ReadTable(keyspace, table) =>
+          readTable(keyspace, table)
       }
   }
 
@@ -138,6 +146,15 @@ object CassandraDDL {
       .filter(_.startsWith(nameStartWith))
       .collect.toSet
   }
+
+  def readTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
+    sc.cassandraTable[String](keyspace, table)
+      .select("data")
+      .map { raw =>
+        DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
+      }
+  }
+
 }
 
 /*
