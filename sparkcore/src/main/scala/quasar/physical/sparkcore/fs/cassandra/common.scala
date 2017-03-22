@@ -38,6 +38,7 @@ final case class CreateTable(keyspace: String, table: String) extends CassandraD
 
 final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTable: String) extends CassandraDDL[Unit]
 final case class ListTables(keyspace: String) extends CassandraDDL[Set[String]]
+final case class ListKeyspaces(startWith: String) extends CassandraDDL[Set[String]]
 
 object CassandraDDL {
 
@@ -51,6 +52,7 @@ object CassandraDDL {
     def createKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(CreateKeyspace(keyspace)))
     def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] = Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
     def listTables(keyspace: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListTables(keyspace)))
+    def listKeyspaces(startWith: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListKeyspaces(startWith)))
   }
 
   object Ops {
@@ -78,6 +80,8 @@ object CassandraDDL {
           moveTable(fromK, fromT, toK, toT)
         case ListTables(keyspace) =>
           listTables(keyspace)
+        case ListKeyspaces(nameStartWith) =>
+          listKeyspaces(nameStartWith)
       }
   }
 
@@ -129,6 +133,11 @@ object CassandraDDL {
       .collect.toSet
   }
 
+  def listKeyspaces[S[_]](nameStartWith: String)(implicit sc: SparkContext) = Task.delay {
+    sc.cassandraTable[String]("system_schema","keyspaces").select("keyspace_name")
+      .filter(_.startsWith(nameStartWith))
+      .collect.toSet
+  }
 }
 
 /*

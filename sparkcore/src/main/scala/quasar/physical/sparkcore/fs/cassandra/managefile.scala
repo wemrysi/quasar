@@ -28,9 +28,6 @@ import quasar.fp.free._
 import quasar.fs.impl.ensureMoveSemantics
 
 import org.apache.spark.SparkContext
-import com.datastax.driver.core.Session
-import com.datastax.spark.connector.cql.CassandraConnector
-import com.datastax.spark.connector._
 import pathy._, Path._
 import scalaz._, Scalaz._
 
@@ -100,35 +97,48 @@ object managefile {
   }
 
   def delete[S[_]](path: APath)(implicit
-    read: Read.Ops[SparkContext, S]
-    ): Free[S, FileSystemError \/ Unit] = 
-  read.asks { sc =>
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      maybeFile(path).fold(deleteDir(path, sc))(file => deleteFile(file))
-    }
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
+    ): Free[S, FileSystemError \/ Unit] =
+      maybeFile(path).fold(deleteDir(path))(file => deleteFile(file))
+
+  private def deleteFile[S[_]](file: AFile)(implicit
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, FileSystemError \/ Unit] = {
+    val ks = keyspace(fileParent(file))
+    val tb = tableName(file)
+
+    (for {
+      keyspaceExists <- cass.keyspaceExists(ks).liftM[FileSystemErrT]
+      tableExists    <- cass.tableExists(ks, tb).liftM[FileSystemErrT]
+      _              <- EitherT((
+                                  if(keyspaceExists && tableExists)
+                                    ().right
+                                  else
+                                    pathErr(pathNotFound(file)).left[Unit]
+                                ).point[Free[S, ?]])
+      _              <- cass.dropTable(ks, tb).liftM[FileSystemErrT]
+    } yield ()).run
   }
 
-  def deleteFile(file: AFile)(implicit session: Session) = 
-    if(keyspaceExists(keyspace(fileParent(file))) && tableExists(keyspace(fileParent(file)), tableName(file))) {
-      val r = dropTable(keyspace(fileParent(file)), tableName(file))
-      ().right[FileSystemError]
-    } else {
-      pathErr(pathNotFound(file)).left[Unit]
-    }
-
-  def deleteDir(dir: APath, sc: SparkContext)(implicit session: Session) = {  
+  private def deleteDir[S[_]](dir: APath)(implicit
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, FileSystemError \/ Unit] = {
     val aDir: ADir = refineType(dir).fold(d => d, fileParent(_))
     val ks = keyspace(aDir)
-    val dirs = sc.cassandraTable[String]("system_schema","keyspaces").select("keyspace_name")
-      .filter(_.startsWith(ks))
-      .collect.toSet
 
-    if(!dirs.isEmpty){
-      dirs.foreach( d => dropKeyspace(d))
-      ().right[FileSystemError]
-    } else {
-      pathErr(pathNotFound(dir)).left[Unit]
-    }
+    (for {
+      keyspaces <- cass.listKeyspaces(ks).liftM[FileSystemErrT]
+      _         <- EitherT((
+                             if(keyspaces.isEmpty)
+                               pathErr(pathNotFound(dir)).left[Unit]
+                             else
+                               ().right
+                           ).point[Free[S, ?]])
+      _         <- keyspaces.map { keyspace =>
+                     cass.dropKeyspace(keyspace)
+                   }.toList.sequence.liftM[FileSystemErrT]
+    } yield ()).run
   }
 
   def tempFile[S[_]](near: APath)(implicit
