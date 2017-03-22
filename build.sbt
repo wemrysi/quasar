@@ -217,9 +217,6 @@ lazy val common = project
   .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
