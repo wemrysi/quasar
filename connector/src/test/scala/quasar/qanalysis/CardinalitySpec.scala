@@ -16,12 +16,13 @@
 
 package quasar.qanalysis
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski.κ
 import quasar.contrib.pathy.{AFile, ADir, APath}
 import quasar.qscript._
 import quasar.qscript.MapFuncs._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
+
 
 import matryoshka.data.Fix
 import pathy.Path._
@@ -217,7 +218,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func)))
         val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
-        val join = quasar.qscript.EquiJoin(cardinality, left, right, func, func, Inner, joinFunc)
+        val join = quasar.qscript.EquiJoin(cardinality, left, right, func, func, JoinType.Inner, joinFunc)
         compile(join) must_== cardinality * (cardinality / 2)
       }
     }
@@ -231,7 +232,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func)))
         val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
-        val join = quasar.qscript.ThetaJoin(cardinality, left, right, joinFunc, Inner, joinFunc)
+        val join = quasar.qscript.ThetaJoin(cardinality, left, right, joinFunc, JoinType.Inner, joinFunc)
         compile(join) must_== cardinality * (cardinality / 2)
       }
     }

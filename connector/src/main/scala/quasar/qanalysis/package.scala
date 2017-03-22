@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.qscript._
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fp._, ski._
