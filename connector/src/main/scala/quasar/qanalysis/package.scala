@@ -25,10 +25,11 @@ import matryoshka.{Hole => _, _}
 import matryoshka.patterns._
 import matryoshka.implicits._
 import matryoshka.data._
-import scalaz._
+import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 package object qanalysis {
+
   sealed trait AnalysisResult
   case object Instant extends AnalysisResult
   case object Interactive extends AnalysisResult
@@ -43,7 +44,7 @@ package object qanalysis {
 
   @typeclass
   trait Cost[F[_]] {
-    def evaluate: GAlgebra[(Int, ?), F, Int]
+    def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), F, Int]
   }
 
   @typeclass
@@ -53,7 +54,7 @@ package object qanalysis {
       func: Functor[F],
       cardinalty: Cardinality[F],
       cost: Cost[F]
-    ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate)
+    ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate(pathCard))
   }
 
   object Cardinality {
@@ -146,41 +147,81 @@ package object qanalysis {
       }
   }
 
+  /**
+    * This is "generic" implementation for `Cost` that can be used by any connector. 
+    * Can be used for newly created connectors. More mature connectors should provide
+    * their own instance that will take into account connector specific informations
+    */
   object Cost {
-    implicit def deadEnd: Cost[Const[DeadEnd, ?]] = ???
+    implicit def deadEnd: Cost[Const[DeadEnd, ?]] = new Cost[Const[DeadEnd, ?]] {
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), Const[DeadEnd, ?], Int] =
+          (qs: Const[DeadEnd, (Int, Int)]) => 1
+      }
+
     implicit def read[A]: Cost[Const[Read[A], ?]] =
       new Cost[Const[Read[A], ?]] {
-        def evaluate: GAlgebra[(Int, ?), Const[Read[A], ?], Int] =
-          (qs: Const[Read[A], (Int, Int)]) => ???
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), Const[Read[A], ?], Int] =
+          (qs: Const[Read[A], (Int, Int)]) => 1
       }
     implicit def shiftedRead[A]: Cost[Const[ShiftedRead[A], ?]] =
       new Cost[Const[ShiftedRead[A], ?]] {
-        def evaluate: GAlgebra[(Int, ?), Const[ShiftedRead[A], ?], Int] =
-          (qs: Const[ShiftedRead[A], (Int, Int)]) => ???
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), Const[ShiftedRead[A], ?], Int] =
+          (qs: Const[ShiftedRead[A], (Int, Int)]) => 1
       }
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cost[QScriptCore[T, ?]] =
       new Cost[QScriptCore[T, ?]] {
-        def evaluate: GAlgebra[(Int, ?), QScriptCore[T, ?], Int] = {
-          case qscript.Map((card, cost), f) => ???
-          case Reduce((card, cost), bucket, reducers, repair) => ???
-          case Sort((card, cost), bucket, orders) => ???
-          case Filter((card, cost), f) => ???
-          case Subset((card, cost), from, sel, count) => ???
-          case LeftShift((card, cost), struct, id, repair) => ???
-          case Union((card, cost), lBranch, rBranch) => ???
-          case Unreferenced() => ???
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), QScriptCore[T, ?], Int] = {
+          case qscript.Map((card, cost), f) => card + cost
+          case Reduce((card, cost), bucket, reducers, repair) => card + cost
+          case Sort((card, cost), bucket, orders) => card + cost
+          case Filter((card, cost), f) => card + cost
+          case Subset((card, cost), from, sel, count) => card + cost
+          case LeftShift((card, cost), struct, id, repair) => card + cost
+          case Union((card, cost), lBranch, rBranch) => card + cost
+          case Unreferenced() => 0
         }
-
       }
-    implicit def projectBucket[T[_[_]]]: Cost[ProjectBucket[T, ?]] = ???
+
+    implicit def projectBucket[T[_[_]]]: Cost[ProjectBucket[T, ?]] =
+      new Cost[ProjectBucket[T, ?]] {
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), ProjectBucket[T, ?], Int] = {
+          case BucketField((card, cost), _, _) => card + cost
+          case BucketIndex((card, cost), _, _) => card + cost
+        }
+      }
+
+    // TODO contribute to matryoshka
+    private def ginterpret[W[_], F[_], A, B](f: A => Id[B], φ: GAlgebra[W, F, B]): GAlgebra[W, CoEnv[A, F, ?], B] =
+      ginterpretM[W, Id, F, A, B](f, φ)
+
     implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Cost[EquiJoin[T, ?]] =
       new Cost[EquiJoin[T, ?]] {
-        def evaluate: GAlgebra[(Int, ?), EquiJoin[T, ?], Int] = {
-          case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) => ???
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), EquiJoin[T, ?], Int] = {
+          case EquiJoin((card, cost), lBranch, rBranch, lKey, rKey, jt, combine) =>
+            val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
+            lBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost)) +
+            rBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost))
         }
       }
-    implicit def thetaJoin[T[_[_]]]: Cost[ThetaJoin[T, ?]] = ???
+    implicit def thetaJoin[T[_[_]] : RecursiveT : ShowT]: Cost[ThetaJoin[T, ?]] =
+      new Cost[ThetaJoin[T, ?]] {
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), ThetaJoin[T, ?], Int] = {
+          case ThetaJoin((card, cost), lBranch, rBranch, _, _, _) => {
+            val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
+            lBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost)) +
+            rBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost))
+          }
+        }
+      }
 
+    implicit def coproduct[F[_], G[_]](implicit F: Cost[F], G: Cost[G]):
+        Cost[Coproduct[F, G, ?]] =
+      new Cost[Coproduct[F, G, ?]] {
+        def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), Coproduct[F, G, ?], Int] =
+          _.run.fold(F.evaluate(pathCard), G.evaluate(pathCard))
+      }
   }
 
 }
