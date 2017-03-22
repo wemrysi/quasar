@@ -78,49 +78,25 @@ object managefile {
     val dft = tableName(df)
     for {
       keyspaceExists <- cass.keyspaceExists(dks)
-      _ <- if (!keyspaceExists) cass.createKeyspace(dks) else Free.pure[S, Unit](())
-      tableExists <- cass.tableExists(dks, dft)
-      _ <- if(tableExists) cass.dropTable(dks, dft) else Free.pure[S, Unit](())
-      _ <- cass.moveTable(keyspace(fileParent(sf)), tableName(sf), dks, dft)
-      r <- cass.dropTable(keyspace(fileParent(sf)), tableName(sf))
-    } yield (r)
-  }
-
-  private def moveTable(sf: AFile, df: AFile)(implicit sc: SparkContext) = {
-    val dks = keyspace(fileParent(df))
-    val dft = tableName(df)
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val u1 = if(!keyspaceExists(dks)){
-        createKeyspace(dks)
-      }
-      val u2 = if(tableExists(dks, dft)) {
-        dropTable(dks, dft)
-      }
-      val rdd = sc.cassandraTable(keyspace(fileParent(sf)), tableName(sf))
-      rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = keyspace(fileParent(df)), tableName = tableName(df)))
-
-      val r = dropTable(keyspace(fileParent(sf)), tableName(sf))
-    }
+      _              <- if (!keyspaceExists) cass.createKeyspace(dks) else Free.pure[S, Unit](())
+      tableExists    <- cass.tableExists(dks, dft)
+      _              <- if(tableExists) cass.dropTable(dks, dft) else Free.pure[S, Unit](())
+      _              <- cass.moveTable(keyspace(fileParent(sf)), tableName(sf), dks, dft)
+      _              <- cass.dropTable(keyspace(fileParent(sf)), tableName(sf))
+    } yield ()
   }
 
   def moveDir[S[_]](sd: ADir, dd: ADir)(implicit
     read: Read.Ops[SparkContext, S],
     cass: CassandraDDL.Ops[S]
-    ): Free[S, Unit] = {
-    read.asks { implicit sc =>
-      val srcTables = sc.cassandraTable[String]("system_schema", "tables")
-        .select("table_name")
-        .where("keyspace_name = ?", keyspace(sd))
-        .collect.toSet
-
-      srcTables.foreach { tn =>
-        moveTable(sd </> file(tn), dd </> file(tn))
-      }
-
-      val _ = CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        dropKeyspace(keyspace(sd))
-      }
-    }
+  ): Free[S, Unit] = {
+    for {
+      tables <- cass.listTables(keyspace(sd))
+      _      <- tables.map { tn =>
+                  moveFile(sd </> file(tn), dd </> file(tn))
+                }.toList.sequence
+      _      <- cass.dropKeyspace(keyspace(sd))
+    } yield ()
   }
 
   def delete[S[_]](path: APath)(implicit

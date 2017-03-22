@@ -37,8 +37,7 @@ final case class DropTable(keyspace: String, table: String) extends CassandraDDL
 final case class CreateTable(keyspace: String, table: String) extends CassandraDDL[Unit]
 
 final case class MoveTable(fromKs: String, fromTable: String, toKs: String, toTable: String) extends CassandraDDL[Unit]
-
-// Functor[Cassandraddl]
+final case class ListTables(keyspace: String) extends CassandraDDL[Set[String]]
 
 object CassandraDDL {
 
@@ -51,6 +50,7 @@ object CassandraDDL {
     def createTable(keyspace: String, table: String): Free[S, Unit] = Free.liftF(s0.inj(CreateTable(keyspace, table)))
     def createKeyspace(keyspace: String): Free[S, Unit] = Free.liftF(s0.inj(CreateKeyspace(keyspace)))
     def moveTable(fromK: String, fromT: String, toK: String, toT: String): Free[S, Unit] = Free.liftF(s0.inj(MoveTable(fromK, fromT, toK, toT)))
+    def listTables(keyspace: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListTables(keyspace)))
   }
 
   object Ops {
@@ -76,6 +76,8 @@ object CassandraDDL {
           createKeyspace(keyspace)
         case MoveTable(fromK, fromT, toK, toT) =>
           moveTable(fromK, fromT, toK, toT)
+        case ListTables(keyspace) =>
+          listTables(keyspace)
       }
   }
 
@@ -118,6 +120,13 @@ object CassandraDDL {
   def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = Task.delay {
     val rdd = sc.cassandraTable(fromK, fromT)
     rdd.saveAsCassandraTableEx(rdd.tableDef.copy(keyspaceName = toK, tableName = toT))
+  }
+
+  def listTables[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
+    sc.cassandraTable[String]("system_schema", "tables")
+      .select("table_name")
+      .where("keyspace_name = ?", keyspace)
+      .collect.toSet
   }
 
 }
