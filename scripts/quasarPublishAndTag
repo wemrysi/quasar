@@ -3,10 +3,12 @@
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
+source scripts/constants
+
 # Only publishAndTag on first Travis job
 if [[ "${TRAVIS_JOB_NUMBER##*.}" == "1" ]]; then
   "$SBT" transferPublishAndTagResources
-  ./scripts/publishAndTag 'quasar-analytics/quasar'
+  scripts/publishAndTag 'quasar-analytics/quasar'
 else
   echo "Travis not running on job 1, so skipping publishAndTag"
 fi
