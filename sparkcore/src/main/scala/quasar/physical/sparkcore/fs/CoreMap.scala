@@ -16,7 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef.{Eq => _, _}
+import slamdata.Predef.{Eq => _, _}
 import quasar.{Data, DataCodec}
 import quasar.Planner._
 import quasar.common.PrimaryType

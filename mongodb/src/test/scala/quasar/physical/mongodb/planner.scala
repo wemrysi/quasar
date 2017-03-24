@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.fp._
@@ -88,10 +88,10 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
+  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, Nil, 0L, None)
+    queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -3515,14 +3515,16 @@ class PlannerSpec extends
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
     }
 
-    def countAccumOps(wf: Workflow) = countOps(wf, { case $group(_, _, _) => true })
-    def countUnwindOps(wf: Workflow) = countOps(wf, { case $unwind(_, _) => true })
-    def countMatchOps(wf: Workflow) = countOps(wf, { case $match(_, _) => true })
+    val WC = Inject[WorkflowOpCoreF, WorkflowF]
+
+    def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
+    def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
+    def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
 
     def noConsecutiveProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(Fix($project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
+      countOps(wf, { case WC($ProjectF(Embed(WC($ProjectF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
     def noConsecutiveSimpleMapOps(wf: Workflow) =
-      countOps(wf, { case $simpleMap(Fix($simpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
+      countOps(wf, { case WC($SimpleMapF(Embed(WC($SimpleMapF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
     def maxAccumOps(wf: Workflow, max: Int) =
       countAccumOps(wf) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
     def maxUnwindOps(wf: Workflow, max: Int) =
@@ -3530,7 +3532,7 @@ class PlannerSpec extends
     def maxMatchOps(wf: Workflow, max: Int) =
       countMatchOps(wf) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
     def brokenProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
+      countOps(wf, { case WC($ProjectF(_, Reshape(shape), _)) => shape.isEmpty }) aka "$project ops with no fields"
 
     def danglingReferences(wf: Workflow) =
       wf.foldMap(_.unFix match {
@@ -3546,7 +3548,7 @@ class PlannerSpec extends
 
     def rootPushes(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op @ $group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
+        case WC(op @ $GroupF(src, Grouped(map), _)) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
         case _ => Nil
       }) aka "group ops pushing $$ROOT"
 
@@ -3647,7 +3649,7 @@ class PlannerSpec extends
     * @throws AssertionError If the `Query` is not a selection
     */
   def columnNames(q: Query): List[String] =
-    fixParser.parse(q).toOption.get.project match {
+    fixParser.parseExpr(q).toOption.get.project match {
       case Select(_, projections, _, _, _, _) =>
         projectionNames(projections, None).toOption.get.map(_._1)
       case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
@@ -3726,7 +3728,7 @@ class PlannerSpec extends
     genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
-    fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    fixParser.parseExpr(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**

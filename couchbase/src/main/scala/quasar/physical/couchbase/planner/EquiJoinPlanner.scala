@@ -16,7 +16,8 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson
@@ -59,10 +60,12 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
     }
   }
 
+  val QC = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
+
   object BranchBucketCollection {
     def unapply(qs: FreeQS[T]): Option[BucketCollection] = (qs match {
       case Embed(CoEnv(\/-(CShiftedRead(c))))                              => c.some
-      case Embed(CoEnv(\/-(QScriptCore(
+      case Embed(CoEnv(\/-(QC(
         qscript.Filter(Embed(CoEnv(\/-(CShiftedRead(c)))),MetaGuard()))))) => c.some
       case _                                                               => none
     }) >>= (c => BucketCollection.fromPath(c.getConst.path).toOption)
@@ -72,8 +75,8 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
         case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(ejson.Common(ejson.Str(v2)))))) => true
-          case _                                                                         => false
+          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+          case _                                                                       => false
         }
         case v => false
       }
@@ -121,10 +124,10 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
         lKey, KeyMetaId(),
         joinType, combine) =>
       joinType match {
-        case Inner     =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, Inner.right)
-        case LeftOuter =>
-          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, LeftOuter.left)
+        case JoinType.Inner     =>
+          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.Inner.right)
+        case JoinType.LeftOuter =>
+          keyJoin(lBranch, lKey, combine, rBktCol, LeftSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }
@@ -134,10 +137,10 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGener
         KeyMetaId(), rKey,
         joinType, combine) =>
       joinType match {
-        case Inner     =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, Inner.right)
-        case RightOuter =>
-          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, LeftOuter.left)
+        case JoinType.Inner     =>
+          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.Inner.right)
+        case JoinType.RightOuter =>
+          keyJoin(rBranch, rKey, combine, lBktCol, RightSide, JoinType.LeftOuter.left)
         case _         =>
           unimpl
       }

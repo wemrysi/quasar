@@ -16,9 +16,9 @@
 
 package quasar.qscript
 
-import quasar.Predef.{ Eq => _, _ }
+import slamdata.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
@@ -236,7 +236,7 @@ class QScriptSpec
               Free.roll(MakeArray(LeftSideF)),
               Free.roll(MakeArray(RightSideF))))))),
           BoolLit(true),
-          Inner,
+          JoinType.Inner,
           Free.roll(Add(
             ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
             ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
@@ -505,7 +505,7 @@ class QScriptSpec
               Free.roll(MakeArray(LeftSideF)),
               Free.roll(MakeArray(RightSideF))))))),
           BoolLit(true),
-          Inner,
+          JoinType.Inner,
           Free.roll(ConcatMaps(
             ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
             ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
@@ -581,7 +581,7 @@ class QScriptSpec
                   ProjectIndexR(
                     RightSideF, IntLit(1)),
                   IntLit(2))))),
-            Inner,
+            JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
                 StrLit("name"),

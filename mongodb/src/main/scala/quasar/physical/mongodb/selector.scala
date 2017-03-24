@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.fp._
 import quasar.javascript._
@@ -25,7 +25,7 @@ import scala.Any
 
 import scalaz._, Scalaz._
 
-sealed trait Selector {
+sealed abstract class Selector {
   def bson: Bson.Doc
 
   import Selector._
@@ -93,7 +93,7 @@ object Selector {
       }
     }
 
-  sealed trait Condition {
+  sealed abstract class Condition {
     def bson: Bson
   }
 
@@ -185,7 +185,7 @@ object Selector {
     protected def rhs = Bson.Int32(size)
   }
 
-  sealed trait SelectorExpr {
+  sealed abstract class SelectorExpr {
     def bson: Bson
   }
 
@@ -219,7 +219,7 @@ object Selector {
       Doc(ListMap(pairs.map(t => t._1 -> Expr(t._2)): _*))
   }
 
-  sealed trait CompoundSelector extends Selector {
+  sealed abstract class CompoundSelector extends Selector {
     protected def op: String
     def left: Selector
     def right: Selector

@@ -16,7 +16,7 @@
 
 package quasar.regression
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 
 import scala.None
@@ -29,7 +29,7 @@ import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
 
-sealed trait Predicate {
+sealed abstract class Predicate {
   def apply[F[_]: Catchable: Monad](
     expected: Vector[Json],
     actual: Process[F, Json],

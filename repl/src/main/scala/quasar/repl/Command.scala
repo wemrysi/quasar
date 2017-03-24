@@ -16,14 +16,14 @@
 
 package quasar.repl
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.sql.{Query}
 
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 
-sealed trait Command
+sealed abstract class Command
 object Command {
   private val ExitPattern         = "(?i)(?:exit)|(?:quit)".r
   private val HelpPattern         = "(?i)(?:help)|(?:commands)|\\?".r

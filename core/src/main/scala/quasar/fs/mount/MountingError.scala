@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.connector.EnvironmentError
 import quasar.fs._
 
@@ -24,7 +24,7 @@ import monocle.Prism
 import scalaz.NonEmptyList
 import scalaz._, Scalaz._
 
-sealed trait MountingError
+sealed abstract class MountingError
 
 object MountingError {
   final case class PError private (err: PathError)

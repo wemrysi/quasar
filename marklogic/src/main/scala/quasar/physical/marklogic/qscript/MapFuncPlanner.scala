@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -111,7 +111,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Integer(s)                   => xs.integer(s).point[F]
     case Decimal(s)                   => xs.double(s).point[F]
     case Null(s)                      => SP.null_ map (n => if_ (s eq "null".xs) then_ n else_ emptySeq)
-    case ToString(x)                  => SP.toString(x)
+    case ToString(x)                  => SP.asString(x)
     case Search(in, ptn, ci)          => fn.matches(in, ptn, Some(if_ (ci) then_ "i".xs else_ "".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
 
@@ -143,7 +143,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   private def asDateTime(x: XQuery) = SP.castIfNode(x) >>= (lib.asDateTime[F] apply _)
 
   private def binOpF(x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
-    if (flwor.isMatching(x) || flwor.isMatching(y))
+    if (flwor.nonEmpty(x) || flwor.nonEmpty(y))
       for {
         vx <- freshName[F]
         vy <- freshName[F]
@@ -159,7 +159,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     castedBinOpF(x, y)((a, b) => op(a, b).point[F])
 
   private def ternOpF(x: XQuery, y: XQuery, z: XQuery)(op: (XQuery, XQuery, XQuery) => F[XQuery]): F[XQuery] =
-    if (flwor.isMatching(x) || flwor.isMatching(y) || flwor.isMatching(z))
+    if (flwor.nonEmpty(x) || flwor.nonEmpty(y) || flwor.nonEmpty(z))
       for {
         vx <- freshName[F]
         vy <- freshName[F]

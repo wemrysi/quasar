@@ -16,7 +16,7 @@
 
 package quasar.frontend
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
 import quasar.common.SortDir
 import quasar.contrib.pathy.FPath

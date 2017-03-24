@@ -16,7 +16,7 @@
 
 package quasar.frontend.logicalplan
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, SemanticError.TypeError
 import quasar.common.SortDir
 import quasar.contrib.pathy._
@@ -25,6 +25,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
+import quasar.sql.CIName
 
 import scala.Predef.$conforms
 import scala.Symbol
@@ -86,10 +87,10 @@ final class LogicalPlanR[T]
   def normalizeTempNames(t: T) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
-  def bindFree(vars: Map[Symbol, T])(t: T): String \/ T =
-    t.cataM[String \/ ?, T] {
-      case Free(sym) => vars.get(sym).toRightDisjunction(s"Could not find variable $sym")
-      case other     => other.embed.right
+  def bindFree(vars: Map[CIName, T])(t: T): T =
+    t.cata[T] {
+      case Free(sym) => vars.get(CIName(sym.name)).getOrElse((Free(sym):LP[T]).embed)
+      case other     => other.embed
     }
 
   /** Per the following:
@@ -103,6 +104,7 @@ final class LogicalPlanR[T]
     * it could create spurious shadowing. normalizeTempNames is recommended.
     * NB: at the moment, Lets are only hoisted one level.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val normalizeLetsƒ: LP[T] => Option[LP[T]] = {
     case Let(b, Embed(Let(a, x1, x2)), x3) =>
       lp.let(a, x1, let(b, x2, x3)).some

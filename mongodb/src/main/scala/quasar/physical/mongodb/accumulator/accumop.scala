@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.accumulator
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, Terminal}
 import quasar.fp.ski._
 import quasar.physical.mongodb.expression.ExprOpOps
@@ -25,7 +25,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
-sealed trait AccumOp[A]
+sealed abstract class AccumOp[A]
 
 object AccumOp {
   final case class $addToSet[A](value: A) extends AccumOp[A]

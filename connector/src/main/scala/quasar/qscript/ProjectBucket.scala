@@ -16,8 +16,9 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderTreeT}, RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -48,7 +49,7 @@ sealed abstract class ProjectBucket[T[_[_]], A] {
     extends ProjectBucket[T, A]
 
 object ProjectBucket {
-  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, ProjectBucket[T, ?]] =
+  implicit def equal[T[_[_]]: OrderT]: Delay[Equal, ProjectBucket[T, ?]] =
     new Delay[Equal, ProjectBucket[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -105,7 +106,7 @@ object ProjectBucket {
       }
     }
 
-  implicit def mergeable[T[_[_]]: CorecursiveT: EqualT]:
+  implicit def mergeable[T[_[_]]: CorecursiveT: OrderT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]

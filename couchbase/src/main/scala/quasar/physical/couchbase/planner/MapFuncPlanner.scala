@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.contrib.scalaz.eitherT._

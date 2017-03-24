@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xml.{NCName, NSPrefix}
 import quasar.physical.marklogic.xml.namespaces._

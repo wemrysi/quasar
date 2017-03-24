@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.workflow
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{RenderTree, Terminal}
 import quasar.physical.mongodb.{Bson, BsonField, CollectionName}
 
@@ -57,12 +57,6 @@ object $lookup {
     as: BsonField)
     (implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, CollectionName, BsonField, BsonField, BsonField)] =
-    I.prj(op) collect {
-      case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
-    }
 }
 
 final case class $SampleF[A](src: A, size: Int)
@@ -80,22 +74,9 @@ final case class $SampleF[A](src: A, size: Int)
 object $sample {
   def apply[F[_]: Coalesce](size: Int)(implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($SampleF(src, size))))
-
-  def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, Int)] =
-    I.prj(op) collect {
-      case $SampleF(src, size) => (src, size)
-    }
-  }
+}
 
 object WorkflowOp3_2F {
-  // NB: this extractor has to be used instead of the simpler ones provided for
-  // each op if you need to bind the op itself, and not just its fields.
-  // For example: `case $lookup(src, from, lf, ff, as) => ` vs.
-  // `case WorkflowOp3_2F(l @ $LookupF(_, _, _, _, _)) =>`
-  def unapply[F[_], A](fa: F[A])(implicit I: WorkflowOp3_2F :<: F): Option[WorkflowOp3_2F[A]] =
-    I.prj(fa)
-
   implicit val traverse: Traverse[WorkflowOp3_2F] =
     new Traverse[WorkflowOp3_2F] {
       def traverseImpl[G[_], A, B](fa: WorkflowOp3_2F[A])(f: A => G[B])

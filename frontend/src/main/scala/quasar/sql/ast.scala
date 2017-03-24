@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 
@@ -24,7 +24,7 @@ import matryoshka._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait Sql[A]
+sealed abstract class Sql[A]
 object Sql {
 
   implicit val equal: Delay[Equal, Sql] =

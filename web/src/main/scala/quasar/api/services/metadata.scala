@@ -16,7 +16,7 @@
 
 package quasar.api.services
 
-import quasar.Predef.{ -> => _, _ }
+import slamdata.Predef.{ -> => _, _ }
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
@@ -37,6 +37,7 @@ object metadata {
   final case class FsNode(name: String, typ: String, mount: Option[String])
 
   object FsNode {
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def apply(pathSegment: PathSegment, mount: Option[String]): FsNode =
       FsNode(
         pathSegment.fold(_.value, _.value),
@@ -67,7 +68,7 @@ object metadata {
       M.havingPrefix(parent).map { mounts =>
         names map { name =>
           val path = name.fold(parent </> dir1(_), parent </> file1(_))
-          FsNode(name, mounts.get(path).map(_.fold(_.value, "view")))
+          FsNode(name, mounts.get(path).map(_.fold(_.value, "view", "module")))
         }
       }.liftM[FileSystemErrT]
 

@@ -130,7 +130,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
     mkObjectEntry(key, value) >>= (mkObject(_))
 
   /** Returns the string representation of the given item. */
-  def toString(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
+  def asString(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     toStringFn.apply(item)
 
   /** Returns the name of the type of the given item or the empty seq if unknown. */

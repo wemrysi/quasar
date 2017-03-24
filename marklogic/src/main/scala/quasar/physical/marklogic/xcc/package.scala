@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.catchable._
 import quasar.effect.Capture

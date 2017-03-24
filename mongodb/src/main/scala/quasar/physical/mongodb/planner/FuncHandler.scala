@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, _}, MapFuncs._

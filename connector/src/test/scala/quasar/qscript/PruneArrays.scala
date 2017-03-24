@@ -16,8 +16,8 @@
 
 package quasar.qscript
 
-import quasar.Predef.List
-import quasar.common.SortDir
+import slamdata.Predef.List
+import quasar.common.{JoinType, SortDir}
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.sql.CompilerHelpers
@@ -626,7 +626,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
           HoleQS,
           BoolLit[Fix, JoinSide](true),
-          Inner,
+          JoinType.Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
       initial.pruneArrays must equal(initial)
@@ -654,7 +654,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           HoleQS,
           HoleF,
           HoleF,
-          Inner,
+          JoinType.Inner,
           MakeMapR(StrLit("xyz"), Free.point(LeftSide)))).embed
 
       initial.pruneArrays must equal(initial)
@@ -815,49 +815,6 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(expected)
     }
 
-    "rewrite left shift with array referenced through left and right side" in {
-      val initialSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
-          ExcludeId,
-          ConcatArraysR(
-            ConcatArraysR(
-              MakeArrayR(IntLit(6)),
-              MakeArrayR(IntLit(7))),
-            MakeArrayR(IntLit(8))))).embed
-
-      val initial: Fix[QST] =
-        QCT.inj(LeftShift(
-          initialSrc,
-          HoleF,
-          ExcludeId,
-          AddR(
-            ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](1)),
-            ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](2))))).embed
-
-      val expectedSrc: Fix[QST] =
-        QCT.inj(LeftShift(
-          UnreferencedRT.embed,
-          HoleF,
-          ExcludeId,
-          ConcatArraysR(
-            MakeArrayR(IntLit(7)),
-            MakeArrayR(IntLit(8))))).embed
-
-      // TODO this can be rewritten further so that `struct` is just `HoleF`
-      val expected: Fix[QST] =
-        QCT.inj(LeftShift(
-          expectedSrc,
-          HoleF,
-          ExcludeId,
-          AddR(
-            ProjectIndexR(Free.point(RightSide), IntLit[Fix, JoinSide](0)),
-            ProjectIndexR(Free.point(LeftSide), IntLit[Fix, JoinSide](1))))).embed
-
-      initial.pruneArrays must equal(expected)
-    }
-
     "rewrite left shift with entire array unreferenced" in {
       val initialSrc: Fix[QST] =
         QCT.inj(LeftShift(
@@ -873,7 +830,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       val initial: Fix[QST] =
         QCT.inj(LeftShift(
           initialSrc,
-          HoleF,
+          IntLit(2),
           ExcludeId,
           AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
 
@@ -887,7 +844,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       val expected: Fix[QST] =
         QCT.inj(LeftShift(
           expectedSrc,
-          HoleF,
+          IntLit(2),
           ExcludeId,
           AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
 

@@ -16,7 +16,7 @@
 
 package quasar.fp.free
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
 

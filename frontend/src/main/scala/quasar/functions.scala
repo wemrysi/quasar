@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 // Needed for shapeless
@@ -28,7 +28,7 @@ import shapeless._
 import shapeless.syntax.sized._
 import shapeless.ops.nat.ToInt
 
-sealed trait DimensionalEffect
+sealed abstract class DimensionalEffect
 /** Describes a function that reduces a set of values to a single value. */
 final case object Reduction extends DimensionalEffect
 /** Describes a function that expands a compound value into a set of values for

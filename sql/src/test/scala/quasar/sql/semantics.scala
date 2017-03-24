@@ -16,7 +16,7 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.TreeMatchers
 import quasar.sql.fixpoint._
 

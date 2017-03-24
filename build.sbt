@@ -1,6 +1,5 @@
 import github.GithubPlugin._
 import quasar.project._
-import quasar.project.build._
 
 import java.lang.{ String, Integer }
 import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
@@ -14,6 +13,8 @@ import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
+import slamdata.CommonDependencies
+import slamdata.SbtSlamData.transferPublishAndTagResources
 
 val BothScopes = "test->test;compile->compile"
 
@@ -25,51 +26,29 @@ val ExclusiveTest = Tags.Tag("exclusive-test")
 def exclusiveTasks(tasks: Scoped*) =
   tasks.flatMap(inTask(_)(tags := Seq((ExclusiveTest, 1))))
 
-lazy val checkHeaders =
-  taskKey[Unit]("Fail the build if createHeaders is not up-to-date")
-
-lazy val buildSettings = Seq(
+lazy val buildSettings = commonBuildSettings ++ Seq(
   organization := "org.quasar-analytics",
-  headers := Map(
-    ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
-    ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
-  scalaOrganization := "org.typelevel",
-  outputStrategy := Some(StdoutOutput),
   initialize := {
     val version = sys.props("java.specification.version")
     assert(
       Integer.parseInt(version.split("\\.")(1)) >= 8,
       "Java 8 or above required, found " + version)
   },
-  autoCompilerPlugins := true,
-  autoAPIMappings := true,
-  resolvers ++= Seq(
-    Resolver.sonatypeRepo("releases"),
-    Resolver.sonatypeRepo("snapshots"),
-    "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
-    "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
-    "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.3"),
-  addCompilerPlugin("org.scalamacros" %  "paradise"       % "2.1.0" cross CrossVersion.full),
+
+  libraryDependencies += CommonDependencies.slamdata.predef,
 
   ScoverageKeys.coverageHighlighting := true,
 
-  // NB: These options need scalac 2.11.7 ∴ sbt > 0.13 for meta-project
-  scalacOptions ++= BuildInfo.scalacOptions ++ Seq(
+  scalacOptions ++= Seq(
     "-target:jvm-1.8",
-    "-Ybackend:GenBCode",
-    "-Ydelambdafy:method",
-    "-Ypartial-unification",
-    "-Yliteral-types",
-    "-Ywarn-unused-import"),
-  scalacOptions in (Test, console) --= Seq(
-    "-Yno-imports",
-    "-Ywarn-unused-import"),
-  scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
+    "-Ybackend:GenBCode"),
+  // NB: -Xlint triggers issues that need to be fixed
+  scalacOptions --= Seq(
+    "-Xlint"),
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
-  wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
+  wartremoverWarnings in (Compile, compile) --= Seq(
     Wart.Any,                   // - see wartremover/wartremover#263
     Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
     Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
@@ -80,14 +59,7 @@ lazy val buildSettings = Seq(
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
 
-  console := { (console in Test).value }, // console alias test:console
-
-  licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
-
-  checkHeaders := {
-    if ((createHeaders in Compile).value.nonEmpty)
-      sys.error("headers not all present")
-  })
+  console := { (console in Test).value }) // console alias test:console
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -103,39 +75,16 @@ concurrentRestrictions in Global := {
 // Tasks tagged with `ExclusiveTest` should be run exclusively.
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
-lazy val publishSettings = Seq(
+lazy val publishSettings = commonPublishSettings ++ Seq(
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
-  licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
-  publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value)
-      Some("snapshots" at nexus + "content/repositories/snapshots")
-    else
-      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-  },
-  publishMavenStyle := true,
-  publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
-  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
-  releaseCrossBuild := true,
-  autoAPIMappings := true,
   scmInfo := Some(
     ScmInfo(
       url("https://github.com/quasar-analytics/quasar"),
       "scm:git@github.com:quasar-analytics/quasar.git"
     )
-  ),
-  developers := List(
-    Developer(
-      id = "slamdata",
-      name = "SlamData Inc.",
-      email = "contact@slamdata.com",
-      url = new URL("http://slamdata.com")
-    )
-  )
-)
+  ))
 
 lazy val assemblySettings = Seq(
   test in assembly := {},
@@ -168,14 +117,6 @@ lazy val publishTestsSettings = Seq(
   publishArtifact in (Test, packageBin) := true
 )
 
-// Include to prevent publishing any artifacts for a project
-lazy val noPublishSettings = Seq(
-  publishTo := Some(Resolver.file("nopublish repository", file("target/nopublishrepo"))),
-  publish := {},
-  publishLocal := {},
-  publishArtifact := false
-)
-
 lazy val githubReleaseSettings =
   githubSettings ++ Seq(
     GithubKeys.assets := Seq(assembly.value),
@@ -199,6 +140,7 @@ lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(transferPublishAndTagResources)
   .settings(aggregate in assembly := false)
   .aggregate(
         foundation,
@@ -255,8 +197,6 @@ lazy val effect = project
   .dependsOn(foundation % BothScopes)
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.AsInstanceOf))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
@@ -277,11 +217,6 @@ lazy val common = project
   .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
@@ -295,8 +230,7 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
@@ -311,9 +245,7 @@ lazy val frontend = project
   .settings(
     libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -322,9 +254,6 @@ lazy val sql = project
   .settings(name := "quasar-sql-internal")
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
-  .settings(
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Equals))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -342,9 +271,7 @@ lazy val connector = project
   .settings(publishTestsSettings)
   .settings(
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -354,7 +281,6 @@ lazy val couchbase = project
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -364,11 +290,7 @@ lazy val marklogic = project
   .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(
-    libraryDependencies ++= Dependencies.marklogic,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Overloading))
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))
@@ -402,9 +324,7 @@ lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.postgresql,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -428,9 +348,7 @@ lazy val sparkcore = project
   .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,
-    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value),
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf))
+    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -462,8 +380,7 @@ lazy val repl = project
   .settings(
     fork in run := true,
     connectInput in run := true,
-    outputStrategy := Some(StdoutOutput),
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    outputStrategy := Some(StdoutOutput))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
@@ -476,9 +393,7 @@ lazy val web = project
   .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
-    libraryDependencies ++= Dependencies.web,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.Overloading))
+    libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests

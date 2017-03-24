@@ -16,9 +16,10 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Planner => QPlanner, RenderTreeT}
 import quasar.common._
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
@@ -46,12 +47,14 @@ object queryfile {
 
   type QKvs[F[_], G[_]] = Kvs[G, QueryFile.ResultHandle, impl.DataStream[F]]
 
-  type MLQScript[T[_[_]], A] = (
+  type MLQScriptCP[T[_[_]]] = (
     QScriptCore[T, ?]           :\:
     ThetaJoin[T, ?]             :\:
     Const[ShiftedRead[ADir], ?] :/:
     Const[Read[AFile], ?]
-  )#M[A]
+  )
+
+  type MLQScript[T[_[_]], A] = MLQScriptCP[T]#M[A]
 
   implicit def mlQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[MLQScript[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
@@ -117,7 +120,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
   ](
     lp: T[LogicalPlan]
@@ -127,8 +130,6 @@ object queryfile {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
 
-    val C = Coalesce[T, MLQ, MLQ]
-    val N = Normalizable[MLQ]
     val R = new Rewrite[T]
 
     def logPhase(pr: PhaseResult): F[Unit] =
@@ -143,11 +144,7 @@ object queryfile {
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
                      R.optimize(reflNT[MLQ]),
-                     repeatedly(R.applyTransforms(
-                       C.coalesceQC[MLQ](idPrism),
-                       C.coalesceTJ[MLQ](idPrism.get),
-                       C.coalesceSR[MLQ, ADir](idPrism),
-                       N.normalizeF(_: MLQ[T[MLQ]]))))
+                     Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)
       inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])

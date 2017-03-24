@@ -16,10 +16,11 @@
 
 package quasar.physical.couchbase.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
@@ -85,7 +86,7 @@ object queryfile {
     case FileExists(file)     => fileExists(file)
   }
 
-  def executePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def executePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan], out: AFile
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -120,7 +121,7 @@ object queryfile {
                 ))).into.liftF
     } yield out).run.run
 
-  def evaluatePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def evaluatePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -154,7 +155,7 @@ object queryfile {
   ): Free[S, Unit] =
     results.delete(handle)
 
-  def explain[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def explain[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -211,7 +212,7 @@ object queryfile {
                  )).into.liftM[PhaseResultT])
     } yield r
 
-  def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -224,14 +225,15 @@ object queryfile {
     lpLcToN1ql[T, S](lp, lc)
   }
 
-  def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpLcToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Plan[S, (T[N1QL], ISet[APath])] = {
-    type CBQS[A]  = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+    type CBQSCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+    type CBQS[A]  = CBQSCP#M[A]
     type CBQS0[A] = (Const[ShiftedRead[ADir], ?] :/: CBQS)#M[A]
 
     implicit val couchbaseQScriptToQSTotal: Injectable.Aux[CBQS, QScriptTotal[T, ?]] =
@@ -239,7 +241,6 @@ object queryfile {
 
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
     val rewrite = new Rewrite[T]
-    val C = Coalesce[T, CBQS, CBQS]
 
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
@@ -250,11 +251,7 @@ object queryfile {
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(rewrite.applyTransforms(
-                  C.coalesceQC[CBQS](idPrism),
-                  C.coalesceEJ[CBQS](idPrism.get),
-                  C.coalesceSR[CBQS, AFile](idPrism),
-                  Normalizable[CBQS].normalizeF(_: CBQS[T[CBQS]]))))
+                Unicoalesce[T, CBQSCP])
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan
