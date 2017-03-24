@@ -17,15 +17,13 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef.{Eq => _, _}
-import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}
-import quasar.std.TemporalPart
 import quasar.{Data, DataCodec}
 import quasar.Planner._
+import quasar.common.PrimaryType
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
-import quasar.common.PrimaryType
+import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
