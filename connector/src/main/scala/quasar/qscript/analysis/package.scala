@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.qscript
 
 import slamdata.Predef._
-import quasar.qscript._
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fp._, ski._
 
@@ -28,7 +27,7 @@ import matryoshka.data._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
-package object qanalysis {
+package object analysis {
 
   sealed trait AnalysisResult
   case object Instant extends AnalysisResult
@@ -80,7 +79,7 @@ package object qanalysis {
         val I = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
         def calculate(pathCard: APath => Int): Algebra[QScriptCore[T, ?], Int] = {
-          case qscript.Map(card, f) => card
+          case Map(card, f) => card
           case Reduce(card, bucket, reducers, repair) =>
             bucket.fold(κ(card / 2), {
               case MapFuncs.Constant(v) => 1
@@ -91,7 +90,7 @@ package object qanalysis {
           case Subset(card, from, sel, count) => {
             val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
             def c = count.fold(κ(card / 2), {
-              case I(qscript.Map(_, MapFuncs.IntLit(v))) => v.toInt
+              case I(Map(_, MapFuncs.IntLit(v))) => v.toInt
               case _ => card / 2
             })
             sel match {
@@ -171,7 +170,7 @@ package object qanalysis {
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cost[QScriptCore[T, ?]] =
       new Cost[QScriptCore[T, ?]] {
         def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), QScriptCore[T, ?], Int] = {
-          case qscript.Map((card, cost), f) => card + cost
+          case Map((card, cost), f) => card + cost
           case Reduce((card, cost), bucket, reducers, repair) => card + cost
           case Sort((card, cost), bucket, orders) => card + cost
           case Filter((card, cost), f) => card + cost
