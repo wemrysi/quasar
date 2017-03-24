@@ -1,0 +1,55 @@
+mongodb_2_6:
+  container_name: mongodb_2_6
+  image: tutum/mongodb:2.6
+  command: mongod --smallfiles
+  ports:
+   - "27018:27017"
+
+mongodb_3_0:
+  container_name: mongodb_3_0
+  image: mongo:3.0
+  command: mongod --smallfiles
+  ports:
+   - "27019:27017"
+
+mongodb_read_only:
+  container_name: mongodb_read_only
+  image: mongo:3.0
+  command: mongod --smallfiles
+  ports:
+   - "27020:27017"
+
+mongodb_3_2:
+  container_name: mongodb_3_2
+  image: mongo:3.2
+  command: ["mongod", "--smallfiles"]
+  ports:
+   - "27021:27017"
+
+mongodb_3_4:
+  container_name: mongodb_3_4
+  image: mongo:3.4
+  command: ["mongod", "--smallfiles"]
+  ports:
+   - "27022:27017"
+
+postgresql:
+  container_name: postgresql
+  image: postgres:9.6
+  privileged: true
+  ports:
+    - "5432:5432"
+
+marklogic:
+  container_name: marklogic
+  build: ./Dockerfiles/Marklogic
+  dockerfile: MarkLogic-Dockerfile
+  ports:
+    - "8000-8002:8000-8002"
+
+couchbase:
+  container_name: couchbase
+  image: couchbase/server:enterprise-4.5.1
+  ports:
+    - "8091-8094:8091-8094"
+    - "11210:11210"

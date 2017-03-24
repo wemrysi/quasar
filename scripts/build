@@ -9,53 +9,20 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 # update CI configuration.
 #
 
+echo "running build2..."
+
 source "$(dirname $0)/constants"
-
-echo "Script Path:   $SCRIPT_DIR"
-echo "Root Path:     $WS_DIR"
-echo "Version:       $QUASAR_VERSION"
-echo "Web Jar:       $QUASAR_WEB_JAR"
-echo "Web Jar Dir:   $QUASAR_WEB_JAR_DIR"
-echo "Web Jar Path:  $QUASAR_WEB_JAR_PATH"
-
-QUASAR_MONGODB_TESTDB="quasar-test"
-QUASAR_MONGODB_HOST_2_6="localhost:27018"
-QUASAR_MONGODB_HOST_3_0="localhost:27019"
-QUASAR_MONGODB_HOST_3_2="localhost:27020"
 
 TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
 
-# Enables running tests for a single mongo release by specifying an argument of
-# "2_6", "3_0", or "3_2" for the MongoDB 2.6.x, 3.0.x, and 3.2.x releases.
-if [[ "$#" == "1" ]]; then
-  QUASAR_MONGODB_RELEASE="$1"
-else
-  QUASAR_MONGODB_RELEASE="NONE"
-fi
 
-# Perform setup for integration tests:
-if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
-  export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
 
-  if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
-    echo "mongodb_2_6=\"mongodb://${QUASAR_MONGODB_HOST_2_6}\"" > $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
-    echo "mongodb_3_0=\"mongodb://${QUASAR_MONGODB_HOST_3_0}\"" > $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-    echo "mongodb_read_only=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" > $TEST_CONFIG_FILE
-    echo "mongodb_read_only_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" >> $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
-    echo "mongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" > $TEST_CONFIG_FILE
-    echo "mongodb_q_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" >> $TEST_CONFIG_FILE
-  fi
-
-  echo "Using local MongoDB config"
-fi
-
+# only do code coverage on job .1 AND on a non-pull request
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
+  echo "in job #1 building connector, this will take a while..."
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION clean coverage connector/test:compile
   else
@@ -68,7 +35,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION 'web/assembly' doc
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION clean 'web/assembly' doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -80,8 +47,9 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
+  echo "in job > #1 building connector, this will take a while..."
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION clean connector/test:compile
   fi
 
   # Not the first job in Travis; run only integration tests (no sense

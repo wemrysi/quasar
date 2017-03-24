@@ -1,0 +1,84 @@
+#!/bin/bash
+set -e
+
+echo "configuring couchbase..."
+
+CBWOP='http://admin:password@localhost'
+CB='http://Administrator:password@localhost'
+
+sleep 10
+
+# doing this as suggested here by Dan Douglass on 22/Jan/16 12:13PM
+# https://issues.couchbase.com/browse/MB-16233
+echo "setting up couchbase memory quota../"
+curl -v -s -X POST $CBWOP:8091/pools/default -d memoryQuota=512
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase services../"
+curl -v $CBWOP:8091/node/controller/setupServices -d services=kv%2Cn1ql%2Cindex%2Cfts
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase web console with username and password..."
+curl -v $CBWOP:8091/settings/web -d port=8091 -d username=Administrator -d password=password
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase indexes..."
+curl -v $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase pools..."
+curl -v -X POST $CB:8091/pools/default -d memoryQuota=400 -d indexMemoryQuota=1024
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase default buckets..."
+curl -v $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=default&authType=sasl'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase quasar-test buckets..."
+curl -v $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=quasar-test&authType=sasl'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase for primary index on quasar-test..."
+curl -v $CB:8093/query -d 'statement=create primary index on `quasar-test`'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase index on quasar-test..."
+curl -v $CB:8093/query -d 'statement=create index quasar_test_type_idx on `quasar-test`(type)'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase sample buckets..."
+curl -v $CB:8091/sampleBuckets/install -d '["beer-sample"]'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase primary index for beer-sample..."
+curl -v $CB:8093/query -d 'statement=create primary index on `beer-sample`'
+printf "\n\n"
+
+sleep 10
+
+echo "setting up couchbase index on beer-sample..."
+curl -v $CB:8093/query -d 'statement=create index beer_sample_type_idx on `beer-sample`(type)'
+
+sleep 10
+
+echo "couchbase configuration done!"
