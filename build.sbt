@@ -121,6 +121,7 @@ lazy val githubReleaseSettings =
   githubSettings ++ Seq(
     GithubKeys.assets := Seq(assembly.value),
     GithubKeys.repoSlug := "quasar-analytics/quasar",
+    GithubKeys.releaseName := "quasar " + GithubKeys.tag.value,
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
     releaseProcess := Seq[ReleaseStep](
