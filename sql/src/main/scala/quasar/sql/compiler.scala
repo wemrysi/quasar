@@ -27,7 +27,8 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib, StdLib._, date.TemporalPart
+import quasar.std.StdLib, StdLib._
+import quasar.std.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
 import matryoshka._

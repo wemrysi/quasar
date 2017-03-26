@@ -44,6 +44,7 @@ final case class ConstrainedPlan[T]
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._
+  import quasar.std.TemporalPart
 
   def read(path: FPath) = lp.read[T](path).embed
   def constant(data: Data) = lp.constant[T](data).embed
