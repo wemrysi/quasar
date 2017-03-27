@@ -233,9 +233,6 @@ lazy val common = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
-  .settings(
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
