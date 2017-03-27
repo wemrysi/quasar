@@ -96,7 +96,7 @@ else
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   fi
 
-  # Not the first job in Travis; run only integration tests (no sensek
+  # Not the first job in Travis; run only integration tests (no sense
   # re-doing work that isn't affected by the available backends)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION it/test it/exclusive:test
 fi
