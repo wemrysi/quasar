@@ -62,26 +62,31 @@ object GithubPlugin extends Plugin {
 
       val github = githubAuth.value
 
-      log.info("repoSlug    = " + repoSlug.value)
-      log.info("tag         = " + tag.value)
-      log.info("releaseName = " + releaseName.value)
-      log.info("draft       = " + draft.value)
-      log.info("prerelease  = " + prerelease.value)
-      log.info("commitish   = " + commitish.value)
-
       val release = Try {
         val repo = github.getRepository(repoSlug.value)
 
+        val body =
+          repo.listTags.find(_.getName == tag.value).map { tagUnpopulated =>
+            repo.getCommit(tagUnpopulated.getCommit.getSHA1).getCommitShortInfo.getMessage
+          }.getOrElse(scala.sys.error("Tag not found"))
+
+        log.info("repoSlug    = " + repoSlug.value)
+        log.info("tag         = " + tag.value)
+        log.info("releaseName = " + releaseName.value)
+        log.info("draft       = " + draft.value)
+        log.info("body        = " + body)
+        log.info("prerelease  = " + prerelease.value)
+        log.info("commitish   = " + commitish.value)
+
         val existingRelease =
-          repo.listReleases().asList.toList
-            .find(_.getName == releaseName.value)
+          repo.listReleases.find(_.getName == releaseName.value)
 
         existingRelease.getOrElse {
           val releaseBuilder = repo
             .createRelease(tag.value)
             .name(releaseName.value)
             .draft(draft.value)
-            //body(body). // TODO: Build release notes from fixed issues
+            .body(body)
             .prerelease(prerelease.value)
 
           (commitish.value match {
@@ -92,7 +97,7 @@ object GithubPlugin extends Plugin {
       } match {
         case Success(v) => v
         case Failure(e) =>
-          throw new RuntimeException("Could not create the Github release", e)
+          throw new RuntimeException("Could not access or create the Github release", e)
       }
 
       log.info("Created Github release: " + release)
