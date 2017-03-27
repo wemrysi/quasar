@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.qanalysis
+package quasar.qscript.analysis
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
