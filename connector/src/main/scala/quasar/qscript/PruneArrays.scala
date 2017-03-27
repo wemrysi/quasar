@@ -154,6 +154,22 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   def rewriteRepair(array: ConcatArrays[T, JoinFunc], seen: SeenIndices): JoinFunc  =
     arrayRewrite(array, seen.map(_.toInt).toSet)
 
+  def rewriteBranch(branch: FreeQS, seen: SeenIndices): FreeQS =
+    branch.resume match {
+      case -\/(qs) =>
+        Inject[QScriptCore, QScriptTotal].prj(qs) match {
+          case Some(LeftShift(src, struct, id, repair)) =>
+            repair.resume match {
+              case -\/(array @ ConcatArrays(_, _)) =>
+                Free.roll(Inject[QScriptCore, QScriptTotal].inj(
+                  LeftShift(src, struct, id, rewriteRepair(array, seen))))
+              case _ => branch
+            }
+          case _ => branch
+        }
+      case _ => branch
+    }
+
   // TODO: Can we be more efficient? - can get rid of `.sorted`, but might be
   //       non-deterministic, then.
   val indexMapping: SeenIndices => IndexMapping =
@@ -204,8 +220,37 @@ object PruneArrays {
   implicit def shiftedRead[A]: PruneArrays[Const[ShiftedRead[A], ?]] = default
   implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
-  // TODO examine branches
-  implicit def thetaJoin[T[_[_]]]: PruneArrays[ThetaJoin[T, ?]] = default
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[ThetaJoin[T, ?]] =
+    new PruneArrays[ThetaJoin[T, ?]] {
+      val helpers = new PAHelpers[T]
+      import helpers._
+
+      def find[M[_], A](in: ThetaJoin[A])(implicit M: MonadState[M, RewriteState]) = {
+        val state: RewriteState =
+          liftJoinSide(findIndicesInFunc[JoinSide](in.on)) |+|
+            liftJoinSide(findIndicesInFunc[JoinSide](in.combine))
+        M.put(Ignore).as(state) // annotate computed state as environment
+      }
+
+      def remap[M[_], A](env: RewriteState, in: ThetaJoin[A])(implicit M: MonadState[M, RewriteState]) =
+        haltRemap(env match {
+          case Ignore => in
+          case Rewrite(indices) => {
+            val leftIndices: KnownIndices = getIndices(LeftSide.right, indices)
+            val rightIndices: KnownIndices = getIndices(RightSide.right, indices)
+
+            val lrepl: IndexMapping = leftIndices.cata(indexMapping, ScalaMap.empty)
+            val rrepl: IndexMapping = rightIndices.cata(indexMapping, ScalaMap.empty)
+
+            ThetaJoin(in.src,
+              leftIndices.map(rewriteBranch(in.lBranch, _)).getOrElse(in.lBranch),
+              rightIndices.map(rewriteBranch(in.rBranch, _)).getOrElse(in.rBranch),
+              remapIndicesInJoinFunc(in.on, lrepl, rrepl),
+              in.f,
+              remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
+          }
+        })
+    }
 
   implicit def equiJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[EquiJoin[T, ?]] =
     new PruneArrays[EquiJoin[T, ?]] {
@@ -220,23 +265,7 @@ object PruneArrays {
         M.put(Ignore).as(state) // annotate computed state as environment
       }
 
-      def remap[M[_], A](env: RewriteState, in: EquiJoin[A])(implicit M: MonadState[M, RewriteState]) = {
-        def rewriteBranch(branch: FreeQS, seen: SeenIndices): FreeQS =
-          branch.resume match {
-            case -\/(qs) =>
-              Inject[QScriptCore, QScriptTotal].prj(qs) match {
-                case Some(LeftShift(src, struct, id, repair)) =>
-                  repair.resume match {
-                    case -\/(array @ ConcatArrays(_, _)) =>
-                      Free.roll(Inject[QScriptCore, QScriptTotal].inj(
-                        LeftShift(src, struct, id, rewriteRepair(array, seen))))
-                    case _ => branch
-                  }
-                case _ => branch
-              }
-            case _ => branch
-          }
-
+      def remap[M[_], A](env: RewriteState, in: EquiJoin[A])(implicit M: MonadState[M, RewriteState]) =
         haltRemap(env match {
           case Ignore => in
           case Rewrite(indices) => {
@@ -255,7 +284,6 @@ object PruneArrays {
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
           }
         })
-      }
     }
 
   def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =

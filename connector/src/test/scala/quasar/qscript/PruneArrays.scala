@@ -677,8 +677,36 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
 	  lBranch,
           HoleQS,
-	  HoleF,
+	  HoleF,  // reference entire left branch
           HoleF,
+          JoinType.Inner,
+          MakeMapR(
+	    StrLit("xyz"),
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2))))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite theta join with entire array branch referenced in condition" in {
+      val lBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))))
+
+      val initial: Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+	  lBranch,
+          HoleQS,
+	  EqR(
+	    AddR(LeftSideF, IntLit[Fix, JoinSide](2)),  // reference entire left branch
+	    RightSideF),
           JoinType.Inner,
           MakeMapR(
 	    StrLit("xyz"),
@@ -709,7 +737,33 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           JoinType.Inner,
           MakeMapR(
 	    StrLit("xyz"),
-	    LeftSideF))).embed
+	    LeftSideF))).embed  // reference entire left branch
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    "not rewrite theta join with entire array branch referenced in combine" in {
+      val lBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))))
+
+      val initial: Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+	  lBranch,
+          HoleQS,
+          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+          JoinType.Inner,
+          MakeMapR(
+	    StrLit("xyz"),
+	    LeftSideF))).embed  // reference entire left branch
 
       initial.pruneArrays must equal(initial)
     }
@@ -743,6 +797,75 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
 	    IntLit[Fix, Hole](2)))).embed
 
       initial.pruneArrays must equal(initial)
+    }
+
+    "rewrite theta join with unused array elements in both branches" in {
+      val lBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(6)),
+              MakeArrayR(IntLit(7))),
+            MakeArrayR(IntLit(8))))))
+
+      val rBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            ConcatArraysR(
+              MakeArrayR(IntLit(1)),
+              MakeArrayR(IntLit(2))),
+            MakeArrayR(StrLit("xyz"))))))
+
+      val initial: Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+	  lBranch,
+          rBranch,
+          EqR(
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+	    ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+          JoinType.Inner,
+          MakeMapR(
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+	    ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](2))))).embed
+
+      val lBranchExpected: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          MakeArrayR(IntLit(8)))))
+
+      val rBranchExpected: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          HoleQS,
+          HoleF,
+          ExcludeId,
+          ConcatArraysR(
+            MakeArrayR(IntLit(1)),
+            MakeArrayR(StrLit("xyz"))))))
+
+
+      val expected: Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+	  lBranchExpected,
+          rBranchExpected,
+          EqR(
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
+	    ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+          JoinType.Inner,
+          MakeMapR(
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
+	    ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))).embed
+
+      initial.pruneArrays must equal(expected)
     }
 
     "rewrite equi join with unused array elements in both branches" in {
