@@ -154,7 +154,10 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   def rewriteRepair(array: ConcatArrays[T, JoinFunc], seen: SeenIndices): JoinFunc  =
     arrayRewrite(array, seen.map(_.toInt).toSet)
 
-  def rewriteBranch(branch: FreeQS, seen: SeenIndices): FreeQS =
+  // TODO currently we only rewrite the branch if it is precisely a LeftShift
+  // we need to generalize this so we can rewrite all rewritable branches
+  // e.g. sometimes Filter(LeftShift(_, _, _, ConcatArrays)) is rewritable
+  def rewriteBranch(branch: FreeQS, seen: SeenIndices): Option[FreeQS] =
     branch.resume match {
       case -\/(qs) =>
         Inject[QScriptCore, QScriptTotal].prj(qs) match {
@@ -162,12 +165,12 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
             repair.resume match {
               case -\/(array @ ConcatArrays(_, _)) =>
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(
-                  LeftShift(src, struct, id, rewriteRepair(array, seen))))
-              case _ => branch
+                  LeftShift(src, struct, id, rewriteRepair(array, seen)))).some
+              case _ => none
             }
-          case _ => branch
+          case _ => none
         }
-      case _ => branch
+      case _ => none
     }
 
   // TODO: Can we be more efficient? - can get rid of `.sorted`, but might be
@@ -239,12 +242,19 @@ object PruneArrays {
             val leftIndices: KnownIndices = getIndices(LeftSide.right, indices)
             val rightIndices: KnownIndices = getIndices(RightSide.right, indices)
 
-            val lrepl: IndexMapping = leftIndices.cata(indexMapping, ScalaMap.empty)
-            val rrepl: IndexMapping = rightIndices.cata(indexMapping, ScalaMap.empty)
+            val (lrepl, lBranch): (IndexMapping, FreeQS) =
+              leftIndices.flatMap { seen =>
+                rewriteBranch(in.lBranch, seen).map((indexMapping(seen), _))
+              }.getOrElse((ScalaMap.empty, in.lBranch))
+
+            val (rrepl, rBranch): (IndexMapping, FreeQS) =
+              rightIndices.flatMap { seen =>
+                rewriteBranch(in.rBranch, seen).map((indexMapping(seen), _))
+              }.getOrElse((ScalaMap.empty, in.rBranch))
 
             ThetaJoin(in.src,
-              leftIndices.map(rewriteBranch(in.lBranch, _)).getOrElse(in.lBranch),
-              rightIndices.map(rewriteBranch(in.rBranch, _)).getOrElse(in.rBranch),
+              lBranch,
+              rBranch,
               remapIndicesInJoinFunc(in.on, lrepl, rrepl),
               in.f,
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
@@ -272,12 +282,19 @@ object PruneArrays {
             val leftIndices: KnownIndices = getIndices(LeftSide.right, indices)
             val rightIndices: KnownIndices = getIndices(RightSide.right, indices)
 
-            val lrepl: IndexMapping = leftIndices.cata(indexMapping, ScalaMap.empty)
-            val rrepl: IndexMapping = rightIndices.cata(indexMapping, ScalaMap.empty)
+            val (lrepl, lBranch): (IndexMapping, FreeQS) =
+              leftIndices.flatMap { seen =>
+                rewriteBranch(in.lBranch, seen).map((indexMapping(seen), _))
+              }.getOrElse((ScalaMap.empty, in.lBranch))
+
+            val (rrepl, rBranch): (IndexMapping, FreeQS) =
+              rightIndices.flatMap { seen =>
+                rewriteBranch(in.rBranch, seen).map((indexMapping(seen), _))
+              }.getOrElse((ScalaMap.empty, in.rBranch))
 
             EquiJoin(in.src,
-              leftIndices.map(rewriteBranch(in.lBranch, _)).getOrElse(in.lBranch),
-              rightIndices.map(rewriteBranch(in.rBranch, _)).getOrElse(in.rBranch),
+              lBranch,
+              rBranch,
               remapIndicesInFunc(in.lKey, lrepl),
               remapIndicesInFunc(in.rKey, rrepl),
               in.f,

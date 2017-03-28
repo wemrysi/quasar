@@ -653,6 +653,43 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
+    // this can be rewritten - we just don't support that yet
+    "not rewrite theta join with filtered left shift as branch" in {
+      val initial: Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+	  Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
+          HoleQS,
+          EqR(
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+	    StrLit[Fix, JoinSide]("foo")),
+          JoinType.Inner,
+          MakeMapR(
+	    StrLit[Fix, JoinSide]("bar"),
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
+    // this can be rewritten - we just don't support that yet
+    "not rewrite equi join with filtered left shift as branch" in {
+      val initial: Fix[QST] =
+        EJT.inj(EquiJoin(
+          UnreferencedRT.embed,
+	  Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
+          HoleQS,
+          EqR(
+	    ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+	    StrLit[Fix, Hole]("foo")),
+	  HoleF,
+          JoinType.Inner,
+          MakeMapR(
+	    StrLit[Fix, JoinSide]("bar"),
+	    ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
+
+      initial.pruneArrays must equal(initial)
+    }
+
     "rewrite theta join with unused array elements in both branches" in {
       val rBranch: FreeQS =
         Free.roll(QCT.inj(LeftShift(
