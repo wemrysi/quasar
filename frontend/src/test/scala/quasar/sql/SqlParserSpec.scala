@@ -232,6 +232,42 @@ class SQLParserSpec extends quasar.Qspec {
       parse(""":`start time`""") should beRightDisjOrDiff(VariR("start time"))
     }
 
+    "parse variable with quoted name starting with '_'" in {
+      parse(""":`_8`""") should beRightDisjOrDiff(VariR("_8"))
+    }
+
+    "not parse variable with '_' as the name" in {
+      parse(""":_""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with digit as the name" in {
+      parse(""":8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with digit at the start of the name" in {
+      parse(""":8_""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "not parse variable with '_' at the start of the name" in {
+      parse(""":_8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `:'"))
+    }
+
+    "parse simple query with '_' as relation" in {
+      parse("""SELECT * FROM `_`""").toOption should beSome
+    }
+
+    "parse simple query with '_' in relation" in {
+      parse("""SELECT * FROM `/foo/bar/_`""").toOption should beSome
+    }
+
     "parse simple query with variable as relation" in {
       parse("""SELECT * FROM :table""").toOption should beSome
     }
@@ -275,7 +311,7 @@ class SQLParserSpec extends quasar.Qspec {
                   where dt < date("2014-11-16")
                   and tm < time("03:00:00")
                   and ts < timestamp("2014-11-16T03:00:00Z") + interval("PT1H")
-                  and _id != oid("abc123")"""
+                  and `_id` != oid("abc123")"""
 
       parse(q) must beRightDisjunction
     }
@@ -404,6 +440,36 @@ class SQLParserSpec extends quasar.Qspec {
       parse("""foo := 5; foo""") must
         beRightDisjunction(
           LetR(CIName("foo"), IntLiteralR(5), IdentR("foo")))
+    }
+
+    "parse basic let with quoted identifier starting with '_'" in {
+      parse("""`_8` := 5; `_8`""") must
+        beRightDisjunction(
+          LetR(CIName("_8"), IntLiteralR(5), IdentR("_8")))
+    }
+
+    "not parse basic let with '_' as the identifier" in {
+      parse("""_ := 5; _""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `*** error: '!' expected but _ found'"))
+    }
+
+    "not parse basic let with digit as the identifier" in {
+      parse("""8 := 5; 8""") must
+        beLeftDisjunction(
+          GenericParsingError("keyword 'except' expected; but found `:='"))
+    }
+
+    "not parse basic let with digit at the start of the identifier" in {
+      parse("""8_ := 5; 8_""") must
+        beLeftDisjunction(
+          GenericParsingError("keyword 'except' expected; but found `*** error: '!' expected but _ found'"))
+    }
+
+    "not parse basic let with '_' at the start of the identifier" in {
+      parse("""_8 := 5; _8""") must
+        beLeftDisjunction(
+          GenericParsingError("quotedIdent expected; but found `*** error: '!' expected but _ found'"))
     }
 
     "parse nested lets" in {
@@ -602,7 +668,7 @@ class SQLParserSpec extends quasar.Qspec {
         p => if (p != node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)
-    }
+    }.set(minTestsOk = 1000) // one cannot test a parser too much
 
     "round-trip quoted variable names through the pretty-printer" >> {
       val q = "select * from :`A.results`"

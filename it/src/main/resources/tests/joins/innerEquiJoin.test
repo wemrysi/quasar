@@ -9,7 +9,7 @@
         "couchbase":         "skip"
     },
     "data": ["../smallZips.data", "../zips.data"],
-    "query": "select smallZips.city, zips.state from `../smallZips` join `../zips` on smallZips._id = zips._id",
+    "query": "select smallZips.city, zips.state from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
     "predicate": "containsAtLeast",
     "expected": [{"city": "AGAWAM",       "state": "MA"},
                  {"city": "CUSHMAN",      "state": "MA"},
