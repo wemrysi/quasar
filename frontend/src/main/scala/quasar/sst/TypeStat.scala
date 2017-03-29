@@ -25,7 +25,7 @@ import matryoshka._
 import monocle.Prism
 import scalaz._, Scalaz._, NonEmptyList.nel, Tags.Max
 import scalaz.std.anyVal.{char => charInst}
-import spire.algebra.{AdditiveSemigroup, Field, NRoot, Rig}
+import spire.algebra.{AdditiveMonoid, AdditiveSemigroup, Field, NRoot}
 import spire.math.ConvertableTo
 import spire.syntax.field._
 
@@ -113,47 +113,47 @@ object TypeStat extends TypeStatInstances {
     case Count(n) => n
   } (Count(_))
 
-  def fromEJson[A](ejson: EJson[_])(implicit R: Rig[A], A: ConvertableTo[A]): TypeStat[A] =
+  def fromEJson[A](cnt: A, ejson: EJson[_])(implicit M: AdditiveMonoid[A], A: ConvertableTo[A]): TypeStat[A] =
     ejson match {
-      case C(   ejs.Null())  => count(R.one)
-      case C(   ejs.Bool(b)) => bool(b.fold(R.one, R.zero), b.fold(R.zero, R.one))
-      case E(   ejs.Byte(b)) => byte(R.one, b, b)
-      case E(   ejs.Char(c)) => char(R.one, c, c)
-      case C(    ejs.Str(s)) => str(R.one, s, s)
-      case E(    ejs.Int(i)) => int(SampleStats.one(A fromBigInt i), i, i)
-      case C(    ejs.Dec(d)) => dec(SampleStats.one(A fromBigDecimal d), d, d)
-      case C(   ejs.Arr(xs)) => fromFoldable(R.one, xs)
-      case E(   ejs.Map(xs)) => fromFoldable(R.one, xs)
-      case E(ejs.Meta(_, _)) => count(R.one)
+      case C(   ejs.Null())  => count(cnt)
+      case C(   ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
+      case E(   ejs.Byte(b)) => byte(cnt, b, b)
+      case E(   ejs.Char(c)) => char(cnt, c, c)
+      case C(    ejs.Str(s)) => str(cnt, s, s)
+      case E(    ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt     i), i, i)
+      case C(    ejs.Dec(d)) => dec(SampleStats.freq(cnt, A fromBigDecimal d), d, d)
+      case C(   ejs.Arr(xs)) => fromFoldable(cnt, xs)
+      case E(   ejs.Map(xs)) => fromFoldable(cnt, xs)
+      case E(ejs.Meta(_, _)) => count(cnt)
     }
 
   def fromFoldable[F[_]: Foldable, A](cnt: A, fa: F[_])(implicit A: ConvertableTo[A]): TypeStat[A] =
     (coll(cnt, _: Option[A], _: Option[A])).tupled(some(A fromInt fa.length).squared)
 
-  def fromTypeFƒ[J, A: Order: ConvertableTo](
+  def fromTypeFƒ[J, A: Order: ConvertableTo](cnt: A)(
     implicit
     J: Recursive.Aux[J, EJson],
     F: Field[A]
   ): Algebra[TypeF[J, ?], Option[TypeStat[A]]] = {
     case TypeF.Bottom()              => none
-    case TypeF.Top()                 => some(count(F.one))
-    case TypeF.Simple(_)             => some(count(F.one))
-    case TypeF.Const(j)              => some(fromEJson(J.project(j)))
-    case TypeF.Arr(-\/(xs))          => some(fromFoldable(maxOrOne(xs), xs))
-    case TypeF.Arr(\/-(x))           => some(coll(x.cata(_.size, F.one), none, none))
-    case TypeF.Map(xs, None)         => some(fromFoldable(maxOrOne(xs), xs))
+    case TypeF.Top()                 => some(count(cnt))
+    case TypeF.Simple(_)             => some(count(cnt))
+    case TypeF.Const(j)              => some(fromEJson(cnt, J.project(j)))
+    case TypeF.Arr(-\/(xs))          => some(fromFoldable(maxOr(cnt, xs), xs))
+    case TypeF.Arr(\/-(x))           => some(coll(x.cata(_.size, cnt), none, none))
+    case TypeF.Map(xs, None)         => some(fromFoldable(maxOr(cnt, xs), xs))
 
     case TypeF.Map(xs, Some((a, b))) =>
       val ys = xs.toIList
-      some(coll(maxOrOne(a :: b :: ys), some(F fromInt xs.size), none))
+      some(coll(maxOr(cnt, a :: b :: ys), some(F fromInt xs.size), none))
 
     case TypeF.Union(a, b, cs)       => nel(a, b :: cs).suml1
   }
 
   ////
 
-  private def maxOrOne[F[_]: Foldable, A: Order](fa: F[Option[TypeStat[A]]])(implicit R: Rig[A]): A =
-    Tag.unwrap(fa.foldMap(s => Max(s map (_.size)))) | R.one
+  private def maxOr[F[_]: Foldable, A: Order: AdditiveSemigroup](a: A, fa: F[Option[TypeStat[A]]]): A =
+    Tag.unwrap(fa.foldMap(s => Max(s map (_.size)))) | a
 }
 
 sealed abstract class TypeStatInstances {

@@ -38,6 +38,11 @@ package object tpe {
         _.fold(SimpleType.name(_), CompositeType.name(_)))
   }
 
+  object SimpleEJson {
+    def unapply(ejs: EJson[_]): Option[SimpleType] =
+      simpleTypeOf(ejs)
+  }
+
   /** Returns the `CompositeType` of the given EJson value, if exists. */
   val compositeTypeOf: EJson[_] => Option[CompositeType] = {
     case C(ejs.Arr(_)) => some(CompositeType.Arr)
