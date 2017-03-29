@@ -26,6 +26,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
+import monocle.Lens
 import scalaz._, Scalaz._
 
 /** A measure annotated Type focused on structure over semantics.
@@ -52,6 +53,10 @@ final case class StructuralType[L, V](toCofree: Cofree[TypeF[L, ?], V]) extends 
 }
 
 object StructuralType extends StructuralTypeInstances {
+  /** Lens targeting the top-level annotation of a structural type. */
+  def measure[L, V]: Lens[StructuralType[L, V], V] =
+    Lens[StructuralType[L, V], V](_.copoint)(v => st => envT(v, st.project.lower).embed)
+
   /** The structural type representing the given EJson value, annotated with
     * the result of `measure`.
     */
@@ -205,16 +210,16 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
   implicit def comonad[L]: Comonad[StructuralType[L, ?]] =
     new Comonad[StructuralType[L, ?]] {
       def copoint[A](st: StructuralType[L, A]) =
-        st.toCofree.head
+        st.copoint
 
       override def cojoin[A](st: StructuralType[L, A]) =
-        StructuralType(st.toCofree.duplicate map (StructuralType(_)))
+        st.cojoin
 
       override final def map[A, B](st: StructuralType[L, A])(f: A => B) =
-        StructuralType(st.toCofree map f)
+        st map f
 
       def cobind[A, B](st: StructuralType[L, A])(f: StructuralType[L, A] => B) =
-        StructuralType(st.toCofree.cobind(c => f(StructuralType(c))))
+        st cobind f
     }
 
   implicit def equal[L: Equal, V: Equal]: Equal[StructuralType[L, V]] = {
