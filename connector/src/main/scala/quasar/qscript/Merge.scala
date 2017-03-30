@@ -94,14 +94,33 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
       ZipperAcc(Nil, sides, tails).left
   }
 
+  private def insertIdentityMap[G[_]: Traverse](implicit QC: QScriptCore :<: G)
+      : G[T[G]] => G[T[G]] = in => {
+    QC.prj(in).cata({
+      case qs @ Filter(_, _) => QC.inj(Map(QC.inj(qs).embed, HoleF))
+      case qs @ Sort(_, _, _) => QC.inj(Map(QC.inj(qs).embed, HoleF))
+      case qs => QC.inj(qs)
+    }, in)
+  }
+
   def mergeT[G[_]: Traverse](left: T[G], right: T[G])(
     implicit
       mergeable: Mergeable.Aux[T, G],
+      coalesce: Coalesce.Aux[T, G, G],
+      N: Normalizable[G],
       DE: Const[DeadEnd, ?] :<: G,
+      QC: QScriptCore :<: G,
       FI: Injectable.Aux[G, QScriptTotal]):
       SrcMerge[T[G], FreeQS] = {
-    val lLin: List[G[EM]] = left.cata(linearize[G]).reverse
-    val rLin: List[G[EM]] = right.cata(linearize[G]).reverse
+
+    val leftNorm: T[G] = left.transCata[T[G]](
+      insertIdentityMap[G] >>> repeatedly(coalesce.coalesceQCNormalize[G](idPrism)))
+
+    val rightNorm: T[G] = right.transCata[T[G]](
+      insertIdentityMap[G] >>> repeatedly(coalesce.coalesceQCNormalize[G](idPrism)))
+
+    val lLin: List[G[EM]] = leftNorm.cata(linearize[G]).reverse
+    val rLin: List[G[EM]] = rightNorm.cata(linearize[G]).reverse
 
     val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
       elgot(

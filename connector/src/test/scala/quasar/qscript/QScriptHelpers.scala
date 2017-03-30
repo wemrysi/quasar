@@ -84,6 +84,10 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(MapFuncs.ProjectField(src, field))
 
+  def DeleteFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.DeleteField(src, field))
+
   def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(MapFuncs.ProjectIndex(src, field))
