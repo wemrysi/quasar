@@ -1656,7 +1656,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail with duplicate alias" in {
-      compile("select car.name as name, owner.name as name from owners as owner join cars as car on car._id = owner.carId") must
+      compile("select car.name as name, owner.name as name from owners as owner join cars as car on car.`_id` = owner.carId") must
         beLeftDisjunction("DuplicateAlias(name)")
     }
 

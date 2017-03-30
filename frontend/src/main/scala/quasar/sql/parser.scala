@@ -63,7 +63,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       delim
 
     def identifierString: Parser[String] =
-      ((letter | elem('_')) ~ rep(digit | letter | elem('_'))) ^^ {
+      letter ~ rep(digit | letter | elem('_')) ^^ {
         case x ~ xs => (x :: xs).mkString
       }
 
@@ -101,7 +101,6 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       "org.wartremover.warts.Serializable"))
     def identParser: Parser[Token] =
       quotedIdentParser | identifierString ^^ processIdent
-
 
     override def whitespace: Parser[scala.Any] = rep(
       whitespaceChar |
