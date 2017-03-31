@@ -300,7 +300,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
                 (res.status must_== Ok)                                      and
-                (mntd must_== Set(MR.mountModule(dst, sampleStatements)))          and
+                (mntd must_== Set(MR.mountModule(dst, sampleStatements)))    and
                 (srcAfter must beNone)                                       and
                 (dstAfter must beSome(MountConfig.moduleConfig(sampleStatements)))
             }

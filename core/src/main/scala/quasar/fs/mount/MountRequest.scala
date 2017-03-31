@@ -32,7 +32,7 @@ sealed abstract class MountRequest {
     this match {
       case MountView(f, _, _)       => f
       case MountFileSystem(d, _, _) => d
-      case MountModule(d, _)     => d
+      case MountModule(d, _)        => d
     }
 
   def toConfig: MountConfig =

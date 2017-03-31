@@ -120,7 +120,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         moduleName: DirName,
         vcfg: (Fix[Sql], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
-      ) => (fileName != viewName && directoryName != fsMountName) ==> {
+      ) => (fileName ≠ viewName && directoryName ≠ fsMountName) ==> {
         val moduleConfig: List[Statement[Fix[Sql]]] = List(
           FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
         val parent: ADir = rootDir </> dir("foo")

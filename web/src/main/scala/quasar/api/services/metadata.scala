@@ -82,7 +82,7 @@ object metadata {
         names.map { name =>
           FsNode(name, mount = None, args = args.get(stringValue(name)))
         }
-      // Or Else we optionnally associate some metadata to FsNode's if they happen to be some kind of mount
+      // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
       }.getOrElseF {
         M.havingPrefix(parent).map { mounts =>
           names map { name =>
