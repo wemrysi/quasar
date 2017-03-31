@@ -14,20 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.contrib
+package quasar
 
-import _root_.algebra.{Eq, Semigroup => ASemigroup, Monoid => AMonoid}
-import _root_.scalaz.{Equal, Semigroup, Monoid}
+import slamdata.Predef._
 
-package object algebra extends AlgebraInstancesLowPriority {
-  implicit def algebraEqual[A](implicit A: Eq[A]): Equal[A] =
-    Equal.equal(A.eqv)
-
-  implicit def algebraMonoid[A](implicit A: AMonoid[A]): Monoid[A] =
-    Monoid.instance((x, y) => A.combine(x, y), A.empty)
-}
-
-sealed abstract class AlgebraInstancesLowPriority {
-  implicit def algebraSemigroup[A](implicit A: ASemigroup[A]): Semigroup[A] =
-    Semigroup.instance((x, y) => A.combine(x, y))
+package object sst {
+  /** Statistical Structural Type */
+  type SST[J, A] = StructuralType[J, Option[TypeStat[A]]]
 }
