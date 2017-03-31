@@ -27,8 +27,7 @@ import quasar.fs.mount._, FileSystemDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
 
-import java.net.URI
-import scala.sys
+import java.net.{URLDecoder, URI}
 
 import org.http4s.{ParseFailure, Uri}
 import org.apache.hadoop.conf.Configuration
@@ -116,9 +115,18 @@ package object hdfs {
     } yield (sparkConf, SparkFSConf(sparkConf, hdfsUrl, rootPath))
   }
 
-  private def fetchSparkCoreJar: Task[String] = Task.delay {
-    sys.env("QUASAR_HOME") + "/sparkcore.jar"
-  }
+
+  private def fetchSparkCoreJar: Task[String] = for {
+    pathStr <- Task.delay {
+       URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+    }
+    maybeDirStr <- Task.delay {
+      val maybePath: Option[APath] =
+        posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
+      maybePath.map(parentDir(_)).join.map(posixCodec.printPath(_))
+    }
+    dirStr <- maybeDirStr.fold(Task.fail(new RuntimeException(s"Could not get parent dir for $pathStr")).as(""))(Task.now(_))
+  } yield dirStr + "/sparkcore.jar"
 
   def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
