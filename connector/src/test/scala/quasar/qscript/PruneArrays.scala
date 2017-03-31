@@ -505,7 +505,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(expected)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite subset with unused array elements" in {
       val initial: Fix[QST] =
         QCT.inj(Subset(
@@ -521,7 +521,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite union with unused array elements" in {
       val initial: Fix[QST] =
         QCT.inj(Union(
@@ -536,7 +536,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite theta join with unused array elements in source" in {
       val initial: Fix[QST] =
         TJT.inj(ThetaJoin(
@@ -552,7 +552,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite equi join with unused array elements in source" in {
       val initial: Fix[QST] =
         EJT.inj(EquiJoin(
@@ -633,7 +633,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // we'd like to be able to rewrite this
+    // FIXME: we'd like to be able to rewrite this
     // but it might require more work in addition to array pruning
     "not rewrite equi join with array branch referenced outside of join" in {
       val initial: Fix[QST] =
@@ -653,7 +653,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite theta join with filtered left shift as branch" in {
       val initial: Fix[QST] =
         TJT.inj(ThetaJoin(
@@ -671,7 +671,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
       initial.pruneArrays must equal(initial)
     }
 
-    // this can be rewritten - we just don't support that yet
+    // FIXME: this can be rewritten - we just don't support that yet
     "not rewrite equi join with filtered left shift as branch" in {
       val initial: Fix[QST] =
         EJT.inj(EquiJoin(
