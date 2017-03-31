@@ -41,7 +41,7 @@ notifications:
 
 branches:
   except:
-    - /^v\d+\.\d+\.\d+-.*$/ # don't redundantly build tags
+    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
 
 cache:
   directories:
