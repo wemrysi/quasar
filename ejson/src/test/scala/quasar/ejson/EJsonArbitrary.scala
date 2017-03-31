@@ -41,6 +41,7 @@ trait EJsonArbitrary {
   implicit val arbitraryExtension = new WrapArb[Extension] {
     def apply[α](arb: Arbitrary[α]) = Arbitrary(
       Gen.oneOf(
+        (arb.gen, arb.gen).zip ^^ ((Meta[α] _).tupled),
         (arb.gen, arb.gen).zip.list ^^ Map[α],
         genByte ^^ Byte[α],
         genChar ^^ Char[α],

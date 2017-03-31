@@ -17,13 +17,13 @@
 package quasar.physical.sparkcore.fs
 
 import slamdata.Predef.{Eq => _, _}
-import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
 import quasar.{Data, DataCodec}
 import quasar.Planner._
+import quasar.common.PrimaryType
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncs._
 import quasar.std.{DateLib, StringLib}
+import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
@@ -253,6 +253,8 @@ object CoreMap extends Serializable {
     }).right
     case Or(f1, f2) => ((x: A) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
+      case (Data.NA, b) => b
+      case (a, Data.NA) => a
       case _ => undefined
     }).right
     case Between(f1, f2, f3) => ((x: A) => between(f1(x), f2(x), f3(x))).right
@@ -328,6 +330,8 @@ object CoreMap extends Serializable {
       case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2, ff3) => f2.right
+    case TypeOf(f) =>
+      (f >>> ((d: Data) => d.dataType.toPrimaryType.fold(Data.NA : Data)(p => Data.Str(PrimaryType.name(p))))).right[PlannerError]
     case _ => InternalError.fromMsg("not implemented").left
   }
 

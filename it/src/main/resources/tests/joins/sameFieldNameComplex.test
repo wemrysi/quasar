@@ -8,7 +8,7 @@
         "postgresql":        "pending"
     },
     "data": ["../owners.data", "../cars.data"],
-    "query": "SELECT owner.name, car.name from `../owners` as owner join `../cars` as car on car._id = owner.carId and owner.year = car.year[0]",
+    "query": "SELECT owner.name, car.name from `../owners` as owner join `../cars` as car on car.`_id` = owner.carId and owner.year = car.year[0]",
     "predicate": "containsExactly",
     "ignoreFieldOrder": ["marklogic_json"],
     "expected": [{ "name": "emma",  "name0": "RangeRover-Evoque" },

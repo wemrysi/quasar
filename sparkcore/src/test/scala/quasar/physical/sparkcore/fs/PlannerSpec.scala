@@ -17,7 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.qscript.QScriptHelpers
 import quasar.qscript._
 import quasar.qscript.ReduceFuncs._
@@ -446,7 +446,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, Inner, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
@@ -479,7 +479,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, LeftOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.LeftOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
@@ -516,7 +516,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, RightOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.RightOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {
@@ -551,7 +551,7 @@ class PlannerSpec
             Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
           ))
 
-          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, FullOuter, combine)
+          val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.FullOuter, combine)
 
           val program: SparkState[RDD[Data]] = compile(equiJoin)
           program.eval(sc).run.map(result => result must beRightDisjunction.like {

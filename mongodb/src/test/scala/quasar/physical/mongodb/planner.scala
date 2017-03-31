@@ -88,10 +88,10 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
+  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, Nil, 0L, None)
+    queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -1971,7 +1971,7 @@ class PlannerSpec extends
     }
 
     "plan array flatten with unflattened field" in {
-      plan("SELECT _id as zip, loc as loc, loc[*] as coord FROM zips") must
+      plan("SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips") must
         beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
@@ -2052,7 +2052,7 @@ class PlannerSpec extends
     }
 
     "unify flattened fields with unflattened field" in {
-      plan("select _id as zip, loc[*] from zips order by loc[*]") must
+      plan("select `_id` as zip, loc[*] from zips order by loc[*]") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
@@ -2623,7 +2623,7 @@ class PlannerSpec extends
     "plan js and filter with id" in {
       Bson.ObjectId.fromString("0123456789abcdef01234567").fold[Result](
         failure("Couldn’t create ObjectId."))(
-        oid => plan("""select length(city), foo = oid("0123456789abcdef01234567") from days where _id = oid("0123456789abcdef01234567")""") must
+        oid => plan("""select length(city), foo = oid("0123456789abcdef01234567") from days where `_id` = oid("0123456789abcdef01234567")""") must
           beWorkflow(chain[Workflow](
             $read(collection("db", "days")),
             $match(Selector.Doc(
@@ -2760,7 +2760,7 @@ class PlannerSpec extends
       Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 
     "plan simple join (map-reduce)" in {
-      plan2_6("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+      plan2_6("select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
         beWorkflow(
           joinStructure(
             $read(collection("db", "zips")), "__tmp0", $$ROOT,
@@ -2786,7 +2786,7 @@ class PlannerSpec extends
     }
 
     "plan simple join ($lookup)" in {
-      plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+      plan("select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.Doc(
@@ -2811,7 +2811,7 @@ class PlannerSpec extends
 
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
-      val query = "select zips2.city from zips join zips2 on zips._id = zips2._id"
+      val query = "select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`"
       plan3_2(query,
         c => Map(
           collection("db", "zips") -> CollectionStatistics(10, 100, true),
@@ -2822,7 +2822,7 @@ class PlannerSpec extends
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
-      val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips._id = zips2._id"
+      val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips.`_id` = zips2.`_id`"
       plan(query) must_== plan2_6(query)
     }
 
@@ -2833,7 +2833,7 @@ class PlannerSpec extends
     }
 
     "plan non-equi join" in {
-      plan("select zips2.city from zips join zips2 on zips._id < zips2._id") must
+      plan("select zips2.city from zips join zips2 on zips.`_id` < zips2.`_id`") must
       beWorkflow(
         joinStructure(
           $read(collection("db", "zips")), "__tmp0", $$ROOT,
@@ -3313,7 +3313,7 @@ class PlannerSpec extends
 
     "plan count of $lookup" in {
       plan3_2(
-        "select tp._id, count(*) from `zips` as tp join `largeZips` as ti on tp._id = ti.TestProgramId group by tp._id",
+        "select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
         indexes()) must
       beWorkflow(chain[Workflow](
@@ -3649,7 +3649,7 @@ class PlannerSpec extends
     * @throws AssertionError If the `Query` is not a selection
     */
   def columnNames(q: Query): List[String] =
-    fixParser.parse(q).toOption.get.project match {
+    fixParser.parseExpr(q).toOption.get.project match {
       case Select(_, projections, _, _, _, _) =>
         projectionNames(projections, None).toOption.get.map(_._1)
       case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
@@ -3728,7 +3728,7 @@ class PlannerSpec extends
     genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
-    fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    fixParser.parseExpr(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**

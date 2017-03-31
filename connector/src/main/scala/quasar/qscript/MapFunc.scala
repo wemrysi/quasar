@@ -22,7 +22,8 @@ import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.std.StdLib._, date.TemporalPart
+import quasar.std.StdLib._
+import quasar.std.TemporalPart
 
 import matryoshka._
 import matryoshka.data._

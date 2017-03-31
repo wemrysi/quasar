@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.common.{JoinType, PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
@@ -934,10 +934,10 @@ object MongoDbQScriptPlanner {
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
             qs.f match {
-              case Inner => set.InnerJoin
-              case FullOuter => set.FullOuterJoin
-              case LeftOuter => set.LeftOuterJoin
-              case RightOuter => set.RightOuterJoin
+              case JoinType.Inner => set.InnerJoin
+              case JoinType.FullOuter => set.FullOuterJoin
+              case JoinType.LeftOuter => set.LeftOuterJoin
+              case JoinType.RightOuter => set.RightOuterJoin
             },
             JoinSource(lb, List(lk), lj.map(List(_))),
             JoinSource(rb, List(rk), rj.map(List(_)))))).join
@@ -1233,16 +1233,14 @@ object MongoDbQScriptPlanner {
       : M[Crystallized[WF]] = {
     val rewrite = new Rewrite[T]
 
-    type MongoQScript[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+    type MongoQScriptCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+    type MongoQScript[A] = MongoQScriptCP#M[A]
 
     implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript, QScriptTotal[T, ?]] =
       ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
     // NB: Intermediate form of QScript between the standard form and Mongo’s.
     type MongoQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: MongoQScript)#M[A]
-
-    val C = quasar.qscript.Coalesce[T, MongoQScript, MongoQScript]
 
     (for {
       qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp).liftM[GenT]
@@ -1255,10 +1253,7 @@ object MongoDbQScriptPlanner {
           .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
-            repeatedly(applyTransforms(
-              C.coalesceQCNormalize[MongoQScript](idPrism),
-              C.coalesceEJNormalize[MongoQScript](idPrism.get),
-              C.coalesceSRNormalize[MongoQScript, AFile](idPrism)))))
+            Unicoalesce[T, MongoQScriptCP]))
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",

@@ -49,6 +49,7 @@ class ParquetRDD[T: ClassTag](
     pathStr: String
 ) extends RDD[T](_sc, Nil) {
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   override def compute(raw: Partition, context: TaskContext): Iterator[T] = {
     val partition = raw.asInstanceOf[ParquetRDDPartition[T]]
     val prr       = new ParquetRecordReader(partition.readSupport)

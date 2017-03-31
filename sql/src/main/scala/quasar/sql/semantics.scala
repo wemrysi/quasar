@@ -185,8 +185,8 @@ object SemanticAnalysis {
     def | (that: Provenance): Provenance = Either(this, that)
 
     def simplify: Provenance = this match {
-      case x : Either => anyOf(x.flatten.map(_.simplify).filterNot(_ == Empty))
-      case x : Both => allOf(x.flatten.map(_.simplify).filterNot(_ == Empty))
+      case x : Either => anyOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))
+      case x : Both => allOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))
       case _ => this
     }
 
@@ -205,10 +205,12 @@ object SemanticAnalysis {
 
     // TODO: Implement Order for all sorts of types so we can get Equal (well,
     //       Order, even) defined properly for Provenance.
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.AsInstanceOf",
+      "org.wartremover.warts.Equals"))
     override def equals(that: scala.Any): Boolean = (this, that) match {
       case (x, y) if (x.eq(y.asInstanceOf[AnyRef])) => true
-      case (Relation(v1), Relation(v2))             => v1 == v2
+      case (Relation(v1), Relation(v2))             => v1 ≟ v2
       case (Either(_, _), that @ Either(_, _))      => this.simplify.flatten == that.simplify.flatten
       case (Both(_, _), that @ Both(_, _))          => this.simplify.flatten == that.simplify.flatten
       case (_, _)                                   => false

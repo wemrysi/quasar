@@ -27,8 +27,7 @@ script:
   - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
-  - sbt transferPublishAndTagResources
-  - ./scripts/publishAndTag 'quasar-analytics/quasar'
+  - ./scripts/quasarPublishAndTag
 
 after_success: ./scripts/afterSuccess
 
@@ -38,7 +37,7 @@ notifications:
       - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
         %{build_url}"
   slack:
-    secure: KPCXtCAjtlpRQcH7TQtprrf67yIqPVpht9L6/+wbbNd14Tj3x53fiZ3OTabHVx3SL2ZWxbWq+FJGxdIFMyxC/fC0bV9flB7PlRtqHJV1Q7g49odAMAZL7syWr7vFP5bJt+TXuxHvMBihDHFk1Cehy4a1cnrOMReDgqGIFCwQtbI=
+    secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
 
 branches:
   except:
@@ -49,6 +48,10 @@ cache:
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
+    - target
+    - .targets
+    - project/project/target
+    - project/target
     - scripts/marklogic/docker
 
 before_cache:

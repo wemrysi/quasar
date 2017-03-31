@@ -232,7 +232,8 @@ object queryfile {
     S1: MonotonicSeq :<: S,
     S2: Task :<: S
   ): Plan[S, (T[N1QL], ISet[APath])] = {
-    type CBQS[A]  = (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+    type CBQSCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+    type CBQS[A]  = CBQSCP#M[A]
     type CBQS0[A] = (Const[ShiftedRead[ADir], ?] :/: CBQS)#M[A]
 
     implicit val couchbaseQScriptToQSTotal: Injectable.Aux[CBQS, QScriptTotal[T, ?]] =
@@ -240,7 +241,6 @@ object queryfile {
 
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
     val rewrite = new Rewrite[T]
-    val C = Coalesce[T, CBQS, CBQS]
 
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
@@ -251,10 +251,7 @@ object queryfile {
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
-                repeatedly(applyTransforms(
-                  C.coalesceQCNormalize[CBQS](idPrism),
-                  C.coalesceEJNormalize[CBQS](idPrism.get),
-                  C.coalesceSRNormalize[CBQS, AFile](idPrism))))
+                Unicoalesce[T, CBQSCP])
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
                 Planner[T, Free[S, ?], CBQS].plan

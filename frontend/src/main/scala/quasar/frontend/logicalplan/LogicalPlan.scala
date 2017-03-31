@@ -23,7 +23,7 @@ import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 
 import scala.Symbol
 import scala.Predef.$conforms
@@ -141,7 +141,7 @@ object LogicalPlan {
           case Invoke(func, values) =>
             // TODO remove trailing comma
             func.show ++ Cord("(") ++
-            values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(",") } ++ Cord(")")
+            values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(", ") } ++ Cord(")")
           case Free(n) =>
             Cord("Free(") ++ Cord(n.toString) ++ Cord(")")
           case Let(n, f, b) =>
@@ -193,6 +193,7 @@ object LogicalPlan {
         }
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   implicit val equal: Delay[Equal, LogicalPlan] =
     new Delay[Equal, LogicalPlan] {
       def apply[A](fa: Equal[A]) = {

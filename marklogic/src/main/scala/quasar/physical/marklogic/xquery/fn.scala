@@ -60,6 +60,7 @@ object fn {
   def data(item: XQuery): XQuery =
     XQuery(s"fn:data($item)")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def doc(): XQuery =
     XQuery("fn:doc()")
 
@@ -141,6 +142,7 @@ object fn {
   def not(bool: XQuery): XQuery =
     XQuery(s"fn:not($bool)")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def QName(localPart: XQuery): XQuery =
     XQuery(s"fn:QName($localPart)")
 

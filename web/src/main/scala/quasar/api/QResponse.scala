@@ -134,6 +134,7 @@ object QResponse {
       E.headers,
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def streaming[S[_], A]
       (p: Process[Free[S, ?], A])
       (implicit E: EntityEncoder[A], S0: Task :<: S)

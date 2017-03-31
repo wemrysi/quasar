@@ -35,6 +35,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
 import org.apache.spark._
 import pathy.Path._
+import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -57,7 +58,8 @@ package object hdfs {
 
     def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
-    def master(uri: Uri): State[SparkConf, Unit] = State.modify(_.setMaster(s"spark://${uri.host}:${uri.port}"))
+    def master(host: String, port: Int): State[SparkConf, Unit] =
+      State.modify(_.setMaster(s"spark://$host:$port"))
 
     def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
 
@@ -66,8 +68,12 @@ package object hdfs {
 
     val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
-    val sparkConfOrErr: DefinitionError \/ SparkConf = uriOrErr.map(uri => 
-      (master(uri) *> appName *>
+    val sparkConfOrErr: DefinitionError \/ SparkConf = for {
+      uri <- uriOrErr
+      host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
+      port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
+    } yield {
+      (master(host.value, port) *> appName *>
         config("spark.executor.memory", uri) *>
         config("spark.executor.cores", uri) *>
         config("spark.executor.extraJavaOptions", uri) *>
@@ -87,7 +93,7 @@ package object hdfs {
         config("spark.speculation", uri) *>
         config("spark.task.cpus", uri)
       ).exec(new SparkConf())
-    )
+    }
 
     val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
       uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
@@ -119,7 +125,7 @@ package object hdfs {
     S1: PhysErr :<: S
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
-    val genSc = fetchSparkCoreJar.map { jar => 
+    val genSc = fetchSparkCoreJar.map { jar =>
       val sc = new SparkContext(sparkConf)
       sc.addJar(jar)
       sc

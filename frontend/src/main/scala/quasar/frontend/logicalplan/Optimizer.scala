@@ -97,16 +97,16 @@ final class Optimizer[T: Equal]
   val lpr = new LogicalPlanR[T]
 
   private def countUsageƒ(target: Symbol): Algebra[LP, Int] = {
-    case Free(symbol) if symbol == target => 1
-    case Let(ident, form, _) if ident == target => form
+    case Free(symbol) if symbol ≟ target => 1
+    case Let(ident, form, _) if ident ≟ target => form
     case x => x.fold
   }
 
   private def inlineƒ[A](target: Symbol, repl: LP[T]):
       LP[(T, T)] => LP[T] =
   {
-    case Free(symbol) if symbol == target => repl
-    case Let(ident, form, body) if ident == target =>
+    case Free(symbol) if symbol ≟ target => repl
+    case Let(ident, form, body) if ident ≟ target =>
       Let(ident, form._2, body._1)
     case x => x.map(_._2)
   }
@@ -159,7 +159,7 @@ final class Optimizer[T: Equal]
       Some(map.keys.map(n => lpr.constant(Data.Str(n))).toList)
     case Sort(src, _) => src._2
     case InvokeUnapply(DeleteField, Sized(src, field)) =>
-      src._2.map(_.filterNot(_ == field._1))
+      src._2.map(_.filterNot(_ ≟ field._1))
     case InvokeUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
     case InvokeUnapply(ObjectConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
     // NB: the remaining Invoke cases simply pass through or combine shapes
@@ -236,6 +236,7 @@ final class Optimizer[T: Equal]
       case t                                       => List(t)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
     def toComp(left: T, right: T)(c: T):
         (List[Component[T, T]], Component[T, T]) =
       boundParaM[T, (List[Component[T, T]], ?), LP, Component[T, T]](c) {
