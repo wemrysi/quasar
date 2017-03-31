@@ -145,7 +145,7 @@ package object sql {
 
   def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)
 
-  private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9]*".r
+  private val SimpleNamePattern = "[a-zA-Z][_a-zA-Z0-9]*".r
 
   private def _q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 

@@ -10,7 +10,7 @@
         "spark_hdfs": "pending"
     },
     "data": "zips.data",
-    "query": "select _id as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",
+    "query": "select `_id` as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",
     "predicate": "equalsExactly",
     "expected": [{ "zip": "99722", "loc": 68.077395},
                  { "zip": "99721", "loc": 68.11878},

@@ -7,7 +7,7 @@
         "couchbase":         "skip"
     },
     "data": "zips.data",
-    "query": "select _id as zip from zips union select city, state from zips",
+    "query": "select `_id` as zip from zips union select city, state from zips",
     "predicate": "containsAtLeast",
     "expected": [
         { "zip": "01001" },
