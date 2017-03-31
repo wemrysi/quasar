@@ -123,10 +123,10 @@ package object hdfs {
     maybeDirStr <- Task.delay {
       val maybePath: Option[APath] =
         posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
-      maybePath.map(parentDir(_)).join.map(posixCodec.printPath(_))
+          maybePath.map(parentDir(_)).join.map(_  </> file("sparkcore.jar")).map(posixCodec.printPath(_))
     }
     dirStr <- maybeDirStr.fold(Task.fail(new RuntimeException(s"Could not get parent dir for $pathStr")).as(""))(Task.now(_))
-  } yield dirStr + "/sparkcore.jar"
+  } yield dirStr
 
   def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
