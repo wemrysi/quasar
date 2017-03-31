@@ -19,13 +19,15 @@ object Dependencies {
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
+  private val spireVersion             = "0.14.1"
 
   def foundation = Seq(
     CommonDependencies.scalaz.core,
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
-    "org.typelevel" %% "algebra"         % algebraVersion,
+    "org.typelevel" %% "algebra"     % algebraVersion,
+    "org.typelevel" %% "spire"       % spireVersion,
     CommonDependencies.argonaut.argonaut,
     CommonDependencies.argonaut.scalaz,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
@@ -35,7 +37,9 @@ object Dependencies {
     CommonDependencies.shapeless.shapeless,
     CommonDependencies.scalacheck.scalacheck                  % Test,
     CommonDependencies.simulacrum.simulacrum                  % Test,
+    "org.typelevel" %% "algebra-laws"    % algebraVersion     % Test,
     "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
+    "org.typelevel" %% "spire-laws"      % spireVersion       % Test,
     "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
     CommonDependencies.scalaz.scalacheckBinding               % Test,
     CommonDependencies.typelevel.shapelessScalacheck          % Test,
