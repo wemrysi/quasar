@@ -78,10 +78,10 @@ fi
 # database configuration scripts
 #
 CONTAINERS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
-for VAR in "$CONTAINERS"
+for CONNECTOR in "$CONTAINERS"
   do
-    if [[ $VAR == "mongodb_read_only" ]]; then init_mongo;      fi
-    if [[ $VAR =~ "couchbase"         ]]; then init_couchbase;  fi
-    if [[ $VAR =~ "marklogic"         ]]; then init_marklogic;  fi
-    if [[ $VAR =~ "postgresql"        ]]; then init_postgresql; fi
+    if [[ $CONNECTOR == "mongodb_read_only" ]]; then init_mongo;      fi
+    if [[ $CONNECTOR =~ "couchbase"         ]]; then init_couchbase;  fi
+    if [[ $CONNECTOR =~ "marklogic"         ]]; then init_marklogic;  fi
+    if [[ $CONNECTOR =~ "postgresql"        ]]; then init_postgresql; fi
 done
