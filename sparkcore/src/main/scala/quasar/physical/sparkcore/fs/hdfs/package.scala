@@ -116,28 +116,28 @@ package object hdfs {
   }
 
 
-  private def fetchSparkCoreJar: Task[String] = for {
-    pathStr <- Task.delay {
-       URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+  private def fetchSparkCoreJarPath: OptionT[Task, APath] = {
+    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
+    val fetchProjectRootPath = Task.delay {
+      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
     }
-    maybeDirStr <- Task.delay {
-      val maybePath: Option[APath] =
-        posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
-          maybePath.map(parentDir(_)).join.map(_  </> file("sparkcore.jar")).map(posixCodec.printPath(_))
-    }
-    dirStr <- maybeDirStr.fold(Task.fail(new RuntimeException(s"Could not get parent dir for $pathStr")).as(""))(Task.now(_))
-  } yield dirStr
+    OptionT(fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar")))))
+  }
 
   def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
-    val genSc = fetchSparkCoreJar.map { jar =>
-      val sc = new SparkContext(sparkConf)
-      sc.addJar(jar)
-      sc
-    }
+    val genSc = {
+      val jarPath =
+        fetchSparkCoreJarPath.run.flatMap(_.fold(Task.fail(new RuntimeException(s"Could not get parent dir")).as(""))(p => Task.now(posixCodec.printPath(p))))
+      jarPath.map { jar =>
+        val sc = new SparkContext(sparkConf)
+        sc.addJar(jar)
+        sc
+      }}
 
     lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
