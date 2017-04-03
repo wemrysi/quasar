@@ -35,7 +35,7 @@ import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
 import org.apache.spark._
 import pathy.Path._
 import pathy.Path.posixCodec
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object hdfs {
@@ -116,7 +116,7 @@ package object hdfs {
   }
 
 
-  private def fetchSparkCoreJarPath: OptionT[Task, APath] = {
+  private def sparkCoreJar: OptionT[Task, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
@@ -127,25 +127,29 @@ package object hdfs {
 
   def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
-    S1: PhysErr :<: S
+    S1: PhysErr :<: S,
+    FailOps: Failure.Ops[PhysicalError, S]
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
-    val genSc = {
-      val jarPath =
-        fetchSparkCoreJarPath.run.flatMap(_.fold(Task.fail(new RuntimeException(s"Could not get parent dir")).as(""))(p => Task.now(posixCodec.printPath(p))))
-      jarPath.map { jar =>
-        val sc = new SparkContext(sparkConf)
-        sc.addJar(jar)
-        sc
-      }}
+    val genSc: Free[S, String \/ SparkContext] = lift{
+      sparkCoreJar.run.flatMap(_.fold(
+        Task.now("Could not fetch sparkcore.jar".left[SparkContext]))
+        (p => Task.delay {
+          val jarPath = posixCodec.printPath(p)
+          val sc = new SparkContext(sparkConf)
+          sc.addJar(jarPath)
+          sc.right[String]
+        }
+      ))
+    }.into[S]
 
-    lift((TaskRef(0L) |@|
+    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift( (TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, HdfsWriteCursor]) |@|
-      genSc) {
+      TaskRef(Map.empty[WriteHandle, HdfsWriteCursor])
+      ) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, writeCursors, sc) =>
+      (genState, rddStates, sparkCursors, writeCursors) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -156,6 +160,11 @@ package object hdfs {
 
       SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
+
+    genSc >>= (_.fold(
+      msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
+      definition(_)
+    ))
   }
 
   val fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) = (sparkFsConf: SparkFSConf) => {
