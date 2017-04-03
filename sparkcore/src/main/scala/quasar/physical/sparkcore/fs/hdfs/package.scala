@@ -139,6 +139,9 @@ package object hdfs {
           val sc = new SparkContext(sparkConf)
           sc.addJar(jarPath)
           sc.right[String]
+        }.handleWith {
+          case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
+            "You can not mount second Spark based connector... Please unmount existing one first.".left[SparkContext].point[Task]
         }
       ))
     }.into[S]
