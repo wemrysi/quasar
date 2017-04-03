@@ -64,7 +64,7 @@ class CompileServiceSpec extends quasar.Qspec with FileSystemFixture {
     "return all inputs of a query" >> {
       get[AJson](compileService)(
         path = rootDir </> dir("foo"),
-        query = Some(Query("""SELECT c1.user, c2.type FROM `/users` as c1 JOIN `events` as c2 ON c1._id = c2.userId""")),
+        query = Some(Query("""SELECT c1.user, c2.type FROM `/users` as c1 JOIN `events` as c2 ON c1.`_id` = c2.userId""")),
         state = InMemState.empty,
         status = Status.Ok,
         response = json => Json.parse(json.nospaces) must beLike {

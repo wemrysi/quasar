@@ -50,6 +50,11 @@ cache:
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
+    - target
+    - .targets
+    - project/project/target
+    - project/target
+    - scripts/marklogic/docker
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
