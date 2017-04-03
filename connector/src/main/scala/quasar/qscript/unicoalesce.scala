@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 
@@ -37,23 +38,14 @@ object Unicoalesce {
       SR: UnicoalesceSR[T, C],
       EJ: UnicoalesceEJ[T, C],
       TJ: UnicoalesceTJ[T, C],
-      N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] = {
-
-    val cs = List(
-      QC(C),
-      SR(C),
-      EJ(C),
-      TJ(C),
-      N.normalizeF(_: C#M[T[C#M]]))
-
-    cs match {
-      case hd :: tl =>
-        repeatedly(
-          applyTransforms[T, C#M, C#M](hd, tl: _*))
-
-      case Nil => (x => x)
-    }
-  }
+      N: Normalizable[C#M]): C#M[T[C#M]] => C#M[T[C#M]] =
+    repeatedly(
+      applyTransforms(
+        QC(C),
+        SR(C),
+        EJ(C),
+        TJ(C),
+        N.normalizeF(_: C#M[T[C#M]])))
 }
 
 sealed trait UnicoalesceQC[T[_[_]], C <: CoM] extends Unicoalesce[T, C]

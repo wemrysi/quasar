@@ -1,0 +1,30 @@
+{
+    "name": "self-ordered distinct",
+
+    "backends": {
+        "couchbase":      "skip",
+        "marklogic_json": "skip",
+        "marklogic_xml":  "skip",
+        "mongodb_q_3_2":  "skip",
+        "postgresql":     "pending",
+        "spark_hdfs":     "skip",
+        "spark_local":    "skip"
+    },
+
+    "data": "zips.data",
+
+    "query": "select distinct city from zips order by city",
+
+    "predicate": "equalsInitial",
+
+    "expected": ["AARON",
+                 "AARONSBURG",
+                 "ABAC",
+                 "ABBEVILLE",
+                 "ABBOT VILLAGE",
+                 "ABBOTSFORD",
+                 "ABBOTT",
+                 "ABBOTT PARK",
+                 "ABBOTTSTOWN",
+                 "ABBYVILLE"]
+}
