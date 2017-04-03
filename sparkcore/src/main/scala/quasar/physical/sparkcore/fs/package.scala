@@ -30,6 +30,15 @@ package object fs {
 
   final case class SparkFSDef[HS[_], S[_]](run: Free[HS, ?] ~> Free[S, ?], close: Free[S, Unit])
 
+  val genSc: SparkConf => EitherT[Task, String, SparkContext] = (sparkConf: SparkConf) =>
+  EitherT(Task.delay {
+    val sc = new SparkContext(sparkConf)
+    sc.right[String]
+  }.handleWith {
+    case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
+      "You can not mount second Spark based connector... Please unmount existing one first.".left[SparkContext].point[Task]
+  })
+
   def definition[HS[_],S[_], T](
     fsType: FileSystemType,
     parseUri: ConnectionUri => DefinitionError \/ (SparkConf, T),

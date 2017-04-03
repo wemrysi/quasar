@@ -24,8 +24,9 @@ import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, FileSystemDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
 import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
+
 
 import java.net.{URLDecoder, URI}
 
@@ -116,13 +117,15 @@ package object hdfs {
   }
 
 
-  private def sparkCoreJar: OptionT[Task, APath] = {
+  private def sparkCoreJar: EitherT[Task, String, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
       posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
     }
-    OptionT(fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar")))))
+    val jar: Task[Option[APath]] =
+      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
+    EitherT(jar.map(_.fold("Could not fetch sparkcore.jar".left[APath])(p => p.right[String])))
   }
 
   def sparkFsDef[S[_]](implicit
@@ -131,20 +134,13 @@ package object hdfs {
     FailOps: Failure.Ops[PhysicalError, S]
   ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
 
-    val genSc: Free[S, String \/ SparkContext] = lift{
-      sparkCoreJar.run.flatMap(_.fold(
-        Task.now("Could not fetch sparkcore.jar".left[SparkContext]))
-        (p => Task.delay {
-          val jarPath = posixCodec.printPath(p)
-          val sc = new SparkContext(sparkConf)
-          sc.addJar(jarPath)
-          sc.right[String]
-        }.handleWith {
-          case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
-            "You can not mount second Spark based connector... Please unmount existing one first.".left[SparkContext].point[Task]
-        }
-      ))
-    }.into[S]
+    val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
+      sc <- coreGenSc(sparkConf)
+      jar <- sparkCoreJar
+    } yield {
+      sc.addJar(posixCodec.printPath(jar))
+      sc
+    }).run).into[S]
 
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift( (TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
@@ -164,7 +160,7 @@ package object hdfs {
       SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
 
-    genSc >>= (_.fold(
+    genScWithJar >>= (_.fold(
       msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
       definition(_)
     ))
