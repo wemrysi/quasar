@@ -44,6 +44,7 @@ final case class ConstrainedPlan[T]
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._
+  import quasar.std.TemporalPart
 
   def read(path: FPath) = lp.read[T](path).embed
   def constant(data: Data) = lp.constant[T](data).embed
@@ -123,7 +124,7 @@ final class LogicalPlanR[T]
       case _ => None
     }
 
-    // avoid illegally rewriting the continuation
+    // NB: avoids illegally rewriting the continuation
     case InvokeUnapply(relations.Cond, Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
         lp.let(a, x1, invoke[nat._3](relations.Cond, Func.Input3(x2, a2, a3))).some

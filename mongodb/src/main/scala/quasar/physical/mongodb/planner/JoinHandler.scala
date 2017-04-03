@@ -231,9 +231,10 @@ object JoinHandler {
         (WorkflowBuilder[WF], FixOp[WF]) =
       (src, $map[WF](keyMap(key, rootField, otherField), ListMap()))
 
-    def wbReduce(src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
-                 rootField: BsonField.Name, otherField: BsonField.Name):
-        (WorkflowBuilder[WF], FixOp[WF]) =
+    def wbReduce
+      (src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
+        rootField: BsonField.Name, otherField: BsonField.Name)
+        : (WorkflowBuilder[WF], FixOp[WF]) =
       (DocBuilder(
         reduce(groupBy(src, key))($push(_)),
         ListMap(

@@ -223,23 +223,19 @@ class QScriptSpec
               ProjectFieldR(HoleF, StrLit("foo"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           BoolLit(true),
           JoinType.Inner,
           Free.roll(Add(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
     }
 
     "convert project object and make object" in {
@@ -494,21 +490,17 @@ class QScriptSpec
             Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           BoolLit(true),
           JoinType.Inner,
           Free.roll(ConcatMaps(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
     }
 
     // TODO #1794 prune arrays
@@ -680,7 +672,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
-          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
+          List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
           Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }

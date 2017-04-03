@@ -6,7 +6,7 @@
         "postgresql": "pending"
     },
     "data": "zips.data",
-    "query": "SELECT loc[*] as coord, _id as zip FROM zips",
+    "query": "SELECT loc[*] as coord, `_id` as zip FROM zips",
     "predicate": "containsAtLeast",
     "ignoreFieldOrder": ["marklogic_json"],
     "expected": [

@@ -19,7 +19,6 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.common.JoinType._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalacheck.gen
 import quasar.sql.fixpoint._
 
 import matryoshka.data.Fix
@@ -172,8 +171,10 @@ trait ExprArbitrary {
     genIdentString map (Vari(_))
 
   private def genIdentString: Gen[String] =
-    Gen.listOf(gen.printableAsciiChar) map (_.filter(_ ≠ '`').mkString)
-
+    for {
+      c <- Gen.alphaChar
+      cs <- Gen.listOf(Gen.frequency((1, '_'), (62, Gen.alphaNumChar)))
+    } yield (c :: cs).mkString
 }
 
 object ExprArbitrary extends ExprArbitrary

@@ -22,8 +22,6 @@ import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.data._
 import monocle.macros.Lenses
@@ -142,8 +140,8 @@ object ReduceIndex {
 
 /** A placeholder value that can appear in plans, but will never be referenced
   * in the result. We consider this a wart. It should be implemented as an
-  * arbitrary value with minimal cost to generate (since it will simply be
-  * discarded).
+  * arbitrary value (of cardinality 1) with minimal cost to generate (since it
+  * will simply be discarded).
   */
 @Lenses final case class Unreferenced[T[_[_]], A]()
     extends QScriptCore[T, A]
@@ -188,8 +186,6 @@ object QScriptCore {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
-      val f1: Show[JoinFunc[T]] = implicitly
-
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++

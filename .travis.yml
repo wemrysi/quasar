@@ -27,8 +27,7 @@ script:
   - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
-  - sbt transferPublishAndTagResources
-  - ./scripts/publishAndTag 'quasar-analytics/quasar'
+  - ./scripts/quasarPublishAndTag
 
 after_success: ./scripts/afterSuccess
 
@@ -49,6 +48,10 @@ cache:
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
+    - target
+    - .targets
+    - project/project/target
+    - project/target
     - scripts/marklogic/docker
 
 before_cache:

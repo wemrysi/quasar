@@ -12,8 +12,8 @@
 
     "data": ["../smallZips.data", "../zips.data"],
 
-    "query": "select smallZips.city, zips.state from `../smallZips`, `../zips` where smallZips._id = zips._id
-            and \"MA\" = zips.state",
+    "query": "select smallZips.city, zips.state from `../smallZips`, `../zips`
+              where smallZips.`_id` = zips.`_id` and \"MA\" = zips.state",
 
     "predicate": "containsAtLeast",
 
