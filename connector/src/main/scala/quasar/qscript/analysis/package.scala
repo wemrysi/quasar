@@ -171,7 +171,13 @@ package object analysis {
           case Filter((card, cost), f) => card + cost
           case Subset((card, cost), from, sel, count) => card + cost
           case LeftShift((card, cost), struct, id, repair) => card + cost
-          case Union((card, cost), lBranch, rBranch) => card + cost
+          case Union((card, cost), lBranch, rBranch) => {
+            val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+            val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
+            val left = lBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost))
+            val right = rBranch.zygo(interpret(κ(card), compileCardinality), ginterpret(κ(cost), compileCost))
+            (left + right) / 2
+          }
           case Unreferenced() => 0
         }
       }
