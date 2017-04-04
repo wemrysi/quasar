@@ -1249,8 +1249,7 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log(
         "QScript (Mongo-specific)",
-        rewrite.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], MongoQScript0].apply(qs)
-          .transCataM(ExpandDirs[T, MongoQScript0, MongoQScript].expandDirs(idPrism.reverseGet, listContents))
+        Unirewrite[T, MongoQScriptCP, M](rewrite, listContents).apply(qs)
           .map(_.transHylo(
             rewrite.optimize(reflNT[MongoQScript]),
             Unicoalesce[T, MongoQScriptCP]))
