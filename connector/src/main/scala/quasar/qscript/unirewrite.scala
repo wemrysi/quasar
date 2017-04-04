@@ -34,15 +34,8 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
 
   implicit def fileRead[T[_[_]]: BirecursiveT, C <: CoM](
     implicit
-      FQR: Functor[QScriptRead[T, ?]],
-      TSSR: Traverse[QScriptShiftRead[T, ?]],
       FC: Functor[C#M],
       TC0: Traverse[C0[C, ?]],
-      QC: QScriptCore[T, ?] :<: QScriptShiftRead[T, ?],
-      TJ: ThetaJoin[T, ?] :<: QScriptShiftRead[T, ?],
-      SD: Const[ShiftedRead[ADir], ?] :<: QScriptShiftRead[T, ?],
-      SF: Const[ShiftedRead[AFile], ?] :<: QScriptShiftRead[T, ?],
-      S: ShiftRead.Aux[T, QScriptRead[T, ?], QScriptShiftRead[T, ?]],
       J: SimplifyJoin.Aux[T, QScriptShiftRead[T, ?], C0[C, ?]],
       C: Coalesce.Aux[T, QScriptShiftRead[T, ?], QScriptShiftRead[T, ?]],
       N: Normalizable[QScriptShiftRead[T, ?]],
