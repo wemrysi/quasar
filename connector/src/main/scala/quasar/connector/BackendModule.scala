@@ -81,9 +81,8 @@ trait BackendModule {
 
     type QSR[A] = QScriptRead[T, A]
 
-    val lc: DiscoverPath.ListContents[M] = { dir =>
-      MonadError_[M, FileSystemError].unattempt(QueryFileModule.listContents(dir))
-    }
+    val lc: DiscoverPath.ListContents[M] =
+      (QueryFileModule.listContents(_)).andThen(MonadError_[M, FileSystemError].unattempt(_))
 
     val R = new Rewrite[T]
 
