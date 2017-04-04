@@ -69,10 +69,10 @@ insert_bogus() {
 
 connector_lookup() {
   CONNECTOR=$1
-  if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo      $CONTAINER; fi
-  if [[ $CONNECTOR =~ "postgresql"           ]]; then configure_postgresql $CONTAINER; fi
-  if [[ $CONNECTOR =~ "marklogic"            ]]; then configure_marklogic  $CONTAINER; fi
-  if [[ $CONNECTOR =~ "couchbase"            ]]; then configure_couchbase  $CONTAINER; fi
+  if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo      $CONNECTOR; fi
+  if [[ $CONNECTOR =~ "postgresql"           ]]; then configure_postgresql $CONNECTOR; fi
+  if [[ $CONNECTOR =~ "marklogic"            ]]; then configure_marklogic  $CONNECTOR; fi
+  if [[ $CONNECTOR =~ "couchbase"            ]]; then configure_couchbase  $CONNECTOR; fi
   if [[ $CONNECTOR == "spark_local_test"     ]]; then configure_spark; fi
 }
 
@@ -112,13 +112,15 @@ else
   # check if we are running docker-machine on a mac if so run eval
   # if not then maybe we are in linux and docker-machine doesn't exist
   # we need this in order to run docker commands
-  if [[ $(command -v docker-machine) = 0 ]]
-  then 
+  if [[ -x "$(command -v docker-machine)" ]]
+  then
+    echo "found docker-machine..."
     eval $(docker-machine env default)
     DOCKERIP=$(docker-machine ip default)
   else
+    echo "didn't find docker-machine..."
     DOCKERIP="localhost"
   fi
   if [[ $# -gt 1 && $1 == "spark" ]]; then configure_spark; fi
-  populate_local_testing_config $CONNECTORS
+  populate_local_testing_config
 fi

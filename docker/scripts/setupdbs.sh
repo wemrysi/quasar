@@ -66,10 +66,16 @@ init_marklogic() {
 #
 if [[ ${TRAVIS:-} ]]
 then
-  echo "in a travis environment..."
+  echo "in a travis environment, docker is in our path..."
 else
-  echo "local environment connecting to docker daemon..."
-  eval "$(docker-machine env default)"
+  echo "local environment, looking for docker..."
+  if [[ -x "$(command -v docker-machine)" ]]
+    then
+      echo "found docker-machine..."
+      eval "$(docker-machine env default)"
+    else
+      echo "didn't find docker-machine, will assume docker is in your path..."
+    fi
 fi
 
 
