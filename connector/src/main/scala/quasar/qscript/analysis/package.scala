@@ -46,15 +46,12 @@ package object analysis {
     def evaluate(pathCard: APath => Int): GAlgebra[(Int, ?), F, Int]
   }
 
-  @typeclass
-  trait Analyzer[F[_]] {
-    def analyze[T](t: T)(pathCard: APath => Int)(implicit
-      rec: Recursive.Aux[T, F],
-      func: Functor[F],
-      cardinalty: Cardinality[F],
-      cost: Cost[F]
-    ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate(pathCard))
-  }
+  def analyze[F[_], T](t: T)(pathCard: APath => Int)(implicit
+    rec: Recursive.Aux[T, F],
+    func: Functor[F],
+    cardinalty: Cardinality[F],
+    cost: Cost[F]
+  ): Int = rec.zygo(t)(cardinalty.calculate(pathCard), cost.evaluate(pathCard))
 
   object Cardinality {
 
