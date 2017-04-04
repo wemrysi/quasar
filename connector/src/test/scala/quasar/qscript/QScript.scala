@@ -666,7 +666,8 @@ class QScriptSpec
                   ProjectIndexR(RightSideF, IntLit(1)),
                   Free.roll(Undefined()))),
                 StrLit("pop")))))))),
-        // FIXME this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
         QC.inj(Sort((),
           NullLit(),
           (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
@@ -890,7 +891,8 @@ class QScriptSpec
               Free.roll(Undefined()))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
-        // FIXME this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
         QC.inj(Sort((),
           NullLit(),
           (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
@@ -938,7 +940,8 @@ class QScriptSpec
               Free.roll(Undefined()))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
-        // FIXME this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
         QC.inj(Sort((),
           NullLit(),
           (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
