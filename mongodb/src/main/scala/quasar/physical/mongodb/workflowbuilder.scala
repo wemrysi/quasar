@@ -1010,7 +1010,8 @@ object WorkflowBuilder {
     loop(src)
   }
 
-  private def merge[F[_]: Coalesce](left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
+  private def merge[F[_]: Coalesce]
+    (left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
     (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
     : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
     def delegate =
@@ -1222,8 +1223,6 @@ object WorkflowBuilder {
 
     def skip(wb: WorkflowBuilder[F], count: Long): WorkflowBuilder[F] =
       ShapePreservingBuilder(wb, Nil, { case Nil => $skip[F](count) })
-
-    def squash[F[_]](wb: WorkflowBuilder[F]): WorkflowBuilder[F] = wb
 
     def filter
       (src: WorkflowBuilder[F],
