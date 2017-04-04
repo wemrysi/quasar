@@ -5,7 +5,7 @@
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_q_3_2":     "skip",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",

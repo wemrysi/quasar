@@ -21,6 +21,7 @@ import quasar.Data
 import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.connector.PlannerErrT
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
@@ -40,8 +41,8 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript[A] =
-     (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+  type SparkQScriptCP = QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?]
+  type SparkQScript[A] = SparkQScriptCP#M[A]
 
   implicit val sparkQScriptToQSTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
     ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
@@ -76,7 +77,6 @@ object queryfile {
     def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
       val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-      val C = quasar.qscript.Coalesce[Fix, SparkQScript, SparkQScript]
       val rewrite = new Rewrite[Fix]
       for {
         qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
@@ -84,10 +84,7 @@ object queryfile {
                    .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
         optQS =  qs.transHylo(
                    rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(applyTransforms(
-                     C.coalesceQCNormalize[SparkQScript](idPrism),
-                     C.coalesceEJNormalize[SparkQScript](idPrism.get),
-                     C.coalesceSRNormalize[SparkQScript, AFile](idPrism))))
+                   Unicoalesce[Fix, SparkQScriptCP])
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }

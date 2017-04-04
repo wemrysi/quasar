@@ -53,22 +53,34 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   echo "Using local MongoDB config"
 fi
 
+# if we're building a pull request, DON'T clean and use the cache instead
+if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
+  CLEAN=clean
+  COVERAGE=coverage
+  COVERAGE_REPORT=coverageReport
+else
+  CLEAN=
+  COVERAGE=
+  COVERAGE_REPORT=
+fi
+
+# only do code coverage on job .1 AND on a non-pull request
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION clean coverage connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
   else
-    "$SBT" ++$TRAVIS_SCALA_VERSION clean
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders coverage test exclusive:test coverageReport
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION 'web/assembly' doc
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly' doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -81,7 +93,7 @@ else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   fi
 
   # Not the first job in Travis; run only integration tests (no sense

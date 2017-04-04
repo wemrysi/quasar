@@ -2,7 +2,6 @@
     "name": "project index from group with filter",
     "backends": {
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "skip",
         "postgresql":        "pending"
     },
     "data": "slamengine_commits.data",

@@ -1,7 +1,6 @@
 {
     "name": "select aliased field sorted by original name",
     "backends": {
-        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

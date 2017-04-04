@@ -27,7 +27,8 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib, StdLib._, date.TemporalPart
+import quasar.std.StdLib, StdLib._
+import quasar.std.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 
 import matryoshka._
@@ -733,10 +734,10 @@ final class Compiler[M[_], T: Equal]
       compile0(func.body, map).map { body =>
         val lpFunc = new HomomorphicFunction[T, T] {
           def arity = func.args.size
-          def apply(args: List[T]): Option[T] = {
-            val argsMap = func.args.map(arg => scala.Symbol(arg.value)).zip(args).toMap
-            if (func.args.size ≠ args.size) None else lpr.bindFree(argsMap)(body).toOption
-          }
+          def apply(args: List[T]): Option[T] =
+            func.args.alignBoth(args).sequence.map { argsMap =>
+              lpr.bindFree(argsMap.toMap)(body)
+            }
         }
         map + (func.name -> lpFunc)
       }

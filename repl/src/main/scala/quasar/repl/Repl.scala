@@ -201,13 +201,11 @@ object Repl {
             state <- RS.get
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
-            lim   =  (state.summaryCount > 0).fold(
-                       Positive(state.summaryCount + 1L),
-                       None)
-            query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim) flatMap (enum =>
+            lim   =  (state.summaryCount > 0).option(state.summaryCount)
+            query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L))) flatMap (enum =>
                        Q.transforms.execToCompExec(enum.drainTo[Vector]))
             _     <- runQuery(state, query)(
-                      ds => summarize[S](state.summaryCount, state.format)(ds))
+                      ds => summarize[S](lim, state.format)(ds))
           } yield ())
 
       case Explain(q) =>
@@ -248,7 +246,7 @@ object Repl {
   def mountType[S[_]](path: APath)(implicit
     M: Mounting.Ops[S]
   ): Free[S, Option[String]] =
-    M.lookupType(path).map(_.fold(_.value, "view")).run
+    M.lookupType(path).map(_.fold(_.value, "view", "module")).run
 
   def showPhaseResults: PhaseResults => String = _.map(_.shows).mkString("\n\n")
 
@@ -262,7 +260,7 @@ object Repl {
     }
 
   def summarize[S[_]]
-    (max: Int, format: OutputFormat)
+    (max: Option[Int], format: OutputFormat)
     (rows: IndexedSeq[Data])
     (implicit P: ConsoleIO.Ops[S])
       : Free[S, Unit] = {
@@ -271,7 +269,7 @@ object Repl {
 
     if (rows.lengthCompare(0) <= 0) P.println("No results found")
     else {
-      val prefix = rows.take(max).toList
+      val prefix = max.fold(rows)(rows.take).toList
       (format match {
         case OutputFormat.Table =>
           Prettify.renderTable(prefix)
@@ -282,7 +280,7 @@ object Repl {
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
       }).foldMap(P.println) *>
-        (if (rows.lengthCompare(max) > 0) P.println("...")
+        (if (max.fold(false)(rows.lengthCompare(_) > 0)) P.println("...")
         else ().point[Free[S, ?]])
     }
   }
