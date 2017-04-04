@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.pathy.APath
 import quasar.fp._, ski._
 
 import matryoshka.{Hole => _, _}
@@ -63,15 +63,10 @@ package object analysis {
         def calculate(pathCard: APath => Int): Algebra[ Const[Read[A], ?], Int] =
           (qs: Const[Read[A], Int]) => 1
       }
-    implicit def shiftedReadFile: Cardinality[Const[ShiftedRead[AFile], ?]] =
-      new Cardinality[Const[ShiftedRead[AFile], ?]] {
-        def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[AFile], ?], Int] =
-          (qs: Const[ShiftedRead[AFile], Int]) => pathCard(qs.getConst.path)
-      }
-    implicit def shiftedReadDir: Cardinality[Const[ShiftedRead[ADir], ?]] =
-      new Cardinality[Const[ShiftedRead[ADir], ?]] {
-        def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[ADir], ?], Int] =
-          (qs: Const[ShiftedRead[ADir], Int]) => pathCard(qs.getConst.path)
+    implicit def shiftedReadFile[A <: APath]: Cardinality[Const[ShiftedRead[A], ?]] =
+      new Cardinality[Const[ShiftedRead[A], ?]] {
+        def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[A], ?], Int] =
+          (qs: Const[ShiftedRead[A], Int]) => pathCard(qs.getConst.path)
       }
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
       new Cardinality[QScriptCore[T, ?]] {
