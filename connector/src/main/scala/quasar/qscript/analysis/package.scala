@@ -142,9 +142,9 @@ package object analysis {
   }
 
   /**
-    * This is "generic" implementation for `Cost` that can be used by any connector. 
+    * This is a "generic" implementation for `Cost` that can be used by any connector. 
     * Can be used for newly created connectors. More mature connectors should provide
-    * their own instance that will take into account connector specific informations
+    * their own instance that will take into account connector-specific information.
     */
   object Cost {
     implicit def deadEnd: Cost[Const[DeadEnd, ?]] = new Cost[Const[DeadEnd, ?]] {
