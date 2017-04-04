@@ -242,8 +242,6 @@ object queryfile {
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
     val rewrite = new Rewrite[T]
 
-    def implicitly[A](implicit A: A) = A
-
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
