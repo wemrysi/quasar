@@ -39,13 +39,6 @@ trait BackendModule {
   type QS[T[_[_]]] <: CoM
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
-  // TODO need to provide implicit materialization from QScriptRead[T, A] to QS[T]#M[A]
-  // it's tempting to just have the implementor provide information about the QS
-  // structure so that we can factor out the boilerplate (the various colaesce calls, etc),
-  // but that's tricky because the Marklogic connector has some specific WAYS in which
-  // it wants us to transform things, specifically because of the Read/ShiftedRead
-  // madness.  so we may have to materialize some more specific things here
-
   type Config
 
   type Repr
