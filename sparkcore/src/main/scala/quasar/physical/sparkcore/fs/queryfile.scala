@@ -75,16 +75,19 @@ object queryfile {
   ): QueryFile ~> Free[S, ?] = {
 
     def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
-      val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
+      type F[A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+
+      val lc: DiscoverPath.ListContents[F] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       val rewrite = new Rewrite[Fix]
       for {
-        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
-                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript0].apply(_))
-                   .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
-        optQS =  qs.transHylo(
-                   rewrite.optimize(reflNT[SparkQScript]),
-                   Unicoalesce[Fix, SparkQScriptCP])
+        qs <- QueryFile.convertToQScriptRead[Fix, F, QScriptRead[Fix, ?]](lc)(lp)
+        shifted <- Unirewrite[Fix, SparkQScriptCP, F](rewrite, lc).apply(qs)
+
+        optQS = shifted.transHylo(
+                  rewrite.optimize(reflNT[SparkQScript]),
+                  Unicoalesce[Fix, SparkQScriptCP])
+
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }
