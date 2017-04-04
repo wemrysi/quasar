@@ -17,21 +17,27 @@
 package quasar
 package connector
 
-import quasar.Predef._
-import quasar.common.PhaseResults
+import slamdata.Predef._
+import quasar.common._
 import quasar.contrib.pathy._
+import quasar.contrib.matryoshka._
+import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.qscript._
 
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._
+import scalaz.syntax.all._
 import scalaz.concurrent.Task
 
 trait BackendModule {
   type QS[T[_[_]]] <: CoM
+  type QSM[T[_[_]], A] = QS[T]#M[A]
 
   // TODO need to provide implicit materialization from QScriptRead[T, A] to QS[T]#M[A]
   // it's tempting to just have the implementor provide information about the QS
@@ -45,18 +51,58 @@ trait BackendModule {
   type Repr
   type M[A]
 
-  implicit def M: Monad[M]
+  def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
+  private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
+
+  def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
+  private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
+
+  def MonadM: Monad[M]
+  private final implicit def _MonadM = MonadM
+
+  def MonadFsErrM: MonadFsErr[M]
+  private final implicit def _MonadFsErrM = MonadFsErrM
+
+  def PhaseResultTellM: PhaseResultTell[M]
+  private final implicit def _PhaseResultTellM = PhaseResultTellM
+
+  def UnirewriteT[T[_[_]]]: Unirewrite[T, QS[T]]
+  private final implicit def _UnirewriteT[T[_[_]]] = UnirewriteT[T]
+
+  def UnicoalesceCap[T[_[_]]]: Unicoalesce.Capture[T, QS[T]]
+  private final implicit def _UnicoalesceCap[T[_[_]]] = UnicoalesceCap[T]
 
   def compile: M ~> Task
 
   final def definition(config: Config): FileSystemDef[Task] = ???
 
-  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](lp: T[LogicalPlan]): M[Repr] = {
-    // TODO do magic things with typeclasses!  yay! coalesce stuff; optimize; normalize; thingies
-    ???
+  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT: OrderT](
+      lp: T[LogicalPlan]): M[Repr] = {
+
+    type QSR[A] = QScriptRead[T, A]
+
+    val lc: DiscoverPath.ListContents[M] = { dir =>
+      MonadError_[M, FileSystemError].unattempt(QueryFileModule.listContents(dir))
+    }
+
+    val R = new Rewrite[T]
+
+    for {
+      qs <- QueryFile.convertToQScriptRead[T, M, QSR](lc)(lp)
+      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
+
+      // _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
+
+      optimized =
+        shifted.transHylo(R.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
+
+      // _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
+
+      main <- plan(optimized)
+    } yield main
   }
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: QS[T]): M[Repr]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): M[Repr]
 
   trait QueryFileModule {
     import QueryFile._
