@@ -17,7 +17,7 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.MonadTell_
+import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 
 import scalaz._
 
@@ -26,4 +26,5 @@ package object common {
   type PhaseResultW[A] = Writer[PhaseResults, A]
   type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
   type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
+  type PhaseResultListen[F[_]] = MonadListen_[F, PhaseResults]
 }
