@@ -37,49 +37,22 @@ import scalaz.syntax.all._
 import scalaz.concurrent.Task
 
 trait BackendModule[Config] {
-  type QS[T[_[_]]] <: CoM
   type QSM[T[_[_]], A] = QS[T]#M[A]
-
-  type Repr
-  type M[A]
-
-  def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
-  private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
-
-  def DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]]
-  private final implicit def _DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
-
-  def ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath]
-  private final implicit def _ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
-
-  def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
-  private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
-
-  def MonadM: Monad[M]
-  private final implicit def _MonadM = MonadM
-
-  def MonadFsErrM: MonadFsErr[M]
-  private final implicit def _MonadFsErrM = MonadFsErrM
-
-  def PhaseResultTellM: PhaseResultTell[M]
-  private final implicit def _PhaseResultTellM = PhaseResultTellM
-
-  def PhaseResultListenM: PhaseResultListen[M]
-  private final implicit def _PhaseResultListenM = PhaseResultListenM
-
-  def UnirewriteT[T[_[_]]]: Unirewrite[T, QS[T]]
-  private final implicit def _UnirewriteT[T[_[_]]] = UnirewriteT[T]
-
-  def UnicoalesceCap[T[_[_]]]: Unicoalesce.Capture[T, QS[T]]
-  private final implicit def _UnicoalesceCap[T[_[_]]] = UnicoalesceCap[T]
 
   // TODO enrich to something like EitherT so we can factor out errors that are concerning
   // maybe PhysicalErr somethingorother?
   type Final[A] = Task[A]
 
-  def compile(config: Config, uri: ConnectionUri): FileSystemDef.DefErrT[Final, (M ~> Final, Final[Unit])]
-
-  val Type: FileSystemType
+  private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
+  private final implicit def _DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
+  private final implicit def _ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
+  private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
+  private final implicit def _MonadM = MonadM
+  private final implicit def _MonadFsErrM = MonadFsErrM
+  private final implicit def _PhaseResultTellM = PhaseResultTellM
+  private final implicit def _PhaseResultListenM = PhaseResultListenM
+  private final implicit def _UnirewriteT[T[_[_]]] = UnirewriteT[T]
+  private final implicit def _UnicoalesceCap[T[_[_]]] = UnicoalesceCap[T]
 
   final def definition(config: Config): FileSystemDef[Final] = FileSystemDef fromPF {
     case (Type, uri) =>
@@ -89,18 +62,18 @@ trait BackendModule[Config] {
       }
   }
 
-  private def fsInterpreter: FileSystem ~> M = {
-    def rePhaseify[A](back: M[A]) =
+  private final def fsInterpreter: FileSystem ~> M = {
+    def attemptListen[A](back: M[A]) =
       MonadListen_[M, PhaseResults].listen(back.attempt).map(_.swap)
 
     val qfInter: QueryFile ~> M = λ[QueryFile ~> M] {
       case QueryFile.ExecutePlan(lp, out) =>
         val back = lpToRepr(lp).map(_.repr).flatMap(r => QueryFileModule.executePlan(r, out))
-        rePhaseify(back)
+        attemptListen(back)
 
       case QueryFile.EvaluatePlan(lp) =>
         val back = lpToRepr(lp).map(_.repr).flatMap(r => QueryFileModule.evaluatePlan(r))
-        rePhaseify(back)
+        attemptListen(back)
 
       case QueryFile.More(h) => QueryFileModule.more(h).attempt
       case QueryFile.Close(h) => QueryFileModule.close(h)
@@ -111,7 +84,7 @@ trait BackendModule[Config] {
           explanation <- QueryFileModule.explain(pp.repr)
         } yield ExecutionPlan(Type, explanation, pp.paths)
 
-        rePhaseify(back)
+        attemptListen(back)
 
       case QueryFile.ListContents(dir) => QueryFileModule.listContents(dir).attempt
       case QueryFile.FileExists(file) => QueryFileModule.fileExists(file)
@@ -171,6 +144,28 @@ trait BackendModule[Config] {
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
   }
 
+  // everything abstract below this line
+
+  type QS[T[_[_]]] <: CoM
+
+  type Repr
+  type M[A]
+
+  def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
+  def DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]]
+  def ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath]
+  def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
+  def MonadM: Monad[M]
+  def MonadFsErrM: MonadFsErr[M]
+  def PhaseResultTellM: PhaseResultTell[M]
+  def PhaseResultListenM: PhaseResultListen[M]
+  def UnirewriteT[T[_[_]]]: Unirewrite[T, QS[T]]
+  def UnicoalesceCap[T[_[_]]]: Unicoalesce.Capture[T, QS[T]]
+
+  def compile(config: Config, uri: ConnectionUri): FileSystemDef.DefErrT[Final, (M ~> Final, Final[Unit])]
+
+  val Type: FileSystemType
+
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT: OrderT](
       cp: T[QSM[T, ?]]): M[Repr]
 
@@ -218,5 +213,3 @@ trait BackendModule[Config] {
 
   def ManageFileModule: ManageFileModule
 }
-
-final case class PhysicalPlan[R](repr: R, paths: ISet[APath])
