@@ -1,6 +1,3 @@
-# This script examines the running containers
-# and produces a testing.conf file with proper URIs
-#
 #!/usr/bin/env bash
 
 set -euo pipefail # STRICT MODE
@@ -76,51 +73,88 @@ connector_lookup() {
   if [[ $CONNECTOR == "spark_local_test"     ]]; then configure_spark; fi
 }
 
-populate_travis_testing_config() {
-  CONNECTOR=$1
-  CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
-  rm -f $CONFIGFILE
-  insert_bogus
-  connector_lookup $CONNECTOR
-}
 
-populate_local_testing_config() {
-  CONNECTORS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
-  CONFIGFILE=../../it/testing.conf
-  rm -f $CONFIGFILE
-  insert_bogus
-  for CONNECTOR in $CONNECTORS
-  do
-    connector_lookup $CONNECTOR
-  done
-}
-
-##########################################
-# main method
-# it determines if we are running in travis or not
-# once it figures out where it is running it 
-# proceeds to configure the various items we need
-# to run this script
-#
-if [[ ${TRAVIS:-} ]]
-then
-  echo "creating testing.conf in a travis env..."
-  DOCKERIP="localhost"
-  populate_travis_testing_config $1
-else
-  echo "creating testing.conf in a local env..."
-  # check if we are running docker-machine on a mac if so run eval
-  # if not then maybe we are in linux and docker-machine doesn't exist
-  # we need this in order to run docker commands
-  if [[ -x "$(command -v docker-machine)" ]]
+define_needed_evn_vars() {
+  if [[ ${TRAVIS:-} ]]
   then
-    echo "found docker-machine..."
-    eval $(docker-machine env default)
-    DOCKERIP=$(docker-machine ip default)
-  else
-    echo "didn't find docker-machine..."
+    CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
     DOCKERIP="localhost"
+  else
+    CONFIGFILE=../../it/testing.conf
+    if [[ -x "$(command -v docker-machine)" ]]
+    then
+      eval "$(docker-machine env default)"
+      DOCKERIP=$(docker-machine ip default)  
+    else
+      DOCKERIP="localhost"
+    fi
   fi
-  if [[ $# -gt 1 && $1 == "spark" ]]; then configure_spark; fi
-  populate_local_testing_config
-fi
+}
+
+cleanup_testing_conf_file() {
+  rm -f $CONFIGFILE
+}
+
+usage() {
+cat << EOF
+Usage: $0 [-h] [-a] [-c CONNECTOR-NAME]
+Assembles Quasar integration configuration file, it/testing.conf, from currently running 
+containerized connectors or for the specific CONNECTOR-NAME passed in. Works for local
+development and within travis-ci.
+
+  -h                   help (also trigged with no parameters): display this help and exit
+  -a                   cleans existing testing.conf and adds connector URIs to testing.conf for all currently running dockerized connectors
+  -i CONNECTOR-NAME    add connector URI to existing testing.conf file
+  -c CONNECTOR-NAME    cleans exisitng testing.conf and adds a connector URI for CONNECTOR-NAME currently running 
+  -t                   create testing.conf with all currently running dockerized connectors plus spark local connector
+EOF
+}
+
+# if no args are passed in print usage
+[ $# -eq 0 ] && usage
+
+# initialize our env
+define_needed_evn_vars
+
+# command line parsing logic
+while getopts ":hastpc:i:" opt; do
+  case $opt in
+    a)
+      echo "creating testing.conf with URIs for all running connectors..." >&2
+      cleanup_testing_conf_file
+      insert_bogus
+      CONNECTORS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
+      for CONNECTOR in $CONNECTORS
+      do
+        connector_lookup $CONNECTOR
+      done          
+      ;;
+    i)
+      echo "adding URI for $OPTARG to testing.conf..." >&2
+      connector_lookup $OPTARG
+      ;;
+    c)
+      echo "creating testing.conf with URI for $OPTARG..." >&2
+      cleanup_testing_conf_file
+      insert_bogus
+      connector_lookup $OPTARG     
+      ;;
+    t)
+      echo "creating testing.conf with URIs for all running connectors plus URI for spark local..." >&2
+      ./$0 -a
+      ./$0 -i spark_local_test
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+    h | *)
+      usage
+      exit 1
+      ;;
+  esac
+done

@@ -1,7 +1,7 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
-echo "configuring couchbase..."
 
 CBWOP='http://admin:password@localhost'
 CB='http://Administrator:password@localhost'

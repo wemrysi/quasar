@@ -1,8 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
-ML_ADMIN_PREFIX="http://localhost:8001/admin/v1"
+MLHOSTNAME=$1
+ML_ADMIN_PREFIX="http://${MLHOSTNAME}:8001/admin/v1"
 ML_USERNAME="marklogic"
 ML_PASSWORD="marklogic"
 

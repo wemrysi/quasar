@@ -1,6 +1,12 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
 
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+while ! pg_isready; do
+  echo -n '.'
+  sleep 1
+done
 
 psql -v ON_ERROR_STOP=1 --username "postgres" <<-EOSQL
     CREATE DATABASE "quasar-test";
