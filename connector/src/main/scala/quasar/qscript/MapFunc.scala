@@ -228,7 +228,7 @@ object MapFunc {
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def rewrite[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]:
+  private def rewrite[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
