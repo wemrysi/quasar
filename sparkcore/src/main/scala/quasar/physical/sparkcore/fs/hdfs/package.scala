@@ -125,7 +125,7 @@ package object hdfs {
     }
     val jar: Task[Option[APath]] =
       fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
-    EitherT(jar.map(_.fold("Could not fetch sparkcore.jar".left[APath])(p => p.right[String])))
+    OptionT(jar).toRight("Could not fetch sparkcore.jar")
   }
 
   def sparkFsDef[S[_]](implicit
