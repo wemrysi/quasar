@@ -25,7 +25,7 @@ import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 
-import scala.collection.Iterable
+import scala.collection.immutable.Iterable
 
 import matryoshka._
 import matryoshka.data.Fix

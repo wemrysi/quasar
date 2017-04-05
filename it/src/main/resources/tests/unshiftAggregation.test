@@ -1,8 +1,8 @@
 {
     "name": "unshift aggregation",
-    "NB": "Couchbase skipped due to different ordering of pop array. Enable once group contents ordering is possible.",
+    "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
     "backends": {
-        "couchbase":  "skip",
+        "couchbase":  "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",

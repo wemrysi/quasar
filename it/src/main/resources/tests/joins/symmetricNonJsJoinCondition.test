@@ -5,10 +5,10 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "skip",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
     "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
     "data": ["../zips.data", "../largeZips.data"],

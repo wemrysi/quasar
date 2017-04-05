@@ -184,18 +184,6 @@ package object qscript {
       : F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
 
-  /** Chains multiple transformations together, each of which can fail to change
-    * anything.
-    */
-  def applyTransforms[T[_[_]], F[_], G[_]]
-    (transform: F[T[G]] => Option[F[T[G]]],
-      transforms: (F[T[G]] => Option[F[T[G]]])*)
-      : F[T[G]] => Option[F[T[G]]] =
-    transforms.foldLeft(
-      transform)(
-      (prev, next) => x => prev(x).fold(next(x))(y => next(y).orElse(y.some)))
-
-
   // Helpers for creating `Injectable` instances
 
   object ::\:: {
@@ -222,7 +210,7 @@ package object qscript {
       (implicit PA: PruneArrays[F], T: BirecursiveT[T], TF: Traverse[F])
         : T[F] = {
       val pa = new PAFindRemap[T, F]
-      self.hyloM[State[PATypes.KnownIndices, ?], pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(none)._2
+      self.hyloM[State[PATypes.RewriteState, ?], pa.ArrayEnv[F, ?], T[F]](pa.remapIndices, pa.findIndices).run(PATypes.Ignore)._2
     }
   }
 }

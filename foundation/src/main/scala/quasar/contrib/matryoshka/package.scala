@@ -16,8 +16,10 @@
 
 package quasar.contrib
 
+import slamdata.Predef._
+
 import _root_.matryoshka._
-import _root_.scalaz._
+import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
@@ -33,4 +35,13 @@ package object matryoshka {
         Order.orderBy((_: Coproduct[F, G, A]).run)
       }
     }
+
+  /** Chains multiple transformations together, each of which can fail to change
+    * anything.
+    */
+  def applyTransforms[A](first: A => Option[A], rest: (A => Option[A])*)
+      : A => Option[A] =
+    rest.foldLeft(
+      first)(
+      (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 }
