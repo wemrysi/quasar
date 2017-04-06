@@ -36,6 +36,7 @@ import org.http4s.argonaut._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
+import scalaz.Scalaz._
 import scalaz.concurrent.Task
 
 object MetadataFixture {
