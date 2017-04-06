@@ -16,7 +16,7 @@ install:
 
 # run post db config scripts and populate the it/testing.conf file
 before_script:
-  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./setupdbs.sh -a
+  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./setupdbs.sh -c $CONNECTOR
   - cd $TRAVIS_BUILD_DIR/docker/scripts && ./assemble_testing_conf.sh -c $CONNECTOR
   - cd $TRAVIS_BUILD_DIR/it && cat testing.conf
 
