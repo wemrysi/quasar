@@ -151,6 +151,10 @@ object Server {
         _         <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
       } yield ()
 
+    def initUpdate(tx: StatefulTransactor, cfgFile: Option[FsFile]) =
+      loadConfigFile[MountingsConfig](cfgFile).liftM[MainErrT] >>= (mCfg =>
+        initUpdateMetaStore(Schema.schema, tx.transactor, cfgFile, mCfg.mountings))
+
     logErrors(for {
       qCfg  <- QuasarConfig.fromArgs(args)
       wCfg  <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
@@ -158,7 +162,7 @@ object Server {
       tx    <- metastoreTransactor(msCfg)
       _     <- qCfg.cmd match {
                  case Start               => start(tx, qCfg.port | wCfg.server.port, qCfg)
-                 case InitUpdateMetaStore => initUpdateSchema(Schema.schema, tx.transactor)
+                 case InitUpdateMetaStore => initUpdate(tx, qCfg.configPath)
                }
     } yield ())
   }

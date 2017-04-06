@@ -50,7 +50,7 @@ object CliOptions {
       help("help") text("prints this usage text\n")
 
       cmd("initUpdateMetaStore")
-        .text("Initializes the metastore schema.\n")
+        .text("Initializes and updates the metastore.\n")
         .action((_, c) =>
           (Lens.id[CliOptions] composeLens CliOptions.cmd).set(InitUpdateMetaStore)(c))
     }

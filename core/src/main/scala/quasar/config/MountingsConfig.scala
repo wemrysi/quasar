@@ -17,20 +17,23 @@
 package quasar.config
 
 import slamdata.Predef._
+import quasar.fs.mount
 
 import argonaut._, Argonaut._
 import monocle.macros.Lenses
-import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
-@Lenses final case class CoreConfig(metastore: Option[MetaStoreConfig])
+@Lenses final case class MountingsConfig(mountings: Option[mount.MountingsConfig])
 
-object CoreConfig {
-  implicit val configOps: ConfigOps[CoreConfig] = new ConfigOps[CoreConfig] {
-    val name = "core"
+object MountingsConfig {
+  val fieldName = "mountings"
 
-    val default = MetaStoreConfig.configOps.default ∘ (ms => CoreConfig(ms.some))
+  implicit val configOps: ConfigOps[MountingsConfig] = new ConfigOps[MountingsConfig] {
+    val name = "mountings"
+
+    val default = Task.now(MountingsConfig(None))
   }
 
-  implicit val codec: CodecJson[CoreConfig] =
-    casecodec1(CoreConfig.apply, CoreConfig.unapply)("metastore")
+  implicit val codec: CodecJson[MountingsConfig] =
+    casecodec1(MountingsConfig.apply, MountingsConfig.unapply)(fieldName)
 }

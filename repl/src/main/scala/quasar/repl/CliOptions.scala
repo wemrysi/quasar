@@ -42,7 +42,7 @@ object CliOptions {
     help("help") text("prints this usage text\n")
 
     cmd("initUpdateMetaStore")
-      .text("Initializes and updates the metastore schema.\n")
+      .text("Initializes and updates the metastore.\n")
       .action((_, c) => c.copy(cmd = InitUpdateMetaStore))
 
   }

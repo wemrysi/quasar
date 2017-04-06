@@ -53,13 +53,13 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
 
   "fromString" should {
     "parse valid config" in {
-      configOps.fromString(TestConfigStr) must beRightDisjunction(TestConfig)
+      ConfigOps.fromString(TestConfigStr) must beRightDisjunction(TestConfig)
     }
   }
 
   "toString" should {
     "render same config" in {
-      configOps.asString(TestConfig) must_= TestConfigStr
+      ConfigOps.asString(TestConfig) must_= TestConfigStr
     }
   }
 

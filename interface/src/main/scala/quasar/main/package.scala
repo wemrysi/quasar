@@ -17,7 +17,7 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.config.MetaStoreConfig
+import quasar.config.{ConfigOps, FsFile, MetaStoreConfig}
 import quasar.console.stdout
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.pathy._
@@ -33,6 +33,7 @@ import quasar.physical._
 
 import scala.util.control.NonFatal
 
+import argonaut._, Argonaut._
 import doobie.imports.{ConnectionIO, HC, Transactor}
 import doobie.syntax.connectionio._
 import eu.timepit.refined.auto._
@@ -131,11 +132,6 @@ package object main {
       .leftMap(t => {t.printStackTrace ; s"While initializing the MetaStore: ${t.getMessage}"})
   }
 
-  /** Initialize and update metastore schema
-    */
-  def initUpdateMetaStore[A](schema: Schema[A]): ConnectionIO[Unit] =
-    schema.updateToLatest
-
   def jdbcMounter[S[_]](
     hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
@@ -183,9 +179,32 @@ package object main {
       s"While verifying MetaStore schema: ${t.getMessage}".left)))
   }
 
-  def initUpdateSchema[A](schema: Schema[A], transactor: Transactor[Task]): MainTask[Unit] =
-    EitherT(transactor.trans(initUpdateMetaStore(schema)).attempt ∘ (
-      _.leftMap(t => s"While initializing and updating MetaStore schema: ${t.getMessage}")))
+  def initUpdateMetaStore[A](
+    schema: Schema[A], transactor: Transactor[Task],
+    cfgFile: Option[FsFile], mCfg: Option[MountingsConfig]
+  ): MainTask[Unit] = {
+    val migrateMounts: ConnectionIO[Unit] =
+      (mCfg | MountingsConfig.empty).toMap.toList.traverse {
+        case (p, m) => MetaStoreAccess.insertMount(p, m)
+      } *>
+      taskToConnectionIO(
+        ConfigOps.jsonFromFile(cfgFile).fold(
+          e => Task.fail(new RuntimeException(e.shows)), Task.now
+        ).join >>= (json =>
+          ConfigOps.jsonToFile(
+            json.obj.cata(o => jObject(o - config.MountingsConfig.fieldName), json),
+            cfgFile)))
+
+    val op: ConnectionIO[Unit] =
+      for {
+        ver <- schema.readVersion
+        _   <- schema.updateToLatest
+        _   <- ver.isEmpty.whenM(migrateMounts)
+      } yield ()
+
+    EitherT(transactor.trans(op).attempt ∘ (
+      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}")))
+  }
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {

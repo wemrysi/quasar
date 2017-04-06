@@ -160,6 +160,8 @@ The contents of the optional `parameters` object correspond to the various drive
 
 Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a web or repl quasar jar.
 
+If mounts are already defined in the config file, initialization will migrate those to the metadata store.
+
 ### Database mounts
 
 If the mount's key is "mongodb", then the `connectionUri` is a standard [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/). Only the primary host is required to be present, however in most cases a database name should be specified as well. Additional hosts and options may be included as specified in the linked documentation.

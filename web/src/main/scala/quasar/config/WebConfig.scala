@@ -26,6 +26,8 @@ import scalaz._, Scalaz._
 
 object WebConfig {
   implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
+    val name = "web"
+
     val default = MetaStoreConfig.configOps.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
   }
 
