@@ -18,13 +18,14 @@ configure_spark() {
 # injects marklogic xml and json url
 # into it/testing.conf
 #
-configure_marklogic() {
+configure_marklogic_xml() {
   CONTAINERNAME=$1
-  if [[ $CONTAINERNAME == "marklogic" ]]
-  then 
-    echo "marklogic_json=\"xcc://marklogic:marklogic@${DOCKERIP}:8000/Documents?format=json\"" >> $CONFIGFILE
-    echo "marklogic_xml=\"xcc://marklogic:marklogic@${DOCKERIP}:8000/Documents?format=xml\"" >> $CONFIGFILE
-  fi  
+  echo "${CONTAINERNAME}=\"xcc://marklogic:marklogic@${DOCKERIP}:8000/Documents?format=xml\"" >> $CONFIGFILE
+}
+
+configure_marklogic_json() {
+  CONTAINERNAME=$1
+  echo "${CONTAINERNAME}=\"xcc://marklogic:marklogic@${DOCKERIP}:9000/Documents?format=json\"" >> $CONFIGFILE
 }
 
 ##########################################
@@ -33,7 +34,7 @@ configure_marklogic() {
 #
 configure_couchbase() {
   CONTAINERNAME=$1
-  if [[ $CONTAINERNAME == "couchbase" ]]; then echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password\"" >> $CONFIGFILE; fi  
+  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password\"" >> $CONFIGFILE
 }
 
 
@@ -43,7 +44,7 @@ configure_couchbase() {
 #
 configure_postgresql() {
   CONTAINERNAME=$1
-  if [[ $CONTAINERNAME == "postgresql" ]]; then echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE; fi  
+  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE
 }
 
 ##########################################
@@ -66,10 +67,11 @@ insert_bogus() {
 
 connector_lookup() {
   CONNECTOR=$1
-  if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo      $CONNECTOR; fi
-  if [[ $CONNECTOR =~ "postgresql"           ]]; then configure_postgresql $CONNECTOR; fi
-  if [[ $CONNECTOR =~ "marklogic"            ]]; then configure_marklogic  $CONNECTOR; fi
-  if [[ $CONNECTOR =~ "couchbase"            ]]; then configure_couchbase  $CONNECTOR; fi
+  if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo          $CONNECTOR;      fi
+  if [[ $CONNECTOR =~ "postgresql"           ]]; then configure_postgresql     $CONNECTOR;      fi
+  if [[ $CONNECTOR == "marklogic_xml"        ]]; then configure_marklogic_xml  $CONNECTOR 8001; fi
+  if [[ $CONNECTOR == "marklogic_json"       ]]; then configure_marklogic_json $CONNECTOR 9001; fi
+  if [[ $CONNECTOR =~ "couchbase"            ]]; then configure_couchbase      $CONNECTOR;      fi
   if [[ $CONNECTOR == "spark_local_test"     ]]; then configure_spark; fi
 }
 

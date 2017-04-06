@@ -67,7 +67,8 @@ env:
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=postgresql
-    - CONNECTOR=marklogic
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=marklogic_json
     - CONNECTOR=couchbase
     - CONNECTOR=spark_local_test
 

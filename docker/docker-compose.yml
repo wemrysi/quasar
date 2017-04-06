@@ -40,12 +40,19 @@ postgresql:
   ports:
     - "5432:5432"
 
-marklogic:
-  container_name: marklogic
+marklogic_xml:
+  container_name: marklogic_xml
   build: ./Dockerfiles/Marklogic
   dockerfile: MarkLogic-Dockerfile
   ports:
     - "8000-8002:8000-8002"
+
+marklogic_json:
+  container_name: marklogic_json
+  build: ./Dockerfiles/Marklogic
+  dockerfile: MarkLogic-Dockerfile
+  ports:
+    - "9000-9002:8000-8002"
 
 couchbase:
   container_name: couchbase

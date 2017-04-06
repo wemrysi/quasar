@@ -40,7 +40,7 @@ init_marklogic() {
   # the container due to this curl issue
   # curl: symbol lookup error: /lib64/libldap-2.4.so.2
   echo "configuring marklogic..."
-  ./init_marklogic.sh $1
+  ./init_marklogic.sh $1 $2
 }
 
 ##########################################
@@ -49,10 +49,11 @@ init_marklogic() {
 #
 apply_configuration() {
   CONNECTOR=$1
-  if [[ $CONNECTOR == "mongodb_read_only" ]]; then init_mongo;                fi
-  if [[ $CONNECTOR =~ "couchbase"         ]]; then init_couchbase;            fi
-  if [[ $CONNECTOR =~ "marklogic"         ]]; then init_marklogic $DOCKERIP;  fi
-  if [[ $CONNECTOR =~ "postgresql"        ]]; then init_postgresql;           fi
+  if [[ $CONNECTOR == "mongodb_read_only" ]]; then init_mongo;                     fi
+  if [[ $CONNECTOR =~ "couchbase"         ]]; then init_couchbase;                 fi
+  if [[ $CONNECTOR == "marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001;  fi
+  if [[ $CONNECTOR == "marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001;  fi
+  if [[ $CONNECTOR =~ "postgresql"        ]]; then init_postgresql;                fi
 }
 
 configure_connectors() {
