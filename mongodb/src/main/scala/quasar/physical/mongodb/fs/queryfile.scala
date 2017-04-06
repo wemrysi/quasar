@@ -56,7 +56,7 @@ object queryfile {
       : QueryFile ~> MongoQuery[C, ?] =
     new QueryFileInterpreter(
       execMongo,
-      MongoDbQScriptPlanner.plan[Fix, FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]])
+      MongoDbPlanner.plan[Fix, FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]])
 
   def run[C, S[_]](
     client: MongoClient,

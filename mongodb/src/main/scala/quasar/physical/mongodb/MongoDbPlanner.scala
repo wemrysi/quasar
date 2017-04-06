@@ -58,7 +58,7 @@ final case class There[T[_[_]]](index: Int, next: InputFinder[T])
     a.resume.fold(fa => next(fa.toList.apply(index)), κ(a))
 }
 
-object MongoDbQScriptPlanner {
+object MongoDbPlanner {
   import fixExprOp._
 
   // FIXME: Move to Matryoshka.

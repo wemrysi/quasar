@@ -46,7 +46,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import quasar.specs2.QuasarMatchers._
 
-class PlannerQScriptSpec extends
+class PlannerSpec extends
     org.specs2.mutable.Specification with
     org.specs2.ScalaCheck with
     CompilerHelpers with
@@ -130,7 +130,7 @@ class PlannerQScriptSpec extends
       // tests currently run into that.
       .flatMap(_.fold(
         _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbQScriptPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
+        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
 
   def plan0(query: String, model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -169,7 +169,7 @@ class PlannerQScriptSpec extends
     (for {
       _          <- emit("Input",      logical)
       simplified <- emit("Simplified", optimizer.simplify(logical))
-      phys       <- MongoDbQScriptPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+      phys       <- MongoDbPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
     } yield phys).run.value.toEither
   }
 
