@@ -146,6 +146,8 @@ trait GenericFuncInstances {
       case agg.Min                        => "Min"
       case agg.Max                        => "Max"
       case agg.Avg                        => "Avg"
+      case agg.First                      => "First"
+      case agg.Last                       => "Last"
       case agg.Arbitrary                  => "Arbitrary"
       case array.ArrayLength              => "ArrayLength"
       case date.ExtractCentury            => "ExtractCentury"

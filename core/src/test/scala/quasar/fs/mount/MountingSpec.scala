@@ -49,7 +49,7 @@ abstract class MountingSpec[S[_]](
   val mntErr = MountingFailure.Ops[S]
   val mmErr = PathMismatchFailure.Ops[S]
   // NB: Without the explicit imports, scalac complains of an import cycle
-  import mnt.{FreeS, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
+  import mnt.{FreeS, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, mountModule, remount, replace, unmount, viewsHavingPrefix, modulesHavingPrefix}
 
   implicit class StrOps(s: String) {
     def >>*[A: AsResult](a: => FreeS[A]) =
@@ -144,6 +144,24 @@ abstract class MountingSpec[S[_]](
 
         lookupConfig(f).run.tuple(lookupConfig(d).run)
           .map(_ must_=== ((None, None)))
+      }
+
+      "viewsHavingPrefix" >>* {
+        val v = rootDir </> dir("d1") </> file("f1")
+        val m = rootDir </> dir("d1") </> dir("d4")
+        val f = rootDir </> dir("d1") </> dir("d5")
+
+        (mountViewNoVars(v, exprA) *> mountModule(m, Nil) *> mountFileSystem(f, dbType, uriA) *> viewsHavingPrefix(rootDir))
+          .map(_ must_= Set(v))
+      }
+
+      "modulesHavingPrefix" >>* {
+        val v = rootDir </> dir("d1") </> file("f1")
+        val m = rootDir </> dir("d1") </> dir("d4")
+        val f = rootDir </> dir("d1") </> dir("d5")
+
+        (mountViewNoVars(v, exprA) *> mountModule(m, Nil) *> mountFileSystem(f, dbType, uriA) *> modulesHavingPrefix(rootDir))
+          .map(_ must_= Set(m))
       }
     }
 

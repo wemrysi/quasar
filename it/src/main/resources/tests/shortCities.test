@@ -7,10 +7,10 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "spark_local":       "pending",
-        "spark_hdfs":        "pending"
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
-    "NB": "Skipped for all connectors due to reduce/sort ordering bug.
+    "NB": "Skipped for all QScript connectors due to reduce/sort ordering bug.
            Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.",
     "data": "largeZips.data",
     "query": "select distinct city from largeZips order by length(city), city limit 5",

@@ -245,9 +245,7 @@ object queryfile {
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
       _    <- tell(Vector(tree("QScript (post convertToQScriptRead)", qs)))
-      shft <- rewrite.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], CBQS0]
-                .apply(qs)
-                .transCataM(ExpandDirs[T, CBQS0, CBQS].expandDirs(idPrism.reverseGet, lc))
+      shft <- Unirewrite[T, CBQSCP, Plan[S, ?]](rewrite, lc).apply(qs)
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
                 rewrite.optimize(reflNT[CBQS]),
