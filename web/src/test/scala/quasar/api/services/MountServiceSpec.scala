@@ -26,11 +26,13 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount.{MountRequest => MR, _}
+import quasar.sql._
 
 import argonaut._, Argonaut._
 import org.http4s._, Status._
 import org.http4s.argonaut._
 import org.specs2.specification.core.Fragment
+import matryoshka.data.Fix
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
@@ -52,6 +54,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   val fooUri = ConnectionUri("foo")
   val barUri = ConnectionUri("foo")
   val invalidUri = ConnectionUri("invalid")
+  val sampleStatements: List[Statement[Fix[Sql]]] = List(FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
 
   val M = Mounting.Ops[Eff]
 
@@ -160,6 +163,22 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
       }
 
+      "succeed with correct SQL Statements" >> prop { d: ADir =>
+        runTest { service =>
+          val cfg = MountConfig.moduleConfig(sampleStatements)
+          val cfgStr = EncodeJson.of[MountConfig].encode(cfg)
+
+          for {
+            _    <- M.mountModule(d, sampleStatements)
+            r    <- service(Request(uri = pathUri(d)))
+            (res, _) = r
+            body <- lift(res.as[Json]).into[Eff]
+          } yield {
+            (body must_== cfgStr) and (res.status must_== Ok)
+          }
+        }
+      }
+
       "be 404 with missing mount (dir)" >> prop { d: APath =>
         runTest { service =>
           for {
@@ -257,6 +276,33 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (mntd must_== Set(MR.mountView(dst, expr, vars)))              and
               (srcAfter must beNone)                                         and
               (dstAfter must beSome(MountConfig.viewConfig(expr, vars)))
+            }
+          }
+        }
+      }
+
+      "succeed with module mount" >> prop { (src: ADir, dst: ADir) =>
+        (src ≠ dst) ==> {
+          runTest { service =>
+            for {
+              _        <- M.mountModule(src, sampleStatements)
+
+              r        <- service(Request(
+                method = MOVE,
+                uri = pathUri(src),
+                headers = Headers(destination(dst))))
+
+              (res, mntd) = r
+              body     <- lift(res.as[String]).into[Eff]
+
+              srcAfter <- M.lookupConfig(src).run
+              dstAfter <- M.lookupConfig(dst).run
+            } yield {
+              (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
+                (res.status must_== Ok)                                      and
+                (mntd must_== Set(MR.mountModule(dst, sampleStatements)))    and
+                (srcAfter must beNone)                                       and
+                (dstAfter must beSome(MountConfig.moduleConfig(sampleStatements)))
             }
           }
         }
@@ -467,6 +513,26 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
                 MR.mountView(vdst, expr, vars)
               ))                                         and
               (after must beSome(MountConfig.viewConfig(expr, vars)))
+            }
+          }
+        }
+
+        "succeed with module path" >> prop { (parent: ADir, d: RDir) =>
+          runTest { service =>
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.moduleConfig(sampleStatements))
+
+            for {
+              req   <- reqBuilder(parent, d, cfgStr)
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              dst   =  parent </> d
+              after <- M.lookupConfig(dst).run
+            } yield {
+              (body must_== s"added ${printPath(dst)}")                         and
+                (res.status must_== Ok)                                         and
+                (mntd must_== Set(MR.mountModule(dst, sampleStatements)))       and
+                (after must beSome(MountConfig.moduleConfig(sampleStatements)))
             }
           }
         }
@@ -717,6 +783,29 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res.status must_== Ok)                   and
             (mntd must beEmpty)                       and
             (after must beNone)
+          }
+        }
+      }
+
+      "succeed with module path" >> prop { d: ADir =>
+        val statements: List[Statement[Fix[Sql]]] = List(FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
+
+        runTest { service =>
+          for {
+            _     <- M.mountModule(d, statements)
+
+            r     <- service(Request(
+              method = DELETE,
+              uri = pathUri(d)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+
+            after <- M.lookupConfig(d).run
+          } yield {
+            (body must_== s"deleted ${printPath(d)}") and
+              (res.status must_== Ok)                 and
+              (mntd must beEmpty)                     and
+              (after must beNone)
           }
         }
       }

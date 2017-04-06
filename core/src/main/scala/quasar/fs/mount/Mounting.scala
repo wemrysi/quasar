@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.sql.Sql
+import quasar.sql.{Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -51,6 +51,9 @@ object Mounting {
     extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
+    extends Mounting[MountingError \/ Unit]
+
+  final case class MountModule(loc: ADir, statements: List[Statement[Fix[Sql]]])
     extends Mounting[MountingError \/ Unit]
 
   final case class Unmount(path: APath)
@@ -85,6 +88,16 @@ object Mounting {
     def viewsHavingPrefix(dir: ADir): FreeS[Set[AFile]] =
       rPathsHavingPrefix(dir).map(_.foldMap(_.toSet))
 
+    def viewsHavingPrefix_(dir: ADir): FreeS[Set[RFile]] =
+      viewsHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
+
+    def modulesHavingPrefix(dir: ADir): FreeS[Set[ADir]] =
+      havingPrefix(dir).map(_.collect { case (k, v) if v === MountType.ModuleMount => k }.toSet
+        .foldMap(p => refineType(p).swap.toSet))
+
+    def modulesHavingPrefix_(dir: ADir): FreeS[Set[RDir]] =
+      modulesHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
+
     /** Whether the given path refers to a mount. */
     def exists(path: APath): FreeS[Boolean] =
       lookupType(path).isDefined
@@ -117,6 +130,14 @@ object Mounting {
     ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountFileSystem(loc, typ, uri)))
 
+    def mountModule(
+      loc: ADir,
+      statements: List[Statement[Fix[Sql]]]
+    )(implicit
+      SO: MountingFailure :<: S
+    ): FreeS[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(MountModule(loc, statements)))
+
     /** Attempt to create a mount described by the given configuration at the
       * given location.
       */
@@ -141,8 +162,8 @@ object Mounting {
             mmErr.fail(PathTypeMismatch(loc)))
 
         case ModuleConfig(statements) =>
-          D.right.getOption(refineType(loc)) cata (
-            file => mmErr.fail(PathTypeMismatch(loc)), // TODO: Mount module instead of erroring out
+          D.left.getOption(refineType(loc)) cata (
+            dir => mountModule(dir, statements),
             mmErr.fail(PathTypeMismatch(loc)))
       }
     }

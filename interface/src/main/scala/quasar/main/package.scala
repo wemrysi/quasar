@@ -178,7 +178,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose view.fileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[FileSystem, V, Free[V, ?]](module.fileSystem[V], liftFT)) compose view.fileSystem[V]
       }
   }
 
