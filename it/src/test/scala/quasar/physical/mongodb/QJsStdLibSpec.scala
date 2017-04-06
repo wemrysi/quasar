@@ -32,7 +32,7 @@ import shapeless.Nat
 /** Test the implementation of the standard library for MongoDb's map-reduce
   * (i.e. JavaScript).
   */
-class MongoDbQJsStdLibSpec extends MongoDbQStdLibSpec {
+class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.ToString, Data.Dec(_) :: Nil) =>

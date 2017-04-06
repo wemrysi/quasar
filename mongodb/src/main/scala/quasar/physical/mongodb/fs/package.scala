@@ -89,50 +89,6 @@ package object fs {
       } yield FileSystemDef.DefinitionResult[M](fs, close)
   }
 
-  val QScriptFsType = FileSystemType("mongodbq")
-
-  def qscriptFileSystem[S[_]](
-    client: MongoClient,
-    defDb: Option[DefaultDb]
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
-    val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
-
-    (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
-      managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) =>
-      interpretFileSystem[Free[S, ?]](
-        qfile compose queryfile.interpretQ(execMongo),
-        rfile compose readfile.interpret,
-        wfile compose writefile.interpret,
-        mfile compose managefile.interpret))
-  }
-
-  def qscriptDefinition[S[_]](implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
-    case (QScriptFsType, uri) =>
-      type M[A] = Free[S, A]
-      for {
-        client <- asyncClientDef[S](uri)
-        defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, FileSystem ~> M](free.lift(
-                    qscriptFileSystem[S](client, defDb)
-                      .leftMap(_.right[NonEmptyList[String]])
-                      .run
-                  ).into[S])
-        close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield FileSystemDef.DefinitionResult[M](fs, close)
-  }
-
   val listContents: ADir => EitherT[MongoDbIO, FileSystemError, Set[PathSegment]] =
     dir => EitherT(dirName(dir) match {
       case Some(_) =>

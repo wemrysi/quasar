@@ -22,10 +22,10 @@ import quasar.physical.mongodb._
 
 import scalaz._, Scalaz._
 
-class MongoDbQIOSpec extends Qspec {
+class MongoDbIOSpec extends Qspec {
   import MongoDbSpec._
 
-  clientShould(QScriptFsType) { (backend, prefix, setupClient, testClient) =>
+  clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     backend.name should {

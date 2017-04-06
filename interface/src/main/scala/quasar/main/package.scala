@@ -53,7 +53,6 @@ package object main {
       writeChunkSize =  1000L
     ) translate injectFT[Task, PhysFsEff],
     mongodb.fs.definition[PhysFsEff],
-    mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],
     skeleton.fs.definition[PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],

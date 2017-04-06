@@ -2,8 +2,10 @@
   "name": "dow and isodow",
 
   "backends": {
-    "mongodb_q_3_2": "pending",
-    "postgresql": "pending"
+    "mongodb_2_6": "pending",
+    "mongodb_3_0": "pending",
+    "mongodb_3_2": "pending",
+    "postgresql":  "pending"
   },
 
   "data": "../days.data",

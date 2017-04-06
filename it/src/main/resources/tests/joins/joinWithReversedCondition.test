@@ -1,10 +1,12 @@
 {
     "name": "join with reversed condition and complex condition expression",
     "backends": {
+        "couchbase":         "skip",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
-        "couchbase":         "skip"
+        "postgresql":        "pending"
     },
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth

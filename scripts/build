@@ -51,7 +51,6 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
     echo "mongodb_read_only_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" >> $TEST_CONFIG_FILE
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
     echo "mongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" > $TEST_CONFIG_FILE
-    echo "mongodb_q_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" >> $TEST_CONFIG_FILE
   fi
 
   echo "Using local MongoDB config"

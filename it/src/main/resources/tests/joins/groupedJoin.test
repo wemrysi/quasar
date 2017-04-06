@@ -1,14 +1,16 @@
 {
     "name": "count grouped joined tables",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
+        "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
     "query": "SELECT p.author.login, COUNT(*) as count
@@ -17,9 +19,8 @@
     "predicate": "containsExactly",
     "ignoreFieldOrder": ["mongodb_2_6",
                          "mongodb_3_0",
-                         "mongodb_read_only",
                          "mongodb_3_2",
-                         "mongodb_q_3_2"],
+                         "mongodb_read_only"],
     "expected": [{ "login": "mossprescott", "count": 15 },
                  { "login": "sellout"     , "count":  9 },
                  { "login": "jdegoes"     , "count":  6 }]

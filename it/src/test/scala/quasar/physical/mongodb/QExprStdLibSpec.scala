@@ -35,7 +35,7 @@ import shapeless.Nat
 /** Test the implementation of the standard library for MongoDb's aggregation
   * pipeline (aka ExprOp).
   */
-class MongoDbQExprStdLibSpec extends MongoDbQStdLibSpec {
+class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */

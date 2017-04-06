@@ -1,9 +1,11 @@
 {
     "name": "flatten array on the left with unflattened field",
     "backends": {
-        "couchbase": "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending"
+        "couchbase":   "skip",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "postgresql":  "pending"
     },
     "data": "zips.data",
     "query": "SELECT loc[*] as coord, `_id` as zip FROM zips",

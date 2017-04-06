@@ -1,14 +1,16 @@
 {
     "name": "flatten one side of a join condition",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
-        "postgresql":        "pending",
+        "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
     "NB": "Skipped for all connectors due to LogicalPlan/QScript self-join bug #1539.",
     "data": "../zips.data",

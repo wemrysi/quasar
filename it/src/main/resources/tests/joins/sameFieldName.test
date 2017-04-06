@@ -2,8 +2,10 @@
     "name": "select over fields with same name",
     "backends": {
         "couchbase":         "skip",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
         "postgresql":        "pending"
     },
     "data": ["../owners.data", "../cars.data"],

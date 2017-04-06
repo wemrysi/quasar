@@ -1,13 +1,15 @@
 {
     "name": "group by flattened field",
     "backends": {
-        "couchbase":  "skip",
+        "couchbase":      "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-	"spark_local": "pending",
-        "spark_hdfs": "pending"
+        "mongodb_2_6":    "pending",
+        "mongodb_3_0":    "pending",
+        "mongodb_3_2":    "pending",
+        "postgresql":     "pending",
+        "spark_hdfs":     "pending",
+	"spark_local":    "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",

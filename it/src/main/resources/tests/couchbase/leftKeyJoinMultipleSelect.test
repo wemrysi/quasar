@@ -5,12 +5,11 @@
         "marklogic_xml":     "skip",
         "mongodb_2_6":       "skip",
         "mongodb_3_0":       "skip",
-        "mongodb_read_only": "skip",
         "mongodb_3_2":       "skip",
-        "mongodb_q_3_2":     "skip",
+        "mongodb_read_only": "skip",
         "postgresql":        "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip"
     },
     "data": [],
     "query": "SELECT META(brewery).id AS brewery_meta_id,

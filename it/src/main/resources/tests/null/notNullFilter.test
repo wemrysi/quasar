@@ -1,8 +1,10 @@
 {
     "name": "filter on is not null",
     "backends": {
+        "mongodb_2_6":    "pending",
+        "mongodb_3_0":    "pending",
+        "mongodb_3_2":    "pending",
         "marklogic_json": "pending",
-        "mongodb_q_3_2":  "pending",
         "postgresql":     "pending"
     },
     "description": "expression with `is not null` should be true whenever the same filter is satisfied",
