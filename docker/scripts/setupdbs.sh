@@ -121,7 +121,6 @@ while getopts ":hac:" opt; do
     c)
       echo "$OPTARG is being configured..." >&2
       enable_docker_env
-      check_container_is_running $OPTARG
       if [[ $OPTARG =~ "spark" ]]
       then
         echo "Will not make a container for this connector: $OPTARG"
