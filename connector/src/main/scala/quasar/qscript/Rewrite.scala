@@ -30,6 +30,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _},
   Inject.{ reflexiveInjectInstance => _, _ },
+  BijectionT._,
   Leibniz._,
   Scalaz._
 
@@ -84,8 +85,8 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
               N: Normalizable[G])
       : T[F] => T[G] = {
     _.codyna(
-      normalize[G]                                              >>>
-      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism)))  >>>
+      normalize[G] >>>
+      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
       liftFG(injectRepeatedly(C.coalesceSRNormalize[G, AFile](idPrism))) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
@@ -102,7 +103,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     N: Normalizable[G]
   ): T[F] => T[G] =
     _.codyna(
-      normalize[G]                                             >>>
+      normalize[G] >>>
       liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
@@ -357,14 +358,17 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
       liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))
 
-  def normalizeCoEnv[F[_]: Traverse: Normalizable](
+  private def normalizeWithBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
+    bij: Bijection[A, T[G]])(
+    prism: PrismNT[G, F],
+    rebase: FreeQS => T[G] => Option[T[G]])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              TJ: ThetaJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
-      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    in => applyNormalizations[F, CoEnv[Hole, F, ?]](coenvPrism, rebaseTCo).apply(in ∘ (_.convertTo[T[CoEnv[Hole, F, ?]]])) ∘
-      (_.convertTo[Free[F, Hole]])
+      F[A] => G[A] =
+    fa => applyNormalizations[F, G](prism, rebase)
+      .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
 
   def normalize[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
@@ -372,7 +376,15 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
              TJ: ThetaJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
-    applyNormalizations[F, F](idPrism, rebaseT)
+    normalizeWithBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
+
+  def normalizeCoEnv[F[_]: Traverse: Normalizable](
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore :<: F,
+             TJ: ThetaJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
+      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
+    normalizeWithBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
 
   /** Should only be applied after all other QScript transformations. This gives
     * the final, optimized QScript for conversion.
