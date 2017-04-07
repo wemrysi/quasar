@@ -176,15 +176,14 @@ trait CoalesceInstances {
 class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
   private def CoalesceTotal = Coalesce[T, QScriptTotal, QScriptTotal]
 
-  private type QST = QScriptTotal[T[CoEnv[Hole, QScriptTotal, ?]]]
-  private type CoEnvQST[A] = CoEnv[Hole, QScriptTotal, A]
-
-  private def freeTotal(branch: FreeQS)(coalesce: QST => Option[QST]): FreeQS = {
-    val modify: T[CoEnv[Hole, QScriptTotal, ?]] => T[CoEnv[Hole, QScriptTotal, ?]] =
-      _.cata((co: CoEnv[Hole, QScriptTotal, T[CoEnv[Hole, QScriptTotal, ?]]]) =>
+  private def freeTotal(branch: FreeQS)(
+    coalesce: QScriptTotal[T[CoEnvQS]] => Option[QScriptTotal[T[CoEnvQS]]]):
+      FreeQS = {
+    val modify: T[CoEnvQS] => T[CoEnvQS] =
+      _.cata((co: CoEnvQS[T[CoEnvQS]]) =>
         co.run.fold(
           κ(co),
-          in => CoEnv[Hole, QScriptTotal, T[CoEnv[Hole, QScriptTotal, ?]]](
+          in => CoEnv[Hole, QScriptTotal, T[CoEnvQS]](
             repeatedly(coalesce)(in).right)).embed)
 
     applyCoEnvBijection[T, QScriptTotal, Hole](modify).apply(branch)
@@ -195,7 +194,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
 
   private def freeSR(branch: FreeQS): FreeQS = {
     def freeSR0[A](b: FreeQS)(implicit SR: Const[ShiftedRead[A], ?] :<: QScriptTotal): FreeQS =
-      freeTotal(b)(CoalesceTotal.coalesceSRNormalize[CoEnv[Hole, QScriptTotal, ?], A](coenvPrism[QScriptTotal, Hole]))
+      freeTotal(b)(CoalesceTotal.coalesceSRNormalize[CoEnvQS, A](coenvPrism[QScriptTotal, Hole]))
 
     freeSR0[AFile](freeSR0[ADir](branch))
   }
