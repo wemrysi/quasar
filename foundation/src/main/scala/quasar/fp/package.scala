@@ -260,14 +260,13 @@ package object fp
       self.resume leftMap (_ map (_.resume))
   }
 
+  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A, B](f: F[B] => M[CoEnv[A, F, B]])
+      : CoEnv[A, F, B] => M[CoEnv[A, F, B]] =
+    co => co.run.fold(κ(co.point[M]), f)
+
   def liftCo[T[_[_]], F[_], A, B](f: F[B] => CoEnv[A, F, B])
       : CoEnv[A, F, B] => CoEnv[A, F, B] =
-    co => co.run.fold(κ(co), f)
-
-  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A]
-    (f: F[T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]])
-      : CoEnv[A, F, T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]] =
-    co => co.run.fold(κ(co.point[M]), f)
+    liftCoM[T, Id, F, A, B](f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),

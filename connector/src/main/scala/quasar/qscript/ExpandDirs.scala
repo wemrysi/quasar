@@ -210,7 +210,7 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
     (listContents: DiscoverPath.ListContents[M], branch: FreeQS)
       : M[FreeQS] =
     branch.transCataM[M, T[CoEnv[Hole, QScriptTotal, ?]], CoEnv[Hole, QScriptTotal, ?]](
-      liftCoM[T, M, QScriptTotal, Hole](
+      liftCoM[T, M, QScriptTotal, Hole, T[CoEnv[Hole, QScriptTotal, ?]]](
         ExpandDirsTotal.expandDirs(
           coenvPrism[QScriptTotal, Hole].reverseGet,
           listContents))
