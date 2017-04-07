@@ -158,10 +158,10 @@ package object main {
   }
 
   private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
-    val tranform: PhysFsEffM ~> Task =
+    val transform: PhysFsEffM ~> Task =
       foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
 
-    dr.translate(tranform).close
+    dr.translate(transform).close
   }
 
   private def closeAllMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] =
