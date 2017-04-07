@@ -19,6 +19,8 @@ script:
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
+  - psql -c 'CREATE DATABASE metastore;' -U postgres
+  - echo 'postgresql_metastore="{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' > $TEST_CONFIG_FILE
   - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" > $TEST_CONFIG_FILE ; fi
   - if [[ $QUASAR_MARKLOGIC_JSON || $QUASAR_MARKLOGIC_XML ]]; then ./scripts/installMarkLogic; fi
   - if [ $QUASAR_MARKLOGIC_XML ]; then echo "marklogic_xml=${QUASAR_MARKLOGIC_XML}" > $TEST_CONFIG_FILE; fi
@@ -87,3 +89,4 @@ env:
     - MONGO_3_2_PORT=27020
     - MONGO_3_2_AUTH=""
     - TEST_CONFIG_FILE=it/testing.conf
+    - POSTGRESQL_METASTORE=
