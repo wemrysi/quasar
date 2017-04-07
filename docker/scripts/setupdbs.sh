@@ -68,10 +68,6 @@ configure_connectors() {
 # attach our shell to docker
 # this allows us to run docker commands
 #
-check_container_is_running() {
-  CONTAINER_IS_RUNNING=$(docker inspect -f {{.State.Running}} $1)
-}
-
 enable_docker_env() {
   if [[ -x "$(command -v docker-machine)" ]]
   then
@@ -126,11 +122,11 @@ while getopts ":hac:" opt; do
       echo "$OPTARG is being configured..." >&2
       enable_docker_env
       check_container_is_running $OPTARG
-      if [[ $CONTAINER_IS_RUNNING == "true" ]]
+      if [[ $OPTARG =~ "spark" ]]
       then
-        apply_configuration $OPTARG
+        echo "Will not make a container for this connector: $OPTARG"
       else
-        echo "The container $OPTARG doesn't seems to be running"
+        apply_configuration $OPTARG
       fi     
       ;;
     \?)
