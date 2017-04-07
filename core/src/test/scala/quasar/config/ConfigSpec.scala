@@ -83,10 +83,8 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
   }
 
   "encoding" should {
-    "round-trip any well-formed config" >> prop { (cfg: Config) =>
-      val json = EncodeJson.of[Config].encode(cfg)
-      val cfg2 = DecodeJson.of[Config].decode(json.hcursor)
-      cfg2.result must beRight(cfg)
+    "lawful json codec" >> prop { (cfg: Config) =>
+      CodecJson.codecLaw(CodecJson.derived[Config])(cfg)
     }
   }
 }
