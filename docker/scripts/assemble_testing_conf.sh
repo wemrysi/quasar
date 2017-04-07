@@ -34,7 +34,7 @@ configure_marklogic_json() {
 #
 configure_couchbase() {
   CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password\"" >> $CONFIGFILE
+  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
 }
 
 
