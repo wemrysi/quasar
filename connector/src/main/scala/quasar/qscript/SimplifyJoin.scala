@@ -50,12 +50,13 @@ object SimplifyJoin {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
-  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T])
-      : FreeQS[T] =
-    branch
-      .convertTo[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]
-      .transCata[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]](liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)))
-      .convertTo[FreeQS[T]]
+  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
+    val modify: T[CoEnv[Hole, QScriptTotal[T, ?], ?]] => T[CoEnv[Hole, QScriptTotal[T, ?], ?]] =
+      _.transCata[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]](
+        liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+
+    applyCoEnvBijection[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
+  }
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)

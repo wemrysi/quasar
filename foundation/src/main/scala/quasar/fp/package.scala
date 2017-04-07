@@ -23,7 +23,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Lens
-import scalaz.{Lens => _, _}, BijectionT._, Liskov._, Scalaz._
+import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
@@ -282,6 +282,14 @@ package object fp
     bijection[Id, Id, Free[F, A], T[CoEnv[A, F, ?]]](
       _.convertTo[T[CoEnv[A, F, ?]]],
       _.convertTo[Free[F, A]])
+
+  def applyBijection[A, B](bij: Bijection[A, B])(modify: B => B): A => A =
+    bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK
+
+  def applyCoEnvBijection[T[_[_]]: BirecursiveT, F[_]: Functor, A](
+    modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
+      Free[F, A] => Free[F, A] =
+    applyBijection[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
 }
 
 package fp {
