@@ -64,5 +64,11 @@ printf "\n\n"
 
 sleep 10
 
+echo "setting up couchbase sample beer buckets..."
+curl -v $CB:8091/sampleBuckets/install -d '["beer-sample"]'
+printf "\n\n"
+
+sleep 10
+
 echo "couchbase configuration done!"
 printf "\n\n"
