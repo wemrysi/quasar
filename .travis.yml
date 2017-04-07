@@ -21,12 +21,12 @@ script:
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
   - psql -c 'CREATE DATABASE metastore;' -U postgres
   - echo 'postgresql_metastore="{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' > $TEST_CONFIG_FILE
-  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" > $TEST_CONFIG_FILE ; fi
+  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; echo "couchbase=${QUASAR_COUCHBASE}" >> $TEST_CONFIG_FILE ; fi
   - if [[ $QUASAR_MARKLOGIC_JSON || $QUASAR_MARKLOGIC_XML ]]; then ./scripts/installMarkLogic; fi
-  - if [ $QUASAR_MARKLOGIC_XML ]; then echo "marklogic_xml=${QUASAR_MARKLOGIC_XML}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_MARKLOGIC_JSON ]; then echo "marklogic_json=${QUASAR_MARKLOGIC_JSON}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" > $TEST_CONFIG_FILE; fi
-  - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" > $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_MARKLOGIC_XML ]; then echo "marklogic_xml=${QUASAR_MARKLOGIC_XML}" >> $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_MARKLOGIC_JSON ]; then echo "marklogic_json=${QUASAR_MARKLOGIC_JSON}" >> $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_POSTGRESQL ]; then echo "postgresql=${QUASAR_POSTGRESQL}" >> $TEST_CONFIG_FILE; fi
+  - if [ $QUASAR_SPARK_LOCAL ]; then echo "spark_local=\"${HOME}/${QUASAR_SPARK_LOCAL}/\"" >> $TEST_CONFIG_FILE; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   - ./scripts/build $MONGO_RELEASE
   - ./scripts/quasarPublishAndTag
