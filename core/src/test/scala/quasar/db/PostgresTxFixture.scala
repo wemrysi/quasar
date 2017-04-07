@@ -27,8 +27,7 @@ trait PostgresTxFixture {
   // TODO: Interim
   def postgresConfigStr: OptionT[Task, String]
 
-  /** Connects to a freshly-created PostgreSQL test DB, using the config found in
-    * `QUASAR_TEST_POSTGRESQL`.
+  /** Connects to a freshly-created PostgreSQL test DB.
     */
   def postgreSqlTransactor(dbName: String): OptionT[Task, StatefulTransactor] = {
     def recreateDb(dbName: String): ConnectionIO[Unit] =
