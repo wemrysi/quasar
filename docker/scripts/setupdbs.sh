@@ -75,8 +75,14 @@ enable_docker_env() {
     eval "$(docker-machine env default)"
     DOCKERIP=$(docker-machine ip default)
   else
-    echo "assuming docker is in your path..."
-    DOCKERIP=localhost
+    if [[ -x "$(command -v docker-machine)" ]]
+    then
+      echo "docker is in your path, proceeding..."
+      DOCKERIP=localhost
+    else
+      echo "docker needs to be installed in order to run: $0"
+      exit 1
+    fi
   fi
 }
 
@@ -90,21 +96,25 @@ configure_all_live_dockerized_connectors() {
     echo "in a travis environment, docker is in our path..."
   else
     echo "local environment, looking for docker..."
-    enable_docker_env
     find_connectors
     configure_connectors "$CONNECTORS"
   fi
 }
 
+create_database() {
+  docker-compose up -d $1 
+}
+
 usage() {
 cat << EOF
 Usage: $0 [-h] [-a] [-c CONNECTOR-NAME]
-Configure newly created dockerized mongo, couchbase, marklogic, and postgresql
+Create and configure dockerized mongo, couchbase, marklogic, and postgresql
 connectors for integration tests with Quasar.
 
   -h                   help (also trigged with no parameters): display this help and exit
   -a                   configure all currently running dockerized connectors
   -c CONNECTOR-NAME    configure running dockerized connector named CONNECTOR-NAME
+  -u "con1 con2..."    use docker-compose up to create and configure a quoted list of connectors
 EOF
 }
 
@@ -112,11 +122,12 @@ EOF
 [ $# -eq 0 ] && usage
 
 # command line parsing logic
-while getopts ":hac:" opt; do
+while getopts ":hac:u:" opt; do
   case $opt in
     a)
       echo "configuring all connectors..." >&2
-      configure_all_live_dockerized_connectors >&2
+      enable_docker_env
+      configure_all_live_dockerized_connectors
       ;;
     c)
       echo "$OPTARG is being configured..." >&2
@@ -127,6 +138,16 @@ while getopts ":hac:" opt; do
       else
         apply_configuration $OPTARG
       fi     
+      ;;
+    u)
+      echo "bringing the following connectors: $OPTARG" >&2
+      enable_docker_env
+      for CONNECTOR in $OPTARG
+      do
+        create_database $CONNECTOR
+        sleep 5
+        apply_configuration $CONNECTOR
+      done
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2

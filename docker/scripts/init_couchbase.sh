@@ -64,21 +64,5 @@ printf "\n\n"
 
 sleep 10
 
-echo "setting up couchbase sample buckets..."
-curl -v $CB:8091/sampleBuckets/install -d '["beer-sample"]'
-printf "\n\n"
-
-sleep 10
-
-echo "setting up couchbase primary index for beer-sample..."
-curl -v $CB:8093/query -d 'statement=create primary index on `beer-sample`'
-printf "\n\n"
-
-sleep 10
-
-echo "setting up couchbase index on beer-sample..."
-curl -v $CB:8093/query -d 'statement=create index beer_sample_type_idx on `beer-sample`(type)'
-
-sleep 10
-
 echo "couchbase configuration done!"
+printf "\n\n"
