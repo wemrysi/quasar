@@ -75,7 +75,7 @@ enable_docker_env() {
     eval "$(docker-machine env default)"
     DOCKERIP=$(docker-machine ip default)
   else
-    if [[ -x "$(command -v docker-machine)" ]]
+    if [[ -x "$(command -v docker)" ]]
     then
       echo "docker is in your path, proceeding..."
       DOCKERIP=localhost
