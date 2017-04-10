@@ -54,7 +54,6 @@ cache:
     - .targets
     - project/project/target
     - project/target
-    - docker
 
 before_cache:
   - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
