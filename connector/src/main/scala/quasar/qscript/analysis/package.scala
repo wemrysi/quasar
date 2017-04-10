@@ -60,7 +60,7 @@ package object analysis {
         def calculate(pathCard: APath => Int): Algebra[ Const[Read[A], ?], Int] =
           (qs: Const[Read[A], Int]) => 1
       }
-    implicit def shiftedReadFile[A <: APath]: Cardinality[Const[ShiftedRead[A], ?]] =
+    implicit def shiftedRead[A <: APath]: Cardinality[Const[ShiftedRead[A], ?]] =
       new Cardinality[Const[ShiftedRead[A], ?]] {
         def calculate(pathCard: APath => Int): Algebra[ Const[ShiftedRead[A], ?], Int] =
           (qs: Const[ShiftedRead[A], Int]) => pathCard(qs.getConst.path)
