@@ -13,6 +13,7 @@ before_install:
 # create all the docker containers we need for IT testing
 install:
   - cd $TRAVIS_BUILD_DIR/docker/scripts && ./init_connector.sh $CONNECTOR
+  - docker-compose ps
 
 # run post db config scripts and populate the it/testing.conf file
 before_script:
