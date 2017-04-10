@@ -1,5 +1,7 @@
-#!/bin/bash
-set -ev
+#!/usr/bin/env bash
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
 
 CONNECTOR=$1
 if [[ $CONNECTOR == "spark_local_test" ]]
