@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main._
+import quasar.main._, metastore._
 import quasar.metastore.{MetaStoreAccess, Schema}
 
 import doobie.syntax.connectionio._

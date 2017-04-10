@@ -23,7 +23,7 @@ import quasar.contrib.pathy._
 import quasar.db.{DbUtil, StatefulTransactor}
 import quasar.fs.mount._
 import quasar.internal.MountServiceConfig
-import quasar.main._
+import quasar.main._, metastore._
 import quasar.metastore._, MetaStoreAccess._
 import quasar.server.Server.QuasarConfig
 import quasar.sql.{fixParser, Query}

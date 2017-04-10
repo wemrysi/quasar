@@ -25,7 +25,7 @@ import quasar.console.{logErrors, stderr}
 import quasar.db.StatefulTransactor
 import quasar.fp._
 import quasar.fp.free._
-import quasar.main._
+import quasar.main._, metastore._
 import quasar.metastore.Schema
 
 import argonaut.DecodeJson
