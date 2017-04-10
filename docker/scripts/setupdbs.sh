@@ -40,7 +40,7 @@ init_marklogic() {
   # the container due to this curl issue
   # curl: symbol lookup error: /lib64/libldap-2.4.so.2
   echo "configuring marklogic..."
-  docker restart $(docker ps -q)
+  sleep 20
   ./init_marklogic.sh $1 $2
 }
 
