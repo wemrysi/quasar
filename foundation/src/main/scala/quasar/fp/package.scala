@@ -19,10 +19,11 @@ package quasar
 import slamdata.Predef._
 
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Lens
-import scalaz.{Lens => _, _}, Liskov._, Scalaz._
+import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
@@ -260,14 +261,13 @@ package object fp
       self.resume leftMap (_ map (_.resume))
   }
 
+  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A, B](f: F[B] => M[CoEnv[A, F, B]])
+      : CoEnv[A, F, B] => M[CoEnv[A, F, B]] =
+    co => co.run.fold(κ(co.point[M]), f)
+
   def liftCo[T[_[_]], F[_], A, B](f: F[B] => CoEnv[A, F, B])
       : CoEnv[A, F, B] => CoEnv[A, F, B] =
-    co => co.run.fold(κ(co), f)
-
-  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A]
-    (f: F[T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]])
-      : CoEnv[A, F, T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]] =
-    co => co.run.fold(κ(co.point[M]), f)
+    liftCoM[T, Id, F, A, B](f)
 
   def idPrism[F[_]] = PrismNT[F, F](
     λ[F ~> (Option ∘ F)#λ](_.some),
@@ -276,6 +276,20 @@ package object fp
   def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
     λ[CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]](_.run.toOption),
     λ[F ~> CoEnv[A, F, ?]](fb => CoEnv(fb.right[A])))
+
+  def coenvBijection[T[_[_]]: BirecursiveT, F[_]: Functor, A]:
+      Bijection[Free[F, A], T[CoEnv[A, F, ?]]] =
+    bijection[Id, Id, Free[F, A], T[CoEnv[A, F, ?]]](
+      _.convertTo[T[CoEnv[A, F, ?]]],
+      _.convertTo[Free[F, A]])
+
+  def applyFrom[A, B](bij: Bijection[A, B])(modify: B => B): A => A =
+    bij.toK >>> kleisli[Id, B, B](modify) >>> bij.fromK
+
+  def applyCoEnvFrom[T[_[_]]: BirecursiveT, F[_]: Functor, A](
+    modify: T[CoEnv[A, F, ?]] => T[CoEnv[A, F, ?]]):
+      Free[F, A] => Free[F, A] =
+    applyFrom[Free[F, A], T[CoEnv[A, F, ?]]](coenvBijection[T, F, A])(modify)
 }
 
 package fp {

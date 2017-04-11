@@ -84,11 +84,11 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   /** Returns `None` if a non-static non-integer index was found.
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
     */
-  def findIndicesInFunc[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] =
+  def findIndicesInFunc[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] =
     func.project.run.fold(k => ScalaMap(k -> none), κ(findIndicesInStruct(func)))
 
-  def findIndicesInStruct[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] = {
-    def accumulateIndices: GAlgebra[(Free[MapFunc, A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
+  def findIndicesInStruct[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] = {
+    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
       case ProjectIndex((src, acc1), (value, acc2)) =>
         val newMap = acc1 |++| acc2
         (src.project.run, value.project.run) match {
@@ -103,14 +103,17 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
       })
     }
 
-    def findIndices: GAlgebra[(Free[MapFunc, A], ?), CoEnv[A, MapFunc, ?], ScalaMap[A, KnownIndices]] =
+    def findIndices: GAlgebra[(FreeMapA[A], ?), CoEnvMapA[A, ?], ScalaMap[A, KnownIndices]] =
       _.run.fold(k => ScalaMap.empty, accumulateIndices)
 
     func.para(findIndices)
   }
 
-  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt): CoEnv[A, MapFunc, FreeMapA[A]] =
-    CoEnv[A, MapFunc, FreeMapA[A]](\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)))))
+  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
+      CoEnvMapA[A, FreeMapA[A]] =
+    CoEnv[A, MapFunc, FreeMapA[A]](ProjectIndex[T, FreeMapA[A]](
+      hole,
+      IntLit(mapping.get(idx).getOrElse(idx))).right[A])
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
