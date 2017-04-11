@@ -1,5 +1,7 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 ##########################################
 # generic function to init containerized 
@@ -9,15 +11,16 @@ set -e
 init_containerdb() {
   CONTAINERNAME=$1
   DBNAME=$(echo "$CONTAINERNAME" | cut -d_ -f1)
-  docker cp init_$DBNAME.sh $CONTAINERNAME:/tmp/init_$DBNAME.sh
-  docker exec $CONTAINERNAME /tmp/init_$DBNAME.sh
+  CAPDBNAME="$(tr '[:lower:]' '[:upper:]' <<< ${DBNAME:0:1})${DBNAME:1}"
+  docker cp init$CAPDBNAME $CONTAINERNAME:/tmp/init$CAPDBNAME
+  docker exec $CONTAINERNAME /tmp/init$CAPDBNAME
 }
 
 ##########################################
 # methods to intialize various databases
 #
 init_mongo() {
-  # only mongodb_read_only need to be configured
+  # only mongodb_read_only needs to be configured
   echo "configuring mongodb_read_only..."
   init_containerdb mongodb_read_only
 }
@@ -41,7 +44,7 @@ init_marklogic() {
   # curl: symbol lookup error: /lib64/libldap-2.4.so.2
   echo "configuring marklogic..."
   sleep 20
-  ./init_marklogic.sh $1 $2
+  ./initMarklogic $1 $2
 }
 
 ##########################################

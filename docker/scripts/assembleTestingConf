@@ -61,10 +61,6 @@ configure_mongo() {
 }
 
 
-insert_bogus() {
-  echo "bogus=true" > $CONFIGFILE
-}
-
 connector_lookup() {
   CONNECTOR=$1
   if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo          $CONNECTOR;      fi
@@ -124,7 +120,6 @@ while getopts ":hastpc:i:" opt; do
     a)
       echo "creating testing.conf with URIs for all running connectors..." >&2
       cleanup_testing_conf_file
-      insert_bogus
       CONNECTORS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
       for CONNECTOR in $CONNECTORS
       do
@@ -138,7 +133,6 @@ while getopts ":hastpc:i:" opt; do
     c)
       echo "creating testing.conf with URI for $OPTARG..." >&2
       cleanup_testing_conf_file
-      insert_bogus
       connector_lookup $OPTARG     
       ;;
     t)

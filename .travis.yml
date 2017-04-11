@@ -12,16 +12,16 @@ before_install:
 
 # create all the docker containers we need for IT testing
 install:
-  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./init_connector.sh $CONNECTOR
+  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./initConnector $CONNECTOR
   - docker-compose ps
 
-# run post db config scripts and populate the it/testing.conf file
+# run db config scripts and populate the it/testing.conf file
 before_script:
-  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./setupdbs.sh -c $CONNECTOR
-  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./assemble_testing_conf.sh -c $CONNECTOR
+  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./setupConnectors -c $CONNECTOR
+  - cd $TRAVIS_BUILD_DIR/docker/scripts && ./assembleTestingConf -c $CONNECTOR
   - cd $TRAVIS_BUILD_DIR/it && cat testing.conf
 
-# Export color variables needed by travis_wait and travis_jigger
+# export some needed env vars, build, then publish and tag resources
 script:
   - cd $TRAVIS_BUILD_DIR
   - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
