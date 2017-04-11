@@ -131,6 +131,7 @@ object queryfile {
     type QSR[A]  = QScriptRead[T, A]
 
     val R = new Rewrite[T]
+    val O = new Optimize[T]
 
     def logPhase(pr: PhaseResult): F[Unit] =
       MonadTell_[F, PhaseResults].tell(Vector(pr))
@@ -143,7 +144,7 @@ object queryfile {
       shifted   <- Unirewrite[T, MLQScriptCP[T], F](R, ops.directoryContents[F, FMT]).apply(qs)
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
-                     R.optimize(reflNT[MLQ]),
+                     O.optimize(reflNT[MLQ]),
                      Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)

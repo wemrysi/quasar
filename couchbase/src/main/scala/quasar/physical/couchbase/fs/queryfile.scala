@@ -241,6 +241,7 @@ object queryfile {
 
     val tell = MonadTell[Plan[S, ?], PhaseResults].tell _
     val rewrite = new Rewrite[T]
+    val optimize = new Optimize[T]
 
     for {
       qs   <- convertToQScriptRead[T, Plan[S, ?], QScriptRead[T, ?]](lc)(lp)
@@ -248,7 +249,7 @@ object queryfile {
       shft <- Unirewrite[T, CBQSCP, Plan[S, ?]](rewrite, lc).apply(qs)
       _    <- tell(Vector(tree("QScript (post shiftRead)", shft)))
       opz  =  shft.transHylo(
-                rewrite.optimize(reflNT[CBQS]),
+                optimize.optimize(reflNT[CBQS]),
                 Unicoalesce[T, CBQSCP])
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
       n1ql <- opz.cataM(
