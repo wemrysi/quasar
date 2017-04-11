@@ -7,6 +7,8 @@ sudo: required
 services:
   - docker
 
+# travis installs postgres by default this will stop and free up the psql port
+# needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
 
@@ -62,14 +64,14 @@ before_cache:
 env:
   matrix:
     - CONNECTOR=mongodb_2_6
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=marklogic_json
+    - CONNECTOR=couchbase
     - CONNECTOR=mongodb_3_0
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=postgresql
-    - CONNECTOR=marklogic_xml
-    - CONNECTOR=marklogic_json
-    - CONNECTOR=couchbase
     - CONNECTOR=spark_local_test
 
   global:
