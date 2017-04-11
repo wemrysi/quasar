@@ -186,7 +186,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] 
           in => CoEnv[Hole, QScriptTotal, T[CoEnvQS]](
             repeatedly(coalesce)(in).right)).embed)
 
-    applyCoEnvBijection[T, QScriptTotal, Hole](modify).apply(branch)
+    applyCoEnvFrom[T, QScriptTotal, Hole](modify).apply(branch)
   }
 
   private def freeQC(branch: FreeQS): FreeQS =

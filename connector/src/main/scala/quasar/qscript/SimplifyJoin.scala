@@ -54,7 +54,7 @@ object SimplifyJoin {
       _.transCata[T[CoEnvQS[T, ?]]](
         liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
 
-    applyCoEnvBijection[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
+    applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
