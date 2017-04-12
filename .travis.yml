@@ -29,8 +29,7 @@ script:
   - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
   - export -f travis_wait travis_jigger
   - ./scripts/build
-  - sbt transferPublishAndTagResources
-  - ./scripts/publishAndTag 'quasar-analytics/quasar'
+  - ./scripts/publishAndTag
 
 after_success:
   - ./scripts/afterSuccess
