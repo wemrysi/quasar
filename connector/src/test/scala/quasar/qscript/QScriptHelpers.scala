@@ -80,6 +80,10 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   val UnreferencedRT: QST[Fix[QST]] = QCT.inj(Unreferenced[Fix, Fix[QST]]())
   def ReadRT(file: AFile): QST[Fix[QST]] = RTF.inj(Const(Read(file)))
 
+  def ConstantR[A](value: Fix[EJson]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.Constant[Fix, FreeMapA[A]](value))
+
   def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(MapFuncs.ProjectField(src, field))
@@ -112,9 +116,29 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(MapFuncs.Add(left, right))
 
+  def SubtractR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.Subtract(left, right))
+
   def EqR[A](left: FreeMapA[A], right: FreeMapA[A]):
       FreeMapA[A] =
     Free.roll(MapFuncs.Eq(left, right))
+
+  def LtR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.Lt(left, right))
+
+  def AndR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.And(left, right))
+
+  def OrR[A](left: FreeMapA[A], right: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.Or(left, right))
+
+  def NotR[A](value: FreeMapA[A]):
+      FreeMapA[A] =
+    Free.roll(MapFuncs.Not(value))
 
   def lpRead(path: String): Fix[LP] =
     lpf.read(sandboxAbs(posixCodec.parseAbsFile(path).get))

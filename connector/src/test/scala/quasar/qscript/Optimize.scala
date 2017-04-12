@@ -16,7 +16,6 @@
 
 package quasar.qscript
 
-import quasar._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 
@@ -35,16 +34,12 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
       val lBranch: QS[FreeQS] =
         QC.inj(Map(
           HoleQS,
-          Free.roll(ProjectField(
-            HoleF,
-            Free.roll(Constant(ejson.CommonEJson.inj(ejson.Str[Fix[ejson.EJson]]("foo")).embed))))))
+          ProjectFieldR(HoleF, StrLit("foo"))))
 
       val rBranch: QS[FreeQS] =
         QC.inj(Map(
           HoleQS,
-          Free.roll(ProjectIndex(
-            HoleF,
-            Free.roll(Constant(ejson.ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed))))))
+          ProjectIndexR(HoleF, IntLit(2))))
 
       val input: QS[Fix[QS]] =
         QC.inj(Filter(

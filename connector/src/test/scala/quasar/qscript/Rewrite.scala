@@ -91,7 +91,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS]()))),
                 Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
                 Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RTF.inj(Const[Read[AFile], FreeQS](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
-        QCT.inj(LeftShift((), HoleF, ExcludeId, Free.point(RightSide))))(
+        QCT.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))(
         implicitly, Corecursive[Fix[QST], QST]).some)
     }
 
@@ -103,7 +103,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             BoolLit[Fix, Hole](true)).embed,
           HoleF,
           ExcludeId,
-          Free.point[MapFunc, JoinSide](RightSide))
+          RightSideF)
 
       Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
       equal(
@@ -111,7 +111,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           Unreferenced[Fix, Fix[QScriptCore]]().embed,
           BoolLit[Fix, Hole](true),
           ExcludeId,
-          Free.point[MapFunc, JoinSide](RightSide)).some)
+          RightSideF).some)
     }
 
     "fold a constant array value" in {
@@ -121,12 +121,12 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(MakeArray(Free.roll(Constant(value))))))
+          MakeArrayR(IntLit(7))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value))).embed))))
+          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(value))).embed)))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -141,19 +141,19 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               ProjectFieldR(HoleF, StrLit("city"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.point(LeftSide))),
-              Free.roll(MakeArray(Free.point(RightSide)))))))),
+            ConcatArraysR(
+              MakeArrayR(LeftSideF),
+              MakeArrayR(RightSideF))))),
           Free.roll(QCT.inj(Map(
             Free.roll(QCT.inj(Unreferenced[Fix, FreeQS]())),
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
           JoinType.Inner,
           ProjectFieldR(
-            Free.roll(ProjectIndex(
-              Free.roll(ProjectIndex(Free.point(LeftSide), IntLit(1))),
-              IntLit(1))),
-            Free.point(RightSide))))
+            ProjectIndexR(
+              ProjectIndexR(LeftSideF, IntLit(1)),
+              IntLit(1)),
+            RightSideF)))
 
       // TODO: only require a single pass
       normalizeExpr(normalizeExpr(exp.embed)) must equal(
@@ -162,7 +162,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           QC.inj(LeftShift((),
             ProjectFieldR(HoleF, StrLit("city")),
             ExcludeId,
-            ProjectFieldR(Free.point(RightSide), StrLit("name"))))))
+            ProjectFieldR(RightSideF, StrLit("name"))))))
     }
 
     "fold a constant doubly-nested array value" in {
@@ -172,12 +172,12 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(MakeArray(Free.roll(MakeArray(Free.roll(Constant(value))))))))
+          MakeArrayR(MakeArrayR(IntLit(7)))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Arr(List(value)))))).embed))))
+          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Arr(List(value)))))).embed)))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -192,25 +192,25 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           Free.roll(TJT.inj(ThetaJoin(
             Free.roll(DET.inj(Const(Root))),
             Free.roll(QCT.inj(LeftShift(
-              Free.point(SrcHole),
+              HoleQS,
               HoleF,
               IncludeId,
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide)))))))),
+              ConcatArraysR(
+                MakeArrayR(LeftSideF),
+                MakeArrayR(RightSideF))))),
             Free.roll(QCT.inj(Map(
               Free.roll(QCT.inj(Unreferenced())),
               StrLit("name")))),
             BoolLit(true),
             JoinType.Inner,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.point(LeftSide))),
-              Free.roll(MakeArray(Free.point(RightSide)))))))),
+            ConcatArraysR(
+              MakeArrayR(LeftSideF),
+              MakeArrayR(RightSideF))))),
           BoolLit(true),
           JoinType.Inner,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(LeftSide))),
-            Free.roll(MakeArray(Free.point(RightSide)))))))
+          ConcatArraysR(
+            MakeArrayR(LeftSideF),
+            MakeArrayR(RightSideF))))
 
       // TODO: only require a single pass
       normalizeExpr(normalizeExpr(exp.embed)) must
@@ -219,42 +219,33 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             RootR.embed,
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(Constant(
-                ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)),
-              Free.roll(MakeArray(
-                Free.roll(ConcatArrays(
-                  Free.roll(MakeArray(
-                    Free.roll(ConcatArrays(
-                      Free.roll(MakeArray(Free.point(LeftSide))),
-                      Free.roll(MakeArray(Free.point(RightSide))))))),
-                  Free.roll(Constant(
-                    ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))))))).embed)
+            ConcatArraysR(
+              ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed),
+              MakeArrayR(
+                ConcatArraysR(
+                  MakeArrayR(
+                    ConcatArraysR(
+                      MakeArrayR(LeftSideF),
+                      MakeArrayR(RightSideF))),
+                  ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))).embed)
     }
 
     "fold nested boolean values" in {
-      val falseBool: Fix[EJson] =
-        EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[EJson]](false))
-
-      val trueBool: Fix[EJson] =
-        EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[EJson]](true))
-
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(MakeArray(
+          MakeArrayR(
             // !false && (false || !true)
-            Free.roll(And(
-              Free.roll(Not(Free.roll(Constant(falseBool)))),
-              Free.roll(Or(
-                Free.roll(Constant(falseBool)),
-                Free.roll(Not(Free.roll(Constant(trueBool))))))))))))
+            AndR(
+              NotR(BoolLit(false)),
+              OrR(
+                BoolLit(false),
+                NotR(BoolLit(true)))))))
 
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          Free.roll(Constant(
-            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[ejson.EJson]](false))))).embed))))
+          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[ejson.EJson]](false))))).embed)))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -265,25 +256,25 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
           Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
           Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
-          Free.roll(And(Free.roll(And(
+          AndR(AndR(
             // reversed equality
-            Free.roll(MapFuncs.Eq(
-              Free.roll(ProjectField(Free.point(RightSide), StrLit("r_id"))),
-              Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_id"))))),
+            EqR(
+              ProjectFieldR(RightSideF, StrLit("r_id")),
+              ProjectFieldR(LeftSideF, StrLit("l_id"))),
             // more complicated expression, duplicated refs
-            Free.roll(MapFuncs.Eq(
-              Free.roll(Add(
-                Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_min"))),
-                Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_max"))))),
-              Free.roll(Subtract(
-                Free.roll(ProjectField(Free.point(RightSide), StrLit("l_max"))),
-                Free.roll(ProjectField(Free.point(RightSide), StrLit("l_min"))))))))),
+            EqR(
+              AddR(
+                ProjectFieldR(LeftSideF, StrLit("l_min")),
+                ProjectFieldR(LeftSideF, StrLit("l_max"))),
+              SubtractR(
+                ProjectFieldR(RightSideF, StrLit("l_max")),
+                ProjectFieldR(RightSideF, StrLit("l_min"))))),
             // inequality
-            Free.roll(Lt(
-              Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_lat"))),
-              Free.roll(ProjectField(Free.point(RightSide), StrLit("r_lat"))))))),
+            LtR(
+              ProjectFieldR(LeftSideF, StrLit("l_lat")),
+              ProjectFieldR(RightSideF, StrLit("r_lat")))),
           JoinType.Inner,
-          Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide)))))
+          ConcatMapsR(LeftSideF, RightSideF)))
 
       simplifyJoinExpr(exp.embed) must equal(
         QCT.inj(Map(
@@ -292,34 +283,34 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,
               Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
               Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(
-                  Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
-                Free.roll(MakeArray(
-                  Free.roll(Add(
-                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_min"))),
-                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_max"))))))))),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(
-                  Free.roll(ProjectField(Free.point(SrcHole), StrLit("r_id"))))),
-                Free.roll(MakeArray(
-                  Free.roll(Subtract(
-                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_max"))),
-                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_min"))))))))),
+              ConcatArraysR(
+                MakeArrayR(
+                  ProjectFieldR(HoleF, StrLit("l_id"))),
+                MakeArrayR(
+                  AddR(
+                    ProjectFieldR(HoleF, StrLit("l_min")),
+                    ProjectFieldR(HoleF, StrLit("l_max"))))),
+              ConcatArraysR(
+                MakeArrayR(
+                  ProjectFieldR(HoleF, StrLit("r_id"))),
+                MakeArrayR(
+                  SubtractR(
+                    ProjectFieldR(HoleF, StrLit("l_max")),
+                    ProjectFieldR(HoleF, StrLit("l_min"))))),
               JoinType.Inner,
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(LeftSide))),
-                Free.roll(MakeArray(Free.point(RightSide))))))).embed,
-            Free.roll(Lt(
-              Free.roll(ProjectField(
-                Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
-                StrLit("l_lat"))),
-              Free.roll(ProjectField(
-                Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))),
-                StrLit("r_lat"))))))).embed,
-          Free.roll(ConcatMaps(
-            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
-            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))))))).embed)
+              ConcatArraysR(
+                MakeArrayR(LeftSideF),
+                MakeArrayR(RightSideF)))).embed,
+            LtR(
+              ProjectFieldR(
+                ProjectIndexR(HoleF, IntLit(0)),
+                StrLit("l_lat")),
+              ProjectFieldR(
+                ProjectIndexR(HoleF, IntLit(1)),
+                StrLit("r_lat"))))).embed,
+          ConcatMapsR(
+            ProjectIndexR(HoleF, IntLit(0)),
+            ProjectIndexR(HoleF, IntLit(1))))).embed)
     }
 
     "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
@@ -328,14 +319,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val originalQScript =
         QCT.inj(Map(
           SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, IncludeId))).embed,
-          Free.roll(Add(
-            Free.roll(ProjectIndex(HoleF, IntLit(1))),
-            Free.roll(ProjectIndex(HoleF, IntLit(1))))))).embed
+          AddR(
+            ProjectIndexR(HoleF, IntLit(1)),
+            ProjectIndexR(HoleF, IntLit(1))))).embed
 
       val expectedQScript =
         QCT.inj(Map(
           SRTF.inj(Const[ShiftedRead[AFile], Fix[QST]](ShiftedRead(sampleFile, ExcludeId))).embed,
-          Free.roll(Add(HoleF, HoleF)))).embed
+          AddR(HoleF, HoleF))).embed
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
