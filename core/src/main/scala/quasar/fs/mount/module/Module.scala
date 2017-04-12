@@ -1,0 +1,172 @@
+/*
+ * Copyright 2014–2017 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package quasar.fs.mount.module
+
+import slamdata.Predef._
+import quasar.{Data, SemanticError, Variables}
+import quasar.contrib.pathy._
+import quasar.effect.LiftedOps
+import quasar.frontend.logicalplan.LogicalPlan
+import quasar.fs._
+import quasar.fs.mount._
+import quasar.sql._
+
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import monocle._
+import scalaz._, Scalaz._
+import scalaz.stream.Process
+import pathy.Path._
+
+sealed abstract class Module[A]
+
+object Module {
+
+  sealed trait Error
+
+  type ErrorT[M[_], A] = EitherT[M, Error, A]
+  type Failure[A] = quasar.effect.Failure[Error, A]
+
+  object Error {
+    final case class FSError(fsErr: FileSystemError) extends Error
+    final case class SemErrors(semErrs: NonEmptyList[SemanticError]) extends Error
+    final case class ArgumentsMissing(missing: List[CIName]) extends Error
+    final case class ParsingErr(parsingErr: ParsingError) extends Error
+
+    val fsError = Prism.partial[Error, FileSystemError] {
+      case FSError(fsErr) => fsErr
+    } (FSError(_))
+
+    val semErrors = Prism.partial[Error, NonEmptyList[SemanticError]] {
+      case SemErrors(semErr) => semErr
+    } (SemErrors(_))
+
+    val argumentsMissing = Prism.partial[Error, List[CIName]] {
+      case ArgumentsMissing(missing) => missing
+    } (ArgumentsMissing(_))
+
+    val parsingErr = Prism.partial[Error, ParsingError] {
+      case ParsingErr(pErr) => pErr
+    } (ParsingErr(_))
+
+    implicit val show: Show[Error] =
+      Show.shows {
+        case FSError(e) => e.shows
+        case SemErrors(e) =>
+          s"Encountered the following semantic errors while attempting to invoke function: ${e.shows}"
+        case ArgumentsMissing(missing) =>
+          s"The following arguments are missing: $missing"
+        case ParsingErr(e) => e.shows
+      }
+  }
+
+
+  final case class InvokeModuleFunction(path: AFile, args: Map[String, String])
+    extends Module[Error \/ QueryFile.ResultHandle]
+
+  final case class More(handle: QueryFile.ResultHandle)
+    extends Module[FileSystemError \/ Vector[Data]]
+
+  final case class Close(h: QueryFile.ResultHandle)
+    extends Module[Unit]
+
+  /** Low-level, unsafe operations. Clients are responsible for resource-safety
+    * when using these.
+    */
+  final class Unsafe[S[_]](implicit S: Module :<: S)
+    extends LiftedOps[Module, S] {
+
+    type M[A] = ErrorT[FreeS, A]
+
+    def invokeFunction(path: AFile, args: Map[String, String]): M[QueryFile.ResultHandle] =
+      EitherT(lift(InvokeModuleFunction(path, args)))
+
+    /** Read a chunk of data from the file represented by the given handle.
+      *
+      * An empty `Vector` signals that all data has been read.
+      */
+    def more(h: QueryFile.ResultHandle): FileSystemErrT[FreeS, Vector[Data]] =
+      EitherT(lift(More(h)))
+
+    /** Closes the given read handle, freeing any resources it was using. */
+    def close(h: QueryFile.ResultHandle): FreeS[Unit] =
+      lift(Close(h))
+  }
+
+  object Unsafe {
+    implicit def apply[S[_]](implicit S: Module :<: S): Unsafe[S] =
+      new Unsafe[S]
+  }
+
+  final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
+    type M[A] = unsafe.M[A]
+
+    /** Returns mounts located at a path having the given prefix. */
+    def invokeFunction(path: AFile, args: Map[String, String]): Process[M, Data] = {
+      // TODO: use DataCursor.process for the appropriate cursor type
+      def closeHandle(h: QueryFile.ResultHandle): Process[M, Nothing] =
+        Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT])
+
+      def readUntilEmpty(h: QueryFile.ResultHandle): Process[M, Data] =
+        Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
+          if (data.isEmpty)
+            Process.halt
+          else
+            Process.emitAll(data) ++ readUntilEmpty(h)
+        }
+
+      Process.bracket(unsafe.invokeFunction(path, args))(closeHandle)(readUntilEmpty)
+    }
+  }
+
+  object Ops {
+    implicit def apply[S[_]](implicit S: Module :<: S): Ops[S] =
+      new Ops[S]
+  }
+
+  object impl {
+
+    import Error._
+    import FileSystemError._
+    import PathError._
+
+    def default[S[_]](implicit query: QueryFile.Unsafe[S], mount: Mounting.Ops[S]): Module ~> Free[S, ?] =
+      λ[Module ~> Free[S, ?]] {
+        case InvokeModuleFunction(file, args) =>
+          val notFoundError = fsError(pathErr(pathNotFound(file)))
+          // case insensitive args
+          val iArgs = args.map{ case (key, value) => (CIName(key), value)}
+          (for {
+            moduleConfig <- mount.lookupModuleConfig(fileParent(file)).toRight(notFoundError)
+            name         =  fileName(file).value
+            funcDec      <- EitherT(moduleConfig.declarations.find(_.name.value ≟ name)
+                              .toRightDisjunction(notFoundError).point[Free[S, ?]])
+            maybeAllArgs =  funcDec.args.map(arg => iArgs.get(arg)).sequence
+            missingArgs  =  funcDec.args.filter(arg => !iArgs.contains(arg))
+            userArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
+            parsedArgs   <- EitherT(userArgs.traverse(argString => fixParser.parseExpr(Query(argString)))
+                              .leftMap(parsingErr(_)).point[Free[S, ?]])
+            sqlBlob      =  Blob(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, List(funcDec))
+            logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sqlBlob, Variables.empty, basePath = fileParent(file))
+                              .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
+            handle       <- EitherT(query.eval(logicalPlan).run.value).leftMap(fsError(_))
+          } yield handle).run
+        case More(handle)  => query.more(handle).run
+        case Close(handle) => query.close(handle)
+      }
+  }
+}
