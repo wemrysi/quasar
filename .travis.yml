@@ -29,7 +29,7 @@ script:
   - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
   - export -f travis_wait travis_jigger
   - ./scripts/build
-  - ./scripts/publishAndTag
+  - ./scripts/quasarPublishAndTag
 
 after_success:
   - ./scripts/afterSuccess
