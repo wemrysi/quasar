@@ -1145,8 +1145,7 @@ object MongoDbQScriptPlanner {
   def elideMoreGeneralGuards[M[_]: Applicative, T[_[_]]: RecursiveT]
     (subType: Type)
     (implicit merr: MonadError_[M, FileSystemError])
-      : CoEnv[Hole, MapFunc[T, ?], FreeMap[T]] =>
-        M[CoEnv[Hole, MapFunc[T, ?], FreeMap[T]]] = {
+      : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
     case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb))) =>
       if (typ.contains(subType)) cont.project.point[M]
       // TODO: Error if there is no overlap between the types.
