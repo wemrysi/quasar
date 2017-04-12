@@ -36,27 +36,23 @@ import scalaz._
 import scalaz.syntax.all._
 import scalaz.concurrent.Task
 
-trait BackendModule[Config] {
+trait BackendModule {
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
-  // TODO enrich to something like EitherT so we can factor out errors that are concerning
-  // maybe PhysicalErr somethingorother?
-  type Final[A] = Task[A]
-
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
-  private final implicit def _DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
-  private final implicit def _ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
+  private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
+  private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
   private final implicit def _MonadM = MonadM
   private final implicit def _MonadFsErrM = MonadFsErrM
   private final implicit def _PhaseResultTellM = PhaseResultTellM
   private final implicit def _PhaseResultListenM = PhaseResultListenM
-  private final implicit def _UnirewriteT[T[_[_]]] = UnirewriteT[T]
-  private final implicit def _UnicoalesceCap[T[_[_]]] = UnicoalesceCap[T]
+  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
+  private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  final def definition(config: Config): FileSystemDef[Final] = FileSystemDef fromPF {
+  final def definition[Task] = FileSystemDef fromPF {
     case (Type, uri) =>
-      compile(config, uri) map {
+      compile(uri) map {
         case (int, close) =>
           FileSystemDef.DefinitionResult(int compose fsInterpreter, close)
       }
@@ -115,7 +111,7 @@ trait BackendModule[Config] {
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
-  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT: OrderT](
+  final def lpToRepr[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT](
       lp: T[LogicalPlan]): M[PhysicalPlan[Repr]] = {
 
     type QSR[A] = QScriptRead[T, A]
@@ -148,21 +144,26 @@ trait BackendModule[Config] {
 
   type QS[T[_[_]]] <: CoM
 
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]]
+
+  type Config
+  def config: Config
+
   type Repr
   type M[A]
 
   def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]]: Delay[RenderTree, QSM[T, ?]]
-  def ExtractPathQSM[T[_[_]]]: ExtractPath[QSM[T, ?], APath]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
+  def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
   def MonadM: Monad[M]
   def MonadFsErrM: MonadFsErr[M]
   def PhaseResultTellM: PhaseResultTell[M]
   def PhaseResultListenM: PhaseResultListen[M]
-  def UnirewriteT[T[_[_]]]: Unirewrite[T, QS[T]]
-  def UnicoalesceCap[T[_[_]]]: Unicoalesce.Capture[T, QS[T]]
+  def UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
-  def compile(config: Config, uri: ConnectionUri): FileSystemDef.DefErrT[Final, (M ~> Final, Final[Unit])]
+  def compile(uri: ConnectionUri): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
 
   val Type: FileSystemType
 

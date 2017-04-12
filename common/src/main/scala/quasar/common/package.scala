@@ -25,6 +25,16 @@ package object common {
   type PhaseResults = Vector[PhaseResult]
   type PhaseResultW[A] = Writer[PhaseResults, A]
   type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
+
   type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
+
+  object PhaseResultTell {
+    def apply[F[_]](implicit F: PhaseResultTell[F]) = F
+  }
+
   type PhaseResultListen[F[_]] = MonadListen_[F, PhaseResults]
+
+  object PhaseResultListen {
+    def apply[F[_]](implicit F: PhaseResultListen[F]) = F
+  }
 }
