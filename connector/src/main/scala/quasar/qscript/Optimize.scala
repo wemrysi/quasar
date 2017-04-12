@@ -63,6 +63,6 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: OrderT: ShowT] extends TTypes[T] {
       QCF: QScriptCore :<: F,
       QCG: QScriptCore :<: G)
       : F[T[G]] => F[T[G]] =
-    liftFF[QScriptCore, F, T[G]](repeatedly(subsetBeforeMap[F, G](FtoG))) >>>
-      liftFF[QScriptCore, F, T[G]](repeatedly(filterBeforeUnion[G]))
+      liftFF[QScriptCore, F, T[G]](
+        repeatedly(applyTransforms(subsetBeforeMap[F, G](FtoG), filterBeforeUnion[G])))
 }
