@@ -25,6 +25,7 @@ import quasar.fs.{FileSystemError, FileSystemErrT, QueryFile}
 import quasar.fs.PathError.invalidPath
 import quasar.fp._, ski._
 import quasar.frontend.logicalplan.{Read => LPRead, LogicalPlan}
+import quasar.std.StdLib.agg
 
 import matryoshka.{Hole => _, _}
 import matryoshka.patterns._
@@ -67,8 +68,7 @@ package object analysis {
       case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
     }
 
-    /** TODO: This  lpFromPath is not proper one, needed equivalent of 'select count(*) from afile' */
-    val lpFromPath: FPath => Fix[LogicalPlan] = (p: FPath) => Fix(LPRead(p))
+    val lpFromPath: FPath => Fix[LogicalPlan] = (p: FPath) => Fix(agg.Count(Fix(LPRead(p))))
     val lp: FileSystemErrT[Free[S, ?], Fix[LogicalPlan]] =
       EitherT.fromDisjunction(afile.map(lpFromPath) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
     val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
