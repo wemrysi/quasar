@@ -30,16 +30,40 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
     expr.transCata[Fix[QS]](optimize.optimize[QS, QS](reflNT))
 
   "optimizer" should {
-    "move filter before union" in {
-      val lBranch: QS[FreeQS] =
+    "move subset before map" in {
+      val from: QS[FreeQS] =
         QC.inj(Map(
-          HoleQS,
+          Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
           ProjectFieldR(HoleF, StrLit("foo"))))
 
-      val rBranch: QS[FreeQS] =
+      val count: QS[FreeQS] =
+        QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
+
+      val input: QS[Fix[QS]] =
+        QC.inj(Subset(
+          RootR.embed,
+          Free.roll(QST[QS].inject(from)),
+          Take,
+          Free.roll(QST[QS].inject(count))))
+
+      val output: QS[Fix[QS]] =
         QC.inj(Map(
-          HoleQS,
-          ProjectIndexR(HoleF, IntLit(2))))
+          QC.inj(Subset(
+            RootR.embed,
+            Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
+            Take,
+            Free.roll(QST[QS].inject(count)))).embed,
+          ProjectFieldR(HoleF, StrLit("foo"))))
+
+      optimizeExpr(input.embed) must equal(output.embed)
+    }
+
+    "move filter before union" in {
+      val lBranch: QS[FreeQS] =
+        QC.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))
+
+      val rBranch: QS[FreeQS] =
+        QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
 
       val input: QS[Fix[QS]] =
         QC.inj(Filter(
