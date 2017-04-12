@@ -17,7 +17,7 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.config, config.{ConfigOps, FsFile, MetaStoreConfig}
+import quasar.config, config.MetaStoreConfig
 import quasar.console.stdout
 import quasar.contrib.scalaz.catchable._
 import quasar.db, db.{DbConnectionConfig, StatefulTransactor}
@@ -132,27 +132,28 @@ object metastore {
   }
 
   def initUpdateMetaStore[A](
-    schema: db.Schema[A], transactor: Transactor[Task],
-    cfgFile: Option[FsFile], mCfg: Option[MountingsConfig]
-  ): MainTask[Unit] = {
-    val migrateMounts: ConnectionIO[Unit] =
-      (mCfg | MountingsConfig.empty).toMap.toList.traverse {
-        case (p, m) => MetaStoreAccess.insertMount(p, m)
-      } *>
-      taskToConnectionIO(
-        ConfigOps.jsonFromFile(cfgFile).fold(
-          e => Task.fail(new RuntimeException(e.shows)), Task.now
-        ).join >>= (json =>
-          ConfigOps.jsonToFile(
-            json.obj.cata(o => jObject(o - config.MountingsConfig.fieldName), json),
-            cfgFile)))
+    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Json
+  ): MainTask[Json] = {
+    val mntsFieldName = "mountings"
 
-    val op: ConnectionIO[Unit] =
+    val mountingsConfigDecodeJson: DecodeJson[MountingsConfig] =
+      DecodeJson(cur => (cur --\ mntsFieldName).as[MountingsConfig])
+
+    val migrateMounts: ConnectionIO[Unit] =
+      mountingsConfigDecodeJson.decodeJson(jCfg).fold(
+        { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
+        m => m.toMap.toList.traverse {
+          case (p, m) => MetaStoreAccess.insertMount(p, m)
+        }.void)
+
+    val op: ConnectionIO[Json] =
       for {
         ver <- schema.readVersion
         _   <- schema.updateToLatest
-        _   <- ver.isEmpty.whenM(migrateMounts)
-      } yield ()
+        r   <- ver.isEmpty.whenM(migrateMounts)
+      } yield ver.isEmpty.fold(
+        jCfg.obj.cata(o => jObject(o - mntsFieldName), jCfg),
+        jCfg)
 
     EitherT(transactor.trans(op).attempt ∘ (
       _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}")))

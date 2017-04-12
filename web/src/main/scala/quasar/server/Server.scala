@@ -23,7 +23,7 @@ import quasar.cli.Cmd, Cmd._
 import quasar.config._
 import quasar.console.{logErrors, stderr}
 import quasar.db.StatefulTransactor
-import quasar.fp._
+import quasar.fp._, ski.κ
 import quasar.fp.free._
 import quasar.main._, metastore._
 import quasar.metastore.Schema
@@ -151,19 +151,17 @@ object Server {
         _         <- Http4sUtils.startAndWait(port, srvc, qCfg.openClient).liftM[MainErrT]
       } yield ()
 
-    def initUpdate(tx: StatefulTransactor, cfgFile: Option[FsFile]) =
-      loadConfigFile[MountingsConfig](cfgFile).liftM[MainErrT] >>= (mCfg =>
-        initUpdateMetaStore(Schema.schema, tx.transactor, cfgFile, mCfg.mountings))
-
     logErrors(for {
       qCfg  <- QuasarConfig.fromArgs(args)
       wCfg  <- loadConfigFile[WebConfig](qCfg.configPath).liftM[MainErrT]
       msCfg <- wCfg.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
       tx    <- metastoreTransactor(msCfg)
-      _     <- qCfg.cmd match {
-                 case Start               => start(tx, qCfg.port | wCfg.server.port, qCfg)
-                 case InitUpdateMetaStore => initUpdate(tx, qCfg.configPath)
-               }
+      _     <- EitherT((qCfg.cmd match {
+                 case Start =>
+                   start(tx, qCfg.port | wCfg.server.port, qCfg) *> tx.shutdown.liftM[MainErrT]
+                 case InitUpdateMetaStore =>
+                   initUpdateMigrate(Schema.schema, tx.transactor, qCfg.configPath)
+               }).run.onFinish(κ(tx.shutdown)))
     } yield ())
   }
 

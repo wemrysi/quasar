@@ -18,11 +18,11 @@ package quasar.repl
 
 import slamdata.Predef._
 import quasar.cli.Cmd, Cmd._
-import quasar.config.{MountingsConfig, _}
+import quasar.config._
 import quasar.console._
 import quasar.db.StatefulTransactor
 import quasar.effect._
-import quasar.fp._
+import quasar.fp._, ski.κ
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
@@ -133,7 +133,6 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val cfgOpsCore = ConfigOps[CoreConfig]
-    val cfgOpsMnts = ConfigOps[MountingsConfig]
 
     def start(tx: StatefulTransactor) =
       for {
@@ -154,14 +153,6 @@ object Main {
         _       <- driver(runCmd, ctx.closeMnts).liftM[MainErrT]
       } yield ()
 
-    def initUpdate(tx: StatefulTransactor, cfgFile: Option[FsFile]) =
-      cfgFile
-        .cata(cfgOpsMnts.fromFile, cfgOpsMnts.fromDefaultPaths)
-        .leftMap(_.shows)
-        .flatMap(mntsCfg =>
-          initUpdateMetaStore(
-            Schema.schema, tx.transactor, cfgFile, mntsCfg.mountings))
-
     val main0: MainTask[Unit] = for {
       opts    <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
                       .cata(_.point[MainTask], MainTask.raiseError("Couldn't parse options."))
@@ -176,10 +167,10 @@ object Main {
                    Task.now, MetaStoreConfig.configOps.default
                  ).liftM[MainErrT]
       tx      <- metastoreTransactor(msCfg)
-      _       <- opts.cmd match {
+      _       <- EitherT((opts.cmd match {
                    case Start               => start(tx)
-                   case InitUpdateMetaStore => initUpdate(tx, cfgPath)
-                 }
+                   case InitUpdateMetaStore => initUpdateMigrate(Schema.schema, tx.transactor, cfgPath)
+                 }).run.onFinish(κ(tx.shutdown)))
     } yield ()
 
     logErrors(main0).unsafePerformSync
