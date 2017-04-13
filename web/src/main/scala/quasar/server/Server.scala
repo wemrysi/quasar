@@ -158,7 +158,7 @@ object Server {
       tx    <- metastoreTransactor(msCfg)
       _     <- EitherT((qCfg.cmd match {
                  case Start =>
-                   start(tx, qCfg.port | wCfg.server.port, qCfg) *> tx.shutdown.liftM[MainErrT]
+                   start(tx, qCfg.port | wCfg.server.port, qCfg)
                  case InitUpdateMetaStore =>
                    initUpdateMigrate(Schema.schema, tx.transactor, qCfg.configPath)
                }).run.onFinish(κ(tx.shutdown)))
