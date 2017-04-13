@@ -1231,6 +1231,7 @@ object MongoDbQScriptPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
     val rewrite = new Rewrite[T]
+    val optimize = new Optimize[T]
 
     type MongoQScriptCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
     type MongoQScript[A] = MongoQScriptCP#M[A]
@@ -1250,7 +1251,7 @@ object MongoDbQScriptPlanner {
         "QScript (Mongo-specific)",
         Unirewrite[T, MongoQScriptCP, M](rewrite, listContents).apply(qs)
           .map(_.transHylo(
-            rewrite.optimize(reflNT[MongoQScript]),
+            optimize.optimize(reflNT[MongoQScript]),
             Unicoalesce[T, MongoQScriptCP]))
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
