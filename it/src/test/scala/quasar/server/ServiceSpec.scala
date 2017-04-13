@@ -205,7 +205,6 @@ class ServiceSpec extends quasar.Qspec {
         AsResult(result))
 
     "MOVE view" in withFileSystemConfigs {
-      println("start MOVE view")
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
       val srcPath = rootDir </> dir("view") </> file("a")
@@ -233,12 +232,10 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      println("end MOVE view")
       r.map(_.status) must beRightDisjunction(Ok)
     }
 
     "MOVE a directory containing views and files" in withFileSystemConfigs {
-      println("start MOVE a directory containing views and files")
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
       val srcPath = rootDir </> dir("a")
@@ -248,11 +245,7 @@ class ServiceSpec extends quasar.Qspec {
 
       val insertMnts =
         insertMount(srcPath </> file("view"), viewConfig) <*
-        fileSystemConfigs.toList.traverse {
-          case (p, m) =>
-            println(s"inserting: $p, $m")
-            insertMount(p, m)
-        }
+        fileSystemConfigs.toList.traverse { case (p, m) => insertMount(p, m) }
 
       val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
@@ -268,7 +261,6 @@ class ServiceSpec extends quasar.Qspec {
           )(Task.now)
       }
 
-      println("end MOVE a directory containing views and files")
       r.map(_.status) must beRightDisjunction(Ok)
     }
   }
