@@ -37,13 +37,6 @@ import simulacrum.typeclass
 
 package object analysis {
 
-  sealed trait AnalysisResult
-  case object Instant extends AnalysisResult
-  case object Interactive extends AnalysisResult
-  case object SemiInteractive extends AnalysisResult
-  case object Batch extends AnalysisResult
-  case object Unknown extends AnalysisResult
-
   @typeclass
   trait Cardinality[F[_]] {
     def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, F, Int]
@@ -53,12 +46,6 @@ package object analysis {
   trait Cost[F[_]] {
     def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, F, Int]
   }
-
-  def analyze[F[_] : Traverse, M[_] : Monad,  T](t: T)(pathCard: APath => M[Int])(implicit
-    rec: Recursive.Aux[T, F],
-    cardinalty: Cardinality[F],
-    cost: Cost[F]
-  ): M[Int] = rec.zygoM(t)(cardinalty.calculate(pathCard), cost.evaluate(pathCard))
 
   def pathCard[S[_]](
     implicit queryOps: QueryFile.Ops[S]
