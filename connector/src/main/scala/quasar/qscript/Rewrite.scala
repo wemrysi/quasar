@@ -350,7 +350,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
              TJ: ThetaJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[G]] => G[T[G]] =
-    repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
+    (repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) _) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
