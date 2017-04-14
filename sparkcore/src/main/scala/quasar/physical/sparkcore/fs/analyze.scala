@@ -14,29 +14,30 @@
  * limitations under the License.
  */
 
-package quasar.fs
+package quasar.physical.sparkcore.fs
 
-import slamdata.Predef._
-import quasar.effect.LiftedOps
+import quasar.fs._
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.qscript.analysis._
 
-
+import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import scalaz._
 
-sealed abstract class Analyze[A]
+object analyze {
 
-object Analyze {
+  def interpreter[S[_], F[_] : Traverse, T](toQS: Fix[LogicalPlan] => T)(implicit
+    R: Recursive.Aux[T, F],
+    CA: Cardinality[F],
+    CO: Cost[F],
+    Q: QueryFile.Ops[S]
+  ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
 
-  final case class QueryCost(lp: Fix[LogicalPlan]) extends Analyze[FileSystemError \/ Int]
-
-  final class Unsafe[S[_]](implicit S: Analyze :<: S) extends LiftedOps[Analyze, S] {
-    def queryCost(lp: Fix[LogicalPlan]): Free[S, FileSystemError \/ Int] = lift(QueryCost(lp))
+    def apply[A](from: Analyze[A]) = from match {
+      case Analyze.QueryCost(lp) =>
+        R.zygoM(toQS(lp))(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S])).run
+    }
   }
 
-  object Unsafe {
-    implicit def apply[S[_]](implicit S: Analyze :<: S): Unsafe[S] =
-      new Unsafe[S]
-  }
 
 }

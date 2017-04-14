@@ -25,7 +25,6 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.qscript.QScriptTotal
-import quasar.main.query.analysis.analyze
 
 import argonaut._, Argonaut._
 import matryoshka._
@@ -38,17 +37,13 @@ object analysis {
 
   type QST[A] = QScriptTotal[Fix, A]
 
-  def service[S[_]](
-    implicit
-    Q: QueryFile.Ops[S],
-    M: ManageFile.Ops[S]
+  def service[S[_]](implicit
+      A: Analyze.Unsafe[S]
   ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
       Json(
         "type"  := "constant",
         "value" := data.map(DataCodec.Precise.encode).unite)
-
-    def toQScript(t: Fix[LogicalPlan]): Fix[QST] = ???
 
     def analyzeQuery(
       blob: sql.Blob[Fix[sql.Sql]],
@@ -61,8 +56,9 @@ object analysis {
         .run.value
         .traverse(_.fold(
           data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-          lp   => analyze[S, QST, Fix[QST]](toQScript(lp)).map(_.asJson.right[ApiError])))
+          lp   => A.queryCost(lp).map(_.map(c => c.asJson).leftMap(fse => fse.toApiError))))
         .map(_.valueOr(_.toApiError.left[Json]))
+
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>

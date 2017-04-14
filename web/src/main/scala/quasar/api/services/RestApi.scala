@@ -50,7 +50,6 @@ object RestApi {
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"  -> query.compile.service[S],
-      "/analysis/fs" -> query.analysis.service[S],
       "/data/fs"     -> data.service[S],
       "/metadata/fs" -> metadata.service[S],
       "/mount/fs"    -> mount.service[S],
