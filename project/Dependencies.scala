@@ -12,7 +12,7 @@ object Dependencies {
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.8.4"
   private val jacksonVersion           = "2.4.4"
-  private val matryoshkaVersion        = "0.16.4"
+  private val matryoshkaVersion        = "0.18.3"
   private val pathyVersion             = "0.2.9"
   private val raptureVersion           = "2.0.0-M6"
   private val scodecBitsVersion        = "1.1.0"
