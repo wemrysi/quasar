@@ -86,7 +86,7 @@ define_needed_evn_vars() {
     CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
     DOCKERIP="localhost"
   else
-    CONFIGFILE=../../it/testing.conf
+    CONFIGFILE=$(dirname $0)/../../it/testing.conf
     if [[ -x "$(command -v docker-machine)" ]]
     then
       eval "$(docker-machine env --shell sh/bash default)"

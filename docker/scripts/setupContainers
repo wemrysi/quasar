@@ -4,13 +4,15 @@ set -euo pipefail # STRICT MODE
 IFS_S=$'\n\t'     # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 IFS=$IFS_S
 
+SCRIPTS_DIR=$(dirname "$0")
+
 ##########################################
 # methods to intialize various databases
 #
 init_mongo() {
   # only mongodb_read_only needs to be configured
   echo "configuring mongodb_read_only..."
-  docker cp initMongodb quasar_mongodb_read_only:/tmp/initMongodb
+  docker cp $SCRIPTS_DIR/initMongodb quasar_mongodb_read_only:/tmp/initMongodb
   docker exec quasar_mongodb_read_only /tmp/initMongodb
 }
 
@@ -19,7 +21,7 @@ init_metastore() {
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
   echo "configuring metastore..."
   docker restart quasar_metastore
-  docker cp initPostgresql quasar_metastore:/tmp/initPostgresql
+  docker cp $SCRIPTS_DIR/initPostgresql quasar_metastore:/tmp/initPostgresql
   docker exec quasar_metastore /tmp/initPostgresql metastore
 }
 
@@ -28,13 +30,13 @@ init_postgresql() {
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
   echo "configuring postgresql..."
   docker restart quasar_postgresql
-  docker cp initPostgresql quasar_postgresql:/tmp/initPostgresql
+  docker cp $SCRIPTS_DIR/initPostgresql quasar_postgresql:/tmp/initPostgresql
   docker exec quasar_postgresql /tmp/initPostgresql quasar-test
 }
 
 init_couchbase() {
   echo "configuring couchbase..."
-  docker cp initCouchbase quasar_couchbase:/tmp/initCouchbase
+  docker cp $SCRIPTS_DIR/initCouchbase quasar_couchbase:/tmp/initCouchbase
   docker exec quasar_couchbase /tmp/initCouchbase
 }
 
@@ -44,7 +46,7 @@ init_marklogic() {
   # curl: symbol lookup error: /lib64/libldap-2.4.so.2
   echo "configuring marklogic..."
   sleep 20
-  ./initMarklogic $1 $2
+  $SCRIPTS_DIR/initMarklogic $1 $2
 }
 
 ##########################################
