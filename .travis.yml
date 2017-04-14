@@ -15,8 +15,8 @@ before_install:
 # create all the docker containers we need for IT testing
 install:
   - cd $TRAVIS_BUILD_DIR/docker/scripts
-  - ./initContainer metastore
-  - ./initContainer $CONNECTOR
+  - ./initContainer quasar_metastore
+  - ./initContainer quasar_$CONNECTOR
   - docker-compose ps
 
 # run db config scripts and populate the it/testing.conf file
