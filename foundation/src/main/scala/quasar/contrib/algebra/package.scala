@@ -16,18 +16,21 @@
 
 package quasar.contrib
 
-import _root_.algebra.{Eq, Semigroup => ASemigroup, Monoid => AMonoid}
-import _root_.scalaz.{Equal, Semigroup, Monoid}
+import _root_.algebra.{Eq, Semigroup => ASemigroup, Monoid => AMonoid, Order => AOrder}
+import _root_.scalaz.{Equal, Semigroup, Monoid, Order, Ordering}
 
 package object algebra extends AlgebraInstancesLowPriority {
-  implicit def algebraEqual[A](implicit A: Eq[A]): Equal[A] =
-    Equal.equal(A.eqv)
+  implicit def algebraOrder[A](implicit A: AOrder[A]): Order[A] =
+    Order.order((x, y) => Ordering.fromInt(A.compare(x, y)))
 
   implicit def algebraMonoid[A](implicit A: AMonoid[A]): Monoid[A] =
     Monoid.instance((x, y) => A.combine(x, y), A.empty)
 }
 
 sealed abstract class AlgebraInstancesLowPriority {
+  implicit def algebraEqual[A](implicit A: Eq[A]): Equal[A] =
+    Equal.equal(A.eqv)
+
   implicit def algebraSemigroup[A](implicit A: ASemigroup[A]): Semigroup[A] =
     Semigroup.instance((x, y) => A.combine(x, y))
 }

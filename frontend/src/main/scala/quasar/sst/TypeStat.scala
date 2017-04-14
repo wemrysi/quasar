@@ -34,34 +34,36 @@ sealed abstract class TypeStat[A] {
 
   /** The number of observations. */
   def size(implicit A: AdditiveSemigroup[A]): A = this match {
-    case  Bool(t, f   ) => A.plus(t, f)
-    case  Byte(c, _, _) => c
-    case  Char(c, _, _) => c
-    case   Str(c, _, _) => c
-    case   Int(s, _, _) => s.size
-    case   Dec(s, _, _) => s.size
-    case  Coll(c, _, _) => c
-    case Count(c      ) => c
+    case  Bool(t, f   )       => A.plus(t, f)
+    case  Byte(c, _, _)       => c
+    case  Char(c, _, _)       => c
+    case   Str(c, _, _, _, _) => c
+    case   Int(s, _, _)       => s.size
+    case   Dec(s, _, _)       => s.size
+    case  Coll(c, _, _)       => c
+    case Count(c      )       => c
   }
 
   /** Combine with `other` accumulating type specific information when possible
     * and summing counts otherwise.
     */
-  def + (other: TypeStat[A])(implicit O: Order[A], A: Field[A]): TypeStat[A] =
+  def + (other: TypeStat[A])(implicit O: Order[A], F: Field[A]): TypeStat[A] =
     (this, other) match {
-      case (Bool(t1, f1        ), Bool(t2, f2        )) =>  bool(t1 + t2, f1 + f2)
-      case (Byte(c1, min1, max1), Byte(c2, min2, max2)) =>  byte(c1 + c2, mn(min1, min2), mx(max1, max2))
-      case (Char(c1, min1, max1), Char(c2, min2, max2)) =>  char(c1 + c2, mn(min1, min2), mx(max1, max2))
-      case ( Str(c1, min1, max1),  Str(c2, min2, max2)) =>   str(c1 + c2, mn(min1, min2), mx(max1, max2))
-      case ( Int(s1, min1, max1),  Int(s2, min2, max2)) =>   int(s1 + s2, mn(min1, min2), mx(max1, max2))
-      case ( Dec(s1, min1, max1),  Dec(s2, min2, max2)) =>   dec(s1 + s2, mn(min1, min2), mx(max1, max2))
-      case (Coll(c1, min1, max1), Coll(c2, min2, max2)) =>  coll(c1 + c2, mn(min1, min2), mx(max1, max2))
+      case (Bool(t1, f1        ), Bool(t2, f2        )) => bool(t1 + t2, f1 + f2)
+      case (Byte(c1, min1, max1), Byte(c2, min2, max2)) => byte(c1 + c2, mn(min1, min2), mx(max1, max2))
+      case (Char(c1, min1, max1), Char(c2, min2, max2)) => char(c1 + c2, mn(min1, min2), mx(max1, max2))
+      case ( Int(s1, min1, max1),  Int(s2, min2, max2)) =>  int(s1 + s2, mn(min1, min2), mx(max1, max2))
+      case ( Dec(s1, min1, max1),  Dec(s2, min2, max2)) =>  dec(s1 + s2, mn(min1, min2), mx(max1, max2))
+      case (Coll(c1, min1, max1), Coll(c2, min2, max2)) => coll(c1 + c2, mn(min1, min2), mx(max1, max2))
 
-      case (Coll(c1, min1, max1),  Str(c2, min2, max2)) =>
-        coll(c1 + c2, mn(min1, some(A fromInt min2.length)), mx(max1, some(A fromInt max2.length)))
+      case (Str(c1, minl1, maxl1, min1, max1), Str(c2, minl2, maxl2, min2, max2)) =>
+        str(c1 + c2, mn(minl1, minl2), mx(maxl1, maxl2), mn(min1, min2), mx(max1, max2))
 
-      case ( Str(c1, min1, max1), Coll(c2, min2, max2)) =>
-        coll(c1 + c2, mn(some(A fromInt min1.length), min2), mx(some(A fromInt max1.length), max2))
+      case (Coll(c1, min1, max1),  Str(c2, minl2, maxl2, _, _)) =>
+        coll(c1 + c2, mn(min1, some(minl2)), mx(max1, some(maxl2)))
+
+      case (Str(c1, minl1, maxl1, _, _), Coll(c2, min2, max2)) =>
+        coll(c1 + c2, mn(some(minl1), min2), mx(some(maxl1), max2))
 
       case (                   x,                    y) => count(x.size + y.size)
     }
@@ -72,14 +74,14 @@ sealed abstract class TypeStat[A] {
 }
 
 object TypeStat extends TypeStatInstances {
-  final case class  Bool[A](trues: A, falses: A)                                           extends TypeStat[A]
-  final case class  Byte[A](cnt: A,                min: SByte,         max: SByte)         extends TypeStat[A]
-  final case class  Char[A](cnt: A,                min: SChar,         max: SChar)         extends TypeStat[A]
-  final case class   Str[A](cnt: A,                min: String,        max: String)        extends TypeStat[A]
-  final case class   Int[A](stats: SampleStats[A], min: BigInt,        max: BigInt)        extends TypeStat[A]
-  final case class   Dec[A](stats: SampleStats[A], min: BigDecimal,    max: BigDecimal)    extends TypeStat[A]
-  final case class  Coll[A](cnt: A,                minSize: Option[A], maxSize: Option[A]) extends TypeStat[A]
-  final case class Count[A](cnt: A)                                                        extends TypeStat[A]
+  final case class  Bool[A](trues: A, falses: A)                                     extends TypeStat[A]
+  final case class  Byte[A](cnt: A, min: SByte, max: SByte)                          extends TypeStat[A]
+  final case class  Char[A](cnt: A, min: SChar, max: SChar)                          extends TypeStat[A]
+  final case class   Str[A](cnt: A, minLen: A, maxLen: A, min: String, max: String)  extends TypeStat[A]
+  final case class   Int[A](stats: SampleStats[A], min: BigInt, max: BigInt)         extends TypeStat[A]
+  final case class   Dec[A](stats: SampleStats[A], min: BigDecimal, max: BigDecimal) extends TypeStat[A]
+  final case class  Coll[A](cnt: A, minSize: Option[A], maxSize: Option[A])          extends TypeStat[A]
+  final case class Count[A](cnt: A)                                                  extends TypeStat[A]
 
   def bool[A] = Prism.partial[TypeStat[A], (A, A)] {
     case Bool(t, f) => (t, f)
@@ -93,9 +95,9 @@ object TypeStat extends TypeStatInstances {
     case Char(n, min, max) => (n, min, max)
   } ((Char[A](_, _, _)).tupled)
 
-  def str[A] = Prism.partial[TypeStat[A], (A, String, String)] {
-    case Str(n, min, max) => (n, min, max)
-  } ((Str[A](_, _, _)).tupled)
+  def str[A] = Prism.partial[TypeStat[A], (A, A, A, String, String)] {
+    case Str(n, minLen, maxLen, min, max) => (n, minLen, maxLen, min, max)
+  } ((Str[A](_, _, _, _, _)).tupled)
 
   def int[A] = Prism.partial[TypeStat[A], (SampleStats[A], BigInt, BigInt)] {
     case Int(ss, min, max) => (ss, min, max)
@@ -119,7 +121,7 @@ object TypeStat extends TypeStatInstances {
       case C(   ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
       case E(   ejs.Byte(b)) => byte(cnt, b, b)
       case E(   ejs.Char(c)) => char(cnt, c, c)
-      case C(    ejs.Str(s)) => str(cnt, s, s)
+      case C(    ejs.Str(s)) => str(cnt, A fromInt s.length, A fromInt s.length, s, s)
       case E(    ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt     i), i, i)
       case C(    ejs.Dec(d)) => dec(SampleStats.freq(cnt, A fromBigDecimal d), d, d)
       case C(   ejs.Arr(xs)) => fromFoldable(cnt, xs)
@@ -167,23 +169,26 @@ sealed abstract class TypeStatInstances {
       case ( Bool(x1, x2    ),  Bool(y1, y2    )) => x1 ≟ y1 && x2 ≟ y2
       case ( Byte(x1, x2, x3),  Byte(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case ( Char(x1, x2, x3),  Char(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
-      case (  Str(x1, x2, x3),   Str(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (  Int(x1, x2, x3),   Int(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (  Dec(x1, x2, x3),   Dec(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case ( Coll(x1, x2, x3),  Coll(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (Count(x1        ), Count(y1        )) => x1 ≟ y1
-      case _                                      => false
+
+      case (Str(x1, x2, x3, x4, x5), Str(y1, y2, y3, y4, y5)) =>
+        x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3 && x4 ≟ y4 && x5 ≟ y5
+
+      case _ => false
     })
 
   implicit def show[A: Show: Equal: Field: NRoot]: Show[TypeStat[A]] =
     Show.shows {
-      case  Bool(t, f       ) => s"Bool(${t.shows}, ${f.shows})"
-      case  Byte(c, min, max) => s"Byte(${c.shows}, ${min.shows}, ${max.shows})"
-      case  Char(c, min, max) => s"Char(${c.shows}, ${min.shows}, ${max.shows})"
-      case   Str(c, min, max) => s"Str(${c.shows}, ${min.shows}, ${max.shows})"
-      case   Int(s, min, max) => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
-      case   Dec(s, min, max) => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
-      case  Coll(c, min, max) => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
-      case Count(c          ) => s"Count(${c.shows})"
+      case  Bool(t, f       )             => s"Bool(${t.shows}, ${f.shows})"
+      case  Byte(c, min, max)             => s"Byte(${c.shows}, ${min.shows}, ${max.shows})"
+      case  Char(c, min, max)             => s"Char(${c.shows}, ${min.shows}, ${max.shows})"
+      case   Str(c, minl, maxl, min, max) => s"Str(${c.shows}, ${minl.shows}, ${maxl.shows}, ${min.shows}, ${max.shows})"
+      case   Int(s, min, max)             => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
+      case   Dec(s, min, max)             => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
+      case  Coll(c, min, max)             => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
+      case Count(c          )             => s"Count(${c.shows})"
     }
 }
