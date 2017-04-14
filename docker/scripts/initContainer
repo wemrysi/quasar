@@ -10,4 +10,5 @@ then
 else
   cd $TRAVIS_BUILD_DIR
   docker-compose -f ./docker/docker-compose.yml up -d $CONTAINER
+  sleep 5
 fi

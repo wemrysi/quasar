@@ -12,7 +12,6 @@ SCRIPTS_DIR=$(dirname "$0")
 init_mongo() {
   # only mongodb_read_only needs to be configured
   echo "configuring mongodb_read_only..."
-  sleep 5
   docker cp $SCRIPTS_DIR/initMongodb quasar_mongodb_read_only:/tmp/initMongodb
   docker exec quasar_mongodb_read_only /tmp/initMongodb
 }
