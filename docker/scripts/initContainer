@@ -4,7 +4,7 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 
 CONTAINER=$1
-if [[ $CONTAINER == "spark_local_test" ]]
+if [[ $CONTAINER == "quasar_spark_local_test" ]]
 then
     echo "$CONTAINER: not starting a container for spark_local_test..."
 else
