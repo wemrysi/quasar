@@ -25,7 +25,7 @@ before_script:
   - ./setupContainers -c quasar_metastore
   - ./setupContainers -c quasar_$CONNECTOR
   - ./assembleTestingConf -c quasar_metastore
-  - ./assembleTestingConf -c quasar_$CONNECTOR
+  - ./assembleTestingConf -i quasar_$CONNECTOR
   - cd $TRAVIS_BUILD_DIR/it && cat testing.conf
 
 # export some needed env vars, build, then publish and tag resources
