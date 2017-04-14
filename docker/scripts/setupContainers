@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
 
 set -euo pipefail # STRICT MODE
-IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
-
-##########################################
-# generic function to init containerized 
-# connectors. init scripts are copied to
-# the container and ran within the container
-#
-init_containerdb() {
-  CONTAINERNAME=$1
-  DBNAME=$(echo "$CONTAINERNAME" | cut -d_ -f1)
-  CAPDBNAME="$(tr '[:lower:]' '[:upper:]' <<< ${DBNAME:0:1})${DBNAME:1}"
-  docker cp init$CAPDBNAME $CONTAINERNAME:/tmp/init$CAPDBNAME
-  docker exec $CONTAINERNAME /tmp/init$CAPDBNAME
-}
+IFS_S=$'\n\t'     # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+IFS=$IFS_S
 
 ##########################################
 # methods to intialize various databases
@@ -22,20 +10,32 @@ init_containerdb() {
 init_mongo() {
   # only mongodb_read_only needs to be configured
   echo "configuring mongodb_read_only..."
-  init_containerdb mongodb_read_only
+  docker cp initMongodb quasar_mongodb_read_only:/tmp/initMongodb
+  docker exec quasar_mongodb_read_only /tmp/initMongodb
+}
+
+init_metastore() {
+  # a restart of the container is needed here due to
+  # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
+  echo "configuring metastore..."
+  docker restart quasar_metastore
+  docker cp initPostgresql quasar_metastore:/tmp/initPostgresql
+  docker exec quasar_metastore /tmp/initPostgresql metastore
 }
 
 init_postgresql() {
   # a restart of the container is needed here due to
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
   echo "configuring postgresql..."
-  docker restart postgresql
-  init_containerdb postgresql
+  docker restart quasar_postgresql
+  docker cp initPostgresql quasar_postgresql:/tmp/initPostgresql
+  docker exec quasar_postgresql /tmp/initPostgresql quasar-test
 }
 
 init_couchbase() {
   echo "configuring couchbase..."
-  init_containerdb couchbase
+  docker cp initCouchbase quasar_couchbase:/tmp/initCouchbase
+  docker exec quasar_couchbase /tmp/initCouchbase
 }
 
 init_marklogic() {
@@ -52,18 +52,19 @@ init_marklogic() {
 # database configuration scripts
 #
 apply_configuration() {
-  CONNECTOR=$1
-  if [[ $CONNECTOR == "mongodb_read_only" ]]; then init_mongo;                     fi
-  if [[ $CONNECTOR =~ "couchbase"         ]]; then init_couchbase;                 fi
-  if [[ $CONNECTOR == "marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001;  fi
-  if [[ $CONNECTOR == "marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001;  fi
-  if [[ $CONNECTOR =~ "postgresql"        ]]; then init_postgresql;                fi
+  CONTAINER=$1
+  if [[ $CONTAINER == "quasar_mongodb_read_only" ]]; then init_mongo;                     fi
+  if [[ $CONTAINER == "quasar_couchbase"         ]]; then init_couchbase;                 fi
+  if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001;  fi
+  if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001;  fi
+  if [[ $CONTAINER == "quasar_postgresql"        ]]; then init_postgresql;                fi
+  if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                 fi
 }
 
-configure_connectors() {
-  for CONNECTOR in $1
+configure_containers() {
+  for CONTAINER in $1
     do
-      apply_configuration $CONNECTOR
+      apply_configuration $CONTAINER
   done
 }
 
@@ -76,7 +77,7 @@ enable_docker_env() {
   if [[ -x "$(command -v docker-machine)" ]]
   then
     echo "found docker-machine, adding it to env..."
-    eval "$(docker-machine env default)"
+    eval "$(docker-machine env --shell sh/bash default)"
     DOCKERIP=$(docker-machine ip default)
   else
     if [[ -x "$(command -v docker)" ]]
@@ -90,35 +91,36 @@ enable_docker_env() {
   fi
 }
 
-find_connectors() {
- CONNECTORS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
+find_containers() {
+  CONTAINERS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}' | grep "quasar_")
 }
 
-configure_all_live_dockerized_connectors() {
+configure_all_live_containers() {
   if [[ ${TRAVIS:-} ]]
   then
     echo "in a travis environment, docker is in our path..."
   else
     echo "local environment, looking for docker..."
-    find_connectors
-    configure_connectors "$CONNECTORS"
+    find_containers
+    configure_containers "$CONTAINERS"
   fi
 }
 
 create_database() {
-  docker-compose up -d $1 
+  echo "$(dirname $0)/../docker-compose.yml"
+  docker-compose -f $(dirname $0)/../docker-compose.yml up -d $1
 }
 
 usage() {
 cat << EOF
-Usage: $0 [-h] [-a] [-c CONNECTOR-NAME]
-Create and configure dockerized mongo, couchbase, marklogic, and postgresql
-connectors for integration tests with Quasar.
+Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
+Create and configure mongo, couchbase, marklogic, and postgresql containers
+for integration tests with Quasar.
 
   -h                   help (also trigged with no parameters): display this help and exit
-  -a                   configure all currently running dockerized connectors
-  -c CONNECTOR-NAME    configure running dockerized connector named CONNECTOR-NAME
-  -u "con1 con2..."    use docker-compose up to create and configure a quoted list of connectors
+  -a                   configure all currently running containers
+  -c CONTAINER-NAME    configure running container named CONTAINER-NAME
+  -u con1[,con2...]    use docker-compose up to create and configure a quoted list of CONTAINER-NAMES
 EOF
 }
 
@@ -129,28 +131,33 @@ EOF
 while getopts ":hac:u:" opt; do
   case $opt in
     a)
-      echo "configuring all connectors..." >&2
+      echo "configuring all containers..." >&2
       enable_docker_env
-      configure_all_live_dockerized_connectors
+      configure_all_live_containers
       ;;
     c)
       echo "$OPTARG is being configured..." >&2
       enable_docker_env
       if [[ $OPTARG =~ "spark" ]]
       then
-        echo "Will not make a container for this connector: $OPTARG"
+        echo "Will not make a container for spark*: $OPTARG"
       else
         apply_configuration $OPTARG
-      fi     
+      fi
       ;;
     u)
-      echo "bringing the following connectors: $OPTARG" >&2
+      echo "bringing up the following containers: $OPTARG" >&2
       enable_docker_env
-      for CONNECTOR in $OPTARG
+      set -f
+      IFS=,
+      CONTAINERS=($OPTARG)
+      set +f
+      IFS=$IFS_S
+      for CONTAINER in "${CONTAINERS[@]}"
       do
-        create_database $CONNECTOR
+        create_database $CONTAINER
         sleep 5
-        apply_configuration $CONNECTOR
+        apply_configuration $CONTAINER
       done
       ;;
     \?)

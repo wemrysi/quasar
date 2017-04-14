@@ -3,11 +3,11 @@ set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 
-CONNECTOR=$1
-if [[ $CONNECTOR == "spark_local_test" ]]
+CONTAINER=$1
+if [[ $CONTAINER == "spark_local_test" ]]
 then
-    echo "$CONNECTOR: not starting a container for this connector..."
+    echo "$CONTAINER: not starting a container for spark_local_test..."
 else
   cd $TRAVIS_BUILD_DIR
-  docker-compose -f ./docker/docker-compose.yml up -d $CONNECTOR
+  docker-compose -f ./docker/docker-compose.yml up -d $CONTAINER
 fi
