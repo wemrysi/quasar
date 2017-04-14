@@ -14,9 +14,6 @@ if [ $RESULT -ne 0 ]; then
     exit 1
 else
   echo "mongodb running, creating db and users..."
-  mongo localhost:27017/quasar-test --eval 'db.createUser({"user": "quasar-dbOwner", "pwd": "quasar", "roles": [ "dbOwner" ]})'
-  mongo localhost:27017/quasar-test --eval 'db.createUser({"user": "quasar-read", "pwd": "quasar", "roles": [ "read" ]})'
+  mongo quasar-test --eval 'db.createUser({"user": "quasar-dbOwner", "pwd": "quasar", "roles": [ "dbOwner" ]})'
+  mongo quasar-test --eval 'db.createUser({"user": "quasar-read", "pwd": "quasar", "roles": [ "read" ]})'
 fi
-
-
-
