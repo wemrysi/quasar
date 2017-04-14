@@ -109,7 +109,6 @@ configure_all_live_containers() {
 }
 
 create_database() {
-  echo "$(dirname $0)/../docker-compose.yml"
   docker-compose -f $(dirname $0)/../docker-compose.yml up -d $1
 }
 
