@@ -23,10 +23,11 @@ import quasar.fp.numeric._
 import quasar.fp.ski.ι
 import quasar.tpe._
 
-import matryoshka._
-import matryoshka.data.Fix
+import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
+import monocle.Fold
+import monocle.syntax.fields._
 import scalaz._, Scalaz._
 import spire.algebra.{Field, Ring}
 import spire.math.ConvertableTo
@@ -36,85 +37,64 @@ object compression {
   import TypeF._
   private val TS = TypeStat
 
-  /** Compress a map by moving the largest group of keys having the same primary
-    * type to the unknown key field and their values to the unknown value field.
-    *
-    * Only maps having at least `minObs` observations and where the ratio
-    * of the size of the map to the number of
-    * observations >= `distinctRatio` are considered.
+  /** Compress a map having greater than `maxSize` keys by moving the largest
+    * group of keys having the same primary type to the unknown key field
+    * and their values to the unknown value field.
     */
   def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
-    minObs: Positive,
-    keyRatio: Double
+    maxSize: Positive
   )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = {
-    type T = Fix[TypeF[J, ?]]
-    type M = PrimaryType ==>> (J ==>> Unit)
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
+      val grouped = kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit]) { (m, j, _) =>
+        primaryTypeOf(j.project).fold(m) { pt =>
+          m.alter(pt, _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ())))
+        }
+      }
 
-    totally {
-      case sstf @ EnvT((ts, Map(kn, unk))) if sufficientlyDiverse(minObs, keyRatio, ts, kn) =>
-        val grouped = kn.foldlWithKey(IMap.empty: M) { (m, j, _) =>
-          primaryTypeOf(j.project).fold(m) { pt =>
-            m.alter(pt, _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ())))
-          }
+      val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
+        val toCompress = kn intersection m
+
+        val compressed = toCompress.toList foldMap { case (j, sst) =>
+          (primarySST(size1(sst.copoint), j), sst)
         }
 
-        val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
-          val toCompress = kn intersection m
+        (kn \\ toCompress, some(compressed) |+| unk)
+      }
 
-          val compressed = toCompress.toList foldMap { case (j, sst) =>
-            (primarySST(size1(sst.copoint), j), sst)
-          }
-
-          (kn \\ toCompress, some(compressed) |+| unk)
-        }
-
-        envT(ts, map[J, SST[J, A]](kn1, unk1))
-    }
+      envT(ts, map[J, SST[J, A]](kn1, unk1))
   }
 
-  /** Compress the largest group of values in a union having the same
-    * primary type to that type.
-    *
-    * Only unions having at least `minObs` observations and where the ratio
-    * of the size of the union to the number of
-    * observations >= `distinctRatio` are considered.
+  /** Compress unions by combining any constants with their primary type if it
+    * also appears in the union.
     */
   def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
-    minObs: Positive,
-    distinctRatio: Double
-  )(implicit
+    implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = {
-    type T = Fix[TypeF[J, ?]]
-    type M = PrimaryType ==>> NonEmptyList[SST[J, A]]
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case sstf @ EnvT((ts, Unioned(xs))) if xs.any(sstConst[J, A].isEmpty) =>
+      val grouped = xs.list groupBy { sst =>
+        sstConst[J, A].isEmpty(sst).fold(
+          TypeF.primary[J](sst.project.lower),
+          none)
+      }
 
-    totally {
-      case sstf @ EnvT((ts, Unioned(xs))) if sufficientlyDiverse(minObs, distinctRatio, ts, xs) =>
-        val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
-        val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
-
-        val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
-          case (pt, ssts) =>
-            val reduced = ssts.foldMap(sst => sst.project match {
-              case EnvT((x, Const(j))) => sstMeasure[J, A].set(x)(primarySST(size1(x), j))
-              case _                   => sst
-            })
-            grouped.insert(some(pt), reduced.wrapNel)
+      grouped.minView flatMap { case (nonPrimary, m0) =>
+        val coalesced = nonPrimary.foldLeft(m0 map (_.suml1)) { (m, sst) =>
+          TypeF.primary[J](sst.project.lower) flatMap { pt =>
+            m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(sst))
+          } getOrElse m.updateAppend(none, sst)
         }
-
-        compressed.foldMap(_.list) match {
-          case ICons(x, ICons(y, zs)) => envT(ts, union[J, SST[J, A]](x, y, zs))
-          case ICons(x, INil())       => envT(ts, x.project.lower)
-          case INil()                 => sstf
-        }
-    }
+        coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
+      } getOrElse sstf
   }
 
-  /** Replace arrays of known size longer than the given limit with an array of unknown size. */
+  /** Replace statically known arrays longer than the given limit with an array
+    * of unknown size.
+    */
   def limitArrays[J: Order, A: Order](maxLength: Positive)(
     implicit
     A : Field[A],
@@ -136,6 +116,31 @@ object compression {
       envT(some(TS.coll(cnt, some(len), some(len))), charArr(cnt))
   }
 
+  /** Compress a union larger than `maxSize` by reducing the largest group of
+    * values sharing a primary type to their shared type.
+    */
+  def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
+    maxSize: Positive
+  )(implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case sstf @ EnvT((ts, Unioned(xs))) if xs.length > maxSize.value =>
+      val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
+      val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
+
+      val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
+        case (pt, ssts) =>
+          grouped.insert(some(pt), ssts.foldMap(widenConst[J, A]).wrapNel)
+      }
+
+      compressed.foldMap(_.list) match {
+        case ICons(x, ICons(y, zs)) => envT(ts, union[J, SST[J, A]](x, y, zs))
+        case ICons(x, INil())       => envT(ts, x.project.lower)
+        case INil()                 => sstf
+      }
+  }
+
   /** Replace encoded binary strings with `byte[]`. */
   def z85EncodedBinary[J, A](
     implicit
@@ -151,6 +156,9 @@ object compression {
   ////
 
   private def sstMeasure[J, A] = StructuralType.measure[J, Option[TypeStat[A]]]
+
+  private def sstConst[J, A]: Fold[SST[J, A], J] =
+    project[SST[J, A], SSTF[J, A, ?]] composeIso envTIso composeLens _2 composePrism const
 
   private def byteArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
     simpleArr(cnt, SimpleType.Byte)
@@ -178,19 +186,17 @@ object compression {
   private def size1[A](ots: Option[TypeStat[A]])(implicit R: Ring[A]): A =
     ots.cata(_.size, R.one)
 
-  /** Returns whether the given foldable is "sufficiently diverse" based on the
-    * provided parameters. Diversity is defined as the ratio of the size of F
-    * to the number of observations.
+  /** Returns the primary SST if the argument is a constant, otherwise returns
+    * the argument itself.
     */
-  private def sufficientlyDiverse[F[_]: Foldable, A: Order, B](
-    minObs: Positive,
-    ratio: Double,
-    ts: Option[TypeStat[A]],
-    fb: F[B]
-  )(implicit A: Field[A]): Boolean = {
-    val (cnt, len) = (size1(ts), fb.length)
-    val thold      = A fromBigInt BigInt(minObs.value)
-    val alen       = A fromInt len
-    cnt >= thold && (alen / cnt) >= A.fromDouble(ratio)
-  }
+  private def widenConst[J: Order, A: ConvertableTo: Field: Order](
+    sst: SST[J, A]
+  )(implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SST[J, A] =
+    sstConst[J, A].headOption(sst).fold(sst) { j =>
+      val ts = sstMeasure[J, A].get(sst)
+      sstMeasure[J, A].set(ts)(primarySST(size1(ts), j))
+    }
 }

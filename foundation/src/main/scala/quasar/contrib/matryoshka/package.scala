@@ -18,7 +18,7 @@ package quasar.contrib
 
 import slamdata.Predef._
 
-import _root_.monocle.Getter
+import _root_.monocle.{Getter, Iso}
 import _root_.matryoshka._
 import _root_.matryoshka.patterns.EnvT
 import _root_.scalaz._, Scalaz._
@@ -35,6 +35,9 @@ package object matryoshka {
 
   def envT[E, W[_], A](e: E, wa: W[A]): EnvT[E, W, A] =
     EnvT((e, wa))
+
+  def envTIso[E, W[_], A]: Iso[EnvT[E, W, A], (E, W[A])] =
+    Iso((_: EnvT[E, W, A]).runEnvT)(EnvT(_))
 
   def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
     Getter(T.project(_))
