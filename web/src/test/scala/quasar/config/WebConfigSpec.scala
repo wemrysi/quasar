@@ -17,27 +17,27 @@
 package quasar.config
 
 import slamdata.Predef._
-import quasar.fs.mount._
-import quasar.physical.mongodb
+import quasar.config.WebConfigArbitrary._
+import quasar.db.DbConnectionConfig
 
-import pathy.Path._
+import eu.timepit.refined._
+import scalaz._, Scalaz._
 
 class WebConfigSpec extends ConfigSpec[WebConfig] {
 
-  def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
-    server = ServerConfig(92),
-    mountings = MountingsConfig(Map(
-      rootDir -> MountConfig.fileSystemConfig(mongodb.fs.FsType, uri))))
+  val TestConfig: WebConfig = WebConfig(
+    server = ServerConfig(refineMV(92)),
+    metastore = MetaStoreConfig(DbConnectionConfig.H2("/h2")).some)
 
-  override def ConfigStr =
+  val TestConfigStr =
     s"""{
       |  "server": {
       |    "port": 92
       |  },
-      |  "mountings": {
-      |    "/": {
-      |      "mongodb": {
-      |        "connectionUri": "${testUri.value}"
+      |  "metastore": {
+      |    "database": {
+      |      "h2": {
+      |        "file": "/h2"
       |      }
       |    }
       |  }

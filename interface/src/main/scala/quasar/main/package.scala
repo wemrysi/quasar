@@ -17,8 +17,10 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.config.{ConfigOps, FsFile}
 import quasar.contrib.pathy._
 import quasar.effect._
+import quasar.db.Schema
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
@@ -28,6 +30,7 @@ import quasar.physical._
 
 import scala.util.control.NonFatal
 
+import doobie.imports.Transactor
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -67,20 +70,7 @@ package object main {
   type QEff[A]    = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
-  type QErrsIO[A]  = Coproduct[Task, QErrs, A]
   type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
-
-  object QErrsIO {
-    /** Interprets errors into strings. */
-    val toMainTask: QErrsIO ~> MainTask = {
-      val f = reflNT[Task] :+: QErrs.toCatchable[Task]
-
-      new (QErrsIO ~> MainTask) {
-        def apply[A](a: QErrsIO[A]) =
-          EitherT(f(a).attempt).leftMap(_.getMessage)
-      }
-    }
-  }
 
   object QErrs {
     def toCatchable[F[_]: Catchable]: QErrs ~> F =
@@ -359,4 +349,15 @@ package object main {
       s"Warning: Failed to mount '${posixCodec.printPath(path)}' because '$err'."
     )
   }
+
+  /** Initialize or update MetaStore Schema and migrate mounts from config file
+    */
+  def initUpdateMigrate[A](
+    schema: Schema[A], tx: Transactor[Task], cfgFile: Option[FsFile]
+  ): MainTask[Unit] =
+    for {
+      j  <- ConfigOps.jsonFromFile(cfgFile).leftMap(_.shows)
+      jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
+      _  <- EitherT.right(ConfigOps.jsonToFile(jʹ, cfgFile))
+    } yield ()
 }

@@ -16,15 +16,16 @@
 
 package quasar.config
 
-import slamdata.Predef.Int
+import quasar.server._
 
 import argonaut._, Argonaut._
+import eu.timepit.refined._, numeric._
 
-final case class ServerConfig(port: Int)
+final case class ServerConfig(port: Port)
 
 object ServerConfig {
-   val DefaultPort = 20223
+  val DefaultPort: Port = refineMV(20223)
 
-   implicit def Codec: CodecJson[ServerConfig] =
-     casecodec1(ServerConfig.apply, ServerConfig.unapply)("port")
+  implicit val codecJson: CodecJson[ServerConfig] =
+    casecodec1(ServerConfig.apply, ServerConfig.unapply)("port")
 }

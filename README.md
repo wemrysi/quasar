@@ -126,37 +126,51 @@ The JSON configuration file must have the following format:
     "port": 8080
   },
 
-  "mountings": {
-    "/": {
-      "mongodb": {
-        "connectionUri": "mongodb://<user>:<pass>@<host>:<port>/<dbname>"
-      }
-    }
-  }
+  "metastore": <metastore_config>
 }
 ```
 
-One or more mountings may be included, and each must have a unique path (above, `/`), which determines where in the filesystem the database(s) contained by the mounting will appear.
+#### Metadata Store
 
-#### Database mounts
+Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) databases are supported.
+
+If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
+
+An example H2 configuration would look something like
+```json
+"h2": {
+  "file": "<path/to/database/file>"
+}
+```
+
+A PostgreSQL configuration looks something like
+```json
+"postgresql": {
+  "host": "<hostname>",
+  "port": "<port>",
+  "database": "<database name>",
+  "userName": "<database user>",
+  "password": "<password for database user>",
+  "parameters": <an optional JSON object of parameter key:value pairs>
+}
+```
+The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL.
+
+#### Initializing and updating Schema
+
+Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a web or repl quasar jar.
+
+If mounts are already defined in the config file, initialization will migrate those to the metadata store.
+
+### Database mounts
 
 If the mount's key is "mongodb", then the `connectionUri` is a standard [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/). Only the primary host is required to be present, however in most cases a database name should be specified as well. Additional hosts and options may be included as specified in the linked documentation.
 
-For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the configuration looks like this:
-```json
-  "mountings": {
-    "/local/": {
-      "mongodb": {
-        "connectionUri": "mongodb://localhost/test"
-      }
-    }
-  }
-```
-Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
+For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the `connectionUri` is `mongodb://localhost/test`. Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
-##### MongoDB
+#### MongoDB
 
 To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
 - `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
@@ -166,7 +180,7 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
-##### Couchbase
+#### Couchbase
 
 To connect to Couchbase use the following `connectionUri` format:
 
@@ -185,7 +199,7 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-##### HDFS using Apache Spark
+#### HDFS using Apache Spark
 
 To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
@@ -193,7 +207,7 @@ To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
 e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
-##### MarkLogic
+#### MarkLogic
 
 To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
@@ -224,22 +238,11 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
   - Element attributes are serialized to an object at the `_attributes` key.
   - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
 
-#### View mounts
+### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
 
-For example, given the above MongoDB mount, an additional view could be defined in this way:
-
-```json
-  "mountings": {
-    ...,
-    "/simpleZips": {
-      "view": {
-        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
-      }
-    }
-  }
-```
+For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
 

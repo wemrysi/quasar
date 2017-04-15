@@ -21,6 +21,7 @@ import slamdata.Predef._
 import scala.concurrent.duration._
 import scala.collection.Seq
 
+import eu.timepit.refined._
 import org.http4s.Uri.Authority
 import org.http4s.client.middleware.Retry
 import org.http4s.{Method, Request, Status, Uri}
@@ -34,9 +35,16 @@ class ControlServiceSpec extends quasar.Qspec {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 
-  def withServerExpectingRestart[B](timeoutMillis: Long = 30000, initialPort: Int = 8888, defaultPort: Int = 8888)
-                                      (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
-    val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
+  def withServerExpectingRestart[B](
+      timeoutMillis: Long = 30000,
+      initialPort: Port = refineMV(8888),
+      defaultPort: Port = refineMV(8888)
+  )(
+      causeRestart: Uri => Task[Unit]
+  )(
+      afterRestart: Task[B]
+  ): B = {
+    val uri = Uri(authority = Some(Authority(port = Some(initialPort.value))))
 
     val servers = Http4sUtils.startServers(initialPort, reload => control.service(defaultPort, reload) orElse info.service)
 
@@ -57,10 +65,15 @@ class ControlServiceSpec extends quasar.Qspec {
   }
 
   "Control Service" should {
-    def checkRunningOn(port: Int) = {
-      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))), method = Method.GET)
+    def checkRunningOn(port: Port) = {
+      val req =
+        Request(
+          uri = Uri(authority = Some(Authority(port = Some(port.value)))),
+          method = Method.GET)
+
       client.fetch(req)(response => Task.now(response.status must_== Status.Ok))
     }
+
     "restart on new port when PUT succeeds" in {
       val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
