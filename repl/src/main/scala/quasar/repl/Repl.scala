@@ -20,19 +20,24 @@ import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables}
 import quasar.common.PhaseResults
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main.{FilesystemQueries, Prettify}
+import quasar.main.{analysis, FilesystemQueries, Prettify}
 import quasar.sql
 
 import eu.timepit.refined.auto._
+import matryoshka.data.Fix
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import spire.std.double._
 
 object Repl {
   import Command.{XDir, XFile}
@@ -50,6 +55,7 @@ object Repl {
       |  [query]
       |  [id] <- [query]
       |  explain [query]
+      |  schema [path]
       |  ls [path]
       |  save [path] [value]
       |  append [path] [value]
@@ -221,6 +227,22 @@ object Repl {
                       perr => DF.fail(perr.shows),
                       κ(().point[Free[S, ?]])))
         } yield ()
+
+      case Schema(f) =>
+        for {
+          state <- RS.get
+          file  =  state targetFile f
+          proc  <- analysis.sampleResults(file, 1000L).run
+          cfg   =  analysis.CompressionSettings(
+                     stringMaxLength  =  64L,
+                     observationThold = 100L,
+                     mapSizeRatio     = 0.03,
+                     unionSizeRatio   = 0.03)
+          p1    =  analysis.extractSchema[Fix[EJson], Double](cfg)
+          sst   =  proc.map(_.pipe(p1).toVector.headOption)
+          _     <- sst.fold(err => DF.fail(err.shows), s => P.println(s.shows))
+        } yield ()
+
 
       case Save(f, v) =>
         write(W.saveThese(_, _), f, v)
