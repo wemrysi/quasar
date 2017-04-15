@@ -39,50 +39,37 @@ import spire.math.ConvertableTo
 object analysis {
   /** Knobs controlling various aspects of SST compression.
     *
-    * @param stringMaxLength  all strings longer than this are compressed to char[]
-    * @param observationThold the number of observations required before applying map and union compression
-    * @param mapSizeRaio      maps having a size / observations ratio of at least this amount will be compressed
-    * @param unionSizeRaio    unions having a size / observations ratio of at least this amount will be compressed
+    * @param mapMaxSize      maps larger than this will be compressed
+    * @param stringMaxLength all strings longer than this are compressed to char[]
+    * @param unionMaxSize    unions larger than this will be compressed
     */
   final case class CompressionSettings(
+    mapMaxSize:      Positive,
     stringMaxLength: Positive,
-    observationThold: Positive,
-    mapSizeRatio: Double,
-    unionSizeRatio: Double
+    unionMaxSize:    Positive
   )
 
-  /** Reduces the input to an `SST` describing the structure of the consumed `Data`. */
+  /** Reduces the input to an `SST` summarizing its structure. */
   def extractSchema[J: Order, A: ConvertableTo: Field: Order](
     settings: CompressionSettings
   )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): Process1[Data, SST[J, A]] = {
-    val preprocess =
-      compression.z85EncodedBinary[J, A] >>>
-      compression.limitStrings[J, A](settings.stringMaxLength)
-
-    val compressTrans = NonEmptyList(
-      compression.coalesceKeys[J, A](
-        settings.observationThold,
-        settings.mapSizeRatio),
-
-      preprocess,
-
-      compression.coalescePrimary[J, A](
-        settings.observationThold,
-        settings.unionSizeRatio)
-    ).foldRight1(_ >>> _)
+    val structuralTrans =
+      compression.coalesceKeys[J, A](settings.mapMaxSize)      >>>
+      compression.z85EncodedBinary[J, A]                       >>>
+      compression.limitStrings[J, A](settings.stringMaxLength) >>>
+      compression.coalescePrimary[J, A]                        >>>
+      compression.narrowUnion[J, A](settings.unionMaxSize)
 
     val compress = (sst: SST[J, A]) => {
-      val compSST = sst.transCata[SST[J, A]](compressTrans)
+      val compSST = sst.transCata[SST[J, A]](structuralTrans)
       (sst ≠ compSST) option compSST
     }
 
     process1.lift(SST.fromData[J, A](Field[A].one, _: Data))
-      .map(_ transCata[SST[J, A]] preprocess)
-      .reduceMonoid
-      .map(repeatedly(compress))
+      .reduce((x, y) => repeatedly(compress)(x |+| y))
   }
 
   /** A random sample of the dataset at the given path. */

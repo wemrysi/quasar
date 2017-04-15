@@ -234,10 +234,9 @@ object Repl {
           file  =  state targetFile f
           proc  <- analysis.sampleResults(file, 1000L).run
           cfg   =  analysis.CompressionSettings(
-                     stringMaxLength  =  64L,
-                     observationThold = 100L,
-                     mapSizeRatio     = 0.03,
-                     unionSizeRatio   = 0.03)
+                     mapMaxSize      = 50L,
+                     stringMaxLength = 64L,
+                     unionMaxSize    = 20L)
           p1    =  analysis.extractSchema[Fix[EJson], Double](cfg)
           sst   =  proc.map(_.pipe(p1).toVector.headOption)
           _     <- sst.fold(err => DF.fail(err.shows), s => P.println(s.shows))
