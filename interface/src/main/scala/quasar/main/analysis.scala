@@ -16,6 +16,7 @@
 
 package quasar.main
 
+import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
@@ -36,25 +37,42 @@ import spire.algebra.Field
 import spire.math.ConvertableTo
 
 object analysis {
+  /** Knobs controlling various aspects of SST compression.
+    *
+    * @param stringMaxLength  all strings longer than this are compressed to char[]
+    * @param observationThold the number of observations required before applying map and union compression
+    * @param mapSizeRaio      maps having a size / observations ratio of at least this amount will be compressed
+    * @param unionSizeRaio    unions having a size / observations ratio of at least this amount will be compressed
+    */
+  final case class CompressionSettings(
+    stringMaxLength: Positive,
+    observationThold: Positive,
+    mapSizeRatio: Double,
+    unionSizeRatio: Double
+  )
+
   /** Reduces the input to an `SST` describing the structure of the consumed `Data`. */
   def extractSchema[J: Order, A: ConvertableTo: Field: Order](
-    implicit
+    settings: CompressionSettings
+  )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): Process1[Data, SST[J, A]] = {
-    // TODO: CompressionSettings
-    val stringLimit: Positive = 128L
-    val minimumObs : Positive =   1L
-    val distRatio             = 0.80
-
     val preprocess =
       compression.z85EncodedBinary[J, A] >>>
-      compression.limitStrings[J, A](stringLimit)
+      compression.limitStrings[J, A](settings.stringMaxLength)
 
-    val compressTrans =
-      compression.coalesceKeys[J, A](minimumObs, distRatio)   >>>
-      preprocess                                              >>>
-      compression.coalescePrimary[J, A](minimumObs, distRatio)
+    val compressTrans = NonEmptyList(
+      compression.coalesceKeys[J, A](
+        settings.observationThold,
+        settings.mapSizeRatio),
+
+      preprocess,
+
+      compression.coalescePrimary[J, A](
+        settings.observationThold,
+        settings.unionSizeRatio)
+    ).foldRight1(_ >>> _)
 
     val compress = (sst: SST[J, A]) => {
       val compSST = sst.transCata[SST[J, A]](compressTrans)
@@ -71,10 +89,20 @@ object analysis {
   def sample[S[_]](file: AFile, size: Positive)(
     implicit Q: QueryFile.Ops[S]
   ): Process[Q.M, Data] = {
-    val lpr        = new LogicalPlanR[Fix[LogicalPlan]]
-    val dsize      = Data._int(size.value)
-    val sampleLP   = lpr.invoke2(StdLib.set.Sample, lpr.read(file), lpr.constant(dsize))
     val dropPhases = λ[Q.transforms.ExecM ~> Q.M](_.mapT(_.value))
-    Q.evaluate(sampleLP).translate(dropPhases)
+    Q.evaluate(sampleQuery(file, size)).translate(dropPhases)
   }
+
+  /** Query representing a random sample of `size` items from the specified file. */
+  def sampleQuery(file: AFile, size: Positive): Fix[LogicalPlan] = {
+    val lpr   = new LogicalPlanR[Fix[LogicalPlan]]
+    val dsize = Data._int(size.value)
+    lpr.invoke2(StdLib.set.Sample, lpr.read(file), lpr.constant(dsize))
+  }
+
+  /** An eager random sample of the dataset at the given path. */
+  def sampleResults[S[_]](file: AFile, size: Positive)(
+    implicit Q: QueryFile.Ops[S]
+  ): Q.M[Process0[Data]] =
+    Q.transforms.dropPhases(Q.results(sampleQuery(file, size)))
 }

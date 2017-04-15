@@ -189,7 +189,8 @@ object compression {
     fb: F[B]
   )(implicit A: Field[A]): Boolean = {
     val (cnt, len) = (size1(ts), fb.length)
+    val thold      = A fromBigInt BigInt(minObs.value)
     val alen       = A fromInt len
-    len >= minObs.value && (alen / cnt) >= A.fromDouble(ratio)
+    cnt >= thold && (alen / cnt) >= A.fromDouble(ratio)
   }
 }
