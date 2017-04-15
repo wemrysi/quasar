@@ -101,4 +101,9 @@ object SemanticError {
       case GenericError(msg) => Some(msg)
       case _ => None
     } (GenericError(_))
+
+  val unboundVariable: Prism[SemanticError, VarName] =
+    Prism.partial[SemanticError, VarName] {
+      case UnboundVariable(varname) => varname
+    }(UnboundVariable(_))
 }

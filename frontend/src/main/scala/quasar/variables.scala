@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.SemanticError._
+import quasar.frontend.SemanticErrors
 import quasar.sql.{Sql, Ident, Query, Select, Vari, TableRelationAST, VariRelationAST, pprint}
 
 import matryoshka._
@@ -67,10 +68,23 @@ object Variables {
     case x => x.embed.right
   }
 
+  def allVariablesƒ: Algebra[Sql, List[VarName]] = {
+    case Vari(name)                             => List(VarName(name))
+    case sel @ Select(_, _, rel, _, _, _) =>
+      rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol)} ++
+      (sel: Sql[List[VarName]]).toList.join
+    case other                                  => other.toList.join
+  }
+
   // FIXME: Get rid of this
   def substVars(expr: Fix[Sql], variables: Variables)
-      : SemanticError \/ Fix[Sql] =
-    expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables))
+      : SemanticErrors \/ Fix[Sql] = {
+    val allVars = expr.cata(allVariablesƒ)
+    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
+    errors.cata(
+      errors => errors.left,
+      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))
+  }
 
   implicit val equal: Equal[Variables] = Equal.equalA
 }
