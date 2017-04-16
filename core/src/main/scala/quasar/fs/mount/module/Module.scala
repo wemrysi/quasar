@@ -36,6 +36,14 @@ sealed abstract class Module[A]
 
 object Module {
 
+  final case class ResultHandle(run: Long) extends scala.AnyVal
+
+  object ResultHandle {
+    implicit val show: Show[ResultHandle] = Show.showFromToString
+
+    implicit val order: Order[ResultHandle] = Order.orderBy(_.run)
+  }
+
   sealed trait Error
 
   type ErrorT[M[_], A] = EitherT[M, Error, A]
@@ -76,12 +84,12 @@ object Module {
 
 
   final case class InvokeModuleFunction(path: AFile, args: Map[String, String])
-    extends Module[Error \/ QueryFile.ResultHandle]
+    extends Module[Error \/ ResultHandle]
 
-  final case class More(handle: QueryFile.ResultHandle)
+  final case class More(handle: ResultHandle)
     extends Module[FileSystemError \/ Vector[Data]]
 
-  final case class Close(h: QueryFile.ResultHandle)
+  final case class Close(h: ResultHandle)
     extends Module[Unit]
 
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
@@ -92,18 +100,18 @@ object Module {
 
     type M[A] = ErrorT[FreeS, A]
 
-    def invokeFunction(path: AFile, args: Map[String, String]): M[QueryFile.ResultHandle] =
+    def invokeFunction(path: AFile, args: Map[String, String]): M[ResultHandle] =
       EitherT(lift(InvokeModuleFunction(path, args)))
 
     /** Read a chunk of data from the file represented by the given handle.
       *
       * An empty `Vector` signals that all data has been read.
       */
-    def more(h: QueryFile.ResultHandle): FileSystemErrT[FreeS, Vector[Data]] =
+    def more(h: ResultHandle): FileSystemErrT[FreeS, Vector[Data]] =
       EitherT(lift(More(h)))
 
     /** Closes the given read handle, freeing any resources it was using. */
-    def close(h: QueryFile.ResultHandle): FreeS[Unit] =
+    def close(h: ResultHandle): FreeS[Unit] =
       lift(Close(h))
   }
 
@@ -118,10 +126,10 @@ object Module {
     /** Returns mounts located at a path having the given prefix. */
     def invokeFunction(path: AFile, args: Map[String, String]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
-      def closeHandle(h: QueryFile.ResultHandle): Process[M, Nothing] =
+      def closeHandle(h: ResultHandle): Process[M, Nothing] =
         Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT])
 
-      def readUntilEmpty(h: QueryFile.ResultHandle): Process[M, Data] =
+      def readUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
           if (data.isEmpty)
             Process.halt
@@ -164,9 +172,9 @@ object Module {
             logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sqlBlob, Variables.empty, basePath = fileParent(file))
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
             handle       <- EitherT(query.eval(logicalPlan).run.value).leftMap(fsError(_))
-          } yield handle).run
-        case More(handle)  => query.more(handle).run
-        case Close(handle) => query.close(handle)
+          } yield ResultHandle(handle.run)).run
+        case More(handle)  => query.more(QueryFile.ResultHandle(handle.run)).run
+        case Close(handle) => query.close(QueryFile.ResultHandle(handle.run))
       }
   }
 }
