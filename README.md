@@ -46,41 +46,62 @@ To compile the project and run tests, first clone the quasar repo and then execu
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-Running the full test suite can be done in two ways:
+Running the full test suite can be done using docker containers for various backends:
 
-##### Testing option 1 (prerequisite: docker)
+##### Full Testing (prerequisite: docker and docker-compose)
 
-A docker container running mongodb operates for the duration of the test run.
+In order to run integration test for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
 
-```bash
-./bin/full-it-tests.sh
-```
+Of particular interest are the following two scripts:
 
-##### Testing option 2
+  1. `docker/scripts/setupContainers`
+  2. `docker/scripts/assembleTestingConf`
 
-In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
-you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
-allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
-instructions that can be found there.
-
-Once we have a MongoDB instance handy, we need to configure the integration tests
-in order to inform Quasar about where to find the backends to test.
-
-Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
+Supported backends datastores are:
 
 ```
-mongodb_3_2="mongodb://<mongoURL>"
-mongodb_3_0="mongodb://<mongoURL>"
-mongodb_2_6="mongodb://<mongoURL>"
+quasar_mongodb_2_6
+quasar_mongodb_3_0
+quasar_mongodb_read_only
+quasar_mongodb_3_2
+quasar_mongodb_3_4
+quasar_metastore
+quasar_postgresql
+quasar_marklogic_xml
+quasar_marklogic_json
+quasar_couchbase
 ```
 
-where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
-something like `localhost:27017` for a local installation. This means the integration tests will be run against
-both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
-tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported filesystems.
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example the command:
+
+```
+./setupContainers -u quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
+```
+
+will create or pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
+
+Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test. 
+This information is convayed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
+file based on the currently running containerizd backends using the following command:
+
+```
+./assembleTestingConf -a
+```
+
+After running this command your `testing.conf` file should look similar to this:
+
+```
+> cat it/testing.conf
+couchbase="couchbase://192.168.99.101?username=Administrator&password=password&socketConnectTimeoutSeconds=15"
+marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
+postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
+mongodb_3_0="mongodb://192.168.99.101:27019"
+```
+
+IP's will vary depending on your docker enviornment. In addition the scripts assume you have docker and docker-compose installed.
+You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
+
 
 #### REPL JAR
 
