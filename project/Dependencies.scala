@@ -8,7 +8,6 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
-  private val argonautShapelessVersion = "1.2.0-M4"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.8.4"
   private val jacksonVersion           = "2.4.4"
@@ -127,8 +126,6 @@ object Dependencies {
   def web = Seq(
     CommonDependencies.http4s.dsl,
     CommonDependencies.http4s.argonaut62,
-    "com.github.alexarchambault" %% "argonaut-shapeless_6.2" % argonautShapelessVersion,
-    "com.github.alexarchambault" %% "argonaut-refined_6.2"   % argonautShapelessVersion,
     CommonDependencies.http4s.blazeClient,
     CommonDependencies.http4s.blazeServer,
     "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",

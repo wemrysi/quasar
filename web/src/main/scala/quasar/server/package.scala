@@ -26,7 +26,7 @@ import quasar.main._
 
 import argonaut._
 import eu.timepit.refined._, numeric._
-import eu.timepit.refined.api.Refined
+import eu.timepit.refined.api.{Refined, RefType}
 import scalaz.{~>, Monad}
 import scalaz.concurrent.Task
 
@@ -38,8 +38,12 @@ package object server {
 
   implicit val codecJsonPort: CodecJson[Port] =
     CodecJson.derived(
-      ArgonautRefined.refinedEncodeJson[Int, PortRange, Refined],
-      ArgonautRefined.refinedDecodeJson[Int, PortRange, Refined])
+      EncodeJson.of[Int].contramap(RefType[Refined].unwrap),
+      DecodeJson(c => DecodeJson.of[Int].decode(c).flatMap { t0 =>
+        RefType[Refined].refine[PortRange](t0) match {
+          case Left(err) => DecodeResult.fail(err, c.history)
+          case Right(t)  => DecodeResult.ok(t)
+        }}))
 
   def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
     failureResponseIOT[F, PhysicalError]    :+:
