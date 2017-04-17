@@ -96,9 +96,7 @@ object SemanticError {
   }
 
   // TODO: Add other prisms when necessary (unless we enable the "No Any" wart first)
-  val genericError: Prism[SemanticError, String] =
-    Prism[SemanticError, String] {
-      case GenericError(msg) => Some(msg)
-      case _ => None
-    } (GenericError(_))
+  val genericError: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
+    case GenericError(msg) => msg
+  } (GenericError(_))
 }

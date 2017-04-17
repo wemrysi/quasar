@@ -21,6 +21,7 @@ import quasar.api._
 import quasar.fp.free._
 import quasar.fs.{FileSystemError, PhysicalError}
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.fs.mount.module.Module
 import quasar.main._
 
 import argonaut._
@@ -42,6 +43,7 @@ package object server {
 
   def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
     failureResponseIOT[F, PhysicalError]    :+:
+    failureResponseIOT[F, Module.Error]     :+:
     failureResponseIOT[F, PathTypeMismatch] :+:
     failureResponseIOT[F, MountingError]    :+:
     failureResponseIOT[F, FileSystemError]
