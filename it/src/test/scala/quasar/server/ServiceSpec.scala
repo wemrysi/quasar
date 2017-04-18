@@ -16,28 +16,37 @@
 
 package quasar.server
 
-import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{TestConfig, Variables}
+import quasar.cli.Cmd.Start
 import quasar.config.{ConfigOps, FsPath, WebConfig}
-import quasar.contrib.pathy.{APath, UriPathCodec}
-import quasar.internal.MountServiceConfig
-import quasar.main.MainErrT
+import quasar.contrib.pathy._
+import quasar.db.{DbUtil, StatefulTransactor}
 import quasar.fs.mount._
+import quasar.internal.MountServiceConfig
+import quasar.main._, metastore._
+import quasar.metastore._, MetaStoreAccess._
 import quasar.server.Server.QuasarConfig
 import quasar.sql.{fixParser, Query}
+import quasar.TestConfig
+import quasar.Variables
 
 import java.io.File
+import scala.util.Random.nextInt
 
 import argonaut._, Argonaut._
-import org.http4s._, Status._, Uri.Authority
+import doobie.imports._
+import eu.timepit.refined._
+import org.http4s.{Query => _, _}, Status._, Uri.Authority
 import org.http4s.argonaut._
+import org.specs2.execute.{AsResult, Result}
+import org.specs2.matcher.MatchResult
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class ServiceSpec extends quasar.Qspec {
-  
+  val schema = Schema.schema
+
   val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient
@@ -45,22 +54,29 @@ class ServiceSpec extends quasar.Qspec {
   sequential
 
   def withServer[A]
-    (port: Int = 8888, webConfig: WebConfig = configOps.default)
+    (port: Port = refineMV(8888), metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])
     (f: Uri => Task[A])
     : String \/ A = {
-    val uri = Uri(authority = Some(Authority(port = Some(port))))
-
-    val service = Server.durableService(
-      QuasarConfig(
-        staticContent = Nil,
-        redirect = None,
-        port = None,
-        configPath = FsPath.parseSystemFile(File.createTempFile("quasar", ".json").toString).run.unsafePerformSync,
-        openClient = false),
-      webConfig)
+    val uri = Uri(authority = Some(Authority(port = Some(port.value))))
 
     (for {
-      (svc, close)  <- service
+      cfgPath       <- FsPath.parseSystemFile(
+                         File.createTempFile("quasar", ".json").toString
+                       ).run.liftM[MainErrT]
+      qCfg          =  QuasarConfig(
+                         cmd = Start,
+                         staticContent = Nil,
+                         redirect = None,
+                         port = None,
+                         configPath = cfgPath,
+                         openClient = false)
+      transactor    <- Task.delay(DbUtil.simpleTransactor(
+                         DbUtil.inMemoryConnectionInfo(s"test_mem_service_spec_$nextInt")
+                       )).liftM[MainErrT]
+      _             <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
+      _             <- metastoreInit.transact(transactor).liftM[MainErrT]
+      msCtx         <- metastoreCtx(StatefulTransactor(transactor, Task.now(())))
+      (svc, close)  =  Server.durableService(qCfg, port, msCtx)
       (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
       r             <- f(uri)
                           .onFinish(_ => shutdown)
@@ -75,7 +91,7 @@ class ServiceSpec extends quasar.Qspec {
     "POST view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-      val r = withServer(port, configOps.default) { baseUri: Uri =>
+      val r = withServer(port) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs",
@@ -96,7 +112,7 @@ class ServiceSpec extends quasar.Qspec {
     "PUT view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-      val r = withServer(port, configOps.default) { baseUri: Uri =>
+      val r = withServer(port) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs" / "a",
@@ -122,7 +138,7 @@ class ServiceSpec extends quasar.Qspec {
         fixParser.parseExpr(Query("select 2"))
           .bimap(_.shows, MountConfig.viewConfig(_, Variables.empty))
 
-      val r = withServer(port, configOps.default) { baseUri: Uri =>
+      val r = withServer(port) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs" / "viewA",
@@ -148,11 +164,9 @@ class ServiceSpec extends quasar.Qspec {
       val dstPath = rootDir </> dir("view") </> file("b")
       val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select * from zips"))
 
-      val webConfig = WebConfig.mountings.set(
-        MountingsConfig(Map(srcPath -> viewConfig)))(
-        configOps.default)
+      val insertMnts = insertMount(srcPath, viewConfig)
 
-      val r = withServer(port, webConfig) { baseUri: Uri =>
+      val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
           Request(
             uri = baseUri / "mount" / "fs" / "view" / "a",
@@ -168,7 +182,6 @@ class ServiceSpec extends quasar.Qspec {
 
       r.map(_.status) must beRightDisjunction(Ok)
     }
-
   }
 
   "/data/fs" should {
@@ -186,41 +199,43 @@ class ServiceSpec extends quasar.Qspec {
 
     val testName = "MOVE view"
 
-    if (fileSystemConfigs.isEmpty) {
-      testName in skipped("Warning: no environment variables set.")
-    } else {
-      testName in {
-        val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+    def withFileSystemConfigs[A](result: MatchResult[A]): Result =
+      fileSystemConfigs.isEmpty.fold(
+        skipped("Warning: no test backends enabled"),
+        AsResult(result))
 
-        val srcPath = rootDir </> dir("view") </> file("a")
-        val dstPath = rootDir </> dir("view") </> file("b")
+    "MOVE view" in withFileSystemConfigs {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
-        val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
+      val srcPath = rootDir </> dir("view") </> file("a")
+      val dstPath = rootDir </> dir("view") </> file("b")
 
-        val webConfig = WebConfig.mountings.set(
-          MountingsConfig(Map(
-            srcPath -> viewConfig) ++ fileSystemConfigs))(
-          configOps.default)
+      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
 
-        val r = withServer(port, webConfig) { baseUri: Uri =>
-          client.fetch(
-            Request(
-              uri = baseUri / "data" / "fs" / "view" / "a",
-              method = Method.MOVE,
-              headers = Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
-            )(Task.now) *>
-          client.fetch(
-            Request(
-              uri = baseUri / "data" / "fs" / "view" / "b",
-              method = Method.GET)
-            )(Task.now)
+      val insertMnts =
+        insertMount(srcPath, viewConfig) <*
+        fileSystemConfigs.toList.traverse {
+          case (p, m) => insertMount(p, m)
         }
 
-        r.map(_.status) must beRightDisjunction(Ok)
+      val r = withServer(port, insertMnts) { baseUri: Uri =>
+        client.fetch(
+          Request(
+            uri = baseUri / "data" / "fs" / "view" / "a",
+            method = Method.MOVE,
+            headers = Headers(Header("Destination", UriPathCodec.printPath(dstPath))))
+          )(Task.now) *>
+        client.fetch(
+          Request(
+            uri = baseUri / "data" / "fs" / "view" / "b",
+            method = Method.GET)
+          )(Task.now)
       }
+
+      r.map(_.status) must beRightDisjunction(Ok)
     }
 
-    "MOVE a directory containing views and files" in {
+    "MOVE a directory containing views and files" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
       val srcPath = rootDir </> dir("a")
@@ -228,12 +243,11 @@ class ServiceSpec extends quasar.Qspec {
 
       val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
 
-      val webConfig = WebConfig.mountings.set(
-        MountingsConfig(Map(
-          (srcPath </> file("view")) -> viewConfig) ++ fileSystemConfigs))(
-        configOps.default)
+      val insertMnts =
+        insertMount(srcPath </> file("view"), viewConfig) <*
+        fileSystemConfigs.toList.traverse { case (p, m) => insertMount(p, m) }
 
-      val r = withServer(port, webConfig) { baseUri: Uri =>
+      val r = withServer(port, insertMnts) { baseUri: Uri =>
         client.fetch(
           Request(
             uri = baseUri / "data" / "fs" / "a" / "",
@@ -248,7 +262,7 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r.map(_.status) must beRightDisjunction(Ok)
-    }.flakyTest("""'\/-(404 Path not found.)' is not \/- with value'200 OK'""")
+    }
   }
 
   step(client.shutdown.unsafePerformSync)

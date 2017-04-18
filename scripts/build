@@ -20,8 +20,6 @@ TRAVIS_MAX_DOC_MINS=20
 
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
 
-
-
 # if we're building a pull request, DON'T clean and use the cache instead
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
   CLEAN=clean

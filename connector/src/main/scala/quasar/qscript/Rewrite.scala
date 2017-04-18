@@ -278,26 +278,6 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     case _                                 => None
   }
 
-  /** Pull more work to _after_ count operations, limiting the dataset. */
-  // TODO: we should be able to pull _most_ of a Reduce repair function to after a Subset
-  def swapMapSubset[F[_], G[_]: Functor]
-    (FtoG: F ~> G)
-    (implicit QC: QScriptCore :<: F)
-      : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
-
-    val FI = Injectable.inject[QScriptCore, QScriptTotal]
-
-    {
-      case Subset(src, from, sel, count) =>
-        from.resume.swap.toOption >>= (FI project _) >>= {
-          case Map(fromInner, mf) =>
-            Map(FtoG(QC.inj(Subset(src, fromInner, sel, count))).embed, mf).some
-          case _ => None
-        }
-      case _ => None
-    }
-  }
-
   def compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
     case LeftShift(src, struct, id, repair) =>
       rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, xy._2))
@@ -350,7 +330,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
              TJ: ThetaJoin :<: F,
              FI: Injectable.Aux[F, QScriptTotal]):
       F[T[G]] => G[T[G]] =
-    repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
+    (repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) _) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
       liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
@@ -385,13 +365,6 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
              FI: Injectable.Aux[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeWithBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
-
-  /** Should only be applied after all other QScript transformations. This gives
-    * the final, optimized QScript for conversion.
-    */
-  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(implicit QC: QScriptCore :<: F)
-      : F[T[G]] => F[T[G]] =
-    liftFF(repeatedly(swapMapSubset(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle

@@ -37,6 +37,13 @@ configure_couchbase() {
   echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
 }
 
+##########################################
+# injects metastore conf into
+# it/testing.conf
+#
+configure_metastore() {
+  echo 'postgresql_metastore="{\"host\":\"'$DOCKERIP'\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' >> $CONFIGFILE
+}
 
 ##########################################
 # injects postgresql url into
@@ -44,7 +51,7 @@ configure_couchbase() {
 #
 configure_postgresql() {
   CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE
+  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}:5433/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE
 }
 
 ##########################################
@@ -53,22 +60,23 @@ configure_postgresql() {
 #
 configure_mongo() {
   CONTAINERNAME=$1
-  if [[ $CONTAINERNAME == "mongodb_2_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27018\"" >> $CONFIGFILE; fi 
-  if [[ $CONTAINERNAME == "mongodb_3_0"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27019\"" >> $CONFIGFILE; fi 
-  if [[ $CONTAINERNAME == "mongodb_read_only" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27020\"" >> $CONFIGFILE; fi 
-  if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi 
-  if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi 
+  if [[ $CONTAINERNAME == "mongodb_2_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27018\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_0"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27019\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_read_only" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27020\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi
 }
 
 
-connector_lookup() {
-  CONNECTOR=$1
-  if [[ $CONNECTOR =~ "mongodb"              ]]; then configure_mongo          $CONNECTOR;      fi
-  if [[ $CONNECTOR =~ "postgresql"           ]]; then configure_postgresql     $CONNECTOR;      fi
-  if [[ $CONNECTOR == "marklogic_xml"        ]]; then configure_marklogic_xml  $CONNECTOR 8001; fi
-  if [[ $CONNECTOR == "marklogic_json"       ]]; then configure_marklogic_json $CONNECTOR 9001; fi
-  if [[ $CONNECTOR =~ "couchbase"            ]]; then configure_couchbase      $CONNECTOR;      fi
-  if [[ $CONNECTOR == "spark_local_test"     ]]; then configure_spark; fi
+container_lookup() {
+  CONTAINER=$(echo "$1" | cut -d_ -f2-)
+  if [[ $CONTAINER =~ "mongodb"              ]]; then configure_mongo          $CONTAINER;      fi
+  if [[ $CONTAINER == "postgresql"           ]]; then configure_postgresql     $CONTAINER;      fi
+  if [[ $CONTAINER == "marklogic_xml"        ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
+  if [[ $CONTAINER == "marklogic_json"       ]]; then configure_marklogic_json $CONTAINER 9001; fi
+  if [[ $CONTAINER == "couchbase"            ]]; then configure_couchbase      $CONTAINER;      fi
+  if [[ $CONTAINER == "spark_local_test"     ]]; then configure_spark;                          fi
+  if [[ $CONTAINER == "metastore"            ]]; then configure_metastore;                      fi
 }
 
 
@@ -78,11 +86,11 @@ define_needed_evn_vars() {
     CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
     DOCKERIP="localhost"
   else
-    CONFIGFILE=../../it/testing.conf
+    CONFIGFILE=$(dirname $0)/../../it/testing.conf
     if [[ -x "$(command -v docker-machine)" ]]
     then
-      eval "$(docker-machine env default)"
-      DOCKERIP=$(docker-machine ip default)  
+      eval "$(docker-machine env --shell sh/bash default)"
+      DOCKERIP=$(docker-machine ip default)
     else
       DOCKERIP="localhost"
     fi
@@ -95,16 +103,15 @@ cleanup_testing_conf_file() {
 
 usage() {
 cat << EOF
-Usage: $0 [-h] [-a] [-c CONNECTOR-NAME]
-Assembles Quasar integration configuration file, it/testing.conf, from currently running 
-containerized connectors or for the specific CONNECTOR-NAME passed in. Works for local
-development and within travis-ci.
+Usage: $0 [-h] [-a] [-c CONTAINER-NAME]
+Assembles Quasar integration configuration file, it/testing.conf, from currently running
+continers. Works for local development and within travis-ci.
 
   -h                   help (also trigged with no parameters): display this help and exit
-  -a                   cleans existing testing.conf and adds connector URIs to testing.conf for all currently running dockerized connectors
-  -i CONNECTOR-NAME    add connector URI to existing testing.conf file
-  -c CONNECTOR-NAME    cleans exisitng testing.conf and adds a connector URI for CONNECTOR-NAME currently running 
-  -t                   create testing.conf with all currently running dockerized connectors plus spark local connector
+  -a                   cleans existing testing.conf and adds testing.conf entries for all currently running quasar test containers
+  -i CONTAINER-NAME    add CONTAINER-NAME entry to existing testing.conf file
+  -c CONTAINER-NAME    cleans exisitng testing.conf and adds a entry for CONTAINER-NAME
+  -t                   add spark local entry to testing.conf
 EOF
 }
 
@@ -118,27 +125,26 @@ define_needed_evn_vars
 while getopts ":hastpc:i:" opt; do
   case $opt in
     a)
-      echo "creating testing.conf with URIs for all running connectors..." >&2
+      echo "cleaning existing testing.conf and adding testing.conf entries for all currently running quasar test containers..." >&2
       cleanup_testing_conf_file
-      CONNECTORS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}')
-      for CONNECTOR in $CONNECTORS
+      CONTAINERS=$(docker ps --filter "name=" | awk '{if(NR>1) print $NF}' | grep "quasar_")
+      for CONTAINER in $CONTAINERS
       do
-        connector_lookup $CONNECTOR
-      done          
+        container_lookup $CONTAINER
+      done
       ;;
     i)
-      echo "adding URI for $OPTARG to testing.conf..." >&2
-      connector_lookup $OPTARG
+      echo "adding $OPTARG entry to existing testing.conf file..." >&2
+      container_lookup $OPTARG
       ;;
     c)
-      echo "creating testing.conf with URI for $OPTARG..." >&2
+      echo "cleaning exisitng testing.conf and adding a entry for $OPTARG..." >&2
       cleanup_testing_conf_file
-      connector_lookup $OPTARG     
+      container_lookup $OPTARG
       ;;
     t)
-      echo "creating testing.conf with URIs for all running connectors plus URI for spark local..." >&2
-      ./$0 -a
-      ./$0 -i spark_local_test
+      echo "adding spark local entry to testing.conf..." >&2
+      ./$0 -i quasar_spark_local_test
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2

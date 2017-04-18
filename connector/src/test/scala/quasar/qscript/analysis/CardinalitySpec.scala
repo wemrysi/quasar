@@ -33,7 +33,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
 
   sequential
 
-  val empty: APath => Int = κ(0)
+  val empty: APath => Id[Int] = κ(0)
 
   "Cardinality" should {
 
@@ -55,7 +55,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "returns what 'pathCard' is returning for given file" in {
         val fileCardinality = 50
         val pathCard = κ(fileCardinality)
-        val compile = Cardinality.shiftedRead[AFile].calculate(pathCard)
+        val compile = Cardinality.shiftedRead[AFile].calculate[Id](pathCard)
         val afile = rootDir </> dir("path") </> dir("to") </> file("file")
         compile(Const[ShiftedRead[AFile], Int](ShiftedRead(afile, ExcludeId))) must_== fileCardinality
       }
@@ -63,7 +63,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "returns what 'pathCard' is returning for given dir" in {
         val dirCardinality = 55
         val pathCard = κ(dirCardinality)
-        val compile = Cardinality.shiftedRead[ADir].calculate(pathCard)
+        val compile = Cardinality.shiftedRead[ADir].calculate[Id](pathCard)
         val adir = rootDir </> dir("path") </> dir("to") </> dir("dir")
         compile(Const[ShiftedRead[ADir], Int](ShiftedRead(adir, ExcludeId))) must_== dirCardinality
       }
@@ -243,10 +243,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         compile(Const(Root)) must_== 1
       }
     }
-
   }
 
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
-
 }

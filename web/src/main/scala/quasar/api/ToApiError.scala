@@ -24,6 +24,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.fs.mount.module.Module
 import quasar.sql._
 
 import argonaut._, Argonaut._
@@ -125,6 +126,17 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         ) :?+ ("data" :?= encodeData(data))
     }
   }
+
+  implicit def moduleErrorToApiError: ToApiError[Module.Error] =
+    error {
+      case Module.Error.FSError(fsErr)            => fsErr.toApiError
+      case Module.Error.SemErrors(semErrs)        => semErrs.toApiError
+      case Module.Error.ArgumentsMissing(missing) =>
+        apiError(
+          BadRequest withReason "Arguments missing to function call",
+          "missing arguments" := missing)
+      case Module.Error.ParsingErr(parsingErr)    => parsingErr.toApiError
+    }
 
   implicit def physicalErrorToApiError: ToApiError[PhysicalError] =
     error(err => fromMsg_(

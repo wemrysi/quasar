@@ -19,7 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fs.FileSystemType
-import quasar.sql, sql.Sql, sql.Statement
+import quasar.sql, sql.Sql, sql.Statement, sql.FunctionDecl
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -32,6 +32,10 @@ sealed abstract class MountConfig
 object MountConfig {
   final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])
     extends MountConfig
+  {
+    def declarations: List[FunctionDecl[Fix[Sql]]] =
+      statements.collect { case funcDec: FunctionDecl[_] => funcDec }
+  }
 
   final case class ViewConfig private[mount] (query: Fix[Sql], vars: Variables)
     extends MountConfig
@@ -68,17 +72,30 @@ object MountConfig {
   implicit def equal: Equal[MountConfig] =
     Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
 
-  val fromConfigPair: (String, ConnectionUri) => String \/ MountConfig = {
+  val toConfigPair: MountConfig => (String, String) = {
+    case ViewConfig(query, vars) =>
+      "view" -> viewCfgAsUri(query, vars)
+    case FileSystemConfig(typ, uri) =>
+      typ.value -> uri.value
+    case ModuleConfig(statements) =>
+      "module" -> stmtsAsSqlStr(statements)
+  }
+
+  val fromConfigPair: (String, String) => String \/ MountConfig = {
     case ("view", uri) =>
-      viewCfgFromUri(uri.value).map(viewConfig(_))
+      viewCfgFromUri(uri).map(i => viewConfig(i))
+    case ("module", stmts) =>
+      sql.fixParser.parseWithParser(stmts, sql.fixParser.statements).bimap(
+        _.message,
+        moduleConfig(_))
     case (typ, uri) =>
-      fileSystemConfig(FileSystemType(typ), uri).right
+      fileSystemConfig(FileSystemType(typ), ConnectionUri(uri)).right
   }
 
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({
       case ModuleConfig(statements)   =>
-        Json("module" := statements.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n"))
+        Json("module" := stmtsAsSqlStr(statements))
       case ViewConfig(query, vars)    =>
         Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
       case FileSystemConfig(typ, uri) =>
@@ -87,12 +104,12 @@ object MountConfig {
     json => json.fields match {
       case Some(key :: Nil) =>
         if (key === "module") (json --\ key).as[String].flatMap { statementsString =>
-          DecodeResult(sql.fixParser.parseWithParser(statementsString, sql.fixParser.statements).map(moduleConfig(_))
-            .leftMap(parseError => (parseError.message, (json --\ key).history)).toEither)
+          DecodeResult(fromConfigPair(key, statementsString)
+            .leftMap((_, (json --\ key).history)).toEither)
         } else {
           val uriCur = json --\ key --\ "connectionUri"
           uriCur.as[ConnectionUri].flatMap(uri => DecodeResult(
-            fromConfigPair(key, uri).leftMap((_, uriCur.history)).toEither))
+            fromConfigPair(key, uri.value).leftMap((_, uriCur.history)).toEither))
         }
       case _ =>
         DecodeResult.fail(s"invalid mount config, expected only one field describing mount type, but found: ${json.focus}", json.history)
@@ -141,4 +158,7 @@ object MountConfig {
       query     = Query.fromMap(qryMap)
     ).renderString
   }
+
+  private def stmtsAsSqlStr(stmts: List[Statement[Fix[Sql]]]) =
+    stmts.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n")
 }

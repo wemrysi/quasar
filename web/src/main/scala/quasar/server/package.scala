@@ -16,20 +16,38 @@
 
 package quasar
 
+import slamdata.Predef._
 import quasar.api._
-import quasar.fp._, free._
+import quasar.fp.free._
 import quasar.fs.{FileSystemError, PhysicalError}
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.fs.mount.module.Module
 import quasar.main._
 
+import argonaut._
+import eu.timepit.refined._, numeric._
+import eu.timepit.refined.api.{Refined, RefType}
 import scalaz.{~>, Monad}
 import scalaz.concurrent.Task
 
 package object server {
   import Mounting.PathTypeMismatch
 
+  type Port      = Int Refined PortRange
+  type PortRange = Interval.Closed[0, 65535]
+
+  implicit val codecJsonPort: CodecJson[Port] =
+    CodecJson.derived(
+      EncodeJson.of[Int].contramap(RefType[Refined].unwrap),
+      DecodeJson(c => DecodeJson.of[Int].decode(c).flatMap { t0 =>
+        RefType[Refined].refine[PortRange](t0) match {
+          case Left(err) => DecodeResult.fail(err, c.history)
+          case Right(t)  => DecodeResult.ok(t)
+        }}))
+
   def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
     failureResponseIOT[F, PhysicalError]    :+:
+    failureResponseIOT[F, Module.Error]     :+:
     failureResponseIOT[F, PathTypeMismatch] :+:
     failureResponseIOT[F, MountingError]    :+:
     failureResponseIOT[F, FileSystemError]

@@ -222,7 +222,7 @@ object MapFunc {
 
   def normalize[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]
       : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
-    repeatedly(rewrite[T, A]) ⋘
+    (repeatedly(rewrite[T, A]) _) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
 
   // TODO: This could be split up as it is in LP, with each function containing
