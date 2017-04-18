@@ -22,7 +22,7 @@ import quasar.config._
 import quasar.console._
 import quasar.db.StatefulTransactor
 import quasar.effect._
-import quasar.fp._, ski.κ
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
@@ -167,10 +167,10 @@ object Main {
                    Task.now, MetaStoreConfig.configOps.default
                  ).liftM[MainErrT]
       tx      <- metastoreTransactor(msCfg)
-      _       <- EitherT((opts.cmd match {
+      _       <- opts.cmd match {
                    case Start               => start(tx)
                    case InitUpdateMetaStore => initUpdateMigrate(Schema.schema, tx.transactor, cfgPath)
-                 }).run.onFinish(κ(tx.shutdown)))
+                 }
     } yield ()
 
     logErrors(main0).unsafePerformSync
