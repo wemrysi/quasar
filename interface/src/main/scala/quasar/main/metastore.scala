@@ -136,15 +136,17 @@ object metastore {
   ): MainTask[Json] = {
     val mntsFieldName = "mountings"
 
-    val mountingsConfigDecodeJson: DecodeJson[MountingsConfig] =
-      DecodeJson(cur => (cur --\ mntsFieldName).as[MountingsConfig])
+    val mountingsConfigDecodeJson: DecodeJson[Option[MountingsConfig]] =
+      DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
 
     val migrateMounts: ConnectionIO[Unit] =
       mountingsConfigDecodeJson.decodeJson(jCfg).fold(
         { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
-        m => m.toMap.toList.traverse {
-          case (p, m) => MetaStoreAccess.insertMount(p, m)
-        }.void)
+        _.cata(
+          m => m.toMap.toList.traverse {
+            case (p, m) => MetaStoreAccess.insertMount(p, m)
+          }.void,
+          ().η[ConnectionIO]))
 
     val op: ConnectionIO[Json] =
       for {
