@@ -50,7 +50,7 @@ Running the full test suite can be done using docker containers for various back
 
 ##### Full Testing (prerequisite: docker and docker-compose)
 
-In order to run integration test for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
+In order to run integration tests for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
 
 Of particular interest are the following two scripts:
 
@@ -58,7 +58,7 @@ Of particular interest are the following two scripts:
   2. `docker/scripts/assembleTestingConf`
 
 
-Supported backends datastores are:
+Qusar supports the following backends datastores:
 
 ```
 quasar_mongodb_2_6
@@ -73,16 +73,17 @@ quasar_marklogic_json
 quasar_couchbase
 ```
 
-Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example the command:
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example 
+if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbsase you would use:
 
 ```
 ./setupContainers -u quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
 ```
 
-will create or pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
+This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
 
 Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test. 
-This information is convayed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
+This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
 file based on the currently running containerizd backends using the following command:
 
 ```
@@ -99,7 +100,7 @@ postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&pass
 mongodb_3_0="mongodb://192.168.99.101:27019"
 ```
 
-IP's will vary depending on your docker enviornment. In addition the scripts assume you have docker and docker-compose installed.
+IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
 You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
 
 
