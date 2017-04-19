@@ -9,7 +9,7 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 # update CI configuration.
 #
 
-echo "running build2..."
+echo "running build script..."
 
 source "$(dirname $0)/constants"
 
@@ -37,26 +37,28 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # running on travis to avoid having the build killed due to lack of output.
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   else
     "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders test exclusive:test
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation.
-  "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly'
+
+  # eliminated $CLEAN from this line
+  "$SBT" ++$TRAVIS_SCALA_VERSION 'web/assembly'
 
   # Running `doc` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
-  if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  else
-    "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  fi
+  #if [[ ${TRAVIS:-} ]]; then
+  #  travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  #else
+  #  "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  #fi
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -65,6 +67,25 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   echo "Result of Quasar JAR test: $TEST_STATUS"
 
   exit $TEST_STATUS
+elif [[ "${JOB_NUM##*.}" == "2" ]]; then
+  echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
+  fi
+
+  # Require that all header comments are present before proceeding, then
+  # build and run all tests everywhere (including integration)
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
+elif [[ "${JOB_NUM##*.}" == "3" ]]; then
+  # Running `doc` can take awhile, so allow it some extra time when
+  # running on travis to avoid having the build killed due to lack of output.
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  fi
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
