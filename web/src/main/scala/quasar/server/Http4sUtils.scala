@@ -20,9 +20,6 @@ import slamdata.Predef._
 import quasar.console._
 import quasar.fp._
 
-import java.net.ServerSocket
-
-import eu.timepit.refined._
 import org.http4s.HttpService
 import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.{Server => Http4sServer}
@@ -38,7 +35,7 @@ import shapeless.nat._
 
 object Http4sUtils {
 
-  final case class ServerBlueprint(port: Port, idleTimeout: Duration, svc: HttpService)
+  final case class ServerBlueprint(port: Int, idleTimeout: Duration, svc: HttpService)
 
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
@@ -55,33 +52,32 @@ object Http4sUtils {
     Process.eval(inputPresent.after(250.milliseconds)).repeat.takeWhile(!_).run
   }
 
-  def openBrowser(port: Port): Task[Unit] = {
-    val url = s"http://localhost:${port.value}/"
+  def openBrowser(port: Int): Task[Unit] = {
+    val url = s"http://localhost:$port/"
     Task.delay(java.awt.Desktop.getDesktop().browse(java.net.URI.create(url)))
       .or(stderr(s"Failed to open browser, please navigate to $url"))
   }
 
   /** Returns why the given port is unavailable or None if it is available. */
-  def unavailableReason(port: Port): OptionT[Task, String] =
-    OptionT(Task.delay(new ServerSocket(port.value)).attempt.flatMap {
+  def unavailableReason(port: Int): OptionT[Task, String] =
+    OptionT(Task.delay(new java.net.ServerSocket(port)).attempt.flatMap {
       case -\/(err: java.net.BindException) => Task.now(Some(err.getMessage))
       case -\/(err)                         => Task.fail(err)
       case \/-(s)                           => Task.delay(s.close()).as(None)
     })
 
   /** An available port number. */
-  def anyAvailablePort: Task[Port] = anyAvailablePorts[_1].map(_(0))
+  def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_(0))
 
   /** Available port numbers. */
-  def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Port], N]] =
-    Process.repeatEval(Task.delay(new ServerSocket(0))).take(toInt[N]).runLog
-      .flatMap(_.traverse(s => refineV[PortRange](s.getLocalPort).fold(
-        e => Task.fail(new RuntimeException(e)),
-        p => Task.delay { s.close; p })))
-      .map(v => Sized.wrap(v.toList))
+  def anyAvailablePorts[N <: Nat: ToInt]: Task[Sized[Seq[Int], N]] = Task.delay {
+    Sized.wrap(
+      List.tabulate(toInt[N]){_ => val s = new java.net.ServerSocket(0); (s, s.getLocalPort)}
+          .map { case (s, p) => s.close; p})
+  }
 
   /** Returns the requested port if available, or the next available port. */
-  def choosePort(requested: Port): Task[Port] =
+  def choosePort(requested: Int): Task[Int] =
     unavailableReason(requested)
       .flatMapF(rsn => stderr(s"Requested port not available: $requested; $rsn") *>
         anyAvailablePort)
@@ -91,10 +87,10 @@ object Http4sUtils {
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Port)] = {
+  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort.value, "0.0.0.0").mountService(blueprint.svc).start
+      server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0").mountService(blueprint.svc).start
     } yield (server, actualPort)
   }
 
@@ -108,7 +104,7 @@ object Http4sUtils {
     * process of servers will terminate.
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     */
-  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer, Port)] = {
+  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
       startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
@@ -136,11 +132,11 @@ object Http4sUtils {
     */
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def startServers(
-    initialPort: Port,
-    produceService: (Port => Task[Unit]) => HttpService
-  ): Task[(Process[Task, (Http4sServer, Port)], Task[Unit])] = {
+    initialPort: Int,
+    produceService: (Int => Task[Unit]) => HttpService
+  ): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
-    def startNew(port: Port): Task[Unit] = {
+    def startNew(port: Int): Task[Unit] = {
       val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)
     }
@@ -150,7 +146,7 @@ object Http4sUtils {
     })
   }
 
-  def startAndWait(port: Port, service: (Port => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] =
+  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] =
     startServers(port, service) >>= {
       case (servers, shutdown) =>
         (openBrowser(port).whenM(openClient) *>

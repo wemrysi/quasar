@@ -37,13 +37,13 @@ import Scalaz._
 import scalaz.concurrent.Task
 
 object Server {
-  type ServiceStarter = (Port => Task[Unit]) => HttpService
+  type ServiceStarter = (Int => Task[Unit]) => HttpService
 
   final case class QuasarConfig(
     cmd: Cmd,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    port: Option[Port],
+    port: Option[Int],
     configPath: Option[FsFile],
     openClient: Boolean)
 
@@ -86,8 +86,8 @@ object Server {
   }
 
   def nonApiService(
-    initialPort: Port,
-    reload: Port => Task[Unit],
+    initialPort: Int,
+    reload: Int => Task[Unit],
     staticContent: List[StaticContent],
     redirect: Option[String]
   ): HttpService = {
@@ -104,14 +104,14 @@ object Server {
   }
 
   def service(
-    initialPort: Port,
+    initialPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
     eval: CoreEff ~> ResponseOr
   ): ServiceStarter = {
     import RestApi._
 
-    (reload: Port => Task[Unit]) =>
+    (reload: Int => Task[Unit]) =>
       finalizeServices(
         toHttpServices(liftMT[Task, ResponseT] :+: eval, coreServices[CoreEffIO]) ++
         additionalServices
@@ -120,7 +120,7 @@ object Server {
 
   def durableService(
     qConfig: QuasarConfig,
-    port: Port,
+    port: Int,
     metastoreCtx: MetaStoreCtx
   ): (ServiceStarter, Task[Unit]) = {
     val f: QErrsTCnxIO ~> ResponseOr =
@@ -139,11 +139,11 @@ object Server {
 
   def launchServer(
     args: Array[String],
-    builder: (QuasarConfig, Port, MetaStoreCtx) => (ServiceStarter, Task[Unit])
+    builder: (QuasarConfig, Int, MetaStoreCtx) => (ServiceStarter, Task[Unit])
   )(implicit
     configOps: ConfigOps[WebConfig]
   ): Task[Unit] = {
-    def start(tx: StatefulTransactor, port: Port, qCfg: QuasarConfig) =
+    def start(tx: StatefulTransactor, port: Int, qCfg: QuasarConfig) =
       for {
         _         <- verifySchema(Schema.schema, tx.transactor)
         msCtx     <- metastoreCtx(tx)

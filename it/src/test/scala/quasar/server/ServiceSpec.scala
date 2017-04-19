@@ -35,7 +35,6 @@ import scala.util.Random.nextInt
 
 import argonaut._, Argonaut._
 import doobie.imports._
-import eu.timepit.refined._
 import org.http4s.{Query => _, _}, Status._, Uri.Authority
 import org.http4s.argonaut._
 import org.specs2.execute.{AsResult, Result}
@@ -54,10 +53,10 @@ class ServiceSpec extends quasar.Qspec {
   sequential
 
   def withServer[A]
-    (port: Port = refineMV(8888), metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])
+    (port: Int = 8888, metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])
     (f: Uri => Task[A])
     : String \/ A = {
-    val uri = Uri(authority = Some(Authority(port = Some(port.value))))
+    val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
       cfgPath       <- FsPath.parseSystemFile(
