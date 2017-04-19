@@ -278,6 +278,33 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     case _                                 => None
   }
 
+  def compactLeftShift[F[_]: Functor, G[_]: Functor]
+    (FToG: PrismNT[G, F])
+    (implicit QC: QScriptCore :<: F)
+      : QScriptCore[T[G]] => Option[F[T[G]]] = {
+    case qs @ LeftShift(Embed(src), struct, ExcludeId, joinFunc) =>
+      (FToG.get(src) >>= QC.prj, struct.resume) match {
+        // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
+        case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
+          fm.resume match {
+            case -\/(MakeArray(value)) =>
+              QC.inj(Map(innerSrc, joinFunc >>= {
+                case LeftSide => fm
+                case RightSide => value
+              })).some
+            case _ => None
+          }
+        // LeftShift(_, MakeArray(_), ExcludeId, _)
+        case (_, -\/(MakeArray(value))) =>
+          QC.inj(Map(src.embed, joinFunc >>= {
+            case LeftSide => HoleF
+            case RightSide => value
+          })).some
+        case (_, _) => None
+      }
+    case qs => None
+  }
+
   def compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
     case LeftShift(src, struct, id, repair) =>
       rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, xy._2))
@@ -333,6 +360,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     (repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) _) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
+      liftFG(injectRepeatedly(compactLeftShift[F, G](prism).apply(_: QScriptCore[T[G]]))) ⋙
       liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
       repeatedly(C.coalesceQCNormalize[G](prism)) ⋙
       liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙

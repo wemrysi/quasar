@@ -46,10 +46,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
+  def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
+    expr.transCata[Fix[QS]](
+      liftFG(injectRepeatedly(rewrite.compactLeftShift[QS, QS](idPrism).apply(_: QScriptCore[Fix[QS]]))))
+
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
-      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))) >>>
-      liftFG(repeatedly(quasar.qscript.Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))))
+      liftFG(repeatedly(Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))) >>>
+      liftFG(repeatedly(Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))))
 
   type QSI[A] =
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
@@ -329,6 +333,52 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           AddR(HoleF, HoleF))).embed
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
+    }
+
+    "transform a left shift with a static array as the source" in {
+      val original: Fix[QS] =
+        QC.inj(LeftShift(
+          QC.inj(Map(
+            RootR.embed,
+            MakeArrayR(AddR(HoleF, IntLit(3))))).embed,
+          HoleF,
+          ExcludeId,
+          ConcatMapsR(
+            MakeMapR(StrLit("right"), RightSideF),
+            MakeMapR(StrLit("left"), LeftSideF)))).embed
+
+      val expected: Fix[QS] =
+        QC.inj(Map(
+          RootR.embed,
+          ConcatMapsR(
+            MakeMapR(StrLit("right"), AddR(HoleF, IntLit(3))),
+            MakeMapR(StrLit("left"), MakeArrayR(AddR(HoleF, IntLit(3))))))).embed
+
+      compactLeftShiftExpr(original) must equal(expected)
+    }
+
+    "transform a left shift with a static array as the struct" in {
+      val original: Fix[QS] =
+        QC.inj(LeftShift(
+          QC.inj(Map(
+            RootR.embed,
+            AddR(HoleF, IntLit(3)))).embed,
+          MakeArrayR(SubtractR(HoleF, IntLit(5))),
+          ExcludeId,
+          ConcatMapsR(
+            MakeMapR(StrLit("right"), RightSideF),
+            MakeMapR(StrLit("left"), LeftSideF)))).embed
+
+      val expected: Fix[QS] =
+        QC.inj(Map(
+          QC.inj(Map(
+            RootR.embed,
+            AddR(HoleF, IntLit(3)))).embed,
+          ConcatMapsR(
+            MakeMapR(StrLit("right"), SubtractR(HoleF, IntLit(5))),
+            MakeMapR(StrLit("left"), HoleF)))).embed
+
+      compactLeftShiftExpr(original) must equal(expected)
     }
   }
 }
