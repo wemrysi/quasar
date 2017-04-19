@@ -93,10 +93,7 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
                   "status" := "Unbound variable.",
                   "detail" -> Json(
                     "message" := "There is no binding for the variable :foo",
-                    "varName" := "foo"
-                  )
-                )
-              )
+                    "varName" := "foo")))
             )
           }
           "multiple variables" >> prop { filesystem: SingleFileMemState =>
@@ -114,20 +111,12 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
                         "status" := "Unbound variable.",
                         "detail" -> Json(
                           "message" := "There is no binding for the variable :foo",
-                          "varName" := "foo"
-                        )
-                      ),
+                          "varName" := "foo")),
                       Json(
                         "status" := "Unbound variable.",
                         "detail" -> Json(
                           "message" := "There is no binding for the variable :baz",
-                          "varName" := "baz"
-                        )
-                      )
-                    )
-                  )
-                )
-              )
+                          "varName" := "baz"))))))
             )
           }
         }

@@ -68,22 +68,22 @@ object Variables {
     case x => x.embed.right
   }
 
-  def allVariablesƒ: Algebra[Sql, List[VarName]] = {
-    case Vari(name)                             => List(VarName(name))
+  def allVariables: Algebra[Sql, List[VarName]] = {
+    case Vari(name)                                      => List(VarName(name))
     case sel @ Select(_, _, rel, _, _, _) =>
-      rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol)} ++
-      (sel: Sql[List[VarName]]).toList.join
-    case other                                  => other.toList.join
+      rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol) } ++
+      (sel: Sql[List[VarName]]).fold
+    case other                                           => other.fold
   }
 
   // FIXME: Get rid of this
   def substVars(expr: Fix[Sql], variables: Variables)
       : SemanticErrors \/ Fix[Sql] = {
-    val allVars = expr.cata(allVariablesƒ)
+    val allVars = expr.cata(allVariables)
     val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
-    errors.cata(
-      errors => errors.left,
-      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))
+    errors.fold(
+      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
+      errors => errors.left)
   }
 
   implicit val equal: Equal[Variables] = Equal.equalA
