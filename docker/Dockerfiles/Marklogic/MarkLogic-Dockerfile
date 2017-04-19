@@ -22,7 +22,7 @@ ADD MarkLogic.rpm.sha1 $ML_RPM_SHA1
 RUN curl -X POST --data "email=${ML_DOWNLOAD_EMAIL}&password=${ML_DOWNLOAD_PASSWORD}" -c $ML_DEV_COOKIES $ML_DEV_LOGIN
 RUN curl -X POST --data "download=$ML_ASSET_PATH" -b $ML_DEV_COOKIES $ML_DEV_GET_TOKEN > /tmp/json
 RUN cat /tmp/json | cut -f 3 -d: | cut -c2- | rev | cut -c3- | rev > /tmp/url
-RUN curl -o $ML_RPM_PATH -m 400 "${ML_DEV_URL}$(cat /tmp/url)"
+RUN curl -o $ML_RPM_PATH -m 4000 "${ML_DEV_URL}$(cat /tmp/url)"
 RUN cd /tmp && sha1sum --status -c $ML_RPM_SHA1
 RUN yum -y localinstall $ML_RPM_PATH
 RUN rm -rf /tmp/url /tmp/json /tmp/MarkLogic*
