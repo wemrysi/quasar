@@ -16,9 +16,9 @@
 
 package quasar.config
 
+import slamdata.Predef._
 import quasar.db.DbConnectionConfig
 import quasar.db.DbConnectionConfigArbitrary._
-import quasar.server.Port
 
 import eu.timepit.refined.scalacheck.numeric._
 import org.scalacheck.Arbitrary
@@ -28,7 +28,7 @@ import scalaz._, Scalaz._
 trait WebConfigArbitrary {
   implicit val webConfigArbitrary: Arbitrary[WebConfig] =
     Arbitrary(
-      (Arbitrary.arbitrary[Port] ⊛ Arbitrary.arbitrary[DbConnectionConfig])((p, c) =>
+      (Arbitrary.arbitrary[Int] ⊛ Arbitrary.arbitrary[DbConnectionConfig])((p, c) =>
         WebConfig(ServerConfig(p), MetaStoreConfig(c).some)))
 }
 

@@ -19,14 +19,10 @@ package quasar.server
 import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
-import quasar.fp.ski.ι
-
-import java.lang.IllegalArgumentException
 
 import monocle.Lens
 import monocle.macros.Lenses
-import eu.timepit.refined._, numeric._
-import scopt.{OptionParser, Read}
+import scopt.OptionParser
 
 /** Command-line options supported by Quasar. */
 @Lenses
@@ -37,7 +33,7 @@ final case class CliOptions(
   contentPath: Option[String],
   contentPathRelative: Boolean,
   openClient: Boolean,
-  port: Option[Port])
+  port: Option[Int])
 
 object CliOptions {
   val default: CliOptions =
@@ -59,11 +55,6 @@ object CliOptions {
   class CliOptionsParser[C](l: Lens[C, CliOptions], cmdName: String)
     extends OptionParser[C](cmdName) {
 
-    // In the style of scopt
-    @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-    implicit val portRead: Read[Port] = Read.intRead.map(i =>
-      refineV[PortRange](i).fold(s => throw new IllegalArgumentException(s), ι))
-
     opt[String]('c', "config") action { (x, c) =>
       (l composeLens config).set(Some(x))(c)
     } text("path to the config file to use")
@@ -84,7 +75,7 @@ object CliOptions {
       (l composeLens openClient).set(true)(c)
     } text("opens a browser window to the client on startup")
 
-    opt[Port]('p', "port") action { (x, c) =>
+    opt[Int]('p', "port") action { (x, c) =>
       (l composeLens port).set(Some(x))(c)
     } text("the port to run Quasar on")
   }
