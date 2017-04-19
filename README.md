@@ -58,7 +58,7 @@ Of particular interest are the following two scripts:
   2. `docker/scripts/assembleTestingConf`
 
 
-Quasar supports the following backends datastores:
+Quasar supports the following datastores:
 
 ```
 quasar_mongodb_2_6
