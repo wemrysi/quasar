@@ -58,7 +58,7 @@ Of particular interest are the following two scripts:
   2. `docker/scripts/assembleTestingConf`
 
 
-Qusar supports the following backends datastores:
+Quasar supports the following backends datastores:
 
 ```
 quasar_mongodb_2_6
@@ -77,8 +77,10 @@ Knowing which backend datastores are supported you can create and configure dock
 if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbsase you would use:
 
 ```
-./setupContainers -u quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
+./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
 ```
+
+Note: `quasar_metastore` is always needed to run integration tests.
 
 This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
 
@@ -94,6 +96,7 @@ After running this command your `testing.conf` file should look similar to this:
 
 ```
 > cat it/testing.conf
+postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
 couchbase="couchbase://192.168.99.101?username=Administrator&password=password&socketConnectTimeoutSeconds=15"
 marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
 postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
