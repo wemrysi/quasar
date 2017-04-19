@@ -390,7 +390,10 @@ sealed abstract class ToApiErrorInstances0 {
   implicit def nonEmptyListToApiError[A: ToApiError]: ToApiError[NonEmptyList[A]] =
     error { nel =>
       val herr = nel.head.toApiError
-      val stat = Status.fromInt(herr.status.code) getOrElse herr.status
-      apiError(stat, "errors" := nel.map(_.toApiError))
+      if (nel.size ≟ 1) herr
+      else {
+        val stat = (Status.fromInt(herr.status.code) getOrElse herr.status) withReason "Multiple errors"
+        apiError(stat, "errors" := nel.map(_.toApiError))
+      }
     }
 }
