@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.ejson._
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.std.StdLib._
@@ -53,8 +54,8 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 object MapFunc {
   import MapFuncs._
 
-  val EC = Inject[ejson.Common,    ejson.EJson]
-  val EX = Inject[ejson.Extension, ejson.EJson]
+  val EC = Inject[Common,    EJson]
+  val EX = Inject[Extension, EJson]
 
   type CoMapFuncR[T[_[_]], A] = CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]
 
@@ -220,7 +221,7 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]
+  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
       : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] => CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] =
     (repeatedly(rewrite[T, A]) _) ⋘
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
@@ -228,7 +229,7 @@ object MapFunc {
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def rewrite[T[_[_]]: BirecursiveT: OrderT: ShowT, A: Show]:
+  private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
     _.run.fold(
       κ(None),
@@ -372,7 +373,7 @@ object MapFunc {
       }
   }
 
-  implicit def equal[T[_[_]]: OrderT, A]: Delay[Equal, MapFunc[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFunc[T, ?]] =
     new Delay[Equal, MapFunc[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
         // nullary

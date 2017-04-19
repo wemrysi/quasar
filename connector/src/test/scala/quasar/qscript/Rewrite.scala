@@ -21,6 +21,7 @@ import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.sql.CompilerHelpers

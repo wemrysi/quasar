@@ -34,9 +34,6 @@ package object matryoshka {
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
     F(A)
 
-  implicit def orderTOrder[T[_[_]], F[_]: Functor](implicit T: OrderT[T], F: Delay[Order, F]): Order[T[F]] =
-    T.orderT[F](F)
-
   implicit def coproductOrder[F[_], G[_]](implicit F: Delay[Order, F], G: Delay[Order, G]): Delay[Order, Coproduct[F, G, ?]] =
     new Delay[Order, Coproduct[F, G, ?]] {
       def apply[A](ord: Order[A]): Order[Coproduct[F, G, A]] = {

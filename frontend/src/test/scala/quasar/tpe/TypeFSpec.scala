@@ -21,6 +21,7 @@ import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson, ejson.{CommonEJson, EJson, EJsonArbitrary}
+import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
 
 import scala.Predef.$conforms
@@ -95,7 +96,11 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "{m} ∪ {k:v} <: {m}" >> prop { kn: IMap[J, T] =>
-      kn.maxViewWithKey forall { case ((k, v), m) =>
+      val normM = kn.mapKeys(_.transCata[J](
+        EJson.replaceString[J] <<< EJson.elideMetadata[J]
+      ))
+
+      normM.maxViewWithKey forall { case ((k, v), m) =>
         isSubtypeOf[J](
           tmap[J, T](m + (k -> v), None).embed,
           tmap[J, T](m,            None).embed)
