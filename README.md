@@ -123,13 +123,13 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-As a command-line REPL user, to have a fully functioning REPL you will also need the metadata store and a mount point. See [here](#Testing) for instructions creating metadata store backend using docker and see [here](#Web) for how to configure the metadata store. To add a mount you can start the web server mentioned [below](#Web) and issue a `curl` command like:
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
 
 ```bash
 curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }' 
 ```
 
-You can find examples of `connectionUri`s [here](#Database) and [here](#Testing).
+You can find examples of `connectionUri` values [here](#database-mounts).
 
 #### Web JAR
 
@@ -147,7 +147,7 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-For web jar users, you also need the metadata store. See [here](#Testing) for getting up and running with one.
+Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
 
 
 ### Configure
