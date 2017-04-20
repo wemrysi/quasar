@@ -19,13 +19,12 @@ package quasar.physical.sparkcore.fs
 import slamdata.Predef._
 import quasar.Data
 import quasar.Planner._
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
+import quasar.common.{PhaseResult, PhaseResults}
 import quasar.connector.PlannerErrT
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
-import quasar.fp._
 import quasar.fp.free._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._, FileSystemError._, QueryFile._
@@ -40,14 +39,6 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object queryfile {
-
-  type SparkQScriptCP = QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?]
-  type SparkQScript[A] = SparkQScriptCP#M[A]
-
-  implicit val sparkQScriptToQSTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
-    ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
-
-  type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
@@ -74,29 +65,11 @@ object queryfile {
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] = {
 
-    def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
-      type F[A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
-
-      val lc: DiscoverPath.ListContents[F] =
-        (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-      val rewrite = new Rewrite[Fix]
-      for {
-        qs <- QueryFile.convertToQScriptRead[Fix, F, QScriptRead[Fix, ?]](lc)(lp)
-        shifted <- Unirewrite[Fix, SparkQScriptCP, F](rewrite, lc).apply(qs)
-
-        optQS = shifted.transHylo(
-                  rewrite.optimize(reflNT[SparkQScript]),
-                  Unicoalesce[Fix, SparkQScriptCP])
-
-        _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
-      } yield optQS
-    }
-
     def qsToProgram[T](
       exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
       lp: Fix[LogicalPlan]
     ): Free[S, (PhaseResults, FileSystemError \/ T)] = {
-          val qs = toQScript(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
+          val qs = toQScript[Free[S, ?]](listContents(input, _))(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
           qs.run.run
         }
 
