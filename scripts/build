@@ -48,17 +48,15 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation.
-
-  # eliminated $CLEAN from this line
   "$SBT" ++$TRAVIS_SCALA_VERSION 'web/assembly'
 
   # Running `doc` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
-  #if [[ ${TRAVIS:-} ]]; then
-  #  travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  #else
-  #  "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  #fi
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION doc
+  fi
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -78,14 +76,6 @@ elif [[ "${JOB_NUM##*.}" == "5" ]]; then
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
-elif [[ "${JOB_NUM##*.}" == "6" ]]; then
-  # Running `doc` can take awhile, so allow it some extra time when
-  # running on travis to avoid having the build killed due to lack of output.
-  if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_DOC_MINS "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  else
-    "$SBT" ++$TRAVIS_SCALA_VERSION doc
-  fi
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
