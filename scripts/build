@@ -67,7 +67,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   echo "Result of Quasar JAR test: $TEST_STATUS"
 
   exit $TEST_STATUS
-elif [[ "${JOB_NUM##*.}" == "2" ]]; then
+elif [[ "${JOB_NUM##*.}" == "5" ]]; then
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
@@ -78,7 +78,7 @@ elif [[ "${JOB_NUM##*.}" == "2" ]]; then
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
-elif [[ "${JOB_NUM##*.}" == "3" ]]; then
+elif [[ "${JOB_NUM##*.}" == "6" ]]; then
   # Running `doc` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   if [[ ${TRAVIS:-} ]]; then
