@@ -609,6 +609,10 @@ Takes a port number in the body, and attempts to restart the server on that port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
 
+### GET /invoke/fs/[path]
+
+Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
+
 
 ## Error Responses
 

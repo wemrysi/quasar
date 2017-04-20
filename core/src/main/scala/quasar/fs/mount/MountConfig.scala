@@ -19,7 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fs.FileSystemType
-import quasar.sql, sql.Sql, sql.Statement
+import quasar.sql, sql.Sql, sql.Statement, sql.FunctionDecl
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -32,6 +32,10 @@ sealed abstract class MountConfig
 object MountConfig {
   final case class ModuleConfig private[mount] (statements: List[Statement[Fix[Sql]]])
     extends MountConfig
+  {
+    def declarations: List[FunctionDecl[Fix[Sql]]] =
+      statements.collect { case funcDec: FunctionDecl[_] => funcDec }
+  }
 
   final case class ViewConfig private[mount] (query: Fix[Sql], vars: Variables)
     extends MountConfig

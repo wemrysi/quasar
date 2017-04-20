@@ -20,13 +20,12 @@ import slamdata.Predef._
 import quasar.config.WebConfigArbitrary._
 import quasar.db.DbConnectionConfig
 
-import eu.timepit.refined._
 import scalaz._, Scalaz._
 
 class WebConfigSpec extends ConfigSpec[WebConfig] {
 
   val TestConfig: WebConfig = WebConfig(
-    server = ServerConfig(refineMV(92)),
+    server = ServerConfig(92),
     metastore = MetaStoreConfig(DbConnectionConfig.H2("/h2")).some)
 
   val TestConfigStr =

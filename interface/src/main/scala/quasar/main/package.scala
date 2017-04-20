@@ -26,6 +26,7 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
+import quasar.fs.mount.module.Module
 import quasar.physical._
 
 import scala.util.control.NonFatal
@@ -75,6 +76,7 @@ package object main {
   object QErrs {
     def toCatchable[F[_]: Catchable]: QErrs ~> F =
       Failure.toRuntimeError[F, PhysicalError]             :+:
+      Failure.toRuntimeError[F, Module.Error]              :+:
       Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
       Failure.toRuntimeError[F, MountingError]             :+:
       Failure.toRuntimeError[F, FileSystemError]
@@ -82,7 +84,7 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (Module :\: Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -94,23 +96,32 @@ package object main {
       S2: PhysErr :<: S,
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S,
-      S5: FileSystemFailure :<: S
-    ): Task[CoreEff ~> Free[S, ?]] =
+      S5: FileSystemFailure :<: S,
+      S6: Module.Failure    :<: S
+    ): Task[CoreEff ~> Free[S, ?]] = {
+      def moduleInter(fs: FileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
+        val wtv: Coproduct[Mounting, FileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
+        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+      }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
+        moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
         (compFs compose Inject[QueryFile, FileSystem])  :+:
         (compFs compose Inject[ReadFile, FileSystem])   :+:
         (compFs compose Inject[WriteFile, FileSystem])  :+:
         (compFs compose Inject[ManageFile, FileSystem]) :+:
+        injectFT[Module.Failure, S]                     :+:
         injectFT[PathMismatchFailure, S]                :+:
         injectFT[MountingFailure, S]                    :+:
         injectFT[FileSystemFailure, S]
       }
+    }
   }
 
   /** The types of failure from core apis. */
-  type CoreErrs[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
-  type CoreErrs0[A] = Coproduct[MountingFailure, FileSystemFailure, A]
+  type CoreErrs[A]   = Coproduct[Module.Failure, CoreErrs1, A]
+  type CoreErrs1[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
+  type CoreErrs0[A]  = Coproduct[MountingFailure, FileSystemFailure, A]
 
 
   //---- FileSystems ----
