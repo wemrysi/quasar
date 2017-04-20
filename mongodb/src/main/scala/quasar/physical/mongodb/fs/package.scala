@@ -24,9 +24,12 @@ import quasar.effect.Failure
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
+import MongoDbQScriptPlanner.MongoQScript
 
+import matryoshka.data.Fix
 import com.mongodb.async.client.MongoClient
 import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
@@ -47,13 +50,15 @@ package object fs {
 
   final case class TmpPrefix(run: String) extends scala.AnyVal
 
+
+
   def fileSystem[S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -63,12 +68,14 @@ package object fs {
       readfile.run[S](client).liftM[EnvErrT]        |@|
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) =>
-      interpretFileSystem[Free[S, ?]](
+    )((execMongo, qfile, rfile, wfile, mfile) => {
+      interpretAnalyticalFileSystem[Free[S, ?]](
+        Empty.analyze[Free[S, ?]], // old mongo, will be removed
         qfile compose queryfile.interpret(execMongo),
         rfile compose readfile.interpret,
         wfile compose writefile.interpret,
-        mfile compose managefile.interpret))
+        mfile compose managefile.interpret)
+    })
   }
 
   def definition[S[_]](implicit
@@ -80,7 +87,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, FileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
                     fileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run
@@ -91,13 +98,17 @@ package object fs {
 
   val QScriptFsType = FileSystemType("mongodbq")
 
+  val toQS: Fix[LogicalPlan] => FileSystemErrT[Free[QueryFile, ?], Fix[MongoQScript[Fix, ?]]] =
+    (lp: Fix[LogicalPlan]) => ???//toMongoQScript(lp, ???).mapT(_.value)
+    // (lp: Fix[LogicalPlan]) => (QueryContext.queryContext(lp) flatMap (qc => toMongoQScript(lp, qc.listContents))).mapT(_.value)
+
   def qscriptFileSystem[S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, FileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -107,12 +118,20 @@ package object fs {
       readfile.run[S](client).liftM[EnvErrT]        |@|
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) =>
-      interpretFileSystem[Free[S, ?]](
+    )((execMongo, qfile, rfile, wfile, mfile) => {
+      val fileSystemInterpreter = interpretFileSystem[Free[S, ?]](
         qfile compose queryfile.interpretQ(execMongo),
         rfile compose readfile.interpret,
         wfile compose writefile.interpret,
-        mfile compose managefile.interpret))
+        mfile compose managefile.interpret)
+
+      val querFileInterpter = fileSystemInterpreter compose Inject[QueryFile, FileSystem]
+      val analyze0: Analyze ~> Free[QueryFile, ?] =
+        Analyze.defaultInterpreter[QueryFile, MongoQScript[Fix, ?], Fix[MongoQScript[Fix, ?]]](toQS)
+      val analyzeInterpreter: Analyze ~> Free[S, ?] = analyze0 andThen flatMapSNT(querFileInterpter)
+
+      analyzeInterpreter :+: fileSystemInterpreter
+    })
   }
 
   def qscriptDefinition[S[_]](implicit
@@ -124,7 +143,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, FileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
                     qscriptFileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run
