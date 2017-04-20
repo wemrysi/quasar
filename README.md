@@ -123,6 +123,14 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+As a command-line REPL user, to have a fully functioning REPL you will also need the metadata store and a mount point. See [here](#Testing) for instructions creating metadata store backend using docker and see [here](#Web) for how to configure the metadata store. To add a mount you can start the web server mentioned [below](#Web) and issue a `curl` command like:
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }' 
+```
+
+You can find examples of `connectionUri`s [here](#Database) and [here](#Testing).
+
 #### Web JAR
 
 To build a JAR containing a lightweight HTTP server that allows you to programmatically interact with Quasar, execute the following command:
@@ -139,9 +147,12 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+For web jar users, you also need the metadata store. See [here](#Testing) for getting up and running with one.
+
+
 ### Configure
 
-The various JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
+The various REPL JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
 
 The JSON configuration file must have the following format:
 
@@ -150,14 +161,19 @@ The JSON configuration file must have the following format:
   "server": {
     "port": 8080
   },
-
-  "metastore": <metastore_config>
+  "metastore": {
+    "database": {
+      <metastore_config>
+    }
+  }
 }
 ```
 
 #### Metadata Store
 
 Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) databases are supported.
+
+To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
 
 If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
 
@@ -179,7 +195,14 @@ A PostgreSQL configuration looks something like
   "parameters": <an optional JSON object of parameter key:value pairs>
 }
 ```
-The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL.
+
+The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL. One example for a value of the `parameters` object may be a `loglevel`:
+
+```json
+"parameters": {
+  "loglevel": 1
+}
+```
 
 #### Initializing and updating Schema
 
