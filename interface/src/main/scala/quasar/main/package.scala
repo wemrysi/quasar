@@ -92,11 +92,11 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
-      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
     )(
       implicit
       S0: Task :<: S,
@@ -108,10 +108,11 @@ package object main {
     ): Task[CoreEff ~> Free[S, ?]] =
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
         injectFT[Mounting, S]                           :+:
-        (compFs compose Inject[QueryFile, FileSystem])  :+:
-        (compFs compose Inject[ReadFile, FileSystem])   :+:
-        (compFs compose Inject[WriteFile, FileSystem])  :+:
-        (compFs compose Inject[ManageFile, FileSystem]) :+:
+        (compFs compose Inject[Analyze, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[QueryFile, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[ReadFile, AnalyticalFileSystem])   :+:
+        (compFs compose Inject[WriteFile, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[ManageFile, AnalyticalFileSystem]) :+:
         injectFT[PathMismatchFailure, S]                :+:
         injectFT[MountingFailure, S]                    :+:
         injectFT[FileSystemFailure, S]
@@ -142,21 +143,21 @@ package object main {
       *       for more flexible production of interpreters.
       */
     def interpreter[S[_]](
-      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
     )(implicit
       S0: Task :<: S,
       S1: PhysErr :<: S,
       S2: Mounting :<: S,
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S
-    ): Task[FileSystem ~> Free[S, ?]] =
+    ): Task[AnalyticalFileSystem ~> Free[S, ?]] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
         seqRef     <- TaskRef(startSeq)
         viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
         mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
       } yield {
-        val hierarchicalFs: FileSystem ~> Free[S, ?] =
+        val hierarchicalFs: AnalyticalFileSystem ~> Free[S, ?] =
           HierarchicalFsEff.dynamicFileSystem(
             hfsRef,
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
@@ -167,7 +168,7 @@ package object main {
           :\: Mounting
           :\: MountingFailure
           :\: PathMismatchFailure
-          :/: FileSystem
+          :/: AnalyticalFileSystem
         )#M[A]
 
         val compFs: V ~> Free[S, ?] =
@@ -178,7 +179,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose flatMapSNT(transformIn[FileSystem, V, Free[V, ?]](module.fileSystem[V], liftFT)) compose view.fileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[AnalyticalFileSystem, V, Free[V, ?]](module.analyticalFileSystem[V], liftFT)) compose view.analyticalFileSystem[V]
       }
   }
 
@@ -207,13 +208,13 @@ package object main {
       * time as the ref is updated.
       */
     def dynamicFileSystem[S[_]](
-      ref: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      ref: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       hfs: HierarchicalFsEff ~> Free[S, ?]
     )(implicit
       S: Task :<: S
-    ): FileSystem ~> Free[S, ?] =
-      new (FileSystem ~> Free[S, ?]) {
-        def apply[A](fs: FileSystem[A]) =
+    ): AnalyticalFileSystem ~> Free[S, ?] =
+      new (AnalyticalFileSystem ~> Free[S, ?]) {
+        def apply[A](fs: AnalyticalFileSystem[A]) =
           lift(ref.read.map(free.foldMapNT(hfs) compose _))
             .into[S]
             .flatMap(_ apply fs)
@@ -257,7 +258,7 @@ package object main {
 
   object MountEff {
     def interpreter[S[_]](
-      hrchRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      hrchRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: Task :<: S,
@@ -291,7 +292,7 @@ package object main {
       */
     def interpreter[F[_], S[_]](
       cfgsImpl: MountConfigs ~> F,
-      hrchFsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      hrchFsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       mntdFsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: F :<: S,

@@ -259,6 +259,30 @@ object hierarchical {
     }
   }
 
+  def analyze[F[_], S[_]](
+    afs: Mounts[Analyze ~> F]
+  )(
+    implicit
+    S1: F :<: S,
+    S2: MonotonicSeq :<: S,
+    S3: MountedResultH :<: S
+  ): Analyze ~> Free[S, ?] = {
+    import Analyze._
+
+    type M[A] = Free[S, A]
+
+    lazy val mountedAfs = afs mapWithDir { case (d, f) =>
+      flatMapSNT(injectFT[F, S] compose f) compose mounted.analyze[Analyze](d)
+    }
+
+    λ[Analyze ~> M] {
+      case QueryCost(lp) =>
+        // FIX-ME
+        // mountForPlan(mountedAfs, lp, none)
+        ???
+    }
+  }
+
   def fileSystem[F[_], S[_]](
     mounts: Mounts[FileSystem ~> F]
   )(implicit
@@ -277,6 +301,17 @@ object hierarchical {
     val mf: ManageFile ~> M = manageFile[F, S](mounts map (_ compose injFS[ManageFile]))
 
     qf :+: rf :+: wf :+: mf
+  }
+
+  def analyticalFileSystem[F[_], S[_]](
+    mounts: Mounts[AnalyticalFileSystem ~> F]
+  )(implicit
+    S1: F :<: S,
+    S2: MountedResultH :<: S,
+    S3: MonotonicSeq :<: S
+  ): AnalyticalFileSystem ~> Free[S, ?] = {
+    analyze[F, S](mounts map (_ compose Inject[Analyze, AnalyticalFileSystem])) :+:
+    fileSystem[F,S](mounts.map(_  compose Inject[FileSystem, AnalyticalFileSystem]))
   }
 
   ////

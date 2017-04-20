@@ -68,9 +68,9 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
     }
 
 
-  val abortFs: FileSystem ~> AbortM =
-    new (FileSystem ~> AbortM) {
-      def apply[A](fs: FileSystem[A]) =
+  val abortFs: AnalyticFileSystem ~> AbortM =
+    new (AnalyticalFileSystem ~> AbortM) {
+      def apply[A](fs: AnalyticalFileSystem[A]) =
         abort.fail("FileSystem")
     }
 

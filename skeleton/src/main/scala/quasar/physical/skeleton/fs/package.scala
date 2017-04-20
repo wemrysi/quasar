@@ -25,17 +25,19 @@ import scalaz.concurrent.Task
 package object fs {
   val FsType = FileSystemType("skeleton")
 
+  def analyze[S[_]]: Analyze ~> Free[S, ?] = Empty.analyze[Free[S, ?]]
   def query[S[_]]: QueryFile ~> Free[S, ?] = Empty.queryFile[Free[S, ?]]
   def read[S[_]]: ReadFile ~> Free[S, ?] = Empty.readFile[Free[S, ?]]
   def write[S[_]]: WriteFile ~> Free[S, ?] = Empty.writeFile[Free[S, ?]]
   def manage[S[_]]: ManageFile ~> Free[S, ?] = Empty.manageFile[Free[S, ?]]
+
 
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
         FileSystemDef.DefinitionResult[Free[S, ?]](
-          interpretFileSystem(query, read, write, manage),
+          interpretAnalyticalFileSystem(analyze, query, read, write, manage),
           Free.point(())).point[DefErrT[Free[S, ?], ?]]
     }
 }

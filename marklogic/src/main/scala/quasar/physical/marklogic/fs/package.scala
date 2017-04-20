@@ -131,12 +131,13 @@ package object fs {
     val dropWritten = λ[MLFS ~> Free[MarkLogicFs, ?]](_.value)
 
     val xformPaths =
-      if (rootDir === pRootDir) liftFT[FileSystem]
-      else chroot.fileSystem[FileSystem](rootDir)
+      if (rootDir === pRootDir) liftFT[AnalyticalFileSystem]
+      else chroot.analyticalFileSystem[AnalyticalFileSystem](rootDir)
 
     runMarkLogicFs(xccUri) map { case (run, shutdown) =>
       DefinitionResult[Task](
-        run compose dropWritten compose foldMapNT(interpretFileSystem(
+        run compose dropWritten compose foldMapNT(interpretAnalyticalFileSystem(
+          analyze.interpreter[MLFS],
           convertQueryFileErrors(queryfile.interpret[XccEval, MLFSQ, FMT](
             readChunkSize, xccEvalToMLFSQ)),
           convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](

@@ -136,7 +136,7 @@ object Server {
   ): MainTask[(ServiceStarter, Task[Unit])] =
     for {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](

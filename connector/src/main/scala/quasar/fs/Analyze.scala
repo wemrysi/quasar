@@ -19,8 +19,9 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.effect.LiftedOps
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.qscript.analysis._
 
-
+import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import scalaz._
 
@@ -37,6 +38,21 @@ object Analyze {
   object Unsafe {
     implicit def apply[S[_]](implicit S: Analyze :<: S): Unsafe[S] =
       new Unsafe[S]
+  }
+
+  def defaultInterpreter[S[_], F[_] : Traverse, T](toQS: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], T])(implicit
+    R: Recursive.Aux[T, F],
+    CA: Cardinality[F],
+    CO: Cost[F],
+    Q: QueryFile.Ops[S]
+  ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
+
+    def apply[A](from: Analyze[A]) = from match {
+      case Analyze.QueryCost(lp) => (for {
+        qs <- toQS(lp)
+        c  <- R.zygoM(qs)(CA.calculate(pathCard[S]), CO.evaluate(pathCard[S]))
+      } yield c).run
+    }
   }
 
 }

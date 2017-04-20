@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
@@ -189,6 +190,36 @@ object transformPaths {
 
       case FileExists(f) =>
         Q.fileExists(inPath(f))
+    }
+    transformIn(g, liftFT[S])
+  }
+
+  def analyze[S[_]](
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: EndoK[RelPath]
+  )(implicit
+    S: Analyze :<: S
+  ): S ~> Free[S, ?] = {
+    import Analyze._
+
+    val U = Analyze.Unsafe[S]
+
+    val g = λ[Analyze ~> Free[S, ?]] {
+      case QueryCost(lp) => ???
+        // FIX-ME
+      /*
+      case ExecutePlan(lp, out) =>
+        Q.execute(transformFile(inPath)(lp), inPath(out))
+          .bimap(transformErrorPath(outPath), outPath(_))
+          .run.run
+
+      case EvaluatePlan(lp) =>
+        U.eval(transformFile(inPath)(lp))
+          .leftMap(transformErrorPath(outPath))
+          .run.run
+*/
+
     }
     transformIn(g, liftFT[S])
   }
