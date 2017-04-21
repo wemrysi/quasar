@@ -21,9 +21,10 @@ import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
-import quasar.fs._
+import quasar.fp.TaskRef
+import quasar.fs._, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef._
-import quasar.physical.sparkcore.fs.{genSc => coreGenSc}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, genSc => coreGenSc}
 
 import java.net.URLDecoder
 
@@ -37,9 +38,15 @@ import scalaz.concurrent.Task
 
 package object elastic {
 
+  import corequeryfile.RddState
+
   val FsType = FileSystemType("spark-elastic")
 
-  type Eff[A] = Coproduct[Task, PhysErr, A]
+  type Eff0[A] = Coproduct[Task, PhysErr, A]
+  type Eff1[A] = Coproduct[Read[SparkContext, ?], Eff0, A]
+  type Eff2[A] = Coproduct[ElasticCall, Eff1, A]
+  type Eff3[A] = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
 
   final case class SparkFSConf(sparkConf: SparkConf)
 
@@ -52,6 +59,8 @@ package object elastic {
 
     def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
 
+    def indexAuto: State[SparkConf, Unit] = State.modify(_.set("es.index.auto.create", "true"))
+
     val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
     val sparkConfOrErr: DefinitionError \/ SparkConf = for {
@@ -59,7 +68,7 @@ package object elastic {
       host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
       port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
     } yield {
-      (master(host.value, port) *> appName).exec(new SparkConf())
+      (master(host.value, port) *> appName *> indexAuto).exec(new SparkConf())
     }
 
     sparkConfOrErr.map(sparkConf => (sparkConf, SparkFSConf(sparkConf)))
@@ -90,10 +99,20 @@ package object elastic {
       sc
     }).run).into[S]
 
-    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift(Task.delay {
-      val interpreter: Eff ~> S = injectNT[Task, S] :+: injectNT[PhysErr, S]
-      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
-    }).into[S]
+    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
+      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState])) {
+        (genState, rddStates) => {
+          val interpreter: Eff ~> S =
+            (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+          (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+          (ElasticCall.interpreter(sc) andThen injectNT[Task, S]) :+:
+          (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
+          injectNT[Task, S] :+:
+          injectNT[PhysErr, S]
+
+          SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+        }
+      }).into[S]
 
     genScWithJar >>= (_.fold(
       msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
@@ -105,7 +124,7 @@ package object elastic {
 
     type FreeEff[A]  = Free[Eff, A]
     interpretFileSystem(
-      Empty.queryFile[FreeEff],
+      corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
       Empty.readFile[FreeEff],
       Empty.writeFile[FreeEff],
       Empty.manageFile[FreeEff])
