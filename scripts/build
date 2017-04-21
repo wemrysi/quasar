@@ -9,7 +9,7 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 # update CI configuration.
 #
 
-echo "running build2..."
+echo "running build script..."
 
 source "$(dirname $0)/constants"
 
@@ -19,8 +19,6 @@ TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 TRAVIS_MAX_DOC_MINS=20
 
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
-
-
 
 # if we're building a pull request, DON'T clean and use the cache instead
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
@@ -39,18 +37,18 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # running on travis to avoid having the build killed due to lack of output.
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   else
     "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders test exclusive:test
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation.
-  "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly'
+  "$SBT" ++$TRAVIS_SCALA_VERSION 'web/assembly'
 
   # Running `doc` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
@@ -67,6 +65,17 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   echo "Result of Quasar JAR test: $TEST_STATUS"
 
   exit $TEST_STATUS
+elif [[ "${JOB_NUM##*.}" == "5" ]]; then
+  echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
+  fi
+
+  # Require that all header comments are present before proceeding, then
+  # build and run all tests everywhere (including integration)
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.

@@ -202,10 +202,9 @@ object Repl {
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
             lim   =  (state.summaryCount > 0).option(state.summaryCount)
-            query =  fsQ.enumerateQuery(expr, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L))) flatMap (enum =>
-                       Q.transforms.execToCompExec(enum.drainTo[Vector]))
-            _     <- runQuery(state, query)(
-                      ds => summarize[S](lim, state.format)(ds))
+            query =  fsQ.queryResults(expr, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
+                       .map(_.toVector)
+            _     <- runQuery(state, query)(ds => summarize[S](lim, state.format)(ds))
           } yield ())
 
       case Explain(q) =>

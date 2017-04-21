@@ -48,7 +48,7 @@ package object quasar {
     import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
-      substAst <- phase("Variables Substituted", ast.mapExpressionM(Variables.substVars(_, vars) leftMap (_.wrapNel)))
+      substAst <- phase("Variables Substituted", ast.mapExpressionM(Variables.substVars(_, vars)))
       absAst   <- phase("Absolutized", substAst.map(_.mkPathsAbsolute(basePath)).right)
       normed   <- phase("Normalized Projections", absAst.map(normalizeProjections[Fix[Sql]]).right)
       sortProj <- phase("Sort Keys Projected", normed.map(projectSortKeys[Fix[Sql]]).right)
