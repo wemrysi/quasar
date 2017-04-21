@@ -91,7 +91,7 @@ object Dependencies {
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.0.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
@@ -103,6 +103,7 @@ object Dependencies {
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
+    "org.elasticsearch" % "elasticsearch-spark-20_2.11" % "5.3.0",
     CommonDependencies.http4s.core
   )
 
