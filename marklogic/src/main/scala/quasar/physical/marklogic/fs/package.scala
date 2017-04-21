@@ -137,7 +137,7 @@ package object fs {
     runMarkLogicFs(xccUri) map { case (run, shutdown) =>
       DefinitionResult[Task](
         run compose dropWritten compose foldMapNT(interpretAnalyticalFileSystem(
-          analyze.interpreter[MLFS],
+          Empty.analyze[MLFS],
           convertQueryFileErrors(queryfile.interpret[XccEval, MLFSQ, FMT](
             readChunkSize, xccEvalToMLFSQ)),
           convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](

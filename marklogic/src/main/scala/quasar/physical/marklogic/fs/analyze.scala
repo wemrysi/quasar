@@ -16,11 +16,28 @@
 
 package quasar.physical.marklogic.fs
 
+import quasar.common.PhaseResultTell
 import quasar.fs._
+import quasar.frontend.logicalplan.LogicalPlan
+import quasar.fp.free._
+import quasar.physical.marklogic.qscript.SearchOptions
+import quasar.physical.marklogic.xcc._
 
+import matryoshka.data.Fix
 import scalaz._
 
 object analyze {
   // FIX-ME
-  def interpreter[G[_]: Monad]: Analyze ~> G = Empty.analyze[G]
+  def interpreter[
+    F[_]: Monad: PhaseResultTell: Xcc,
+    S[_],
+    FMT: SearchOptions](implicit
+    s0: F :<: S, 
+    Q: QueryFile.Ops[S]
+  ): Analyze ~> Free[S, ?] = {
+    type G[A] = queryfile.MLQScript[Fix, A]
+    type Err[A] = FileSystemErrT[F, A]
+    Analyze.defaultInterpreter[S, G, Fix[G]]((lp: Fix[LogicalPlan]) => queryfile.lpToQScript[Err, Fix, FMT](lp).mapT(b => lift(b).into[S]))
+
+  }
 }
