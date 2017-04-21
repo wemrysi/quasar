@@ -24,7 +24,6 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
-import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import shapeless.{Fin, Nat, Sized, Succ}
 
@@ -146,8 +145,6 @@ package object fp
     with DebugOps {
 
   import ski._
-
-  type EnumT[F[_], A] = EnumeratorT[A, F]
 
   /** An endomorphism is a mapping from a category to itself.
    *  It looks like scalaz already staked out "Endo" for the
