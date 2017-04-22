@@ -17,11 +17,13 @@
 package quasar.sst
 
 import slamdata.Predef.{Byte => SByte, Char => SChar, _}
-import quasar.{ejson => ejs}, ejs.{CommonEJson => C, EJson, ExtEJson => E}
+import quasar.{ejson => ejs}, ejs.{CommonEJson => C, EJson, ExtEJson => E, EncodeEJson}
+import quasar.ejson.implicits._
 import quasar.fp.numeric.SampleStats
 import quasar.tpe.TypeF
 
 import matryoshka._
+import matryoshka.implicits._
 import monocle.Prism
 import scalaz._, Scalaz._, NonEmptyList.nel, Tags.Max
 import scalaz.std.anyVal.{char => charInst}
@@ -160,6 +162,58 @@ object TypeStat extends TypeStatInstances {
 
 sealed abstract class TypeStatInstances {
   import TypeStat._
+
+  implicit def encodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A]] =
+    new EncodeEJson[TypeStat[A]] {
+      def encode[J](ts: TypeStat[A])(implicit J: Corecursive.Aux[J, EJson]): J = {
+        def emap(xs: (String, J)*): J =
+          E(ejs.map(xs.toList.map(_.leftMap(_.asEJson[J])))).embed
+
+        def optEntry[B: EncodeEJson](k: String, b: Option[B]): List[(String, J)] =
+          b.map(x => (k, x.asEJson[J])).toList
+
+        def minmax[B: EncodeEJson](c: A, mn: B, mx: B): J =
+          emap(
+            "count" -> c.asEJson[J],
+            "min"   -> mn.asEJson[J],
+            "max"   -> mx.asEJson[J])
+
+        def dist[B: EncodeEJson](ss: SampleStats[A], mn: B, mx: B): J =
+          emap(
+            "count"        -> ss.size.asEJson[J],
+            "distribution" -> emap(
+                      ("mean"   -> ss.mean.asEJson[J])    ::
+              optEntry("variance", ss.populationVariance) :::
+              optEntry("skewness", ss.populationSkewness) :::
+              optEntry("kurtosis", ss.populationKurtosis) : _*),
+            "min"          -> mn.asEJson[J],
+            "max"          -> mx.asEJson[J])
+
+        ts match {
+          case Bool(t, f)               => emap("true" -> t.asEJson[J], "false" -> f.asEJson[J])
+          case Byte(c, mn, mx)          => minmax(c, mn, mx)
+          case Char(c, mn, mx)          => minmax(c, mn, mx)
+          case Int(s, mn, mx)           => dist(s, mn, mx)
+          case Dec(s, mn, mx)           => dist(s, mn, mx)
+          case Count(c)                 => emap("count" -> c.asEJson[J])
+
+          case Coll(c, mnl, mxl)        =>
+            emap(
+              ("count" -> c.asEJson[J])  ::
+              optEntry("minLength", mnl) :::
+              optEntry("maxLength", mxl) : _*)
+
+
+          case Str(c, mnl, mxl, mn, mx) =>
+            emap(
+              "count"     -> c.asEJson[J],
+              "minLength" -> mnl.asEJson[J],
+              "maxLength" -> mxl.asEJson[J],
+              "min"       -> mn.asEJson[J],
+              "max"       -> mx.asEJson[J])
+        }
+      }
+    }
 
   implicit def semigroup[A: Order: Field]: Semigroup[TypeStat[A]] =
     Semigroup.instance(_ + _)
