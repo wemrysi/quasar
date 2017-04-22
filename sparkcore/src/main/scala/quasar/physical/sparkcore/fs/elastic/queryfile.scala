@@ -36,6 +36,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
+// TODO_ES use ElasticCall.Ops instead of lift().into[S]
 object queryfile {
 
   private def path(file: AFile) = posixCodec.unsafePrintPath(file) // TODO_ES handle invalid paths
@@ -53,7 +54,7 @@ object queryfile {
   }).into[S]
 
   def fileExists[S[_]](f: AFile)(implicit
-n    E: ElasticCall :<: S
+    E: ElasticCall :<: S
   ): Free[S, Boolean] = {
     val index :: typ :: Nil = path(f).split("/").toList // TODO_ES handle invalid paths
     lift(TypeExists(index, typ)).into[S]
@@ -61,9 +62,12 @@ n    E: ElasticCall :<: S
 
   def listContents[S[_]](adir: ADir)(implicit
     E: ElasticCall :<: S
-  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT((for {
-    types <- lift(ListTypes(parseIndex(adir))).into[S]
-  } yield types.map(t => FileName(t).right[DirName]).toSet).map(_.right[FileSystemError]))
+  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = {
+    val call = if(adir === rootDir) lift(ListIndecies()).into[S] else lift(ListTypes(parseIndex(adir))).into[S]
+    EitherT((for {
+      types <- call
+    } yield types.map(t => FileName(t).right[DirName]).toSet).map(_.right[FileSystemError]))
+  }
 
   def readChunkSize: Int = 5000
 
