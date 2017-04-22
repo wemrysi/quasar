@@ -28,6 +28,7 @@ import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, genSc => coreGe
 
 import java.net.URLDecoder
 
+import com.sksamuel.elastic4s._
 import org.apache.spark._
 import org.http4s.{ParseFailure, Uri}
 import pathy.Path._
@@ -99,13 +100,16 @@ package object elastic {
       sc
     }).run).into[S]
 
+    // TODO_ES from config and in M : Monad
+    val client = TcpClient.transport(ElasticsearchClientUri("localhost", 9300))
+
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
       (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState])) {
         (genState, rddStates) => {
           val interpreter: Eff ~> S =
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
           (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-          (ElasticCall.interpreter(sc) andThen injectNT[Task, S]) :+:
+          (ElasticCall.interpreter(sc, client) andThen injectNT[Task, S]) :+:
           (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
           injectNT[Task, S] :+:
           injectNT[PhysErr, S]

@@ -18,23 +18,32 @@ package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
 
+import com.sksamuel.elastic4s._
+import com.sksamuel.elastic4s.ElasticDsl._  
 import org.apache.spark._
 import scalaz._, scalaz.concurrent.Task
 
 sealed trait ElasticCall[A]
 final case class TypeExists(index: String, typ: String) extends ElasticCall[Boolean]
 final case class ListTypes(index: String) extends ElasticCall[List[String]]
-
+final case class ListIndecies() extends ElasticCall[List[String]]
 
 object ElasticCall {
 
-  implicit def interpreter(sc: SparkContext): ElasticCall ~> Task = new (ElasticCall ~> Task) {
+  implicit def interpreter(sc: SparkContext, client: TcpClient): ElasticCall ~> Task = new (ElasticCall ~> Task) {
     def apply[A](from: ElasticCall[A]) = from match {
       case TypeExists(index, typ) => Task.delay {
-        false // ES_TODO
+        client.execute { typesExist(index / typ) }.await.isExists
       }
       case ListTypes(index) => Task.delay {
-        List.empty[String] //ES_TODO
+        client.execute {
+          getMapping(index)
+        }.await.mappingsFor(index).keys.toList
+      }
+      case ListIndecies() => Task.delay {
+        client.execute {
+          getSegments("*")
+        }.await.indices.keys.toList
       }
     }
   }
