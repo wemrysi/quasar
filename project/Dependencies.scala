@@ -137,5 +137,5 @@ object Dependencies {
     CommonDependencies.argonaut.monocle                         % Test,
     CommonDependencies.http4s.blazeClient                       % Test,
     CommonDependencies.refined.scalacheck                       % Test,
-    "io.verizon.knobs" %% "core"                % "3.12.27a"    % Test)
+    "io.verizon.knobs" % "core_2.11"  % "4.0.30-scalaz-7.2"     % Test)
 }
