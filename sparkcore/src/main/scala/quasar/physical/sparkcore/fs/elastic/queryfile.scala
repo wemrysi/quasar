@@ -63,10 +63,12 @@ object queryfile {
   def listContents[S[_]](adir: ADir)(implicit
     E: ElasticCall :<: S
   ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = {
-    val call = if(adir === rootDir) lift(ListIndecies()).into[S] else lift(ListTypes(parseIndex(adir))).into[S]
-    EitherT((for {
-      types <- call
-    } yield types.map(t => FileName(t).right[DirName]).toSet).map(_.right[FileSystemError]))
+    val segments = if(adir === rootDir) {
+      lift(ListIndecies()).into[S].map(_.map(t => DirName(t).left[FileName]).toSet)
+    } else {
+      lift(ListTypes(parseIndex(adir))).into[S].map(_.map(t => FileName(t).right[DirName]).toSet)
+    }
+    EitherT(segments.map(_.right[FileSystemError]))
   }
 
   def readChunkSize: Int = 5000
