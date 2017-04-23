@@ -70,7 +70,7 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.0.42.Final" // This version is set to be the same as Spark
+    val nettyVersion = "4.0.29.Final" // This version is set to be the same as Spark
                                       // to avoid problems in web and it where their classpaths get merged
                                       // In any case, it should be binary compatible with version 4.0.26 that this
                                       // mongo release is expecting
@@ -104,9 +104,9 @@ object Dependencies {
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
     "org.elasticsearch" % "elasticsearch-spark-20_2.11" % "5.3.0",
-    "com.sksamuel.elastic4s" %% "elastic4s-core" % "5.3.1",
-    "com.sksamuel.elastic4s" %% "elastic4s-tcp" % "5.3.1",
-    "com.sksamuel.elastic4s" %% "elastic4s-http" % "5.3.1",
+    // "com.sksamuel.elastic4s" %% "elastic4s-core" % "5.3.1",
+    // "com.sksamuel.elastic4s" %% "elastic4s-http" % "5.3.1",
+    // "com.sksamuel.elastic4s" %% "elastic4s-jackson" % "5.3.1",
     CommonDependencies.http4s.core
   )
 
