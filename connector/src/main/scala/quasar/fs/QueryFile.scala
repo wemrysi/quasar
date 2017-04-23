@@ -95,7 +95,7 @@ object QueryFile {
       //       repeatedly until unchanged.
       .transAna[T[QS]](rewrite.normalize)
       .transAna[T[QS]](rewrite.normalize)
-      .pruneArrays
+      .pruneArraysF
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
