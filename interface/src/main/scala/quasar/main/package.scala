@@ -61,6 +61,7 @@ package object main {
     postgresql.fs.definition[PhysFsEff],
     skeleton.fs.definition[PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
+    sparkcore.fs.elastic.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
   ).fold
 
