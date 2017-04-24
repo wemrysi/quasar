@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.TaskRef
-import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle
+import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, FileSystemDef._
 import quasar.physical.sparkcore.fs.{readfile => corereadfile, queryfile => corequeryfile, genSc => coreGenSc}
 
@@ -47,7 +47,8 @@ package object elastic {
   type Eff2[A] = Coproduct[ElasticCall, Eff1, A]
   type Eff3[A] = Coproduct[MonotonicSeq, Eff2, A]
   type Eff4[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
-  type Eff[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
+  type Eff5[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
+  type Eff[A]  = Coproduct[KeyValueStore[WriteHandle, writefile.WriteCursor, ?], Eff5, A]
 
   final case class SparkFSConf(sparkConf: SparkConf)
 
@@ -101,9 +102,10 @@ package object elastic {
     }).run).into[S]
 
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
-      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState]) |@|       TaskRef(Map.empty[ReadHandle, SparkCursor])) {
-        (genState, rddStates, readCursors) => {
+      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState]) |@| TaskRef(Map.empty[ReadHandle, SparkCursor]) |@| TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
+        (genState, rddStates, readCursors, writeCursors) => {
           val interpreter: Eff ~> S =
+            (KeyValueStore.impl.fromTaskRef[WriteHandle, writefile.WriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
           (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
@@ -128,7 +130,7 @@ package object elastic {
     interpretFileSystem(
       corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
       corereadfile.interpret[Eff](readfile.input[Eff]),
-      Empty.writeFile[FreeEff],
+      writefile.interpreter[Eff],
       Empty.manageFile[FreeEff])
   }
 
