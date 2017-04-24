@@ -22,9 +22,9 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.TaskRef
-import quasar.fs._, QueryFile.ResultHandle
+import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle
 import quasar.fs.mount._, FileSystemDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, genSc => coreGenSc}
+import quasar.physical.sparkcore.fs.{readfile => corereadfile, queryfile => corequeryfile, genSc => coreGenSc}
 
 import java.net.URLDecoder
 
@@ -46,7 +46,8 @@ package object elastic {
   type Eff1[A] = Coproduct[Read[SparkContext, ?], Eff0, A]
   type Eff2[A] = Coproduct[ElasticCall, Eff1, A]
   type Eff3[A] = Coproduct[MonotonicSeq, Eff2, A]
-  type Eff[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
+  type Eff4[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
+  type Eff[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
 
   final case class SparkFSConf(sparkConf: SparkConf)
 
@@ -100,9 +101,10 @@ package object elastic {
     }).run).into[S]
 
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
-      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState])) {
-        (genState, rddStates) => {
+      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState]) |@|       TaskRef(Map.empty[ReadHandle, SparkCursor])) {
+        (genState, rddStates, readCursors) => {
           val interpreter: Eff ~> S =
+            (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
           (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
           (ElasticCall.interpreter(sc) andThen injectNT[Task, S]) :+:
@@ -125,7 +127,7 @@ package object elastic {
     type FreeEff[A]  = Free[Eff, A]
     interpretFileSystem(
       corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
-      Empty.readFile[FreeEff],
+      corereadfile.interpret[Eff](readfile.input[Eff]),
       Empty.writeFile[FreeEff],
       Empty.manageFile[FreeEff])
   }
