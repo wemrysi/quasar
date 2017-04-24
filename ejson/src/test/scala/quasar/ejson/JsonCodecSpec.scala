@@ -75,4 +75,12 @@ final class JsonCodecSpec extends Qspec with EJsonArbitrary {
 
     roundtrip(m).toEither must beRight(equal(m))
   }
+
+  "map keys equal to one of the codec keys with additional sigil prefix are preserved" >> prop { v: E =>
+    val m = ExtEJson(Map(JsonCodec.ExtKeys.toList map { k =>
+      CommonEJson(str[E](JsonCodec.Sigil.toString + k)).embed -> v
+    })).embed
+
+    roundtrip(m).toEither must beRight(equal(m))
+  }
 }
