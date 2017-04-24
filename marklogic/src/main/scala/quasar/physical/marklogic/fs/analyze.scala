@@ -27,7 +27,6 @@ import matryoshka.data.Fix
 import scalaz._
 
 object analyze {
-  // FIX-ME
   def interpreter[
     F[_]: Monad: PhaseResultTell: Xcc,
     S[_],

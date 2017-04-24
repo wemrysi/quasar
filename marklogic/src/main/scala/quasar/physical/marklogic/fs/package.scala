@@ -136,15 +136,27 @@ package object fs {
 
     runMarkLogicFs(xccUri) map { case (run, shutdown) =>
       DefinitionResult[Task](
-        run compose dropWritten compose foldMapNT(interpretAnalyticalFileSystem(
-          Empty.analyze[MLFS],
-          convertQueryFileErrors(queryfile.interpret[XccEval, MLFSQ, FMT](
-            readChunkSize, xccEvalToMLFSQ)),
-          convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](
-            readChunkSize, xccEvalToMLFSQ)),
-          convertWriteFileErrors(writefile.interpret[MLFSQ, FMT](writeChunkSize)),
-          managefile.interpret[MLFS, FMT]
-        )) compose xformPaths, shutdown)
+        run compose dropWritten compose foldMapNT{
+          val queryfileInterpreter: QueryFile ~> MLFS =
+            convertQueryFileErrors(queryfile.interpret[XccEval, MLFSQ, FMT](
+              readChunkSize, xccEvalToMLFSQ))
+          val fsInterpreter: FileSystem ~> MLFS = interpretFileSystem(
+            queryfileInterpreter,
+            convertReadFileErrors(readfile.interpret[XccEval, MLFSQ, FMT](
+              readChunkSize, xccEvalToMLFSQ)),
+            convertWriteFileErrors(writefile.interpret[MLFSQ, FMT](writeChunkSize)),
+            managefile.interpret[MLFS, FMT]
+          )
+          type Bar[A] = PhaseResultT[MLFS, A]
+          type MLFSPP[A] = Coproduct[Bar, QueryFile, A]
+          // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+          import WriterT.writerTMonadListen
+          val analyze0: Analyze ~> Free[MLFSPP, ?] = analyze.interpreter[Bar, MLFSPP, FMT]
+          val bar2MLFS: Bar ~> MLFS = λ[Bar ~> MLFS](_.value)
+          val analyze1: MLFSPP ~> MLFS = bar2MLFS :+: queryfileInterpreter
+          val analyzeInterpreter = foldMapNT(analyze1) compose analyze0
+          analyzeInterpreter :+: fsInterpreter
+        } compose xformPaths, shutdown)
     }
   }
 
