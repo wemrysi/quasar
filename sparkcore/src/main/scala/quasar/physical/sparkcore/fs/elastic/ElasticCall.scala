@@ -17,7 +17,9 @@
 package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
+import quasar.{Data, DataCodec}
 
+import org.http4s.client.blaze._
 import org.apache.spark._
 import scalaz._, scalaz.concurrent.Task
 
@@ -33,11 +35,37 @@ object ElasticCall {
       case TypeExists(index, typ) => Task.delay {
         false
       }
-      case ListTypes(index) => Task.delay {
-        List.empty[String]
+      case ListTypes(index) => for {
+        httpClient <- Task.delay {
+          PooledHttp1Client()
+        }
+        indices <- httpClient.expect[String]("http://localhost:9200/_mapping?")
+      } yield {
+        val result = DataCodec.parse(indices)(DataCodec.Precise).fold(error => List.empty[String], {
+          case Data.Obj(idxs) => idxs(index) match {
+            case Data.Obj(mapping) => mapping("mappings") match {
+              case Data.Obj(types) => types.keys.toList.map(d => s"$d")
+              case _ => List.empty[String] // TODO_ES handling errors
+            }
+            case _ => List.empty[String] // TODO_ES handling errors
+          }
+          case _ => List.empty[String] // TODO_ES handling errors
+        })
+        httpClient.shutdownNow() // TODO_ES handling resources
+        result
       }
-      case ListIndecies() => Task.delay {
-        List("foo", "bar")
+      case ListIndecies() => for {
+        httpClient <- Task.delay {
+          PooledHttp1Client()
+        }
+        indices <- httpClient.expect[String]("http://localhost:9200/_aliases")
+      } yield {
+        val result = DataCodec.parse(indices)(DataCodec.Precise).fold(error => List.empty[String], {
+          case Data.Obj(m) => m.keys.toList.map(d => s"$d")
+          case _ => List.empty[String] // TODO_ES handling errors
+        })
+        httpClient.shutdownNow() // TODO_ES handling resources
+        result
       }
     }
   }

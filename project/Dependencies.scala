@@ -104,6 +104,7 @@ object Dependencies {
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
     "org.elasticsearch" % "elasticsearch-spark-20_2.11" % "5.3.0",
+    "org.http4s"                 %% "http4s-blaze-client"       % "0.14.1a", //TODO_ES use CommonDependecies
     // "com.sksamuel.elastic4s" %% "elastic4s-core" % "5.3.1",
     // "com.sksamuel.elastic4s" %% "elastic4s-http" % "5.3.1",
     // "com.sksamuel.elastic4s" %% "elastic4s-jackson" % "5.3.1",
