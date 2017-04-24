@@ -16,7 +16,6 @@
 
 package quasar.main
 
-import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
