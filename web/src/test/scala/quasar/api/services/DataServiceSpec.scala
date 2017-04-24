@@ -34,6 +34,7 @@ import quasar.fs._
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
 import org.http4s._
+import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
 import org.specs2.specification.core.Fragment
