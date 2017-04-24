@@ -72,7 +72,7 @@ package object fs {
         interp(uri).map { run =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             run compose interpretAnalyticalFileSystem(
-              Empty.analyze[Free[Eff, ?]], // FIX-ME
+              Empty.analyze[Free[Eff, ?]],
               queryfile.interpret,
               readfile.interpret,
               writefile.interpret,
