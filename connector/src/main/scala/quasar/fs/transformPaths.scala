@@ -208,6 +208,7 @@ object transformPaths {
     val g = λ[Analyze ~> Free[S, ?]] {
       case QueryCost(lp) => ???
         // FIX-ME
+        // goal: for all path in LP, run inPath
       /*
       case ExecutePlan(lp, out) =>
         Q.execute(transformFile(inPath)(lp), inPath(out))
