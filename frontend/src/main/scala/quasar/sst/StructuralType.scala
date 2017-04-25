@@ -18,7 +18,7 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -183,6 +183,11 @@ object StructuralType extends StructuralTypeInstances {
 }
 
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
+  implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] = {
+    implicit val encodeEnvT = EncodeEJsonK.envT[V, TypeF[L, ?]]("measure", "structure")
+    EncodeEJson.encodeEJsonR[StructuralType[L, V], EnvT[V, TypeF[L, ?], ?]]
+  }
+
   implicit def corecursive[L, V]: Corecursive.Aux[StructuralType[L, V], EnvT[V, TypeF[L, ?], ?]] =
     new Corecursive[StructuralType[L, V]] {
       type Base[B] = EnvT[V, TypeF[L, ?], B]
