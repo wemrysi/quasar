@@ -35,7 +35,6 @@ import scala.Predef.implicitly
 
 final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
   type QS[T[_[_]]] = fs.queryfile.MLQScriptCP[T]
-  type Config = (Positive, Positive)
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
@@ -55,7 +54,11 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
   def UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
-  def compile(uri: ConnectionUri): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
+  type Config = Unit
+
+  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] = ???
+
+  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
     ???
 
   val Type = FileSystemType("marklogic")
@@ -66,36 +69,36 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): M[AFile] = ???
-    def evaluatePlan(repr: Repr): M[ResultHandle] = ???
-    def more(h: ResultHandle): M[Vector[Data]] = ???
-    def close(h: ResultHandle): M[Unit] = ???
-    def explain(repr: Repr): M[String] = ???
-    def listContents(dir: ADir): M[Set[PathSegment]] = ???
-    def fileExists(file: AFile): M[Boolean] = ???
+    def executePlan(repr: Repr, out: AFile): Kleisli[M, Config, AFile] = ???
+    def evaluatePlan(repr: Repr): Kleisli[M, Config, ResultHandle] = ???
+    def more(h: ResultHandle): Kleisli[M, Config, Vector[Data]] = ???
+    def close(h: ResultHandle): Kleisli[M, Config, Unit] = ???
+    def explain(repr: Repr): Kleisli[M, Config, String] = ???
+    def listContents(dir: ADir): Kleisli[M, Config, Set[PathSegment]] = ???
+    def fileExists(file: AFile): Kleisli[M, Config, Boolean] = ???
   }
 
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): M[ReadHandle] = ???
-    def read(h: ReadHandle): M[Vector[Data]] = ???
-    def close(h: ReadHandle): M[Unit] = ???
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Kleisli[M, Config, ReadHandle] = ???
+    def read(h: ReadHandle): Kleisli[M, Config, Vector[Data]] = ???
+    def close(h: ReadHandle): Kleisli[M, Config, Unit] = ???
   }
 
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
-    def open(file: AFile): M[WriteHandle] = ???
-    def write(h: WriteHandle, chunk: Vector[Data]): M[Vector[FileSystemError]] = ???
-    def close(h: WriteHandle): M[Unit] = ???
+    def open(file: AFile): Kleisli[M, Config, WriteHandle] = ???
+    def write(h: WriteHandle, chunk: Vector[Data]): Kleisli[M, Config, Vector[FileSystemError]] = ???
+    def close(h: WriteHandle): Kleisli[M, Config, Unit] = ???
   }
 
   object ManageFileModule extends ManageFileModule {
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): M[Unit] = ???
-    def delete(path: APath): M[Unit] = ???
-    def tempFile(near: APath): M[AFile] = ???
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Kleisli[M, Config, Unit] = ???
+    def delete(path: APath): Kleisli[M, Config, Unit] = ???
+    def tempFile(near: APath): Kleisli[M, Config, AFile] = ???
   }
 }

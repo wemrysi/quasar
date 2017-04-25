@@ -130,6 +130,7 @@ trait BackendModule {
       QueryFileModule.listContents(_)
 
     val R = new Rewrite[T]
+    val O = new Optimize[T]
 
     for {
       qs <- QueryFile.convertToQScriptRead[T, Kleisli[M, Config, ?], QSR](lc)(lp)
@@ -138,7 +139,7 @@ trait BackendModule {
       _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted)).liftM[Kleisli[?[_], Config, ?]]
 
       optimized =
-        shifted.transHylo(R.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
+        shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
 
       _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized)).liftM[Kleisli[?[_], Config, ?]]
 
