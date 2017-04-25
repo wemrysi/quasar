@@ -26,13 +26,13 @@ import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.api.PathUtils._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.effect.KeyValueStore
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.InMemory._
 import quasar.fs.mount._
+import quasar.fs.mount.Fixture.runConstantMount
 import quasar.fs.mount.module.Module
 import quasar.sql._
 import quasar.sql.fixpoint._
@@ -60,23 +60,11 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
     failureResponseOr[Module.Error]      :+:
     (liftMT[Task, ResponseT] compose inter)
 
-  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
-    type MEff[A] = Coproduct[Task, MountConfigs, A]
-    TaskRef(mounts).map { configsRef =>
-
-      val mounter: Mounting ~> Free[MEff, ?] = Mounter.trivial[MEff]
-
-      val meff: MEff ~> Task =
-        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
-
-      foldMapNT(meff) compose mounter
-    }
-  }
-
   def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
-    HttpService.lift(req => (runFs(mem) |@| mountingInter(mounts)).tupled.flatMap { case (fs, mount) =>
-      val moduleInter = foldMapNT(mount :+: fs) compose Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
-      invoke.service[Eff].toHttpService(effRespOr(moduleInter)).apply(req)
+    HttpService.lift(req => runFs(mem).flatMap { fs =>
+      val module = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+      val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
+      invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
     })
 
   def sampleStatements(name: String, readFrom: Path[_, Path.File, Path.Sandboxed]): List[Statement[Fix[Sql]]] = {

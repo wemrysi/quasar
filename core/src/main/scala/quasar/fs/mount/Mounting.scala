@@ -19,13 +19,14 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy._
-import quasar.effect.LiftedOps
+import quasar.effect.{KeyValueStore, LiftedOps}
 import quasar.fp.ski._
+import quasar.fp.free._
 import quasar.fs._
 import quasar.sql.{Sql, Statement}
 
 import matryoshka.data.Fix
-import monocle.Prism
+import monocle.{Prism, Lens}
 import monocle.std.{disjunction => D}
 import pathy._, Path._
 import scalaz._, Scalaz._
@@ -229,5 +230,14 @@ object Mounting {
   object Ops {
     implicit def apply[S[_]](implicit S: Mounting :<: S): Ops[S] =
       new Ops[S]
+  }
+
+  object impl {
+    def constant: Mounting ~> State[Map[APath, MountConfig], ?] = {
+      type F[A] = State[Map[APath, MountConfig], A]
+      val mntr = Mounter.trivial[MountConfigs]
+      val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
+      mntr andThen foldMapNT(kvf)
+    }
   }
 }
