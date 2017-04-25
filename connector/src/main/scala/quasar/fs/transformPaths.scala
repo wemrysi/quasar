@@ -16,7 +16,6 @@
 
 package quasar.fs
 
-import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
@@ -206,21 +205,8 @@ object transformPaths {
     val U = Analyze.Unsafe[S]
 
     val g = λ[Analyze ~> Free[S, ?]] {
-      case QueryCost(lp) => ???
-        // FIX-ME
-        // goal: for all path in LP, run inPath
-      /*
-      case ExecutePlan(lp, out) =>
-        Q.execute(transformFile(inPath)(lp), inPath(out))
-          .bimap(transformErrorPath(outPath), outPath(_))
-          .run.run
-
-      case EvaluatePlan(lp) =>
-        U.eval(transformFile(inPath)(lp))
-          .leftMap(transformErrorPath(outPath))
-          .run.run
-*/
-
+      case QueryCost(lp) =>
+        U.queryCost(transformFile(inPath)(lp)).map(_.leftMap(transformErrorPath(outPath)))
     }
     transformIn(g, liftFT[S])
   }
