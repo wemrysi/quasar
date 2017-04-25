@@ -207,11 +207,11 @@ object LogicalPlan {
             // NB: a couple of special cases for readability
             case Constant(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
             case InvokeUnapply(func @ structural.ObjectProject, Sized(expr, name)) =>
-              ra.render(name) match {
-                case RenderedTree(_, Some(n), Nil) =>
-                  Terminal("ObjectProject" :: nodeType, Some(ra.render(expr).shows + "{" + n + "}"))
-                case n => NonTerminal("Invoke" :: nodeType, Some(func.shows), ra.render(expr) :: n :: Nil)
-              }
+              (ra.render(expr), ra.render(name)) match {
+                case (exprR @ RenderedTree(_, Some(_), Nil), RenderedTree(_, Some(n), Nil)) =>
+                  Terminal("ObjectProject" :: nodeType, Some(exprR.shows + "{" + n + "}"))
+                case (x, n) => NonTerminal("Invoke" :: nodeType, Some(func.shows), x :: n :: Nil)
+            }
 
             case Read(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
             case Constant(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
@@ -219,12 +219,12 @@ object LogicalPlan {
             case JoinSideName(name)        => Terminal("JoinSideName" :: nodeType, Some(name.toString))
             case Join(l, r, t, JoinCondition(lName, rName, c)) =>
               NonTerminal("Join" :: nodeType, None, List(
-	        ra.render(l),
-		ra.render(r),
-		RenderTree[JoinType].render(t),
-		Terminal("LeftSide" :: nodeType, Some(lName.toString)),
-		Terminal("RightSide" :: nodeType, Some(rName.toString)),
-		ra.render(c)))
+                ra.render(l),
+                ra.render(r),
+                RenderTree[JoinType].render(t),
+                Terminal("LeftSide" :: nodeType, Some(lName.toString)),
+                Terminal("RightSide" :: nodeType, Some(rName.toString)),
+                ra.render(c)))
             case Free(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case Let(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))
             case Sort(src, ords)           =>
