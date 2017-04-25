@@ -212,8 +212,8 @@ final class LogicalPlanR[T]
 
       case Sort(src, ords) =>
         (inferTypes(typ, src) ⊛ ords.traverse {
-	  case (a, d) => inferTypes(Type.Top, a) strengthR d
-	 })(lp.sort[Typed[LP]](_, _))
+          case (a, d) => inferTypes(Type.Top, a) strengthR d
+        })(lp.sort[Typed[LP]](_, _))
 
       case TemporalTrunc(part, src) =>
         typ.contains(Type.Temporal).fold(
@@ -332,19 +332,19 @@ final class LogicalPlanR[T]
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           checkGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
         case Typecheck(expr, typ, cont, fallback) =>
-	  val typer: Func.Typer[Nat._3] = {
+          val typer: Func.Typer[Nat._3] = {
             case Sized(_, t2, _) => Type.glb(t2, typ).success
-	  }
-	  val construct: Func.Input[T, Nat._3] => T = {
+          }
+          val construct: Func.Input[T, Nat._3] => T = {
             case Sized(a1, a2, a3) => typecheck(a1, typ, a2, a3)
-	  }
-	  val (constrs, plan): (List[NamedConstraint[T]], T) = expr.constraints.foldLeftM(expr.plan) {
-	    case (acc, constr) =>
-	      if ((Free(constr.name) == expr.plan) && (constr.inferred == typ))
-	        (Nil, constr.term)
-	      else
-	        (List(constr), expr.plan)
-	  }
+          }
+          val (constrs, plan): (List[NamedConstraint[T]], T) = expr.constraints.foldLeftM(expr.plan) {
+            case (acc, constr) =>
+              if ((Free(constr.name) == expr.plan) && (constr.inferred == typ))
+                (Nil, constr.term)
+              else
+                (List(constr), expr.plan)
+          }
           val expr0 = ConstrainedPlan(expr.inferred, constrs, plan)
           checkInvoke(inf, typer, construct, Func.Input3(expr0, cont, fallback))
         case Let(name, value, in) =>
