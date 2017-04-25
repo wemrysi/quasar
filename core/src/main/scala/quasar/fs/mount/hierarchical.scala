@@ -276,11 +276,11 @@ object hierarchical {
     }
 
     λ[Analyze ~> M] {
-      case QueryCost(lp) =>
-        // FIX-ME
-        // anaserwers: what mount should I run this LP on
-        // mountForPlan(mountedAfs, lp, none)
-        ???
+      case a @ QueryCost(lp) =>
+        val forPlan: FileSystemError \/ (ADir, Analyze ~> M) = mountForPlan(mountedAfs, lp, none)
+        forPlan.fold(_.left[Int].point[M], {
+          case (mnt, g) => g(a)
+        })
     }
   }
 
