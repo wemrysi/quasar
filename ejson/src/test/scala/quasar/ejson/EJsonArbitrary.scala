@@ -19,36 +19,40 @@ package quasar.ejson
 import quasar.fp._
 import quasar.pkg.tests._
 
-// TODO[matryoshka]: Switch to Delay[Arbitrary, F] when we're able to upgrade
+import matryoshka.Delay
+
 trait EJsonArbitrary {
-  implicit val arbitraryCommon = new WrapArb[Common] {
-    def apply[α](arb: Arbitrary[α]) = Arbitrary(
-      Gen.oneOf(
-        arb.list ^^ Arr[α],
-        const(Null[α]()),
-        genBool ^^ Bool[α],
-        genString map Str[α],
-        genBigDecimal map Dec[α]
+  implicit val arbitraryCommon: Delay[Arbitrary, Common] =
+    new Delay[Arbitrary, Common] {
+      def apply[α](arb: Arbitrary[α]) = Arbitrary(
+        Gen.oneOf(
+          arb.list      ^^ Arr[α],
+          const(           Null[α]()),
+          genBool       ^^ Bool[α],
+          genString     ^^ Str[α],
+          genBigDecimal ^^ Dec[α]
+        )
       )
-    )
-  }
+    }
 
-  implicit val arbitraryObj = new WrapArb[Obj] {
-    def apply[α](arb: Arbitrary[α]) =
-      (genString, arb.gen).zip.list ^^ (l => Obj(l.toListMap))
-  }
+  implicit val arbitraryObj: Delay[Arbitrary, Obj] =
+    new Delay[Arbitrary, Obj] {
+      def apply[α](arb: Arbitrary[α]) =
+        (genString, arb.gen).zip.list ^^ (l => Obj(l.toListMap))
+    }
 
-  implicit val arbitraryExtension = new WrapArb[Extension] {
-    def apply[α](arb: Arbitrary[α]) = Arbitrary(
-      Gen.oneOf(
-        (arb.gen, arb.gen).zip ^^ ((Meta[α] _).tupled),
-        (arb.gen, arb.gen).zip.list ^^ Map[α],
-        genByte ^^ Byte[α],
-        genChar ^^ Char[α],
-        genBigInt ^^ Int[α]
+  implicit val arbitraryExtension: Delay[Arbitrary, Extension] =
+    new Delay[Arbitrary, Extension] {
+      def apply[α](arb: Arbitrary[α]) = Arbitrary(
+        Gen.oneOf(
+          (arb.gen, arb.gen).zip      ^^ (Meta[α] _).tupled,
+          (arb.gen, arb.gen).zip.list ^^ Map[α],
+          genByte                     ^^ Byte[α],
+          genChar                     ^^ Char[α],
+          genBigInt                   ^^ Int[α]
+        )
       )
-    )
-  }
+    }
 }
 
 object EJsonArbitrary extends EJsonArbitrary

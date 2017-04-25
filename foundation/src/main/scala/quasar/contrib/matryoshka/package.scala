@@ -22,6 +22,10 @@ import _root_.matryoshka._
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
+  /** Make a partial endomorphism total by returning the argument when undefined. */
+  def totally[A](pf: PartialFunction[A, A]): A => A =
+    orOriginal(pf.lift)
+
   implicit def delayOrder[F[_], A](implicit F: Delay[Order, F], A: Order[A]): Order[F[A]] =
     F(A)
 
