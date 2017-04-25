@@ -23,7 +23,6 @@ import _root_.matryoshka._
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
-
   def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
     Getter(T.project(_))
 

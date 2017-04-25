@@ -73,11 +73,12 @@ package object ejson {
 
   /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
     */
-  type Json[A] = Coproduct[Obj, Common, A]
+  type Json[A]    = Coproduct[Obj, Common, A]
+  val ObjJson     = implicitly[Obj :<: Json]
+  val CommonJson  = implicitly[Common :<: Json]
 
-  type EJson[A] = Coproduct[Extension, Common, A]
-
-  val ExtEJson = implicitly[Extension :<: EJson]
+  type EJson[A]   = Coproduct[Extension, Common, A]
+  val ExtEJson    = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
   object EJson {

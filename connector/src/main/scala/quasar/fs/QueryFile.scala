@@ -35,8 +35,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz.{ToIdOps => _, _}
-import scalaz.iteratee._
-import scalaz.stream.Process
+import scalaz.stream.{Process0, Process}
 
 sealed abstract class QueryFile[A]
 
@@ -96,7 +95,7 @@ object QueryFile {
       //       repeatedly until unchanged.
       .transAna[T[QS]](rewrite.normalize)
       .transAna[T[QS]](rewrite.normalize)
-      .pruneArrays
+      .pruneArraysF
   }
 
   /** The shape of QScript that’s used during conversion from LP. */
@@ -263,30 +262,6 @@ object QueryFile {
     def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[AFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])
 
-    /** Returns an enumerator of data resulting from evaluating the given
-      * `LogicalPlan`.
-      */
-    def enumerate(plan: Fix[LogicalPlan]): EnumeratorT[Data, ExecM] = {
-      import Iteratee._
-
-      val enumHandle: EnumeratorT[ResultHandle, ExecM] =
-        unsafe.eval(plan).liftM[EnumT]
-
-      def enumData(h: ResultHandle): EnumeratorT[Vector[Data], ExecM] =
-        new EnumeratorT[Vector[Data], ExecM] {
-          def apply[A] = s => s mapContOr (k =>
-            iterateeT(hoistToExec(unsafe.more(h)) flatMap { data =>
-              if (data.isEmpty)
-                toExec(unsafe.close(h)) *> k(emptyInput).value
-              else
-                (k(elInput(data)) >>== apply[A]).value
-            }),
-            iterateeT(toExec(unsafe.close(h) as s)))
-        }
-
-      enumHandle flatMap enumData flatMap (enumIndexedSeq[Data, ExecM](_))
-    }
-
     /** Returns the stream of data resulting from evaluating the given
       * `LogicalPlan`.
       */
@@ -306,6 +281,26 @@ object QueryFile {
       Process.bracket(unsafe.eval(plan))(h => Process.eval_(close(h))) { h =>
         moreUntilEmpty(h).translate(hoistToExec)
       }
+    }
+
+    /** Returns a stream of data resulting from evaluating the given
+      * `LogicalPlan`.
+      *
+      * This consumes the entire result, if you need control over how much
+      * data is consumed, see `evaluate`.
+      */
+    def results(plan: Fix[LogicalPlan]): ExecM[Process0[Data]] = {
+      def close(h: ResultHandle): ExecM[Unit] =
+        toExec(unsafe.close(h))
+
+      def next(h: ResultHandle): ExecM[Option[(Vector[Data], ResultHandle)]] =
+        hoistToExec(unsafe.more(h))
+          .ensuring(_.isDefined whenM close(h))
+          .map(xs => xs.nonEmpty.option((xs, h)))
+
+      unsafe.eval(plan)
+        .flatMap(h => StreamT.unfoldM(h)(next).toStream <* close(h))
+        .map(cs => Process.emitAll(cs) flatMap (Process.emitAll(_)))
     }
 
     /** Returns a description of how the the given logical plan will be

@@ -23,7 +23,6 @@ object Dependencies {
   def foundation = Seq(
     CommonDependencies.scalaz.core,
     CommonDependencies.scalaz.concurrent,
-    CommonDependencies.scalaz.iteratee,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
     "org.typelevel" %% "algebra"         % algebraVersion,

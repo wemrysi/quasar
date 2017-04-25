@@ -46,41 +46,66 @@ To compile the project and run tests, first clone the quasar repo and then execu
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-Running the full test suite can be done in two ways:
+Running the full test suite can be done using docker containers for various backends:
 
-##### Testing option 1 (prerequisite: docker)
+##### Full Testing (prerequisite: docker and docker-compose)
 
-A docker container running mongodb operates for the duration of the test run.
+In order to run integration tests for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
 
-```bash
-./bin/full-it-tests.sh
-```
+Of particular interest are the following two scripts:
 
-##### Testing option 2
+  1. `docker/scripts/setupContainers`
+  2. `docker/scripts/assembleTestingConf`
 
-In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
-you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
-allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
-instructions that can be found there.
-
-Once we have a MongoDB instance handy, we need to configure the integration tests
-in order to inform Quasar about where to find the backends to test.
-
-Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
+Quasar supports the following datastores:
 
 ```
-mongodb_3_2="mongodb://<mongoURL>"
-mongodb_3_0="mongodb://<mongoURL>"
-mongodb_2_6="mongodb://<mongoURL>"
+quasar_mongodb_2_6
+quasar_mongodb_3_0
+quasar_mongodb_read_only
+quasar_mongodb_3_2
+quasar_mongodb_3_4
+quasar_metastore
+quasar_postgresql
+quasar_marklogic_xml
+quasar_marklogic_json
+quasar_couchbase
 ```
 
-where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
-something like `localhost:27017` for a local installation. This means the integration tests will be run against
-both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
-tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported filesystems.
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example 
+if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbsase you would use:
+
+```
+./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
+```
+
+Note: `quasar_metastore` is always needed to run integration tests.
+
+This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
+
+Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test. 
+This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
+file based on the currently running containerizd backends using the following command:
+
+```
+./assembleTestingConf -a
+```
+
+After running this command your `testing.conf` file should look similar to this:
+
+```
+> cat it/testing.conf
+postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
+couchbase="couchbase://192.168.99.101?username=Administrator&password=password&socketConnectTimeoutSeconds=15"
+marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
+postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
+mongodb_3_0="mongodb://192.168.99.101:27019"
+```
+
+IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
+You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
+
 
 #### REPL JAR
 
@@ -98,6 +123,14 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }' 
+```
+
+You can find examples of `connectionUri` values [here](#database-mounts).
+
 #### Web JAR
 
 To build a JAR containing a lightweight HTTP server that allows you to programmatically interact with Quasar, execute the following command:
@@ -114,9 +147,12 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
+
+
 ### Configure
 
-The various JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
+The various REPL JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
 
 The JSON configuration file must have the following format:
 
@@ -125,14 +161,19 @@ The JSON configuration file must have the following format:
   "server": {
     "port": 8080
   },
-
-  "metastore": <metastore_config>
+  "metastore": {
+    "database": {
+      <metastore_config>
+    }
+  }
 }
 ```
 
 #### Metadata Store
 
 Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) databases are supported.
+
+To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
 
 If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
 
@@ -154,7 +195,14 @@ A PostgreSQL configuration looks something like
   "parameters": <an optional JSON object of parameter key:value pairs>
 }
 ```
-The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL.
+
+The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL. One example for a value of the `parameters` object may be a `loglevel`:
+
+```json
+"parameters": {
+  "loglevel": 1
+}
+```
 
 #### Initializing and updating Schema
 
