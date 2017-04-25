@@ -1,6 +1,5 @@
 # This property is never used, but it's here so that Knobs doesn't fail to parse the file if all other
 # parameters are commented out
-# TODO: Remove once PR #49 of Knobs gets merged and released (https://github.com/Verizon/knobs/pull/49)
 #postgresql_metastore = "{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore_test\",\"userName\":\"postgres\",\"password\":\"postgres\"}"
 #mongodb_2_6       ="mongodb://<host>:<port>"
 #mongodb_3_0       ="mongodb://<host>:<port>"
