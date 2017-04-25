@@ -20,11 +20,12 @@ import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables}
 import quasar.common.PhaseResults
+import quasar.contrib.argonaut._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, JsonCodec}
 import quasar.ejson.implicits._
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
@@ -32,8 +33,10 @@ import quasar.fs.mount._
 import quasar.main.{analysis, FilesystemQueries, Prettify}
 import quasar.sql
 
+import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -239,7 +242,10 @@ object Repl {
                      unionMaxSize    = 20L)
           p1    =  analysis.extractSchema[Fix[EJson], Double](cfg)
           sst   =  proc.map(_.pipe(p1).toVector.headOption)
-          _     <- sst.fold(err => DF.fail(err.shows), s => P.println(s.shows))
+          sstJs =  sst.map(_.map(_.asEJson[Fix[EJson]].cata(JsonCodec.encodeƒ[Json])))
+          _     <- sstJs.fold(
+                     err => DF.fail(err.shows),
+                     s   => P.println(s.fold("{}")(_.spaces2)))
         } yield ()
 
 
