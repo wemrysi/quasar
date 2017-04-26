@@ -175,7 +175,7 @@ package object hdfs {
     def fileSystem: Task[HdfsFileSystem] = Task.delay {
       val conf = new Configuration()
       conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-      HdfsFileSystem.get(new URI(sparkFsConf.hdfsUriStr), conf)
+      HdfsFileSystem.get(new URI(URLDecoder.decode(sparkFsConf.hdfsUriStr, "UTF-8")), conf)
     }
 
     interpretFileSystem(
