@@ -48,6 +48,18 @@ object analysis {
     unionMaxSize:    Positive
   )
 
+  object CompressionSettings {
+    val DefaultMapMaxSize:      Positive = 50L
+    val DefaultStringMaxLength: Positive = 64L
+    val DefaultUnionMaxSize:    Positive =  1L
+
+    val Default: CompressionSettings =
+      CompressionSettings(
+        mapMaxSize      = DefaultMapMaxSize,
+        stringMaxLength = DefaultStringMaxLength,
+        unionMaxSize    = DefaultUnionMaxSize)
+  }
+
   /** Reduces the input to an `SST` summarizing its structure. */
   def extractSchema[J: Order, A: ConvertableTo: Field: Order](
     settings: CompressionSettings
@@ -74,10 +86,8 @@ object analysis {
   /** A random sample of the dataset at the given path. */
   def sample[S[_]](file: AFile, size: Positive)(
     implicit Q: QueryFile.Ops[S]
-  ): Process[Q.M, Data] = {
-    val dropPhases = λ[Q.transforms.ExecM ~> Q.M](_.mapT(_.value))
-    Q.evaluate(sampleQuery(file, size)).translate(dropPhases)
-  }
+  ): Process[Q.M, Data] =
+    Q.evaluate(sampleQuery(file, size)).translate(Q.transforms.dropPhases)
 
   /** Query representing a random sample of `size` items from the specified file. */
   def sampleQuery(file: AFile, size: Positive): Fix[LogicalPlan] = {
