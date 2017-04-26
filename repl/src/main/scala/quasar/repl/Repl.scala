@@ -236,11 +236,8 @@ object Repl {
           state <- RS.get
           file  =  state targetFile f
           proc  <- analysis.sampleResults(file, 1000L).run
-          cfg   =  analysis.CompressionSettings(
-                     mapMaxSize      = 50L,
-                     stringMaxLength = 64L,
-                     unionMaxSize    = 20L)
-          p1    =  analysis.extractSchema[Fix[EJson], Double](cfg)
+          p1    =  analysis.extractSchema[Fix[EJson], Double](
+                     analysis.CompressionSettings.Default)
           sst   =  proc.map(_.pipe(p1).toVector.headOption)
           sstJs =  sst.map(_.map(_.asEJson[Fix[EJson]].cata(JsonCodec.encodeƒ[Json])))
           _     <- sstJs.fold(

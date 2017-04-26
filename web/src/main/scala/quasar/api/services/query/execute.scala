@@ -20,7 +20,6 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
-import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski._
@@ -52,11 +51,7 @@ object execute {
     S2: FileSystemFailure :<: S
   ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
-
-    val removePhaseResults = new (FileSystemErrT[PhaseResultT[Free[S,?], ?], ?] ~> FileSystemErrT[Free[S,?], ?]) {
-      def apply[A](t: FileSystemErrT[PhaseResultT[Free[S,?], ?], A]): FileSystemErrT[Free[S,?], A] =
-        EitherT[Free[S,?],FileSystemError,A](t.run.value)
-    }
+    val xform = QueryFile.Transforms[Free[S, ?]]
 
     def destinationFile(fileStr: String): ApiError \/ (Path[Abs,File,Unsandboxed] \/ Path[Rel,File,Unsandboxed]) = {
       val err = -\/(ApiError.apiError(
@@ -73,7 +68,7 @@ object execute {
           queryPlan(xpr, requestVars(req), basePath, off, lim)
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
-              lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
+              lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases)))
         })
 
       case req @ POST -> AsDirPath(path) =>

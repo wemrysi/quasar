@@ -213,6 +213,14 @@ package object api {
         "path" := path))
     }
 
+  def decodedFile(encodedPath: String): ApiError \/ AFile =
+    decodedPath(encodedPath) flatMap { path =>
+      refineType(path).leftAs(ApiError.fromMsg(
+        BadRequest withReason "File path expected.",
+        s"Expected '${posixCodec.printPath(path)}' to be a file.",
+        "path" := path))
+    }
+
   def decodedPath(encodedPath: String): ApiError \/ APath =
     AsPath.unapply(HPath(encodedPath)) \/> ApiError.fromMsg(
       BadRequest withReason "Malformed path.",
