@@ -100,10 +100,8 @@ package object fs {
                 val listContents: ADir => Free[QueryFile, FileSystemError \/ Set[PathSegment]] =
                   (adir: ADir) => QueryFile.Ops[QueryFile].ls(adir).run
                 val analyze0: Analyze ~> Free[QueryFile, ?] =
-                  // FIX-ME chroot 
                   Analyze.defaultInterpreter[QueryFile, SparkQScript, Fix[SparkQScript]](lp => toQScript(listContents)(lp).mapT(_.value))
                 val analyzeInterpreter   = analyze0 andThen flatMapSNT(queryFileIntereter)
-
                 FileSystemDef.DefinitionResult[Free[S, ?]](
                   (analyzeInterpreter :+: fileSystemInterpreter) andThen run,
                   close)
