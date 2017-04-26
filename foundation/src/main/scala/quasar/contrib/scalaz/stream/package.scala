@@ -14,27 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.contrib.scalaz
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.eitherT._
 
-import quasar.contrib.pathy._
-import quasar.contrib.scalaz.State
-import quasar.effect.KeyValueStore
-import quasar.fp.free._
-
-import monocle.Lens
 import scalaz._
+import scalaz.stream.Process
 
-object Fixture {
+package object stream {
 
-  def constant: Mounting ~> State[Map[APath, MountConfig], ?] = {
-    type F[A] = State[Map[APath, MountConfig], A]
-    val mntr = Mounter.trivial[MountConfigs]
-    val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
-    mntr andThen foldMapNT(kvf)
+  implicit class AugmentedProcess[M[_], A](p: Process[M, A]) {
+    def runLogCatch(implicit monad: Monad[M]): M[Throwable \/ Vector[A]] = {
+      val right = λ[M ~> EitherT[M, Throwable, ?]](EitherT.right(_))
+      p.translate(right).runLog.run
+    }
   }
 
-  def runConstantMount[M[_]: Monad](mnts: Map[APath, MountConfig]): Mounting ~> M =
-    constant andThen State.evalNT[Map[APath, MountConfig], M](mnts)
 }
