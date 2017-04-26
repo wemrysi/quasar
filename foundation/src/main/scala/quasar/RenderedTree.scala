@@ -141,9 +141,13 @@ object RenderedTree {
 }
 
 object Terminal {
-  def apply(nodeType: List[String], label: Option[String]): RenderedTree = RenderedTree(nodeType, label, Nil)
+  def apply(nodeType: List[String], label: Option[String])
+      : RenderedTree =
+    RenderedTree(nodeType, label, Nil)
 }
 
 object NonTerminal {
-  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree]): RenderedTree = RenderedTree(nodeType, label, children)
+  def apply(nodeType: List[String], label: Option[String], children: List[RenderedTree])
+      : RenderedTree =
+    RenderedTree(nodeType, label, children)
 }
