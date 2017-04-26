@@ -26,25 +26,24 @@ import scalaz._, Scalaz._
 
 object Schema {
   val schema = db.Schema[Int](
-    MetaStoreAccess.tableExists("Properties").flatMap {
-      case true  => sql"SELECT schemaVersion FROM Properties".query[Int].unique.map(_.some)
+    MetaStoreAccess.tableExists("quasar_properties").flatMap {
+      case true  => sql"SELECT schema_version FROM quasar_properties".query[Int].unique.map(_.some)
       case false => none[Int].point[ConnectionIO]
     },
-    ver => sql"UPDATE Properties SET schemaVersion = $ver".update.run.void,
-    // NB: Currently requires coordination with QAdv due to preexistence there. 
-    // TODO: Craft a less tightly coupled approach.
+    ver => sql"UPDATE quasar_properties SET schema_version = $ver".update.run.void,
     SortedMap(
       0 ->
-        sql"CREATE TABLE Properties (schemaVersion INT NOT NULL)".update.run.void *>
-        sql"INSERT INTO Properties (schemaVersion) VALUES (0)".update.run.void,
-      1 ->
-        sql"""CREATE TABLE Mounts (
+        sql"""DROP TABLE IF EXISTS properties""".update.run.void                           *>
+        sql"""CREATE TABLE IF NOT EXISTS quasar_properties (
+              schema_version INT NOT NULL
+              )""".update.run.void                                                         *>
+        sql"""INSERT INTO quasar_properties (schema_version) VALUES (0)""".update.run.void *>
+        sql"""CREATE TABLE IF NOT EXISTS mounts (
               path          VARCHAR  NOT NULL  PRIMARY KEY,
               type          VARCHAR  NOT NULL,
               connectionUri VARCHAR  NOT NULL
-              )""".update.run.void,
-      3 ->
-        sql"""CREATE INDEX Mounts_type ON Mounts (type)""".update.run.void
+              )""".update.run.void                                                         *>
+        sql"""CREATE INDEX IF NOT EXISTS mounts_type ON mounts (type)""".update.run.void
 
         /*
         Important! Once a new schema version is added to this sequence and
