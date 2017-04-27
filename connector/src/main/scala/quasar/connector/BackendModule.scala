@@ -52,7 +52,7 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  final def definition[Task] = FileSystemDef fromPF {
+  final def definition = FileSystemDef fromPF {
     case (Type, uri) =>
       parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
         compile(cfg) map {
