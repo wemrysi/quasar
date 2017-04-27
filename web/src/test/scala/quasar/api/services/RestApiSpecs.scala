@@ -33,7 +33,7 @@ import org.specs2.matcher.TraversableMatchers._
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :/: MountingFileSystem)#M[A]
+  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Mounting :\: Analyze :/: FileSystem)#M[A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {
@@ -41,16 +41,16 @@ class RestApiSpecs extends quasar.Qspec {
         Task.fail(new RuntimeException("unimplemented"))
     }
 
-    val fs =
-      runFs(InMemState.empty)
-        .map(MountingFileSystem.interpret(mount, _))
+    val analyze = Empty.analyze[Task]
 
-    val eff = fs map { runFs =>
+    val eff = runFs(InMemState.empty) map { fs =>
       NaturalTransformation.refl[Task]               :+:
       Failure.toRuntimeError[Task, PathTypeMismatch] :+:
       Failure.toRuntimeError[Task, MountingError]    :+:
       Failure.toRuntimeError[Task, FileSystemError]  :+:
-      runFs
+      mount :+:
+      analyze :+:
+      fs
     }
 
     val service = eff map { runEff =>
