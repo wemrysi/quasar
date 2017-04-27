@@ -2,8 +2,7 @@
     "name": "group by a computed value",
 
     "backends": {
-        "couchbase":      "skip",
-        "postgresql":     "pending"
+        "postgresql": "pending"
     },
     "ignoreFieldOrder": [
         "marklogic_json",
