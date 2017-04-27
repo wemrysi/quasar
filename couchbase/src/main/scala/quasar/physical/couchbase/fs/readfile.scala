@@ -31,6 +31,8 @@ import eu.timepit.refined.api.RefType.ops._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
+// .erros.asScala.toVector 
+
 object readfile {
 
   def interpret[S[_]](
@@ -57,13 +59,18 @@ object readfile {
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- EitherT(lift(Task.delay(
-                   bkt.query(n1qlQuery(qStr))
-                     .allRows
-                     .asScala
-                     .toVector
-                     .traverse(rowToData)
-                 )).into)
+      qResult <- EitherT(lift(Task.delay {
+                   val queryResult = bkt.query(n1qlQuery(qStr))
+                   queryResult.errors.asScala.toVector.toNel.cata(
+                     errors => FileSystemError.readFailed(
+                       qStr,
+                       "[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
+                     queryResult
+                       .allRows
+                       .asScala
+                       .toVector
+                       .traverse(rowToData))
+                 }).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](
