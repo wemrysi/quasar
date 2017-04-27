@@ -25,13 +25,9 @@ import quasar.fs._
 import quasar.fs.impl.ReadOpts
 import quasar.physical.couchbase.common._
 
-import scala.collection.JavaConverters._
-
 import eu.timepit.refined.api.RefType.ops._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
-// .erros.asScala.toVector 
 
 object readfile {
 
@@ -59,18 +55,7 @@ object readfile {
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- EitherT(lift(Task.delay {
-                   val queryResult = bkt.query(n1qlQuery(qStr))
-                   queryResult.errors.asScala.toVector.toNel.cata(
-                     errors => FileSystemError.readFailed(
-                       qStr,
-                       "[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
-                     queryResult
-                       .allRows
-                       .asScala
-                       .toVector
-                       .traverse(rowToData))
-                 }).into)
+      qResult <- EitherT(lift(queryData(bkt, qStr)).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](
