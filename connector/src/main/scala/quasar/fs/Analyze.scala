@@ -31,8 +31,9 @@ object Analyze {
 
   final case class QueryCost(lp: Fix[LogicalPlan]) extends Analyze[FileSystemError \/ Int]
 
+  // TODO rename to Ops
   final class Unsafe[S[_]](implicit S: Analyze :<: S) extends LiftedOps[Analyze, S] {
-    def queryCost(lp: Fix[LogicalPlan]): Free[S, FileSystemError \/ Int] = lift(QueryCost(lp))
+    def queryCost(lp: Fix[LogicalPlan]): FileSystemErrT[Free[S, ?], Int] = EitherT(lift(QueryCost(lp)))
   }
 
   object Unsafe {

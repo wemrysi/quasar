@@ -56,7 +56,7 @@ object analysis {
         .run.value
         .traverse(_.fold(
           data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-          lp   => A.queryCost(lp).map(_.map(c => c.asJson).leftMap(fse => fse.toApiError))))
+          lp   => A.queryCost(lp).bimap(_.toApiError, _.asJson).run))
         .map(_.valueOr(_.toApiError.left[Json]))
 
 

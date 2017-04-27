@@ -183,6 +183,18 @@ object view {
     }
   }
 
+  def analyze[S[_]](implicit
+    M: Mounting.Ops[S],
+    A: Analyze.Unsafe[S]
+  ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
+    def apply[A](from: Analyze[A]) = from match {
+      case Analyze.QueryCost(lp) => resolveViewRefs[S](lp).run.flatMap(_.fold(
+        e => planningFailed(lp, Planner.InternalError fromMsg e.shows).raiseError[FileSystemErrT[Free[S, ?], ?], Int],
+        p => A.queryCost(p)).run)
+
+    }
+  }
+
   /** Translates requests which refer to any view path into operations
     * on an underlying filesystem, where references to views have been
     * rewritten as queries against actual files.
@@ -214,13 +226,9 @@ object view {
     S5: ViewState :<: S,
     S6: Mounting :<: S,
     S7: MountingFailure :<: S,
-    S8: PathMismatchFailure :<: S
-  ): AnalyticalFileSystem ~> Free[S, ?] = {
-    // FIX-ME
-    val analyze: Analyze ~> Free[S, ?] = Empty.analyze[Free[S, ?]]
-    analyze :+: fileSystem[S]
-  }
-
+    S8: PathMismatchFailure :<: S,
+    S9: Analyze :<: S
+  ): AnalyticalFileSystem ~> Free[S, ?] = analyze :+: fileSystem[S]
 
   /** Resolve view references in the given `LP`. */
   def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])

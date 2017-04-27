@@ -206,7 +206,7 @@ object transformPaths {
 
     val g = λ[Analyze ~> Free[S, ?]] {
       case QueryCost(lp) =>
-        U.queryCost(transformFile(inPath)(lp)).map(_.leftMap(transformErrorPath(outPath)))
+        U.queryCost(transformFile(inPath)(lp)).leftMap(transformErrorPath(outPath)).run
     }
     transformIn(g, liftFT[S])
   }
