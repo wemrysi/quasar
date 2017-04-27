@@ -22,6 +22,7 @@ import quasar.effect.Failure
 import quasar.fp._, free._
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.fs.mount.module.Module
 
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
@@ -33,7 +34,7 @@ import org.specs2.matcher.TraversableMatchers._
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Mounting :\: Analyze :/: FileSystem)#M[A]
+  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {
@@ -43,11 +44,15 @@ class RestApiSpecs extends quasar.Qspec {
 
     val analyze = Empty.analyze[Task]
 
-    val eff = runFs(InMemState.empty) map { fs =>
-      NaturalTransformation.refl[Task]               :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch] :+:
-      Failure.toRuntimeError[Task, MountingError]    :+:
-      Failure.toRuntimeError[Task, FileSystemError]  :+:
+    type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
+
+    val eff: Task[Eff ~> Task] = runFs(InMemState.empty) map { fs =>
+      NaturalTransformation.refl[Task]                   :+:
+      Failure.toRuntimeError[Task, PathTypeMismatch]     :+:
+      Failure.toRuntimeError[Task, MountingError]        :+:
+      Failure.toRuntimeError[Task, FileSystemError]      :+:
+      Failure.toRuntimeError[Task, Module.Error]         :+:
+      (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
       mount :+:
       analyze :+:
       fs

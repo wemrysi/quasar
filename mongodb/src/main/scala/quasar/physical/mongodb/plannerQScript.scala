@@ -1223,6 +1223,8 @@ object MongoDbQScriptPlanner {
     mtell: MonadTell_[M, PhaseResults]
   ): M[T[MongoQScript[T, ?]]] = {
     val rewrite = new Rewrite[T]
+    val optimize = new Optimize[T]
+
     implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript[T, ?], QScriptTotal[T, ?]] =
       ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
@@ -1235,7 +1237,7 @@ object MongoDbQScriptPlanner {
         "QScript (Mongo-specific)",
         Unirewrite[T, MongoQScriptCP[T], M](rewrite, listContents).apply(qs)
           .map(_.transHylo(
-            rewrite.optimize(reflNT[MongoQScript[T, ?]]),
+            optimize.optimize(reflNT[MongoQScript[T, ?]]),
             Unicoalesce[T, MongoQScriptCP[T]]))
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))))
     } yield opt
@@ -1258,8 +1260,6 @@ object MongoDbQScriptPlanner {
       ev2: EX :<: ExprOp,
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
-
-
 
     (for {
       opt <- toMongoQScript(lp, listContents).liftM[GenT]

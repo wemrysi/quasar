@@ -129,7 +129,7 @@ object queryfile {
   ](lp: T[LogicalPlan]): F[T[MLQScript[T, ?]]] = {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
-
+    val O = new Optimize[T]
     val R = new Rewrite[T]
 
     for {
@@ -137,7 +137,7 @@ object queryfile {
       shifted   <- Unirewrite[T, MLQScriptCP[T], F](R, ops.directoryContents[F, FMT]).apply(qs)
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
-        R.optimize(reflNT[MLQ]),
+        O.optimize(reflNT[MLQ]),
         Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
     } yield optimized

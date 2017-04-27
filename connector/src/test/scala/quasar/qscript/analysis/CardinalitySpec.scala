@@ -242,11 +242,9 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         val compile = Cardinality.deadEnd.calculate(empty)
         compile(Const(Root)) must_== 1
       }
-     }
-
+    }
   }
 
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
-     
 }

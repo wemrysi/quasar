@@ -28,7 +28,7 @@ import quasar.sql.FunctionDecl
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
-object module {
+package object module {
   import MountConfig._
 
   /** Intercept and fail any read to a module path; all others are passed untouched. */

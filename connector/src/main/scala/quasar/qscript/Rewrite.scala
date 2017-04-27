@@ -278,24 +278,31 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     case _                                 => None
   }
 
-  /** Pull more work to _after_ count operations, limiting the dataset. */
-  // TODO: we should be able to pull _most_ of a Reduce repair function to after a Subset
-  def swapMapSubset[F[_], G[_]: Functor]
-    (FtoG: F ~> G)
+  def compactLeftShift[F[_]: Functor, G[_]: Functor]
+    (FToG: PrismNT[G, F])
     (implicit QC: QScriptCore :<: F)
-      : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
-
-    val FI = Injectable.inject[QScriptCore, QScriptTotal]
-
-    {
-      case Subset(src, from, sel, count) =>
-        from.resume.swap.toOption >>= (FI project _) >>= {
-          case Map(fromInner, mf) =>
-            Map(FtoG(QC.inj(Subset(src, fromInner, sel, count))).embed, mf).some
-          case _ => None
-        }
-      case _ => None
-    }
+      : QScriptCore[T[G]] => Option[F[T[G]]] = {
+    case qs @ LeftShift(Embed(src), struct, ExcludeId, joinFunc) =>
+      (FToG.get(src) >>= QC.prj, struct.resume) match {
+        // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
+        case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
+          fm.resume match {
+            case -\/(MakeArray(value)) =>
+              QC.inj(Map(innerSrc, joinFunc >>= {
+                case LeftSide => fm
+                case RightSide => value
+              })).some
+            case _ => None
+          }
+        // LeftShift(_, MakeArray(_), ExcludeId, _)
+        case (_, -\/(MakeArray(value))) =>
+          QC.inj(Map(src.embed, joinFunc >>= {
+            case LeftSide => HoleF
+            case RightSide => value
+          })).some
+        case (_, _) => None
+      }
+    case qs => None
   }
 
   def compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
@@ -353,6 +360,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     (repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) _) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
       liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
+      liftFG(injectRepeatedly(compactLeftShift[F, G](prism).apply(_: QScriptCore[T[G]]))) ⋙
       liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
       repeatedly(C.coalesceQCNormalize[G](prism)) ⋙
       liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙
@@ -385,13 +393,6 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
              FI: Injectable.Aux[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeWithBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
-
-  /** Should only be applied after all other QScript transformations. This gives
-    * the final, optimized QScript for conversion.
-    */
-  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(implicit QC: QScriptCore :<: F)
-      : F[T[G]] => F[T[G]] =
-    liftFF(repeatedly(swapMapSubset(FtoG)))
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
     * [[Root]] (and projections, etc.) into [[Read]], so then we can handle

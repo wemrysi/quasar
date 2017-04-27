@@ -46,41 +46,66 @@ To compile the project and run tests, first clone the quasar repo and then execu
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-Running the full test suite can be done in two ways:
+Running the full test suite can be done using docker containers for various backends:
 
-##### Testing option 1 (prerequisite: docker)
+##### Full Testing (prerequisite: docker and docker-compose)
 
-A docker container running mongodb operates for the duration of the test run.
+In order to run integration tests for various backends the `docker/scripts` are provided to easily create dockerized backend data stores.
 
-```bash
-./bin/full-it-tests.sh
-```
+Of particular interest are the following two scripts:
 
-##### Testing option 2
+  1. `docker/scripts/setupContainers`
+  2. `docker/scripts/assembleTestingConf`
 
-In order to run the integration tests for a given backend, you will need to provide a URL to it. For instance, in the case of MongoDB, If you have a hosted MongoDB instance handy, then you can simply point to it, or else
-you probably want to install MongoDB locally and point Quasar to that one. Installing MongoDB locally is probably a good idea as it will
-allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
-In order to install MongoDB locally you can either use something like Homebrew (on OS X) or simply go to the MongoDB website and follow the
-instructions that can be found there.
-
-Once we have a MongoDB instance handy, we need to configure the integration tests
-in order to inform Quasar about where to find the backends to test.
-
-Simply copy `it/testing.conf.example` to `it/testing.conf` and change the values. For example:
+Quasar supports the following datastores:
 
 ```
-mongodb_3_2="mongodb://<mongoURL>"
-mongodb_3_0="mongodb://<mongoURL>"
-mongodb_2_6="mongodb://<mongoURL>"
+quasar_mongodb_2_6
+quasar_mongodb_3_0
+quasar_mongodb_read_only
+quasar_mongodb_3_2
+quasar_mongodb_3_4
+quasar_metastore
+quasar_postgresql
+quasar_marklogic_xml
+quasar_marklogic_json
+quasar_couchbase
 ```
 
-where <mongoURL> is the url at which one can find a Mongo database. For example <mongoURL> would probably look
-something like `localhost:27017` for a local installation. This means the integration tests will be run against
-both MongoDB versions 2.6, 3.0, and 3.2. Alternatively, you can choose to install only one of these and run the integration
-tests against only that one database. Simply omit a version in order to avoid testing against it. On the integration
-server, the tests are run against all supported filesystems.
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
+if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbsase you would use:
+
+```
+./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
+```
+
+Note: `quasar_metastore` is always needed to run integration tests.
+
+This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
+
+Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test.
+This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
+file based on the currently running containerizd backends using the following command:
+
+```
+./assembleTestingConf -a
+```
+
+After running this command your `testing.conf` file should look similar to this:
+
+```
+> cat it/testing.conf
+postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
+couchbase="couchbase://192.168.99.101?username=Administrator&password=password&socketConnectTimeoutSeconds=15"
+marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
+postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
+mongodb_3_0="mongodb://192.168.99.101:27019"
+```
+
+IP's will vary depending on your docker environment. In addition the scripts assume you have docker and docker-compose installed.
+You can find information about installing docker [here](https://www.docker.com/products/docker-toolbox).
+
 
 #### REPL JAR
 
@@ -98,6 +123,14 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }'
+```
+
+You can find examples of `connectionUri` values [here](#database-mounts).
+
 #### Web JAR
 
 To build a JAR containing a lightweight HTTP server that allows you to programmatically interact with Quasar, execute the following command:
@@ -114,9 +147,12 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
+Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
+
+
 ### Configure
 
-The various JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
+The various REPL JARs can be configured by using a command-line argument to indicate the location of a JSON configuration file. If no config file is specified, it is assumed to be `quasar-config.json`, from a standard location in the user's home directory.
 
 The JSON configuration file must have the following format:
 
@@ -125,38 +161,64 @@ The JSON configuration file must have the following format:
   "server": {
     "port": 8080
   },
-
-  "mountings": {
-    "/": {
-      "mongodb": {
-        "connectionUri": "mongodb://<user>:<pass>@<host>:<port>/<dbname>"
-      }
+  "metastore": {
+    "database": {
+      <metastore_config>
     }
   }
 }
 ```
 
-One or more mountings may be included, and each must have a unique path (above, `/`), which determines where in the filesystem the database(s) contained by the mounting will appear.
+#### Metadata Store
 
-#### Database mounts
+Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) (9.5+) databases are supported.
+
+To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
+
+If no metastore configuration is specified, the default configuration will use an H2 database located in the default quasar configuration directory for your operating system.
+
+An example H2 configuration would look something like
+```json
+"h2": {
+  "file": "<path/to/database/file>"
+}
+```
+
+A PostgreSQL configuration looks something like
+```json
+"postgresql": {
+  "host": "<hostname>",
+  "port": "<port>",
+  "database": "<database name>",
+  "userName": "<database user>",
+  "password": "<password for database user>",
+  "parameters": <an optional JSON object of parameter key:value pairs>
+}
+```
+
+The contents of the optional `parameters` object correspond to the various driver configuration parameters available for PostgreSQL. One example for a value of the `parameters` object may be a `loglevel`:
+
+```json
+"parameters": {
+  "loglevel": 1
+}
+```
+
+#### Initializing and updating Schema
+
+Before the server can be started, the metadata store schema must be initialized. To do so utilize the "initUpdateMetaStore" command with a web or repl quasar jar.
+
+If mounts are already defined in the config file, initialization will migrate those to the metadata store.
+
+### Database mounts
 
 If the mount's key is "mongodb", then the `connectionUri` is a standard [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/). Only the primary host is required to be present, however in most cases a database name should be specified as well. Additional hosts and options may be included as specified in the linked documentation.
 
-For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the configuration looks like this:
-```json
-  "mountings": {
-    "/local/": {
-      "mongodb": {
-        "connectionUri": "mongodb://localhost/test"
-      }
-    }
-  }
-```
-Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
+For example, say a MongoDB instance is running on the default port on the same machine as Quasar, and contains databases `test` and `students`, the `students` database contains a collection `cs101`, and the `connectionUri` is `mongodb://localhost/test`. Then the filesystem will contain the paths `/local/test/` and `/local/students/cs101`, among others.
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
-##### MongoDB
+#### MongoDB
 
 To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection string, and also provide the following via system properties when launching either JAR (i.e. `java -Djavax.net.ssl.trustStore=/home/quasar/ssl/certs.ts`):
 - `javax.net.ssl.trustStore`: path specifying a file containing the certificate chain for verifying the server.
@@ -166,7 +228,7 @@ To connect to MongoDB using TLS/SSL, specify `?ssl=true` in the connection strin
 - `javax.net.debug`: (optional) use `all` for very verbose but sometimes helpful output.
 - `invalidHostNameAllowed`: (optional) use `true` to disable host name checking, which is less secure but may be needed in test environments using self-signed certificates.
 
-##### Couchbase
+#### Couchbase
 
 To connect to Couchbase use the following `connectionUri` format:
 
@@ -185,7 +247,7 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-##### HDFS using Apache Spark
+#### HDFS using Apache Spark
 
 To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
@@ -193,7 +255,7 @@ To connect to HDFS using Apache Spark use the following `connectionUri` format:
 
 e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
-##### MarkLogic
+#### MarkLogic
 
 To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
 
@@ -224,22 +286,11 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
   - Element attributes are serialized to an object at the `_attributes` key.
   - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
 
-#### View mounts
+### View mounts
 
 If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL² query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
 
-For example, given the above MongoDB mount, an additional view could be defined in this way:
-
-```json
-  "mountings": {
-    ...,
-    "/simpleZips": {
-      "view": {
-        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
-      }
-    }
-  }
-```
+For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
 
@@ -557,6 +608,10 @@ Takes a port number in the body, and attempts to restart the server on that port
 ### DELETE /server/port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
+
+### GET /invoke/fs/[path]
+
+Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
 
 
 ## Error Responses
