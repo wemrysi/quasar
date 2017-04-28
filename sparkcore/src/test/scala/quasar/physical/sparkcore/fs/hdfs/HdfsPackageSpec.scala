@@ -19,11 +19,17 @@ package quasar.physical.sparkcore.fs.hdfs
 import slamdata.Predef._
 
 import org.apache.spark.SparkConf
-import java.net.{URI, URLDecoder}
+import java.net.URI
 import pathy._, Path._
-import scalaz._, concurrent.Task
+import scalaz._, Scalaz._, concurrent.Task
 
 class HdfsPackageSpec extends quasar.Qspec {
+
+  // TODO move to contrib/show.scala ?
+  implicit val showThrowable = new Show[Throwable] {
+    override def show(t: Throwable): Cord =
+      Cord.stringToCord(t.getMessage)
+  }
 
   "hdfs.generateHdfsFS" should {
     "create a valid HDFS file system if URL is valid" in {
@@ -32,13 +38,14 @@ class HdfsPackageSpec extends quasar.Qspec {
     }
 
     "create a valid HDFS file system if URL is valid but encoded" in {
-      val url = "hdfs%3A%2F%2Flocalhost%3A9000"
-      hdfsUri(url).unsafePerformSync must_== new URI(URLDecoder.decode(url, "UTF-8"))
+      val encodedUrl = "hdfs%3A%2F%2Flocalhost%3A9000"
+      val decodedUrl = "hdfs://localhost:9000"
+      hdfsUri(encodedUrl).unsafePerformSync must_== new URI(decodedUrl)
     }
 
     "fail if URL is not valid" in {
       val url = "blabalbab"
-      hdfsUri(url).attempt.map(_.leftMap(e => s"${e.getMessage}")).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")
+      hdfsUri(url).attempt.map(_.leftMap(_.show.toString)).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")
     }
     
   }
