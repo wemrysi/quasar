@@ -2,7 +2,6 @@
     "name": "largest zips",
     "backends": {
         "postgresql": "pending",
-        "couchbase":  "skip",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
