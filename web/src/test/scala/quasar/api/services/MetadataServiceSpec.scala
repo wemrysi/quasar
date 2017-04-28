@@ -121,19 +121,19 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         moduleName: DirName,
         vcfg: (Fix[Sql], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
-      ) => (fileName ≠ viewName && directoryName ≠ fsMountName) ==> {
+      ) => (fileName ≠ viewName && directoryName ≠ fsMountName && fsMountName ≠ moduleName) ==> {
         val moduleConfig: List[Statement[Fix[Sql]]] = List(
           FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
         val parent: ADir = rootDir </> dir("foo")
         val mnts = Map[APath, MountConfig](
-          (parent </> file(viewName.value),   MountConfig.viewConfig(vcfg)),
-          (parent </> dir(fsMountName.value), MountConfig.fileSystemConfig(fsCfg)),
-          (parent </> dir1(moduleName),       MountConfig.moduleConfig(moduleConfig)))
+          (parent </> file1(viewName), MountConfig.viewConfig(vcfg)),
+          (parent </> dir1(fsMountName), MountConfig.fileSystemConfig(fsCfg)),
+          (parent </> dir1(moduleName), MountConfig.moduleConfig(moduleConfig)))
         val mem = InMemState fromFiles Map(
-          (parent </> file(fileName.value), Vector()),
-          (parent </> dir(directoryName.value) </> file("quux"), Vector()),
-          (parent </> file(viewName.value), Vector()),
-          (parent </> dir(fsMountName.value) </> file("bar"), Vector()))
+          (parent </> file1(fileName), Vector()),
+          (parent </> dir1(directoryName) </> file("quux"), Vector()),
+          (parent </> file1(viewName), Vector()),
+          (parent </> dir1(fsMountName) </> file("bar"), Vector()))
 
         service(mem, mnts)(Request(uri = pathUri(parent)))
           .as[Json].unsafePerformSync must_=== Json("children" := List(
