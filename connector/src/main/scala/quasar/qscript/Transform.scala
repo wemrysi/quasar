@@ -21,6 +21,7 @@ import quasar._, Planner._
 import quasar.common.JoinType
 import quasar.contrib.matryoshka._
 import quasar.ejson._
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFunc._
@@ -46,7 +47,7 @@ import shapeless.{nat, Sized}
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
 class Transform
-  [T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT,
+  [T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: Traverse: Normalizable]
   (implicit
     C:  Coalesce.Aux[T, F, F],

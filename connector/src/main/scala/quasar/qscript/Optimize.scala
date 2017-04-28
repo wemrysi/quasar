@@ -24,7 +24,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-class Optimize[T[_[_]]: BirecursiveT: EqualT: OrderT: ShowT] extends TTypes[T] {
+class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   private val FI = Injectable.inject[QScriptCore, QScriptTotal]
 
   /** Pull more work to _after_ count operations, limiting the dataset. */

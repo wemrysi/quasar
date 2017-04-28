@@ -21,6 +21,7 @@ import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.sql.CompilerHelpers
@@ -120,7 +121,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
     "fold a constant array value" in {
       val value: Fix[EJson] =
-        EJson.fromExt[Fix[EJson]].apply(ejson.Int[Fix[EJson]](7))
+        EJson.fromExt(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
@@ -171,7 +172,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
     "fold a constant doubly-nested array value" in {
       val value: Fix[EJson] =
-        EJson.fromExt[Fix[EJson]].apply(ejson.Int[Fix[EJson]](7))
+        EJson.fromExt(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
@@ -181,7 +182,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Arr(List(value)))))).embed)))
+          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon(ejson.Arr(List(value)))))).embed)))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }
@@ -224,14 +225,14 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             HoleF,
             IncludeId,
             ConcatArraysR(
-              ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed),
+              ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon(ejson.Str[Fix[ejson.EJson]]("name"))))).embed),
               MakeArrayR(
                 ConcatArraysR(
                   MakeArrayR(
                     ConcatArraysR(
                       MakeArrayR(LeftSideF),
                       MakeArrayR(RightSideF))),
-                  ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))).embed)
+                  ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon(ejson.Str[Fix[ejson.EJson]]("name"))))).embed)))))).embed)
     }
 
     "fold nested boolean values" in {
@@ -249,7 +250,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR.embed,
-          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix[EJson]].apply(ejson.Bool[Fix[ejson.EJson]](false))))).embed)))
+          ConstantR(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon(ejson.Bool[Fix[ejson.EJson]](false))))).embed)))
 
       normalizeFExpr(exp.embed) must equal(expected.embed)
     }

@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
 import quasar.qscript.MapFunc._
@@ -122,9 +123,9 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  def concat[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, A: Equal: Show](
-    l: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
     // NB: Might be better to do this later, after some normalization, part of
@@ -155,8 +156,10 @@ package object qscript {
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
-  def rebaseBranch[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
-    (br: FreeQS[T], fm: FreeMap[T]): FreeQS[T] = {
+  def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT](
+    br: FreeQS[T],
+    fm: FreeMap[T]
+  ): FreeQS[T] = {
     val rewrite = new Rewrite[T]
 
     (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
@@ -249,7 +252,7 @@ package qscript {
   @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 
   object Ann {
-    implicit def equal[T[_[_]]: OrderT: EqualT]: Equal[Ann[T]] =
+    implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
       Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
 
     implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
@@ -259,9 +262,9 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: OrderT: EqualT, F[_]: Functor]
-      (implicit F: Delay[Equal, F])
-        : Equal[Target[T, F]] =
+    implicit def equal[T[_[_]]: EqualT, F[_]: Functor](
+      implicit F: Delay[Equal, F], J: Equal[T[EJson]]
+    ): Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
 
     implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])
