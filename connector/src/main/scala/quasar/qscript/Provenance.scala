@@ -45,7 +45,7 @@ sealed abstract class Provenance[T[_[_]]]
 object Provenance {
   // TODO: This might not be the proper notion of equality – this just tells us
   //       which things align properly for autojoins.
-  implicit def equal[T[_[_]]: OrderT: EqualT]: Equal[Provenance[T]] =
+  implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Provenance[T]] =
     Equal.equal {
       case (Nada(),        Nada())        => true
       case (Value(_),      Value(_))      => true
@@ -69,7 +69,7 @@ object Provenance {
   }
 }
 
-class ProvenanceT[T[_[_]]: CorecursiveT: OrderT: EqualT] extends TTypes[T] {
+class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) extends TTypes[T] {
   type Provenance = quasar.qscript.provenance.Provenance[T]
 
   def genComparisons(lps: List[Provenance], rps: List[Provenance]): JoinFunc =

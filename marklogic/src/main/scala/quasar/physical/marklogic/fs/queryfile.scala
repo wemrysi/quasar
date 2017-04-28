@@ -23,6 +23,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
+import quasar.ejson.implicits._
 import quasar.fp._, eitherT._
 import quasar.fp.numeric.Positive
 import quasar.fs._
@@ -120,7 +121,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
   ](
     lp: T[LogicalPlan]

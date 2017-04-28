@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec, RenderTreeT}
 import quasar.common.{PhaseResults, PhaseResultT}
 import quasar.common.PhaseResult.{detail, tree}
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, Read, MonotonicSeq}
@@ -86,7 +85,7 @@ object queryfile {
     case FileExists(file)     => fileExists(file)
   }
 
-  def executePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
+  def executePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan], out: AFile
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -121,7 +120,7 @@ object queryfile {
                 ))).into.liftF
     } yield out).run.run
 
-  def evaluatePlan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
+  def evaluatePlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -155,7 +154,7 @@ object queryfile {
   ): Free[S, Unit] =
     results.delete(handle)
 
-  def explain[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
+  def explain[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -212,7 +211,7 @@ object queryfile {
                  )).into.liftM[PhaseResultT])
     } yield r
 
-  def lpToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
     S0: Read[Context, ?] :<: S,
@@ -225,7 +224,7 @@ object queryfile {
     lpLcToN1ql[T, S](lp, lc)
   }
 
-  def lpLcToN1ql[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, S[_]](
+  def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit

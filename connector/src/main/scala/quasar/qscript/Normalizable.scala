@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 
@@ -37,25 +38,25 @@ import simulacrum.typeclass
 trait NormalizableInstances {
   import Normalizable._
 
-  def normalizable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] =
+  def normalizable[T[_[_]]: BirecursiveT: EqualT: ShowT] =
     new NormalizableT[T]
 
   implicit def const[A]: Normalizable[Const[A, ?]] =
     make(λ[Const[A, ?] ~> (Option ∘ Const[A, ?])#λ](_ => None))
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[QScriptCore[T, ?]] =
     normalizable[T].QScriptCore
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ProjectBucket[T, ?]] =
     normalizable[T].ProjectBucket
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[ThetaJoin[T, ?]] =
     normalizable[T].ThetaJoin
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
@@ -69,8 +70,7 @@ trait NormalizableInstances {
   }
 }
 
-class NormalizableT[T[_[_]]: BirecursiveT : OrderT: EqualT : ShowT]
-    extends TTypes[T] {
+class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 
