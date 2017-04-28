@@ -40,16 +40,22 @@ object normalization {
         JC: Corecursive.Aux[J, EJson],
         JR: Recursive.Aux[J, EJson]
       ): T =
-        t.transCata[T](
-              reduceToBottom[J, T]
-          >>> normalizeEJson[J, T]
-          >>> liftConst[J, T]
-          >>> coalesceUnion[J, T]
-          >>> simplifyUnion[J, T]
-        )
+        t.transCata[T](normalizeƒ[J, T])
     }
   }
 
+  def normalizeƒ[J: Order, T](
+    implicit
+    TC: Corecursive.Aux[T, TypeF[J, ?]],
+    TR: Recursive.Aux[T, TypeF[J, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): TypeF[J, T] => TypeF[J, T] =
+    reduceToBottom[J, T] >>>
+    normalizeEJson[J, T] >>>
+    liftConst[J, T]      >>>
+    coalesceUnion[J, T]  >>>
+    simplifyUnion[J, T]
 
   // Normalizations
 

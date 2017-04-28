@@ -131,7 +131,11 @@ object TypeF extends TypeFInstances {
             >>> elideBottom[J, T]
           )
 
-        normalization.normalize[J]((x, y).apo[T](glbƒ[J, T] <<< normArg.product))
+        (x, y).ghylo[Id, T \/ ?](
+          distCata[TypeF[J, ?]],
+          distApo[T, TypeF[J, ?]],
+          normalization.normalizeƒ[J, T] >>> (_.embed),
+          glbƒ[J, T] <<< normArg.product)
       }
     }
   }
