@@ -176,7 +176,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => HttpService.notFound // note: This needs to change to `Response.fallthrough` when http4s is upgraded
+          case None       => Response.fallthrough
         }
       }
     }
