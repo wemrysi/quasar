@@ -73,7 +73,7 @@ quasar_marklogic_json
 quasar_couchbase
 ```
 
-Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example 
+Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
 if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbsase you would use:
 
 ```
@@ -84,7 +84,7 @@ Note: `quasar_metastore` is always needed to run integration tests.
 
 This command will pull docker images, create containers running the specified backends, and configure them appropriately for Quasar testing.
 
-Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test. 
+Once backends are ready we need to configure the integrations tests in order to inform Quasar about where to find the backends to test.
 This information is conveyed to Quasar using the file `it/testing.conf`. Using the `assembleTestingConf` script you can generate a `testing.conf`
 file based on the currently running containerizd backends using the following command:
 
@@ -126,7 +126,7 @@ java -jar [<path to jar>] [-c <config file>]
 As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }' 
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100?username=Administrator&password=password" } }'
 ```
 
 You can find examples of `connectionUri` values [here](#database-mounts).
@@ -171,7 +171,7 @@ The JSON configuration file must have the following format:
 
 #### Metadata Store
 
-Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) databases are supported.
+Configuration for the metadata store consists of providing connection information for a supported database. Currently the [H2](http://www.h2database.com/) and [PostgreSQL](https://www.postgresql.org/) (9.5+) databases are supported.
 
 To easily get up and running with a PostgreSQL metastore backend using docker see [Full Testing](#Full) section.
 
