@@ -123,10 +123,9 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
-    l: FreeMapA[T, A],
-    r: FreeMapA[T, A]
-  ): (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
     // NB: Might be better to do this later, after some normalization, part of
