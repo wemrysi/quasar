@@ -31,7 +31,6 @@ import monocle.syntax.fields._
 import scalaz._, Scalaz._
 import spire.algebra.{Field, Ring}
 import spire.math.ConvertableTo
-import spire.syntax.field._
 
 object compression {
   import TypeF._
@@ -149,8 +148,8 @@ object compression {
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Const(Embed(EncodedBinary(size))))) =>
       // NB: Z85 uses 5 chars for every 4 bytes.
-      val (cnt, len) = (size1(ts), A.fromBigInt(size) * A.fromInt(4) / A.fromInt(5))
-      envT(some(TS.coll(cnt, some(len), some(len))), byteArr(cnt))
+      val (cnt, len) = (size1(ts), some(A.fromBigInt(size)))
+      envT(some(TS.coll(cnt, len, len)), byteArr(cnt))
   }
 
   ////

@@ -72,7 +72,7 @@ package object sst {
   object EncodedBinary {
     def unapply[J](ejs: EJson[J])(implicit J: Recursive.Aux[J, EJson]): Option[BigInt] =
       ejs match {
-        case E(Meta(Embed(SizedTypeTag(BinaryTag, size)), Embed(C(Str(_))))) => some(size)
+        case E(Meta(Embed(C(Str(_))), Embed(SizedTypeTag(BinaryTag, size)))) => some(size)
         case _                                                               => none
       }
   }
