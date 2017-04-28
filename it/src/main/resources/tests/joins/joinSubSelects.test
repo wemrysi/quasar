@@ -10,7 +10,8 @@
         "postgresql":        "pending"
     },
 
-    "NB": "Skipped for all connectors due to QScript join bug #1866.",
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../zips.data", "../largeZips.data"],
 

@@ -2,12 +2,13 @@
     "name": "join with multiple fields selected",
 
     "backends": {
-        "couchbase": "pending",
-        "marklogic_json": "pending",
+        "couchbase":         "pending",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../smallZips.data", "../extraSmallZips.data"],
 
@@ -19,6 +20,8 @@
               FROM `../smallZips` JOIN `../extraSmallZips`
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
+
+    "ignoreFieldOrder": [ "marklogic_json" ],
 
     "predicate": "containsAtLeast",
 

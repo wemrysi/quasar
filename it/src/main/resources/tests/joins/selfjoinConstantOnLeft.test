@@ -10,11 +10,16 @@
         "postgresql":        "pending"
     },
 
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": "../largeZips.data",
 
-    "query": "select a.city, b.state from `../largeZips` as a, `../largeZips` as b
+    "query": "select a.city, b.state
+              from `../largeZips` as a, `../largeZips` as b
               where a.`_id` = b.`_id` and \"CA\" = b.state",
 
     "predicate": "containsAtLeast",
+
     "expected": [{ "city": "REDONDO BEACH", "state": "CA" }]
 }

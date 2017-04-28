@@ -6,13 +6,18 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
 
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
 
-    "query": "select smallZips.city, zips.state from `../smallZips`, `../zips` where smallZips.`_id` = zips.`_id`",
+    "query": "select smallZips.city, zips.state
+              from `../smallZips`, `../zips`
+              where smallZips.`_id` = zips.`_id`",
 
     "predicate": "containsAtLeast",
 
