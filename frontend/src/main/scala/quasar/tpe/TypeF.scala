@@ -200,7 +200,7 @@ object TypeF extends TypeFInstances {
     def apply[J] = new PartiallyApplied[J]
     final class PartiallyApplied[J] {
       def apply[T](a: T, b: T)(implicit J: Equal[J], T: Recursive.Aux[T, TypeF[J, ?]]): Boolean =
-        EqualR.equal[T, TypeF[J, ?]](a, b)(traverse[J], T, structuralEqual[J])
+        Recursive.equal[T, TypeF[J, ?]](traverse[J], T, structuralEqual[J]).equal(a, b)
     }
   }
 
