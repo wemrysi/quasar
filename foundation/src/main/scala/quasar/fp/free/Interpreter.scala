@@ -17,8 +17,6 @@
 package quasar.fp.free
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.eitherT._
-import quasar.contrib.scalaz.writerT._
 
 import scalaz._
 import scalaz.stream.Process
@@ -33,32 +31,32 @@ import scalaz.stream.Process
 class Interpreter[F[_], M[_]: Monad](val interpretTerm: F ~> M) {
   type Program[A] = Free[F,A]
 
-  def interpret: Program ~> M =
+  def run: Program ~> M =
     foldMapNT(interpretTerm)
 
-  def interpretT[T[_[_],_]: Hoist]: T[Program,?] ~> T[M,?] =
-    Hoist[T].hoist[Program,M](interpret)
+  def runT[T[_[_],_]: Hoist]: T[Program,?] ~> T[M,?] =
+    Hoist[T].hoist[Program,M](run)
 
-  def interpretT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist]: T1[T2[Program,?],?] ~> T1[T2[M,?],?] =
-    Hoist[T1].hoist[T2[Program,?],T2[M,?]](interpretT[T2])(Hoist[T2].apply[Program])
+  def runT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist]: T1[T2[Program,?],?] ~> T1[T2[M,?],?] =
+    Hoist[T1].hoist[T2[Program,?],T2[M,?]](runT[T2])(Hoist[T2].apply[Program])
 
   // TODO: Add test (Used downstream in QAdv)
-  def interpretT3[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist, T3[_[_],_]: Hoist]: T1[T2[T3[Program,?],?],?] ~> T1[T2[T3[M,?],?],?] =
-    Hoist[T1].hoist[T2[T3[Program,?],?], T2[T3[M,?],?]](interpretT2[T2,T3])(Hoist[T2].apply[T3[Program,?]](Hoist[T3].apply[Program]))
+  def runT3[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist, T3[_[_],_]: Hoist]: T1[T2[T3[Program,?],?],?] ~> T1[T2[T3[M,?],?],?] =
+    Hoist[T1].hoist[T2[T3[Program,?],?], T2[T3[M,?],?]](runT2[T2,T3])(Hoist[T2].apply[T3[Program,?]](Hoist[T3].apply[Program]))
 
   def runLog[A](p: Process[Program,A])(implicit catchable: Catchable[M]): M[Vector[A]] =
-    p.translate(interpret).runLog
+    p.translate(run).runLog
 
   def runLogT[T[_[_],_]:Hoist,A](p: Process[T[Program,?],A])(implicit catchable: Catchable[T[M,?]]): T[M,Vector[A]] = {
     type ResultT[A] = T[M,A]
     val monadR: Monad[ResultT] = Hoist[T].apply
-    p.translate[T[M,?]](interpretT[T]).runLog[ResultT,A](monadR, catchable)
+    p.translate[T[M,?]](runT[T]).runLog[ResultT,A](monadR, catchable)
   }
 
   def runLogT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist,A](p: Process[T1[T2[Program,?],?],A])(implicit catchable: Catchable[T1[T2[M,?],?]]): T1[T2[M,?],Vector[A]] = {
     type ResultT[A] = T1[T2[M,?],A]
     val monadR: Monad[ResultT] = Hoist[T1].apply[T2[M,?]](Hoist[T2].apply)
-    p.translate[ResultT](interpretT2[T1,T2]).runLog[ResultT,A](monadR,catchable)
+    p.translate[ResultT](runT2[T1,T2]).runLog[ResultT,A](monadR,catchable)
   }
 
   // TODO: Add test (Used downstream in QAdv)
@@ -66,39 +64,6 @@ class Interpreter[F[_], M[_]: Monad](val interpretTerm: F ~> M) {
   : T1[T2[T3[M,?],?],Vector[A]] = {
     type ResultT[A] = T1[T2[T3[M,?],?],A]
     val monadR: Monad[ResultT] = Hoist[T1].apply[T2[T3[M,?],?]](Hoist[T2].apply[T3[M,?]](Hoist[T3].apply))
-    p.translate[ResultT](interpretT3[T1,T2,T3]).runLog[ResultT,A](monadR,catchable)
-  }
-}
-
-/** Extends Interpreter to provide a version with better type inference for
-  * commonly used `MonadTrans`
-  * @param interpretTerm A natural transformation from the Algebra into the
-  *                      desired `Monad` from which many other natural
-  *                      transformations can be derived
-  * @tparam F The type of the `Functor` that represents the algebra to be
-  *           interpreted
-  * @tparam M The `Monad` into which to translate the `Free` Algebra
-  */
-class SpecializedInterpreter[F[_], M[_]: Monad](interpretTerm: F ~> M)
-    extends Interpreter(interpretTerm) {
-  def runLogE[E, A]
-    (p: Process[EitherT[Program, E, ?], A])
-    (implicit catchable: Catchable[M])
-      : EitherT[M, E, Vector[A]] = {
-    type T[Program[_], A] = EitherT[Program, E, A]
-    runLogT[T, A](p)
-  }
-
-  def runLogWE[E, L: Monoid, A]
-    (p: Process[EitherT[WriterT[Program, L, ?], E, ?], A])
-    (implicit catchable: Catchable[M])
-      : EitherT[WriterT[M, L, ?], E, Vector[A]] = {
-    type T1[M[_], A] = EitherT[M, E, A]
-    type T2[M[_], A] = WriterT[M, L, A]
-    type WriterResult[A] = T2[M, A]
-    type ResultT[A] = T1[T2[M, ?], A]
-    val catchableR: Catchable[ResultT] =
-      eitherTCatchable[WriterResult, E](writerTCatchable[M, L], WriterT.writerTFunctor[M, L])
-    runLogT2[T1, T2, A](p)(Hoist[T1], Hoist[T2], catchableR)
+    p.translate[ResultT](runT3[T1,T2,T3]).runLog[ResultT,A](monadR,catchable)
   }
 }

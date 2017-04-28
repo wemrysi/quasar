@@ -104,6 +104,6 @@ object TraceFS {
     interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace)
 
   def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathSegment]]): (Vector[RenderedTree], A) = {
-    new free.Interpreter(traceFs(paths)).interpret(t).run
+    new free.Interpreter(traceFs(paths)).run(t).run
   }
 }

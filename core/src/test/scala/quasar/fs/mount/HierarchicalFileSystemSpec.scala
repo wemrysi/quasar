@@ -41,7 +41,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import ManageFile.MoveSemantics, QueryFile.ResultHandle
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
-  val transforms = QueryFile.Transforms[F]
+  val transforms = QueryFile.Transforms[FreeFS]
   val unsafeq = QueryFile.Unsafe[FileSystem]
 
   type ExecM[A] = transforms.ExecM[A]
@@ -90,10 +90,10 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
     )).toOption.get)
 
-  val runMntd: F ~> MountedFs =
+  val runMntd: FreeFS ~> MountedFs =
     foldMapNT(foldMapNT(interpHEff).compose[FileSystem](interpretMnted))
 
-  val runEmpty: F ~> MountedFs = {
+  val runEmpty: FreeFS ~> MountedFs = {
     val interpEmpty: FileSystem ~> HEffM =
       hierarchical.fileSystem[MountedFs, HEff](Mounts.empty)
     foldMapNT(foldMapNT(interpHEff) compose interpEmpty)
