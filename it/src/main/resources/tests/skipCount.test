@@ -11,12 +11,8 @@
         "spark_local":    "skip"
     },
 
-    "NB": "Skipped in spark due to ListMap serialization stack overflow, where
-           the ListMap is used in Data.Obj and is contained in a QScript UnshiftMap.
-
-           QScript can (and needs to) remove the UnshiftMap as it is unnecessary.
-           And spark needs to support UnshiftMap, which it will when it moves from
-           Data to EJson.",
+    "NB": "#1748: Disabled in spark due to ListMap serialization stack overflow.
+           #2122: Improves the qscript, but the qscript _should_ currently be correct.",
 
     "data": "zips.data",
 
