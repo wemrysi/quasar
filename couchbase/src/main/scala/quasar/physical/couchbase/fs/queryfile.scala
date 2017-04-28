@@ -110,7 +110,7 @@ object queryfile {
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftF
-      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into[S].liftM[PhaseResultT])
+      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[PhaseResultT])
       _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[PhaseResultT]))
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable

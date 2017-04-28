@@ -27,8 +27,7 @@ import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.cluster.ClusterManager
-import com.couchbase.client.java.document.json.JsonObject
-import com.couchbase.client.java.query.{N1qlParams, N1qlQuery}
+import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
 import scalaz._, Scalaz._
@@ -60,6 +59,7 @@ object common {
     prefix: String
   ): Task[FileSystemError \/ Unit] = {
     val qStr = s"""DELETE FROM `${bucket.name}` WHERE type LIKE "${prefix}%""""
+
     query(bucket, qStr).map(_.void)
   }
 
@@ -69,7 +69,7 @@ object common {
   ): Task[FileSystemError \/ List[DocType]] = {
     val qStr = s"""SELECT distinct type FROM `${bucket.name}`
                    WHERE type LIKE "${prefix}%""""
-    query(bucket, qStr).map(_.map(_.toList.map(r => DocType(r.getString("type")))))
+    query(bucket, qStr).map(_.map(_.toList.map(r => DocType(r.value.getString("type")))))
   }
 
   def existsWithPrefix(
@@ -78,7 +78,7 @@ object common {
   ): Task[FileSystemError \/ Boolean] = {
     val qStr = s"""SELECT count(*) > 0 v FROM `${bucket.name}`
                    WHERE type = "${prefix}" OR type like "${prefix}/%""""
-    query(bucket, qStr).map(_.map(_.toList.exists(_.getBoolean("v").booleanValue === true)))
+    query(bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
   }
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
@@ -93,17 +93,18 @@ object common {
   def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
-  def query(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[JsonObject]] = Task.delay {
-    val qr = bucket.query(N1qlQuery.simple(
-      query, N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS)))
-    qr.errors.asScala.toVector.toNel.cata(
-      errors => FileSystemError.readFailed(
-        query,"[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
-      qr.allRows.asScala.toVector.map(_.value).right)
-  }
+  def query(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[N1qlQueryRow]] =
+    Task.delay {
+      val qr = bucket.query(N1qlQuery.simple(
+        query, N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS)))
+      qr.errors.asScala.toVector.toNel.cata(
+        errors => FileSystemError.readFailed(
+          query,"[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
+        qr.allRows.asScala.toVector.right)
+    }
 
-  def queryData(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[Data]] = 
-    this.query(bucket, query) ∘ (_ >>= (_.traverse(jsonObjectToData)))
+  def queryData(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[Data]] =
+    this.query(bucket, query) ∘ (_ >>= (_.traverse(rowToData)))
 
   def getBucket[S[_]](
     name: String
@@ -120,8 +121,10 @@ object common {
   def resultsFromCursor(cursor: Cursor): (Cursor, Vector[Data]) =
     (Cursor(Vector.empty), cursor.result)
 
-  def jsonObjectToData(jo: JsonObject): FileSystemError \/ Data = 
-    DataCodec.parse(jo.toString)(DataCodec.Precise).leftMap(err => 
-      FileSystemError.readFailed(jo.toString, err.shows))
+  def rowToData(row: N1qlQueryRow): FileSystemError \/ Data = {
+    val rowStr = new String(row.byteValue)
 
+    DataCodec.parse(rowStr)(DataCodec.Precise).leftMap(err =>
+      FileSystemError.readFailed(rowStr, err.shows))
+  }
 }
