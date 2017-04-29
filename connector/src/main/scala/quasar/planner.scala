@@ -89,6 +89,9 @@ object Planner {
     def fromMsg(msg: String): PlannerError = apply(msg, None)
   }
 
+  def UnexpectedJoinSide(n: Symbol): PlannerError =
+    InternalError.fromMsg(s"Unexpected JoinSideName ${n.shows} should have been removed in qscript compilation.")
+
   implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {
     def render(v: PlannerError) = Terminal(List("Error"), Some(v.message))
   }
