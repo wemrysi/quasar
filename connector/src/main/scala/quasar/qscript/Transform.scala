@@ -502,37 +502,6 @@ class Transform
         if func.effect ≟ Reduction =>
       invokeReduction2(func, Func.Input2(a1, a2)).right
 
-    case lp.InvokeUnapply(set.Distinct, Sized(a1)) =>
-      // NB: If there’s no provenance, then there’s nothing to reduce. We’re
-      //     already holding a single value.
-      prov.swapProvenances(provenance.Value(a1.ann.values) :: a1.ann.provenance).tailOption.fold(a1) { tail =>
-        prov.genBuckets(tail) match {
-          case Some((newProvs, buckets)) =>
-            Target(Ann(
-              prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
-              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-              QC.inj(Reduce[T, T[F]](
-                a1.value,
-                buckets,
-                Nil,
-                Free.roll(ConcatArrays(
-                  Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                  Free.roll(MakeArray(Free.roll(ProjectIndex(Free.point(ReduceIndex(none)), IntLit(0))))))))).embed)
-          case None => a1
-        }
-      }.right
-
-    case lp.InvokeUnapply(set.DistinctBy, Sized(a1, a2)) =>
-      val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
-      invokeReduction1(
-        agg.First,
-        Func.Input1(
-          Target(
-            Ann(
-              prov.swapProvenances(provenance.Value(rval) :: base.buckets),
-              lval),
-            base.src))).right
-
     case lp.InvokeUnapply(set.Sample, Sized(a1, a2)) =>
       val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(a1.value, a2.value)
 

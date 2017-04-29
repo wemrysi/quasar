@@ -336,7 +336,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               ProjectIndexR(HoleF, IntLit(1)))).embed,
             HoleF,
             ExcludeId,
-            ConcatArraysR(LeftSideF, RightSideF))).embed,
+            ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
       val innerExpected: Fix[QST] =
@@ -354,7 +354,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               ProjectIndexR(HoleF, IntLit(0)))).embed,
             HoleF,
             ExcludeId,
-            LeftSideF[Fix])).embed,
+            MakeArrayR(LeftSideF))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
       initial.pruneArrays must equal(expected)

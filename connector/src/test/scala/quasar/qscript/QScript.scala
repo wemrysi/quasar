@@ -412,7 +412,7 @@ class QScriptSpec
               Free.roll(MakeArray(
                 Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
               Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
-            Free.roll(Constant(ejsonArr(ejsonStr("loc")))))))),
+            Free.roll(MakeArray(StrLit("loc"))))))),
         QC.inj(LeftShift((),
           ProjectFieldR(
             ProjectIndexR(HoleF, IntLit(1)),
@@ -428,7 +428,7 @@ class QScriptSpec
                       ProjectIndexR(LeftSideF, IntLit(0)),
                       IntLit(0)))))))),
               Free.roll(MakeArray(RightSideF)))),
-            Free.roll(Constant(ejsonArr(ejsonInt(10)))))))),
+            Free.roll(MakeArray(IntLit(10))))))),
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
@@ -624,8 +624,9 @@ class QScriptSpec
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             ProjectIndexR(HoleF, IntLit(1)))),
-          Nil,
-          ProjectIndexR(ReduceIndexF(None), IntLit(0)))))(
+          // FIXME: This should be fetched from the bucket
+          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(1)))),
+          ReduceIndexF(0.some))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -675,7 +676,23 @@ class QScriptSpec
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
           List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(
+                    ProjectIndexR(ReduceIndexF(None), IntLit(0)))))),
+                Free.roll(MakeArray(
+                  Free.roll(MakeArray(
+                    ProjectIndexR(ReduceIndexF(None), IntLit(0)))))))),
+              Free.roll(MakeArray(ReduceIndexF(0.some))))),
+            Free.roll(MakeArray(
+              ProjectFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))))),
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
+        QC.inj(Map((),
+          Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -902,10 +919,23 @@ class QScriptSpec
               MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
               MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
             StrLit("__sd__0"))),
-          List(ReduceFuncs.First(ConcatMapsR(
-            MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
-            MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
-          DeleteFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))(
+          List(
+            ReduceFuncs.First(ConcatMapsR(
+              MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
+              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+          ConcatArraysR(
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(MakeArrayR(ProjectIndexR(ReduceIndexF(None), IntLit(0)))),
+                MakeArrayR(MakeArrayR(ProjectIndexR(ReduceIndexF(None), IntLit(0))))),
+              MakeArrayR(ReduceIndexF(0.some))),
+            MakeArrayR(ProjectFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))),
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(3)), SortDir.asc).wrapNel)),
+        QC.inj(Map((), DeleteFieldR(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0")))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -951,10 +981,24 @@ class QScriptSpec
               MakeMapR(StrLit("name"), cond),
               MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
             StrLit("__sd__0"))),
-          List(ReduceFuncs.First(ConcatMapsR(
-            MakeMapR(StrLit("name"), cond),
-            MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
-          DeleteFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))(
+          List(
+            ReduceFuncs.First(ConcatMapsR(
+              MakeMapR(StrLit("name"), cond),
+              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+          ConcatArraysR(
+            ConcatArraysR(
+              ConcatArraysR(
+                MakeArrayR(MakeArrayR(ProjectIndexR(ReduceIndexF(None), IntLit(0)))),
+                MakeArrayR(MakeArrayR(ProjectIndexR(ReduceIndexF(None), IntLit(0))))),
+              MakeArrayR(ReduceIndexF(0.some))),
+            MakeArrayR(ProjectFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))),
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectIndexR(HoleF, IntLit(3)), SortDir.asc).wrapNel)),
+        QC.inj(Map((),
+          DeleteFieldR(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0")))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 

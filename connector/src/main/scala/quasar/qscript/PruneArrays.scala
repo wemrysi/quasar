@@ -141,18 +141,13 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     }
 
   /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
-  private def arrayRewrite(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc = {
-    val rewrite = new quasar.qscript.Rewrite[T]
-
-    def removeUnusedIndices[A](array: List[A], indicesToKeep: Set[Int]): List[A] =
-      indicesToKeep.toList.sorted map array
-
-    rewrite.rebuildArray[JoinSide](
-      removeUnusedIndices[JoinFunc](rewrite.flattenArray[JoinSide](array), indicesToKeep))
-  }
-
-  def rewriteRepair(array: ConcatArrays[T, JoinFunc], seen: SeenIndices): JoinFunc  =
-    arrayRewrite(array, seen.map(_.toInt).toSet)
+  def rewriteRepair[A](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
+    repair.project match {
+      case StaticArray(array) =>
+        val rewrite = new quasar.qscript.Rewrite[T]
+        rewrite.rebuildArray[A](seen.map(_.toInt).toList.sorted ∘ array).some
+      case _ => none
+    }
 
   // TODO currently we only rewrite the branch if it is precisely a LeftShift
   // we need to generalize this so we can rewrite all rewritable branches
@@ -160,14 +155,15 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   def rewriteBranch(branch: FreeQS, seen: SeenIndices): Option[FreeQS] =
     branch.resume match {
       case -\/(qs) =>
-        Inject[QScriptCore, QScriptTotal].prj(qs) match {
-          case Some(LeftShift(src, struct, id, repair)) =>
-            repair.resume match {
-              case -\/(array @ ConcatArrays(_, _)) =>
-                Free.roll(Inject[QScriptCore, QScriptTotal].inj(
-                  LeftShift(src, struct, id, rewriteRepair(array, seen)))).some
-              case _ => none
-            }
+        Inject[QScriptCore, QScriptTotal].prj(qs) >>= {
+          case LeftShift(src, struct, id, repair) =>
+            rewriteRepair(repair, seen) ∘ (rep =>
+              Free.roll(Inject[QScriptCore, QScriptTotal].inj(
+                LeftShift(src, struct, id, rep))))
+          case Reduce(src, bucket, reducers, repair) =>
+            rewriteRepair(repair, seen) ∘ (rep =>
+              Free.roll(Inject[QScriptCore, QScriptTotal].inj(
+                Reduce(src, bucket, reducers, rep))))
           case _ => none
         }
       case _ => none
@@ -383,34 +379,25 @@ object PruneArrays {
         // ignore `env` everywhere except for `LeftShift`
         in match {
           case LeftShift(src, struct, id, repair) =>
-            def replacementRemap(repl: IndexMapping): QScriptCore[A] =
+            def replacement(repair: JoinFunc, repl: IndexMapping): QScriptCore[A] =
               LeftShift(src,
                 remapIndicesInFunc(struct, repl),
                 id,
                 remapIndicesInLeftShift(struct, repair, repl))
 
             def notSeen: M[QScriptCore[A]] =
-              M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacementRemap)))
+              M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> (replacement(repair, _)))))
 
-            repair.resume match {
-              case -\/(array @ ConcatArrays(_, _)) =>
-                env match {
-                  case Ignore => notSeen
-                  case Rewrite(indices) =>
-                    getIndices(SrcHole.left, indices).cata(
-                      seen => {
-                        def replacement(repl: IndexMapping): QScriptCore[A] =
-                          LeftShift(src,
-                            remapIndicesInFunc(struct, repl),
-                            id,
-                            remapIndicesInLeftShift(struct, rewriteRepair(array, seen), repl))
-                        M.put(env).as(
-                          getIndices(SrcHole.left, indices).fold[QScriptCore[A]](
-                            LeftShift(src, struct, id, rewriteRepair(array, seen)))(
-                            indexMapping >>> replacement))
-                      }, notSeen)
-                }
-              case _ => notSeen
+            env match {
+              case Ignore => notSeen
+              case Rewrite(indices) =>
+                (getIndices(SrcHole.left, indices) >>= (seen =>
+                  rewriteRepair(repair, seen) ∘ (rep => {
+                    M.put(env).as(
+                      getIndices(SrcHole.left, indices).fold[QScriptCore[A]](
+                        LeftShift(src, struct, id, rep))(
+                        indexMapping >>> (replacement(rep, _))))
+                  }))).getOrElse(notSeen)
             }
 
           case Reduce(src, bucket0, reducers0, repair) =>

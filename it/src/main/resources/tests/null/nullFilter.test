@@ -3,9 +3,6 @@
 
     "backends": {
         "marklogic_json": "pending",
-        "mongodb_2_6":    "pending",
-        "mongodb_3_0":    "pending",
-        "mongodb_3_2":    "pending",
         "postgresql":     "pending"
     },
 

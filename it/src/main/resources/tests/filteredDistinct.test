@@ -1,9 +1,6 @@
 {
     "name": "filtered distinct of one field",
     "backends": {
-        "mongodb_2_6": "pending",
-        "mongodb_3_0": "pending",
-        "mongodb_3_2": "pending",
         "postgresql":  "pending"
     },
     "data": "olympics.data",

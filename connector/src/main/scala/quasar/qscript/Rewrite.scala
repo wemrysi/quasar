@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
+import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
@@ -34,22 +35,12 @@ import scalaz.{:+: => _, Divide => _, _},
   Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
-  def flattenArray[A: Show](array: ConcatArrays[T, FreeMapA[A]]): List[FreeMapA[A]] = {
-    def inner(jf: FreeMapA[A]): List[FreeMapA[A]] =
-      jf.resume match {
-        case -\/(ConcatArrays(lhs, rhs)) => inner(lhs) ++ inner(rhs)
-        case _                           => List(jf)
-      }
-    inner(Free.roll(array))
-  }
-
-  def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = {
-    def inner(funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
-      case Nil          => Free.roll(EmptyArray[T, FreeMapA[A]])
-      case func :: Nil  => func
-      case func :: rest => Free.roll(ConcatArrays(inner(rest), func))
-    }
-    inner(funcs.reverse)
+  def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
+    case Nil    => Free.roll(EmptyArray[T, FreeMapA[A]])
+    case h :: t =>
+      t.foldLeft(
+        Free.roll(MakeArray[T, FreeMapA[A]](h)))(
+        (acc, e) => Free.roll(ConcatArrays(acc, Free.roll(MakeArray(e)))))
   }
 
   def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
@@ -297,7 +288,7 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
     }
   }
 
-  def compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+  val compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
     case LeftShift(src, struct, id, repair) =>
       rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, xy._2))
 
@@ -315,18 +306,38 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   }
 
   private def findUniqueBuckets(bucket0: FreeMap): Option[FreeMap] =
-    bucket0.resume match {
-      case -\/(array @ ConcatArrays(_, _)) =>
-        val bucket: FreeMap = rebuildArray(flattenArray(array).distinctE.toList)
+    bucket0.project match {
+      case StaticArray(array) =>
+        val bucket: FreeMap = rebuildArray(array.distinctE.toList)
         if (bucket0 ≟ bucket) None else bucket.some
      case _ => None
   }
 
-  def uniqueBuckets = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+  val uniqueBuckets = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
     case Reduce(src, bucket, reducers, repair) =>
+      // FIXME: Update indexes into bucket.
       findUniqueBuckets(bucket).map(Reduce(src, _, reducers, repair))
     case Sort(src, bucket, order) =>
       findUniqueBuckets(bucket).map(Sort(src, _, order))
+    case _ => None
+  }
+
+  val compactReductions = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
+    case Reduce(src, bucket, reducers, repair) =>
+      val (mapping, newReducers) =
+        reducers.zipWithIndex.foldLeft[(scala.collection.immutable.Map[Int, Int], List[ReduceFunc[FreeMap]])](
+          (scala.collection.immutable.Map[Int, Int](), Nil)) {
+          case ((map, lrf), (rf, origIndex)) =>
+            val i = lrf.indexWhere(_ ≟ rf)
+            (i ≟ -1).fold((map, lrf :+ rf), (map + ((origIndex, i)), lrf))
+        }
+
+      (newReducers ≠ reducers).option(
+        Reduce(
+          src,
+          bucket,
+          newReducers,
+          repair.map(ri => ReduceIndex(ri.idx.map(i => mapping.applyOrElse(i, κ(i)))))))
     case _ => None
   }
 
@@ -351,8 +362,10 @@ class Rewrite[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
       F[T[G]] => G[T[G]] =
     repeatedly(Normalizable[F].normalizeF(_: F[T[G]])) ⋙
       liftFG(injectRepeatedly(elideNopJoin[F, T[G]](rebase))) ⋙
-      liftFF(repeatedly(compactQC(_: QScriptCore[T[G]]))) ⋙
-      liftFF(repeatedly(uniqueBuckets(_: QScriptCore[T[G]]))) ⋙
+      liftFF(repeatedly(applyTransforms(
+        compactQC(_: QScriptCore[T[G]]),
+        uniqueBuckets(_: QScriptCore[T[G]]),
+        compactReductions(_: QScriptCore[T[G]])))) ⋙
       repeatedly(C.coalesceQCNormalize[G](prism)) ⋙
       liftFG(injectRepeatedly(C.coalesceTJNormalize[G](prism.get))) ⋙
       (fa => QC.prj(fa).fold(prism.reverseGet(fa))(elideNopQC[F, G](prism.reverseGet)))

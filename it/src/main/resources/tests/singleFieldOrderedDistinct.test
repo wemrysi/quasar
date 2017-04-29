@@ -4,19 +4,11 @@
         "couchbase":      "pending",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
-        "mongodb_2_6":    "pending",
-        "mongodb_3_0":    "pending",
-        "mongodb_3_2":    "pending",
-        "postgresql":     "pending",
-	"spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "postgresql":     "pending"
     },
     "data": "olympics.data",
 
-    "NB": "Skipped for all connectors due to reduce/sort ordering bug.
-           Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.
-
-           The lack of alias on this field is important, as it triggers the
+    "NB": "The lack of alias on this field is important, as it triggers the
            `select value` semantics of returning a value directly, not wrapped
            in a map.",
 

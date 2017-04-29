@@ -974,8 +974,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile union" in {
       testLogicalPlanCompile(
         "select loc, pop from zips union select city from zips",
-          lpf.normalizeLets(lpf.normalizeLets(
-            lpf.invoke1(Distinct, lpf.invoke2(Union, setA, setB)))))
+        lpf.normalizeLets(lpf.normalizeLets(
+          lpf.let('__tmp1, lpf.invoke2(Union, setA, setB),
+            lpf.invoke1(Arbitrary,
+              lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1)))))))
     }
 
     "compile union all" in {
@@ -989,7 +991,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select loc, pop from zips intersect select city from zips",
         lpf.normalizeLets(lpf.normalizeLets(
-          lpf.invoke1(Distinct, lpf.invoke2(Intersect, setA, setB)))))
+          lpf.let('__tmp1, lpf.invoke2(Intersect, setA, setB),
+            lpf.invoke1(Arbitrary,
+              lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1)))))))
     }
 
     "compile intersect all" in {
@@ -1573,21 +1577,30 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile simple distinct" in {
       testLogicalPlanCompile(
         "select distinct city from zips",
-        lpf.invoke1(Distinct,
+        lpf.let(
+          '__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city"))))))
+            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
+          lpf.invoke1(Arbitrary,
+            lpf.invoke2(GroupBy, lpf.free('__tmp0), lpf.free('__tmp0)))))
     }
 
     "compile simple distinct ordered" in {
       testLogicalPlanCompile(
         "select distinct city from zips order by city",
-        lpf.let('__tmp0,
+        lpf.let(
+          '__tmp0,
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
-          lpf.invoke1(Distinct,
+          lpf.let(
+            '__tmp1,
+            lpf.sort(lpf.free('__tmp0), (lpf.free('__tmp0), SortDir.asc).wrapNel),
             lpf.sort(
-              lpf.free('__tmp0),
-              (lpf.free('__tmp0), SortDir.asc).wrapNel))))
+              lpf.invoke1(Arbitrary,
+                lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))),
+              (lpf.invoke1(Arbitrary,
+                lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))),
+                SortDir.asc).wrapNel))))
     }
 
     "compile distinct with unrelated order by" in {
@@ -1605,30 +1618,47 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 lpf.free('__tmp1),
                 (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.desc).wrapNel),
               lpf.invoke2(DeleteField,
-                lpf.invoke2(DistinctBy, lpf.free('__tmp2),
-                  lpf.invoke2(DeleteField, lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0")))),
+                lpf.sort(
+                  lpf.invoke1(First,
+                    lpf.invoke2(GroupBy,
+                      lpf.free('__tmp2),
+                      lpf.invoke2(DeleteField,
+                        lpf.free('__tmp2),
+                        lpf.constant(Data.Str("__sd__0"))))),
+                  (lpf.invoke2(ObjectProject, lpf.invoke1(First,
+                    lpf.invoke2(GroupBy,
+                      lpf.free('__tmp2),
+                      lpf.invoke2(DeleteField,
+                        lpf.free('__tmp2),
+                        lpf.constant(Data.Str("__sd__0"))))), lpf.constant(Data.Str("__sd__0"))), SortDir.desc).wrapNel),
                 lpf.constant(Data.Str("__sd__0")))))))
     }
 
     "compile count(distinct(...))" in {
       testLogicalPlanCompile(
         "select count(distinct(lower(city))) from zips",
-        lpf.invoke1(Squash,
-          lpf.invoke1(Count,
-            lpf.invoke1(Distinct,
-              lpf.invoke1(Lower,
-                lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city"))))))))
+        lpf.let(
+          '__tmp0,
+          lpf.invoke1(Lower,
+            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
+          lpf.invoke1(Squash,
+            lpf.invoke1(Count,
+              lpf.invoke1(Arbitrary,
+                lpf.invoke2(GroupBy, lpf.free('__tmp0), lpf.free('__tmp0)))))))
     }
 
     "compile simple distinct with two named projections" in {
       testLogicalPlanCompile(
         "select distinct city as CTY, state as ST from zips",
         lpf.let('__tmp0, read("zips"),
-          lpf.invoke1(Distinct,
+          lpf.let(
+            '__tmp1,
             lpf.invoke1(Squash,
               makeObj(
                 "CTY" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-                "ST" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("state"))))))))
+                "ST" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("state"))))),
+            lpf.invoke1(Arbitrary,
+              lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))))))
     }
 
     "compile count distinct with two exprs" in {

@@ -3904,24 +3904,6 @@ class PlannerSpec extends
           ExcludeId)))
     }
 
-    "plan distinct on full collection" in {
-      plan(lpf.invoke1(s.Distinct, read("db/cities"))) must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "cities")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            obj(
-              "__tmp1" ->
-                Call(jscore.ident("remove"),
-                  List(jscore.ident("x"), jscore.Literal(Js.Str("_id")))))))),
-            ListMap()),
-          $group(
-            grouped(),
-            -\/(reshape("0" -> $field("__tmp1")))),
-          $project(
-            reshape("value" -> $field("_id", "0")),
-            ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
-
     "plan with extra squash and flattening" in {
       // NB: this case occurs when a view's LP is embedded in a larger query
       //     (See SD-1403), because type-checks are inserted into the inner and
@@ -3938,10 +3920,9 @@ class PlannerSpec extends
               Type.Obj(Map(), Some(Type.Top)),
               lpf.free('check0),
               lpf.constant(Data.NA))),
-          lpf.invoke1(s.Distinct,
-            lpf.invoke1(identity.Squash,
-              makeObj(
-                "city" ->
+          lpf.invoke1(identity.Squash,
+            makeObj(
+              "city" ->
                 lpf.invoke2(ObjectProject,
                   lpf.invoke2(s.Filter,
                     lpf.free('tmp0),
@@ -3957,41 +3938,41 @@ class PlannerSpec extends
                             lpf.constant(Data.Arr(List(Data.NA)))))),
                       lpf.constant(Data.Str("^.*MONT.*$")),
                       lpf.constant(Data.Bool(false)))),
-                  lpf.constant(Data.Str("city")))))))
+                  lpf.constant(Data.Str("city"))))))
 
       plan(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
           reshape(
-            "__tmp12" -> $cond(
+            "__tmp4" -> $cond(
               $and(
                 $lte($literal(Bson.Doc()), $$ROOT),
                 $lt($$ROOT, $literal(Bson.Arr(List())))),
               $$ROOT,
               $literal(Bson.Undefined)),
-            "__tmp13" -> $$ROOT),
+            "__tmp5" -> $$ROOT),
           IgnoreId),
         $project(
           reshape(
-            "__tmp14" -> $cond(
+            "__tmp6" -> $cond(
               $and(
-                $lte($literal(Bson.Arr(List())), $field("__tmp12", "loc")),
-                $lt($field("__tmp12", "loc"), $literal(Bson.Binary.fromArray(Array[Byte]())))),
-              $field("__tmp12", "loc"),
+                $lte($literal(Bson.Arr(List())), $field("__tmp4", "loc")),
+                $lt($field("__tmp4", "loc"), $literal(Bson.Binary.fromArray(Array[Byte]())))),
+              $field("__tmp4", "loc"),
               $literal(Bson.Arr(List(Bson.Undefined)))),
-            "__tmp15" -> $field("__tmp13")),
+            "__tmp7" -> $field("__tmp5")),
           IgnoreId),
-        $unwind(DocField("__tmp14")),
+        $unwind(DocField("__tmp6")),
         $match(
           Selector.Doc(
-            BsonField.Name("__tmp14") -> Selector.Regex("^.*MONT.*$", false, true, false, false))),
+            BsonField.Name("__tmp6") -> Selector.Regex("^.*MONT.*$", false, true, false, false))),
         $project(
           reshape(
-            "__tmp16" -> $cond(
+            "__tmp8" -> $cond(
               $and(
-                $lte($literal(Bson.Doc()), $field("__tmp15")),
-                $lt($field("__tmp15"), $literal(Bson.Arr(List())))),
-              $field("__tmp15"),
+                $lte($literal(Bson.Doc()), $field("__tmp7")),
+                $lt($field("__tmp7"), $literal(Bson.Arr(List())))),
+              $field("__tmp7"),
               $literal(Bson.Undefined))),
           IgnoreId),
         $project(
