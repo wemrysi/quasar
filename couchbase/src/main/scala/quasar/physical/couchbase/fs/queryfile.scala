@@ -109,8 +109,8 @@ object queryfile {
       bkt    <- lift(Task.delay(
                   ctx.cluster.openBucket(bktCol.bucket)
                 )).into.liftF
-      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into[S].liftF
-      _      <- lift(exists.whenM(deleteHavingPrefix(bkt, bktCol.collection))).into[S].liftF
+      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[PhaseResultT])
+      _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[PhaseResultT]))
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable
                     .from(docs)
@@ -187,7 +187,7 @@ object queryfile {
       ctx    <- context.ask.liftM[FileSystemErrT]
       bktCol <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
-      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into)
     } yield exists).exists(ι)
 
   def n1qlResults[T[_[_]]: BirecursiveT, S[_]](
@@ -201,14 +201,8 @@ object queryfile {
       bkt     <- lift(Task.delay(
                    ctx.cluster.openBucket()
                  )).into.liftF
-      q       <- RenderQuery.compact(n1ql).map(n1qlQuery).liftPE
-      r       <- EitherT(lift(Task.delay(
-                   bkt.query(q)
-                     .allRows
-                     .asScala
-                     .toVector
-                     .traverse(rowToData)
-                 )).into.liftM[PhaseResultT])
+      q       <- RenderQuery.compact(n1ql).liftPE
+      r       <- EitherT(lift(queryData(bkt, q)).into.liftM[PhaseResultT])
     } yield r
 
   def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
@@ -283,7 +277,7 @@ object queryfile {
       ctx    <- context.ask.liftM[FileSystemErrT]
       bktCol <- EitherT(bucketCollectionFromPath(dir).η[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
-      types  <- lift(docTypesFromPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+      types  <- EitherT(lift(docTypesFromPrefix(bkt, bktCol.collection)).into)
       _      <- EitherT((
                   if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
                   else ().right
