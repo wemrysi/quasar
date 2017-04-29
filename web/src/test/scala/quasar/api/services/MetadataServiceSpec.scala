@@ -36,6 +36,7 @@ import org.http4s.argonaut._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
+import scalaz.Scalaz._
 import scalaz.concurrent.Task
 
 object MetadataFixture {
@@ -48,6 +49,11 @@ object MetadataFixture {
         Task.now(queryFile(fs).eval(mem))
     }
 
+  def withMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
+    val run: MetadataEff ~> Task = runQuery(mem) :+: runMount(mnts)
+    foldMapNT(run) compose flatMapSNT(transformIn[QueryFile, MetadataEff, Free[MetadataEff, ?]](module.queryFile[MetadataEff], liftFT)) compose view.queryFile[MetadataEff]
+  }
+
   def runMount(mnts: Map[APath, MountConfig]): Mounting ~> Task =
     new (Mounting ~> Task) {
       type F[A] = State[Map[APath, MountConfig], A]
@@ -59,7 +65,7 @@ object MetadataFixture {
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService =
     metadata.service[MetadataEff].toHttpService(
-      liftMT[Task, ResponseT] compose (runQuery(mem) :+: runMount(mnts)))
+      liftMT[Task, ResponseT] compose (withMounts(mem, mnts) :+: runMount(mnts)))
 }
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
@@ -108,31 +114,51 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
       "and mounts when any children happen to be mount points" >> prop { (
-        fName: FileName,
-        dName: DirName,
-        mName: DirName,
-        vName: FileName,
+        fileName: FileName,
+        directoryName: DirName,
+        fsMountName: DirName,
+        viewName: FileName,
+        moduleName: DirName,
         vcfg: (Fix[Sql], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
-      ) => (fName != vName && dName != mName) ==> {
+      ) => (fileName ≠ viewName && directoryName ≠ fsMountName && fsMountName ≠ moduleName) ==> {
+        val moduleConfig: List[Statement[Fix[Sql]]] = List(
+          FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
         val parent: ADir = rootDir </> dir("foo")
         val mnts = Map[APath, MountConfig](
-          (parent </> file(vName.value), MountConfig.viewConfig(vcfg)),
-          (parent </> dir(mName.value), MountConfig.fileSystemConfig(fsCfg)))
+          (parent </> file1(viewName), MountConfig.viewConfig(vcfg)),
+          (parent </> dir1(fsMountName), MountConfig.fileSystemConfig(fsCfg)),
+          (parent </> dir1(moduleName), MountConfig.moduleConfig(moduleConfig)))
         val mem = InMemState fromFiles Map(
-          (parent </> file(fName.value), Vector()),
-          (parent </> dir(dName.value) </> file("quux"), Vector()),
-          (parent </> file(vName.value), Vector()),
-          (parent </> dir(mName.value) </> file("bar"), Vector()))
+          (parent </> file1(fileName), Vector()),
+          (parent </> dir1(directoryName) </> file("quux"), Vector()),
+          (parent </> file1(viewName), Vector()),
+          (parent </> dir1(fsMountName) </> file("bar"), Vector()))
 
         service(mem, mnts)(Request(uri = pathUri(parent)))
           .as[Json].unsafePerformSync must_=== Json("children" := List(
-            FsNode(fName.value, "file", None),
-            FsNode(dName.value, "directory", None),
-            FsNode(vName.value, "file", Some("view")),
-            FsNode(mName.value, "directory", Some(fsCfg._1.value))
+            FsNode(fileName.value, "file", None, None),
+            FsNode(directoryName.value, "directory", None, None),
+            FsNode(viewName.value, "file", Some("view"), None),
+            FsNode(fsMountName.value, "directory", Some(fsCfg._1.value), None),
+            FsNode(moduleName.value, "directory", Some("module"), None)
           ).sorted)
       }}
+
+      "and functions as files on a module mount with additionnal info about functions parameters" >> prop { dir: ADir =>
+        val moduleConfig: List[Statement[Fix[Sql]]] = List(
+          FunctionDecl(CIName("FOO"), List(CIName("BAR")), Fix(boolLiteral(true))),
+          FunctionDecl(CIName("BAR"), List(CIName("BAR"), CIName("BAZ")), Fix(boolLiteral(false))))
+        val mnts = Map[APath, MountConfig](
+          (dir, MountConfig.moduleConfig(moduleConfig)))
+        val mem = InMemState.empty
+
+        service(mem, mnts)(Request(uri = pathUri(dir)))
+          .as[Json].unsafePerformSync must_=== Json("children" := List(
+          FsNode("FOO", "file", mount = None, args = Some(List("BAR"))),
+          FsNode("BAR", "file", mount = None, args = Some(List("BAR", "BAZ")))
+        ).sorted)
+      }
 
       "and empty object for existing file" >> prop { s: SingleFileMemState =>
         service(s.state, Map())(Request(uri = pathUri(s.file)))

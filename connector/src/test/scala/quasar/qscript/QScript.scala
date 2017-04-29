@@ -478,7 +478,11 @@ class QScriptSpec
       convert(
         lc.some,
         lp.let('__tmp0,
-          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), lpf.constant(Data.Bool(true))).embed,
+          lp.join(
+            lpRead("/person"),
+            lpRead("/car"),
+            JoinType.Inner,
+            lp.JoinCondition('__leftJoin5, '__rightJoin6, lpf.constant(Data.Bool(true)))).embed,
           identity.Squash(
             structural.ObjectConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
@@ -503,28 +507,30 @@ class QScriptSpec
             ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
     }
 
-    // TODO #1794 prune arrays
     "convert basic join with explicit join condition" in {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
-      val lp = lpf.let('__tmp0, lpRead("/foo"),
-        lpf.let('__tmp1, lpRead("/bar"),
-          lpf.let('__tmp2,
-            StdLib.set.InnerJoin(lpf.free('__tmp0), lpf.free('__tmp1),
+      val query =
+        lpf.let('__tmp0, 
+          lpf.join(
+            lpRead("/foo"),
+            lpRead("/bar"),
+            JoinType.Inner,
+            lp.JoinCondition('__leftJoin9, '__rightJoin10,
               relations.Eq(
-                structural.ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("id"))).embed,
-                structural.ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))).embed).embed).embed,
-            makeObj(
-              "name" ->
-                structural.ObjectProject(
-                  JoinDir.Left.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("name"))).embed,
-              "address" ->
-                structural.ObjectProject(
-                  JoinDir.Right.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("address"))).embed))))
+                structural.ObjectProject(lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))).embed,
+                structural.ObjectProject(lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id"))).embed).embed)),
+          makeObj(
+            "name" ->
+              structural.ObjectProject(
+                JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                lpf.constant(Data.Str("name"))).embed,
+            "address" ->
+              structural.ObjectProject(
+                JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+                lpf.constant(Data.Str("address"))).embed))
 
-      convert(None, lp) must
+      convert(None, query) must
         beSome(beTreeEqual(chain(
           RootR,
           TJ.inj(ThetaJoin((),
@@ -532,67 +538,37 @@ class QScriptSpec
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))),
               HoleF,
               IncludeId,
-              ConcatArraysR(
-                MakeArrayR(ConcatArraysR(
-                  MakeArrayR(LeftSideF),
-                  MakeArrayR(RightSideF))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                    MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("id")))))))))),
+              MakeArrayR(RightSideF)))),
             Free.roll(QCT.inj(LeftShift(
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("bar"))))),
               HoleF,
               IncludeId,
-              ConcatArraysR(
-                MakeArrayR(ConcatArraysR(
-                  MakeArrayR(LeftSideF),
-                  MakeArrayR(RightSideF))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                    MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("foo_id")))))))))),
+              MakeArrayR(RightSideF)))),
             Free.roll(Eq(
               ProjectFieldR(
                 ProjectIndexR(
-                  ProjectIndexR(
-                    LeftSideF, IntLit(1)),
+                  ProjectIndexR(LeftSideF, IntLit(0)),
                   IntLit(1)),
-                ProjectIndexR(
-                  ProjectIndexR(
-                    LeftSideF, IntLit(1)),
-                  IntLit(2))),
+                StrLit("id")),
               ProjectFieldR(
                 ProjectIndexR(
-                  ProjectIndexR(
-                    RightSideF, IntLit(1)),
+                  ProjectIndexR(RightSideF, IntLit(0)),
                   IntLit(1)),
-                ProjectIndexR(
-                  ProjectIndexR(
-                    RightSideF, IntLit(1)),
-                  IntLit(2))))),
+                StrLit("foo_id")))),
             JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
                 StrLit("name"),
                 ProjectFieldR(
                   ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(
-                        LeftSideF, IntLit(0)),
-                      IntLit(1)),
+                    ProjectIndexR(LeftSideF, IntLit(0)),
                     IntLit(1)),
                   StrLit("name"))),
               MakeMapR(
                 StrLit("address"),
                 ProjectFieldR(
                   ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(
-                        RightSideF, IntLit(0)),
-                      IntLit(1)),
+                    ProjectIndexR(RightSideF, IntLit(0)),
                     IntLit(1)),
                   StrLit("address")))))))))
     }

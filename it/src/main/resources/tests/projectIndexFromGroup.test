@@ -1,7 +1,6 @@
 {
     "name": "project index from group",
     "backends": {
-        "couchbase":         "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
@@ -9,6 +8,7 @@
     "query": "select parents[0].sha, count(*) as count from slamengine_commits group by parents[0].sha",
     "predicate": "containsAtLeast",
     "ignoreFieldOrder": [
+      "couchbase",
       "marklogic_json",
       "mongodb_2_6",
       "mongodb_3_0",

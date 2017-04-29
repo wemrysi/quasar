@@ -9,9 +9,12 @@
         "mongodb_3_0":    "pending",
         "mongodb_3_2":    "pending",
         "postgresql":     "pending",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "spark_hdfs":     "skip",
+        "spark_local":    "skip"
     },
+
+    "NB": "#1748: Disabled in spark due to ListMap serialization stack overflow.
+           #2122: Improves the qscript, but the qscript _should_ currently be correct.",
 
     "data": "zips.data",
 

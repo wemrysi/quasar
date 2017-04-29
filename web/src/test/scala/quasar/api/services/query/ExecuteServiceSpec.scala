@@ -37,6 +37,7 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
+import org.http4s.argonaut._
 import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import pathy.Path._

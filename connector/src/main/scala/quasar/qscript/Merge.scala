@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.Planner._
 import quasar.contrib.matryoshka._
+import quasar.ejson.implicits._
 import quasar.fp.{ ExternallyManaged => EM, _ }
 
 import matryoshka._
@@ -27,7 +28,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
+class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   case class ZipperSides(
     lSide: FreeMap,
     rSide: FreeMap)
@@ -61,7 +62,7 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
 
   // FIXME unify with more general target delinearization
   private def delinearizeTargetsCoEnv[A]:
-      Coalgebra[CoEnv[Hole, QScriptTotal, ?], List[CoEnv[Hole, QScriptTotal, A]]] = {
+      Coalgebra[CoEnvQS, List[CoEnvQS[A]]] = {
     case Nil    => CoEnv(-\/(SrcHole))
     case h :: t => h.as(t)
   }
@@ -152,12 +153,12 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
   }
 
   private def mergeFreeQS(left: FreeQS, right: FreeQS): SrcMerge[FreeQS, FreeQS] = {
-    def trans = λ[QScriptTotal ~> CoEnv[Hole, QScriptTotal, ?]](qs => CoEnv(qs.right[Hole]))
+    def trans = λ[QScriptTotal ~> CoEnvQS](qs => CoEnv(qs.right[Hole]))
 
-    def unify: List[CoEnv[Hole, QScriptTotal, EM]] => FreeQS =
+    def unify: List[CoEnvQS[EM]] => FreeQS =
       _.reverse.ana[FreeQS](delinearizeTargetsCoEnv[EM])
 
-    mergePair[Free[?[_], Hole], CoEnv[Hole, QScriptTotal, ?], QScriptTotal](left, right)(trans, unify)
+    mergePair[Free[?[_], Hole], CoEnvQS, QScriptTotal](left, right)(trans, unify)
   }
 
   private def mergeBranches(rewrite: Rewrite[T])(left: FreeQS, right: FreeQS): PlannerError \/ SrcMerge[FreeQS, FreeMap] =
@@ -168,7 +169,7 @@ class Merge[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT] extends TTypes[T] {
 
         def rebase0(l: FreeQS)(r: FreeQS): Option[FreeQS] = rebase(l, r).some
 
-        val baseSrc: Option[CoEnv[Hole, QScriptTotal, FreeQS]] =
+        val baseSrc: Option[CoEnvQS[FreeQS]] =
           rewrite.unifySimpleBranchesCoEnv[QScriptTotal, FreeQS](src, lBranch, rBranch, combine)(rebase0)
 
         baseSrc.cata(src =>

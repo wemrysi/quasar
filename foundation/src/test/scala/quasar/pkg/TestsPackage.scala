@@ -24,8 +24,6 @@ import scala.collection.Traversable
 import scala.language.postfixOps
 import scala.{ Byte, Char }
 
-import scalaz.~>
-
 package object tests extends TestsPackage
 
 trait TestsPackage extends ScalacheckSupport with SpecsSupport
@@ -60,7 +58,6 @@ trait ScalacheckSupport {
   type Pretty                  = org.scalacheck.util.Pretty
   type Prop                    = org.scalacheck.Prop
   type Shrink[A]               = org.scalacheck.Shrink[A]
-  type WrapArb[F[_]]           = Arbitrary ~> λ[α => Arbitrary[F[α]]]
 
   import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency, alphaNumChar }
 

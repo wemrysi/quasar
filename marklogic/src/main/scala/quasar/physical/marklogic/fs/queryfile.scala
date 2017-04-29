@@ -23,6 +23,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
+import quasar.ejson.implicits._
 import quasar.fp._, eitherT._
 import quasar.fp.numeric.Positive
 import quasar.fs._
@@ -120,7 +121,7 @@ object queryfile {
 
   def lpToXQuery[
     F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
   ](
     lp: T[LogicalPlan]
@@ -131,6 +132,7 @@ object queryfile {
     type QSR[A]  = QScriptRead[T, A]
 
     val R = new Rewrite[T]
+    val O = new Optimize[T]
 
     def logPhase(pr: PhaseResult): F[Unit] =
       MonadTell_[F, PhaseResults].tell(Vector(pr))
@@ -143,7 +145,7 @@ object queryfile {
       shifted   <- Unirewrite[T, MLQScriptCP[T], F](R, ops.directoryContents[F, FMT]).apply(qs)
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
-                     R.optimize(reflNT[MLQ]),
+                     O.optimize(reflNT[MLQ]),
                      Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
       main      <- plan(optimized)

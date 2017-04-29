@@ -9,19 +9,9 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 # update CI configuration.
 #
 
+echo "running build script..."
+
 source "$(dirname $0)/constants"
-
-echo "Script Path:   $SCRIPT_DIR"
-echo "Root Path:     $WS_DIR"
-echo "Version:       $QUASAR_VERSION"
-echo "Web Jar:       $QUASAR_WEB_JAR"
-echo "Web Jar Dir:   $QUASAR_WEB_JAR_DIR"
-echo "Web Jar Path:  $QUASAR_WEB_JAR_PATH"
-
-QUASAR_MONGODB_TESTDB="quasar-test"
-QUASAR_MONGODB_HOST_2_6="localhost:27018"
-QUASAR_MONGODB_HOST_3_0="localhost:27019"
-QUASAR_MONGODB_HOST_3_2="localhost:27020"
 
 # FIXME: Remove travis_wait usages when associated phases produce output
 #        more frequently than Travis's 10 minute imposed window
@@ -29,32 +19,6 @@ TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 TRAVIS_MAX_DOC_MINS=20
 
 JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
-
-# Enables running tests for a single mongo release by specifying an argument of
-# "2_6", "3_0", or "3_2" for the MongoDB 2.6.x, 3.0.x, and 3.2.x releases.
-if [[ "$#" == "1" ]]; then
-  QUASAR_MONGODB_RELEASE="$1"
-else
-  QUASAR_MONGODB_RELEASE="NONE"
-fi
-
-# Perform setup for integration tests:
-if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
-  export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
-
-  if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
-    echo "mongodb_2_6=\"mongodb://${QUASAR_MONGODB_HOST_2_6}\"" > $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
-    echo "mongodb_3_0=\"mongodb://${QUASAR_MONGODB_HOST_3_0}\"" > $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
-    echo "mongodb_read_only=\"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" > $TEST_CONFIG_FILE
-    echo "mongodb_read_only_insert=\"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"" >> $TEST_CONFIG_FILE
-  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_2" ]]; then
-    echo "mongodb_3_2=\"mongodb://${QUASAR_MONGODB_HOST_3_2}\"" > $TEST_CONFIG_FILE
-  fi
-
-  echo "Using local MongoDB config"
-fi
 
 # if we're building a pull request, DON'T clean and use the cache instead
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
@@ -71,19 +35,20 @@ fi
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
+  echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
-    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   else
     "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders test exclusive:test
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation.
-  "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN 'web/assembly'
+  "$SBT" ++$TRAVIS_SCALA_VERSION 'web/assembly'
 
   # Running `doc` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
@@ -100,9 +65,21 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   echo "Result of Quasar JAR test: $TEST_STATUS"
 
   exit $TEST_STATUS
+elif [[ "${JOB_NUM##*.}" == "5" ]]; then
+  echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
+  fi
+
+  # Require that all header comments are present before proceeding, then
+  # build and run all tests everywhere (including integration)
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
+  echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
   fi

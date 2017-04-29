@@ -1,5 +1,6 @@
 {
     "name": "perform inner equi-join",
+
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "skip",
@@ -10,9 +11,18 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
+
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
-    "query": "select smallZips.city, zips.state from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
+
+    "query": "select smallZips.city, zips.state
+              from `../smallZips` join `../zips`
+              on smallZips.`_id` = zips.`_id`",
+
     "predicate": "containsAtLeast",
+
     "expected": [{"city": "AGAWAM",       "state": "MA"},
                  {"city": "CUSHMAN",      "state": "MA"},
                  {"city": "BARRE",        "state": "MA"},

@@ -25,6 +25,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.frontend.logicalplan.LogicalPlan
@@ -80,12 +81,13 @@ object queryfile {
       val lc: DiscoverPath.ListContents[F] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       val rewrite = new Rewrite[Fix]
+      val optimize = new Optimize[Fix]
       for {
         qs <- QueryFile.convertToQScriptRead[Fix, F, QScriptRead[Fix, ?]](lc)(lp)
         shifted <- Unirewrite[Fix, SparkQScriptCP, F](rewrite, lc).apply(qs)
 
         optQS = shifted.transHylo(
-                  rewrite.optimize(reflNT[SparkQScript]),
+                  optimize.optimize(reflNT[SparkQScript]),
                   Unicoalesce[Fix, SparkQScriptCP])
 
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))

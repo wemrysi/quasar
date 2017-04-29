@@ -492,7 +492,7 @@ object WorkflowBuilder {
   }
 
   def normalize[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp]) =
-    repeatedly(normalizeƒ[F])
+    repeatedly(normalizeƒ[F]) _
 
   private def rewriteObjRefs
     (obj: ListMap[BsonField.Name, GroupValue[Fix[ExprOp]]])

@@ -28,7 +28,6 @@ import quasar.qscript.MapFuncs._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.CoEnv
 import pathy.Path.{dir1, file1}
 import scalaz._, Scalaz._
 
@@ -209,8 +208,8 @@ private[qscript] final class ExpandDirsBranch[T[_[_]]: BirecursiveT] extends TTy
   def applyToBranch[M[_]: Monad: MonadFsErr]
     (listContents: DiscoverPath.ListContents[M], branch: FreeQS)
       : M[FreeQS] =
-    branch.transCataM[M, T[CoEnv[Hole, QScriptTotal, ?]], CoEnv[Hole, QScriptTotal, ?]](
-      liftCoM[T, M, QScriptTotal, Hole](
+    branch.transCataM[M, T[CoEnvQS], CoEnvQS](
+      liftCoM[T, M, QScriptTotal, Hole, T[CoEnvQS]](
         ExpandDirsTotal.expandDirs(
           coenvPrism[QScriptTotal, Hole].reverseGet,
           listContents))

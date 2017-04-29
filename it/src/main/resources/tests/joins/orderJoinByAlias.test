@@ -1,5 +1,6 @@
 {
     "name": "order join by alias",
+
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "skip",
@@ -10,9 +11,19 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
+
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
-    "query": "select z1.`_id` as zip, z2.pop / 1000 as popK from `../smallZips` as z1 inner join `../zips` as z2 on z1.`_id` = z2.`_id` order by popK desc",
+
+    "query": "select z1.`_id` as zip, z2.pop / 1000 as popK
+              from `../smallZips` as z1 inner join `../zips` as z2
+              on z1.`_id` = z2.`_id`
+              order by popK desc",
+
     "predicate": "equalsInitial",
+
     "expected": [{ "zip": "01201", "popK": 50.655 },
                  { "zip": "01040", "popK": 43.704 },
                  { "zip": "01085", "popK": 40.117 },

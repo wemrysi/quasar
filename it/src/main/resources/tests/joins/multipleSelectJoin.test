@@ -11,6 +11,8 @@
         "postgresql":        "pending"
     },
 
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../extraSmallZips.data"],
 
     "query": "SELECT smallZips.city AS CitySmall,
@@ -21,6 +23,8 @@
               FROM `../smallZips` JOIN `../extraSmallZips`
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
+
+    "ignoreFieldOrder": [ "marklogic_json" ],
 
     "predicate": "containsAtLeast",
 

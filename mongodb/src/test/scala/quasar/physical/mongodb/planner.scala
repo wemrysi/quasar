@@ -2804,13 +2804,7 @@ class PlannerSpec extends
               $unwind(DocField(JoinHandler.LeftName)),
               $unwind(DocField(JoinHandler.RightName)),
               $project(
-                reshape("value" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "city"),
-                    $literal(Bson.Undefined))),
+                reshape("value" -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
     }.pendingUntilFixed("#1560")
@@ -2829,13 +2823,7 @@ class PlannerSpec extends
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $project(
-            reshape("value" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Right.name, "city"),
-                $literal(Bson.Undefined))),
+            reshape("value" -> $field(JoinDir.Right.name, "city")),
             ExcludeId)))
     }.pendingUntilFixed("#1560")
 
@@ -3875,7 +3863,7 @@ class PlannerSpec extends
         $match(Selector.Doc(
           BsonField.Name("baz") -> Selector.Eq(Bson.Int32(0)))),
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan Sort expression (and extra project)" in {
       val lp =

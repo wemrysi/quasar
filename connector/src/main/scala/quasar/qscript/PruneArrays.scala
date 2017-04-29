@@ -76,7 +76,7 @@ object PATypes {
       : M[F[A]]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
@@ -84,11 +84,11 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
   /** Returns `None` if a non-static non-integer index was found.
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
     */
-  def findIndicesInFunc[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] =
+  def findIndicesInFunc[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] =
     func.project.run.fold(k => ScalaMap(k -> none), κ(findIndicesInStruct(func)))
 
-  def findIndicesInStruct[A](func: Free[MapFunc, A]): ScalaMap[A, KnownIndices] = {
-    def accumulateIndices: GAlgebra[(Free[MapFunc, A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
+  def findIndicesInStruct[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] = {
+    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
       case ProjectIndex((src, acc1), (value, acc2)) =>
         val newMap = acc1 |++| acc2
         (src.project.run, value.project.run) match {
@@ -103,14 +103,17 @@ class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
       })
     }
 
-    def findIndices: GAlgebra[(Free[MapFunc, A], ?), CoEnv[A, MapFunc, ?], ScalaMap[A, KnownIndices]] =
+    def findIndices: GAlgebra[(FreeMapA[A], ?), CoEnvMapA[A, ?], ScalaMap[A, KnownIndices]] =
       _.run.fold(k => ScalaMap.empty, accumulateIndices)
 
     func.para(findIndices)
   }
 
-  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt): CoEnv[A, MapFunc, FreeMapA[A]] =
-    CoEnv[A, MapFunc, FreeMapA[A]](\/-(ProjectIndex(hole, IntLit(mapping.get(idx).getOrElse(idx)))))
+  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
+      CoEnvMapA[A, FreeMapA[A]] =
+    CoEnv[A, MapFunc, FreeMapA[A]](ProjectIndex[T, FreeMapA[A]](
+      hole,
+      IntLit(mapping.get(idx).getOrElse(idx))).right[A])
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
@@ -201,6 +204,22 @@ object PruneArrays {
       case Rewrite(indices) => getIndices(SrcHole.left, indices).fold(default)(mapping)
     }
 
+  implicit def coenv[T[_[_]]](
+    implicit PAQST: PruneArrays[QScriptTotal[T, ?]])
+      : PruneArrays[CoEnvQS[T, ?]] =
+    new PruneArrays[CoEnvQS[T, ?]] {
+
+      def find[M[_], A](in: CoEnvQS[T, A])(implicit M: MonadState[M, RewriteState]) =
+        in.run.fold(
+          κ(default.find(in)),
+          PAQST.find(_))
+
+      def remap[M[_], A](env: RewriteState, in: CoEnvQS[T, A])(implicit M: MonadState[M, RewriteState]) =
+        in.run.fold(
+          κ(default.remap(env, in)),
+          PAQST.remap(env, _).map(qs => CoEnv(qs.right[Hole])))
+    }
+
   implicit def coproduct[I[_], J[_]]
     (implicit I: PruneArrays[I], J: PruneArrays[J])
       : PruneArrays[Coproduct[I, J, ?]] =
@@ -219,7 +238,7 @@ object PruneArrays {
   implicit def shiftedRead[A]: PruneArrays[Const[ShiftedRead[A], ?]] = default
   implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[ThetaJoin[T, ?]] =
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT]: PruneArrays[ThetaJoin[T, ?]] =
     new PruneArrays[ThetaJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -249,8 +268,8 @@ object PruneArrays {
               }.getOrElse((ScalaMap.empty, in.rBranch))
 
             ThetaJoin(in.src,
-              lBranch,
-              rBranch,
+              lBranch.pruneArraysBranch,
+              rBranch.pruneArraysBranch,
               remapIndicesInJoinFunc(in.on, lrepl, rrepl),
               in.f,
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
@@ -258,7 +277,7 @@ object PruneArrays {
         })
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[EquiJoin[T, ?]] =
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT]: PruneArrays[EquiJoin[T, ?]] =
     new PruneArrays[EquiJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -289,8 +308,8 @@ object PruneArrays {
               }.getOrElse((ScalaMap.empty, in.rBranch))
 
             EquiJoin(in.src,
-              lBranch,
-              rBranch,
+              lBranch.pruneArraysBranch,
+              rBranch.pruneArraysBranch,
               remapIndicesInFunc(in.lKey, lrepl),
               remapIndicesInFunc(in.rKey, rrepl),
               in.f,
@@ -302,7 +321,7 @@ object PruneArrays {
   def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =
     map.get(key).getOrElse(Set.empty.some)
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -331,7 +350,7 @@ object PruneArrays {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 
@@ -359,8 +378,8 @@ object PruneArrays {
 
             M.put(bucketIndices |+| reducersIndices).as(Ignore)
 
-          case Union(_, _, _)     => default.find(in) // TODO examine branches
-          case Subset(_, _, _, _) => default.find(in) // TODO examine branches
+          case Union(_, _, _)     => default.find(in)
+          case Subset(_, _, _, _) => default.find(in)
 
           case Map(_, func)    => M.put(liftHole(findIndicesInFunc[Hole](func))).as(Ignore)
           case Filter(_, func) => M.modify(liftHole(findIndicesInFunc[Hole](func)) |+| _).as(Ignore)
@@ -409,8 +428,11 @@ object PruneArrays {
                 repair)
             M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacement)))
 
-          case Union(_, _, _)     => default.remap(env, in) // TODO examine branches
-          case Subset(_, _, _, _) => default.remap(env, in) // TODO examine branches
+          case Union(src, lBranch, rBranch) =>
+            M.put(Ignore).as(Union(src, lBranch.pruneArraysBranch, rBranch.pruneArraysBranch))
+
+          case Subset(src, from, op, count) =>
+            M.put(Ignore).as(Subset(src, from.pruneArraysBranch, op, count.pruneArraysBranch))
 
           case Map(src, func) =>
             def replacement(repl: IndexMapping): QScriptCore[A] =
@@ -449,10 +471,14 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If the focus is an array that can be pruned, the annotatation is set to
     * the state. Else the annotation is set to `None`.
     */
-  def findIndices[M[_]](implicit M: MonadState[M, RewriteState], P: PruneArrays[F])
-      : CoalgebraM[M, ArrayEnv[F, ?], T[F]] = tqs => {
-    val gtg = tqs.project
-    P.find(gtg) ∘ (newEnv => EnvT((newEnv, gtg)))
+  def findIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+    implicit
+      R: Recursive.Aux[S[F], G],
+      M: MonadState[M, RewriteState],
+      P: PruneArrays[G])
+      : CoalgebraM[M, ArrayEnv[G, ?], S[F]] = sf => {
+    val gsf: G[S[F]] = sf.project
+    P.find(gsf) ∘ (newEnv => EnvT((newEnv, gsf)))
   }
 
   /** Given an annotated input, we produce an output with state.
@@ -462,10 +488,13 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If an array has an associated environment, we update the state
     * to be the environment and prune the array.
     */
-  def remapIndices[M[_]](implicit M: MonadState[M, RewriteState], P: PruneArrays[F])
-      : AlgebraM[M, ArrayEnv[F, ?], T[F]] = arrenv => {
-    val (env, qs): (RewriteState, F[T[F]]) = arrenv.run
-
-    P.remap(env, qs) ∘ (_.embed)
+  def remapIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+    implicit
+      C: Corecursive.Aux[S[F], G],
+      M: MonadState[M, RewriteState],
+      P: PruneArrays[G])
+      : AlgebraM[M, ArrayEnv[G, ?], S[F]] = arrenv => {
+    val (env, gsf): (RewriteState, G[S[F]]) = arrenv.run
+    P.remap(env, gsf) ∘ (_.embed)
   }
 }

@@ -71,11 +71,11 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(0)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial(UnreferencedRT).pruneArrays must equal(expected(UnreferencedRT))
-      initial(RootRT).pruneArrays must equal(expected(RootRT))
+      initial(UnreferencedRT).pruneArraysF must equal(expected(UnreferencedRT))
+      initial(RootRT).pruneArraysF must equal(expected(RootRT))
 
       val data = rootDir </> file("zips")
-      initial(ReadRT(data)).pruneArrays must equal(expected(ReadRT(data)))
+      initial(ReadRT(data)).pruneArraysF must equal(expected(ReadRT(data)))
     }
 
     "not rewrite map-filter with no unused array elements" in {
@@ -92,7 +92,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(1)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "rewrite map-sort with unused array elements" in {
@@ -140,11 +140,11 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               (ProjectIndexR(HoleF, IntLit(2)), SortDir.Ascending)))).embed,
           ProjectIndexR(HoleF, IntLit(1)))).embed
 
-      initial(UnreferencedRT).pruneArrays must equal(expected(UnreferencedRT))
-      initial(RootRT).pruneArrays must equal(expected(RootRT))
+      initial(UnreferencedRT).pruneArraysF must equal(expected(UnreferencedRT))
+      initial(RootRT).pruneArraysF must equal(expected(RootRT))
 
       val data = rootDir </> file("zips")
-      initial(ReadRT(data)).pruneArrays must equal(expected(ReadRT(data)))
+      initial(ReadRT(data)).pruneArraysF must equal(expected(ReadRT(data)))
     }
 
     "not rewrite map-sort with no unused array elements" in {
@@ -171,7 +171,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
           ProjectIndexR(HoleF, IntLit(2)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite filter with unused array elements" in {
@@ -186,7 +186,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               MakeArrayR(BoolLit(true))))).embed,
           ProjectIndexR(HoleF, IntLit(1)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite sort with unused array elements" in {
@@ -204,7 +204,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite map with entire array referenced" in {
@@ -213,7 +213,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           array3,
           HoleF)).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite map with entire array and specific index referenced" in {
@@ -224,7 +224,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(ProjectIndexR(HoleF, IntLit(0))),
             MakeArrayR(HoleF)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "rewrite map with unused array elements 1,2" in {
@@ -242,7 +242,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(6)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements 0,2" in {
@@ -260,7 +260,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(7)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements 0,1" in {
@@ -278,7 +278,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(IntLit(8)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite map with unused array elements in a binary map func" in {
@@ -302,7 +302,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(1)),
             ProjectIndexR(HoleF, IntLit(0))))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite leftshift with nonstatic array dereference" in {
@@ -313,7 +313,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(2)),
             ProjectIndexR(HoleF, AddR(IntLit(0), IntLit(1)))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "rewrite two leftshift arrays" in {
@@ -357,7 +357,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             MakeArrayR(LeftSideF))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite filter-map-filter-leftshift" in {
@@ -406,7 +406,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit(0)))).embed,
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite reduce-filter-leftshift" in {
@@ -450,7 +450,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
           MakeMapR(IntLit(0), ReduceIndexF(0.some))))
 
-      initial.embed.pruneArrays must equal(expected.embed)
+      initial.embed.pruneArraysF must equal(expected.embed)
     }
 
     "rewrite bucket field with unused array elements" in {
@@ -480,7 +480,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ProjectIndexR(HoleF, IntLit(1)),
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite bucket index with unused array elements" in {
@@ -502,7 +502,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ProjectIndexR(HoleF, IntLit(1)),
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -518,7 +518,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             HoleQS,
             ProjectIndexR(HoleF, IntLit[Fix, Hole](0))))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -533,7 +533,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             HoleQS,
             ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -549,7 +549,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           JoinType.Inner,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -566,7 +566,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           JoinType.Inner,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite equi join with entire array branch referenced in key" in {
@@ -582,7 +582,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit("xyz"),
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite theta join with entire array branch referenced in condition" in {
@@ -599,7 +599,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit("xyz"),
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite equi join with entire array branch referenced in combine" in {
@@ -615,7 +615,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit("xyz"),
             LeftSideF))).embed  // reference entire left branch
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite theta join with entire array branch referenced in combine" in {
@@ -630,7 +630,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit("xyz"),
             LeftSideF))).embed  // reference entire left branch
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: we'd like to be able to rewrite this
@@ -650,7 +650,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
             IntLit[Fix, Hole](2)))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -668,7 +668,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit[Fix, JoinSide]("bar"),
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     // FIXME: this can be rewritten - we just don't support that yet
@@ -687,7 +687,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             StrLit[Fix, JoinSide]("bar"),
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](1))))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "rewrite theta join with unused array elements in both branches" in {
@@ -745,7 +745,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
             ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite equi join with unused array elements in both branches" in {
@@ -801,7 +801,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
             ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with array referenced through struct" in {
@@ -826,7 +826,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           MakeMapR(StrLit("xyz"), RightSideF))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite left shift with entire array referenced through left side" in {
@@ -837,7 +837,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite left shift with array referenced non-statically through struct" in {
@@ -848,7 +848,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "rewrite left shift with array referenced through left side and struct" in {
@@ -875,7 +875,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with array referenced through struct with a right side reference" in {
@@ -912,7 +912,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "rewrite left shift with entire array unreferenced" in {
@@ -937,7 +937,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           AddR(IntLit[Fix, JoinSide](2), IntLit[Fix, JoinSide](3)))).embed
 
-      initial.pruneArrays must equal(expected)
+      initial.pruneArraysF must equal(expected)
     }
 
     "not rewrite left shift with entire array referenced by the right side" in {
@@ -948,7 +948,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           RightSideF)).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
     }
 
     "not rewrite left shift with entire array referenced by the left side" in {
@@ -959,7 +959,158 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           ExcludeId,
           LeftSideF)).embed
 
-      initial.pruneArrays must equal(initial)
+      initial.pruneArraysF must equal(initial)
+    }
+  }
+
+  "prune arrays branches" should {
+    val rBranch: FreeQS =
+      Free.roll(QCT.inj(LeftShift(
+        HoleQS,
+        HoleF,
+        ExcludeId,
+        ConcatArraysR(
+          ConcatArraysR(
+            MakeArrayR(IntLit(1)),
+            MakeArrayR(IntLit(2))),
+          MakeArrayR(StrLit("xyz"))))))
+
+    val innerInitial: FreeQS =
+      Free.roll(TJT.inj(ThetaJoin(
+        Free.roll(QCT.inj(Unreferenced())),
+        arrayBranch3,
+        rBranch,
+        EqR(
+          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+        JoinType.Inner,
+        MakeMapR(
+          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
+          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](2))))))
+
+    val lBranchExpected: FreeQS =
+      Free.roll(QCT.inj(LeftShift(
+        HoleQS,
+        HoleF,
+        ExcludeId,
+        MakeArrayR(IntLit(8)))))
+
+    val rBranchExpected: FreeQS =
+      Free.roll(QCT.inj(LeftShift(
+        HoleQS,
+        HoleF,
+        ExcludeId,
+        ConcatArraysR(
+          MakeArrayR(IntLit(1)),
+          MakeArrayR(StrLit("xyz"))))))
+
+    val innerExpected: FreeQS =
+      Free.roll(TJT.inj(ThetaJoin(
+        Free.roll(QCT.inj(Unreferenced())),
+        lBranchExpected,
+        rBranchExpected,
+        EqR(
+          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
+          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](0))),
+        JoinType.Inner,
+        MakeMapR(
+          ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
+          ProjectIndexR(RightSideF, IntLit[Fix, JoinSide](1))))))
+
+    "rewrite left branch of theta join" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+          branch,
+          HoleQS,
+          EqR(LeftSideF, RightSideF),
+          JoinType.Inner,
+          MakeMapR(LeftSideF, RightSideF))).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite right branch of theta join" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        TJT.inj(ThetaJoin(
+          UnreferencedRT.embed,
+          HoleQS,
+          branch,
+          EqR(LeftSideF, RightSideF),
+          JoinType.Inner,
+          MakeMapR(LeftSideF, RightSideF))).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite left branch of equi join" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        EJT.inj(EquiJoin(
+          UnreferencedRT.embed,
+          branch,
+          HoleQS,
+          HoleF,
+          HoleF,
+          JoinType.Inner,
+          MakeMapR(LeftSideF, RightSideF))).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite right branch of equi join" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        EJT.inj(EquiJoin(
+          UnreferencedRT.embed,
+          HoleQS,
+          branch,
+          HoleF,
+          HoleF,
+          JoinType.Inner,
+          MakeMapR(LeftSideF, RightSideF))).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite left branch of union" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        QCT.inj(Union(
+          UnreferencedRT.embed,
+          branch,
+          HoleQS)).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite right branch of union" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        QCT.inj(Union(
+          UnreferencedRT.embed,
+          HoleQS,
+          branch)).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite from branch of subset" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        QCT.inj(Subset(
+          UnreferencedRT.embed,
+          branch,
+          Drop,
+          HoleQS)).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
+    }
+
+    "rewrite count branch of subset" in {
+      def outer(branch: FreeQS): Fix[QST] =
+        QCT.inj(Subset(
+          UnreferencedRT.embed,
+          HoleQS,
+          Drop,
+          branch)).embed
+
+      outer(innerInitial).pruneArraysF must equal(outer(innerExpected))
     }
   }
 }

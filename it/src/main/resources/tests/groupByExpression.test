@@ -2,7 +2,6 @@
     "name": "group by a computed value",
 
     "backends": {
-        "couchbase":  "skip",
         "postgresql": "pending"
     },
     "ignoreFieldOrder": [

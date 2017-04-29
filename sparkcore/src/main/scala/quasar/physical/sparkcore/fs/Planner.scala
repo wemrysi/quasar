@@ -209,6 +209,7 @@ object Planner {
             case UnshiftArray(a) => a >>> ((d: Data) => Data.Arr(List(d)))
             case UnshiftMap(a1, a2) => ((d: Data) => a1(d) match {
               case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))
+              case Data.Int(i) => Data.Obj(ListMap(i.shows -> a2(d)))
               case _ => Data.NA
             })
           }

@@ -10,6 +10,8 @@
         "postgresql":        "pending"
     },
 
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../largeZips.data", "../zips.data"],
 
     "query": "select a.city as a, b.city as b, b.pop - a.pop as diff

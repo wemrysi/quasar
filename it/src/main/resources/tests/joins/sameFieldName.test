@@ -1,5 +1,6 @@
 {
     "name": "select over fields with same name",
+
     "backends": {
         "couchbase":         "skip",
         "mongodb_2_6":       "pending",
@@ -8,10 +9,19 @@
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../owners.data", "../cars.data"],
-    "query": "SELECT owner.name, car.name from `../owners` as owner join `../cars` as car on car.`_id` = owner.carId",
+
+    "query": "SELECT owner.name, car.name
+              from `../owners` as owner join `../cars` as car
+              on car.`_id` = owner.carId",
+
     "predicate": "containsExactly",
+
     "ignoreFieldOrder": ["marklogic_json"],
+
     "expected": [{ "name": "emma",  "name0": "RangeRover-Evoque" },
                  { "name": "scott", "name0": "Honda-civic" },
                  { "name": "scott", "name0": "BMW-X5" }]
