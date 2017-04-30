@@ -39,32 +39,41 @@ package object tpe {
   }
 
   object SimpleEJson {
-    def unapply(ejs: EJson[_]): Option[SimpleType] =
+    def unapply[J](ejs: J)(implicit J: Recursive.Aux[J, EJson]): Option[SimpleType] =
       simpleTypeOf(ejs)
   }
 
-  /** Returns the `CompositeType` of the given EJson value, if exists. */
-  val compositeTypeOf: EJson[_] => Option[CompositeType] = {
-    case C(ejs.Arr(_)) => some(CompositeType.Arr)
-    case E(ejs.Map(_)) => some(CompositeType.Map)
-    case C(ejs.Str(_)) => some(CompositeType.Arr)
-    case _             => none
+  /** Returns the primary type of the given EJson value, if it is composite. */
+  def compositeTypeOf[J](ejs: J)(
+    implicit J: Recursive.Aux[J, EJson]
+  ): Option[CompositeType] =
+    primaryTypeOf(ejs).toOption
+
+  /** Returns the primary type of the given EJson value. */
+  def primaryTypeOf[J](ejs: J)(implicit J: Recursive.Aux[J, EJson]): PrimaryType =
+    J.cata(ejs)(primaryTypeOfƒ)
+
+  /** Fold `EJson` to its PrimaryType. */
+  val primaryTypeOfƒ: Algebra[EJson, PrimaryType] = {
+    case E(ejs.Meta(v, _)) => v
+    // Simple
+    case C(ejs.Null() )    => SimpleType.Null.left
+    case C(ejs.Bool(_))    => SimpleType.Bool.left
+    case E(ejs.Byte(_))    => SimpleType.Byte.left
+    case E(ejs.Char(_))    => SimpleType.Char.left
+    case E( ejs.Int(_))    => SimpleType.Int.left
+    case C( ejs.Dec(_))    => SimpleType.Dec.left
+    // Composite
+    case C(ejs.Arr(_))     => CompositeType.Arr.right
+    case E(ejs.Map(_))     => CompositeType.Map.right
+    case C(ejs.Str(_))     => CompositeType.Arr.right
   }
 
-  /** Returns the `SimpleType` of the given EJson value, if exists. */
-  val simpleTypeOf: EJson[_] => Option[SimpleType] = {
-    case C(ejs.Null() ) => some(SimpleType.Null)
-    case C(ejs.Bool(_)) => some(SimpleType.Bool)
-    case E(ejs.Byte(_)) => some(SimpleType.Byte)
-    case E(ejs.Char(_)) => some(SimpleType.Char)
-    case E( ejs.Int(_)) => some(SimpleType.Int)
-    case C( ejs.Dec(_)) => some(SimpleType.Dec)
-    case _              => none
-  }
-
-  /** Returns the `PrimaryType` of the given EJson value, if exists. */
-  val primaryTypeOf: EJson[_] => Option[PrimaryType] =
-    j => compositeTypeOf(j).map(_.right) orElse simpleTypeOf(j).map(_.left)
+  /** Returns the primary type of the given EJson value, if it is simple. */
+  def simpleTypeOf[J](ejs: J)(
+    implicit J: Recursive.Aux[J, EJson]
+  ): Option[SimpleType] =
+    primaryTypeOf(ejs).swap.toOption
 
   // Instances
 

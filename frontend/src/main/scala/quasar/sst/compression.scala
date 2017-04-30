@@ -48,11 +48,11 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
-      val grouped = kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit]) { (m, j, _) =>
-        primaryTypeOf(j.project).fold(m) { pt =>
-          m.alter(pt, _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ())))
-        }
-      }
+      val grouped =
+        kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit])((m, j, _) =>
+          m.alter(
+            primaryTypeOf(j),
+            _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
 
       val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
         val toCompress = kn intersection m
@@ -177,10 +177,10 @@ object compression {
     implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] = j.project match {
-    case ej @ SimpleEJson(s) => envT(some(TS.fromEJson(cnt, ej)), simple[J, SST[J, A]](s)).embed
-    case ej @ C(Str(_))      => envT(some(TS.fromEJson(cnt, ej)), charArr[J, A](cnt)).embed
-    case _                   => SST.fromEJson(cnt, j)
+  ): SST[J, A] = j match {
+    case SimpleEJson(s)   => envT(some(TS.fromEJson(cnt, j)), simple[J, SST[J, A]](s)).embed
+    case Embed(C(Str(_))) => envT(some(TS.fromEJson(cnt, j)), charArr[J, A](cnt)).embed
+    case _                => SST.fromEJson(cnt, j)
   }
 
   private def size1[A](ots: Option[TypeStat[A]])(implicit R: Ring[A]): A =

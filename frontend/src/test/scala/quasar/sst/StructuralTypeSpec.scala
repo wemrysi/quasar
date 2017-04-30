@@ -63,7 +63,7 @@ final class StructuralTypeSpec extends Spec
     }
 
     "unmergable values accumulate via union" >> prop { (x: J, y: J) =>
-      ((compositeTypeOf(x.project) ≠ compositeTypeOf(y.project)) && (x ≠ y)) ==> {
+      ((compositeTypeOf(x) ≠ compositeTypeOf(y)) && (x ≠ y)) ==> {
       val (xst, yst) = (mkST(x), mkST(y))
       val exp = envT(2, TypeF.coproduct[J, S](xst, yst)).embed
       (xst |+| yst) must equal(exp)
