@@ -600,8 +600,10 @@ package object workflow {
 
         val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
           case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-            case I($ProjectF(src, shape, _))  =>
-              shape.toJs.fold(
+            case I($ProjectF(src, shape, id))  =>
+              (if (id ≠ ExcludeId)
+                shape.set(BsonField.Name("_id"), $include.right)
+              else shape).toJs.fold(
                 κ(I.inj(mr)),
                 x => {
                   val base = jscore.Name("__rez")

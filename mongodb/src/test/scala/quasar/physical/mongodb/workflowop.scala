@@ -300,7 +300,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
+          ExcludeId),
         $simpleMap((MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), Select(ident("x"), "value")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
 
       val expected = chain[Workflow](
@@ -318,7 +318,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
+          ExcludeId),
         $simpleMap(
           (FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()))
@@ -339,7 +339,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
-          IncludeId),
+          ExcludeId),
         $reduce($ReduceF.reduceNOP, ListMap()))
 
       val expected = chain[Workflow](
