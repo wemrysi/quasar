@@ -19,7 +19,9 @@ package ygg.macros
 import scala.StringContext
 import scala.reflect.ClassTag
 import scala.Predef.implicitly
-import quasar._, Predef._
+
+import slamdata.Predef._
+import quasar._
 
 class ArgonautJsonSpec extends AbstractJsonSpec[argonaut.Json]()(argonaut.JawnParser.facade, implicitly[ClassTag[argonaut.Json]])
 class DataJsonSpec extends AbstractJsonSpec[Data]()
