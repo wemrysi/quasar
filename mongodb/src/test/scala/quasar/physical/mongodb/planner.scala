@@ -265,8 +265,8 @@ class PlannerSpec extends
            ExcludeId)))
     }
 
-    "plan concat" in {
-      plan("select concat(bar, baz) from foo") must
+    "plan concat (3.0-)" in {
+      plan3_0("select concat(bar, baz) from foo") must
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
@@ -280,6 +280,29 @@ class PlannerSpec extends
                    $lte($literal(Bson.Text("")), $field("bar")),
                    $lt($field("bar"), $literal(Bson.Doc()))),
                  $concat($field("bar"), $field("baz")),
+                 $literal(Bson.Undefined)),
+               $literal(Bson.Undefined))),
+           ExcludeId)))
+    }
+
+    "plan concat (3.2+)" in {
+      plan3_2("select concat(bar, baz) from foo", defaultStats, defaultIndexes) must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "foo")),
+         $project(
+           reshape("value" ->
+             $cond(
+               $and(
+                 $lte($literal(Bson.Text("")), $field("baz")),
+                 $lt($field("baz"), $literal(Bson.Doc()))),
+               $cond(
+                 $and(
+                   $lte($literal(Bson.Text("")), $field("bar")),
+                   $lt($field("bar"), $literal(Bson.Doc()))),
+                 $let(ListMap(DocVar.Name("a1") -> $field("bar"), DocVar.Name("a2") -> $field("baz")),
+                   $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                     $concatArrays(List($field("$a1"), $field("$a2"))),
+                     $concat($field("$a1"), $field("$a2")))),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
@@ -308,9 +331,20 @@ class PlannerSpec extends
                      $and(
                        $lte($literal(Bson.Text("")), $field("city")),
                        $lt($field("city"), $literal(Bson.Doc())))),
-                   $concat( // TODO: ideally, this would be a single $concat
-                     $concat($field("city"), $literal(Bson.Text(", "))),
-                     $field("state")),
+                   $let( // TODO: ideally, this would be a single $concat
+                     ListMap(
+                       DocVar.Name("a1") ->
+                         $let(
+                           ListMap(
+                             DocVar.Name("a1") -> $field("city"),
+                             DocVar.Name("a2") -> $literal(Bson.Text(", "))),
+                           $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                             $concatArrays(List($field("$a1"), $field("$a2"))),
+                             $concat($field("$a1"), $field("$a2")))),
+                       DocVar.Name("a2") -> $field("state")),
+                     $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                       $concatArrays(List($field("$a1"), $field("$a2"))),
+                       $concat($field("$a1"), $field("$a2")))),
                    $literal(Bson.Undefined)),
                  $literal(Bson.Undefined))),
            ExcludeId)))
@@ -499,8 +533,8 @@ class PlannerSpec extends
           ExcludeId)))
     }.pendingUntilFixed(notOnPar)
 
-    "plan select array element" in {
-      plan("select loc[0] from zips") must
+    "plan select array element (3.0-)" in {
+      plan3_0("select loc[0] from zips") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -511,6 +545,22 @@ class PlannerSpec extends
           ListMap()),
         $project(
           reshape("value" -> $field("__tmp0")),
+          ExcludeId)))
+    }
+
+    "plan select array element (3.2+)" in {
+      plan3_2("select loc[0] from zips", defaultStats, defaultIndexes) must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "zips")),
+        $project(
+          reshape(
+            "value" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr(List())), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $arrayElemAt($field("loc"), $literal(Bson.Int32(0))),
+                $literal(Bson.Undefined))),
           ExcludeId)))
     }
 
@@ -1907,8 +1957,8 @@ class PlannerSpec extends
         }
     }.pendingUntilFixed(notOnPar)
 
-    "plan array project with concat" in {
-      plan("select city, loc[0] from zips") must
+    "plan array project with concat (3.0-)" in {
+      plan3_0("select city, loc[0] from zips") must
         beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
@@ -1925,6 +1975,25 @@ class PlannerSpec extends
               reshape(
                 "city" -> $include(),
                 "1"    -> $include()),
+              IgnoreId))
+        }
+    }
+
+    "plan array project with concat (3.2+)" in {
+      plan3_2("select city, loc[0] from zips", defaultStats, defaultIndexes) must
+        beWorkflow {
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $project(
+              reshape(
+                "city" -> $field("city"),
+                "1"    ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Arr(List())), $field("loc")),
+                      $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                    $arrayElemAt($field("loc"), $literal(Bson.Int32(0))),
+                    $literal(Bson.Undefined))),
               IgnoreId))
         }
     }

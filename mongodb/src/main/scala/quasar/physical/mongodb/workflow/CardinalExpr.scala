@@ -19,7 +19,6 @@ package quasar.physical.mongodb.workflow
 import scalaz._, Scalaz._
 
 sealed abstract class CardinalExpr[A]
-
 final case class MapExpr[A](fn: A)  extends CardinalExpr[A]
 final case class FlatExpr[A](fn: A) extends CardinalExpr[A]
 

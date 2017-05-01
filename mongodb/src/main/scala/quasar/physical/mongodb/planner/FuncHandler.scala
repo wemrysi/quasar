@@ -166,16 +166,36 @@ object FuncHandler {
     })
   }
 
-  def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
-    implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
-    new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
-      def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
-        val fp = new ExprOp3_2F.fixpoint[Free[ExprOp3_2F, A], ExprOp3_2F](Free.roll)
-        import fp._
+  def handleOps3_2[T[_[_]]]: FuncHandler[T, Expr3_2] = {
+    implicit def hole[D](d: D): Free[Expr3_2, D] = Free.pure(d)
+    new FuncHandler[T, Expr3_2](new (MapFunc[T, ?] ~> M[Expr3_2, ?]) {
+      def apply[A](fa: MapFunc[T, A]): M[Expr3_2, A] = {
+        val fp32 = new ExprOp3_2F.fixpoint[Free[Expr3_2, A], Expr3_2](Free.roll)
+        val fp26 = new ExprOpCoreF.fixpoint[Free[Expr3_2, A], Expr3_2](Free.roll)
+        import fp32._, fp26._
 
         fa.some collect {
-          case Power(a1, a2) =>
-            $pow(a1, a2)
+          case Power(a1, a2)        => $pow(a1, a2)
+          case ProjectIndex(a1, a2) => $arrayElemAt(a1, a2)
+          case ConcatArrays(a1, a2) =>
+            $let(ListMap(DocVar.Name("a1") -> a1, DocVar.Name("a2") -> a2),
+              $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                $concatArrays(List($field("$a1"), $field("$a2"))),
+                $concat($field("$a1"), $field("$a2"))))
+          case TypeOf(a1) => // NB: Identical to the one in Core, but uses $isArray
+            $cond($lt(a1, $literal(Bson.Null)),                          $literal(Bson.Undefined),
+              $cond($eq(a1, $literal(Bson.Null)),                        $literal(Bson.Text("null")),
+                // TODO: figure out how to distinguish integer
+                $cond($lt(a1, $literal(Bson.Text(""))),                  $literal(Bson.Text("decimal")),
+                  // TODO: Once we’re encoding richer types, we need to check for metadata here.
+                  $cond($lt(a1, $literal(Bson.Doc())),                   $literal(Bson.Text("array")),
+                    $cond($lt(a1, $literal(Bson.Arr())),                 $literal(Bson.Text("map")),
+                      $cond($isArray(a1),                                $literal(Bson.Text("array")),
+                        $cond($lt(a1, $literal(Bson.Bool(false))),       $literal(Bson.Text("_bson.objectid")),
+                          $cond($lt(a1, $literal(Check.minDate)),        $literal(Bson.Text("boolean")),
+                            $cond($lt(a1, $literal(Check.minTimestamp)), $literal(Bson.Text("_ejson.timestamp")),
+                              $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
+                                                                         $literal(Bson.Text("_bson.regularexpression"))))))))))))
         }
       }
     })
