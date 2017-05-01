@@ -16,7 +16,8 @@
 
 package ygg
 
-import quasar._, Predef._
+import slamdata.Predef._
+import quasar._
 import quasar.ejson.EJson
 import jawn.SimpleFacade
 

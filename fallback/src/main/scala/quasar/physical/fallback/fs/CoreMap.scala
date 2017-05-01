@@ -18,7 +18,7 @@ package quasar.physical.fallback.fs
 
 import slamdata.Predef.{Eq => _, _}
 import quasar.qscript.MapFuncs._
-import quasar.std.{DateLib, StringLib}, DateLib.TemporalPart
+import quasar.std.{DateLib, StringLib, TemporalPart}
 import quasar.DataCodec
 import quasar.Planner._
 import quasar.fp.ski._

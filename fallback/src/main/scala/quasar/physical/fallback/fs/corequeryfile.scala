@@ -70,25 +70,7 @@ object corequeryfile {
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
   ): QueryFile ~> Free[S, ?] = {
 
-    def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
-      val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
-        (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-      val C = quasar.qscript.Coalesce[Fix, SparkQScript, SparkQScript]
-      val rewrite = new Rewrite[Fix]
-      for {
-        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
-                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript0].apply(_))
-                   .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
-        optQS =  qs.transHylo(
-                   rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(rewrite.applyTransforms(
-                     C.coalesceQC[SparkQScript](idPrism),
-                     C.coalesceEJ[SparkQScript](idPrism.get),
-                     C.coalesceSR[SparkQScript, AFile](idPrism),
-                     Normalizable[SparkQScript].normalizeF(_: SparkQScript[Fix[SparkQScript]]))))
-        _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
-      } yield optQS
-    }
+    def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = ???
 
     def qsToProgram[T](
       exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
@@ -124,21 +106,7 @@ object corequeryfile {
   private def explainPlan[S[_]](input: Input, fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
-  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
-
-    val total = scala.Predef.implicitly[Planner[SparkQScript]]
-
-    read.asks { sc =>
-      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc).run
-
-      injectFT.apply {
-        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(fsType, "RDD Directed Acyclic Graph"))))).map(EitherT(_))
-      }
-    }.join
-  }
+  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = ???
 
   private def executePlan[S[_]](input: Input, qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,

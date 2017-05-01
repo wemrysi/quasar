@@ -54,13 +54,13 @@ trait PrecogEvaluator[M[+_]] extends StdLibEvaluatorStack[M] with BlockStoreColu
 }
 object PrecogEvaluator {
   def apply[M[+_]: Monad](ps: Map[Path, Map[ColumnRef, Long]]): PrecogEvaluator[M] = new PrecogEvaluator[M] {
-    val M           = implicitly[Monad[M]]
+    val M           = Monad[M]
     val projections = ps
   }
 }
 
 object fall extends PrecogEvaluator[Id] {
-  val M           = implicitly[Monad[Id]]
+  val M           = Monad[Id]
   val projections = Map[Path, Map[ColumnRef, Long]]()
 
   implicit class TableOps(private val self: Table) {

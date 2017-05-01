@@ -159,8 +159,8 @@ class MapFuncData extends MapFuncHandler[Data] with Prisms[Data] {
 
   val ba          = BooleanAlgebra.BooleanAlgebraData
   val na          = NumericAlgebra.NumericAlgebraData
-  val ord         = implicitly[Ord[Data]]
-  val show        = implicitly[Show[Data]]
+  val ord         = Ord[Data]
+  val show        = Show[Data]
 
   val jsonAlgebra = Data.fromEJson
   val Bool        = Data._bool
