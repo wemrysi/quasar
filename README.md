@@ -575,6 +575,172 @@ Removes all data and views at the specified path. Single files are deleted atomi
 Moves data from one path to another within the same backend. The new path must
 be provided in the `Destination` request header. Single files are moved atomically.
 
+### GET /invoke/fs/[path]
+
+Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
+
+### GET /schema/fs/[path]?arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
+
+Where `path` is a file path and `size` is a positive integer. Returns a schema document, summarizing the dataset at the specified path.
+
+For example, given a dataset having documents like:
+
+```json
+{"_id":"01001","city":"AGAWAM","loc":[-72.622739,42.070206],"pop":15338,"state":"MA"}
+{"_id":"01002","city":"CUSHMAN","loc":[-72.51565,42.377017],"pop":36963,"state":"MA"}
+{"_id":"01005","city":"BARRE","loc":[-72.108354,42.409698],"pop":4546,"state":"MA"}
+{"_id":"01007","city":"BELCHERTOWN","loc":[-72.410953,42.275103],"pop":10579,"state":"MA"}
+{"_id":"01008","city":"BLANDFORD","loc":[-72.936114,42.182949],"pop":1240,"state":"MA"}
+{"_id":"01010","city":"BRIMFIELD","loc":[-72.188455,42.116543],"pop":3706,"state":"MA"}
+{"_id":"01011","city":"CHESTER","loc":[-72.988761,42.279421],"pop":1688,"state":"MA"}
+{"_id":"01012","city":"CHESTERFIELD","loc":[-72.833309,42.38167],"pop":177,"state":"MA"}
+{"_id":"01013","city":"CHICOPEE","loc":[-72.607962,42.162046],"pop":23396,"state":"MA"}
+{"_id":"01020","city":"CHICOPEE","loc":[-72.576142,42.176443],"pop":31495,"state":"MA"}
+```
+
+a schema document might look like
+
+```json
+{
+  "measure" : {
+    "count" : 1000.0,
+    "minLength" : 5.0,
+    "maxLength" : 5.0
+  },
+  "structure" : {
+    "type" : "map",
+    "of" : {
+      "city" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "ABBEVILLE",
+          "max" : "YOUNGSVILLE",
+          "minLength" : 3.0,
+          "maxLength" : 16.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "state" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "AK",
+          "max" : "WY",
+          "minLength" : 2.0,
+          "maxLength" : 2.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "pop" : {
+        "measure" : {
+          "count" : 1000.0,
+          "distribution" : {
+            "mean" : 8560.410999999996,
+            "variance" : 153498226.66073978,
+            "skewness" : 2.1932119902818976,
+            "kurtosis" : 8.145272163842572
+          },
+          "min" : 0,
+          "max" : 83158
+        },
+        "structure" : {
+          "type" : "integer"
+        }
+      },
+      "_id" : {
+        "measure" : {
+          "count" : 1000.0,
+          "min" : "01342",
+          "max" : "99744",
+          "minLength" : 5.0,
+          "maxLength" : 5.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : {
+            "measure" : {
+              "count" : 1000.0
+            },
+            "structure" : {
+              "type" : "character"
+            }
+          }
+        }
+      },
+      "loc" : {
+        "measure" : {
+          "count" : 1000.0,
+          "minLength" : 2.0,
+          "maxLength" : 2.0
+        },
+        "structure" : {
+          "type" : "array",
+          "of" : [
+            {
+              "measure" : {
+                "count" : 1000.0,
+                "distribution" : {
+                  "mean" : -90.75566306399999,
+                  "variance" : 215.8880504119835,
+                  "skewness" : -1.3085274289304345,
+                  "kurtosis" : 5.671392237003005
+                },
+                "min" : -170.293408,
+                "max" : -68.031686
+              },
+              "structure" : {
+                "type" : "decimal"
+              }
+            },
+            {
+              "measure" : {
+                "count" : 1000.0,
+                "distribution" : {
+                  "mean" : 39.02678901400003,
+                  "variance" : 26.66316872053294,
+                  "skewness" : -0.030243876777278023,
+                  "kurtosis" : 4.447095871155061
+                },
+                "min" : 20.027748,
+                "max" : 64.840238
+              },
+              "structure" : {
+                "type" : "decimal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+Schema documents represent an estimate of the structure of the given dataset and are generated from a random sample of the data. Each node of the resulting structure is annotated with the frequency the node was observed and the bounds of the observed values, when available (NB: bounds should be seen as a reference and not taken as the true, global maximum or minimum values). Additionally, for numeric values, statistical distribution information is included.
+
+When two documents differ in structure, their differences are accumulated in a union. Basic frequency information is available for the union and more specific annotations are preserved as much as possible for the various members.
+
+The `arrayMaxLength`, `mapMaxSize`, `stringMaxLength` and `unionMaxSize` parameters allow for control over the amount of information contained in the returned schema by limiting the size of various structures in the result. Structures that exceed the various size thresholds are compressed using various heuristics depending on the structure involved.
+
 ### GET /mount/fs/[path]
 
 Retrieves the configuration for the mount point at the provided path. In the case of MongoDB, the response will look like
@@ -608,10 +774,6 @@ Takes a port number in the body, and attempts to restart the server on that port
 ### DELETE /server/port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
-
-### GET /invoke/fs/[path]
-
-Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
 
 
 ## Error Responses
