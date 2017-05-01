@@ -61,6 +61,7 @@ object CoreMap extends Serializable {
       : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] = {
     case Constant(f) => κ(f.cata(Data.fromEJson)).right
     case Undefined() => κ(undefined).right
+    case JoinSideName(n) => UnexpectedJoinSide(n).left
 
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)

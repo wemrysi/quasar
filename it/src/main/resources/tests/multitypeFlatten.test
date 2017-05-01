@@ -5,10 +5,10 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_read_only": "pending",
-        "mongodb_q_3_2": "pending",
+        "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "spark_local":       "pending",
-        "spark_hdfs":        "pending"
+        "spark_local":       "skip",
+        "spark_hdfs":        "skip"
     },
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (

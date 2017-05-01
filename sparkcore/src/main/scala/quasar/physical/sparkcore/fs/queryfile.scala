@@ -25,6 +25,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.frontend.logicalplan.LogicalPlan

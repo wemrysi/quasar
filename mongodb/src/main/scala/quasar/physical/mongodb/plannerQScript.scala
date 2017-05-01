@@ -18,10 +18,11 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{JoinType, PhaseResult, PhaseResults, SortDir}
+import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
@@ -281,6 +282,8 @@ object MongoDbQScriptPlanner {
           _.point[M])
       // FIXME: Not correct
       case Undefined() => ident("undefined").point[M]
+      case JoinSideName(n) =>
+        merr.raiseError[JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => New(Name("Date"), Nil).point[M]
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
@@ -821,7 +824,7 @@ object MongoDbQScriptPlanner {
               })
       }
 
-    implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: OrderT: ShowT]:
+    implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
@@ -908,7 +911,7 @@ object MongoDbQScriptPlanner {
         }
       }
 
-    implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: OrderT: ShowT]:
+    implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
@@ -933,12 +936,8 @@ object MongoDbQScriptPlanner {
           getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
           (lb, rb, lk, rk, lj, rj) =>
           liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-            qs.f match {
-              case JoinType.Inner => set.InnerJoin
-              case JoinType.FullOuter => set.FullOuterJoin
-              case JoinType.LeftOuter => set.LeftOuterJoin
-              case JoinType.RightOuter => set.RightOuterJoin
-            },
+            // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
+            LogicalPlan.funcFromJoinType(qs.f),
             JoinSource(lb, List(lk), lj.map(List(_))),
             JoinSource(rb, List(rk), rj.map(List(_)))))).join
       }
@@ -1214,7 +1213,7 @@ object MongoDbQScriptPlanner {
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def plan0
-    [T[_[_]]: BirecursiveT: OrderT: EqualT: RenderTreeT: ShowT,
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
@@ -1271,7 +1270,7 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
     (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],

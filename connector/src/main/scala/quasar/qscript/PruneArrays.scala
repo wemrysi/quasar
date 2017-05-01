@@ -76,7 +76,7 @@ object PATypes {
       : M[F[A]]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT: OrderT: EqualT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
@@ -242,7 +242,7 @@ object PruneArrays {
   implicit def shiftedRead[A]: PruneArrays[Const[ShiftedRead[A], ?]] = default
   implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[ThetaJoin[T, ?]] =
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT]: PruneArrays[ThetaJoin[T, ?]] =
     new PruneArrays[ThetaJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -281,7 +281,7 @@ object PruneArrays {
         })
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: OrderT: EqualT]: PruneArrays[EquiJoin[T, ?]] =
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT]: PruneArrays[EquiJoin[T, ?]] =
     new PruneArrays[EquiJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -325,7 +325,7 @@ object PruneArrays {
   def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =
     map.get(key).getOrElse(Set.empty.some)
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: OrderT: EqualT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -354,7 +354,7 @@ object PruneArrays {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: OrderT: EqualT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 

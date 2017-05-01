@@ -806,6 +806,10 @@ object MongoDbPlanner {
         def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
+      case JoinSideName(_) =>
+        state(-\/(InternalError fromMsg s"unexpected JoinSideName"))
+      case Join(_, _, _, _) =>
+        state(-\/(InternalError fromMsg s"unexpected Join"))
       case Free(name) =>
         state(-\/(InternalError fromMsg s"variable $name is unbound"))
       case Let(_, _, in) => state(in.head._2)
@@ -1011,9 +1015,12 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+  def plan[M[_]](logical0: Fix[LP], queryContext: fs.QueryContext[M])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
+
+    val logical: Fix[LP] =
+      logical0.cata[Fix[LP]](optimizer.reconstructOldJoins)
 
     queryContext.model match {
       case `3.2` =>
