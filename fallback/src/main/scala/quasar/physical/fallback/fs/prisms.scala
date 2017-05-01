@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import monocle._
 import java.time._
 

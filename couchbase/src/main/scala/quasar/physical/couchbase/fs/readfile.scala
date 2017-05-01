@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
@@ -24,8 +24,6 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.impl.ReadOpts
 import quasar.physical.couchbase.common._
-
-import scala.collection.JavaConverters._
 
 import eu.timepit.refined.api.RefType.ops._
 import scalaz._, Scalaz._
@@ -57,13 +55,7 @@ object readfile {
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
                      WHERE type="${bktCol.collection}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- EitherT(lift(Task.delay(
-                   bkt.query(n1qlQuery(qStr))
-                     .allRows
-                     .asScala
-                     .toVector
-                     .traverse(rowToData)
-                 )).into)
+      qResult <- EitherT(lift(queryData(bkt, qStr)).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](

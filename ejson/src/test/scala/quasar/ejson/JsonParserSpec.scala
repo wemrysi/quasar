@@ -16,20 +16,23 @@
 
 package quasar.ejson
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Qspec
 import quasar.fp._
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.:<:
+import scalaz.{:<:, Inject}
 import jawn.ast._
 
 final class JsonParserSpec extends Qspec {
   type J = Fix[Json]
   val C  = implicitly[Common :<: Json]
   val O  = implicitly[Obj    :<: Json]
+
+  val C = Inject[Common, Json]
+  val O = Inject[Obj,    Json]
 
   val js = """{
     "array"  : [ 1, "two" ],

@@ -16,9 +16,9 @@
 
 package quasar.qscript
 
-import quasar.Predef.{ Eq => _, _ }
+import slamdata.Predef.{ Eq => _, _ }
 import quasar.{Data, TreeMatchers, Type}
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
@@ -223,23 +223,19 @@ class QScriptSpec
               ProjectFieldR(HoleF, StrLit("foo"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           BoolLit(true),
-          Inner,
+          JoinType.Inner,
           Free.roll(Add(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
     }
 
     "convert project object and make object" in {
@@ -482,7 +478,11 @@ class QScriptSpec
       convert(
         lc.some,
         lp.let('__tmp0,
-          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), lpf.constant(Data.Bool(true))).embed,
+          lp.join(
+            lpRead("/person"),
+            lpRead("/car"),
+            JoinType.Inner,
+            lp.JoinCondition('__leftJoin5, '__rightJoin6, lpf.constant(Data.Bool(true)))).embed,
           identity.Squash(
             structural.ObjectConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
@@ -494,45 +494,43 @@ class QScriptSpec
             Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(LeftSideF)),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MakeArray(RightSideF))))),
           BoolLit(true),
-          Inner,
+          JoinType.Inner,
           Free.roll(ConcatMaps(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(1)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
     }
 
-    // TODO #1794 prune arrays
     "convert basic join with explicit join condition" in {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
-      val lp = lpf.let('__tmp0, lpRead("/foo"),
-        lpf.let('__tmp1, lpRead("/bar"),
-          lpf.let('__tmp2,
-            StdLib.set.InnerJoin(lpf.free('__tmp0), lpf.free('__tmp1),
+      val query =
+        lpf.let('__tmp0, 
+          lpf.join(
+            lpRead("/foo"),
+            lpRead("/bar"),
+            JoinType.Inner,
+            lp.JoinCondition('__leftJoin9, '__rightJoin10,
               relations.Eq(
-                structural.ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("id"))).embed,
-                structural.ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))).embed).embed).embed,
-            makeObj(
-              "name" ->
-                structural.ObjectProject(
-                  JoinDir.Left.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("name"))).embed,
-              "address" ->
-                structural.ObjectProject(
-                  JoinDir.Right.projectFrom(lpf.free('__tmp2)),
-                  lpf.constant(Data.Str("address"))).embed))))
+                structural.ObjectProject(lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))).embed,
+                structural.ObjectProject(lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id"))).embed).embed)),
+          makeObj(
+            "name" ->
+              structural.ObjectProject(
+                JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                lpf.constant(Data.Str("name"))).embed,
+            "address" ->
+              structural.ObjectProject(
+                JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+                lpf.constant(Data.Str("address"))).embed))
 
-      convert(None, lp) must
+      convert(None, query) must
         beSome(beTreeEqual(chain(
           RootR,
           TJ.inj(ThetaJoin((),
@@ -540,67 +538,37 @@ class QScriptSpec
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))),
               HoleF,
               IncludeId,
-              ConcatArraysR(
-                MakeArrayR(ConcatArraysR(
-                  MakeArrayR(LeftSideF),
-                  MakeArrayR(RightSideF))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                    MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("id")))))))))),
+              MakeArrayR(RightSideF)))),
             Free.roll(QCT.inj(LeftShift(
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("bar"))))),
               HoleF,
               IncludeId,
-              ConcatArraysR(
-                MakeArrayR(ConcatArraysR(
-                  MakeArrayR(LeftSideF),
-                  MakeArrayR(RightSideF))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                    MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("foo_id")))))))))),
+              MakeArrayR(RightSideF)))),
             Free.roll(Eq(
               ProjectFieldR(
                 ProjectIndexR(
-                  ProjectIndexR(
-                    LeftSideF, IntLit(1)),
+                  ProjectIndexR(LeftSideF, IntLit(0)),
                   IntLit(1)),
-                ProjectIndexR(
-                  ProjectIndexR(
-                    LeftSideF, IntLit(1)),
-                  IntLit(2))),
+                StrLit("id")),
               ProjectFieldR(
                 ProjectIndexR(
-                  ProjectIndexR(
-                    RightSideF, IntLit(1)),
+                  ProjectIndexR(RightSideF, IntLit(0)),
                   IntLit(1)),
-                ProjectIndexR(
-                  ProjectIndexR(
-                    RightSideF, IntLit(1)),
-                  IntLit(2))))),
-            Inner,
+                StrLit("foo_id")))),
+            JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
                 StrLit("name"),
                 ProjectFieldR(
                   ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(
-                        LeftSideF, IntLit(0)),
-                      IntLit(1)),
+                    ProjectIndexR(LeftSideF, IntLit(0)),
                     IntLit(1)),
                   StrLit("name"))),
               MakeMapR(
                 StrLit("address"),
                 ProjectFieldR(
                   ProjectIndexR(
-                    ProjectIndexR(
-                      ProjectIndexR(
-                        RightSideF, IntLit(0)),
-                      IntLit(1)),
+                    ProjectIndexR(RightSideF, IntLit(0)),
                     IntLit(1)),
                   StrLit("address")))))))))
     }
@@ -674,13 +642,15 @@ class QScriptSpec
                   ProjectIndexR(RightSideF, IntLit(1)),
                   Free.roll(Undefined()))),
                 StrLit("pop")))))))),
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
         QC.inj(Sort((),
           NullLit(),
           (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
           Free.roll(MakeArray(
             Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
-          List(ReduceFuncs.Arbitrary(ProjectIndexR(HoleF, IntLit(0)))),
+          List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
           Free.roll(DeleteField(ReduceIndexF(0.some), StrLit("__sd__0"))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
@@ -870,6 +840,98 @@ class QScriptSpec
             Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1.some))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
 
+    }
+
+    "convert an ordered filtered distinct" in {
+      val lp = fullCompileExp("select distinct city from zips where pop <= 10 order by pop")
+      val qs = convert(lc.some, lp)
+
+      val guard: JoinFunc =
+        Free.roll(Guard(
+          ProjectIndexR(RightSideF, IntLit(1)),
+          Type.Obj(ScalaMap(), Some(Type.Top)),
+          ProjectIndexR(RightSideF, IntLit(1)),
+          Free.roll(Undefined())))
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          IncludeId,
+          ConcatArraysR(
+            MakeArrayR(guard),
+            MakeArrayR(Free.roll(Guard(
+              ProjectFieldR(guard, StrLit("pop")),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              Free.roll(Lte(ProjectFieldR(guard, StrLit("pop")), IntLit(10))),
+              Free.roll(Undefined()))))))),
+        QC.inj(Filter((),
+          ProjectIndexR(HoleF, IntLit(1)))),
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
+        QC.inj(Reduce((),
+          MakeArrayR(DeleteFieldR(
+            ConcatMapsR(
+              MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
+              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
+            StrLit("__sd__0"))),
+          List(ReduceFuncs.First(ConcatMapsR(
+            MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
+            MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+          DeleteFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))(
+        implicitly, Corecursive[Fix[QS], QS])))
+    }
+
+    "convert an ordered filtered distinct with cases" in {
+      val lp = fullCompileExp("""select distinct case state when "MA" then "Massachusetts" else "unknown" end as name from zips where pop <= 10 order by pop""")
+      val qs = convert(lc.some, lp)
+
+      val guard: JoinFunc =
+        Free.roll(Guard(
+          ProjectIndexR(RightSideF, IntLit(1)),
+          Type.Obj(ScalaMap(), Some(Type.Top)),
+          ProjectIndexR(RightSideF, IntLit(1)),
+          Free.roll(Undefined())))
+
+      val cond: FreeMap =
+        Free.roll(Cond(
+          Free.roll(Eq(ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA"))),
+          StrLit("Massachusetts"),
+          StrLit("unknown")))
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((),
+          HoleF,
+          IncludeId,
+          ConcatArraysR(
+            MakeArrayR(guard),
+            MakeArrayR(Free.roll(Guard(
+              ProjectFieldR(guard, StrLit("pop")),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              Free.roll(Lte(ProjectFieldR(guard, StrLit("pop")), IntLit(10))),
+              Free.roll(Undefined()))))))),
+        QC.inj(Filter((),
+          ProjectIndexR(HoleF, IntLit(1)))),
+        // FIXME #2034
+        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        QC.inj(Sort((),
+          NullLit(),
+          (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
+        QC.inj(Reduce((),
+          MakeArrayR(DeleteFieldR(
+            ConcatMapsR(
+              MakeMapR(StrLit("name"), cond),
+              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
+            StrLit("__sd__0"))),
+          List(ReduceFuncs.First(ConcatMapsR(
+            MakeMapR(StrLit("name"), cond),
+            MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+          DeleteFieldR(ReduceIndexF(0.some), StrLit("__sd__0")))))(
+        implicitly, Corecursive[Fix[QS], QS])))
     }
 
     "convert a flattened array" in {

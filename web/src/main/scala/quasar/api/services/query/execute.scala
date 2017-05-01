@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import quasar.Predef.{ -> => _, _ }
+import slamdata.Predef.{ -> => _, _ }
 import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
@@ -27,7 +27,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.main.FilesystemQueries
-import quasar.sql.{Query, Sql}
+import quasar.sql.{Blob, Query, Sql}
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -82,7 +82,7 @@ object execute {
             respond_(bodyMustContainQuery)
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
-              val parseRes: ApiError \/ Fix[Sql] =
+              val parseRes: ApiError \/ Blob[Fix[Sql]] =
                 sql.fixParser.parse(Query(query)).leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =

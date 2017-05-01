@@ -16,14 +16,19 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+
+// Needed for shapeless
+import scala.Predef._
 
 import matryoshka._
 import scalaz._
 import shapeless._
+import shapeless.syntax.sized._
+import shapeless.ops.nat.ToInt
 
-sealed trait DimensionalEffect
+sealed abstract class DimensionalEffect
 /** Describes a function that reduces a set of values to a single value. */
 final case object Reduction extends DimensionalEffect
 /** Describes a function that expands a compound value into a set of values for
@@ -102,7 +107,7 @@ final case class TernaryFunc(
     applyGeneric(Func.Input3[A](a1, a2, a3))
 }
 
-sealed abstract class GenericFunc[N <: Nat] {
+sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
   def effect: DimensionalEffect
   def help: String
   def codomain: Func.Codomain
@@ -114,6 +119,9 @@ sealed abstract class GenericFunc[N <: Nat] {
   def applyGeneric[A](args: Func.Input[A, N]): LP[A] =
     Invoke[N, A](this, args)
 
+  def applyUnsized[A](args: List[A]): Option[LP[A]] =
+    args.sized[N].map(applyGeneric)
+
   final def tpe(args: Func.Domain[N]): Func.VCodomain =
     typer0(args)
 
@@ -121,6 +129,11 @@ sealed abstract class GenericFunc[N <: Nat] {
     untyper0((domain, codomain), tpe)
 
   final def arity: Int = domain.length
+
+  def toFunction[A]: HomomorphicFunction[A, LP[A]] = new HomomorphicFunction[A, LP[A]] {
+    def arity = self.arity
+    def apply(args: List[A]) = self.applyUnsized(args)
+  }
 }
 
 trait GenericFuncInstances {
@@ -133,6 +146,8 @@ trait GenericFuncInstances {
       case agg.Min                        => "Min"
       case agg.Max                        => "Max"
       case agg.Avg                        => "Avg"
+      case agg.First                      => "First"
+      case agg.Last                       => "Last"
       case agg.Arbitrary                  => "Arbitrary"
       case array.ArrayLength              => "ArrayLength"
       case date.ExtractCentury            => "ExtractCentury"

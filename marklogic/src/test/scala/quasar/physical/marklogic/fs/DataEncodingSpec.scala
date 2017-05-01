@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataArbitrary}, DataArbitrary._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data._

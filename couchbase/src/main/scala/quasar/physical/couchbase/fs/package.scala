@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
 import quasar.contrib.pathy.APath
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
@@ -28,6 +28,7 @@ import quasar.physical.couchbase.common.{BucketCollection, Context, Cursor}
 
 import java.net.ConnectException
 import java.time.Duration
+import scala.math
 
 import com.couchbase.client.java.CouchbaseCluster
 import com.couchbase.client.java.env.{CouchbaseEnvironment, DefaultCouchbaseEnvironment}
@@ -45,7 +46,8 @@ package object fs {
 
   val minimumRequiredVersion = new Version(4, 5, 1)
 
-  val defaultQueryTimeout: Duration = Duration.ofSeconds(300)
+  val defaultSocketConnectTimeout: Duration = Duration.ofSeconds(1)
+  val defaultQueryTimeout: Duration         = Duration.ofSeconds(300)
 
   type Eff[A] = (
     Task                                             :\:
@@ -66,32 +68,37 @@ package object fs {
   }
 
   def context(connectionUri: ConnectionUri): DefErrT[Task, Context] = {
-    final case class ConnUriParams(user: String, pass: String, queryTimeout: Duration)
+    final case class ConnUriParams(user: String, pass: String, socketConnectTimeout: Duration, queryTimeout: Duration)
 
     def liftDT[A](v: => NonEmptyList[String] \/ A): DefErrT[Task, A] =
       EitherT(Task.delay(
         v.leftMap(_.left[EnvironmentError])
       ))
 
-    def env(qt: Duration): Task[CouchbaseEnvironment] = Task.delay(
+    def env(p: ConnUriParams): Task[CouchbaseEnvironment] = Task.delay(
       DefaultCouchbaseEnvironment
         .builder()
-        .queryTimeout(qt.toMillis)
-        .build()
-    )
+        .socketConnectTimeout(
+          math.min(p.socketConnectTimeout.toMillis, Int.MaxValue.toLong).toInt)
+        .queryTimeout(p.queryTimeout.toMillis)
+        .build())
+
+    def duration(uri: Uri, name: String, default: Duration) =
+      (uri.params.get(name) ∘ (parseLong(_) ∘ Duration.ofSeconds))
+         .getOrElse(default.success)
+         .leftMap(κ(s"$name must be a valid long".wrapNel))
 
     for {
       uri     <- liftDT(
                    Uri.fromString(connectionUri.value).leftMap(_.message.wrapNel)
                  )
       params  <- liftDT((
-                   uri.params.get("username").toSuccessNel("No username in ConnectionUri") |@|
-                   uri.params.get("password").toSuccessNel("No password in ConnectionUri") |@|
-                   (uri.params.get("queryTimeoutSeconds") ∘ (parseLong(_) ∘ Duration.ofSeconds))
-                      .getOrElse(defaultQueryTimeout.success)
-                      .leftMap(κ(s"queryTimeoutSeconds must be a valid long".wrapNel))
+                   uri.params.get("username").toSuccessNel("No username in ConnectionUri")   |@|
+                   uri.params.get("password").toSuccessNel("No password in ConnectionUri")   |@|
+                   duration(uri, "socketConnectTimeoutSeconds", defaultSocketConnectTimeout) |@|
+                   duration(uri, "queryTimeoutSeconds", defaultQueryTimeout)
                  )(ConnUriParams).disjunction)
-      ev      <- env(params.queryTimeout).liftM[DefErrT]
+      ev      <- env(params).liftM[DefErrT]
       cluster <- EitherT(Task.delay(
                    CouchbaseCluster.fromConnectionString(ev, uri.renderString).right
                  ).handle {

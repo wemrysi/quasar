@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.contrib.scalaz.eitherT._
@@ -24,7 +24,7 @@ import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
-import quasar.std.DateLib.TemporalPart, TemporalPart._
+import quasar.std.TemporalPart, TemporalPart._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -183,7 +183,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         a1),
       WhenThen(
         RegexContains(a1, str(regex.regex)).embed,
-        Obj(Map(str(key) -> a1)).embed)
+        Obj(List(str(key) -> a1)).embed)
     )(
       Else(Null[T[N1QL]].embed)
     ).embed
@@ -194,6 +194,8 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
       undefined.η[M]
+    case MF.JoinSideName(n) =>
+      unexpectedP(s"JoinSideName(${n.shows})")
 
     // array
     case MF.Length(a1) =>
@@ -476,7 +478,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
         Select(
           Value(true),
           ResultExpr(
-            Obj(Map(
+            Obj(List(
               ToString(a1).embed -> IfNull(id1.embed, undefined).embed
             )).embed,
             none
@@ -488,7 +490,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
           filter  = none,
           groupBy = none,
           orderBy = nil).embed,
-      Obj(Map(a1 -> a2)).embed))
+      Obj(List(a1 -> a2)).embed))
     case MF.ConcatArrays(a1, a2) =>
       def containsAgg(v: T[N1QL]): Boolean = v.cataM[Option, Unit] {
         case Avg(_) | Count(_) | Max(_) | Min(_) | Sum(_) | ArrAgg(_) => none

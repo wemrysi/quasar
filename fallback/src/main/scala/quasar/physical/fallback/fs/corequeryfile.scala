@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.connector.PlannerErrT

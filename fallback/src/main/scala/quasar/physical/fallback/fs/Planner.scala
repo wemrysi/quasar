@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, quasar.Planner._
 import quasar.common.SortDir
 import quasar.contrib.pathy.{AFile, ADir}

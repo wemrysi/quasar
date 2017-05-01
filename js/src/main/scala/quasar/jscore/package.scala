@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.fp._
 
@@ -70,9 +70,6 @@ package object jscore {
   // Check the RHS, but assume the LHS is known to be defined:
   def unsafeAssign(lhs: JsCore, rhs: => JsCore): Js.Expr =
     Js.BinOp("=", lhs.toJs, rhs.toJs)
-
-  val meh = implicitly[EqualT[Fix]]
-  val meh2 = implicitly[Delay[Equal, JsCoreF]]
 
   private def replaceSolitary(oldForm: JsCore, newForm: JsCore, in: JsCore):
       Option[JsCore] =

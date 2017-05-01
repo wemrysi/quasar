@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.ejson.{Common, EJson, Json, Extension}
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.fp._
 import quasar.javascript.{Js}
@@ -32,7 +32,7 @@ import java.time.{Duration, Instant, LocalDate, LocalDateTime, LocalTime, ZoneOf
 import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 
-sealed trait Data extends Product with Serializable {
+sealed abstract class Data extends Product with Serializable {
   def dataType: Type
   def toJs: Option[jscore.JsCore]
 }
@@ -60,7 +60,7 @@ object Data {
   val _bool =
     Prism.partial[Data, Boolean] { case Data.Bool(b) => b } (Data.Bool(_))
 
-  sealed trait Number extends Data {
+  sealed abstract class Number extends Data {
     override def equals(other: Any) = (this, other) match {
       case (Int(v1), Number(v2)) => BigDecimal(v1) ≟ v2
       case (Dec(v1), Number(v2)) => v1 ≟ v2

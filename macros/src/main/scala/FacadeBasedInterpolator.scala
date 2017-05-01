@@ -16,7 +16,7 @@
 
 package ygg.macros
 
-import quasar.Predef._
+import slamdata.Predef._
 import scala.{ Any, StringContext }
 import jawn.Facade
 

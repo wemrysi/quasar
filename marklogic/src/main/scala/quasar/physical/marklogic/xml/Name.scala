@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xml
 
-import quasar.Predef.String
+import slamdata.Predef.String
 import quasar.physical.marklogic.validation._
 
 import eu.timepit.refined.api.Refined
@@ -30,8 +30,8 @@ final case class Name(value: String Refined IsName) {
 
 object Name {
   implicit val order: Order[Name] =
-    Order.orderBy(_.value.get)
+    Order.orderBy(_.value.value)
 
   implicit val show: Show[Name] =
-    Show.shows(_.value.get)
+    Show.shows(_.value.value)
 }

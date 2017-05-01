@@ -16,11 +16,10 @@
 
 package quasar.server
 
-import quasar.Predef.{ -> => _, _ }
+import slamdata.Predef.{ -> => _, _ }
 
 import org.http4s.dsl._
 import org.http4s.HttpService
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 

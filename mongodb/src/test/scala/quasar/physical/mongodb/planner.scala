@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.fp._
@@ -88,7 +88,7 @@ class PlannerSpec extends
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
+  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
@@ -1971,7 +1971,7 @@ class PlannerSpec extends
     }
 
     "plan array flatten with unflattened field" in {
-      plan("SELECT _id as zip, loc as loc, loc[*] as coord FROM zips") must
+      plan("SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips") must
         beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
@@ -2052,7 +2052,7 @@ class PlannerSpec extends
     }
 
     "unify flattened fields with unflattened field" in {
-      plan("select _id as zip, loc[*] from zips order by loc[*]") must
+      plan("select `_id` as zip, loc[*] from zips order by loc[*]") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $project(
@@ -2623,7 +2623,7 @@ class PlannerSpec extends
     "plan js and filter with id" in {
       Bson.ObjectId.fromString("0123456789abcdef01234567").fold[Result](
         failure("Couldn’t create ObjectId."))(
-        oid => plan("""select length(city), foo = oid("0123456789abcdef01234567") from days where _id = oid("0123456789abcdef01234567")""") must
+        oid => plan("""select length(city), foo = oid("0123456789abcdef01234567") from days where `_id` = oid("0123456789abcdef01234567")""") must
           beWorkflow(chain[Workflow](
             $read(collection("db", "days")),
             $match(Selector.Doc(
@@ -2760,7 +2760,7 @@ class PlannerSpec extends
       Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 
     "plan simple join (map-reduce)" in {
-      plan2_6("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+      plan2_6("select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
         beWorkflow(
           joinStructure(
             $read(collection("db", "zips")), "__tmp0", $$ROOT,
@@ -2774,19 +2774,13 @@ class PlannerSpec extends
               $unwind(DocField(JoinHandler.LeftName)),
               $unwind(DocField(JoinHandler.RightName)),
               $project(
-                reshape("value" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "city"),
-                    $literal(Bson.Undefined))),
+                reshape("value" -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
     }
 
     "plan simple join ($lookup)" in {
-      plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+      plan("select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.Doc(
@@ -2799,19 +2793,13 @@ class PlannerSpec extends
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $project(
-            reshape("value" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Right.name, "city"),
-                $literal(Bson.Undefined))),
+            reshape("value" -> $field(JoinDir.Right.name, "city")),
             ExcludeId)))
     }
 
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
-      val query = "select zips2.city from zips join zips2 on zips._id = zips2._id"
+      val query = "select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`"
       plan3_2(query,
         c => Map(
           collection("db", "zips") -> CollectionStatistics(10, 100, true),
@@ -2822,7 +2810,7 @@ class PlannerSpec extends
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
-      val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips._id = zips2._id"
+      val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips.`_id` = zips2.`_id`"
       plan(query) must_== plan2_6(query)
     }
 
@@ -2833,7 +2821,7 @@ class PlannerSpec extends
     }
 
     "plan non-equi join" in {
-      plan("select zips2.city from zips join zips2 on zips._id < zips2._id") must
+      plan("select zips2.city from zips join zips2 on zips.`_id` < zips2.`_id`") must
       beWorkflow(
         joinStructure(
           $read(collection("db", "zips")), "__tmp0", $$ROOT,
@@ -3313,7 +3301,7 @@ class PlannerSpec extends
 
     "plan count of $lookup" in {
       plan3_2(
-        "select tp._id, count(*) from `zips` as tp join `largeZips` as ti on tp._id = ti.TestProgramId group by tp._id",
+        "select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
         indexes()) must
       beWorkflow(chain[Workflow](
@@ -3515,14 +3503,16 @@ class PlannerSpec extends
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
     }
 
-    def countAccumOps(wf: Workflow) = countOps(wf, { case $group(_, _, _) => true })
-    def countUnwindOps(wf: Workflow) = countOps(wf, { case $unwind(_, _) => true })
-    def countMatchOps(wf: Workflow) = countOps(wf, { case $match(_, _) => true })
+    val WC = Inject[WorkflowOpCoreF, WorkflowF]
+
+    def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
+    def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
+    def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
 
     def noConsecutiveProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(Fix($project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
+      countOps(wf, { case WC($ProjectF(Embed(WC($ProjectF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
     def noConsecutiveSimpleMapOps(wf: Workflow) =
-      countOps(wf, { case $simpleMap(Fix($simpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
+      countOps(wf, { case WC($SimpleMapF(Embed(WC($SimpleMapF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
     def maxAccumOps(wf: Workflow, max: Int) =
       countAccumOps(wf) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
     def maxUnwindOps(wf: Workflow, max: Int) =
@@ -3530,7 +3520,7 @@ class PlannerSpec extends
     def maxMatchOps(wf: Workflow, max: Int) =
       countMatchOps(wf) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
     def brokenProjectOps(wf: Workflow) =
-      countOps(wf, { case $project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
+      countOps(wf, { case WC($ProjectF(_, Reshape(shape), _)) => shape.isEmpty }) aka "$project ops with no fields"
 
     def danglingReferences(wf: Workflow) =
       wf.foldMap(_.unFix match {
@@ -3546,7 +3536,7 @@ class PlannerSpec extends
 
     def rootPushes(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op @ $group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
+        case WC(op @ $GroupF(src, Grouped(map), _)) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
         case _ => Nil
       }) aka "group ops pushing $$ROOT"
 
@@ -3647,7 +3637,7 @@ class PlannerSpec extends
     * @throws AssertionError If the `Query` is not a selection
     */
   def columnNames(q: Query): List[String] =
-    fixParser.parse(q).toOption.get.project match {
+    fixParser.parseExpr(q).toOption.get.project match {
       case Select(_, projections, _, _, _, _) =>
         projectionNames(projections, None).toOption.get.map(_._1)
       case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
@@ -3670,7 +3660,7 @@ class PlannerSpec extends
     } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield sql.InvokeFunctionR("search", List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
+    } yield sql.InvokeFunctionR(CIName("search"), List(x, sql.StringLiteralR("^BOULDER"), sql.BoolLiteralR(false))),
     Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
   val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
@@ -3697,13 +3687,13 @@ class PlannerSpec extends
     sql.IdentR("pop"),
     // IntLiteralR(0),  // TODO: exposes bugs (see SD-478)
     sql.BinopR(sql.IdentR("pop"), sql.IntLiteralR(1), Minus), // an ExprOp
-    sql.InvokeFunctionR("length", List(sql.IdentR("city")))) // requires JS
+    sql.InvokeFunctionR(CIName("length"), List(sql.IdentR("city")))) // requires JS
   def genReduceInt = genInnerInt.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x)),
-    sql.InvokeFunctionR("sum", List(x)),
-    sql.InvokeFunctionR("count", List(sql.SpliceR(None)))))
+    sql.InvokeFunctionR(CIName("min"), List(x)),
+    sql.InvokeFunctionR(CIName("max"), List(x)),
+    sql.InvokeFunctionR(CIName("sum"), List(x)),
+    sql.InvokeFunctionR(CIName("count"), List(sql.SpliceR(None)))))
   def genOuterInt = Gen.oneOf(
     Gen.const(sql.IntLiteralR(0)),
     genReduceInt,
@@ -3713,20 +3703,20 @@ class PlannerSpec extends
   def genInnerStr = Gen.oneOf(
     sql.IdentR("city"),
     // StringLiteralR("foo"),  // TODO: exposes bugs (see SD-478)
-    sql.InvokeFunctionR("lower", List(sql.IdentR("city"))))
+    sql.InvokeFunctionR(CIName("lower"), List(sql.IdentR("city"))))
   def genReduceStr = genInnerStr.flatMap(x => Gen.oneOf(
     x,
-    sql.InvokeFunctionR("min", List(x)),
-    sql.InvokeFunctionR("max", List(x))))
+    sql.InvokeFunctionR(CIName("min"), List(x)),
+    sql.InvokeFunctionR(CIName("max"), List(x))))
   def genOuterStr = Gen.oneOf(
     Gen.const(sql.StringLiteralR("foo")),
     Gen.const(sql.IdentR("state")),  // possibly the grouping key, so never reduced
     genReduceStr,
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("lower", List(x))),   // an ExprOp
-    genReduceStr.flatMap(x => sql.InvokeFunctionR("length", List(x))))  // requires JS
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("lower"), List(x))),   // an ExprOp
+    genReduceStr.flatMap(x => sql.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
-    fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    fixParser.parseExpr(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**
@@ -4048,7 +4038,8 @@ class PlannerSpec extends
     "include all phases when successful" in {
       planLog("select city from zips").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)",
@@ -4065,7 +4056,8 @@ class PlannerSpec extends
     "include correct phases with planner error" in {
       planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Annotated Tree",
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "Logical Plan (reduced typechecks)", "Logical Plan (remove typecheck filters)",
           "Logical Plan (aligned joins)", "Logical Plan (projections preferred)"))

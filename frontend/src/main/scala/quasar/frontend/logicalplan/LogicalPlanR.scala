@@ -16,15 +16,16 @@
 
 package quasar.frontend.logicalplan
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, SemanticError.TypeError
-import quasar.common.SortDir
-import quasar.contrib.pathy.FPath
+import quasar.common.{JoinType, SortDir}
+import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
+import quasar.sql.CIName
 
 import scala.Predef.$conforms
 import scala.Symbol
@@ -43,6 +44,7 @@ final case class ConstrainedPlan[T]
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._
+  import quasar.std.TemporalPart
 
   def read(path: FPath) = lp.read[T](path).embed
   def constant(data: Data) = lp.constant[T](data).embed
@@ -54,6 +56,9 @@ final class LogicalPlanR[T]
     invoke[nat._2](func, Func.Input2(v1, v2))
   def invoke3(func: GenericFunc[nat._3], v1: T, v2: T, v3: T) =
     invoke[nat._3](func, Func.Input3(v1, v2, v3))
+  def joinSideName(name: Symbol) = lp.joinSideName[T](name).embed
+  def join(left: T, right: T, tpe: JoinType, cond: JoinCondition[T]) =
+    lp.join(left, right, tpe, cond).embed
   def free(name: Symbol) = lp.free[T](name).embed
   def let(name: Symbol, form: T, in: T) =
     lp.let(name, form, in).embed
@@ -85,6 +90,12 @@ final class LogicalPlanR[T]
   def normalizeTempNames(t: T) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
+  def bindFree(vars: Map[CIName, T])(t: T): T =
+    t.cata[T] {
+      case Free(sym) => vars.get(CIName(sym.name)).getOrElse((Free(sym):LP[T]).embed)
+      case other     => other.embed
+    }
+
   /** Per the following:
     * 1. Successive Lets are re-associated to the right:
     *    (let a = (let b = x1 in x2) in x3) becomes
@@ -96,6 +107,7 @@ final class LogicalPlanR[T]
     * it could create spurious shadowing. normalizeTempNames is recommended.
     * NB: at the moment, Lets are only hoisted one level.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val normalizeLetsƒ: LP[T] => Option[LP[T]] = {
     case Let(b, Embed(Let(a, x1, x2)), x3) =>
       lp.let(a, x1, let(b, x2, x3)).some
@@ -115,23 +127,12 @@ final class LogicalPlanR[T]
       case _ => None
     }
 
-    // avoid illegally rewriting the continuation
+    // NB: avoids illegally rewriting the continuation
     case InvokeUnapply(relations.Cond, Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
         lp.let(a, x1, invoke[nat._3](relations.Cond, Func.Input3(x2, a2, a3))).some
       case _ => None
     }
-
-    case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
-      if func == set.InnerJoin      || func == set.LeftOuterJoin ||
-         func == set.RightOuterJoin || func == set.FullOuterJoin =>
-      (a1, a2, a3) match {
-        case (Embed(Let(a, x1, x2)), a2, a3) =>
-          lp.let(a, x1, invoke[nat._3](func, Func.Input3(x2, a2, a3))).some
-        case (a1, Embed(Let(a, x1, x2)), a3) =>
-          lp.let(a, x1, invoke[nat._3](func, Func.Input3(a1, x2, a3))).some
-        case _ => None
-      }
 
     case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) => (a1, a2, a3) match {
       case (Embed(Let(a, x1, x2)), a2, a3) =>
@@ -142,6 +143,15 @@ final class LogicalPlanR[T]
         lp.let(a, x1, invoke[nat._3](func, Func.Input3(a1, a2, x2))).some
       case _ => None
     }
+
+    case Join(l, r, tpe, cond) =>
+      (l, r) match {
+        case (Embed(Let(a, x1, x2)), r) =>
+          lp.let(a, x1, join(x2, r, tpe, cond)).some
+        case (l, Embed(Let(a, x1, x2))) =>
+          lp.let(a, x1, join(l, x2, tpe, cond)).some
+        case _ => None
+      }
 
     // we don't rewrite a `Let` as the `cont` to avoid illegally rewriting the continuation
     case Typecheck(Embed(Let(a, x1, x2)), typ, cont, fallback) =>
@@ -173,18 +183,37 @@ final class LogicalPlanR[T]
         }
       } yield lp.invoke(func, args0)
 
+      case JoinSideName(n) => success(lp.joinSideName[Typed[LP]](n))
+
+      case Join(l, r, joinType, JoinCondition(lName, rName, cond)) =>
+        LP.funcFromJoinType(joinType).untpe(typ).flatMap { types =>
+          inferTypes(types(2), cond).flatMap { cond0 =>
+            // FIXME: single pass for both names
+            val lTyp = cond0.collect {
+              case Cofree(typ0, JoinSideName(`lName`)) => typ0
+            }.concatenate(Type.TypeGlbMonoid)
+            val rTyp = cond0.collect {
+              case Cofree(typ0, JoinSideName(`rName`)) => typ0
+            }.concatenate(Type.TypeGlbMonoid)
+            (inferTypes(Type.glb(lTyp, types(0)), l) |@| inferTypes(Type.glb(rTyp, types(1)), r))(
+              lp.join(_, _, joinType, JoinCondition(lName, rName, cond0)))
+          }
+        }
+
       case Free(n) => success(lp.free[Typed[LP]](n))
 
       case Let(n, form, in) =>
         inferTypes(typ, in).flatMap { in0 =>
-          val fTyp = in0.collect {
+          val formTyp = in0.collect {
             case Cofree(typ0, Free(n0)) if n0 == n => typ0
           }.concatenate(Type.TypeGlbMonoid)
-          inferTypes(fTyp, form).map(lp.let[Typed[LP]](n, _, in0))
+          inferTypes(formTyp, form).map(lp.let[Typed[LP]](n, _, in0))
         }
 
       case Sort(src, ords) =>
-        (inferTypes(typ, src) ⊛ ords.traverse { case (a, d) => inferTypes(Type.Top, a) strengthR d })(lp.sort[Typed[LP]](_, _))
+        (inferTypes(typ, src) ⊛ ords.traverse {
+          case (a, d) => inferTypes(Type.Top, a) strengthR d
+        })(lp.sort[Typed[LP]](_, _))
 
       case TemporalTrunc(part, src) =>
         typ.contains(Type.Temporal).fold(
@@ -210,18 +239,16 @@ final class LogicalPlanR[T]
     * • otherwise, we fail
     */
   private def unifyOrCheck(inf: Type, poss: Type, term: T)
-      : NameT[SemDisj, ConstrainedPlan[T]] = {
-    if (inf.contains(poss))
+      : NameT[SemDisj, ConstrainedPlan[T]] =
+    if (inf.contains(poss)) {
       emit(ConstrainedPlan(poss, Nil, poss match {
         case Type.Const(d) => constant(d)
         case _             => term
       }))
-      else if (poss.contains(inf)) {
-        emitName(freshName("checku").map(name =>
-          ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), free(name))))
-      }
-      else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
-  }
+    } else if (poss.contains(inf)) {
+      emitName(freshName("checku").map(name =>
+        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), free(name))))
+    } else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
 
   private def appConst
     (constraints: ConstrainedPlan[T], fallback: T) =
@@ -305,23 +332,26 @@ final class LogicalPlanR[T]
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           checkGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
         case Typecheck(expr, typ, cont, fallback) =>
-	  val typer: Func.Typer[Nat._3] = {
+          val typer: Func.Typer[Nat._3] = {
             case Sized(_, t2, _) => Type.glb(t2, typ).success
-	  }
-	  val construct: Func.Input[T, Nat._3] => T = {
+          }
+          val construct: Func.Input[T, Nat._3] => T = {
             case Sized(a1, a2, a3) => typecheck(a1, typ, a2, a3)
-	  }
-	  val (constrs, plan): (List[NamedConstraint[T]], T) = expr.constraints.foldLeftM(expr.plan) {
-	    case (acc, constr) =>
-	      if ((Free(constr.name) == expr.plan) && (constr.inferred == typ))
-	        (Nil, constr.term)
-	      else
-	        (List(constr), expr.plan)
-	  }
+          }
+          val (constrs, plan): (List[NamedConstraint[T]], T) = expr.constraints.foldLeftM(expr.plan) {
+            case (acc, constr) =>
+              if ((Free(constr.name) == expr.plan) && (constr.inferred == typ))
+                (Nil, constr.term)
+              else
+                (List(constr), expr.plan)
+          }
           val expr0 = ConstrainedPlan(expr.inferred, constrs, plan)
           checkInvoke(inf, typer, construct, Func.Input3(expr0, cont, fallback))
         case Let(name, value, in) =>
           unifyOrCheck(inf, in.inferred, let(name, appConst(value, constant(Data.NA)), appConst(in, constant(Data.NA))))
+        case JoinSideName(v) => emit(ConstrainedPlan(inf, Nil, joinSideName(v)))
+        case Join(l, r, tpe, JoinCondition(lName, rName, c)) =>
+          checkJoin(inf, LP.funcFromJoinType(tpe), Func.Input3(l, r, c), lName, rName, tpe)
         // TODO: Get the possible type from the LetF
         case Free(v) => emit(ConstrainedPlan(inf, Nil, free(v)))
         case Sort(expr, ords) =>
@@ -368,6 +398,19 @@ final class LogicalPlanR[T]
         lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
           unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
     }
+  }
+
+  private def checkJoin(
+    inf: Type,
+    func: GenericFunc[nat._3],
+    args: Func.Input[ConstrainedPlan[T], nat._3],
+    lName: Symbol,
+    rName: Symbol,
+    tpe: JoinType)
+      : NameT[SemDisj, ConstrainedPlan[T]] = {
+    val const = args.map(appConst(_, constant(Data.NA)))
+    lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
+      unifyOrCheck(inf, _, join(const(0), const(1), tpe, JoinCondition(lName, rName, const(2)))))
   }
 
   type SemNames[A] = NameT[SemDisj, A]
@@ -417,9 +460,13 @@ final class LogicalPlanR[T]
   def lpParaZygoHisto[A, B] = lpParaZygoHistoM[Id, A, B] _
 
   /** The set of paths referenced in the given plan. */
-  def paths(lp: T): Set[FPath] =
-    lp.foldMap(_.cata[Set[FPath]] {
-      case Read(p) => Set(p)
+  def paths(lp: T): ISet[FPath] =
+    lp.foldMap(_.cata[ISet[FPath]] {
+      case Read(p) => ISet singleton p
       case other   => other.fold
     })
+
+  /** The set of absolute paths referenced in the given plan. */
+  def absolutePaths(lp: T): ISet[APath] =
+    paths(lp) foldMap (p => ISet fromFoldable refineTypeAbs(p).swap)
 }

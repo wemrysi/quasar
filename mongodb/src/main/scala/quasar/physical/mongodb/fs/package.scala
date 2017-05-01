@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NameGenerator => NG}
 import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
 import quasar.config._

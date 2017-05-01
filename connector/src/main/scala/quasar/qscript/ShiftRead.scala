@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 
@@ -56,7 +56,7 @@ object ShiftRead {
       FreeQS[T] =
     branch.futu[FreeQS[T]](
       _.project.run.fold(
-        h => CoEnv(h.left[QScriptTotal[T, Free[CoEnv[Hole, QScriptTotal[T, ?], ?], FreeQS[T]]]]),
+        h => CoEnv(h.left[QScriptTotal[T, Free[CoEnvQS[T, ?], FreeQS[T]]]]),
         ShiftTotal.shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
   implicit def read[T[_[_]]: BirecursiveT, F[_], A]

@@ -16,7 +16,9 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.RenderTree.make
+import quasar.RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
@@ -24,9 +26,6 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
-
-import RenderTree.make
-import RenderTree.ops._
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
@@ -135,10 +134,13 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit lazy val stringRenderTree: RenderTree[String] =
     RenderTree.fromShow[String]("String")
 
+  implicit lazy val symbolRenderTree: RenderTree[Symbol] =
+    RenderTree.fromShow[Symbol]("Symbol")
+
   implicit def pathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
     // NB: the implicit Show instance in scope here ends up being a circular
     // call, so an explicit reference to pathy's Show is needed.
-    make(p => Terminal(List("Path"), pathy.Path.PathShow.shows(p).some))
+    make(p => Terminal(List("Path"), pathy.Path.pathShow.shows(p).some))
 
   implicit def leftTuple4RenderTree[A, B, C, D](implicit RA: RenderTree[A], RB: RenderTree[B], RC: RenderTree[C], RD: RenderTree[D]):
       RenderTree[(((A, B), C), D)] =

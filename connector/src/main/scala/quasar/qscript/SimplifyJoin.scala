@@ -16,13 +16,12 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp._
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
@@ -50,12 +49,13 @@ object SimplifyJoin {
 
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
-  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T])
-      : FreeQS[T] =
-    branch
-      .convertTo[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]
-      .transCata[T[CoEnv[Hole, QScriptTotal[T, ?], ?]]](liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)))
-      .convertTo[FreeQS[T]]
+  def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
+    val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
+      _.transCata[T[CoEnvQS[T, ?]]](
+        liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+
+    applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
+  }
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)

@@ -5,7 +5,7 @@
         "postgresql":        "pending"
     },
     "data": "smallZips.data",
-    "query": "select integer(_id) as intId, decimal(_id) as decId from smallZips",
+    "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from smallZips",
     "predicate": "containsAtLeast",
     "ignoreFieldOrder": [ "couchbase", "marklogic_json" ],
     "expected": [

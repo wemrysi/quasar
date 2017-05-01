@@ -16,9 +16,10 @@
 
 package quasar.ejson
 
-import quasar.Predef._
+import slamdata.Predef._
 import jawn._
-import matryoshka._, implicits._
+import matryoshka._
+import matryoshka.implicits._
 import scalaz._
 
 object jawnFacade {

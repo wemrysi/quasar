@@ -1,15 +1,15 @@
 {
     "name": "distinct * (MongoDB)",
     "backends": {
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":  "skip",
-        "postgresql":        "skip",
+        "couchbase":         "skip",
+        "fallback": "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "couchbase":         "skip",
-        "spark_local": "skip",
-    "fallback": "skip",
-        "spark_hdfs": "skip"
+        "mongodb_read_only": "pending",
+        "mongodb_q_3_2":     "pending",
+        "postgresql":        "skip",
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip"
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",

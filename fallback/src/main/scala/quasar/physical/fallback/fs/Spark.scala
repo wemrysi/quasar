@@ -17,7 +17,7 @@
 package quasar.physical.fallback.fs
 
 import scala.Predef.<:<
-import quasar.Predef._
+import slamdata.Predef._
 import scala.math.{ Ordering => SOrd }
 import scala.collection.TraversableOnce
 

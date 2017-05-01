@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data => QData, NameGenerator}
 import quasar.Planner.InternalError
 import quasar.ejson
@@ -49,7 +49,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
           {
-            case Embed(ejson.Common(ejson.Str(key))) =>
+            case Embed(MapFunc.EC(ejson.Str(key))) =>
               Data[T[N1QL]](QData.Str(key)).embed.η[M]
             case key =>
               EitherT(
@@ -57,7 +57,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGe
                   .left[T[N1QL]].η[PR])
           },
           v => processFreeMapDefault(v, id)
-        )) ∘ (l => Obj(l.toMap).embed)
+        )) ∘ (Obj(_).embed)
       case _ =>
         processFreeMapDefault(f, id)
     }

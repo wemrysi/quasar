@@ -16,14 +16,16 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.Planner._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.connector.PlannerErrT
+import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.frontend.logicalplan.LogicalPlan
@@ -40,8 +42,8 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  type SparkQScript[A] =
-     (QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+  type SparkQScriptCP = QScriptCore[Fix, ?] :\: EquiJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?]
+  type SparkQScript[A] = SparkQScriptCP#M[A]
 
   implicit val sparkQScriptToQSTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
     ::\::[QScriptCore[Fix, ?]](::/::[Fix, EquiJoin[Fix, ?], Const[ShiftedRead[AFile], ?]])
@@ -74,21 +76,20 @@ object queryfile {
   ): QueryFile ~> Free[S, ?] = {
 
     def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
-      val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
+      type F[A] = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+
+      val lc: DiscoverPath.ListContents[F] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-      val C = quasar.qscript.Coalesce[Fix, SparkQScript, SparkQScript]
       val rewrite = new Rewrite[Fix]
+      val optimize = new Optimize[Fix]
       for {
-        qs    <- QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)
-                   .map(rewrite.simplifyJoinOnShiftRead[QScriptRead[Fix, ?], QScriptShiftRead[Fix, ?], SparkQScript0].apply(_))
-                   .flatMap(_.transCataM(ExpandDirs[Fix, SparkQScript0, SparkQScript].expandDirs(idPrism.reverseGet, lc)))
-        optQS =  qs.transHylo(
-                   rewrite.optimize(reflNT[SparkQScript]),
-                   repeatedly(rewrite.applyTransforms(
-                     C.coalesceQC[SparkQScript](idPrism),
-                     C.coalesceEJ[SparkQScript](idPrism.get),
-                     C.coalesceSR[SparkQScript, AFile](idPrism),
-                     Normalizable[SparkQScript].normalizeF(_: SparkQScript[Fix[SparkQScript]]))))
+        qs <- QueryFile.convertToQScriptRead[Fix, F, QScriptRead[Fix, ?]](lc)(lp)
+        shifted <- Unirewrite[Fix, SparkQScriptCP, F](rewrite, lc).apply(qs)
+
+        optQS = shifted.transHylo(
+                  optimize.optimize(reflNT[SparkQScript]),
+                  Unicoalesce[Fix, SparkQScriptCP])
+
         _     <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.tree("QScript (Spark)", optQS)), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield optQS
     }
@@ -138,7 +139,13 @@ object queryfile {
       injectFT.apply {
         sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => Task.delay(Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), ExecutionPlan(fsType, "RDD Directed Acyclic Graph"))))).map(EitherT(_))
+          rdd => {
+            val rddDebug = rdd.toDebugString
+            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
+            Task.delay(Writer(
+              Vector(PhaseResult.detail("RDD", rddDebug)),
+              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))
+          })).map(EitherT(_))
       }
     }.join
   }

@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
 import jawn.Facade
 import scala.{ Null, collection => sc }
 

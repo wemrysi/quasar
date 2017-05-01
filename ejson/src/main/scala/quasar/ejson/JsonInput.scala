@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import quasar.Predef._
+import slamdata.Predef._
 import jawn._
 import java.nio.ByteBuffer.wrap
 import java.nio.file.Files
@@ -52,7 +52,7 @@ object JsonInput {
   def readSeqFrom[A](sp: SupportParser[A], in: JsonInput): Try[Vector[A]] = {
     import sp.facade
 
-    def eitherToTry(x: Either[_, scSeq[A]]): Try[Vector[A]] = x match {
+    def eitherToTry(x: Either[_, scala.collection.Seq[A]]): Try[Vector[A]] = x match {
       case Left(t: Throwable) => scala.util.Failure(t)
       case Left(t)            => scala.util.Failure(new RuntimeException(t.toString))
       case Right(x)           => scala.util.Success(x.toVector)

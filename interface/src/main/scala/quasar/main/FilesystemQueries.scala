@@ -16,19 +16,18 @@
 
 package quasar.main
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, queryPlan, Variables}
 import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.sql.Sql
+import quasar.sql.{Blob, Sql}
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
-import scalaz.iteratee._
-import scalaz.stream.Process
+import scalaz.stream.{Process0, Process}
 
 class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   import Q.transforms._
@@ -36,22 +35,11 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 
-  /** Enumerates the result of executing the given SQL^2 query. */
-  def enumerateQuery(
-    query: Fix[Sql],
-    vars: Variables,
-    basePath: ADir,
-    off: Natural,
-    lim: Option[Positive]
-  ): CompExecM[EnumeratorT[Data, ExecM]] =
-    compToCompExec(queryPlan(query, vars, basePath, off, lim))
-      .map(_.fold(EnumeratorT.enumList(_), Q.enumerate(_)))
-
   /** Returns the source of values from the result of executing the given
     * SQL^2 query.
     */
   def evaluateQuery(
-    query: Fix[Sql],
+    query: Blob[Fix[Sql]],
     vars: Variables,
     basePath: ADir,
     off: Natural,
@@ -67,7 +55,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     * using the given output file if possible.
     */
   def executeQuery(
-    query: Fix[Sql],
+    query: Blob[Fix[Sql]],
     vars: Variables,
     basePath: ADir,
     out: AFile)(
@@ -80,12 +68,25 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
 
   /** Returns the physical execution plan for the given SQL^2 query. */
   def explainQuery(
-    query: Fix[Sql],
+    query: Blob[Fix[Sql]],
     vars: Variables,
     basePath: ADir
   ): CompExecM[ExecutionPlan] =
     compToCompExec(queryPlan(query, vars, basePath, 0L, None))
       .flatMap(lp => execToCompExec(lp.fold(
-        κ(ExecutionPlan(FileSystemType("none"), "Constant").point[ExecM]),
+        κ(ExecutionPlan(FileSystemType("none"), "Constant", ISet.empty).point[ExecM]),
         Q.explain(_))))
+
+  /** The results of executing the given SQL^2 query. */
+  def queryResults(
+    query: Blob[Fix[Sql]],
+    vars: Variables,
+    basePath: ADir,
+    off: Natural,
+    lim: Option[Positive]
+  ): CompExecM[Process0[Data]] =
+    compToCompExec(queryPlan(query, vars, basePath, off, lim))
+      .flatMap(_.fold(
+        ds => Process.emitAll(ds).point[CompExecM],
+        lp => execToCompExec(Q.results(lp))))
 }

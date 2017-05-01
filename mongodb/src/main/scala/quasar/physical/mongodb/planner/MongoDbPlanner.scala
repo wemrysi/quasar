@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{fs => _, _}, RenderTree.ops._, Type._
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.contrib.pathy.mkAbsolute
@@ -187,6 +187,8 @@ object MongoDbPlanner {
               Call(Select(array, "indexOf"), List(value))))
 
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
+
+        case Concat => Arity2(BinOp(jscore.Add, _, _))
 
         case MakeObject => args match {
           case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
@@ -709,16 +711,18 @@ object MongoDbPlanner {
                 })
           }
         case GroupBy =>
-          lift(Arity2(HasWorkflow, HasKeys).map((WB.groupBy(_, _)).tupled))
+          lift(Arity2(HasWorkflow, HasKeys) ∘ (WB.groupBy(_, _)).tupled)
 
         // TODO: pull these out into a groupFuncHandler (which will also provide stdDev)
-        case Count      => groupExpr0($sum($literal(Bson.Int32(1))))
-        case Sum        => groupExpr1($sum(_))
-        case Avg        => groupExpr1($avg(_))
-        case Min        => groupExpr1($min(_))
-        case Max        => groupExpr1($max(_))
+        case Count        => groupExpr0($sum($literal(Bson.Int32(1))))
+        case Sum          => groupExpr1($sum(_))
+        case Avg          => groupExpr1($avg(_))
+        case Min          => groupExpr1($min(_))
+        case Max          => groupExpr1($max(_))
+        case First        => groupExpr1($first(_))
+        case Last         => groupExpr1($last(_))
         case UnshiftArray => groupExpr1($push(_))
-        case Arbitrary  => groupExpr1($first(_))
+        case Arbitrary    => groupExpr1($first(_))
 
         case ArrayLength =>
           lift(Arity2(HasWorkflow, HasInt)).flatMap {
@@ -747,14 +751,14 @@ object MongoDbPlanner {
             case (p, index) => WB.projectIndex(p, index.toInt)
           })
         case DeleteField  =>
-          lift(Arity2(HasWorkflow, HasText).flatMap((WB.deleteField(_, _)).tupled))
-        case FlattenMap   => lift(Arity1(HasWorkflow).map(WB.flattenMap(_)))
-        case FlattenArray => lift(Arity1(HasWorkflow).map(WB.flattenArray(_)))
-        case Squash       => lift(Arity1(HasWorkflow).map(WB.squash))
+          lift(Arity2(HasWorkflow, HasText) >>= (WB.deleteField(_, _)).tupled)
+        case FlattenMap   => lift(Arity1(HasWorkflow) ∘ WB.flattenMap)
+        case FlattenArray => lift(Arity1(HasWorkflow) ∘ WB.flattenArray)
+        case Squash       => lift(Arity1(HasWorkflow))
         case Distinct     =>
-          lift(Arity1(HasWorkflow)).flatMap(WB.distinct(_))
+          lift(Arity1(HasWorkflow)) >>= WB.distinct
         case DistinctBy   =>
-          lift(Arity2(HasWorkflow, HasKeys)).flatMap((WB.distinctBy(_, _)).tupled)
+          lift(Arity2(HasWorkflow, HasKeys)) >>= (WB.distinctBy(_, _)).tupled
 
         case _ => fail(UnsupportedFunction(func, "in workflow planner".some))
       })
@@ -802,6 +806,10 @@ object MongoDbPlanner {
         def orElse[A, B](v1: A \/ B, v2: A \/ B): A \/ B =
           v1.swapped(_.flatMap(e => v2.toOption <\/ e))
         State(s => orElse(wb.run(s), js.run(s)).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
+      case JoinSideName(_) =>
+        state(-\/(InternalError fromMsg s"unexpected JoinSideName"))
+      case Join(_, _, _, _) =>
+        state(-\/(InternalError fromMsg s"unexpected Join"))
       case Free(name) =>
         state(-\/(InternalError fromMsg s"variable $name is unbound"))
       case Let(_, _, in) => state(in.head._2)
@@ -1007,9 +1015,12 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[M[_]](logical: Fix[LP], queryContext: fs.QueryContext[M])
+  def plan[M[_]](logical0: Fix[LP], queryContext: fs.QueryContext[M])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
+
+    val logical: Fix[LP] =
+      logical0.cata[Fix[LP]](optimizer.reconstructOldJoins)
 
     queryContext.model match {
       case `3.2` =>

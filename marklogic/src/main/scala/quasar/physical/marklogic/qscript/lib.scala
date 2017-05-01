@@ -16,10 +16,10 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski.{ι, κ}
 import quasar.physical.marklogic.xml.namespaces._
-import quasar.std.DateLib.TemporalPart
+import quasar.std.TemporalPart
 import quasar.physical.marklogic.xquery._
 
 import java.lang.SuppressWarnings

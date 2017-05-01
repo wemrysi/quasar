@@ -2,14 +2,11 @@
     "name": "flatten array with unflattened field",
     "backends": {
         "couchbase":  "skip",
-        "mongodb_q_3_2": "pending",
-        "postgresql": "pending",
-        "spark_local": "skip",
-    "fallback": "skip",
-        "spark_hdfs": "skip"
+        "fallback": "skip",
+        "postgresql": "pending"
     },
     "data": "zips.data",
-    "query": "SELECT _id as zip, loc as loc, loc[*] as coord FROM zips",
+    "query": "SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips",
     "predicate": "containsAtLeast",
     "ignoreFieldOrder": ["marklogic_json"],
     "expected": [

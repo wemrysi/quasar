@@ -2,12 +2,10 @@
   "name": "date_part with (virtually) all selectors, after conversion to JS (see #1238)",
 
   "backends": {
+      "fallback": "skip",
       "mongodb_read_only": "pending",
       "postgresql":        "pending",
-      "marklogic_xml":     "pending",
-      "spark_local": "skip",
-    "fallback": "skip",
-      "spark_hdfs": "skip"
+      "marklogic_xml":     "pending"
   },
 
   "data": "../slamengine_commits.data",

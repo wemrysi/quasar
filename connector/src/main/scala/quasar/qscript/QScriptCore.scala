@@ -16,9 +16,10 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
+import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
@@ -139,16 +140,13 @@ object ReduceIndex {
 
 /** A placeholder value that can appear in plans, but will never be referenced
   * in the result. We consider this a wart. It should be implemented as an
-  * arbitrary value with minimal cost to generate (since it will simply be
-  * discarded).
+  * arbitrary value (of cardinality 1) with minimal cost to generate (since it
+  * will simply be discarded).
   */
 @Lenses final case class Unreferenced[T[_[_]], A]()
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  def unapply[T[_[_]], F[_], A](fa: F[A])(implicit C: QScriptCore[T, ?] :<: F): Option[QScriptCore[T, A]] =
-    C.prj(fa)
-
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
@@ -188,8 +186,6 @@ object QScriptCore {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
-      val f1: Show[JoinFunc[T]] = implicitly
-
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++

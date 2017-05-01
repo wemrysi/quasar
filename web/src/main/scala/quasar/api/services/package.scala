@@ -16,9 +16,9 @@
 
 package quasar.api
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
-import quasar.fs._
+import quasar.effect.Failure
 import quasar.fp.numeric._
 
 import argonaut._, Argonaut._
@@ -33,17 +33,17 @@ import scalaz.stream.Process
 package object services {
   import Validation.FlatMap._
 
-  def formattedDataResponse[S[_]](
+  def formattedDataResponse[S[_], E](
     format: MessageFormat,
-    data: Process[FileSystemErrT[Free[S, ?], ?], Data]
+    data: Process[EitherT[Free[S, ?], E, ?], Data]
   )(implicit
-    S0: FileSystemFailure :<: S,
+    S0: Failure[E, ?] :<: S,
     S1: Task :<: S
   ): QResponse[S] = {
     val ctype = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))
     QResponse.headers.modify(
       _.put(ctype) ++ format.disposition.toList
-    )(QResponse.streaming(format.encode[FileSystemErrT[Free[S,?],?]](data)))
+    )(QResponse.streaming(format.encode[EitherT[Free[S,?], E,?]](data)))
   }
 
   def limitOrInvalid(

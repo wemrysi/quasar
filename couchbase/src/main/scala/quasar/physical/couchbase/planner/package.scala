@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerError}
 import quasar.common.PhaseResultT
@@ -49,6 +49,12 @@ package object planner {
       Select(
         Value(true), ResultExpr(a, none).wrapNel, keyspace = none, join = none,
         unnest = none, let = nil,  filter = none, groupBy = none, orderBy = Nil).embed)
+
+  def unexpected[A](name: String): PlannerError \/ A =
+    InternalError.fromMsg(s"unexpected $name").left
+
+  def unexpectedP[F[_]: Applicative, A](name: String): CBPhaseLog[F, A] =
+    EitherT(unexpected[A](name).η[PhaseResultT[F, ?]])
 
   def unimplemented[A](name: String): PlannerError \/ A =
     InternalError.fromMsg(s"unimplemented $name").left

@@ -16,18 +16,22 @@
 
 package quasar
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.config.{ConfigOps, FsFile}
 import quasar.contrib.pathy._
 import quasar.effect._
+import quasar.db.Schema
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
+import quasar.fs.mount.module.Module
 import quasar.physical._
 
 import scala.util.control.NonFatal
 
+import doobie.imports.Transactor
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -67,24 +71,12 @@ package object main {
   type QEff[A]    = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
-  type QErrsIO[A]  = Coproduct[Task, QErrs, A]
   type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
-
-  object QErrsIO {
-    /** Interprets errors into strings. */
-    val toMainTask: QErrsIO ~> MainTask = {
-      val f = reflNT[Task] :+: QErrs.toCatchable[Task]
-
-      new (QErrsIO ~> MainTask) {
-        def apply[A](a: QErrsIO[A]) =
-          EitherT(f(a).attempt).leftMap(_.getMessage)
-      }
-    }
-  }
 
   object QErrs {
     def toCatchable[F[_]: Catchable]: QErrs ~> F =
       Failure.toRuntimeError[F, PhysicalError]             :+:
+      Failure.toRuntimeError[F, Module.Error]              :+:
       Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
       Failure.toRuntimeError[F, MountingError]             :+:
       Failure.toRuntimeError[F, FileSystemError]
@@ -92,7 +84,7 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (Module :\: Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -104,23 +96,32 @@ package object main {
       S2: PhysErr :<: S,
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S,
-      S5: FileSystemFailure :<: S
-    ): Task[CoreEff ~> Free[S, ?]] =
+      S5: FileSystemFailure :<: S,
+      S6: Module.Failure    :<: S
+    ): Task[CoreEff ~> Free[S, ?]] = {
+      def moduleInter(fs: FileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
+        val wtv: Coproduct[Mounting, FileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
+        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+      }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
+        moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
         (compFs compose Inject[QueryFile, FileSystem])  :+:
         (compFs compose Inject[ReadFile, FileSystem])   :+:
         (compFs compose Inject[WriteFile, FileSystem])  :+:
         (compFs compose Inject[ManageFile, FileSystem]) :+:
+        injectFT[Module.Failure, S]                     :+:
         injectFT[PathMismatchFailure, S]                :+:
         injectFT[MountingFailure, S]                    :+:
         injectFT[FileSystemFailure, S]
       }
+    }
   }
 
   /** The types of failure from core apis. */
-  type CoreErrs[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
-  type CoreErrs0[A] = Coproduct[MountingFailure, FileSystemFailure, A]
+  type CoreErrs[A]   = Coproduct[Module.Failure, CoreErrs1, A]
+  type CoreErrs1[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
+  type CoreErrs0[A]  = Coproduct[MountingFailure, FileSystemFailure, A]
 
 
   //---- FileSystems ----
@@ -178,7 +179,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose view.fileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[FileSystem, V, Free[V, ?]](module.fileSystem[V], liftFT)) compose view.fileSystem[V]
       }
   }
 
@@ -359,4 +360,15 @@ package object main {
       s"Warning: Failed to mount '${posixCodec.printPath(path)}' because '$err'."
     )
   }
+
+  /** Initialize or update MetaStore Schema and migrate mounts from config file
+    */
+  def initUpdateMigrate[A](
+    schema: Schema[A], tx: Transactor[Task], cfgFile: Option[FsFile]
+  ): MainTask[Unit] =
+    for {
+      j  <- ConfigOps.jsonFromFile(cfgFile).leftMap(_.shows)
+      jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
+      _  <- EitherT.right(ConfigOps.jsonToFile(jʹ, cfgFile))
+    } yield ()
 }

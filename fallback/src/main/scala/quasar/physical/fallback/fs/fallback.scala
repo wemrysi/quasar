@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import blueeyes.yggConfig
 import blueeyes.json.JValue
 import com.precog.yggdrasil.vfs.StubVFSMetadata

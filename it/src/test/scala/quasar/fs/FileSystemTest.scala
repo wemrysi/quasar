@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
@@ -33,7 +33,6 @@ import scala.Either
 import eu.timepit.refined.auto._
 import monocle.Optional
 import monocle.function.Index
-import monocle.std.vector._
 import org.specs2.specification.core.{Fragment, Fragments}
 import org.specs2.execute.{Failure => _, _}
 import pathy.Path._

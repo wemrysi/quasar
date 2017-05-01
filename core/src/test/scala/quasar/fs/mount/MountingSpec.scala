@@ -17,7 +17,7 @@
 package quasar.fs.mount
 
 import scala.Predef.$conforms
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.{PathError, FileSystemType}
@@ -28,7 +28,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
-import monocle.std.tuple2._
 import org.specs2.execute._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -50,10 +49,10 @@ abstract class MountingSpec[S[_]](
   val mntErr = MountingFailure.Ops[S]
   val mmErr = PathMismatchFailure.Ops[S]
   // NB: Without the explicit imports, scalac complains of an import cycle
-  import mnt.{F, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, remount, replace, unmount}
+  import mnt.{FreeS, havingPrefix, lookupConfig, lookupType, mountView, mountFileSystem, mountModule, remount, replace, unmount, viewsHavingPrefix, modulesHavingPrefix}
 
   implicit class StrOps(s: String) {
-    def >>*[A: AsResult](a: => F[A]) =
+    def >>*[A: AsResult](a: => FreeS[A]) =
       s >> a.foldMap(interpret).unsafePerformSync
   }
 
@@ -85,7 +84,7 @@ abstract class MountingSpec[S[_]](
   def maybeExists[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism pathExists getOption dj
 
-  def mountViewNoVars(loc: AFile, query: Fix[Sql]): F[Unit] =
+  def mountViewNoVars(loc: AFile, query: Fix[Sql]): FreeS[Unit] =
     mountView(loc, query, noVars)
 
   s"$interpName mounting interpreter" should {
@@ -145,6 +144,24 @@ abstract class MountingSpec[S[_]](
 
         lookupConfig(f).run.tuple(lookupConfig(d).run)
           .map(_ must_=== ((None, None)))
+      }
+
+      "viewsHavingPrefix" >>* {
+        val v = rootDir </> dir("d1") </> file("f1")
+        val m = rootDir </> dir("d1") </> dir("d4")
+        val f = rootDir </> dir("d1") </> dir("d5")
+
+        (mountViewNoVars(v, exprA) *> mountModule(m, Nil) *> mountFileSystem(f, dbType, uriA) *> viewsHavingPrefix(rootDir))
+          .map(_ must_= Set(v))
+      }
+
+      "modulesHavingPrefix" >>* {
+        val v = rootDir </> dir("d1") </> file("f1")
+        val m = rootDir </> dir("d1") </> dir("d4")
+        val f = rootDir </> dir("d1") </> dir("d5")
+
+        (mountViewNoVars(v, exprA) *> mountModule(m, Nil) *> mountFileSystem(f, dbType, uriA) *> modulesHavingPrefix(rootDir))
+          .map(_ must_= Set(m))
       }
     }
 
@@ -250,10 +267,10 @@ abstract class MountingSpec[S[_]](
     }
 
     "mountFileSystem" >> {
-      def mountFF(d1: ADir, d2: ADir): F[Unit] =
+      def mountFF(d1: ADir, d2: ADir): FreeS[Unit] =
         mountFileSystem(d1, dbType, uriA) *> mountFileSystem(d2, dbType, uriB)
 
-      def mountVF(f: AFile, d: ADir): F[Option[MountConfig]] =
+      def mountVF(f: AFile, d: ADir): FreeS[Option[MountConfig]] =
         mountViewNoVars(f, exprA)        *>
         mountFileSystem(d, dbType, uriA) *>
         lookupConfig(d).run

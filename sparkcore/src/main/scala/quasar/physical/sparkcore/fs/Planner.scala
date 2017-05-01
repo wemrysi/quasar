@@ -16,9 +16,9 @@
 
 package quasar.physical.sparkcore.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._, quasar.Planner._
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
@@ -155,13 +155,13 @@ object Planner {
         case Min(_) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Int(a), Data.Int(b)) => Data.Int(a.min(b))
           case (Data.Number(a), Data.Number(b)) => Data.Dec(a.min(b))
-          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) < 0).fold(a, b))
           case _ => Data.NA
         }
         case Max(_) => (d1: Data, d2: Data) => (d1, d2) match {
           case (Data.Int(a), Data.Int(b)) => Data.Int(a.max(b))
           case (Data.Number(a), Data.Number(b)) => Data.Dec(a.max(b))
-          case (Data.Str(a), Data.Str(b)) => Data.Str(a) // TODO fix this
+          case (Data.Str(a), Data.Str(b)) => Data.Str((a.compare(b) > 0).fold(a, b))
           case _ => Data.NA
         }
         case Avg(_) => (d1: Data, d2: Data) => (d1, d2) match {
@@ -209,6 +209,7 @@ object Planner {
             case UnshiftArray(a) => a >>> ((d: Data) => Data.Arr(List(d)))
             case UnshiftMap(a1, a2) => ((d: Data) => a1(d) match {
               case Data.Str(k) => Data.Obj(ListMap(k -> a2(d)))
+              case Data.Int(i) => Data.Obj(ListMap(i.shows -> a2(d)))
               case _ => Data.NA
             })
           }
@@ -227,6 +228,11 @@ object Planner {
               : List[Data] =
             Zip[List].zipWith(f,(a.zip(b)))(_.tupled(_))
 
+          val avgReducers = reducers.map {
+            case Avg(_) => true
+            case _  => false
+          }
+
           StateT((sc: SparkContext) =>
             EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
               case (partitioner, trans, repair) =>
@@ -234,8 +240,8 @@ object Planner {
                   .reduceByKey(merge(_,_, reducersFuncs))
                   .map {
                   case (k, vs) =>
-                    val v = Zip[List].zipWith(vs, reducers) {
-                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), Avg(_)) => Data.Dec(sum / BigDecimal(count))
+                    val v = Zip[List].zipWith(vs, avgReducers) {
+                      case (Data.Arr(List(Data.Dec(sum), Data.Int(count))), true) => Data.Dec(sum / BigDecimal(count))
                       case (d, _) => d
                     }
                     repair(k, v)
@@ -339,16 +345,16 @@ object Planner {
             val krRdd = rRdd.map(d => (rk(d), d))
 
             jt match {
-              case Inner => klRdd.join(krRdd).map {
+              case JoinType.Inner => klRdd.join(krRdd).map {
                 case (_, (l, r)) => merge(l, r)
               }
-              case LeftOuter => klRdd.leftOuterJoin(krRdd).map {
+              case JoinType.LeftOuter => klRdd.leftOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
               }
-              case RightOuter => klRdd.rightOuterJoin(krRdd).map {
+              case JoinType.RightOuter => klRdd.rightOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
               }
-              case FullOuter => klRdd.fullOuterJoin(krRdd).map {
+              case JoinType.FullOuter => klRdd.fullOuterJoin(krRdd).map {
                 case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
               }
             }

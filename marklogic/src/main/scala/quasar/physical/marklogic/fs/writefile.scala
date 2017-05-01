@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
@@ -57,7 +57,7 @@ object writefile {
 
       case WriteFile.Write(h, data) =>
         OptionT(cursors.get(h)).isDefined.ifM(
-          data.grouped(chunkSize.get.toInt)
+          data.grouped(chunkSize.value.toInt)
             .toStream
             .foldMapM(write(h.file, _)),
           Vector(unknownWriteHandle(h)).point[F])

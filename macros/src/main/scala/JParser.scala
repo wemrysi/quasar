@@ -16,7 +16,7 @@
 
 package ygg.macros
 
-import quasar.Predef._
+import slamdata.Predef._
 import jawn._, AsyncParser._
 import scala.util.{ Success, Failure }
 

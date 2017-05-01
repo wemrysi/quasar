@@ -16,13 +16,13 @@
 
 package quasar.connector
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import argonaut._, Argonaut._
 import monocle._
 import scalaz._, Scalaz._
 
-sealed trait EnvironmentError
+sealed abstract class EnvironmentError
 
 object EnvironmentError {
   final case class ConnectionFailed(error: Throwable)

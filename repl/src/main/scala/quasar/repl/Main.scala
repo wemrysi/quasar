@@ -16,17 +16,20 @@
 
 package quasar.repl
 
-import quasar.Predef._
-
+import slamdata.Predef._
+import quasar.cli.Cmd, Cmd._
 import quasar.config._
 import quasar.console._
+import quasar.db.StatefulTransactor
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main._
+import quasar.main._, metastore._
+import quasar.metastore.{MetaStoreAccess, Schema}
 
+import doobie.syntax.connectionio._
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -36,8 +39,6 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object Main {
-  import FileSystemDef.DefinitionResult
-
   private def consoleIO(console: Console): ConsoleIO ~> Task =
     new (ConsoleIO ~> Task) {
       import ConsoleIO._
@@ -51,7 +52,7 @@ object Main {
   type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
-  private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = Task.delay {
+  private def driver(f: Command => Free[DriverEff, Unit], e: Task[Unit]): Task[Unit] = Task.delay {
     val console =
       new Console(new SettingsBuilder()
         .parseOperators(false)
@@ -59,6 +60,7 @@ object Main {
         .interruptHook(new InterruptHook {
           def handleInterrupt(console: Console, action: Action) = {
             console.getShell.out.println("exit")
+            e.unsafePerformSync
             console.stop
           }
         })
@@ -130,43 +132,45 @@ object Main {
     }
 
   def main(args: Array[String]): Unit = {
-    val cfgOps = ConfigOps[CoreConfig]
+    val cfgOpsCore = ConfigOps[CoreConfig]
+
+    def start(tx: StatefulTransactor) =
+      for {
+        _       <- verifySchema(Schema.schema, tx.transactor)
+        ctx     <- metastoreCtx(tx)
+        // NB: for now, there's no way to add mounts through the REPL, so no point
+        // in starting if you can't do anything and can't correct the situation.
+        _       <- MetaStoreAccess.fsMounts
+                     .map(_.isEmpty)
+                     .transact(ctx.metastore.transactor)
+                     .liftM[MainErrT]
+                     .ifM(
+                       MainTask.raiseError("No mounts configured."),
+                       ().point[MainTask])
+
+        coreApi =  QErrsTCnxIO.toMainTask(ctx.metastore.transactor) compose ctx.interp
+        runCmd  <- repl[CoreEff](mt compose coreApi).liftM[MainErrT]
+        _       <- driver(runCmd, ctx.closeMnts).liftM[MainErrT]
+      } yield ()
 
     val main0: MainTask[Unit] = for {
-      opts         <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
+      opts    <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
                       .cata(_.point[MainTask], MainTask.raiseError("Couldn't parse options."))
-      cfgPath      <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-                        FsPath.parseSystemFile(cfg)
-                          .toRight(s"Invalid path to config file: $cfg.")
-                          .map(some))
-
-      config       <- cfgPath.cata(cfgOps.fromFile, cfgOps.fromDefaultPaths).leftMap(_.shows)
-
-      // NB: for now, there's no way to add mounts through the REPL, so no point
-      // in starting if you can't do anything and can't correct the situation.
-      _            <- if (config.mountings.toMap.isEmpty) MainTask.raiseError("No mounts configured.")
-                      else ().point[MainTask]
-
-      cfgRef       <- TaskRef(config).liftM[MainErrT]
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
-
-      ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](
-                        KvsMounter.ephemeralMountConfigs[Task],
-                        hfsRef, mntdRef)
-      initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
-      failedMnts   <- attemptMountAll[Mounting](config.mountings) foldMap initMnts
-      _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-
-      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
-      durableMnt   =  KvsMounter.interpreter[Task, QErrsIO](
-                        writeConfig(CoreConfig.mountings, cfgRef, cfgPath),
-                        hfsRef, mntdRef)
-      toQErrsIOM   =  injectFT[Task, QErrsIO] :+: durableMnt :+: injectFT[QErrs, QErrsIO]
-
-      coreApi      =  foldMapNT(QErrsIO.toMainTask) compose (foldMapNT(toQErrsIOM) compose runCore)
-      runCmd       <- repl[CoreEff](mt compose coreApi).liftM[MainErrT]
-      _            <- driver(runCmd).liftM[MainErrT]
+      cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+                   FsPath.parseSystemFile(cfg)
+                     .toRight(s"Invalid path to config file: $cfg.")
+                     .map(some))
+      cfg     <- cfgPath.cata(
+                   cfgOpsCore.fromFile, cfgOpsCore.fromDefaultPaths
+                 ).leftMap(_.shows)
+      msCfg   <- cfg.metastore.cata(
+                   Task.now, MetaStoreConfig.configOps.default
+                 ).liftM[MainErrT]
+      tx      <- metastoreTransactor(msCfg)
+      _       <- opts.cmd match {
+                   case Start               => start(tx)
+                   case InitUpdateMetaStore => initUpdateMigrate(Schema.schema, tx.transactor, cfgPath)
+                 }
     } yield ()
 
     logErrors(main0).unsafePerformSync

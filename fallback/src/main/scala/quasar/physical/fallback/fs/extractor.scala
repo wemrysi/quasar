@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 
 trait Extractor[A, B] {
   def unapply(x: A): Option[B]

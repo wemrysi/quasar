@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery.{xs => xxs}
@@ -82,6 +82,7 @@ object syntax {
     def in(expression: XQuery): Binding =
       this := expression
 
+    @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
     def return_[F[_]: Functor](result: XQuery => F[XQuery]): F[TypeswitchCaseClause] =
       result(~tb) map (TypeswitchCaseClause(tb.left, _))
 
@@ -115,13 +116,14 @@ object syntax {
   }
 
   final implicit class NCNameOps(val ncname: NCName) extends scala.AnyVal {
-    def xs: XQuery = ncname.value.get.xs
+    def xs: XQuery = ncname.value.value.xs
   }
 
   final implicit class NSUriOps(val uri: NSUri) extends scala.AnyVal {
-    def xs: XQuery = uri.value.get.xs
+    def xs: XQuery = uri.value.value.xs
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
     def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
     def name(local: NCName): NameBuilder = NameBuilder(ns, local)

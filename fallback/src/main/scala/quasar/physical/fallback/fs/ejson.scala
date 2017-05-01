@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import matryoshka._, Recursive.ops._
 import quasar.{ ejson => ej }
 import monocle._

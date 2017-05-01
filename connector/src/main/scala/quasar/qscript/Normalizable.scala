@@ -16,9 +16,11 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.common.SortDir
+import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 
@@ -68,8 +70,7 @@ trait NormalizableInstances {
   }
 }
 
-class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT]
-    extends TTypes[T] {
+class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
   import Normalizable._
   lazy val rewrite = new Rewrite[T]
 

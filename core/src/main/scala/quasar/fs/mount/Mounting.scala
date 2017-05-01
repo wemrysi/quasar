@@ -16,13 +16,13 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.sql.Sql
+import quasar.sql.{Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -30,7 +30,7 @@ import monocle.std.{disjunction => D}
 import pathy._, Path._
 import scalaz._, Scalaz._
 
-sealed trait Mounting[A]
+sealed abstract class Mounting[A]
 
 object Mounting {
 
@@ -51,6 +51,9 @@ object Mounting {
     extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
+    extends Mounting[MountingError \/ Unit]
+
+  final case class MountModule(loc: ADir, statements: List[Statement[Fix[Sql]]])
     extends Mounting[MountingError \/ Unit]
 
   final case class Unmount(path: APath)
@@ -78,23 +81,36 @@ object Mounting {
     import MountConfig._
 
     /** Returns mounts located at a path having the given prefix. */
-    def havingPrefix(dir: ADir): F[Map[APath, MountType]] =
+    def havingPrefix(dir: ADir): FreeS[Map[APath, MountType]] =
       lift(HavingPrefix(dir))
 
     /** The views mounted at paths having the given prefix. */
-    def viewsHavingPrefix(dir: ADir): F[Set[AFile]] =
+    def viewsHavingPrefix(dir: ADir): FreeS[Set[AFile]] =
       rPathsHavingPrefix(dir).map(_.foldMap(_.toSet))
 
+    def viewsHavingPrefix_(dir: ADir): FreeS[Set[RFile]] =
+      viewsHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
+
+    def modulesHavingPrefix(dir: ADir): FreeS[Set[ADir]] =
+      havingPrefix(dir).map(_.collect { case (k, v) if v === MountType.ModuleMount => k }.toSet
+        .foldMap(p => refineType(p).swap.toSet))
+
+    def modulesHavingPrefix_(dir: ADir): FreeS[Set[RDir]] =
+      modulesHavingPrefix(dir).map(_.foldMap(_.relativeTo(dir).toSet))
+
     /** Whether the given path refers to a mount. */
-    def exists(path: APath): F[Boolean] =
+    def exists(path: APath): FreeS[Boolean] =
       lookupType(path).isDefined
 
     /** Returns the mount configuration if the given path refers to a mount. */
-    def lookupConfig(path: APath): OptionT[F, MountConfig] =
+    def lookupConfig(path: APath): OptionT[FreeS, MountConfig] =
       OptionT(lift(LookupConfig(path)))
 
+    def lookupModuleConfig(path: ADir): OptionT[FreeS, ModuleConfig] =
+      lookupConfig(path).flatMap(config => OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS]))
+
     /** Returns the type of mount the path refers to, if any. */
-    def lookupType(path: APath): OptionT[F, MountType] =
+    def lookupType(path: APath): OptionT[FreeS, MountType] =
       OptionT(lift(LookupType(path)))
 
     /** Create a view mount at the given location. */
@@ -104,7 +120,7 @@ object Mounting {
       vars: Variables
     )(implicit
       S0: MountingFailure :<: S
-    ): F[Unit] =
+    ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountView(loc, query, vars)))
 
     /** Create a filesystem mount at the given location. */
@@ -114,8 +130,16 @@ object Mounting {
       uri: ConnectionUri
     )(implicit
       S0: MountingFailure :<: S
-    ): F[Unit] =
+    ): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountFileSystem(loc, typ, uri)))
+
+    def mountModule(
+      loc: ADir,
+      statements: List[Statement[Fix[Sql]]]
+    )(implicit
+      SO: MountingFailure :<: S
+    ): FreeS[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(MountModule(loc, statements)))
 
     /** Attempt to create a mount described by the given configuration at the
       * given location.
@@ -126,7 +150,7 @@ object Mounting {
     )(implicit
       S0: MountingFailure :<: S,
       S1: PathMismatchFailure :<: S
-    ): F[Unit] = {
+    ): FreeS[Unit] = {
       val mmErr = PathMismatchFailure.Ops[S]
 
       config match {
@@ -138,6 +162,11 @@ object Mounting {
         case FileSystemConfig(typ, uri) =>
           D.left.getOption(refineType(loc)) cata (
             dir => mountFileSystem(dir, typ, uri),
+            mmErr.fail(PathTypeMismatch(loc)))
+
+        case ModuleConfig(statements) =>
+          D.left.getOption(refineType(loc)) cata (
+            dir => mountModule(dir, statements),
             mmErr.fail(PathTypeMismatch(loc)))
       }
     }
@@ -151,11 +180,11 @@ object Mounting {
     )(implicit
       S0: MountingFailure :<: S,
       S1: PathMismatchFailure :<: S
-    ): F[Unit] =
+    ): FreeS[Unit] =
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
-    def unmount(path: APath)(implicit S0: MountingFailure :<: S): F[Unit] =
+    def unmount(path: APath)(implicit S0: MountingFailure :<: S): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Unmount(path)))
 
     /** Remount `src` at `dst`, results in an error if there is no mount at
@@ -164,7 +193,7 @@ object Mounting {
     def remount[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed]
-    )(implicit S0: MountingFailure :<: S): F[Unit] =
+    )(implicit S0: MountingFailure :<: S): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Remount(src, dst)))
 
     ////
@@ -179,7 +208,7 @@ object Mounting {
     )(implicit
       S0: MountingFailure :<: S,
       S1: PathMismatchFailure :<: S
-    ): F[Unit] = {
+    ): FreeS[Unit] = {
       val mntErr = MountingFailure.Ops[S]
       val mmErr = PathMismatchFailure.Ops[S]
 
@@ -193,7 +222,7 @@ object Mounting {
       } yield ()
     }
 
-    private def rPathsHavingPrefix(dir: ADir): F[Set[ADir \/ AFile]] =
+    private def rPathsHavingPrefix(dir: ADir): FreeS[Set[ADir \/ AFile]] =
       havingPrefix(dir).map(_.keySet.map(refineType))
   }
 

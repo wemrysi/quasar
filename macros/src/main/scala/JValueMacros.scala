@@ -16,7 +16,7 @@
 
 package ygg.macros
 
-import quasar.Predef._
+import slamdata.Predef._
 import scala.collection.{ mutable => scm }
 import scala.reflect.macros.blackbox._
 import jawn._

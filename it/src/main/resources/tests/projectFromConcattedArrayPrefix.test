@@ -1,11 +1,9 @@
 {
     "name": "project from static concatted array prefix",
     "backends": {
+        "fallback": "skip",
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "spark_local": "skip",
-    "fallback": "skip",
-        "spark_hdfs": "skip"
+        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select ([6, 7] || loc)[1] from largeZips",

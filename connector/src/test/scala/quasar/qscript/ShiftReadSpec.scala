@@ -16,10 +16,11 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, TreeMatchers}
-import quasar.fp._
 import quasar.contrib.pathy.AFile
+import quasar.ejson.implicits._
+import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib._
 

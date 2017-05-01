@@ -16,7 +16,7 @@
 
 package quasar.fs.mount
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fs._
@@ -61,6 +61,7 @@ object Mounter {
       store.get(p).map {
         case ViewConfig(_, _)         => MountType.viewMount()
         case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
+        case ModuleConfig(_)          => MountType.moduleMount()
       }
 
     def handleMount(req: MountRequest): MntE[Unit] = {
@@ -116,6 +117,9 @@ object Mounter {
 
       case MountFileSystem(loc, typ, uri) =>
         handleMount(MountRequest.mountFileSystem(loc, typ, uri)).run
+
+      case MountModule(loc, statements) =>
+        handleMount(MountRequest.mountModule(loc, statements)).run
 
       case Unmount(path) =>
         handleUnmount(path)
@@ -194,6 +198,8 @@ object Mounter {
     refineType(path).fold(
       d => fileSystemConfig.getOption(cfg) map { case (t, u) =>
         MountRequest.mountFileSystem(d, t, u)
+      } orElse {
+        moduleConfig.getOption(cfg) map (MountRequest.mountModule(d, _))
       },
       f => viewConfig.getOption(cfg) map { case (q, vs) =>
         MountRequest.mountView(f, q, vs)

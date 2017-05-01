@@ -16,7 +16,7 @@
 
 package quasar.api.services.query
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar._
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
@@ -28,7 +28,7 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.Sql
+import quasar.sql.{Blob, Sql, CIName}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -37,6 +37,7 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
+import org.http4s.argonaut._
 import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import pathy.Path._
@@ -161,7 +162,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         var_ : Int,
         offset: Int Refined NonNegative,
         limit: Int Refined RPositive) =>
-          (filesystem.file != rootDir </> file("sk(..)a/nZaxo/\"`oq_Jy.g.r.V{\\l") && varName.value != "im" && limit.get != 1 && offset.get != 0 && var_ != 0) ==> {
+          (filesystem.file != rootDir </> file("sk(..)a/nZaxo/\"`oq_Jy.g.r.V{\\l") && varName.value != "im" && limit.value != 1 && offset.value != 0 && var_ != 0) ==> {
             import quasar.std.StdLib.set._
 
             val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
@@ -169,25 +170,25 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
               Fix(Take(
                 Fix(Drop(
                   lp,
-                  lpf.constant(Data.Int(offset.get)))),
-                lpf.constant(Data.Int(limit.get))))
+                  lpf.constant(Data.Int(offset.value)))),
+                lpf.constant(Data.Int(limit.value))))
             val limitedContents =
               filesystem.contents
-                .drop(offset.get)
-                .take(limit.get)
+                .drop(offset.value)
+                .take(limit.value)
 
             get(executeService)(
               path = filesystem.parent,
               query = Some(Query(
                 query,
                 offset = Some(offset),
-                limit = Some(Positive(limit.get.toLong).get),
+                limit = Some(Positive(limit.value.toLong).get),
                 varNameAndValue = Some((varName.value, var_.toString)))),
               state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
               status = Status.Ok,
               response = (a: String) => a must_==
                 jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync
-                  .drop(offset.get).take(limit.get).mkString(""))
+                  .drop(offset.value).take(limit.value).mkString(""))
         }
       }.flakyTest("See precondition for example of offending arguments")
       "POST" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
@@ -204,6 +205,24 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           },
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }
+    }
+    "execute a query with function definitions" >> {
+      val sampleFile = rootDir </> file("foo")
+      val query =
+        """
+          |CREATE FUNCTION TRIVIAL(:user_id)
+          |  BEGIN
+          |    SELECT * FROM `/foo`
+          |  END;
+          |TRIVIAL("bob")
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "5"
+      )
     }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
@@ -252,13 +271,13 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val q = "select sum(1, 2, 3, 4)"
 
         val err: SemanticError =
-          SemanticError.WrongArgumentCount("sum", 1, 4)
+          SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -275,11 +294,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,

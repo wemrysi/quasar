@@ -16,13 +16,14 @@
 
 package quasar.api.services
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam}
 import quasar.fp.liftMT
 import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.fs.mount.module.Module
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -46,14 +47,17 @@ object RestApi {
         S5: FileSystemFailure :<: S,
         S6: Mounting :<: S,
         S7: MountingFailure :<: S,
-        S8: PathMismatchFailure :<: S
+        S8: PathMismatchFailure :<: S,
+        S9: Module :<: S,
+        S10: Module.Failure :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"  -> query.compile.service[S],
       "/data/fs"     -> data.service[S],
       "/metadata/fs" -> metadata.service[S],
       "/mount/fs"    -> mount.service[S],
-      "/query/fs"    -> query.execute.service[S]
+      "/query/fs"    -> query.execute.service[S],
+      "/invoke/fs"   -> invoke.service[S]
     )
 
   val additionalServices: Map[String, HttpService] =

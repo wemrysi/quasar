@@ -16,7 +16,7 @@
 
 package quasar.physical.marklogic.xquery
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.fp.ski.κ
 import quasar.effect.MonoSeq
 import quasar.physical.marklogic.xml.{NCName, QName}

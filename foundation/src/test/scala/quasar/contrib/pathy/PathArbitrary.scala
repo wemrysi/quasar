@@ -16,7 +16,7 @@
 
 package quasar.contrib.pathy
 
-import quasar.Predef._
+import slamdata.Predef._
 
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import pathy.Path._

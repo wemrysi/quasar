@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 
@@ -24,7 +24,7 @@ import monocle.{Lens, Prism}
 import pathy.Path._
 import scalaz._
 
-sealed trait PathError
+sealed abstract class PathError
 
 object PathError {
   final case class PathExists private (path: APath)

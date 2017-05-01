@@ -25,7 +25,6 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._
-import monocle.std.tuple2._
 import scalaz.{Optional => _, _}
 import scalaz.NaturalTransformation.natToFunction
 import pathy.Path._
@@ -180,7 +179,7 @@ object transformPaths {
 
       case Explain(lp) =>
         Q.explain(transformFile(inPath)(lp))
-          .leftMap(transformErrorPath(outPath))
+          .bimap(transformErrorPath(outPath), ExecutionPlan.inputs.modify(_ map outPath))
           .run.run
 
       case ListContents(d) =>

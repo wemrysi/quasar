@@ -2,10 +2,8 @@
     "name": "filter, sort, and limit",
 
     "backends": {
-        "postgresql": "pending",
-        "spark_local": "skip",
-    "fallback": "skip",
-        "spark_hdfs": "skip"
+        "fallback": "skip",
+        "postgresql": "pending"
     },
 
     "data": "zips.data",

@@ -16,9 +16,9 @@
 
 package quasar.sql
 
-import quasar.Predef._
+import slamdata.Predef._
+import quasar.common.JoinType._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalacheck.gen
 import quasar.sql.fixpoint._
 
 import matryoshka.data.Fix
@@ -64,7 +64,7 @@ trait ExprArbitrary {
       1 -> (selectGen(2) ⊛ genIdentString)(ExprRelationAST(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1))(CrossRelation(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1) ⊛
-        Gen.oneOf(LeftJoin, RightJoin, InnerJoin, FullJoin) ⊛
+        Gen.oneOf(LeftOuter, RightOuter, Inner, FullOuter) ⊛
         exprGen(1))(
         JoinRelation(_, _, _, _)))
   }
@@ -95,11 +95,11 @@ trait ExprArbitrary {
         Gen.const("name, address"),
         Gen.const("q: \"a\"")) ∘
         (IdentR(_)),
-      1 -> InvokeFunctionR("timestamp", List(StringLiteralR(Instant.now.toString))),
-      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunctionR("interval", List(StringLiteralR(Duration.ofMillis(millis).toString)))),
-      1 -> InvokeFunctionR("date", List(StringLiteralR("2014-11-17"))),
-      1 -> InvokeFunctionR("time", List(StringLiteralR("12:00:00"))),
-      1 -> InvokeFunctionR("oid", List(StringLiteralR("123456")))
+      1 -> InvokeFunctionR(CIName("timestamp"), List(StringLiteralR(Instant.now.toString))),
+      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunctionR(CIName("interval"), List(StringLiteralR(Duration.ofMillis(millis).toString)))),
+      1 -> InvokeFunctionR(CIName("date"), List(StringLiteralR("2014-11-17"))),
+      1 -> InvokeFunctionR(CIName("time"), List(StringLiteralR("12:00:00"))),
+      1 -> InvokeFunctionR(CIName("oid"), List(StringLiteralR("123456")))
     )
 
   private def complexExprGen(depth: Int): Gen[Fix[Sql]] =
@@ -124,9 +124,9 @@ trait ExprArbitrary {
           UnshiftArray))(
         UnopR(_, _)),
       2 -> (Gen.oneOf("sum", "count", "avg", "length", "make_array") ⊛ exprGen(depth))(
-        (fn, arg) => InvokeFunctionR(fn, List(arg))),
+        (fn, arg) => InvokeFunctionR(CIName(fn), List(arg))),
       1 -> exprGen(depth) ∘
-        (arg => InvokeFunctionR("like", List(arg, StringLiteralR("B%"), StringLiteralR("")))),
+        (arg => InvokeFunctionR(CIName("like"), List(arg, StringLiteralR("B%"), StringLiteralR("")))),
       1 -> (exprGen(depth) ⊛ casesGen(depth) ⊛ Gen.option(exprGen(depth)))(
         MatchR(_, _, _)),
       1 -> (casesGen(depth) ⊛ Gen.option(exprGen(depth)))(SwitchR(_, _))
@@ -158,6 +158,7 @@ trait ExprArbitrary {
     def log2(x: Int): Int = (java.lang.Math.log(x.toDouble)/java.lang.Math.log(2)).toInt
     for {
       sz <- Gen.size
+      if sz > 1
       n  <- Gen.choose(1, log2(sz))
       l  <- Gen.listOfN(n, gen)
     } yield l
@@ -170,8 +171,10 @@ trait ExprArbitrary {
     genIdentString map (Vari(_))
 
   private def genIdentString: Gen[String] =
-    Gen.listOf(gen.printableAsciiChar) map (_.filter(_ ≠ '`').mkString)
-
+    for {
+      c <- Gen.alphaChar
+      cs <- Gen.listOf(Gen.frequency((1, '_'), (62, Gen.alphaNumChar)))
+    } yield (c :: cs).mkString
 }
 
 object ExprArbitrary extends ExprArbitrary

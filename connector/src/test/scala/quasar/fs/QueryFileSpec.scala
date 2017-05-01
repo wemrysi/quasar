@@ -16,11 +16,11 @@
 
 package quasar.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._, eitherT._, stateT._
+import quasar.contrib.scalaz._, stateT._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.scalacheck._
@@ -35,7 +35,7 @@ import scalaz.scalacheck.ScalazArbitrary._
 
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
-  import query._, transforms.ExecM
+  import query._
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
@@ -48,7 +48,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
           val insideOfTarget = descendants.list.map(target </> _)
 
           val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget).map((_,data)).toMap
-          val expected = descendants.list.toList
+          val expected = descendants.list.toList.distinct
 
           Mem.interpret(query.descendantFiles(target)).eval(state).toEither must
             beRight(containTheSameElementsAs(expected))
@@ -89,35 +89,17 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
       }
     }
 
-    "enumerate" >> {
-      "streams results until an empty vector is received" >> prop {
+    "results" >> {
+      "returns the results of the query" >> prop {
         s: SingleFileMemState =>
 
         val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = MemTask.interpret(enumerate(query).drainTo[Vector].run.value)
+        val result = MemTask.interpret(results(query).map(_.toVector).run.value)
 
         result.run(state)
           .unsafePerformSync
           .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents)))
-      }
-
-      "closes result handle when terminated early" >> prop {
-        s: SingleFileMemState =>
-
-        val n = s.contents.length / 2
-        val query = lpf.read(s.file)
-        val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = MemTask.interpret(
-          enumeratee.take[Data, ExecM](n)
-            .run(enumerate(query))
-            .drainTo[Vector]
-            .run.value
-        )
-
-        result.run(state)
-          .unsafePerformSync
-          .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents take n)))
       }
     }
   }

@@ -16,7 +16,7 @@
 
 package quasar.physical.fallback.fs
 
-import quasar.Predef._
+import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.{ ejson => ej }
 import quasar.qscript.{ MapFunc, MapFuncs => mf }
