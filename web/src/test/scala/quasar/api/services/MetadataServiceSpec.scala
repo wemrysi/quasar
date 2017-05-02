@@ -21,8 +21,7 @@ import quasar.{Variables, VariablesArbitrary}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalaz.State
-import quasar.fp.liftMT
+import quasar.fp._
 import quasar.fp.free, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._
@@ -44,7 +43,7 @@ object MetadataFixture {
   type Eff[A] = Coproduct[QueryFile, Mounting, A]
 
   def runQuery(mem: InMemState): QueryFile ~> Task =
-    queryFile andThen State.evalNT[InMemState, Task](mem)
+    queryFile andThen evalNT[Id, InMemState](mem) andThen pointNT[Task]
 
   def runQueryWithMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
     val run: Eff ~> Task = runQuery(mem) :+: runConstantMount[Task](mnts)

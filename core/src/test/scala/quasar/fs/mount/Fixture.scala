@@ -19,8 +19,8 @@ package quasar.fs.mount
 import slamdata.Predef._
 
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.State
 import quasar.effect.KeyValueStore
+import quasar.fp._
 import quasar.fp.free._
 
 import monocle.Lens
@@ -35,6 +35,6 @@ object Fixture {
     mntr andThen foldMapNT(kvf)
   }
 
-  def runConstantMount[M[_]: Monad](mnts: Map[APath, MountConfig]): Mounting ~> M =
-    constant andThen State.evalNT[Map[APath, MountConfig], M](mnts)
+  def runConstantMount[F[_]: Applicative](mnts: Map[APath, MountConfig]): Mounting ~> F =
+    constant andThen evalNT[Id, Map[APath, MountConfig]](mnts) andThen pointNT[F]
 }
