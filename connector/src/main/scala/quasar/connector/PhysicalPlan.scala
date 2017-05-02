@@ -15,26 +15,10 @@
  */
 
 package quasar
+package connector
 
-import slamdata.Predef._
-import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
+import quasar.contrib.pathy._
 
 import scalaz._
 
-package object common {
-  type PhaseResults = Vector[PhaseResult]
-  type PhaseResultW[A] = Writer[PhaseResults, A]
-  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
-
-  type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
-
-  object PhaseResultTell {
-    def apply[F[_]](implicit F: PhaseResultTell[F]) = F
-  }
-
-  type PhaseResultListen[F[_]] = MonadListen_[F, PhaseResults]
-
-  object PhaseResultListen {
-    def apply[F[_]](implicit F: PhaseResultListen[F]) = F
-  }
-}
+final case class PhysicalPlan[R](repr: R, paths: ISet[APath])
