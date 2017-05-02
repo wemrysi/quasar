@@ -24,8 +24,8 @@ package com.precog
 package mimir
 
 import quasar.precog._
-import yggdrasil._
-import yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 import blueeyes._
 import common._

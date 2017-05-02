@@ -20,7 +20,7 @@
 package com.precog
 package mimir
 
-import com.precog.yggdrasil.table._
+import quasar.yggdrasil.table._
 
 import scala.annotation.tailrec
 

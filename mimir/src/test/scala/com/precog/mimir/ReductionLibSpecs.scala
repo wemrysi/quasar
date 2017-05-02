@@ -21,7 +21,7 @@ package com.precog.mimir
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 import scala.Function._
 import scalaz._
 

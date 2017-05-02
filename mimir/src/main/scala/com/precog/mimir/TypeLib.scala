@@ -22,7 +22,7 @@ package mimir
 
 import bytecode._
 
-import yggdrasil._
+import quasar.yggdrasil._
 
 trait TypeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait TypeLib extends ColumnarTableLib {

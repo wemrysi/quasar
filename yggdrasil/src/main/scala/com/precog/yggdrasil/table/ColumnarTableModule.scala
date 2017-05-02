@@ -17,15 +17,15 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.yggdrasil
 package table
 
 import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.bytecode._
-import com.precog.yggdrasil.util._
-import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
+import quasar.yggdrasil.util._
+import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
 import org.slf4j.Logger

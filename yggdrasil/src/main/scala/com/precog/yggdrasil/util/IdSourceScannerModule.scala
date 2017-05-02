@@ -17,11 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil.util
+package quasar.yggdrasil.util
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.table._
+import quasar.yggdrasil.table._
 
 trait IdSourceScannerModule {
   val idSource = new FreshAtomicIdSource

@@ -22,7 +22,7 @@ package mimir
 
 import blueeyes._, json._
 import com.precog.common._
-import yggdrasil._
+import quasar.yggdrasil._
 import com.precog.util.Identifier
 import scalaz._
 

@@ -21,7 +21,7 @@ package com.precog
 package mimir
 
 import blueeyes._
-import com.precog.yggdrasil.TableModule
+import quasar.yggdrasil.TableModule
 
 import scala.collection.mutable
 

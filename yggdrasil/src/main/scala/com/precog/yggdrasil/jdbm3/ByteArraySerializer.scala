@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil.jdbm3
+package quasar.yggdrasil.jdbm3
 
 import blueeyes._
 import java.io.{ DataInput, DataOutput }

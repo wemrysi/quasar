@@ -21,8 +21,8 @@ package com.precog
 package mimir
 
 import bytecode._
-import yggdrasil._
-import yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {

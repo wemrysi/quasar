@@ -19,7 +19,7 @@
  */
 package com.precog.mimir
 
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 import blueeyes._
 import com.precog.common._
 import scalaz._

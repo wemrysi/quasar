@@ -25,8 +25,8 @@ import com.precog.common._
 import com.precog.bytecode._
 import com.precog.util._
 
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 import java.util.regex.{ Pattern, PatternSyntaxException }
 
 /* DEPRECATED

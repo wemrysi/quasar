@@ -20,7 +20,7 @@
 package com.precog
 package mimir
 
-import yggdrasil._
+import quasar.yggdrasil._
 import bytecode._
 
 trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with TableLibModule[M] {

@@ -24,7 +24,7 @@ import scalaz._
 import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 
 trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 

@@ -19,7 +19,7 @@
  */
 package com.precog.mimir
 
-import com.precog.yggdrasil.table.cf
+import quasar.yggdrasil.table.cf
 import scalaz._
 
 trait StdLibEvaluatorStack[M[+ _]]

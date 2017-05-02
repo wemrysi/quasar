@@ -20,8 +20,8 @@
 package com.precog
 package mimir
 
-import yggdrasil._
-import yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 import common._
 import bytecode._

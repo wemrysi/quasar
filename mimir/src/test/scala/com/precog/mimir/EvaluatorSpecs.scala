@@ -24,10 +24,10 @@ import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.util._
 
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.vfs._
-import com.precog.yggdrasil.util._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
+import quasar.yggdrasil.vfs._
+import quasar.yggdrasil.util._
 
 import com.precog.common.security._
 import com.precog.bytecode._

@@ -27,7 +27,7 @@ import blueeyes.json.JNum
 import blueeyes._
 import com.precog.common._
 import com.precog.util.{ IdGen, Identifier }
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 
 import scala.collection.mutable
 

@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.yggdrasil
 
 import vfs.ResourceError
 import com.precog.bytecode.JType

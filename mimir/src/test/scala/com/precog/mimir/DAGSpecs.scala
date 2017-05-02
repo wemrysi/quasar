@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
 import bytecode._
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 import quasar.precog.TestSupport._
 
 object DAGSpecs extends Specification with DAG with FNDummyModule {

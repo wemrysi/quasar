@@ -24,8 +24,8 @@ import com.precog.bytecode._
 import blueeyes._
 import com.precog.common._
 
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait ArrayLib extends ColumnarTableLib {

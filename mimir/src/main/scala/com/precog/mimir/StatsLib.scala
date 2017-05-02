@@ -22,7 +22,7 @@ package mimir
 
 import blueeyes._
 import bytecode._
-import yggdrasil._, table._
+import quasar.yggdrasil._, table._
 import com.precog.common._
 import com.precog.util._
 import scalaz._, Scalaz._

@@ -21,7 +21,7 @@ package com.precog
 package mimir
 
 import com.precog.common._
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 import scalaz._, Scalaz._
 import blueeyes._, json._
 

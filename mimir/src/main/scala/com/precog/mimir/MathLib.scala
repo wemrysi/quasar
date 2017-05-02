@@ -22,8 +22,8 @@ package mimir
 
 import blueeyes._
 import bytecode._
-import yggdrasil._
-import yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {
   trait MathLib extends ColumnarTableLib with InfixLib {

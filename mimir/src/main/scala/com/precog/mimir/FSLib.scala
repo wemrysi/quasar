@@ -23,9 +23,9 @@ import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.bytecode._
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.vfs._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
+import quasar.yggdrasil.vfs._
 
 import java.util.regex._
 import scalaz._, Scalaz._

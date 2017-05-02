@@ -20,7 +20,7 @@
 package com.precog.mimir
 
 import com.precog.common._
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 
 import spire.implicits._
 import scala.util.Random

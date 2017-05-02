@@ -1,4 +1,4 @@
-package com.precog
+package quasar
 
 import blueeyes._
 import scalaz._, Scalaz._, Ordering._

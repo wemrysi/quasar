@@ -22,7 +22,7 @@ package mimir
 
 import util._
 
-import yggdrasil._
+import quasar.yggdrasil._
 import table._
 
 import blueeyes._

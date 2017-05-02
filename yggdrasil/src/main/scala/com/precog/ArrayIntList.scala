@@ -1,5 +1,4 @@
-package com.precog
-package yggdrasil
+package quasar.yggdrasil
 
 class ArrayIntList(initialCapacity: Int) {
   private[this] var _size: Int        = 0

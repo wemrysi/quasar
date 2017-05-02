@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import org.specs2.execute.Result
 import com.precog.bytecode.JType.JUniverseT
-import com.precog.yggdrasil._
+import quasar.yggdrasil._
 import com.precog.util.IdGen
 import scalaz._
 

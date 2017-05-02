@@ -17,14 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.yggdrasil
 package table
 
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.bytecode._
-import com.precog.yggdrasil.jdbm3._
+import quasar.yggdrasil.jdbm3._
 import com.precog.util._
 
 import java.util.SortedMap

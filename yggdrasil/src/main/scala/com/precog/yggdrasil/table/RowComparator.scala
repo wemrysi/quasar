@@ -17,8 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package yggdrasil
+package quasar.yggdrasil
 package table
 
 import blueeyes._

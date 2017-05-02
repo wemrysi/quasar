@@ -25,7 +25,7 @@ import bytecode._
 import com.precog.util._
 import com.precog.common._
 
-import yggdrasil.table._
+import quasar.yggdrasil.table._
 import scalaz._, Scalaz._
 
 class LongAdder {

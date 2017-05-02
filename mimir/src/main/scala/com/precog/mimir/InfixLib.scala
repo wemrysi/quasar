@@ -22,8 +22,8 @@ package mimir
 
 import blueeyes._
 import bytecode._
-import yggdrasil._
-import yggdrasil.table._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 import com.precog.util.NumericComparisons
 

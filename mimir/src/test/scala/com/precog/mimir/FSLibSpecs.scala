@@ -22,9 +22,9 @@ package mimir
 
 import common._
 import common.accounts._
-import yggdrasil._
-import yggdrasil.table._
-import yggdrasil.vfs._
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
+import quasar.yggdrasil.vfs._
 
 import blueeyes._, json._
 import scalaz._, Scalaz._

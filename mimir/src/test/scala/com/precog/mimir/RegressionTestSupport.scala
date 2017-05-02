@@ -24,7 +24,7 @@ import scala.collection.mutable
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.util.CPathUtils._
+import quasar.yggdrasil.util.CPathUtils._
 import blueeyes.json._
 
 trait RegressionTestSupport[M[+_]] {
