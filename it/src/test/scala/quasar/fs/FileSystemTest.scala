@@ -152,8 +152,7 @@ object FileSystemTest {
       fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
       fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)        orElse
       fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
-      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition) orElse
-      fsTestConfig(fallback.fs.FsType,        fallback.fs.definition)
+      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
     }
   }
 

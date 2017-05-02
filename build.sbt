@@ -172,7 +172,7 @@ lazy val root = project.in(file("."))
 //        /   \
        repl,  web,
 //             |
-              it, precog, blueeyes, yggdrasil, mimir, macros, fallback)
+              it, precog, blueeyes, yggdrasil, mimir)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -393,8 +393,7 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    skeleton,
-    fallback)
+    skeleton)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -447,7 +446,6 @@ lazy val it = project
   .enablePlugins(AutomateHeaderPlugin)
 
 
-
 /***** PRECOG *****/
 
 import precogbuild.Build._
@@ -455,56 +453,4 @@ import precogbuild.Build._
 lazy val precog    = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
 lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
 lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
-lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes) also (
-  initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
-     initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
-)
-
-lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugins JmhPlugin also (
-                fork in Test :=  true,
-      sourceDirectory in Jmh := (sourceDirectory in Test).value,
-       classDirectory in Jmh := (classDirectory in Test).value,
-  dependencyClasspath in Jmh := (dependencyClasspath in Test).value,
-              compile in Jmh := ((compile in Jmh) dependsOn (compile in Test)).value,
-                  run in Jmh := ((run in Jmh) dependsOn (Keys.compile in Jmh)).evaluated
-)
-
-addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
-addCommandAlias("cc", "; mimir/test:compile ; test:compile")
-addCommandAlias("tt", "; mimir/test ; test")
-addCommandAlias("ttq", "; mimir/testQuick ; testQuick")
-addCommandAlias("cover", "; coverage ; mimir/test ; coverageReport")
-
-def fallbackRepl = """
-import blueeyes.json._
-import quasar._, fp._, qscript._
-import quasar.physical.fallback.fs._
-import matryoshka._, implicits._
-import scalaz._, Scalaz._
-import ygg.macros._, JsonMacros.EJson._
-"""
-
-/** Macros.
- */
-
-lazy val macros = project.setup
-  .dependsOn(precog % BothScopes, frontend)
-  .settings(commonSettings)
-  .settings(scalacOptions -= "-Xfatal-warnings")
-  .settings(scalacOptions += "-language:_")
-  .settings(libraryDependencies += "io.argonaut"    %% "argonaut-jawn" % "6.2-M3")
-  .settings(libraryDependencies += "org.spire-math" %% "jawn-ast"      % "0.10.4")
-
-/** Fallback evaluator.
- */
-
-lazy val fallback = project
-  .settings(name := "quasar-fallback-internal")
-  .dependsOn(connector % BothScopes, mimir, macros)
-  .settings(commonSettings)
-  .settings(wartremoverWarnings in (Compile, compile) := scala.Nil)
-  .settings(scalacOptions -= "-Xfatal-warnings")
-  .settings(libraryDependencies += "commons-io" % "commons-io" % "2.1")
-  .settings(initialCommands in (Compile, console) := fallbackRepl)
-  .enablePlugins(AutomateHeaderPlugin)
-
+lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes)
