@@ -454,7 +454,7 @@ import precogbuild.Build._
 
 lazy val precog    = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
 lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
-lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
+lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector) scalacArgs ("-Ypartial-unification")
 lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes) also (
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
      initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
