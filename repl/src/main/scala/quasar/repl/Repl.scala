@@ -20,12 +20,11 @@ import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables}
 import quasar.common.PhaseResults
-import quasar.contrib.argonaut._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
-import quasar.ejson.{EJson, JsonCodec}
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
@@ -238,11 +237,11 @@ object Repl {
           proc  <- analysis.sampleResults(file, 1000L).run
           p1    =  analysis.extractSchema[Fix[EJson], Double](
                      analysis.CompressionSettings.Default)
-          sst   =  proc.map(_.pipe(p1).toVector.headOption)
-          sstJs =  sst.map(_.map(_.asEJson[Fix[EJson]].cata(JsonCodec.encodeƒ[Json])))
-          _     <- sstJs.fold(
+          sst   =  proc.map(_.pipe(p1).map(_.asEJson[Fix[EJson]].cata(Data.fromEJson)))
+          js    =  sst.map(_.toVector.headOption.flatMap(DataCodec.Precise.encode))
+          _     <- js.fold(
                      err => DF.fail(err.shows),
-                     s   => P.println(s.fold("{}")(_.spaces2)))
+                     j   => P.println(j.fold("{}")(_.spaces2)))
         } yield ()
 
 

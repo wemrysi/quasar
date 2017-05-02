@@ -17,13 +17,12 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}
+import quasar.{Data, DataArbitrary, DataCodec}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
-import quasar.contrib.argonaut._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.contrib.pathy._
-import quasar.ejson.{EJson, JsonCodec}
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.free._
@@ -33,6 +32,7 @@ import quasar.main.analysis
 
 import argonaut._, Argonaut._, JsonScalaz._
 import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -45,7 +45,7 @@ import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
+import scalaz.stream.{process1, Process}
 import spire.std.double._
 
 final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
@@ -65,14 +65,14 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
   def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json =
     Process.emitAll(dataset)
       .pipe(analysis.extractSchema[J, Double](cfg))
-      .map(_.asEJson[J].cata[Json](JsonCodec.encodeƒ))
+      .map(sst => DataCodec.Precise.encode(sst.asEJson[J].cata[Data](Data.fromEJson)))
+      .pipe(process1.stripNone)
       .toVector.headOption.getOrElse(Json.jNull)
 
   case class SmallPositive(p: Positive)
 
   implicit val smallPositiveArbitrary: Arbitrary[SmallPositive] =
-    Arbitrary(Gen.choose(1L, 10L) flatMap (l =>
-      Positive(l).cata(p => Gen.const(SmallPositive(p)), Gen.fail)))
+    Arbitrary(chooseRefinedNum(1L: Positive, 10L: Positive) map (SmallPositive(_)))
 
   "respond with bad request when" >> {
     "no path given" >> {

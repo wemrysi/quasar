@@ -17,6 +17,7 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef.{-> => _, _}
+import quasar.{Data, DataCodec}
 import quasar.api._
 import quasar.api.services._
 import quasar.ejson.EJson
@@ -27,9 +28,12 @@ import quasar.main.analysis
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
+import matryoshka.implicits._
+import org.http4s.argonaut._
 import org.http4s.dsl._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import scalaz.stream.process1
 import spire.std.double._
 
 object schema {
@@ -71,10 +75,11 @@ object schema {
             stringMaxLength = smax,
             unionMaxSize    = umax)
 
-          firstEJsonResponse(
+          QResponse.streaming(
             analysis.sample[S](file, DefaultSampleSize)
               .pipe(analysis.extractSchema[J, Double](compressionSettings))
-              .map(_.asEJson[J]))
+              .map(sst => DataCodec.Precise.encode(sst.asEJson[J].cata(Data.fromEJson)))
+              .pipe(process1.stripNone))
         })
     }
 }
