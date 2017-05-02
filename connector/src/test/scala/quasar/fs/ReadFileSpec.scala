@@ -18,33 +18,28 @@ package quasar.fs
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}
-import quasar.contrib.pathy._
 import quasar.contrib.scalaz.stream._
-import quasar.fp._
 
-import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
-  import DataArbitrary._
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" >> prop {
-      (f: AFile, xs: Vector[Data]) =>
+      fs: SingleFileMemState =>
 
-      val doRead = read.scanAll(f).runLogCatch.run
+      val doRead = read.scanAll(fs.file).runLogCatch.run
 
-      Mem.run(doRead).eval(InMemory.InMemState.fromFiles(Map(f -> xs))) must_=== xs.right.right
+      Mem.interpret(doRead).eval(fs.state) must_=== fs.contents.right.right
     }.set(maxSize = 10)
 
     "scan should automatically close the read handle when terminated early" >> prop {
-      (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
-        val n = xs.length / 2
-        val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f).take(n)
+      fs: SingleFileMemState => fs.contents.nonEmpty ==> {
+        val n = fs.contents.length / 2
+        val doRead = read.scanAll(fs.file).take(n).runLogCatch.run
 
-        Mem.run(p.runLogCatch.run).run(emptyMem).leftMap(_.rm) must_===
-          ((Map.empty, (xs take n).right.right))
+        Mem.interpret(doRead).run(fs.state).leftMap(_.rm) must_===
+          ((Map.empty, (fs.contents take n).right.right))
       }
     }.set(maxSize = 10)
   }

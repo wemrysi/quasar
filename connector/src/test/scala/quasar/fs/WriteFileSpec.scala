@@ -21,8 +21,8 @@ import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.stream._
-import quasar.fp._
 
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
@@ -56,7 +56,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val write = wt(f, xs.toProcess).runLogCatch.run
 
-        Mem.run(write).exec(emptyMem).contents must_=== Map(f -> xs)
+        Mem.interpret(write).exec(emptyMem).contents must_=== Map(f -> xs)
       }
     }
 
@@ -67,7 +67,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val doWrite = write.append(f, xs.toProcess).runLogCatch.run
 
-        ReadWriteMem.runWithWriteErrors(doWrite, ws.toList).eval(emptyMem) must_===
+        Mem.interpretInjectingWriteErrors(doWrite, ws.toList).eval(emptyMem) must_===
           Vector(wf, partialWrite(xs.length - 1)).right.right
       }
     }
@@ -81,7 +81,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
       val doWrite = write.append(f, src).runLogCatch.run
 
-      Mem.run(doWrite).exec(emptyMem).contents must_=== Map(f -> xs)
+      Mem.interpret(doWrite).exec(emptyMem).contents must_=== Map(f -> xs)
     }
 
     withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
@@ -94,7 +94,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val after = InMemState.fromFiles(Map(f -> ys))
 
-        Mem.run(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
+        Mem.interpret(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
       }
 
       s"$n with empty input should create an empty file" >> prop { f: AFile =>
@@ -105,7 +105,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val program = write *> query.fileExists(f)
 
-        Mem.run(program).eval(emptyMem) must_=== true
+        Mem.interpretEmpty(program) must_=== true
       }
 
       s"$n should leave existing file untouched on failure" >> prop {
@@ -116,7 +116,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
           val before = InMemState.fromFiles(Map(f -> xs))
 
-          ReadWriteMem.runWithWriteErrors(write, List(ws)).run(before).leftMap(_.contents) must_===
+          Mem.interpretInjectingWriteErrors(write, List(ws)).run(before).leftMap(_.contents) must_===
             ((before.contents, Vector(err).right.right))
         }
       }
@@ -133,7 +133,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
       val before = InMemState.fromFiles(Map(f -> zs))
 
-      Mem.run(doWrite).exec(before).contents must_=== before.contents
+      Mem.interpret(doWrite).exec(before).contents must_=== before.contents
     }
 
     withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
@@ -144,7 +144,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val before = InMemState.fromFiles(Map(f -> xs))
 
-        Mem.run(doWrite).run(before) must_=== ((before, pathErr(pathExists(f)).left))
+        Mem.interpret(doWrite).run(before) must_=== ((before, pathErr(pathExists(f)).left))
       }
 
       s"$n should consume all input into a new file" >> prop {
@@ -152,7 +152,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
         val write = wt(f, xs.toProcess).runLogCatch.run
 
-        Mem.run(write).run(emptyMem).leftMap(_.contents) must_=== ((Map(f -> xs), Vector.empty.right.right))
+        Mem.interpret(write).run(emptyMem).leftMap(_.contents) must_=== ((Map(f -> xs), Vector.empty.right.right))
       }
     }
 
@@ -160,7 +160,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       s"$n should fail if the file does not exist" >> prop {
         (f: AFile, xs: Vector[Data]) =>
 
-        Mem.runEmpty(wt(f, xs.toProcess).runLogCatch.run)
+        Mem.interpretEmpty(wt(f, xs.toProcess).runLogCatch.run)
           .toEither must beLeft(pathErr(pathNotFound(f)))
       }
 
@@ -173,7 +173,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
           val before = InMemState.fromFiles(Map(f -> xs))
 
-          ReadWriteMem.runWithWriteErrors(write, List(ws))
+          Mem.interpretInjectingWriteErrors(write, List(ws))
             .run(before).leftMap(_.contents) must_=== ((before.contents, Vector(err).right.right))
         }
       }
@@ -186,7 +186,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
         val before = InMemState.fromFiles(Map(f -> xs))
         val after  = InMemState.fromFiles(Map(f -> ys))
 
-        Mem.run(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
+        Mem.interpret(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
       }
     }
   }

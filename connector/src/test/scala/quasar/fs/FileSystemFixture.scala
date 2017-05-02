@@ -95,21 +95,19 @@ trait FileSystemFixture {
     (Arbitrary.arbitrary[ADir] |@|
       scaleSize(Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]], scalePow(1/3.0)))(NonEmptyDir.apply))
 
-  type FreeFS[A]            = Free[FileSystem, A]
-  type InterceptInMemoryFs[A]     = ReadWriteT[InMemoryFs, A]
+  type FreeFS[A] = Free[FileSystem, A]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import StateT.stateTMonadState
 
   object Mem extends Interpreter[FileSystem, InMemoryFs](interpretTerm = fileSystem) {
-    def runEmpty[A](program: Free[FileSystem, A]) = run(program).eval(emptyMem)
-  }
-  object ReadWriteMem extends Interpreter[FileSystem, InterceptInMemoryFs](interpretTerm = readWrite) {
-    def runWithWriteErrors[A](program: Free[FileSystem, A], errors: List[Vector[FileSystemError]]) =
-      run(program).eval((Nil, errors))
+    def interpretEmpty[A](program: Free[FileSystem, A]): A =
+      interpret(program).eval(emptyMem)
+    def interpretInjectingWriteErrors[A](program: Free[FileSystem, A], errors: List[Vector[FileSystemError]]): InMemoryFs[A] =
+      program.foldMap(alterResponses).eval((Nil, errors))
   }
 
-  val readWrite: FileSystem ~> InterceptInMemoryFs = interpretFileSystem[InterceptInMemoryFs](
+  val alterResponses: FileSystem ~> ReadWriteT[InMemoryFs, ?] = interpretFileSystem[ReadWriteT[InMemoryFs, ?]](
     liftMT[InMemoryFs, ReadWriteT] compose queryFile,
     interceptReads(readFile),
     amendWrites(writeFile),

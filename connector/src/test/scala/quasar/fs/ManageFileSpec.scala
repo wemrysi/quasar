@@ -35,7 +35,7 @@ class ManageFileSpec extends quasar.Qspec with FileSystemFixture {
           val data: manage.M[Throwable \/ Vector[Data]] =
             read.scanAll(fileParent(s.file) </> file(name)).runLogCatch
 
-          Mem.run((rename *> (exists |@| data).tupled).run).eval(s.state)
+          Mem.interpret((rename *> (exists |@| data).tupled).run).eval(s.state)
             .toEither must beRight((false, s.contents.right))
         }
       }
