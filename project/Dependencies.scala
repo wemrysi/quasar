@@ -8,13 +8,15 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
+  private val algebraVersion           = "0.7.0"
   private val disciplineVersion        = "0.5"
-  private val jawnVersion              = "0.8.4"
+  private val jawnVersion              = "0.10.4"
   private val jacksonVersion           = "2.4.4"
   private val matryoshkaVersion        = "0.18.3"
   private val pathyVersion             = "0.2.9"
   private val raptureVersion           = "2.0.0-M6"
   private val scodecBitsVersion        = "1.1.0"
+  private val http4sVersion            = "0.15.9a"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
@@ -24,6 +26,7 @@ object Dependencies {
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
+    "org.typelevel" %% "algebra"         % algebraVersion,
     CommonDependencies.argonaut.argonaut,
     CommonDependencies.argonaut.scalaz,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
@@ -42,7 +45,8 @@ object Dependencies {
 
   def frontend = Seq(
     CommonDependencies.monocle.`macro`,
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "org.typelevel"          %% "algebra-laws"             % algebraVersion  % Test
   )
 
   def ejson = Seq(
@@ -56,7 +60,7 @@ object Dependencies {
     CommonDependencies.doobie.core,
     CommonDependencies.doobie.hikari,
     CommonDependencies.doobie.postgres,
-    CommonDependencies.http4s.core,
+    "org.http4s"           %% "http4s-core" % http4sVersion,
     CommonDependencies.monocle.`macro`,
     "com.github.tototoshi" %% "scala-csv"      % "1.3.4",
     "com.slamdata"         %% "pathy-argonaut" % pathyVersion,
@@ -103,7 +107,7 @@ object Dependencies {
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
-    CommonDependencies.http4s.core
+    "org.http4s"         %% "http4s-core" % http4sVersion
   )
 
   def marklogicValidation = Seq(
@@ -120,13 +124,15 @@ object Dependencies {
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    CommonDependencies.http4s.core
+    "org.http4s"           %% "http4s-core" % http4sVersion
   )
   def web = Seq(
-    CommonDependencies.http4s.dsl,
-    CommonDependencies.http4s.argonaut62,
-    CommonDependencies.http4s.blazeClient,
-    CommonDependencies.http4s.blazeServer,
+    "org.http4s"     %% "http4s-dsl"          % http4sVersion,
+    "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
+    "org.http4s"     %% "http4s-client"       % http4sVersion,
+    "org.http4s"     %% "http4s-server"       % http4sVersion,
+    "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
+    "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
     "org.scodec"     %% "scodec-scalaz"       % "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
@@ -137,5 +143,5 @@ object Dependencies {
     CommonDependencies.argonaut.monocle                         % Test,
     CommonDependencies.http4s.blazeClient                       % Test,
     CommonDependencies.refined.scalacheck                       % Test,
-    "io.verizon.knobs" %% "core"                % "3.12.27a"    % Test)
+    "io.verizon.knobs" %% "core"  % "4.0.30-scalaz-7.2"         % Test)
 }

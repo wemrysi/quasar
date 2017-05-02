@@ -2774,13 +2774,7 @@ class PlannerSpec extends
               $unwind(DocField(JoinHandler.LeftName)),
               $unwind(DocField(JoinHandler.RightName)),
               $project(
-                reshape("value" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "city"),
-                    $literal(Bson.Undefined))),
+                reshape("value" -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
     }
@@ -2799,13 +2793,7 @@ class PlannerSpec extends
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $project(
-            reshape("value" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Right.name, "city"),
-                $literal(Bson.Undefined))),
+            reshape("value" -> $field(JoinDir.Right.name, "city")),
             ExcludeId)))
     }
 

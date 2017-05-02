@@ -18,13 +18,14 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.fp._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
-import scalaz.{Const, Monad}
+import scalaz.{Const, Monad, Show}
 import scalaz.syntax.monad._
 
 private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
@@ -37,6 +38,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
     case Undefined()                  => emptySeq.point[F]
+    case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
     case Length(arrOrstr)             => lib.length[F] apply arrOrstr
 

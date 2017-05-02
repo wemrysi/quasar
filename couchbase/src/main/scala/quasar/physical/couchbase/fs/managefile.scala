@@ -57,14 +57,14 @@ object managefile {
                        ().right
                    ).η[Free[S, ?]])
       bkt       <- EitherT(getBucket(src.bucket))
-      srcExists <- lift(existsWithPrefix(bkt, src.collection)).into.liftM[FileSystemErrT]
+      srcExists <- EitherT(lift(existsWithPrefix(bkt, src.collection)).into)
       _         <- EitherT((
                      if (!srcExists)
                        FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
                      else
                        ().right
                    ).η[Free[S, ?]])
-      dstExists <- lift(existsWithPrefix(bkt, dst.collection)).into.liftM[FileSystemErrT]
+      dstExists <- EitherT(lift(existsWithPrefix(bkt, dst.collection)).into)
       _         <- EitherT((semantics match {
                     case MoveSemantics.FailIfExists if dstExists =>
                       FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
@@ -77,9 +77,7 @@ object managefile {
       qStr      =  s"""update `${bkt.name}`
                        set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
                        where type like "${src.collection}%""""
-      _         <- lift(Task.delay(
-                     bkt.query(n1qlQuery(qStr))
-                   )).into.liftM[FileSystemErrT]
+      _         <- EitherT(lift(query(bkt, qStr)).into)
     } yield ()).run
 
   def delete[S[_]](
@@ -92,12 +90,12 @@ object managefile {
       ctx       <- context.ask.liftM[FileSystemErrT]
       bktCol    <- EitherT(bucketCollectionFromPath(path).η[Free[S, ?]])
       bkt       <- EitherT(getBucket(bktCol.bucket))
-      docsExist <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+      docsExist <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into)
       _         <- EitherT((
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).η[Free[S, ?]])
-      _         <- lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[FileSystemErrT]
+      _         <- EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into)
     } yield ()).run
 
   def tempFile[S[_]](

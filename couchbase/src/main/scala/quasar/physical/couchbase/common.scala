@@ -57,31 +57,28 @@ object common {
   def deleteHavingPrefix(
     bucket: Bucket,
     prefix: String
-  ): Task[Unit] = {
+  ): Task[FileSystemError \/ Unit] = {
     val qStr = s"""DELETE FROM `${bucket.name}` WHERE type LIKE "${prefix}%""""
-    Task.delay(bucket.query(n1qlQuery(qStr))).void
+
+    query(bucket, qStr).map(_.void)
   }
 
   def docTypesFromPrefix(
     bucket: Bucket,
     prefix: String
-  ): Task[List[DocType]] = Task.delay {
+  ): Task[FileSystemError \/ List[DocType]] = {
     val qStr = s"""SELECT distinct type FROM `${bucket.name}`
-                   WHERE type LIKE "${prefix}%"""";
-
-    bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
-      .map(r => DocType(r.value.getString("type")))
+                   WHERE type LIKE "${prefix}%""""
+    query(bucket, qStr).map(_.map(_.toList.map(r => DocType(r.value.getString("type")))))
   }
 
   def existsWithPrefix(
     bucket: Bucket,
     prefix: String
-  ): Task[Boolean] = Task.delay {
+  ): Task[FileSystemError \/ Boolean] = {
     val qStr = s"""SELECT count(*) > 0 v FROM `${bucket.name}`
                    WHERE type = "${prefix}" OR type like "${prefix}/%""""
-
-    bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
-      .exists(_.value.getBoolean("v").booleanValue === true)
+    query(bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
   }
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
@@ -96,10 +93,18 @@ object common {
   def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
-  def n1qlQuery(query: String): N1qlQuery =
-    N1qlQuery.simple(
-      query,
-      N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS))
+  def query(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[N1qlQueryRow]] =
+    Task.delay {
+      val qr = bucket.query(N1qlQuery.simple(
+        query, N1qlParams.build().consistency(ScanConsistency.STATEMENT_PLUS)))
+      qr.errors.asScala.toVector.toNel.cata(
+        errors => FileSystemError.readFailed(
+          query,"[" ⊹ errors.map(_.toString).intercalate(", ") ⊹ "]").left,
+        qr.allRows.asScala.toVector.right)
+    }
+
+  def queryData(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[Data]] =
+    this.query(bucket, query) ∘ (_ >>= (_.traverse(rowToData)))
 
   def getBucket[S[_]](
     name: String
@@ -122,5 +127,4 @@ object common {
     DataCodec.parse(rowStr)(DataCodec.Precise).leftMap(err =>
       FileSystemError.readFailed(rowStr, err.shows))
   }
-
 }

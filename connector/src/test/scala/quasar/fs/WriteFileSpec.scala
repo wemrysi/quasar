@@ -21,8 +21,8 @@ import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
+import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.stateT._
-import quasar.fp._
 
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
