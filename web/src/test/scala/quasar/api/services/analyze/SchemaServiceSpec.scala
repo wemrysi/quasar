@@ -93,7 +93,7 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
         .unsafePerformSync
     }
 
-    addFragments(Fragments(List("mapMaxSize", "stringMaxLength", "unionMaxSize") map { param =>
+    addFragments(Fragments(List("arrayMaxLength", "mapMaxSize", "stringMaxLength", "unionMaxSize") map { param =>
       s"non-positive $param given" >> prop { (file: AFile, i: Int) =>
         val ruri = pathUri(file) +? (param, nonPos(i).toString)
 
@@ -120,6 +120,12 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
       shouldSucceed(file, x, y,
         analysis.CompressionSettings.Default,
         Request(uri = pathUri(file)))
+    }
+
+    "applies arrayMaxLength when specified" >> prop { (file: AFile, x: Data, y: Data, len: SmallPositive) =>
+      val cfg = analysis.CompressionSettings.Default.copy(arrayMaxLength = len.p)
+      val req = Request(uri = pathUri(file) +? ("arrayMaxLength", len.p.shows))
+      shouldSucceed(file, x, y, cfg, req)
     }
 
     "applies mapMaxSize when specified" >> prop { (file: AFile, x: Data, y: Data, size: SmallPositive) =>

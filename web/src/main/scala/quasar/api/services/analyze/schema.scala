@@ -41,6 +41,7 @@ object schema {
 
   val DefaultSampleSize: Positive = 1000L
 
+  object ArrayMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("arrayMaxLength")
   object MapMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("mapMaxSize")
   object StringMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("stringMaxLength")
   object UnionMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("unionMaxSize")
@@ -53,9 +54,14 @@ object schema {
   ): QHttpService[S] =
     QHttpService {
       case req @ GET -> _        :?
+        ArrayMaxLength(arrMax0)  +&
         MapMaxSize(mapMax0)      +&
         StringMaxLength(strMax0) +&
         UnionMaxSize(unionMax0)  =>
+
+        val arrMax =
+          valueOrInvalid("arrayMaxLength", arrMax0)
+            .map(_ | analysis.CompressionSettings.DefaultArrayMaxLength)
 
         val mapMax =
           valueOrInvalid("mapMaxSize", mapMax0)
@@ -69,8 +75,9 @@ object schema {
           valueOrInvalid("unionMaxSize", unionMax0)
             .map(_ | analysis.CompressionSettings.DefaultUnionMaxSize)
 
-        respond_((decodedFile(req.uri.path) |@| mapMax |@| strMax |@| unionMax) { (file, mmax, smax, umax) =>
+        respond_((decodedFile(req.uri.path) |@| arrMax |@| mapMax |@| strMax |@| unionMax) { (file, amax, mmax, smax, umax) =>
           val compressionSettings = analysis.CompressionSettings(
+            arrayMaxLength  = amax,
             mapMaxSize      = mmax,
             stringMaxLength = smax,
             unionMaxSize    = umax)

@@ -38,23 +38,27 @@ import spire.math.ConvertableTo
 object analysis {
   /** Knobs controlling various aspects of SST compression.
     *
+    * @param arrayMaxSize    arrays larger than this will be compressed
     * @param mapMaxSize      maps larger than this will be compressed
     * @param stringMaxLength all strings longer than this are compressed to char[]
     * @param unionMaxSize    unions larger than this will be compressed
     */
   final case class CompressionSettings(
+    arrayMaxLength:  Positive,
     mapMaxSize:      Positive,
     stringMaxLength: Positive,
     unionMaxSize:    Positive
   )
 
   object CompressionSettings {
-    val DefaultMapMaxSize:      Positive = 50L
+    val DefaultArrayMaxLength:  Positive = 64L
+    val DefaultMapMaxSize:      Positive = 64L
     val DefaultStringMaxLength: Positive = 64L
     val DefaultUnionMaxSize:    Positive =  1L
 
     val Default: CompressionSettings =
       CompressionSettings(
+        arrayMaxLength  = DefaultArrayMaxLength,
         mapMaxSize      = DefaultMapMaxSize,
         stringMaxLength = DefaultStringMaxLength,
         unionMaxSize    = DefaultUnionMaxSize)
@@ -71,6 +75,7 @@ object analysis {
       compression.coalesceKeys[J, A](settings.mapMaxSize)      >>>
       compression.z85EncodedBinary[J, A]                       >>>
       compression.limitStrings[J, A](settings.stringMaxLength) >>>
+      compression.limitArrays[J, A](settings.arrayMaxLength)   >>>
       compression.coalescePrimary[J, A]                        >>>
       compression.narrowUnion[J, A](settings.unionMaxSize)
 
