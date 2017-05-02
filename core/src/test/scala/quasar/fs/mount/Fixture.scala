@@ -24,7 +24,7 @@ import quasar.fp._
 import quasar.fp.free._
 
 import monocle.Lens
-import scalaz._
+import scalaz._, Id._
 
 object Fixture {
 
