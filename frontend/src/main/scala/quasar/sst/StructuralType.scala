@@ -137,7 +137,7 @@ object StructuralType extends StructuralTypeInstances {
         case (          None,           None) => none
       }
 
-    def mergable(x: T, y: T): Boolean =
+    def mergeable(x: T, y: T): Boolean =
       (x, y).umap(_.project.lower) match {
         case (    Top(),     Top()) => true
         case (Simple(a), Simple(b)) => a ≟ b
@@ -150,7 +150,7 @@ object StructuralType extends StructuralTypeInstances {
     def mergeUnions(v: V, xs: NonEmptyList[T], ys: NonEmptyList[T]): T \/ EnvT[V, TypeF[L, ?], TT] =
       xs.foldLeft(ys.toZipper map (_.right[TT]))((z, x) =>
         // Pair with merge candidate if found, otherwise add to the union.
-        z.findZ(_ exists (mergable(x, _))).cata(
+        z.findZ(_ exists (mergeable(x, _))).cata(
           _.modify(_ >>= ((x, _).left[T])),
           z.insert((x, ⊥).left[T])))
         .map(_.swap valueOr ((⊥, _)))

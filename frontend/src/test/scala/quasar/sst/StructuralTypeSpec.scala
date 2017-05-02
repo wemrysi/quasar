@@ -62,7 +62,7 @@ final class StructuralTypeSpec extends Spec
       st.multiply(k) must equal(st as k)
     }
 
-    "unmergable values accumulate via union" >> prop { (x: J, y: J) =>
+    "unmergeable values accumulate via union" >> prop { (x: J, y: J) =>
       ((compositeTypeOf(x) ≠ compositeTypeOf(y)) && (x ≠ y)) ==> {
       val (xst, yst) = (mkST(x), mkST(y))
       val exp = envT(2, TypeF.coproduct[J, S](xst, yst)).embed
@@ -100,7 +100,7 @@ final class StructuralTypeSpec extends Spec
       } getOrElse ok
     }
 
-    "unions merge by accumulating mergable values" >> prop { (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
+    "unions merge by accumulating mergeable values" >> prop { (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
       val xst = envT(1, TypeF.arr[J, S](xs.left)).embed
       val yst = envT(1, TypeF.arr[J, S](ys.left)).embed
       val ist = mkST(E(ejs.int[J](i)).embed)
