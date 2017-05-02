@@ -42,15 +42,15 @@ trait BackendModule {
   type ErrorMessages = NonEmptyList[String]
 
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
-  private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
+  private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
   private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
   private final implicit def _MonadM = MonadM
   private final implicit def _MonadFsErrM = MonadFsErrM
   private final implicit def _PhaseResultTellM = PhaseResultTellM
   private final implicit def _PhaseResultListenM = PhaseResultListenM
-  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
-  private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
+  private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
+  private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
   final def definition = FileSystemDef fromPF {
     case (Type, uri) =>
@@ -118,7 +118,7 @@ trait BackendModule {
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
-  final def lpToRepr[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT](
+  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       lp: T[LogicalPlan]): Kleisli[M, Config, PhysicalPlan[Repr]] = {
 
     type QSR[A] = QScriptRead[T, A]
@@ -158,15 +158,15 @@ trait BackendModule {
   type M[A]
 
   def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
-  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
+  def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
   def MonadM: Monad[M]
   def MonadFsErrM: MonadFsErr[M]
   def PhaseResultTellM: PhaseResultTell[M]
   def PhaseResultListenM: PhaseResultListen[M]
-  def UnirewriteT[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
-  def UnicoalesceCap[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
+  def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
+  def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
   def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config]
@@ -175,7 +175,7 @@ trait BackendModule {
 
   val Type: FileSystemType
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT: OrderT](
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): M[Repr]
 
   trait QueryFileModule {
