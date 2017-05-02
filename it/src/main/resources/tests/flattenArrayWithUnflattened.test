@@ -2,7 +2,6 @@
     "name": "flatten array with unflattened field",
     "backends": {
         "couchbase":  "skip",
-        "fallback": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",

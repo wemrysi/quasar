@@ -2,7 +2,6 @@
     "name": "unify flattened fields with unflattened field",
     "backends": {
         "couchbase":  "skip",
-        "fallback": "skip",
         "marklogic_json": "skip",
         "marklogic_xml":  "skip",
         "mongodb_q_3_2": "pending",
