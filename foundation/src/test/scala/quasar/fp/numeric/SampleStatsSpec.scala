@@ -54,7 +54,7 @@ final class SampleStatsSpec extends Spec with ScalazMatchers with SampleStatsArb
   def `mₖ`(k: Int, xs: NonEmptyList[Real]): Real = {
     val  n   = Real(xs.length)
     val `m₁` = μ(xs)
-    xs.map(x => (x - `m₁`) ** k).foldLeft1(_ + _) / n
+    xs.map(x => (x - `m₁`) ** k).foldLeft1(_ + _)
   }
 
   checkAll(propz.equal.laws[SampleStats[Real]])
@@ -90,9 +90,10 @@ final class SampleStatsSpec extends Spec with ScalazMatchers with SampleStatsArb
     "skewness" >> prop { mr: ModerateReals =>
       val xs   = mr.rs
       val ss   = SampleStats.fromFoldable(xs)
+      val n    = Real(xs.length)
       val `m₂` = `mₖ`(2, xs)
       val `m₃` = `mₖ`(3, xs)
-      val  sk  = (`m₂` ≠ Real(0)).option(`m₃` /  `m₂`.fpow(1.5))
+      val  sk  = (`m₂` ≠ Real(0)).option(n.sqrt * `m₃` /  `m₂`.fpow(1.5))
 
       ss.skewness must equal(sk)
     }
@@ -101,11 +102,47 @@ final class SampleStatsSpec extends Spec with ScalazMatchers with SampleStatsArb
     "kurtosis" >> prop { mr: ModerateReals =>
       val  xs  = mr.rs
       val  ss  = SampleStats.fromFoldable(xs)
+      val  n   = Real(xs.length)
       val `m₂` = `mₖ`(2, xs)
       val `m₄` = `mₖ`(4, xs)
-      val  k   = (`m₂` ≠ Real(0)).option(`m₄` /  (`m₂` ** 2))
+      val  k   = (`m₂` ≠ Real(0)).option(n * `m₄` /  (`m₂` ** 2))
 
       ss.kurtosis must equal(k)
+    }
+
+    "population variance" >> prop { mr: ModerateReals =>
+      val xs   = mr.rs
+      val ss   = SampleStats.fromFoldable(xs)
+      val n    = Real(xs.length)
+      val ssq  = xs.map(x => x * x).foldLeft1(_ + _)
+      val sum  = xs.foldLeft1(_ + _)
+      val `popσ²` = (n ≠ Real(1)).option((ssq - ((sum * sum) / n)) / (n - 1))
+
+      ss.populationVariance must equal(`popσ²`)
+    }
+
+    "population skewness" >> prop { mr: ModerateReals =>
+      val xs   = mr.rs
+      val n    = Real(xs.length)
+      val ss   = SampleStats.fromFoldable(xs)
+      val `m₂` = `mₖ`(2, xs)
+      val `m₃` = `mₖ`(3, xs)
+      val den  = (n - 2) * `m₂`.fpow(1.5)
+      val psk  = (den ≠ Real(0)).option((n * (n - Real(1)).sqrt * `m₃`) / den)
+
+      ss.populationSkewness must equal(psk)
+    }
+
+    "population kurtosis" >> prop { mr: ModerateReals =>
+      val  xs  = mr.rs
+      val  ss  = SampleStats.fromFoldable(xs)
+      val  n   = Real(xs.length)
+      val `m₂` = `mₖ`(2, xs)
+      val `m₄` = `mₖ`(4, xs)
+      val den  = (n - 2) * (n - 3) * (`m₂` ** 2)
+      val  pk  = (den ≠ Real(0)).option((n * (n + 1) * (n - 1) * `m₄`) / den)
+
+      ss.populationKurtosis must equal(pk)
     }
   }
 }
