@@ -22,8 +22,8 @@ package table
 
 import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.util._
+import quasar.precog.common._
+import quasar.precog.util._
 
 sealed trait CFId
 case class LeafCFId(identity: String)            extends CFId

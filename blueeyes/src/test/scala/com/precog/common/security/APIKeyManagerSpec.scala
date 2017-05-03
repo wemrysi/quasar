@@ -17,10 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common.security
+package quasar.precog.common.security
 
-import com.precog.common._, accounts._
-import com.precog.common.security.service._
+import quasar.precog.common._, accounts._
+import quasar.precog.common.security.service._
 import quasar.precog.TestSupport._
 
 import scalaz._, Scalaz._

@@ -22,8 +22,8 @@ package quasar.mimir
 import scala.util.Random._
 
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.util.IOUtils
+import quasar.precog.common._
+import quasar.precog.util.IOUtils
 import spire.implicits._
 
 trait ClusteringTestSupport {

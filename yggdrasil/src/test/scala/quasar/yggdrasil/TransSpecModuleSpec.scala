@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.precog.TestSupport._
 
 trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike {

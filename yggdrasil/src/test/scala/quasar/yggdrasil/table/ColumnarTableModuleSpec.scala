@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package table
 
-import com.precog.common._, security._
+import quasar.precog.common._, security._
 import quasar.yggdrasil.bytecode.JType
 import org.slf4j.LoggerFactory
 
@@ -89,7 +89,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     results.copoint must_== expected
   }
 
-  lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
+  lazy val xlogger = LoggerFactory.getLogger("quasar.yggdrasil.table.ColumnarTableModuleSpec")
 
   def streamToString(stream: StreamT[M, CharBuffer]): String = {
     def loop(stream: StreamT[M, CharBuffer], sb: StringBuilder): M[String] =

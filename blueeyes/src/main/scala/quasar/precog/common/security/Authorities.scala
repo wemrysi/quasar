@@ -17,9 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common.security
+package quasar.precog.common.security
 
-import com.precog.common.accounts.AccountId
+import quasar.precog.common.accounts.AccountId
 
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._

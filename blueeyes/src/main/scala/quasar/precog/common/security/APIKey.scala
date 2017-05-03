@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package security
 
 import quasar.blueeyes._, json._, serialization._

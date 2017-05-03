@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 
 class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extends Slice {
 

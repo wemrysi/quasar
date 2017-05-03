@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common.ingest
+package quasar.precog.common.ingest
 
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._

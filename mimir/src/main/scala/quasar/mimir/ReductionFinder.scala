@@ -25,7 +25,7 @@ import scalaz._
 import scala.collection.mutable
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil._
 
 trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {

@@ -21,9 +21,9 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
-import com.precog.common.security._
+import quasar.precog.common.security._
 import scalaz._, Scalaz._
 
 trait MergeSpec[M[+_]] extends

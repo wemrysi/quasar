@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package util
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.blueeyes.json._
 
 object CPathUtils {

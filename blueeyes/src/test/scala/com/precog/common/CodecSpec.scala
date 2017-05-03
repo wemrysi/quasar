@@ -17,10 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 
 import quasar.blueeyes._
-import com.precog.util.{ BitSetUtil, ByteBufferPool, RawBitSet }
+import quasar.precog.util.{ BitSetUtil, ByteBufferPool, RawBitSet }
 import org.scalacheck.{Shrink, Arbitrary, Gen}
 import quasar.precog._, TestSupportWithArb._
 

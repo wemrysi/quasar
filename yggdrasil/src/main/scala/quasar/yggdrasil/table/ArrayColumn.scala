@@ -20,10 +20,10 @@
 package quasar.yggdrasil.table
 
 import quasar.yggdrasil._
-import com.precog.util._
+import quasar.precog.util._
 import quasar.precog._
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet

@@ -19,10 +19,10 @@
  */
 package quasar.yggdrasil.table
 
-import com.precog.util._
+import quasar.precog.util._
 import quasar.yggdrasil._
 import quasar.blueeyes._, json._
-import com.precog.common._
+import quasar.precog.common._
 import scalaz.Semigroup
 import quasar.precog._
 

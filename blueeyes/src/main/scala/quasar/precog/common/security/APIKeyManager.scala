@@ -17,12 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package security
 
 import quasar.blueeyes._
 import service._
-import com.precog.common.accounts.{ Account, AccountId }
+import quasar.precog.common.accounts.{ Account, AccountId }
 
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging

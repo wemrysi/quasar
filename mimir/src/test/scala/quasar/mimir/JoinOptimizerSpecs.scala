@@ -21,11 +21,11 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import org.specs2.execute.Result
 import quasar.yggdrasil.bytecode.JType.JUniverseT
 import quasar.yggdrasil._
-import com.precog.util.IdGen
+import quasar.precog.util.IdGen
 import scalaz._
 
 trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]

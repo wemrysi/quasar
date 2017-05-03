@@ -17,9 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common.security
+package quasar.precog.common.security
 
-import com.precog.common._
+import quasar.precog.common._
 import quasar.blueeyes._
 import quasar.precog.TestSupport._
 

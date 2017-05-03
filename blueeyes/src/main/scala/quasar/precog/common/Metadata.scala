@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 
 import quasar.blueeyes._, json._
 import quasar.blueeyes.json.serialization.{ Extractor, Decomposer }

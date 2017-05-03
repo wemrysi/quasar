@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 
 package object accounts {
   type AccountId    = String

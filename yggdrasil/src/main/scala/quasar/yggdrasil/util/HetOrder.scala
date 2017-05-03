@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package util
 
 import quasar.blueeyes._
-import com.precog.util.NumericComparisons
+import quasar.precog.util.NumericComparisons
 
 /**
   * Compare values of different types.

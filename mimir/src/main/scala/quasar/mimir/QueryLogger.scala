@@ -20,8 +20,8 @@
 
 package quasar.mimir
 
-import com.precog.common._
-import com.precog.common.security._
+import quasar.precog.common._
+import quasar.precog.common.security._
 
 import quasar.blueeyes._, json._, serialization._
 import Iso8601Serialization._
@@ -95,7 +95,7 @@ trait QueryLogger[M[+ _], -P] { self =>
 trait LoggingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
   implicit def M: Applicative[M]
 
-  protected val logger = LoggerFactory.getLogger("com.precog.mimir.QueryLogger")
+  protected val logger = LoggerFactory.getLogger("quasar.mimir.QueryLogger")
 
   def die(): M[Unit] = M.point { () }
 

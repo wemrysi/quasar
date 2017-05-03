@@ -20,8 +20,8 @@
 package quasar.yggdrasil.util
 
 import quasar.blueeyes._
-import com.precog.util._
-import com.precog.common._
+import quasar.precog.util._
+import quasar.precog.common._
 import quasar.yggdrasil.table._
 
 trait IdSourceScannerModule {

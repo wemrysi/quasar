@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package vfs
 
 import ResourceError.NotFound
-import com.precog.common._, security._, ingest._
+import quasar.precog.common._, security._, ingest._
 import scalaz._, Scalaz._
 
 class StubVFSMetadata[M[+_]](projectionMetadata: Map[Path, Map[ColumnRef, Long]])(implicit M: Monad[M]) extends VFSMetadata[M]{

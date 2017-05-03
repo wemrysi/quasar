@@ -20,12 +20,12 @@
 package quasar.yggdrasil.table
 
 import quasar.yggdrasil._
-import com.precog.util._
+import quasar.precog.util._
 import quasar.precog._
 import quasar.yggdrasil.util.CPathUtils
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
-import com.precog.util.RingDeque
+import quasar.precog.util.RingDeque
 
 import TransSpecModule._
 import quasar.blueeyes._, json._

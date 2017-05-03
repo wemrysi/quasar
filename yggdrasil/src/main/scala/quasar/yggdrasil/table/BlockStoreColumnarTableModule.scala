@@ -21,11 +21,11 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.common.security._
+import quasar.precog.common._
+import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.jdbm3._
-import com.precog.util._
+import quasar.precog.util._
 
 import java.util.SortedMap
 import java.util.Comparator
@@ -45,7 +45,7 @@ trait BlockStoreColumnarTableModuleConfig {
 
 trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
-  protected lazy val blockModuleLogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.BlockStoreColumnarTableModule")
+  protected lazy val blockModuleLogger = LoggerFactory.getLogger("quasar.yggdrasil.table.BlockStoreColumnarTableModule")
 
   import trans._
   import TransSpec.deepMap
@@ -1116,7 +1116,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       * Sorts the KV table by ascending or descending order of a transformation
       * applied to the rows.
       *
-      * @see com.precog.yggdrasil.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
+      * @see quasar.yggdrasil.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = {
       for {
@@ -1128,7 +1128,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       * Sorts the KV table by ascending or descending order based on a seq of transformations
       * applied to the rows.
       *
-      * @see com.precog.yggdrasil.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
+      * @see quasar.yggdrasil.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {

@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.table._
 import org.scalacheck.Shrink
 import quasar.precog.TestSupport._

@@ -7,9 +7,9 @@
  * freely granted, provided that this notice is preserved.
  *
  * 20-sep-2012:
- * copied to com.precog.util.BitSet to allow some small additions to the API.
+ * copied to quasar.precog.util.BitSet to allow some small additions to the API.
  */
-package com.precog;
+package quasar.precog;
 
 import java.util.Collection;
 import java.util.Set;

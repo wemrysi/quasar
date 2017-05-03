@@ -21,8 +21,8 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.util.Identifier
+import quasar.precog.common._
+import quasar.precog.util.Identifier
 import scalaz._
 
 trait PredicatePullupSpecs[M[+_]] extends EvaluatorSpecification[M] {

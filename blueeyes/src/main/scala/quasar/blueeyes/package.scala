@@ -3,7 +3,7 @@ package quasar
 import scalaz._
 import java.time.ZoneOffset.UTC
 
-import com.precog.util._
+import quasar.precog.util._
 
 package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type spec    = scala.specialized
@@ -15,10 +15,10 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   val MimeTypes = quasar.precog.MimeTypes
 
   // Temporary
-  type BitSet             = com.precog.BitSet
+  type BitSet             = quasar.precog.BitSet
   type RawBitSet          = Array[Int]
-  val RawBitSet           = com.precog.util.RawBitSet
-  type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+  val RawBitSet           = quasar.precog.util.RawBitSet
+  type ByteBufferPoolS[A] = State[quasar.precog.util.ByteBufferPool -> List[ByteBuffer], A]
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic

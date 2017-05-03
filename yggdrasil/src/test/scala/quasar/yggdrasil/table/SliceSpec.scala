@@ -22,8 +22,8 @@ package quasar.yggdrasil.table
 import quasar.yggdrasil._
 import quasar.precog.TestSupport._
 import quasar.blueeyes._
-import com.precog.util._
-import com.precog.common._
+import quasar.precog.util._
+import quasar.precog.common._
 
 import scala.util.Random
 import org.scalacheck.{ Arbitrary, Gen }

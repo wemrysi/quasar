@@ -21,9 +21,9 @@
 package quasar.mimir
 
 import quasar.yggdrasil.TableModule
-import com.precog.util.IdGen
+import quasar.precog.util.IdGen
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 
 trait JoinOptimizerModule[M[+ _]] extends DAGTransform with TransSpecableModule[M] {
 

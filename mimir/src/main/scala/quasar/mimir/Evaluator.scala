@@ -21,12 +21,12 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import com.precog.common._, accounts._
+import quasar.precog.common._, accounts._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule._
 import quasar.yggdrasil.vfs._
-import com.precog.util._
+import quasar.precog.util._
 
 import org.slf4j.LoggerFactory
 import scala.collection.immutable.Queue
@@ -65,7 +65,7 @@ trait EvaluatorModule[M[+ _]]
     import constants._
 
     private implicit val N = N0
-    private val evalLogger = LoggerFactory.getLogger("com.precog.mimir.Evaluator")
+    private val evalLogger = LoggerFactory.getLogger("quasar.mimir.Evaluator")
     private val transState = StateMonadTrans[EvaluatorState]
     private val monadState = stateTMonadState[EvaluatorState, N]
 

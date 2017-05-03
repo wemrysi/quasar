@@ -21,12 +21,12 @@ package quasar.yggdrasil
 package jdbm3
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import org.slf4j.LoggerFactory
 import quasar.yggdrasil.table._
 
 object JDBMSlice {
-  private lazy val log = LoggerFactory.getLogger("com.precog.yggdrasil.jdbm3.JDBMSlice")
+  private lazy val log = LoggerFactory.getLogger("quasar.yggdrasil.jdbm3.JDBMSlice")
 
   def load(size: Int,
            source: () => Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]],

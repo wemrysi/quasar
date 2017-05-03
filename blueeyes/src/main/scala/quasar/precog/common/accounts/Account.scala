@@ -17,11 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package accounts
 
-import com.precog.common.Path
-import com.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
+import quasar.precog.common.Path
+import quasar.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
 import Permission._
 
 import quasar.blueeyes._, json._, serialization._

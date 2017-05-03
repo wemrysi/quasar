@@ -23,7 +23,7 @@ package quasar.mimir
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import scalaz._, Scalaz._
 

@@ -20,7 +20,7 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 
 import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction

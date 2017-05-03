@@ -21,9 +21,9 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
-import com.precog.util._
+import quasar.precog.util._
 
 import scalaz._
 import scalaz.std.tuple._

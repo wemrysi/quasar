@@ -17,10 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package accounts
 
-import com.precog.common.security._
+import quasar.precog.common.security._
 
 import org.slf4s.Logging
 

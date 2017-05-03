@@ -25,7 +25,7 @@ import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
-import com.precog.util.NumericComparisons
+import quasar.precog.util.NumericComparisons
 
 trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {

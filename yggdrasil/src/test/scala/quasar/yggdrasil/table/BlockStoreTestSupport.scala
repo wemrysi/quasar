@@ -20,8 +20,8 @@
 package quasar.yggdrasil
 package table
 
-import com.precog.common._
-import com.precog.common.security.APIKey
+import quasar.precog.common._
+import quasar.precog.common.security.APIKey
 
 import quasar.blueeyes._, json._
 import scalaz._, Scalaz._

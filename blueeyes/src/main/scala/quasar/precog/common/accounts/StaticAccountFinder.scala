@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package accounts
 
 import org.slf4s.Logging
@@ -26,7 +26,7 @@ import scalaz.Monad
 import scalaz.syntax.monad._
 
 import quasar.blueeyes._
-import com.precog.common.security._
+import quasar.precog.common.security._
 
 class StaticAccountFinder[M[+ _]: Monad](accountId: AccountId, apiKey: APIKey, rootPath: Option[String] = None, email: String = "static@precog.com")
     extends AccountFinder[M]

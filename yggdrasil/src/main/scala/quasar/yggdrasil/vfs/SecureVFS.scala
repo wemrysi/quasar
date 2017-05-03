@@ -21,8 +21,8 @@ package quasar.yggdrasil
 package vfs
 
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.common.security._
+import quasar.precog.common._
+import quasar.precog.common.security._
 import scalaz._, Scalaz._
 
 trait VFSMetadata[M[+ _]] {

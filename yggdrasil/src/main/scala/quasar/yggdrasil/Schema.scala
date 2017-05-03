@@ -21,7 +21,7 @@ package quasar.yggdrasil
 
 import quasar.blueeyes._
 import table._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 
 object Schema {

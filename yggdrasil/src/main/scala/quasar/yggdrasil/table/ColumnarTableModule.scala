@@ -21,8 +21,8 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
-import com.precog.common._
-import com.precog.common.ingest.FileContent
+import quasar.precog.common._
+import quasar.precog.common.ingest.FileContent
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -30,7 +30,7 @@ import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
 import TransSpecModule._
 import org.slf4j.Logger
 import org.slf4s.Logging
-import com.precog.util.IOUtils
+import quasar.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 

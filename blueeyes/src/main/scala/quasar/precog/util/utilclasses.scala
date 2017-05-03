@@ -1,4 +1,4 @@
-package com.precog.util
+package quasar.precog.util
 
 import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._, Extractor._

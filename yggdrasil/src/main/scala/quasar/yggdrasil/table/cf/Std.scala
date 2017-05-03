@@ -22,7 +22,7 @@ package table
 package cf
 
 import quasar.blueeyes._
-import com.precog.util.NumericComparisons
+import quasar.precog.util.NumericComparisons
 
 object std {
   val Eq = CF2P("builtin::ct::eq") {

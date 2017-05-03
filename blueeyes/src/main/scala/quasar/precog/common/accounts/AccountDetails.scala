@@ -17,10 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package accounts
 
-import com.precog.common.security.APIKey
+import quasar.precog.common.security.APIKey
 
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._

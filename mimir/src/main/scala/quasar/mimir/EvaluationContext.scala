@@ -23,7 +23,7 @@ package quasar.mimir
 import quasar.yggdrasil._
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
-import com.precog.common._, security._, accounts._
+import quasar.precog.common._, security._, accounts._
 
 final case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
 

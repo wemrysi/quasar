@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
+package quasar.precog
 
 import quasar.blueeyes._
 import java.util.Comparator

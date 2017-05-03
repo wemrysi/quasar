@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.blueeyes.json._
 import java.math.MathContext
 import scalaz._, Scalaz._

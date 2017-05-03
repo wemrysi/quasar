@@ -21,9 +21,9 @@
 package quasar.mimir
 
 import quasar.blueeyes._, json._
-import com.precog.common._
+import quasar.precog.common._
 import quasar.yggdrasil._
-import com.precog.util.Identifier
+import quasar.precog.util.Identifier
 import scalaz._
 
 trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]

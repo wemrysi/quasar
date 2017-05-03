@@ -22,8 +22,8 @@ package quasar.yggdrasil
 import vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.common.security._
+import quasar.precog.common._
+import quasar.precog.common.security._
 
 import quasar.blueeyes.json._
 

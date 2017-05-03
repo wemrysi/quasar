@@ -1,4 +1,4 @@
-package com.precog.util
+package quasar.precog.util
 
 import quasar.blueeyes._
 import quasar.precog._, TestSupport._

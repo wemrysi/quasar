@@ -20,16 +20,16 @@
 
 package quasar.mimir
 
-import com.precog.common._
-import com.precog.common.accounts._
-import com.precog.util._
+import quasar.precog.common._
+import quasar.precog.common.accounts._
+import quasar.precog.util._
 
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._
 import quasar.yggdrasil.util._
 
-import com.precog.common.security._
+import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
 
 import scalaz._, Scalaz._, Validation._

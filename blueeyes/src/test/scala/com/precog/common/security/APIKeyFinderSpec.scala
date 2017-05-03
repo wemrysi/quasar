@@ -17,10 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 package security
 
-import com.precog.common.security.service._
+import quasar.precog.common.security.service._
 import quasar.blueeyes._
 import quasar.blueeyes.util.Clock
 import scalaz._, Scalaz._

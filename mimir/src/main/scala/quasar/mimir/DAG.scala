@@ -25,8 +25,8 @@ import quasar.yggdrasil.bytecode._
 import quasar.blueeyes.json.JNum
 
 import quasar.blueeyes._
-import com.precog.common._
-import com.precog.util.{ IdGen, Identifier }
+import quasar.precog.common._
+import quasar.precog.util.{ IdGen, Identifier }
 import quasar.yggdrasil._
 
 import scala.collection.mutable

@@ -22,8 +22,8 @@ package quasar.mimir
 
 import quasar.blueeyes._
 import quasar.yggdrasil.bytecode._
-import com.precog.util._
-import com.precog.common._
+import quasar.precog.util._
+import quasar.precog.common._
 
 import quasar.yggdrasil.table._
 import scalaz._, Scalaz._

@@ -20,8 +20,8 @@
 
 package quasar.mimir
 
-import com.precog.common._
-import com.precog.common.accounts._
+import quasar.precog.common._
+import quasar.precog.common.accounts._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._

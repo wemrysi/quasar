@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.util
+package quasar.precog.util
 
 import quasar.blueeyes._
 

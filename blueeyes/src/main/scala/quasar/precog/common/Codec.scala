@@ -17,11 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package quasar.precog.common
 
 import quasar.precog._
 import quasar.blueeyes._
-import com.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
+import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }

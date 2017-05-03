@@ -21,7 +21,7 @@
 package quasar.mimir
 
 import quasar.yggdrasil.bytecode._
-import com.precog.util.Identifier
+import quasar.precog.util.Identifier
 
 trait TypeInferencer extends DAG {
   import instructions.{ BinaryOperation, ArraySwap, WrapObject, DerefArray, DerefObject }

@@ -17,17 +17,15 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package util
+package quasar.precog.util
 
+import quasar.blueeyes._
+
+import java.lang.ref.SoftReference
 import java.nio.ByteBuffer
-
 import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
 import java.util.concurrent.atomic.AtomicLong
 
-import java.lang.ref.SoftReference
-
-import quasar.blueeyes._
 import scalaz._
 import scalaz.State
 
