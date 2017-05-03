@@ -21,7 +21,7 @@ package com.precog.common
 
 import quasar.precog._
 import blueeyes._
-import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
+import com.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }

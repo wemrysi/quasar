@@ -17,10 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
+import quasar.yggdrasil._
 import blueeyes._
+import com.precog.util._
 import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._

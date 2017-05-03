@@ -17,15 +17,17 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
+
+import quasar.yggdrasil._
+import quasar.precog.TestSupport._
+import blueeyes._
+import com.precog.util._
+import com.precog.common._
 
 import scala.util.Random
-import blueeyes._
-import com.precog.common._
 import org.scalacheck.{ Arbitrary, Gen }
 import Gen.{ listOfN, containerOfN }, Arbitrary.arbitrary
-import quasar.precog.TestSupport._
 import ArbitrarySlice._
 
 class SliceSpec extends Specification with ScalaCheck {

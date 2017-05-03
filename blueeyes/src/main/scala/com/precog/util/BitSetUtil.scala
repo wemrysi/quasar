@@ -17,7 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package blueeyes
+package com.precog.util
+
+import blueeyes._
 
 object BitSetUtil {
   class BitSetOperations(private val bs: BitSet) extends AnyVal {

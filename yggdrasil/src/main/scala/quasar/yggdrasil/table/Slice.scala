@@ -17,11 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
+import quasar.yggdrasil._
+import com.precog.util._
 import quasar.precog._
-import util.CPathUtils
+import quasar.yggdrasil.util.CPathUtils
 import com.precog.common._
 import quasar.bytecode._
 import com.precog.util.RingDeque

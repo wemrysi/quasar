@@ -20,13 +20,11 @@
 package com.precog.common
 
 import blueeyes._
-import com.precog.util.{ ByteBufferPool, RawBitSet }
-// import org.specs2._
+import com.precog.util.{ BitSetUtil, ByteBufferPool, RawBitSet }
 import org.scalacheck.{Shrink, Arbitrary, Gen}
 import quasar.precog._, TestSupportWithArb._
 
 class CodecSpec extends Specification with ScalaCheck {
-  // import Arbitrary._
   import ByteBufferPool._
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(

@@ -20,11 +20,8 @@
 
 package quasar.mimir
 
-import util._
-
-import quasar.yggdrasil._
-import table._
-
+import com.precog.util._
+import quasar.yggdrasil._, table._
 import blueeyes._
 import com.precog.common._
 
