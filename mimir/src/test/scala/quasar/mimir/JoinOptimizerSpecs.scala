@@ -23,7 +23,7 @@ package quasar.mimir
 import quasar.blueeyes._
 import com.precog.common._
 import org.specs2.execute.Result
-import quasar.bytecode.JType.JUniverseT
+import quasar.yggdrasil.bytecode.JType.JUniverseT
 import quasar.yggdrasil._
 import com.precog.util.IdGen
 import scalaz._

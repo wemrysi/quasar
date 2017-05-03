@@ -22,7 +22,7 @@ package quasar.yggdrasil
 import quasar.blueeyes._
 import table._
 import com.precog.common._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 
 object Schema {
   def ctypes(jtype: JType): Set[CType] = jtype match {

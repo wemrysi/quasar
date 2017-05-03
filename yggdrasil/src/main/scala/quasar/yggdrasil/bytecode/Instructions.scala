@@ -18,7 +18,7 @@
  *
  */
 
-package quasar.bytecode
+package quasar.yggdrasil.bytecode
 
 trait Instructions {
   type Lib <: Library

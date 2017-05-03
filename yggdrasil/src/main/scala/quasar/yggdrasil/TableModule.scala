@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 
 import vfs.ResourceError
-import quasar.bytecode.JType
+import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
 import com.precog.common._
 import com.precog.common.security._

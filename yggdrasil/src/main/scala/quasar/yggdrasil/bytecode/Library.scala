@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.bytecode
+package quasar.yggdrasil.bytecode
 
 sealed trait IdentityPolicy
 object IdentityPolicy {

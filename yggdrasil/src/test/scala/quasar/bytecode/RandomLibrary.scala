@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.bytecode
+package quasar.yggdrasil.bytecode
 
 import org.scalacheck._
 import Gen._

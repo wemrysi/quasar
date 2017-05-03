@@ -23,7 +23,7 @@ import com.precog.common._
 import quasar.blueeyes._, json._
 import scala.util.Random
 import org.scalacheck.{ Gen, Arbitrary }
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 

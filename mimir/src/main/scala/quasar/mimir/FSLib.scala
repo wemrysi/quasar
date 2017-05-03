@@ -23,7 +23,7 @@ package quasar.mimir
 import quasar.blueeyes._
 import com.precog.common._
 import com.precog.common.security._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._

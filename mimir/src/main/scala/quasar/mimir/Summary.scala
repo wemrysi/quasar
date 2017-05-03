@@ -24,7 +24,7 @@ import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
 import com.precog.common._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import scalaz._, Scalaz._
 
 trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {

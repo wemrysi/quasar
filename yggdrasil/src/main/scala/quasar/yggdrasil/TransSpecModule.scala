@@ -21,7 +21,7 @@ package quasar.yggdrasil
 
 import quasar.blueeyes._
 import com.precog.common._
-import quasar.bytecode.JType
+import quasar.yggdrasil.bytecode.JType
 
 object TransSpecModule {
   object paths {

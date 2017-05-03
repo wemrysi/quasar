@@ -30,7 +30,7 @@ import quasar.yggdrasil.vfs._
 import quasar.yggdrasil.util._
 
 import com.precog.common.security._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 
 import scalaz._, Scalaz._, Validation._
 import quasar.blueeyes._, json._

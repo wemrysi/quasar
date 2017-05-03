@@ -22,7 +22,7 @@ package table
 
 import quasar.blueeyes._, json._
 import com.precog.common._
-import quasar.bytecode.JType
+import quasar.yggdrasil.bytecode.JType
 import com.precog.common.security._
 import scalaz._, Scalaz._
 

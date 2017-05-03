@@ -37,7 +37,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
     DerefArray, DerefObject,
     ArraySwap, WrapObject, JoinObject
   }
-  import quasar.bytecode._
+  import quasar.yggdrasil.bytecode._
   import library._
 
   def flattenType(jtpe : JType) : Map[JPath, Set[CType]] = {

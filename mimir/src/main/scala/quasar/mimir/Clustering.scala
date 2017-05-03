@@ -20,7 +20,7 @@
 
 package quasar.mimir
 
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import com.precog.common._

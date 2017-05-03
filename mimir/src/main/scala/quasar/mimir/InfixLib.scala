@@ -21,7 +21,7 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 

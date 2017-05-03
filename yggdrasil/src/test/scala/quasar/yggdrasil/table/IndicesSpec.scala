@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package table
 
 import com.precog.common._, security._
-import quasar.bytecode.JType
+import quasar.yggdrasil.bytecode.JType
 
 import quasar.blueeyes._, json._
 import scalaz._, Scalaz._

@@ -21,7 +21,7 @@
 package quasar.mimir
 
 import quasar.yggdrasil._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 
 trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with TableLibModule[M] {
   import instructions._

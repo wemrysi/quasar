@@ -22,7 +22,7 @@ package table
 
 import quasar.blueeyes._
 import com.precog.common._
-import quasar.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
+import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 import com.precog.util._
 
 import scalaz._

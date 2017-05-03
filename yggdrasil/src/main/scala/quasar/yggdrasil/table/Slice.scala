@@ -24,7 +24,7 @@ import com.precog.util._
 import quasar.precog._
 import quasar.yggdrasil.util.CPathUtils
 import com.precog.common._
-import quasar.bytecode._
+import quasar.yggdrasil.bytecode._
 import com.precog.util.RingDeque
 
 import TransSpecModule._
