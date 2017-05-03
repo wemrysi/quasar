@@ -1,5 +1,6 @@
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
+
+import quasar.blueeyes._
 
 // context used by JParser, taken from jawn under MIT license.
 // (https://github.com/non/jawn)

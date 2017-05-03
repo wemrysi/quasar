@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
+
+import quasar.blueeyes._
+import quasar.precog._
 
 import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
 import scala.util.Sorting.quickSort
-
 import java.lang.Double.isInfinite
+
 import JValue.{ RenderMode, Compact, Pretty, Canonical }
-import quasar.precog._
 
 /**
   * Data type for Json AST.

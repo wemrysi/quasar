@@ -1,8 +1,7 @@
-package quasar.blueeyes
-package json.serialization
+package quasar.blueeyes.json.serialization
 
+import quasar.blueeyes._, json._
 import quasar.precog._
-import quasar.blueeyes.json._
 import Extractor._
 import scalaz._, Scalaz._
 

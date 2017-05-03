@@ -1,5 +1,6 @@
-package quasar.blueeyes
-package json.serialization
+package quasar.blueeyes.json.serialization
+
+import quasar.blueeyes._, json._
 
 import json._
 import java.util.{ Date => JDate }

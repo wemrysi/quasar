@@ -1,7 +1,6 @@
-package quasar.blueeyes
-package json
-package serialization
+package quasar.blueeyes.json.serialization
 
+import quasar.blueeyes._, json._
 import IsoSerialization._
 import Extractor._
 import DefaultSerialization._

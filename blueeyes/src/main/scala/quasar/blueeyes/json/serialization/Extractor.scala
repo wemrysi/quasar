@@ -1,7 +1,6 @@
-package quasar.blueeyes
-package json
-package serialization
+package quasar.blueeyes.json.serialization
 
+import quasar.blueeyes._, json._
 import quasar.precog._
 import scalaz._, Scalaz._, Validation._
 

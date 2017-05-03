@@ -1,5 +1,6 @@
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
+
+import quasar.blueeyes._
 
 private[json] trait SyncParser extends Parser {
 

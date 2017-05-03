@@ -1,5 +1,6 @@
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
+
+import quasar.blueeyes._
 
 /**
   * Trait used when the data to be parsed is in UTF-8.

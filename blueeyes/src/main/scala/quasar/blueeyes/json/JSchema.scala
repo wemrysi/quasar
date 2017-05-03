@@ -1,5 +1,6 @@
-package quasar.blueeyes
-package json
+
+import quasar.blueeyes._
+
 
 /*
 sealed trait JSchema { self =>

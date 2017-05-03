@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
+
+import quasar.blueeyes._
 
 /** Function to merge two JSONs.
   */
