@@ -428,8 +428,6 @@ lazy val web = project
     libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
-// integration tests
-
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
@@ -448,9 +446,28 @@ lazy val it = project
 
 /***** PRECOG *****/
 
+val headerSettings = Seq(
+  headers := Map(
+     ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
+     ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
+   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
+   checkHeaders := {
+     if ((createHeaders in Compile).value.nonEmpty) sys.error("headers not all present")
+  })
+
 import precogbuild.Build._
 
-lazy val precog    = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
-lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
-lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes)
-lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
+lazy val precog = project.setup
+  .dependsOn(common % BothScopes)
+  .deps(Dependencies.precog: _*)
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val blueeyes = project.setup
+  .dependsOn(precog % BothScopes)
+
+lazy val yggdrasil = project.setup
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+
+lazy val mimir = project.setup.noArtifacts
+  .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes)
