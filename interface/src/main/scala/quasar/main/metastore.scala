@@ -138,17 +138,23 @@ object metastore {
     val mountingsConfigDecodeJson: DecodeJson[Option[MountingsConfig]] =
       DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
 
-    val migrateMounts: ConnectionIO[Unit] =
-      jCfg.traverse_(
-        mountingsConfigDecodeJson.decodeJson(_).fold(
-          { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
-          _.traverse_(_.toMap.toList.traverse((MetaStoreAccess.insertMount _).tupled).void)))
+    val mountingsConfig: ConnectionIO[Option[MountingsConfig]] =
+      taskToConnectionIO(jCfg.traverse(
+        mountingsConfigDecodeJson.decodeJson(_).fold({
+          case (e, _) => Task.fail(new RuntimeException(
+            s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))},
+          Task.now)
+        ) ∘ (_.unite))
+
+    def migrateMounts(cfg: Option[MountingsConfig]): ConnectionIO[Unit] =
+      cfg.traverse_(_.toMap.toList.traverse_((MetaStoreAccess.insertMount _).tupled))
 
     val op: ConnectionIO[Option[Json]] =
       for {
+        cfg <- mountingsConfig
         ver <- schema.readVersion
         _   <- schema.updateToLatest
-        r   <- ver.isEmpty.whenM(migrateMounts)
+        _   <- ver.isEmpty.whenM(migrateMounts(cfg))
       } yield ver.isEmpty.fold(
         jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
