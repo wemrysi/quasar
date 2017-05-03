@@ -82,6 +82,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.constant(Data.Set(List(Data.Str("b"), Data.Str("c")))))
     }
 
+    "compile reduced constant" in {
+      testTypedLogicalPlanCompile(
+        "select count(*) as total from (select \"Hello world\") as lit",
+        lpf.constant(Data.Obj("total" -> Data.Int(1))))
+    }
+
     "compile expression with timestamp, date, time, and interval" in {
       import java.time.{Instant, LocalDate, LocalTime}
 
