@@ -1,6 +1,4 @@
-package quasar.blueeyes
-
-// package precog
+package quasar.precog
 
 import scala.collection.{ mutable => scm }
 

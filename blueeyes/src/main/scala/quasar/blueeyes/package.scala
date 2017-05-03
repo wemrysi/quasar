@@ -5,7 +5,7 @@ import java.time.ZoneOffset.UTC
 
 import com.precog.util._
 
-package object blueeyes extends precog.PackageTime with blueeyes.PackageAliases {
+package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type spec    = scala.specialized
   type switch  = scala.annotation.switch
   type tailrec = scala.annotation.tailrec
