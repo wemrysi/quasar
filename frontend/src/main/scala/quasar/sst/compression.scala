@@ -24,6 +24,7 @@ import quasar.fp.ski.ι
 import quasar.tpe._
 
 import matryoshka.{project => _, _}
+import matryoshka.data.Fix
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
 import monocle.Fold
@@ -55,12 +56,7 @@ object compression {
 
       val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
         val toCompress = kn intersection m
-
-        val compressed = toCompress.toList foldMap { case (j, sst) =>
-          (primarySST(size1(sst.copoint), j), sst)
-        }
-
-        (kn \\ toCompress, some(compressed) |+| unk)
+        (kn \\ toCompress, some(compressMap(toCompress)) |+| unk)
       }
 
       envT(ts, map[J, SST[J, A]](kn1, unk1))
@@ -89,6 +85,28 @@ object compression {
         }
         coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
       } getOrElse sstf
+  }
+
+  /** Compress maps having unknown keys by coalescing known keys with unknown
+    * when the unknown contains any values having the same primary type as the
+    * known key.
+    */
+  def coalesceWithUnknown[J: Order, A: Order: Field: ConvertableTo](
+    implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case EnvT((ts, Map(xs, Some((k, v))))) =>
+      val unkPrimaries = k.toType[Fix[TypeF[J, ?]]].project match {
+        case Unioned(ts) => ISet.fromFoldable(ts.map(t => primary(t.project)).list.unite)
+        case other       => ISet.fromFoldable(primary(other))
+      }
+
+      val (toCompress, unchanged) = xs partitionWithKey { (j, _) =>
+        unkPrimaries member primaryTypeOf(j)
+      }
+
+      envT(ts, TypeF.map(unchanged, some(compressMap(toCompress) |+| ((k, v)))))
   }
 
   /** Replace statically known arrays longer than the given limit with an array
@@ -167,6 +185,16 @@ object compression {
 
   private def simpleArr[J, A](cnt: A, st: SimpleType): TypeF[J, SST[J, A]] =
     arr[J, SST[J, A]](envT(some(TS.count(cnt)), simple[J, SST[J, A]](st)).embed.right)
+
+  private def compressMap[J: Order, A: Order: Field: ConvertableTo](
+    m: J ==>> SST[J, A]
+  )(implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): (SST[J, A], SST[J, A]) =
+    m.toList foldMap { case (j, sst) =>
+      (SST.fromEJson(size1(sst.copoint), j), sst)
+    }
 
   /** Returns the SST of the primary type of the given EJson value.
     *

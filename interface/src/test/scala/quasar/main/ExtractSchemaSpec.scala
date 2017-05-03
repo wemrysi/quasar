@@ -154,7 +154,33 @@ final class ExtractSchemaSpec extends quasar.Qspec {
         ).embed
       )))).embed
 
-    verify(settings.copy(mapMaxSize = 3L), input, expected)
+    verify(settings.copy(mapMaxSize = 3L, unionMaxSize = 1L), input, expected)
+  }
+
+  "coalesce new map keys when primary type in unknown key" >> {
+    val input = List(
+      _obj(ListMap("foo" -> _int(1))),
+      _obj(ListMap("bar" -> _int(1))),
+      _obj(ListMap("baz" -> _int(1))),
+      _obj(ListMap("quux" -> _int(1)))
+    )
+
+    val expected = envT(
+      TypeStat.coll(4.0, 1.0.some, 1.0.some).some,
+      TypeF.map[J, S](IMap.empty[J, S], Some((
+        envT(
+          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux").some,
+          TypeF.arr[J, S](envT(
+            TypeStat.count(4.0).some,
+            TypeF.simple[J, S](SimpleType.Char)
+          ).embed.right)).embed,
+        envT(
+          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)).some,
+          TypeF.const[J, S](E(e.int[J](1)).embed)
+        ).embed
+      )))).embed
+
+    verify(settings.copy(mapMaxSize = 2L, unionMaxSize = 1L), input, expected)
   }
 
   "narrow unions until <= max size" >> {
