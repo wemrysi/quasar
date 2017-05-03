@@ -61,6 +61,7 @@ object Build {
                organization :=  "com.precog",
                     version :=  "0.1",
                scalaVersion :=  "2.11.8",
+          scalaOrganization := "org.typelevel",
         logBuffered in Test :=  false,
    unmanagedJars in Compile +=  (baseDirectory in ThisBuild).value / "lib" / "jdbm-3.0-SNAPSHOT.jar"
       )
