@@ -21,16 +21,15 @@ import quasar.{Variables, VariablesArbitrary}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.effect.KeyValueStore
-import quasar.fp.liftMT
+import quasar.fp._
 import quasar.fp.free, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._
+import quasar.fs.mount.Fixture.runConstantMount
 import quasar.sql._
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
-import monocle.Lens
 import org.http4s._
 import org.http4s.argonaut._
 import pathy.Path._
@@ -41,31 +40,22 @@ import scalaz.concurrent.Task
 
 object MetadataFixture {
 
-  type MetadataEff[A] = Coproduct[QueryFile, Mounting, A]
+  type Eff[A] = Coproduct[QueryFile, Mounting, A]
 
   def runQuery(mem: InMemState): QueryFile ~> Task =
-    new (QueryFile ~> Task) {
-      def apply[A](fs: QueryFile[A]) =
-        Task.now(queryFile(fs).eval(mem))
-    }
+    queryFile andThen evalNT[Id, InMemState](mem) andThen pointNT[Task]
 
-  def withMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
-    val run: MetadataEff ~> Task = runQuery(mem) :+: runMount(mnts)
-    foldMapNT(run) compose flatMapSNT(transformIn[QueryFile, MetadataEff, Free[MetadataEff, ?]](module.queryFile[MetadataEff], liftFT)) compose view.queryFile[MetadataEff]
+  def runQueryWithMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
+    val run: Eff ~> Task = runQuery(mem) :+: runConstantMount[Task](mnts)
+    val addViews = view.queryFile[Eff]
+    val addModules = flatMapSNT(transformIn[QueryFile, Eff, Free[Eff, ?]](module.queryFile[Eff], liftFT))
+    addViews andThen addModules andThen foldMapNT(run)
   }
 
-  def runMount(mnts: Map[APath, MountConfig]): Mounting ~> Task =
-    new (Mounting ~> Task) {
-      type F[A] = State[Map[APath, MountConfig], A]
-      val mntr = Mounter.trivial[MountConfigs]
-      val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
-      def apply[A](ma: Mounting[A]) =
-        Task.now(mntr(ma).foldMap(kvf).eval(mnts))
-    }
-
-  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService =
-    metadata.service[MetadataEff].toHttpService(
-      liftMT[Task, ResponseT] compose (withMounts(mem, mnts) :+: runMount(mnts)))
+  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService = {
+    metadata.service[Eff].toHttpService(
+      liftMT[Task, ResponseT] compose (runQueryWithMounts(mem, mnts) :+: runConstantMount[Task](mnts)))
+  }
 }
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {

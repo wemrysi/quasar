@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.fp.free
+package quasar.contrib.scalaz
+
+import slamdata.Predef._
+import quasar.contrib.scalaz.eitherT._
 
 import scalaz._
+import scalaz.stream.Process
 
-object lift {
-  final class LifterAux[F[_], A](fa: F[A]) {
+package object stream {
 
-    def into[G[_]](implicit I: F :<: G): Free[G, A] =
-      Free.liftF(I.inj(fa))
+  implicit class AugmentedProcess[M[_], A](p: Process[M, A]) {
+    def runLogCatch(implicit monad: Monad[M]): M[Throwable \/ Vector[A]] = {
+      val right = λ[M ~> EitherT[M, Throwable, ?]](EitherT.right(_))
+      p.translate(right).runLog.run
+    }
   }
 
-  def apply[F[_], A](fa: F[A]): LifterAux[F, A] =
-    new LifterAux(fa)
 }
