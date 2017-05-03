@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 
-import scalaz._
+import quasar.contrib.pathy._
+import quasar.effect.KeyValueStore
+import quasar.fp._
+import quasar.fp.free._
 
-package object common {
-  type PhaseResults = Vector[PhaseResult]
-  type PhaseResultW[A] = Writer[PhaseResults, A]
-  type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
+import monocle.Lens
+import scalaz._, Id._
 
-  type PhaseResultTell[F[_]] = MonadTell_[F, PhaseResults]
+object Fixture {
 
-  object PhaseResultTell {
-    def apply[F[_]](implicit F: PhaseResultTell[F]) = F
+  def constant: Mounting ~> State[Map[APath, MountConfig], ?] = {
+    type F[A] = State[Map[APath, MountConfig], A]
+    val mntr = Mounter.trivial[MountConfigs]
+    val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
+    mntr andThen foldMapNT(kvf)
   }
 
-  type PhaseResultListen[F[_]] = MonadListen_[F, PhaseResults]
-
-  object PhaseResultListen {
-    def apply[F[_]](implicit F: PhaseResultListen[F]) = F
-  }
+  def runConstantMount[F[_]: Applicative](mnts: Map[APath, MountConfig]): Mounting ~> F =
+    constant andThen evalNT[Id, Map[APath, MountConfig]](mnts) andThen pointNT[F]
 }
