@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicInteger
 import scalaz._, Scalaz._
 
-package util {
+package object util {
   /**
     * Opaque symbolic identifier (like Int, but better!).
     */
