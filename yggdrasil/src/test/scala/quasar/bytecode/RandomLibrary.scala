@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.bytecode
+package quasar.bytecode
 
 import org.scalacheck._
 import Gen._

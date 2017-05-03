@@ -17,8 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import blueeyes._, json._
 import com.precog.common._
@@ -37,7 +37,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
     DerefArray, DerefObject,
     ArraySwap, WrapObject, JoinObject
   }
-  import bytecode._
+  import quasar.bytecode._
   import library._
 
   def flattenType(jtpe : JType) : Map[JPath, Set[CType]] = {

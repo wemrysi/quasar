@@ -17,14 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import blueeyes._
 // import util._
 import quasar.yggdrasil._
 import table._
-import common._
+import com.precog.common._
 import scalaz._, Scalaz._
 
 trait ModelLibModule[M[+ _]] {

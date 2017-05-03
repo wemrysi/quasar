@@ -23,7 +23,7 @@ package table
 import quasar.precog._
 import util.CPathUtils
 import com.precog.common._
-import com.precog.bytecode._
+import quasar.bytecode._
 import com.precog.util.RingDeque
 
 import TransSpecModule._

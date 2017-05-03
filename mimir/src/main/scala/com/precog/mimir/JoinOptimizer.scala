@@ -17,8 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import quasar.yggdrasil.TableModule
 import com.precog.util.IdGen

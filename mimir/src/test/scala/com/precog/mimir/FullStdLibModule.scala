@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+package quasar.mimir
 
 trait FullStdLibModule[M[+_]] extends StdLibOpFinderModule[M]
     with ReductionFinderModule[M]

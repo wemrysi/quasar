@@ -17,11 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import blueeyes._
-import bytecode._
+import quasar.bytecode._
 import com.precog.util._
 import com.precog.common._
 

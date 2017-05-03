@@ -23,7 +23,7 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest.FileContent
-import com.precog.bytecode._
+import quasar.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
 

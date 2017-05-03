@@ -17,12 +17,13 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+
+package quasar.mimir
 
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
-import com.precog.bytecode._
+import quasar.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._

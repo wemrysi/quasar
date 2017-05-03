@@ -23,7 +23,7 @@ package table
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
-import com.precog.bytecode._
+import quasar.bytecode._
 import quasar.yggdrasil.jdbm3._
 import com.precog.util._
 

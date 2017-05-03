@@ -20,16 +20,16 @@
 /**
   * Contains code from Spire (MIT license) -- Random Forest Example.
   */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import quasar.precog._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
 import blueeyes._
-import common._
-import bytecode._
+import com.precog.common._
+import quasar.bytecode._
 import com.precog.util._
 import spire.implicits._
 

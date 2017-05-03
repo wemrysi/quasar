@@ -17,13 +17,13 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import blueeyes._
 import com.precog.common._
 import org.specs2.execute.Result
-import com.precog.bytecode.JType.JUniverseT
+import quasar.bytecode.JType.JUniverseT
 import quasar.yggdrasil._
 import com.precog.util.IdGen
 import scalaz._

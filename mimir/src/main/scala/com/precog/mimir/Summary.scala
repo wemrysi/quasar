@@ -17,14 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
-import common._
-import bytecode._
+import com.precog.common._
+import quasar.bytecode._
 import scalaz._, Scalaz._
 
 trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {

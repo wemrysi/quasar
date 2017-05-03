@@ -17,8 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package mimir
+
+package quasar.mimir
 
 import com.precog.common._
 import com.precog.common.accounts._
@@ -30,7 +30,7 @@ import quasar.yggdrasil.vfs._
 import quasar.yggdrasil.util._
 
 import com.precog.common.security._
-import com.precog.bytecode._
+import quasar.bytecode._
 
 import scalaz._, Scalaz._, Validation._
 import blueeyes._, json._

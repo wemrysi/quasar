@@ -17,8 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
-package bytecode
+package quasar.bytecode
 
 sealed trait IdentityPolicy
 object IdentityPolicy {

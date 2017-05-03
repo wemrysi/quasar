@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package table
 
-import com.precog.bytecode._
+import quasar.bytecode._
 import com.precog.common._
 
 import blueeyes._, json._

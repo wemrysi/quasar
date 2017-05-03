@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.bytecode
+package quasar.bytecode
 
 sealed trait JType {
   def |(jtype: JType) = JUnionT(this, jtype)

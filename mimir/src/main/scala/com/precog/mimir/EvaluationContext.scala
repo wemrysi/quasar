@@ -17,7 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog
+
+package quasar.mimir
 
 import quasar.yggdrasil._
 import blueeyes._, json._, serialization._

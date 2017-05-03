@@ -452,5 +452,5 @@ import precogbuild.Build._
 
 lazy val precog    = project.setup dependsOn (common % BothScopes) deps (Dependencies.precog: _*)
 lazy val blueeyes  = project.setup dependsOn (precog % BothScopes)
-lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
 lazy val yggdrasil = project.setup dependsOn (blueeyes % BothScopes, precog % BothScopes)
+lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog % BothScopes)
