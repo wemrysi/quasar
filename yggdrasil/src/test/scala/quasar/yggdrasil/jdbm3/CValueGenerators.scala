@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package jdbm3
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import quasar.precog.TestSupport._, Gen._
 

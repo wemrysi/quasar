@@ -21,7 +21,7 @@ package quasar.mimir
 
 import com.precog.common._
 import quasar.yggdrasil._
-import blueeyes._
+import quasar.blueeyes._
 import scalaz._
 
 case class Precision(p: Double)

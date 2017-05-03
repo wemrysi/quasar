@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package vfs
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._

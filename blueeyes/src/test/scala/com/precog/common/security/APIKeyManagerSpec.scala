@@ -17,13 +17,13 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
-package security
+package com.precog.common.security
 
-import accounts._
+import com.precog.common._, accounts._
 import com.precog.common.security.service._
-import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
+
+import scalaz._, Scalaz._
 
 trait APIKeyManagerSpec[M[+_]] extends Specification {
   implicit def M: Monad[M] with Comonad[M]
@@ -31,7 +31,7 @@ trait APIKeyManagerSpec[M[+_]] extends Specification {
   "API Key Manager" should {
     "properly ascribe parentage for grants" in {
       val path = Path("/user1/")
-      val mgr = new InMemoryAPIKeyManager[M](blueeyes.util.Clock.System)
+      val mgr = new InMemoryAPIKeyManager[M](quasar.blueeyes.util.Clock.System)
 
       val grantParentage = for {
         rootKey <- mgr.rootAPIKey

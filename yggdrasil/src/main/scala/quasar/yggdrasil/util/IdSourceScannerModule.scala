@@ -19,7 +19,7 @@
  */
 package quasar.yggdrasil.util
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.util._
 import com.precog.common._
 import quasar.yggdrasil.table._

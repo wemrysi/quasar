@@ -19,7 +19,7 @@
  */
 package quasar.yggdrasil
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.breakOut

@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package jdbm3
 
-import blueeyes._
+import quasar.blueeyes._
 import java.util.Comparator
 
 final case class SortingKeyComparator(rowFormat: RowFormat, ascending: Boolean) extends Comparator[Array[Byte]] {

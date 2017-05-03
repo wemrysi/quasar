@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes._, json._, serialization._, DefaultSerialization._
+import quasar.blueeyes._, json._, serialization._, DefaultSerialization._
 import scalaz._, Scalaz._
 
 class Path private (val elements: String*) {

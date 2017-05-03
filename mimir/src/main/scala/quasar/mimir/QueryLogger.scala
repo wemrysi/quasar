@@ -23,10 +23,10 @@ package quasar.mimir
 import com.precog.common._
 import com.precog.common.security._
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import Iso8601Serialization._
 
-import blueeyes.util.Clock
+import quasar.blueeyes.util.Clock
 import org.slf4j.LoggerFactory
 
 import scalaz._

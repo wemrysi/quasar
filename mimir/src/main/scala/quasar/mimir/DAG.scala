@@ -22,9 +22,9 @@ package quasar.mimir
 
 import quasar.bytecode._
 
-import blueeyes.json.JNum
+import quasar.blueeyes.json.JNum
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import com.precog.util.{ IdGen, Identifier }
 import quasar.yggdrasil._

@@ -21,7 +21,7 @@ package quasar.yggdrasil.table
 
 import quasar.yggdrasil._
 import quasar.precog.TestSupport._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.util._
 import com.precog.common._
 

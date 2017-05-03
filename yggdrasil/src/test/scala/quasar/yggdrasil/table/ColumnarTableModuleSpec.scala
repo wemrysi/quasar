@@ -24,7 +24,7 @@ import com.precog.common._, security._
 import quasar.bytecode.JType
 import org.slf4j.LoggerFactory
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 import TableModule._
 import SampleData._

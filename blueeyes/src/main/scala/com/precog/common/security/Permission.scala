@@ -22,7 +22,7 @@ package security
 
 import accounts.AccountId
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import Extractor._
 import Iso8601Serialization._
 import Versioned._

@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import quasar.precog._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import com.precog.util._
 

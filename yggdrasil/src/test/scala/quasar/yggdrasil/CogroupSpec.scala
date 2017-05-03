@@ -19,9 +19,9 @@
  */
 package quasar.yggdrasil
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
-import blueeyes.json._
+import quasar.blueeyes.json._
 
 import scalaz._
 import scalaz.Ordering._

@@ -24,7 +24,7 @@ import accounts.AccountId
 
 import org.slf4s.Logging
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import scalaz._, Scalaz._
 

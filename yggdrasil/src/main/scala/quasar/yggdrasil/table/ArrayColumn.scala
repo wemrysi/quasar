@@ -22,7 +22,7 @@ package quasar.yggdrasil.table
 import quasar.yggdrasil._
 import com.precog.util._
 import quasar.precog._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 
 trait DefinedAtIndex {

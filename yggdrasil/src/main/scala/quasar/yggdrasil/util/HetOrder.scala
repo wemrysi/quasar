@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package util
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.util.NumericComparisons
 
 /**

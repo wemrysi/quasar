@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package jdbm3
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import org.slf4j.LoggerFactory
 import quasar.yggdrasil.table._

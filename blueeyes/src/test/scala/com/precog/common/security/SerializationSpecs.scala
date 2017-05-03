@@ -22,7 +22,7 @@ package security
 
 import ingest._
 import service.v1
-import blueeyes._, json._, serialization._, DefaultSerialization._
+import quasar.blueeyes._, json._, serialization._, DefaultSerialization._
 import scalaz._, Scalaz._, Validation.FlatMap._
 import quasar.precog.TestSupport._
 

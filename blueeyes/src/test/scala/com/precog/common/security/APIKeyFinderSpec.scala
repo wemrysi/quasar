@@ -21,8 +21,8 @@ package com.precog.common
 package security
 
 import com.precog.common.security.service._
-import blueeyes._
-import blueeyes.util.Clock
+import quasar.blueeyes._
+import quasar.blueeyes.util.Clock
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 

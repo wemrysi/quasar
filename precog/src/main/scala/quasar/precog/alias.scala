@@ -1,4 +1,4 @@
-package blueeyes
+package quasar.blueeyes
 
 // package precog
 

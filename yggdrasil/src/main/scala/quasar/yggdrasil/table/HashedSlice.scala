@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package table
 
 import com.precog.util._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import scala.collection.mutable
 

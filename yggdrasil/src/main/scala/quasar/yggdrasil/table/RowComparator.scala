@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package table
 
-import blueeyes._
+import quasar.blueeyes._
 import scalaz.Ordering._
 
 trait RowComparator { self =>

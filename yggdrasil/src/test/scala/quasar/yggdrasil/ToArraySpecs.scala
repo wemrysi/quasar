@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package table
 
-import blueeyes.json._
+import quasar.blueeyes.json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 

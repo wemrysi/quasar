@@ -1,6 +1,6 @@
 package com.precog.util
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._, Extractor._
 import org.slf4s.Logging
 import quasar.precog._

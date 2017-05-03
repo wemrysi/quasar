@@ -23,7 +23,7 @@ package table
 import com.precog.common._
 import com.precog.common.security.APIKey
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 
 trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {

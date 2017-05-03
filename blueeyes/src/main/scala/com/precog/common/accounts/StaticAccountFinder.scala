@@ -25,7 +25,7 @@ import org.slf4s.Logging
 import scalaz.Monad
 import scalaz.syntax.monad._
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common.security._
 
 class StaticAccountFinder[M[+ _]: Monad](accountId: AccountId, apiKey: APIKey, rootPath: Option[String] = None, email: String = "static@precog.com")

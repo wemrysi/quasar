@@ -20,7 +20,7 @@
 package quasar.mimir
 
 import quasar.yggdrasil._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import scalaz._
 

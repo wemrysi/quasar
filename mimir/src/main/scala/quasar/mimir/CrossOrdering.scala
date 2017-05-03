@@ -20,7 +20,7 @@
 
 package quasar.mimir
 
-import blueeyes._
+import quasar.blueeyes._
 import quasar.yggdrasil.TableModule
 
 import scala.collection.mutable

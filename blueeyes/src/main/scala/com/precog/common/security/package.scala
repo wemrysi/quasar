@@ -19,8 +19,8 @@
  */
 package com.precog.common
 
-import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.Extractor._
+import quasar.blueeyes._, json._, serialization._
+import quasar.blueeyes.json.serialization.Extractor._
 
 import scalaz._
 import scalaz.syntax.bifunctor._

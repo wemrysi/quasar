@@ -22,8 +22,8 @@ package security
 
 import accounts.AccountId
 
-import blueeyes._
-import blueeyes.util.Clock
+import quasar.blueeyes._
+import quasar.blueeyes.util.Clock
 
 import scala.collection.mutable
 

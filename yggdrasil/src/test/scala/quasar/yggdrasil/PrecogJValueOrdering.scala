@@ -19,7 +19,7 @@
  */
 package quasar.yggdrasil
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 
 /**

@@ -20,7 +20,7 @@
 package com.precog
 package common
 
-import blueeyes._
+import quasar.blueeyes._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.order._
 

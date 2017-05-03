@@ -23,7 +23,7 @@ package ingest
 import accounts.AccountId
 import security._
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import Extractor._
 import scalaz._, Scalaz._, Validation._

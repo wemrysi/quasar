@@ -26,7 +26,7 @@ import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._
 
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 

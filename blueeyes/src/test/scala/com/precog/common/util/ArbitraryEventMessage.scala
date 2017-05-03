@@ -21,7 +21,7 @@ package com.precog.common
 package ingest
 
 import security._
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import quasar.precog.JsonTestSupport._, Gen._
 
 trait ArbitraryEventMessage {

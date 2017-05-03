@@ -20,9 +20,9 @@
 package quasar.yggdrasil
 package util
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
-import blueeyes.json._
+import quasar.blueeyes.json._
 
 object CPathUtils {
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {

@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package vfs
 
-import blueeyes.json.serialization.Extractor
+import quasar.blueeyes.json.serialization.Extractor
 import scalaz._
 import scalaz.NonEmptyList._
 

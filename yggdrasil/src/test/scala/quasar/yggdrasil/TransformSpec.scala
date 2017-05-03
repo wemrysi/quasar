@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 
 import com.precog.common._
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scala.util.Random
 import org.scalacheck.{ Gen, Arbitrary }
 import quasar.bytecode._

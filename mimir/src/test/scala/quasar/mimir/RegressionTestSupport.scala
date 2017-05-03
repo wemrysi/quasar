@@ -22,10 +22,10 @@ package quasar.mimir
 import scala.util.Random
 import scala.collection.mutable
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import quasar.yggdrasil.util.CPathUtils._
-import blueeyes.json._
+import quasar.blueeyes.json._
 
 trait RegressionTestSupport[M[+_]] {
   def makeTBounded: Double = {

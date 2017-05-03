@@ -20,9 +20,9 @@
 package com.precog.common
 package ingest
 
-import blueeyes._, json._
-import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.Extractor._
+import quasar.blueeyes._, json._
+import quasar.blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes.json.serialization.Extractor._
 import scalaz._
 import quasar.precog.TestSupport._
 

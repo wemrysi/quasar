@@ -22,7 +22,7 @@ package table
 package cf
 
 import quasar.precog._
-import blueeyes._
+import quasar.blueeyes._
 
 object util {
 

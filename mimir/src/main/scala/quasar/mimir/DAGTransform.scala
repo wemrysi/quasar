@@ -20,7 +20,7 @@
 
 package quasar.mimir
 
-import blueeyes._
+import quasar.blueeyes._
 
 trait DAGTransform extends DAG {
   import dag._

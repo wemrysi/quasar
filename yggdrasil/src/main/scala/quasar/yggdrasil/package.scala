@@ -1,6 +1,6 @@
 package quasar
 
-import blueeyes._
+import quasar.blueeyes._
 import scalaz._, Scalaz._, Ordering._
 
 package object yggdrasil {

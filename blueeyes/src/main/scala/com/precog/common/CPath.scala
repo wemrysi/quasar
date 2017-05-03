@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
@@ -178,7 +178,7 @@ case object CPathArray extends CPathNode {
 }
 
 object CPath {
-  import blueeyes.json._
+  import quasar.blueeyes.json._
   implicit val CPathDecomposer: Decomposer[CPath] = new Decomposer[CPath] {
     def decompose(cpath: CPath): JValue = JString(cpath.toString)
   }

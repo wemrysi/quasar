@@ -19,7 +19,7 @@
  */
 package quasar.yggdrasil.jdbm3
 
-import blueeyes._
+import quasar.blueeyes._
 import java.io.{ DataInput, DataOutput }
 import org.apache.jdbm.Serializer
 

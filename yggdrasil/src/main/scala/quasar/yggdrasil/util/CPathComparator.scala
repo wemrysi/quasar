@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package util
 
 import quasar.precog._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import quasar.yggdrasil.table._
 import scalaz._, Scalaz._

@@ -1,6 +1,6 @@
 package com.precog.util
 
-import blueeyes._
+import quasar.blueeyes._
 import quasar.precog._, TestSupport._
 import scalaz._
 

@@ -20,10 +20,10 @@
 package com.precog.common
 package ingest
 
-import blueeyes._
+import quasar.blueeyes._
 import security._
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._
 import scalaz._, Scalaz._, Validation._
 

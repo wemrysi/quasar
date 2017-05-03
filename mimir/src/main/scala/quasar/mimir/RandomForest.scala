@@ -27,7 +27,7 @@ import quasar.precog._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import quasar.bytecode._
 import com.precog.util._

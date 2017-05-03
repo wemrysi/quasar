@@ -20,7 +20,7 @@
 package com.precog.common
 package security
 
-import blueeyes._
+import quasar.blueeyes._
 import service._
 import com.precog.common.accounts.{ Account, AccountId }
 

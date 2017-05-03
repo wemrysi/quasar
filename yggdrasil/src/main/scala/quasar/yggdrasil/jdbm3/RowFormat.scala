@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package jdbm3
 
 import table._
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
 import com.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._

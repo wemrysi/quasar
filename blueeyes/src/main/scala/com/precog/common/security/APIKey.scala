@@ -20,7 +20,7 @@
 package com.precog.common
 package security
 
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import scalaz._, Scalaz._
 

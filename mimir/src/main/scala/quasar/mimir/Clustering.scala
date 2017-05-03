@@ -24,7 +24,7 @@ import quasar.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import com.precog.common._
-import blueeyes._
+import quasar.blueeyes._
 import scalaz._, Scalaz._
 
 trait KMediansCoreSetClustering {

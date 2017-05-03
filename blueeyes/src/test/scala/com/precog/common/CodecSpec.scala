@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.util.{ BitSetUtil, ByteBufferPool, RawBitSet }
 import org.scalacheck.{Shrink, Arbitrary, Gen}
 import quasar.precog._, TestSupportWithArb._

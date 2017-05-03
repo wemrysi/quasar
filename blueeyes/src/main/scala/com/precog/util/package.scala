@@ -19,7 +19,7 @@
  */
 package com.precog
 
-import blueeyes._
+import quasar.blueeyes._
 import java.util.Comparator
 import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicInteger

@@ -33,7 +33,7 @@ import com.precog.common.security._
 import quasar.bytecode._
 
 import scalaz._, Scalaz._, Validation._
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import quasar.precog.TestSupport._
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]

@@ -17,17 +17,18 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
-package security
+package com.precog.common.security
 
-import blueeyes._
-import scalaz._
+import com.precog.common._
+import quasar.blueeyes._
 import quasar.precog.TestSupport._
+
+import scalaz._
 
 class AccessControlSpec extends Specification {
   import Permission._
 
-  val apiKeyManager = new InMemoryAPIKeyManager[Id](blueeyes.util.Clock.System)
+  val apiKeyManager = new InMemoryAPIKeyManager[Id](quasar.blueeyes.util.Clock.System)
   import apiKeyManager._
 
   "access control" should {

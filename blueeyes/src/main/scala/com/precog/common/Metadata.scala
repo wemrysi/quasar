@@ -19,11 +19,11 @@
  */
 package com.precog.common
 
-import blueeyes._, json._
-import blueeyes.json.serialization.{ Extractor, Decomposer }
-import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.Versioned._
+import quasar.blueeyes._, json._
+import quasar.blueeyes.json.serialization.{ Extractor, Decomposer }
+import quasar.blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes.json.serialization.Extractor._
+import quasar.blueeyes.json.serialization.Versioned._
 import scalaz._
 
 sealed trait MetadataType

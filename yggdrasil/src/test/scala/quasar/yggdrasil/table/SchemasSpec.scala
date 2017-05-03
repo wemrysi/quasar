@@ -21,7 +21,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.bytecode._
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 

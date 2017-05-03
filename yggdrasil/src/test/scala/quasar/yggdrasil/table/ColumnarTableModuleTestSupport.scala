@@ -20,11 +20,11 @@
 package quasar.yggdrasil
 package table
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import com.precog.util._
 
-import blueeyes.json._
+import quasar.blueeyes.json._
 import scalaz._
 import scalaz.syntax.std.boolean._
 

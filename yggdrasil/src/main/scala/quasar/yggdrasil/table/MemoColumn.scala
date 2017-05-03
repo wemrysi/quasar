@@ -20,7 +20,7 @@
 package quasar.yggdrasil
 package table
 
-import blueeyes._
+import quasar.blueeyes._
 
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {
   private[this] var row0          = -1

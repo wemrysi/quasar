@@ -21,11 +21,11 @@ package com.precog.common.security
 
 import com.precog.common.accounts.AccountId
 
-import blueeyes.json._
-import blueeyes.json.serialization._
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.IsoSerialization._
-import blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes.json._
+import quasar.blueeyes.json.serialization._
+import quasar.blueeyes.json.serialization.Extractor._
+import quasar.blueeyes.json.serialization.IsoSerialization._
+import quasar.blueeyes.json.serialization.DefaultSerialization._
 
 import scalaz._
 import scalaz.syntax.std.boolean._

@@ -28,7 +28,7 @@ import quasar.bytecode._
 import com.precog.util.RingDeque
 
 import TransSpecModule._
-import blueeyes._, json._
+import quasar.blueeyes._, json._
 
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer

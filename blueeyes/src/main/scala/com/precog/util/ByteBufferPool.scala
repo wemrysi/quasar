@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import java.lang.ref.SoftReference
 
-import blueeyes._
+import quasar.blueeyes._
 import scalaz._
 import scalaz.State
 

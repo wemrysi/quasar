@@ -19,8 +19,8 @@
  */
 package com.precog.common
 
-import blueeyes._, json._
-import blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes._, json._
+import quasar.blueeyes.json.serialization.DefaultSerialization._
 import scalaz._, Scalaz._
 import quasar.precog._, JsonTestSupport._, Gen._
 

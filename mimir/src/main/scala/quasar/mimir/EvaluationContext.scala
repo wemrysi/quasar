@@ -21,7 +21,7 @@
 package quasar.mimir
 
 import quasar.yggdrasil._
-import blueeyes._, json._, serialization._
+import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import com.precog.common._, security._, accounts._
 

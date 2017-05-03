@@ -20,7 +20,7 @@
 package com.precog.common
 package security
 
-import blueeyes._
+import quasar.blueeyes._
 import org.slf4s.Logging
 
 import scalaz._

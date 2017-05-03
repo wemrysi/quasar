@@ -19,7 +19,7 @@
  */
 package com.precog.util
 
-import blueeyes._
+import quasar.blueeyes._
 
 object BitSetUtil {
   class BitSetOperations(private val bs: BitSet) extends AnyVal {

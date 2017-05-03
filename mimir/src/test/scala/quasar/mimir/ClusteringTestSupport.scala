@@ -21,7 +21,7 @@ package quasar.mimir
 
 import scala.util.Random._
 
-import blueeyes._
+import quasar.blueeyes._
 import com.precog.common._
 import com.precog.util.IOUtils
 import spire.implicits._
