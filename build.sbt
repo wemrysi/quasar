@@ -468,6 +468,8 @@ lazy val blueeyes = project.setup
 
 lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes)
