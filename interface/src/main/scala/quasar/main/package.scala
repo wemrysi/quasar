@@ -371,6 +371,6 @@ package object main {
               e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
               _.some.right))
       jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
-      _  <- EitherT.right(jʹ.cata(ConfigOps.jsonToFile(_, cfgFile), Task.now(())))
+      _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

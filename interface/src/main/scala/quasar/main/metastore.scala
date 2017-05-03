@@ -139,15 +139,10 @@ object metastore {
       DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
 
     val migrateMounts: ConnectionIO[Unit] =
-      jCfg.cata(
+      jCfg.traverse_(
         mountingsConfigDecodeJson.decodeJson(_).fold(
           { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
-          _.cata(
-            m => m.toMap.toList.traverse {
-              case (p, m) => MetaStoreAccess.insertMount(p, m)
-            }.void,
-            ().η[ConnectionIO])),
-        ().η[ConnectionIO])
+          _.traverse_(_.toMap.toList.traverse((MetaStoreAccess.insertMount _).tupled).void)))
 
     val op: ConnectionIO[Option[Json]] =
       for {
@@ -155,7 +150,7 @@ object metastore {
         _   <- schema.updateToLatest
         r   <- ver.isEmpty.whenM(migrateMounts)
       } yield ver.isEmpty.fold(
-        jCfg ∘ (j => j.obj.cata(o => jObject(o - mntsFieldName), j)),
+        jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
 
     EitherT(transactor.trans(op).attempt ∘ (
