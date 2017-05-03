@@ -1,5 +1,4 @@
-package quasar
-package precog
+package quasar.precog
 
 import scala.collection.mutable.Builder
 import scalaz._

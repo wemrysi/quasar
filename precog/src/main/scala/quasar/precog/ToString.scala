@@ -1,5 +1,4 @@
-package quasar
-package precog
+package quasar.precog
 
 trait ToString {
   def to_s: String

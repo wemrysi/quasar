@@ -1,5 +1,4 @@
-package quasar
-package precog
+package quasar.precog
 
 final case class JPath(nodes: List[JPathNode]) extends ToString {
   def to_s: String = nodes match {
