@@ -42,6 +42,13 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
     "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
+  echo "Compiling precog — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN {blueeyes,precog,mimir,yggdrasil}/test:compile
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
+  fi
+
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders test exclusive:test
@@ -73,6 +80,13 @@ elif [[ "${JOB_NUM##*.}" == "5" ]]; then
     "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
   fi
 
+  echo "Compiling precog — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE {blueeyes,precog,mimir,yggdrasil}/test:compile
+  else
+    "$SBT" ++$TRAVIS_SCALA_VERSION $CLEAN
+  fi
+
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE test exclusive:test $COVERAGE_REPORT
@@ -82,6 +96,11 @@ else
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN connector/test:compile
+  fi
+
+  echo "Compiling precog — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
+  if [[ ${TRAVIS:-} ]]; then
+    travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN {blueeyes,precog,mimir,yggdrasil}/test:compile
   fi
 
   # Not the first job in Travis; run only integration tests (no sense
