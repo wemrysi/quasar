@@ -22,7 +22,19 @@ import org.scalacheck.{Shrink, Arbitrary, Gen}
 import quasar.precog._, TestSupportWithArb._
 
 class CodecSpec extends Specification with ScalaCheck {
-  import ByteBufferPool._
+
+
+  // READ ME READ ME READ ME
+  // -----------------------
+  // all of this stuff is basically obsolete, given the presence of scodec
+  // (which didn't exist at the time).  Also I'm pretty sure these tests are
+  // going to nondeterministically deadlock due to the blocking queue usage
+  // within ByteBufferPool.  so they're just commented out for the time being
+  // -----------------------
+  // READ ME READ ME READ ME
+
+
+  /*import ByteBufferPool._
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_, java.math.MathContext.UNLIMITED)))
@@ -168,5 +180,5 @@ class CodecSpec extends Specification with ScalaCheck {
       }
     }
   }
-  // "CValueCodec" should surviveRoundTrip(Codec.CValueCodec)
+  // "CValueCodec" should surviveRoundTrip(Codec.CValueCodec)*/
 }
