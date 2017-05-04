@@ -16,6 +16,18 @@
 
 package quasar.precog;
 
+/*
+ * Javolution - Java(TM) Solution for Real-Time and Embedded Systems
+ * Copyright (C) 2008 - Javolution (http://javolution.org/)
+ * All rights reserved.
+ *
+ * Permission to use, copy, modify, and distribute this software is
+ * freely granted, provided that this notice is preserved.
+ *
+ * 20-sep-2012:
+ * copied to quasar.precog.util.BitSet to allow some small additions to the API.
+ */
+
 import java.util.Collection;
 import java.util.Set;
 
