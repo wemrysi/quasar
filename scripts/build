@@ -18,8 +18,6 @@ source "$(dirname $0)/constants"
 TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 TRAVIS_MAX_DOC_MINS=20
 
-JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
-
 # if we're building a pull request, DON'T clean and use the cache instead
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
   CLEAN=clean
@@ -32,7 +30,7 @@ else
 fi
 
 # only do code coverage on job .1 AND on a non-pull request
-if [[ "${JOB_NUM##*.}" == "1" ]]; then
+if [[ $CONNECTOR == "mongodb_2_6" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
@@ -65,7 +63,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   echo "Result of Quasar JAR test: $TEST_STATUS"
 
   exit $TEST_STATUS
-elif [[ "${JOB_NUM##*.}" == "5" ]]; then
+elif [[ $CONNECTOR == "mongodb_3_0" ]]; then
   echo "Compiling connector — could take up to $TRAVIS_MAX_CONNECTOR_COMPILE_MINS minutes"
   if [[ ${TRAVIS:-} ]]; then
     travis_wait $TRAVIS_MAX_CONNECTOR_COMPILE_MINS "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION $CLEAN $COVERAGE connector/test:compile

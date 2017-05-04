@@ -134,6 +134,9 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
   implicit lazy val stringRenderTree: RenderTree[String] =
     RenderTree.fromShow[String]("String")
 
+  implicit lazy val symbolRenderTree: RenderTree[Symbol] =
+    RenderTree.fromShow[Symbol]("Symbol")
+
   implicit def pathRenderTree[B,T,S]: RenderTree[pathy.Path[B,T,S]] =
     // NB: the implicit Show instance in scope here ends up being a circular
     // call, so an explicit reference to pathy's Show is needed.

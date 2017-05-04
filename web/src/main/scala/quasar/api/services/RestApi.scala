@@ -57,7 +57,8 @@ object RestApi {
       "/metadata/fs" -> metadata.service[S],
       "/mount/fs"    -> mount.service[S],
       "/query/fs"    -> query.execute.service[S],
-      "/invoke/fs"   -> invoke.service[S]
+      "/invoke/fs"   -> invoke.service[S],
+      "/schema/fs"   -> analyze.schema.service[S]
     )
 
   val additionalServices: Map[String, HttpService] =

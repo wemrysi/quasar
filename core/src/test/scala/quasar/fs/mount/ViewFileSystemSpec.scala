@@ -19,6 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 
 import quasar._
+import quasar.common.JoinType
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
@@ -652,15 +653,17 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val vs = Map[AFile, Fix[Sql]](
         vp -> unsafeParse("select * from `/zips`"))
 
-      val q = InnerJoin(
+      val q = lpf.join(
         lpf.read(vp),
         lpf.read(vp),
-        lpf.constant(Data.Bool(true))).embed
+        JoinType.Inner,
+        JoinCondition('__leftJoin0, '__rightJoin1, lpf.constant(Data.Bool(true))))
 
-      val exp = InnerJoin(
+      val exp = lpf.join(
         Squash(lpf.read(zp)).embed,
         Squash(lpf.read(zp)).embed,
-        lpf.constant(Data.Bool(true))).embed
+        JoinType.Inner,
+        JoinCondition('__leftJoin2, '__rightJoin3, lpf.constant(Data.Bool(true))))
 
       resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTreeEqual(exp) }
     }

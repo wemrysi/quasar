@@ -21,6 +21,7 @@ import quasar._, Planner._
 import quasar.common.JoinType
 import quasar.contrib.matryoshka._
 import quasar.ejson._
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFunc._
@@ -46,7 +47,7 @@ import shapeless.{nat, Sized}
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
 class Transform
-  [T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT,
+  [T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: Traverse: Normalizable]
   (implicit
     C:  Coalesce.Aux[T, F, F],
@@ -304,93 +305,11 @@ class Transform
     }
   }
 
-  private def invokeThetaJoin(values: Func.Input[Target[F], nat._3], tpe: JoinType)
-      : PlannerError \/ Target[F] = {
-    val joinError: PlannerError \/ (ThetaJoin[T[F]] \/ JoinFunc) = {
-      val join =
-        QC.inj(reifyResult(values(2).ann, values(2).value))
-          .embed
-          .transCata[T[F]](rewrite.normalize)
-          .project
-
-      // FIXME: #1539 This won’t work where we join a collection against itself
-      TJ.prj(join).fold(
-        QC.prj(join) match {
-          case Some(Map(_, mf)) if mf.count ≟ 0 =>
-            mf.as[JoinSide](LeftSide).right[ThetaJoin[T[F]]].right[PlannerError]
-          case _ =>
-            InternalError.fromMsg(s"non theta join condition found: ${values(2).value.shows} with provenance: ${values(2).ann.shows}").left[ThetaJoin[T[F]] \/ JoinFunc]
-        })(
-        _.left[JoinFunc].right[PlannerError])
-    }
-
-    joinError.flatMap {
-      case -\/(ThetaJoin(condSrc, _condL, _condR, BoolLit(true), JoinType.Inner, cond)) =>
-
-        val SrcMerge(inSrc, _inL, _inR): SrcMerge[T[F], FreeQS] =
-          merge.mergeT(values(0).value, values(1).value)
-
-        val SrcMerge(resultSrc, inAccess, condAccess): SrcMerge[T[F], FreeQS] =
-          merge.mergeT(inSrc, condSrc)
-
-        val inL: FreeQS = rebase(_inL, inAccess)
-        val inR: FreeQS = rebase(_inR, inAccess)
-
-        val condL: FreeQS = rebase(_condL, condAccess)
-        val condR: FreeQS = rebase(_condR, condAccess)
-
-        val Ann(leftBuckets, leftValue) = values(0).ann
-        val Ann(rightBuckets, rightValue) = values(1).ann
-
-        // NB: #1556 This is a magic structure. Improve LogicalPlan to not imply this structure.
-        val combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
-          Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
-
-        merge.tryMergeBranches(rewrite)(inL, inR, condL, condR).map {
-          case (resL, resR) =>
-            // FIXME: The provenances are not correct here - need to use `resL` and `resR` provs
-            Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
-              TJ.inj(ThetaJoin(
-                resultSrc,
-                resL.src,
-                resR.src,
-                cond.flatMap {
-                  case LeftSide => resL.rval.as(LeftSide)
-                  case RightSide => resR.rval.as(RightSide)
-                },
-                tpe,
-                combine.flatMap {
-                  case LeftSide => resL.lval.as(LeftSide)
-                  case RightSide => resR.lval.as(RightSide)
-                })).embed)
-        }
-
-      case -\/(tj) =>
-        InternalError.fromMsg(s"incompatible theta join found with condition ${tj.on.shows} and join type ${tj.f}").left[Target[F]]
-
-      case \/-(cond) =>
-        val merged: SrcMerge[T[F], FreeQS] = merge.mergeT(values(0).value, values(1).value)
-
-        val Ann(leftBuckets, leftValue) = values(0).ann
-        val Ann(rightBuckets, rightValue) = values(1).ann
-
-        // NB: #1556 This is a magic structure. Improve LogicalPlan to not imply this structure.
-        val combine: JoinFunc = Free.roll(ConcatMaps(
-          Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), leftValue.as(LeftSide))),
-          Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), rightValue.as(RightSide)))))
-
-        // FIXME: The provenances are not correct here
-        Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
-          TJ.inj(ThetaJoin(
-            merged.src,
-            merged.lval,
-            merged.rval,
-            cond,
-            tpe,
-            combine)).embed).right[PlannerError]
-    }
-  }
+  // NB: #1556 This is a magic structure. Improve LogicalPlan to not imply this structure.
+  private def magicJoinStructure(left: FreeMap, right: FreeMap): JoinFunc =
+    Free.roll(ConcatMaps(
+      Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), left.as(LeftSide))),
+      Free.roll(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), right.as(RightSide)))))
 
   private def ProjectTarget(prefix: Target[F], field: T[EJson]): Target[F] = {
     val Ann(provs, values) = prefix.ann
@@ -649,14 +568,41 @@ class Transform
           JoinType.LeftOuter,
           LeftSideF)).embed).right
 
-    case lp.InvokeUnapply(func @ TernaryFunc(Transformation, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
-      invokeThetaJoin(
-        Func.Input3(a1, a2, a3),
-        func match {
-          case set.InnerJoin      => JoinType.Inner
-          case set.LeftOuterJoin  => JoinType.LeftOuter
-          case set.RightOuterJoin => JoinType.RightOuter
-          case set.FullOuterJoin  => JoinType.FullOuter
-        })
+    case lp.JoinSideName(name) =>
+      Target(
+        Ann(Nil, Free.roll[MapFunc, Hole](JoinSideName[T, FreeMap](name))),
+        QC.inj(Unreferenced[T, T[F]]()).embed).right
+
+    case lp.Join(left, right, joinType, lp.JoinCondition(lName, rName, func)) =>
+      val SrcMerge(src, lBranch, rBranch) = merge.mergeT(left.value, right.value)
+
+      val Ann(leftBuckets, leftValue) = left.ann
+      val Ann(rightBuckets, rightValue) = right.ann
+
+      val reifiedCondition: F[T[F]] =
+        QC.inj(reifyResult(func.ann, func.value)).embed
+          .transCata[T[F]](rewrite.normalize).project
+
+      val result: PlannerError \/ JoinFunc =
+        QC.prj(reifiedCondition) match {
+          case Some(Map(_, mf)) if mf.count ≟ 0 =>
+            mf.as[JoinSide](LeftSide)
+              .transCata[JoinFunc](replaceJoinSides[T](lName, rName))
+              .right[PlannerError]
+          case _ =>
+            InternalError.fromMsg(s"non-mapping join condition found").left[JoinFunc]
+        }
+
+      result.map(cond =>
+        Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
+          TJ.inj(ThetaJoin(src,
+            lBranch,
+            rBranch,
+            cond >>= {
+              case LeftSide => leftValue >> LeftSideF
+              case RightSide => rightValue >> RightSideF
+            },
+            joinType,
+            magicJoinStructure(leftValue, rightValue))).embed))
   }
 }

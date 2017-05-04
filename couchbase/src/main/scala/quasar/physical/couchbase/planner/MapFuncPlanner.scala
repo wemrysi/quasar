@@ -194,6 +194,8 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]
     case MF.Undefined() =>
       undefined.η[M]
+    case MF.JoinSideName(n) =>
+      unexpectedP(s"JoinSideName(${n.shows})")
 
     // array
     case MF.Length(a1) =>

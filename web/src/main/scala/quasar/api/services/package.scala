@@ -18,20 +18,55 @@ package quasar.api
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.contrib.argonaut._
 import quasar.effect.Failure
+import quasar.ejson.{EJson, JsonCodec}
 import quasar.fp.numeric._
 
 import argonaut._, Argonaut._
 import eu.timepit.refined.auto._
+import matryoshka.Recursive
+import matryoshka.implicits._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
+import scalaz.stream.{Process, Process1, process1}
 
 package object services {
   import Validation.FlatMap._
+
+  /** Set the `Content-Type` of a response to `application/json;mode=ejson`. */
+  def contentJsonEncodedEJson[S[_]]: QResponse[S] => QResponse[S] = {
+    val ejsAsJs   = MediaType.`application/json`.withExtensions(Map("mode" -> "ejson"))
+    val ctype     = `Content-Type`(ejsAsJs, Some(Charset.`UTF-8`))
+    QResponse.headers.modify(_.put(ctype))
+  }
+
+  // TODO: Add `Content-Disposition` support?
+  def ejsonResponse[S[_], E, J](
+    ejson: Process[EitherT[Free[S, ?], E, ?], J]
+  )(implicit
+    J : Recursive.Aux[J, EJson],
+    S0: Failure[E, ?] :<: S,
+    S1: Task :<: S
+  ): QResponse[S] = {
+    val js = ejson.map(_.cata[Json](JsonCodec.encodeƒ[Json]))
+    contentJsonEncodedEJson(QResponse.streaming(js |> jsonArrayLines))
+  }
+
+  // TODO: Handle when response isn't an object or array.
+  def firstEJsonResponse[S[_], E, J](
+    ejson: Process[EitherT[Free[S, ?], E, ?], J]
+  )(implicit
+    J : Recursive.Aux[J, EJson],
+    S0: Failure[E, ?] :<: S,
+    S1: Task :<: S
+  ): QResponse[S] = {
+    val js = ejson.take(1).map(_.cata[Json](JsonCodec.encodeƒ[Json]).spaces2)
+    contentJsonEncodedEJson(QResponse.streaming(js))
+  }
 
   def formattedDataResponse[S[_], E](
     format: MessageFormat,
@@ -44,6 +79,17 @@ package object services {
     QResponse.headers.modify(
       _.put(ctype) ++ format.disposition.toList
     )(QResponse.streaming(format.encode[EitherT[Free[S,?], E,?]](data)))
+  }
+
+  /** Transform a stream of `Json` into a stream of text representing the lines
+    * of a file containing a JSON array of the values.
+    */
+  val jsonArrayLines: Process1[Json, String] = {
+    val lineSep = "\r\n"
+    process1.lift((_: Json).nospaces)
+      .intersperse("," + lineSep)
+      .prepend(List("[" + lineSep))
+      .append(Process.emit(lineSep + "]" + lineSep))
   }
 
   def limitOrInvalid(

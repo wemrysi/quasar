@@ -8,6 +8,7 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
+  private val algebraVersion           = "0.7.0"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.10.4"
   private val jacksonVersion           = "2.4.4"
@@ -19,12 +20,15 @@ object Dependencies {
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
+  private val spireVersion             = "0.14.1"
 
   def foundation = Seq(
     CommonDependencies.scalaz.core,
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
+    "org.typelevel" %% "algebra"     % algebraVersion,
+    "org.typelevel" %% "spire"       % spireVersion,
     CommonDependencies.argonaut.argonaut,
     CommonDependencies.argonaut.scalaz,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
@@ -34,7 +38,9 @@ object Dependencies {
     CommonDependencies.shapeless.shapeless,
     CommonDependencies.scalacheck.scalacheck                  % Test,
     CommonDependencies.simulacrum.simulacrum                  % Test,
+    "org.typelevel" %% "algebra-laws"    % algebraVersion     % Test,
     "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
+    "org.typelevel" %% "spire-laws"      % spireVersion       % Test,
     "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
     CommonDependencies.scalaz.scalacheckBinding               % Test,
     CommonDependencies.typelevel.shapelessScalacheck          % Test,
@@ -43,7 +49,8 @@ object Dependencies {
 
   def frontend = Seq(
     CommonDependencies.monocle.`macro`,
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "org.typelevel"          %% "algebra-laws"             % algebraVersion  % Test
   )
 
   def ejson = Seq(

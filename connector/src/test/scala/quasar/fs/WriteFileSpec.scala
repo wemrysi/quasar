@@ -21,19 +21,17 @@ import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.contrib.scalaz.stateT._
-import quasar.fp._
+import quasar.contrib.scalaz.foldable._
+import quasar.contrib.scalaz.stream._
 
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz._
-import scalaz.std.vector._
+import scalaz._, Scalaz._
 import scalaz.stream._
-import scalaz.syntax.monad._
 
 /** FIXME: couldn't make this one work with Qspec. */
 class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with FileSystemFixture {
-  import DataArbitrary._, FileSystemError._, PathError._
+  import DataArbitrary._, FileSystemError._, PathError._, InMemory.InMemState
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
 
@@ -56,14 +54,9 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       s"$n should consume input and close write handle when finished" >> prop {
         (f: AFile, xs: Vector[Data]) =>
 
-        val p = wt(f, xs.toProcess).drain ++ read.scanAll(f)
+        val write = wt(f, xs.toProcess).runLogCatch.run
 
-        type Result[A] = FileSystemErrT[MemStateTask,A]
-
-        p.translate[Result](MemTask.interpretT).runLog.run
-          .leftMap(_.wm)
-          .run(emptyMem)
-          .unsafePerformSync must_=== ((Map.empty, \/.right(xs)))
+        Mem.interpret(write).exec(emptyMem).contents must_=== Map(f -> xs)
       }
     }
 
@@ -72,9 +65,10 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
         val wf = writeFailed(Data.Str("foo"), "b/c reasons")
         val ws = Vector(wf) +: xs.tail.as(Vector(partialWrite(1)))
 
-        MemFixTask.runLogWithWrites(ws.toList, write.append(f, xs.toProcess))
-          .run.eval(emptyMem)
-          .unsafePerformSync.toEither must beRight(Vector(wf, partialWrite(xs.length - 1)))
+        val doWrite = write.append(f, xs.toProcess).runLogCatch.run
+
+        Mem.interpretInjectingWriteErrors(doWrite, ws.toList).eval(emptyMem) must_===
+          Vector(wf, partialWrite(xs.length - 1)).right.right
       }
     }
 
@@ -85,42 +79,45 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
                 Process.fail(new RuntimeException("SRCFAIL")) ++
                 ys.toProcess
 
-      val p = write.append(f, src).drain onFailure {
-        case err if err.getMessage == "SRCFAIL" => read.scanAll(f)
-        case err                                => Process.fail(err)
-      }
+      val doWrite = write.append(f, src).runLogCatch.run
 
-      MemTask.runLogEmpty(p).unsafePerformSync.toEither must beRight(xs)
+      Mem.interpret(doWrite).exec(emptyMem).contents must_=== Map(f -> xs)
     }
 
     withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
       s"$n should replace existing file" >> prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-        val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
+        val write = wt(f, ys.toProcess).runLogCatch.run
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(ys)
+        val before = InMemState.fromFiles(Map(f -> xs))
+
+        val after = InMemState.fromFiles(Map(f -> ys))
+
+        Mem.interpret(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
       }
 
       s"$n with empty input should create an empty file" >> prop { f: AFile =>
         // This doesn't work unless it's scala.Nothing. The type alias in Predef will fail.
         //   https://issues.scala-lang.org/browse/SI-9951
         val empty: Process0[Data] = Process.empty[scala.Nothing, Data]
-        val p = wt(f, empty) ++ query.fileExistsM(f).liftM[Process]
+        val write = wt(f, empty).runLogCatch.run
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(Vector(true))
+        val program = write *> query.fileExists(f)
+
+        Mem.interpretEmpty(program) must_=== true
       }
 
       s"$n should leave existing file untouched on failure" >> prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
           val err = writeFailed(Data.Str("bar"), "")
-          val ws = xs.as(Vector()) :+ Vector(err)
-          val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
+          val ws = Vector(err)
+          val write = wt(f, ys.toProcess).runLogCatch.run
 
-          MemFixTask.runLogWithWrites(ws.toList, p).run
-            .leftMap(_.contents.keySet)
-            .run(emptyMem)
-            .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
+          val before = InMemState.fromFiles(Map(f -> xs))
+
+          Mem.interpretInjectingWriteErrors(write, List(ws)).run(before).leftMap(_.contents) must_===
+            ((before.contents, Vector(err).right.right))
         }
       }
     }
@@ -132,31 +129,30 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
                 Process.fail(new RuntimeException("SRCFAIL")) ++
                 ys.toProcess
 
-      val init = write.save(f, zs.toProcess).drain
+      val doWrite = write.save(f, src).runLogCatch.run
 
-      val p = write.save(f, src).drain onFailure {
-        case err if err.getMessage == "SRCFAIL" => read.scanAll(f)
-        case err                                => Process.fail(err)
-      }
+      val before = InMemState.fromFiles(Map(f -> zs))
 
-      MemTask.runLogEmpty(init ++ p).unsafePerformSync.toEither must beRight(zs)
+      Mem.interpret(doWrite).exec(before).contents must_=== before.contents
     }
 
     withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
       s"$n should fail if file exists" >> prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-        val p = write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)
+        val doWrite = wt(f, ys.toProcess).runLogCatch.run
 
-        MemTask.runLogEmpty(p).unsafePerformSync.toEither must beLeft(pathErr(pathExists(f)))
+        val before = InMemState.fromFiles(Map(f -> xs))
+
+        Mem.interpret(doWrite).run(before) must_=== ((before, pathErr(pathExists(f)).left))
       }
 
       s"$n should consume all input into a new file" >> prop {
         (f: AFile, xs: Vector[Data]) =>
 
-        val p = wt(f, xs.toProcess) ++ read.scanAll(f)
+        val write = wt(f, xs.toProcess).runLogCatch.run
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(xs)
+        Mem.interpret(write).run(emptyMem).leftMap(_.contents) must_=== ((Map(f -> xs), Vector.empty.right.right))
       }
     }
 
@@ -164,29 +160,33 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       s"$n should fail if the file does not exist" >> prop {
         (f: AFile, xs: Vector[Data]) =>
 
-        MemTask.runLogEmpty(wt(f, xs.toProcess))
-          .unsafePerformSync.toEither must beLeft(pathErr(pathNotFound(f)))
+        Mem.interpretEmpty(wt(f, xs.toProcess).runLogCatch.run)
+          .toEither must beLeft(pathErr(pathNotFound(f)))
       }
 
       s"$n should leave the existing file untouched on failure" >> prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
           val err = writeFailed(Data.Int(42), "")
-          val ws = xs.as(Vector()) :+ Vector(err)
-          val p = (write.append(f, xs.toProcess) ++ wt(f, ys.toProcess)).drain ++ read.scanAll(f)
+          // We need to introduce an error on the first write since `replaceWithThese` only does one write
+          val ws = Vector(err)
+          val write = wt(f, ys.toProcess).runLogCatch.run
 
-          MemFixTask.runLogWithWrites(ws.toList, p).run
-            .leftMap(_.contents.keySet)
-            .run(emptyMem)
-            .unsafePerformSync must_=== ((Set(f), \/.right(xs)))
+          val before = InMemState.fromFiles(Map(f -> xs))
+
+          Mem.interpretInjectingWriteErrors(write, List(ws))
+            .run(before).leftMap(_.contents) must_=== ((before.contents, Vector(err).right.right))
         }
       }
 
       s"$n should overwrite the existing file with new data" >> prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
 
-        val p = write.save(f, xs.toProcess) ++ wt(f, ys.toProcess) ++ read.scanAll(f)
+        val write = wt(f, ys.toProcess).runLogCatch.run
 
-        MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(ys)
+        val before = InMemState.fromFiles(Map(f -> xs))
+        val after  = InMemState.fromFiles(Map(f -> ys))
+
+        Mem.interpret(write).run(before).leftMap(_.contents) must_=== ((after.contents, Vector.empty.right.right))
       }
     }
   }
