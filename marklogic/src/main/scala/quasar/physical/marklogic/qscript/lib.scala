@@ -25,7 +25,6 @@ import quasar.physical.marklogic.xquery._
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
-import eu.timepit.refined.api.Refined
 import scalaz.{Bind, Functor, Monad}
 import scalaz.syntax.monad._
 
@@ -128,30 +127,6 @@ object lib {
       }
     })
 
-  // qscript:comp-eq($x as item()*, $y as item()*) as xs:boolean?
-  def compEq[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("eq", _ eq _, fn.False)
-
-  // qscript:comp-ne($x as item()*, $y as item()*) as xs:boolean?
-  def compNe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("ne", _ ne _, fn.True)
-
-  // qscript:comp-lt($x as item()*, $y as item()*) as xs:boolean?
-  def compLt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("lt", _ lt _, emptySeq)
-
-  // qscript:comp-le($x as item()*, $y as item()*) as xs:boolean?
-  def compLe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("le", _ le _, emptySeq)
-
-  // qscript:comp-gt($x as item()*, $y as item()*) as xs:boolean?
-  def compGt[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("gt", _ gt _, emptySeq)
-
-  // qscript:comp-ge($x as item()*, $y as item()*) as xs:boolean?
-  def compGe[F[_]: Bind: PrologW]: F[FunctionDecl2] =
-    mkComparisonFunction[F]("ge", _ ge _, emptySeq)
-
   // qscript:concat($x as item()?, $y as item()?) as item()?
   def concat[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     qs.declare("concat") flatMap (_(
@@ -198,14 +173,6 @@ object lib {
             .return_(~n))
         }
       }, src)
-    })
-
-  // qscript:element-left-shift($elt as element()) as item()*
-  def elementLeftShift[F[_]: Functor: PrologW]: F[FunctionDecl1] =
-    qs.declare("element-left-shift") map (_(
-      $("elt") as ST("element()?")
-    ).as(ST("item()*")) { elt =>
-      elt `/` child.element()
     })
 
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
@@ -288,16 +255,6 @@ object lib {
     ).as(ST("node()?")) { item: XQuery =>
       val nodeClause = $("n") as ST("node()") return_ (SP.nodeMetadata(_))
       nodeClause map (ec => typeswitch(item)(ec) default emptySeq)
-    })
-
-  // qscript:project-field($src as element()?, $field as xs:QName?) as item()*
-  def projectField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
-    qs.declare("project-field") map (_(
-      $("src")   as ST("element()?"),
-      $("field") as ST("xs:QName?")
-    ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      val n = $("n")
-      fn.filter(func(n.render)(fn.nodeName(~n) eq field), src `/` child.element())
     })
 
   // qscript:reduce-with(
@@ -516,26 +473,4 @@ object lib {
         }
       }
     })
-
-  ////
-
-  private def mkComparisonFunction[F[_]: Bind: PrologW](opName: String, op: (XQuery, XQuery) => XQuery, recover: XQuery): F[FunctionDecl2] =
-    asDateTime[F].fn flatMap { asDT =>
-      qs.declare(Refined.unsafeApply(s"comp-$opName")) map (_(
-        $("x") as ST.Top,
-        $("y") as ST.Top
-      ).as(ST("xs:boolean?")) { (x: XQuery, y: XQuery) =>
-        try_ {
-          if_(
-            isCastable(x, ST("xs:date"))     or
-            isCastable(y, ST("xs:date"))     or
-            isCastable(x, ST("xs:dateTime")) or
-            isCastable(y, ST("xs:dateTime")))
-          .then_ { op(asDT(x), asDT(y)) }
-          .else_ { op(x, y) }
-        } .catch_($("_")) { _ =>
-          recover
-        }
-      })
-    }
 }
