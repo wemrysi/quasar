@@ -1,7 +1,6 @@
 {
     "name": "project from static concatted array prefix",
     "backends": {
-        "fallback": "skip",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

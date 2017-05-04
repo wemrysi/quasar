@@ -474,6 +474,7 @@ lazy val yggdrasil = project.setup
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
-  .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes)
+  .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
+  .scalacArgs ("-Ypartial-unification")
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)

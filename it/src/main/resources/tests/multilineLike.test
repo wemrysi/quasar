@@ -1,7 +1,6 @@
 {
     "name": "match LIKE with multiple lines",
     "backends": {
-        "fallback": "skip",
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
         "postgresql":     "pending",
