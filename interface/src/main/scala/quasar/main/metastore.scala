@@ -55,7 +55,7 @@ object metastore {
   type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
 
   private val metastorePrompt: String =
-    "Is the metastore db running?"
+    "Is the metastore database running?"
 
   object QErrsTCnxIO {
     def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
