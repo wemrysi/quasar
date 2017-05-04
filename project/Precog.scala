@@ -63,6 +63,7 @@ object Build {
         scalaVersion := "2.11.8",
         scalaOrganization := "org.typelevel",
         logBuffered in Test := false,
+        fork in Test := true,
         unmanagedJars in Compile += (baseDirectory in ThisBuild).value / "lib" / "jdbm-3.0-SNAPSHOT.jar"))
   }
 }
