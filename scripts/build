@@ -22,8 +22,8 @@ TRAVIS_MAX_DOC_MINS=20
 # coverage is disabled until we can have coverage in pull requests too
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
   CLEAN=clean
-  COVERAGE=#coverage
-  COVERAGE_REPORT=#coverageReport
+  COVERAGE= #coverage
+  COVERAGE_REPORT= #coverageReport
 else
   CLEAN=
   COVERAGE=
