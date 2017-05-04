@@ -411,6 +411,9 @@ object QueryFile {
 
     val toCompExec: F ~> CompExecM =
       execToCompExec compose toExec
+
+    val dropPhases: ExecM ~> FileSystemErrT[F, ?] =
+      Hoist[FileSystemErrT].hoist(λ[PhaseResultT[F, ?] ~> F](_.value))
   }
 
   object Transforms {

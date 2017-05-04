@@ -36,4 +36,9 @@ object implicits {
         x.transCata[T](EJson.elideMetadata[T]),
         y.transCata[T](EJson.elideMetadata[T]))
     }
+
+  implicit final class EncodeEJsonOps[A](val self: A) extends scala.AnyVal {
+    def asEJson[J](implicit A: EncodeEJson[A], J: Corecursive.Aux[J, EJson]): J =
+      A.encode[J](self)
+  }
 }
