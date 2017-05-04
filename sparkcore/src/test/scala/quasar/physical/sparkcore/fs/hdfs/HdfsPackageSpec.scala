@@ -21,15 +21,9 @@ import slamdata.Predef._
 import org.apache.spark.SparkConf
 import java.net.URI
 import pathy._, Path._
-import scalaz._, Scalaz._, concurrent.Task
+import scalaz._, concurrent.Task
 
 class HdfsPackageSpec extends quasar.Qspec {
-
-  // TODO move to contrib/show.scala ?
-  implicit val showThrowable = new Show[Throwable] {
-    override def show(t: Throwable): Cord =
-      Cord.stringToCord(t.getMessage)
-  }
 
   "hdfs.generateHdfsFS" should {
     "create a valid HDFS file system if URL is valid" in {
@@ -45,7 +39,7 @@ class HdfsPackageSpec extends quasar.Qspec {
 
     "fail if URL is not valid" in {
       val url = "blabalbab"
-      hdfsUri(url).attempt.map(_.leftMap(_.show.toString)).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")
+      hdfsUri(url).attempt.map(_.leftMap(_.getMessage)).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")
     }
     
   }
