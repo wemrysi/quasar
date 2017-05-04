@@ -144,9 +144,10 @@ object Dependencies {
     CommonDependencies.refined.scalacheck                          % Test
   )
   def precog = Seq(
-    "org.slf4s"      %% "slf4s-api"     % "1.7.13",
-    "org.spire-math" %% "spire"         % "0.13.0",
-    "org.scodec"     %% "scodec-scalaz" % "1.3.0a"
+    "org.slf4s"       %% "slf4s-api"     % "1.7.13",
+    "org.spire-math"  %% "spire"         % "0.13.0",
+    "org.scodec"      %% "scodec-scalaz" % "1.3.0a",
+    "org.apache.jdbm" % "jdbm"           % "3.0-alpha5"
   )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,
