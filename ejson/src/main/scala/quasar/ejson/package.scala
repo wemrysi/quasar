@@ -26,9 +26,7 @@ import scala.Unit
 import scala.collection.immutable.{List, ListMap}
 import scala.math.{BigDecimal, BigInt}
 
-import jawn._
 import matryoshka._
-import matryoshka.data._
 import matryoshka.implicits._
 import monocle.{Iso, Prism}
 import scalaz._
@@ -82,23 +80,6 @@ package object ejson {
   type EJson[A]   = Coproduct[Extension, Common, A]
   val ExtEJson    = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
-
-  val fixParser    = jsonParser[Fix[Json]]
-  val fixParserSeq = fixParser async AsyncParser.ValueStream
-
-  def jawnParser[A](implicit z: Facade[A]): SupportParser[A] =
-    new SupportParser[A] { implicit val facade: Facade[A] = z }
-
-  def jawnParserSeq[A](implicit z: Facade[A]): AsyncParser[A] =
-    jawnParser[A] async AsyncParser.ValueStream
-
-  def jsonParser[T](implicit T: Corecursive.Aux[T, Json]): SupportParser[T] =
-    jawnParser(jsonFacade[T, Json])
-
-  def readJson[A: Facade](in: JsonInput): Try[A]            = JsonInput.readOneFrom(jawnParser[A], in)
-  def readJsonSeq[A: Facade](in: JsonInput): Try[Vector[A]] = JsonInput.readSeqFrom(jawnParser[A], in)
-  def readJsonFix(in: JsonInput): Try[Fix[Json]]            = JsonInput.readOneFrom(fixParser, in)
-  def readJsonFixSeq(in: JsonInput): Try[Vector[Fix[Json]]] = JsonInput.readSeqFrom(fixParser, in)
 
   val TypeKey   = "_ejson.type"
   val SizeKey   = "_ejson.size"

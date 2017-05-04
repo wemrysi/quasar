@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.ejson.{BinaryTag, Common, EJson, Extension, Json, SizeKey, TypeKey}
+import quasar.ejson.{BinaryTag, Common, EJson, Extension, SizeKey, TypeKey}
 import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.fp._
@@ -362,7 +362,6 @@ object Data {
   // TODO: Data should be replaced with EJson. These just exist to bridge the
   //       gap in the meantime.
   val fromEJson: Algebra[EJson, Data] = _.run.fold(fromExtension, fromCommon)
-  val fromJson: Algebra[Json, Data]   = _.run.fold({ case ejson.Obj(xs) => Obj(xs) }, fromCommon)
 
   /** Converts the parts of `Data` that it can, then stores the rest in,
     * effectively, `Free.Pure`.

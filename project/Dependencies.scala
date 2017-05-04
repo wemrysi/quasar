@@ -55,8 +55,7 @@ object Dependencies {
 
   def ejson = Seq(
     CommonDependencies.argonaut.argonaut,
-    "org.spire-math" %% "jawn-parser" % jawnVersion,
-    "org.spire-math" %% "jawn-ast"    % jawnVersion      % Test
+    "org.spire-math" %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"

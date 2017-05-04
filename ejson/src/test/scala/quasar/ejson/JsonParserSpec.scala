@@ -24,7 +24,6 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz.Inject
-import jawn.ast._
 
 final class JsonParserSpec extends Qspec {
   type J = Fix[Json]
@@ -32,19 +31,19 @@ final class JsonParserSpec extends Qspec {
   val C = Inject[Common, Json]
   val O = Inject[Obj,    Json]
 
-  val js = """{
-    "array"  : [ 1, "two" ],
-    "null"   : null,
-    "false"  : false,
-    "true"   : true,
-    "num"    : 3598.345455,
-    "int"    : 998765,
-    "string" : "lorem ipsum"
-  }"""
-
   "EJson JSON parser" should {
     "properly construct values" >> {
-      jsonParser[Fix[Json]].parseUnsafe(js) must_= O(Obj(ListMap(
+      val js = """{
+        "array"  : [ 1, "two" ],
+        "null"   : null,
+        "false"  : false,
+        "true"   : true,
+        "num"    : 3598.345455,
+        "int"    : 998765,
+        "string" : "lorem ipsum"
+      }"""
+
+      jsonParser[Fix[Json], Json].parseUnsafe(js) must_= O(Obj(ListMap(
         "array"  -> C(Arr(List(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))).embed,
         "null"   -> C(Null[J]()).embed,
         "false"  -> C(Bool[J](false)).embed,
@@ -53,14 +52,6 @@ final class JsonParserSpec extends Qspec {
         "int"    -> C(Dec[J](BigDecimal(998765))).embed,
         "string" -> C(Str[J]("lorem ipsum")).embed
       ))).embed
-    }
-
-    "read json values" >> {
-      readJsonFix("""[ 1, "two" ]""").toOption must_=== Some(C(Arr(List(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))).embed)
-      readJsonFixSeq(""" 1 "two" """).toOption must_=== Some(Vector(C(Dec[J](BigDecimal(1))).embed, C(Str[J]("two")).embed))
-
-      readJson[JValue]("1").toOption must_=== Some(JNum(1))
-      readJsonSeq[JValue]("1 2").toOption must_=== Some(Vector(JNum(1), JNum(2)))
     }
   }
 }
