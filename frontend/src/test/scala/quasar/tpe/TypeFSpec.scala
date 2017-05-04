@@ -78,7 +78,7 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "<ejs> <: SimpleType" >> prop { j: J =>
-      simpleTypeOf(j.project) all { st =>
+      simpleTypeOf(j) all { st =>
         isSubtypeOf[J](const[J, T](j).embed, simple[J, T](st).embed)
       }
     }

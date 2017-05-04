@@ -17,11 +17,11 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.config.{ConfigOps, FsFile}
+import quasar.config.{ConfigOps, FsFile, ConfigError}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.db.Schema
-import quasar.fp._
+import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
@@ -367,8 +367,10 @@ package object main {
     schema: Schema[A], tx: Transactor[Task], cfgFile: Option[FsFile]
   ): MainTask[Unit] =
     for {
-      j  <- ConfigOps.jsonFromFile(cfgFile).leftMap(_.shows)
+      j  <- EitherT(ConfigOps.jsonFromFile(cfgFile).fold(
+              e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
+              _.some.right))
       jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
-      _  <- EitherT.right(ConfigOps.jsonToFile(jʹ, cfgFile))
+      _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

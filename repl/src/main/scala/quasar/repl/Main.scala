@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main._, metastore._
+import quasar.main._, config._, metastore._
 import quasar.metastore.{MetaStoreAccess, Schema}
 
 import doobie.syntax.connectionio._
@@ -160,9 +160,7 @@ object Main {
                    FsPath.parseSystemFile(cfg)
                      .toRight(s"Invalid path to config file: $cfg.")
                      .map(some))
-      cfg     <- cfgPath.cata(
-                   cfgOpsCore.fromFile, cfgOpsCore.fromDefaultPaths
-                 ).leftMap(_.shows)
+      cfg     <- loadConfigFile[CoreConfig](cfgPath).liftM[MainErrT]
       msCfg   <- cfg.metastore.cata(
                    Task.now, MetaStoreConfig.configOps.default
                  ).liftM[MainErrT]

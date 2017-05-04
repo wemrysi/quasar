@@ -17,7 +17,7 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.config, config.MetaStoreConfig
+import quasar.config.MetaStoreConfig
 import quasar.console.stdout
 import quasar.contrib.scalaz.catchable._
 import quasar.db, db.{DbConnectionConfig, StatefulTransactor}
@@ -34,7 +34,6 @@ import doobie.syntax.connectionio._
 import eu.timepit.refined.auto._
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
-
 
 object metastore {
   type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
@@ -132,29 +131,32 @@ object metastore {
   }
 
   def initUpdateMetaStore[A](
-    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Json
-  ): MainTask[Json] = {
+    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Option[Json]
+  ): MainTask[Option[Json]] = {
     val mntsFieldName = "mountings"
 
     val mountingsConfigDecodeJson: DecodeJson[Option[MountingsConfig]] =
       DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
 
-    val migrateMounts: ConnectionIO[Unit] =
-      mountingsConfigDecodeJson.decodeJson(jCfg).fold(
-        { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
-        _.cata(
-          m => m.toMap.toList.traverse {
-            case (p, m) => MetaStoreAccess.insertMount(p, m)
-          }.void,
-          ().η[ConnectionIO]))
+    val mountingsConfig: ConnectionIO[Option[MountingsConfig]] =
+      taskToConnectionIO(jCfg.traverse(
+        mountingsConfigDecodeJson.decodeJson(_).fold({
+          case (e, _) => Task.fail(new RuntimeException(
+            s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))},
+          Task.now)
+        ) ∘ (_.unite))
 
-    val op: ConnectionIO[Json] =
+    def migrateMounts(cfg: Option[MountingsConfig]): ConnectionIO[Unit] =
+      cfg.traverse_(_.toMap.toList.traverse_((MetaStoreAccess.insertMount _).tupled))
+
+    val op: ConnectionIO[Option[Json]] =
       for {
+        cfg <- mountingsConfig
         ver <- schema.readVersion
         _   <- schema.updateToLatest
-        r   <- ver.isEmpty.whenM(migrateMounts)
+        _   <- ver.isEmpty.whenM(migrateMounts(cfg))
       } yield ver.isEmpty.fold(
-        jCfg.obj.cata(o => jObject(o - mntsFieldName), jCfg),
+        jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
 
     EitherT(transactor.trans(op).attempt ∘ (
