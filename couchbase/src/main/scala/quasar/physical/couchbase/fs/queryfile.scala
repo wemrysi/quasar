@@ -34,8 +34,6 @@ import quasar.Planner.PlannerError
 import quasar.qscript.{Read => _, _}
 import quasar.RenderTree.ops._
 
-import scala.collection.JavaConverters._
-
 import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
@@ -96,25 +94,22 @@ object queryfile {
     (for {
       n1ql   <- lpToN1ql[T, S](lp) map (_._1)
       r      <- n1qlResults(n1ql)
-      bktCol <- bucketCollectionFromPath(out).liftFE
+      col    <- docTypeFromPath(out).η[Plan[S, ?]]
       docs   <- r.map(DataCodec.render).unite.traverse(d => GenUUID.Ops[S].asks(uuid =>
                   JsonDocument.create(
                     uuid.toString,
                     JsonObject
                       .create()
-                      .put("type", bktCol.collection)
+                      .put("type", col.v)
                       .put("value", jsonTranscoder.stringToJsonObject(d)))
                 )).liftF
       ctx    <- Read.Ops[Context, S].ask.liftF
-      bkt    <- lift(Task.delay(
-                  ctx.cluster.openBucket(bktCol.bucket)
-                )).into.liftF
-      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[PhaseResultT])
-      _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(bkt, bktCol.collection)).into[S].liftM[PhaseResultT]))
+      exists <- EitherT(lift(existsWithPrefix(ctx.bucket, col.v)).into.liftM[PhaseResultT])
+      _      <- exists.whenM(EitherT(lift(deleteHavingPrefix(ctx.bucket, col.v)).into[S].liftM[PhaseResultT]))
       _      <- lift(docs.nonEmpty.whenM(Task.delay(
                   Observable
                     .from(docs)
-                    .flatMap(bkt.async.insert(_).asScala)
+                    .flatMap(ctx.bucket.async.insert(_).asScala)
                     .toBlocking
                     .last
                 ))).into.liftF
@@ -172,10 +167,15 @@ object queryfile {
     S0: Task :<: S,
     context: Read.Ops[Context, S]
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    if (dir === rootDir)
-      listRootContents
-    else
-      listNonRootContents(dir)
+    (for {
+      ctx    <- context.ask.liftM[FileSystemErrT]
+      col    <- docTypeFromPath(dir).η[FileSystemErrT[Free[S, ?], ?]]
+      types  <- EitherT(lift(docTypesFromPrefix(ctx.bucket, col.v)).into)
+      _      <- EitherT((
+                  if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
+                  else ().right
+                ).η[Free[S, ?]])
+    } yield pathSegmentsFromPrefixTypes(col.v, types)).run
 
   def fileExists[S[_]](
     file: AFile
@@ -185,9 +185,8 @@ object queryfile {
   ): Free[S, Boolean] =
     (for {
       ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      exists <- EitherT(lift(existsWithPrefix(bkt, bktCol.collection)).into)
+      col    <- docTypeFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
+      exists <- EitherT(lift(existsWithPrefix(ctx.bucket, col.v)).into)
     } yield exists).exists(ι)
 
   def n1qlResults[T[_[_]]: BirecursiveT, S[_]](
@@ -199,12 +198,23 @@ object queryfile {
     for {
       ctx     <- context.ask.liftF
       bkt     <- lift(Task.delay(
-                   ctx.cluster.openBucket()
+                   ctx.bucket
                  )).into.liftF
       q       <- RenderQuery.compact(n1ql).liftPE
       r       <- EitherT(lift(queryData(bkt, q)).into.liftM[PhaseResultT])
       v       =  r >>= (Data._obj.getOption(_).foldMap(_.values.toVector))
     } yield v
+
+
+  // TODO: Make sure we are satisfying the monadReader laws and reusability
+  def monadReaderContext[S[_]](bucketName: Free[S, BucketName]): MonadReader[Free[S, ?], BucketName] = 
+    new MonadReader[Free[S, ?], BucketName] {
+        def ask = bucketName
+        // TODO: wartremover thinkgs override is needed, investigate!
+        def local[A](f: BucketName => BucketName)(fa: Free[S, A]) = ??? //fa.map(f)
+        def point[A](a: => A) = Free.pure(a)
+        def bind[A, B](fa: Free[S, A])(f: A => Free[S, B]) = fa flatMap f
+    }
 
   def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
@@ -216,6 +226,8 @@ object queryfile {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
+    implicit val monadReaderCtx = monadReaderContext(Read.Ops[Context, S].ask.map(c => BucketName(c.bucket.name)))
+
     lpLcToN1ql[T, S](lp, lc)
   }
 
@@ -224,7 +236,8 @@ object queryfile {
     lc: DiscoverPath.ListContents[Plan[S, ?]]
   )(implicit
     S1: MonotonicSeq :<: S,
-    S2: Task :<: S
+    S2: Task :<: S,
+    S3: MonadReader[Free[S, ?], BucketName]
   ): Plan[S, (T[N1QL], ISet[APath])] = {
     type CBQSCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
     type CBQS[A]  = CBQSCP#M[A]
@@ -255,34 +268,4 @@ object queryfile {
       _    <- tell(Vector(detail("N1QL", q)))
     } yield (n1ql, ISet fromFoldable ipt)
   }
-
-  def listRootContents[S[_]]
-  (implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    (for {
-      ctx      <- context.ask.liftM[FileSystemErrT]
-      bktNames <- lift(Task.delay(
-                    ctx.manager.getBuckets.asScala.toList.map(_.name)
-                  )).into.liftM[FileSystemErrT]
-    } yield bktNames.map(DirName(_).left[FileName]).toSet).run
-
-  def listNonRootContents[S[_]](
-    dir: APath
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] =
-    (for {
-      ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(dir).η[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      types  <- EitherT(lift(docTypesFromPrefix(bkt, bktCol.collection)).into)
-      _      <- EitherT((
-                  if (types.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
-                  else ().right
-                ).η[Free[S, ?]])
-    } yield pathSegmentsFromPrefixTypes(bktCol.collection, types)).run
-
 }

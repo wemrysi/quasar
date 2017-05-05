@@ -49,13 +49,12 @@ object readfile {
   ): Free[S, FileSystemError \/ Cursor] =
     (for {
       ctx     <- context.ask.liftM[FileSystemErrT]
-      bktCol  <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      bkt     <- EitherT(getBucket(bktCol.bucket))
+      col     <- docTypeFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
       limit   =  readOpts.limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
-      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${bktCol.bucket}` d
-                     WHERE type="${bktCol.collection}"
+      qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
+                     WHERE type="${col}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
-      qResult <- EitherT(lift(queryData(bkt, qStr)).into)
+      qResult <- EitherT(lift(queryData(ctx.bucket, qStr)).into)
     } yield Cursor(qResult)).run
 
   def read[S[_]](

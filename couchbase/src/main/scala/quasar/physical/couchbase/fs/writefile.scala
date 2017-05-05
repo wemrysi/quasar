@@ -70,18 +70,10 @@ object writefile {
   ): Free[S, FileSystemError \/ WriteHandle] =
     (for {
       ctx      <- context.ask.liftM[FileSystemErrT]
-      bktCol   <- EitherT(bucketCollectionFromPath(file).η[Free[S, ?]])
-      _        <- EitherT(lift(
-                    Task.delay(ctx.manager.hasBucket(bktCol.bucket).booleanValue).ifM(
-                      Task.now(().right),
-                      Task.now(FileSystemError.pathErr(PathError.pathNotFound(file)).left)
-                  )).into)
-      bkt      <- lift(Task.delay(
-                    ctx.cluster.openBucket(bktCol.bucket)
-                  )).into.liftM[FileSystemErrT]
+      col      <- docTypeFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
       i        <- MonotonicSeq.Ops[S].next.liftM[FileSystemErrT]
       handle   =  WriteHandle(file, i)
-      _        <- writeHandles.put(handle, State(bkt, bktCol.collection)).liftM[FileSystemErrT]
+      _        <- writeHandles.put(handle, State(ctx.bucket, col.v)).liftM[FileSystemErrT]
     } yield handle).run
 
   def write[S[_]](

@@ -19,14 +19,11 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
-import quasar.effect.Read
-import quasar.fp.free._
-import quasar.fs.{PathError, FileSystemError}
+import quasar.fs.FileSystemError
 
 import scala.collection.JavaConverters._
 
-import com.couchbase.client.java.{Bucket, Cluster}
-import com.couchbase.client.java.cluster.ClusterManager
+import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
@@ -35,17 +32,9 @@ import scalaz.concurrent.Task
 
 object common {
 
-  final case class Context(cluster: Cluster, manager: ClusterManager)
+  final case class Context(bucket: Bucket)
 
-  final case class BucketCollection(bucket: String, collection: String)
-
-  object BucketCollection {
-    def fromPath(p: APath): PathError \/ BucketCollection =
-      Path.flatten(None, None, None, Some(_), Some(_), p)
-        .toIList.unite.uncons(
-          PathError.invalidPath(p, "no bucket specified").left,
-          (h, t) => BucketCollection(h, t.intercalate("/")).right)
-  }
+  final case class BucketName(v: String)
 
   // type field in Couchbase documents
   final case class DocType(v: String)
@@ -53,6 +42,9 @@ object common {
   final case class Cursor(result: Vector[Data])
 
   val CBDataCodec = DataCodec.Precise
+
+  def docTypeFromPath(p: APath): DocType =
+    DocType(Path.flatten(None, None, None, Some(_), Some(_), p).toIList.intercalate("/".some).orZero)
 
   def deleteHavingPrefix(
     bucket: Bucket,
@@ -87,8 +79,8 @@ object common {
       case h :: _   => DirName(h).left
     }.toSet
 
-  def pathSegmentsFromBucketCollections(bktCols: List[BucketCollection]): Set[PathSegment] =
-    pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
+  //def pathSegmentsFromBucketCollections(bktCols: List[String]): Set[PathSegment] =
+  //  pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
 
   def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
@@ -105,18 +97,6 @@ object common {
 
   def queryData(bucket: Bucket, query: String): Task[FileSystemError \/ Vector[Data]] =
     this.query(bucket, query) ∘ (_ >>= (_.traverse(rowToData)))
-
-  def getBucket[S[_]](
-    name: String
-  )(implicit
-    S0: Task :<: S,
-    context: Read.Ops[Context, S]
-  ): Free[S, FileSystemError \/ Bucket] =
-    context.ask.flatMap(ctx => lift(
-      Task.delay(ctx.manager.hasBucket(name).booleanValue).ifM(
-        Task.delay(ctx.cluster.openBucket(name).right),
-        Task.now(FileSystemError.pathErr(PathError.pathNotFound(rootDir </> dir(name))).left))
-    ).into)
 
   def resultsFromCursor(cursor: Cursor): (Cursor, Vector[Data]) =
     (Cursor(Vector.empty), cursor.result)

@@ -26,6 +26,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.physical.couchbase.common.BucketName
 import quasar.physical.couchbase.fs.queryfile._
 import quasar.physical.couchbase.planner._, Planner._
 import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
@@ -63,12 +64,17 @@ class BasicQueryEnablementSpec
 
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
+  implicit val monadReaderCtx = monadReaderContext(BucketName("beer-sample").η[Free[Eff, ?]])
+
   def n1qlFromSql2(sql2: String): String =
     (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (r => RenderQuery.compact(r._1).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
+
+  implicit val monadReaderCtx2 = monadReaderContext(BucketName("beer-sample").η[Free[MonotonicSeq, ?]])
+
 
   def n1qlFromQS(qs: Fix[QST]): String =
     (qs.cataM(Planner[Fix, Free[MonotonicSeq, ?], QST].plan) >>= (n1ql =>

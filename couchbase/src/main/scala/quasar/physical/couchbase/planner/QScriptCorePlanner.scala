@@ -23,6 +23,7 @@ import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._,
+  common.BucketName,
   N1QL.{Id, Union, Unreferenced, _},
   Case._,
   Select.{Filter, Value, _}
@@ -35,7 +36,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._, NonEmptyList.nels
 
-final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
+final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
   extends Planner[T, F, QScriptCore[T, ?]] {
 
   def int(i: Int) = Data[T[N1QL]](QData.Int(i)).embed
