@@ -42,7 +42,7 @@ trait PackageAliases {
   type ByteBuffer           = java.nio.ByteBuffer
   type CharBuffer           = java.nio.CharBuffer
   type Charset              = java.nio.charset.Charset
-  type ExecutionContext     = java.util.concurrent.ExecutorService
+  //type ExecutionContext     = java.util.concurrent.ExecutorService
   type File                 = java.io.File
   type FileInputStream      = java.io.FileInputStream
   type FileOutputStream     = java.io.FileOutputStream

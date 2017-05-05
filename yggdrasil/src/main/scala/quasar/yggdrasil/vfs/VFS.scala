@@ -172,5 +172,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
     def findDirectChildren(path: Path): EitherT[M, ResourceError, Set[PathMetadata]]
 
     def findPathMetadata(path: Path): EitherT[M, ResourceError, PathMetadata]
+
+    def currentVersion(path: Path): M[Option[VersionEntry]]
   }
 }

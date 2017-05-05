@@ -59,8 +59,6 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  def futureMonad(ec: ExecutionContext): Monad[Future] = implicitly
-
   implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
 
