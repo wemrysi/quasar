@@ -14,22 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar
 
-import quasar.blueeyes._
-import org.slf4s.Logging
+import quasar.precog.PackageAliases
 
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monad._
-
-import java.time.LocalDateTime
-
-trait AccessControl[M[+ _]] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean]
-}
-
-class UnrestrictedAccessControl[M[+ _]: Applicative] extends AccessControl[M] {
-  def hasCapability(apiKey: APIKey, perms: Set[Permission], at: Option[LocalDateTime]): M[Boolean] = true.point[M]
-}
+package object niflheim extends PackageAliases
