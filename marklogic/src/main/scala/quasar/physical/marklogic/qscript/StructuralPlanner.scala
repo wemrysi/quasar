@@ -191,13 +191,15 @@ trait StructuralPlanner[F[_], FMT] { self =>
           .then_(emptySeq)
           .else_(if_(~t eq "null".xs)
           .then_("null".xs)
+          .else_(if_(tpe eq "date".xs)
+          .then_(fn.formatDate(castItem, lib.dateFmt.xs))
           .else_(if_(tpe eq "time".xs)
-          .then_(fn.formatTime(castItem, lib.timeFmt))
+          .then_(fn.formatTime(castItem, lib.timeFmt.xs))
           .else_(if_(tpe eq "timestamp".xs)
-          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt))
+          .then_(fn.formatDateTime(castItem, lib.dateTimeFmt.xs))
           .else_(typeswitch(item)(
             n as ST("node()") return_ κ(nstr)
-          ) default fn.string(item)))))
+          ) default fn.string(item))))))
         })
     })
 
