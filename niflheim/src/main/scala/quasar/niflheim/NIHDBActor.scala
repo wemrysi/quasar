@@ -418,8 +418,6 @@ private[niflheim] object ProjectionState {
 
   def empty(authorities: Authorities) = ProjectionState(-1L, Map.empty, authorities)
 
-  implicit val projectionStateIso = Iso.hlist(ProjectionState.apply _, ProjectionState.unapply _)
-
   // FIXME: Add version for this format
   val v1Schema = "maxOffset" :: "cookedMap" :: "authorities" :: HNil
 

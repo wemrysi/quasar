@@ -24,9 +24,11 @@ import scala.{specialized => spec}
 import scala.collection.mutable
 
 import java.io._
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 private[niflheim] object RawLoader {
-  private val fmt = DateTimeFormat.forPattern("yyyyMMddHHmmssSSS")
+  private val fmt = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")
 
   private val utf8 = java.nio.charset.Charset.forName("UTF-8")
 
@@ -96,7 +98,7 @@ private[niflheim] object RawLoader {
    * From "/foo/bar" we'l return "/foo/bar-corrupted-20130213155306768"
    */
   def getCorruptFile(f: File): File =
-    new File(f.getPath + "-corrupted-" + fmt.print(new DateTime))
+    new File(f.getPath + "-corrupted-" + fmt.format(LocalDateTime.now()))
 
   /**
    * Recovery

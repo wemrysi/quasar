@@ -55,7 +55,7 @@ object V1SegmentFormat extends SegmentFormat {
         val length = buffer.getInt()
         val defined = Codec.BitSetCodec.read(buffer)
         val codec = getCodecFor(ctype)
-        val values = ctype.manifest.newArray(length)
+        val values = ctype.classTag.newArray(length)
         defined.foreach { row =>
           values(row) = codec.read(buffer)
         }
@@ -210,7 +210,9 @@ object V1SegmentFormat extends SegmentFormat {
   }
 
   private def getCodecFor[A](ctype: CValueType[A]): Codec[A] = ctype match {
-    case CPeriod => Codec.LongCodec.as[Period](_.toStandardDuration.getMillis, new Period(_))
+    case CPeriod => ???
+      // there doesn't appear to be a sane way to handle this
+      // Codec.LongCodec.as[Period](_.toStandardDuration.getMillis, new Period(_))
     case CBoolean => Codec.BooleanCodec
     case CString => Codec.Utf8Codec
     case CLong => Codec.PackedLongCodec
@@ -218,7 +220,7 @@ object V1SegmentFormat extends SegmentFormat {
     case CNum => Codec.BigDecimalCodec
     case CDate => Codec.DateCodec
     case CArrayType(elemType) =>
-      Codec.ArrayCodec(getCodecFor(elemType))(elemType.manifest)
+      Codec.ArrayCodec(getCodecFor(elemType))(elemType.classTag)
   }
 }
 

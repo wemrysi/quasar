@@ -25,6 +25,7 @@ import scala.collection.mutable
 import scala.collection.mutable.{Map => MMap}
 
 import java.io._
+import java.time.{LocalDateTime, ZonedDateTime}
 
 case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[CTree], types: MMap[CType, Int]) {
   def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))
@@ -112,10 +113,10 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
     }
   }
 
-  def detectDateTime(s: String): DateTime = {
+  def detectDateTime(s: String): LocalDateTime = {
     if (!DateTimeUtil.looksLikeIso8601(s)) return null
     try {
-      DateTimeUtil.parseDateTime(s, true)
+      DateTimeUtil.parseDateTime(s/*, true*/).toLocalDateTime // !!???
     } catch {
       case e: IllegalArgumentException => null
     }
@@ -130,19 +131,19 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
     }
   }
 
-  def addRealDateTime(row: Int, tree: CTree, s: DateTime) {
+  def addRealDateTime(row: Int, tree: CTree, s: LocalDateTime) {
     val n = tree.getType(CDate)
     if (n >= 0) {
-      val seg = a(n).asInstanceOf[ArraySegment[DateTime]]
+      val seg = a(n).asInstanceOf[ArraySegment[LocalDateTime]]
       seg.defined.set(row)
       seg.values(row) = s
     } else {
       tree.setType(CDate, a.length)
       val d = new BitSet()
       d.set(row)
-      val v = new Array[DateTime](length)
+      val v = new Array[LocalDateTime](length)
       v(row) = s
-      a.append(ArraySegment[DateTime](id, tree.path, CDate, d, v))
+      a.append(ArraySegment[LocalDateTime](id, tree.path, CDate, d, v))
     }
   }
 
