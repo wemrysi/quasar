@@ -88,6 +88,7 @@ object JoinHandler {
         _.exists(_.primary ≟ field),
         false)
 
+    // TODO: Make this `AlgebraM`?
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
       case ev0($ReadF(Collection(db, _))) => db.some
       case op                             => C.pipeline(op).flatMap(_.src)
@@ -104,7 +105,6 @@ object JoinHandler {
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
       case SpliceBuilderF(src, _)             => src
-      case ValueBuilderF(_)                   => None
     }
 
     def lookup(

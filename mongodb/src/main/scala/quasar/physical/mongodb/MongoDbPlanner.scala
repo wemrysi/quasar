@@ -907,7 +907,8 @@ object MongoDbPlanner {
                 // TODO: Better sampling
                 case Sample => WB.limit
               })
-          case Unreferenced() => ValueBuilder(Bson.Null).point[M]
+          case Unreferenced() =>
+            CollectionBuilder($pure(Bson.Null), WorkflowBuilder.Root(), none).point[M]
         }
       }
 

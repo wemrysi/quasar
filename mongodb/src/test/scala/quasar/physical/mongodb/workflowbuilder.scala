@@ -67,59 +67,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           IgnoreId)))
     }
 
-    "make nested expression in single step" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city  <- lift(projectField(read, "city"))
-        state <- lift(projectField(read, "state"))
-        x1    <- expr2(city, pure(Bson.Text(", ")))($concat(_, _))
-        x2    <- expr2(x1, state)($concat(_, _))
-        zero = makeObject(x2, "0")
-      } yield zero).evalZero
-
-      op must beRightDisjOrDiff(
-        DocBuilder(
-          builder.read(collection("db", "zips")),
-          ListMap(BsonField.Name("0") ->
-            \/-($concat($concat($field("city"), $literal(Bson.Text(", "))), $field("state"))))))
-    }
-
-    "make nested expression under shape preserving in single step" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        pop   <- lift(projectField(read, "pop"))
-        filtered = filter(read, List(pop), { case p :: Nil => Selector.Doc(p -> Selector.Lt(Bson.Int32(1000))) })
-        city  <- lift(projectField(filtered, "city"))
-        state <- lift(projectField(filtered, "state"))
-        x1    <- expr2(city, pure(Bson.Text(", ")))($concat(_, _))
-        x2    <- expr2(x1, state)($concat(_, _))
-        zero =  makeObject(x2, "0")
-      } yield zero).evalZero
-
-      op must beRightDisjOrDiff(
-        ShapePreservingBuilder(
-          DocBuilder(
-            builder.read(collection("db", "zips")),
-            ListMap(BsonField.Name("0") ->
-              \/-($concat($concat($field("city"), $literal(Bson.Text(", "))), $field("state"))))),
-          List(ExprBuilder(
-            builder.read(collection("db", "zips")),
-            \/-($field("pop")))),
-          { case f :: Nil => $match[WorkflowF](Selector.Doc(f -> Selector.Lt(Bson.Int32(1000)))) }))
-    }
-
-    "combine array with constant value" in {
-      val read = builder.read(collection("db", "zips"))
-      val pureArr = pure(Bson.Arr(List(Bson.Int32(0), Bson.Int32(1))))
-      val op = (for {
-        city   <- lift(projectField(read, "city"))
-        array  <- arrayConcat(makeArray(city), pureArr)
-        state2 <- lift(projectIndex(array, 2))
-      } yield (state2: Fix[WorkflowBuilderF[WorkflowF, ?]]).transCata[Fix[WorkflowBuilderF[WorkflowF, ?]]](normalize)).evalZero
-
-      op must beRightDisjunction(ExprBuilder(read, $literal(Bson.Int32(1)).right))
-    }
-
     "elide array with known projection" in {
       val read = builder.read(collection("db", "zips"))
       val op = (for {
@@ -144,20 +91,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       op must beLeftDisjunction(UnsupportedFunction(
         quasar.std.StdLib.structural.ArrayProject,
         Some("array does not contain index ‘2’.")))
-    }
-
-    "project field from value" in {
-      val value = pure(Bson.Doc(ListMap(
-        "foo" -> Bson.Int32(1),
-        "bar" -> Bson.Int32(2))))
-      projectField(value, "bar") must
-        beRightDisjOrDiff(pure(Bson.Int32(2)))
-    }
-
-    "project index from value" in {
-      val value = pure(Bson.Arr(List(Bson.Int32(1), Bson.Int32(2))))
-      projectIndex(value, 1) must
-        beRightDisjOrDiff(pure(Bson.Int32(2)))
     }
 
     "merge reads" in {
@@ -245,7 +178,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       val read = builder.read(collection("db", "zips"))
       val op = (for {
         pop     <- lift(projectField(read, "pop"))
-        grouped =  groupBy(pop, List(pure(Bson.Int32(1))))
+        grouped =  groupBy(pop, Nil)
         total   =  reduce(grouped)($sum(_))
         obj     =  makeObject(total, "total")
         rez     <- build(obj)
@@ -344,9 +277,9 @@ class WorkflowBuilderSpec extends quasar.Qspec {
     "group in expression" in {
       val read    = builder.read(collection("db", "zips"))
       val op = (for {
-        pop     <- lift(projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop"))
+        pop     <- lift(projectField(groupBy(read, Nil), "pop"))
         total   =  reduce(pop)($sum(_))
-        expr    <- expr2(total, pure(Bson.Int32(1000)))($divide(_, _))
+        expr    <- expr1(total)($divide(_, $literal(Bson.Int32(1000))))
         inK     =  makeObject(expr, "totalInK")
         rez     <- build(inK)
       } yield rez).evalZero
@@ -355,11 +288,11 @@ class WorkflowBuilderSpec extends quasar.Qspec {
         chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
-              BsonField.Name("__tmp2") -> $sum($field("pop")))),
+              BsonField.Name("__tmp0") -> $sum($field("pop")))),
             \/-($literal(Bson.Null))),
           $project(Reshape(ListMap(
             BsonField.Name("totalInK") ->
-              \/-($divide($field("__tmp2"), $literal(Bson.Int32(1000)))))),
+              \/-($divide($field("__tmp0"), $literal(Bson.Int32(1000)))))),
           IgnoreId)))
     }
 
@@ -555,7 +488,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
 
     "render in-process group" in {
       val op = for {
-        pop     <- projectField(groupBy(read, List(pure(Bson.Int32(1)))), "pop")
+        pop     <- projectField(groupBy(read, Nil), "pop")
       } yield reduce(pop)($sum(_))
       op.map(render) must beRightDisjunction(
         """GroupBuilder
@@ -565,7 +498,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           |│  │  ╰─ Schema
           |│  ╰─ ExprOp("$pop")
           |├─ By
-          |│  ╰─ ValueBuilder(Int32(1))
           |╰─ Content
           |   ╰─ -\/
           |      ╰─ AccumOp({ "$sum": "$$ROOT" })""".stripMargin)
