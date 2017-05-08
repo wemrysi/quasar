@@ -37,10 +37,7 @@ class RestApiSpecs extends quasar.Qspec {
   type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: Module :/: MountingFileSystem)#M[A]
 
   "OPTIONS" should {
-    val mount = new (Mounting ~> Task) {
-      def apply[A](m: Mounting[A]): Task[A] =
-        Task.fail(new RuntimeException("unimplemented"))
-    }
+    val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
 
     val fs =
       runFs(InMemState.empty)

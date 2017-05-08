@@ -50,17 +50,17 @@ object queryfile {
 
   type SparkQScript0[A] = (Const[ShiftedRead[ADir], ?] :/: SparkQScript)#M[A]
 
-  final case class Input(
+  final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
-    store: (RDD[Data], AFile) => Task[Unit],
-    fileExists: AFile => Task[Boolean],
-    listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]],
+    store: (RDD[Data], AFile) => Free[S, Unit],
+    fileExists: AFile => Free[S, Boolean],
+    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]],
     readChunkSize: () => Int
   )
 
   type SparkContextRead[A] = effect.Read[SparkContext, A]
 
-  def chrooted[S[_]](input: Input, fsType: FileSystemType, prefix: ADir)(implicit
+  def chrooted[S[_]](input: Input[S], fsType: FileSystemType, prefix: ADir)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
@@ -68,7 +68,7 @@ object queryfile {
   ): QueryFile ~> Free[S, ?] =
     flatMapSNT(interpreter(input, fsType)) compose chroot.queryFile[QueryFile](prefix)
 
-  def interpreter[S[_]](input: Input, fsType: FileSystemType)(implicit
+  def interpreter[S[_]](input: Input[S], fsType: FileSystemType)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
@@ -125,7 +125,7 @@ object queryfile {
 
   // TODO unify explainPlan, executePlan & evaluatePlan
   // This might be more complicated then it looks at first glance
-  private def explainPlan[S[_]](input: Input, fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
+  private def explainPlan[S[_]](input: Input[S], fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
@@ -150,7 +150,7 @@ object queryfile {
     }.join
   }
 
-  private def executePlan[S[_]](input: Input, qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
+  private def executePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: effect.Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
@@ -158,21 +158,20 @@ object queryfile {
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
 
     read.asks { sc =>
-      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc).run
+      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
+        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
 
-      injectFT.apply {
-        sparkStuff >>= (mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
-      }
+      sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
+        planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
+        rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+
     }.join
   }
 
   // TODO for Q4.2016  - unify it with ReadFile
   final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
 
-  private def evaluatePlan[S[_]](input: Input, qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
+  private def evaluatePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
       s0: Task :<: S,
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S],
       read: Read.Ops[SparkContext, S],
@@ -223,11 +222,10 @@ object queryfile {
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
      ): Free[S, Unit] = kvs.delete(h)
 
-  private def fileExists[S[_]](input: Input, f: AFile)(implicit
-    s0: Task :<: S): Free[S, Boolean] =
-    injectFT[Task, S].apply (input.fileExists(f))
+  private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
+    s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)
 
-  private def listContents[S[_]](input: Input, d: ADir)(implicit
+  private def listContents[S[_]](input: Input[S], d: ADir)(implicit
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    injectFT[Task, S].apply(input.listContents(d).run)
+    input.listContents(d).run
 }

@@ -21,13 +21,10 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalaz.stateT._
 import quasar.fp._
-import quasar.fp.free.{Interpreter, SpecializedInterpreter}
+import quasar.fp.free.Interpreter
 import quasar.fs.SandboxedPathy._
 import quasar.scalacheck._
-
-import scala.collection.IndexedSeq
 
 import org.scalacheck.{Gen, Arbitrary, Shrink}
 import org.scalacheck.Shrink.shrink
@@ -36,8 +33,6 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
-import scalaz.stream._
-import scalaz.concurrent.Task
 
 case class AlphaCharacters(value: String)
 
@@ -100,55 +95,23 @@ trait FileSystemFixture {
     (Arbitrary.arbitrary[ADir] |@|
       scaleSize(Arbitrary.arbitrary[NonEmptyList[(RFile, Vector[Data])]], scalePow(1/3.0)))(NonEmptyDir.apply))
 
-  type F[A]            = Free[FileSystem, A]
-  type InMemFix[A]     = ReadWriteT[InMemoryFs, A]
-  type MemStateTask[A] = StateT[Task, InMemState, A]
-  type MemStateFix[A]  = ReadWriteT[MemStateTask, A]
-
-  object Mem extends Interpreter[FileSystem,InMemoryFs](
-    interpretTerm = fileSystem
-  ) {
-    def interpret[E,A](term: EitherT[F,E,A]): InMemoryFs[E \/ A] =
-      interpretT[EitherT[?[_],E,?]].apply(term).run
-    def interpret[L:Monoid,E,A](term: EitherT[WriterT[F,L,?],E,A]): InMemoryFs[(L,E \/ A)] = {
-      type T1[M[_],A] = EitherT[M,E,A]
-      type T2[M[_],A] = WriterT[M,L,A]
-      interpretT2[T1,T2].apply(term).run.run
-    }
-  }
-
-  val hoistTask: InMemoryFs ~> MemStateTask =
-    Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
-
-  object MemTask extends SpecializedInterpreter[FileSystem, MemStateTask](
-    interpretTerm = hoistTask compose Mem.interpretTerm
-  ) {
-
-    def runLogEmpty[A](p: Process[FileSystemErrT[F,?],A]): Task[FileSystemError \/ IndexedSeq[A]] =
-      runLogE(p).run.eval(emptyMem)
-  }
-
-  val hoistFix: ReadWriteT[InMemoryFs,?] ~> MemStateFix =
-    Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistTask)
-
-  val readWrite: FileSystem ~> ReadWriteT[InMemoryFs,?] = interpretFileSystem[InMemFix](
-    liftMT[InMemoryFs, ReadWriteT] compose queryFile,
-    interceptReads(readFile),
-    amendWrites(writeFile),
-    liftMT[InMemoryFs, ReadWriteT] compose manageFile)
+  type FreeFS[A] = Free[FileSystem, A]
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import StateT.stateTMonadState
 
-  object MemFixTask extends SpecializedInterpreter[FileSystem, MemStateFix](
-    interpretTerm = hoistFix compose readWrite
-  ) {
-    def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
-      EitherT(runLogE(p).run.eval((rs, ws)))
-
-    def runLogWithWrites[E,A](ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
-      runLogWithRW(List(), ws, p)
+  object Mem extends Interpreter[FileSystem, InMemoryFs](interpretTerm = fileSystem) {
+    def interpretEmpty[A](program: Free[FileSystem, A]): A =
+      interpret(program).eval(emptyMem)
+    def interpretInjectingWriteErrors[A](program: Free[FileSystem, A], errors: List[Vector[FileSystemError]]): InMemoryFs[A] =
+      program.foldMap(alterResponses).eval((Nil, errors))
   }
+
+  val alterResponses: FileSystem ~> ReadWriteT[InMemoryFs, ?] = interpretFileSystem[ReadWriteT[InMemoryFs, ?]](
+    liftMT[InMemoryFs, ReadWriteT] compose queryFile,
+    interceptReads(readFile),
+    amendWrites(writeFile),
+    liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 }
 
 object FileSystemFixture {

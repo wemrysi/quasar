@@ -81,6 +81,10 @@ package object ejson {
   val ExtEJson    = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
+  val TypeKey   = "_ejson.type"
+  val SizeKey   = "_ejson.size"
+  val BinaryTag = "_ejson.binary"
+
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =
       json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
@@ -118,5 +122,42 @@ package object ejson {
         (t :: ts).traverse(t => ExtEJson.prj(t.project) >>= (char[T].getOption(_)))
           .fold(a)(cs => CommonEJson(str[T](cs.mkString)))
     }
+  }
+
+  object TypeTag {
+    import EJson._
+
+    def apply[T](tag: String)(implicit T: Corecursive.Aux[T, EJson]): T =
+      fromExt(Map(List(fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)))))
+
+    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[String] =
+      ejs match {
+        case ExtEJson(Map(List((Embed(CommonEJson(Str(`TypeKey`))), Embed(CommonEJson(Str(s))))))) => some(s)
+        case _                                                                                     => none
+      }
+  }
+
+  object SizedTypeTag {
+    import EJson._
+
+    def apply[T](tag: String, size: BigInt)(implicit T: Corecursive.Aux[T, EJson]): T =
+      fromExt(Map(List(
+        fromCommon[T](Str(TypeKey)) -> fromCommon[T](Str(tag)),
+        fromCommon[T](Str(SizeKey)) -> fromExt[T](Int(size))
+      )))
+
+    def unapply[T](ejs: EJson[T])(implicit T: Recursive.Aux[T, EJson]): Option[(String, BigInt)] =
+      ejs match {
+        case ExtEJson(Map(xs)) =>
+          val tpe = xs collectFirst {
+            case (Embed(CommonEJson(Str(TypeKey))), Embed(CommonEJson(Str(t)))) => t
+          }
+          val size = xs collectFirst {
+            case (Embed(CommonEJson(Str(SizeKey))), Embed(ExtEJson(Int(s)))) => s
+          }
+          tpe tuple size
+
+        case _ => none
+      }
   }
 }

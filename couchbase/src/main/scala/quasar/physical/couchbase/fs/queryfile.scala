@@ -203,7 +203,8 @@ object queryfile {
                  )).into.liftF
       q       <- RenderQuery.compact(n1ql).liftPE
       r       <- EitherT(lift(queryData(bkt, q)).into.liftM[PhaseResultT])
-    } yield r
+      v       =  r >>= (Data._obj.getOption(_).foldMap(_.values.toVector))
+    } yield v
 
   def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]

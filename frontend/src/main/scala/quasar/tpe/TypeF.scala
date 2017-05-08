@@ -18,7 +18,8 @@ package quasar.tpe
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
+import quasar.ejson
+import quasar.ejson.{CommonEJson => C, ExtEJson => E, EJson, EncodeEJson, EncodeEJsonK}
 import quasar.fp.ski.κ
 
 import scala.Tuple2
@@ -179,23 +180,23 @@ object TypeF extends TypeFInstances {
         )))
 
     _.umap(_.project) match {
-      case (           Bottom(),                   _)                   => bottom()
-      case (                  _,            Bottom())                   => bottom()
-      case (              Top(),                   y)                   => y map (_.left)
-      case (                  x,               Top())                   => x map (_.left)
-      case (          Simple(x),           Simple(y)) if x ≟ y          => simple(x)
-      case (           Const(x),            Const(y)) if x ≟ y          => const(x)
-      case (          Simple(s), Const(j @ Embed(y))) if isSimply(y, s) => const(j)
-      case (Const(j @ Embed(x)),           Simple(s)) if isSimply(x, s) => const(j)
-      case (   Arr(-\/(INil())),              Arr(y))                   => arr[J, T](y) map (_.left)
-      case (             Arr(x),    Arr(-\/(INil())))                   => arr[J, T](x) map (_.left)
-      case (             Arr(x),              Arr(y))                   => arr[J, LR](arrayGlb((x, y))) map (_.right)
-      case (      Map(xs, None),         Map(ys, uy)) if xs.isEmpty     => map[J, T](ys, uy) map (_.left)
-      case (        Map(xs, ux),       Map(ys, None)) if ys.isEmpty     => map[J, T](xs, ux) map (_.left)
-      case (        Map(xs, ux),         Map(ys, uy))                   => mapGlb(xs, ux, ys, uy) map (_.right)
-      case (    Union(a, b, cs),                   y)                   => union[J, T](a, b, cs) map ((_, y.embed).right)
-      case (                  x,     Union(a, b, cs))                   => union[J, T](a, b, cs) map ((x.embed, _).right)
-      case _                                                            => bottom()
+      case (        Bottom(),                _)                   => bottom()
+      case (               _,         Bottom())                   => bottom()
+      case (           Top(),                y)                   => y map (_.left)
+      case (               x,            Top())                   => x map (_.left)
+      case (       Simple(x),        Simple(y)) if x ≟ y          => simple(x)
+      case (        Const(x),         Const(y)) if x ≟ y          => const(x)
+      case (       Simple(s),         Const(j)) if isSimply(j, s) => const(j)
+      case (        Const(j),        Simple(s)) if isSimply(j, s) => const(j)
+      case (Arr(-\/(INil())),           Arr(y))                   => arr[J, T](y) map (_.left)
+      case (          Arr(x), Arr(-\/(INil())))                   => arr[J, T](x) map (_.left)
+      case (          Arr(x),           Arr(y))                   => arr[J, LR](arrayGlb((x, y))) map (_.right)
+      case (   Map(xs, None),      Map(ys, uy)) if xs.isEmpty     => map[J, T](ys, uy) map (_.left)
+      case (     Map(xs, ux),    Map(ys, None)) if ys.isEmpty     => map[J, T](xs, ux) map (_.left)
+      case (     Map(xs, ux),      Map(ys, uy))                   => mapGlb(xs, ux, ys, uy) map (_.right)
+      case ( Union(a, b, cs),                y)                   => union[J, T](a, b, cs) map ((_, y.embed).right)
+      case (               x,  Union(a, b, cs))                   => union[J, T](a, b, cs) map ((x.embed, _).right)
+      case _                                                      => bottom()
     }
   }
 
@@ -263,7 +264,7 @@ object TypeF extends TypeFInstances {
     implicit J: Recursive.Aux[J, EJson]
   ): Option[PrimaryType] = tf match {
     case Simple(s)                         => some(s.left)
-    case Const(j)                          => primaryTypeOf(j.project)
+    case Const(j)                          => some(primaryTypeOf(j))
     case Arr(_)                            => some(CompositeType.Arr.right)
     case Map(_, _)                         => some(CompositeType.Map.right)
     case Bottom() | Top() | Union(_, _, _) => none
@@ -272,7 +273,9 @@ object TypeF extends TypeFInstances {
   ////
 
   /** Returns whether the given EJson is of the specified `SimpleType`. */
-  private def isSimply(j: EJson[_], s: SimpleType): Boolean =
+  private def isSimply[J](j: J, s: SimpleType)(
+    implicit J: Recursive.Aux[J, EJson]
+  ): Boolean =
     simpleTypeOf(j) exists (_ ≟ s)
 
   /** Returns the structural union of a non-empty foldable of types. */
@@ -355,6 +358,50 @@ private[quasar] sealed abstract class TypeFInstances {
          union[J, A].getOption(tf),
            top[J, A].getOption(tf)
       )
+    }
+
+  implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
+    new EncodeEJsonK[TypeF[A, ?]] {
+      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
+        case Bottom()        => tlabel("bottom")
+        case Top()           => tlabel("top")
+        case Simple(s)       => tlabel(SimpleType.name(s))
+        case Const(a)        => tof("const", A.encode[J](a))
+        case Union(x, y, zs) => tof("sum", C(ejson.arr((x :: y :: zs).toList)).embed)
+
+        case Arr(a) =>
+          tof("array", a.leftMap(js => C(ejson.arr(js.toList)).embed).merge)
+
+        case Map(kvs, unk) =>
+          val jjs   = kvs.toList.map(_.leftMap(A.encode[J](_)))
+          val other = unk map { case (k, v) => (
+            C(ejson.str[J]("other")).embed,
+            map1(
+              C(ejson.str[J]("keys")).embed   -> k,
+              C(ejson.str[J]("values")).embed -> v)
+          )}
+          tof("map", E(ejson.map(jjs)).embed, other.toList: _*)
+      }
+
+      private def map1[J](assoc: (J, J), assocs: (J, J)*)(
+        implicit J: Corecursive.Aux[J, EJson]
+      ): J =
+        E(ejson.map(assoc :: assocs.toList)).embed
+
+      private def tmap[J](v: J, assocs: (J, J)*)(
+        implicit J: Corecursive.Aux[J, EJson]
+      ): J =
+        map1(C(ejson.str[J]("type")).embed -> v, assocs: _*)
+
+      private def tlabel[J](label: String, assocs: (J, J)*)(
+        implicit J: Corecursive.Aux[J, EJson]
+      ): J =
+        tmap(C(ejson.str[J](label)).embed, assocs: _*)
+
+      private def tof[J](label: String, of: J, assocs: (J, J)*)(
+        implicit J: Corecursive.Aux[J, EJson]
+      ): J =
+        tlabel(label, ((C(ejson.str[J]("of")).embed -> of) :: assocs.toList): _*)
     }
 
   implicit def traverse[J]: Traverse[TypeF[J, ?]] =

@@ -6,7 +6,7 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 source scripts/constants
 
 # Only publishAndTag on first Travis job
-if [[ "${TRAVIS_JOB_NUMBER##*.}" == "1" ]]; then
+if [[ $CONNECTOR == "mongodb_2_6" ]]; then
   "$SBT" transferPublishAndTagResources
   scripts/publishAndTag 'quasar-analytics/quasar'
 else
