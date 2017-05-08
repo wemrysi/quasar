@@ -21,6 +21,9 @@ import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
+import java.time.format.DateTimeFormatter.{ISO_DATE, ISO_TIME}
+import java.time.ZoneOffset.UTC
+
 import matryoshka._
 import scalaz._, Scalaz._
 
@@ -31,7 +34,7 @@ private[qscript] final class DataPlanner[M[_]: Monad, FMT](
   val plan: AlgebraM[M, Const[Data, ?], XQuery] = _.getConst match {
     case Data.Binary(bytes) => xs.base64Binary(base64Bytes(bytes).xs).point[M]
     case Data.Bool(b)       => b.fold(fn.True, fn.False).point[M]
-    case Data.Date(d)       => xs.date(isoLocalDate(d).xs).point[M]
+    case Data.Date(d)       => xs.date(ISO_DATE.format(d atStartOfDay UTC).xs).point[M]
     case Data.Dec(d)        => xs.double(d.toString.xqy).point[M]
     case Data.Id(id)        => id.xs.point[M]
     case Data.Int(i)        => xs.integer(i.toString.xqy).point[M]
@@ -39,7 +42,7 @@ private[qscript] final class DataPlanner[M[_]: Monad, FMT](
     case Data.NA            => expr.emptySeq.point[M]
     case Data.Null          => SP.null_
     case Data.Str(s)        => s.xs.point[M]
-    case Data.Time(t)       => xs.time(isoLocalTime(t).xs).point[M]
+    case Data.Time(t)       => xs.time(ISO_TIME.format(t atOffset UTC).xs).point[M]
     case Data.Timestamp(ts) => xs.dateTime(isoInstant(ts).xs).point[M]
 
     case Data.Arr(elements) =>
