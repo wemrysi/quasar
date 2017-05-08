@@ -24,7 +24,7 @@ import quasar.precog.common.security._
 import quasar.precog.common.jobs._
 import quasar.yggdrasil.execution._
 import quasar.yggdrasil.metadata._
-import quasar.yggdrasil.nihdb._
+// import quasar.yggdrasil.nihdb._
 import quasar.yggdrasil.scheduling._
 import quasar.precog.util._
 import ResourceError._
@@ -187,7 +187,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
         result   <- cacheAt match {
           case Some(cachePath) =>
             for {
-              _ <- EitherT {
+              _ <- EitherT[M, EvaluationError, PrecogUnit] {
                 permissionsFinder.writePermissions(ctx.apiKey, cachePath, clock.instant()) map { pset =>
                   /// here, we just terminate the computation early if no write permissions are available.
                   if (pset.nonEmpty) \/.right(PrecogUnit)
@@ -213,7 +213,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
 
           case None =>
             log.debug("No caching to be performed for query results of query at path  %s".format(path.path))
-            EitherT.right(StoredQueryResult(raw, None, None).point[M])
+            EitherT.right[M, EvaluationError, StoredQueryResult](StoredQueryResult(raw, None, None).point[M])
         }
       } yield result
     }

@@ -44,7 +44,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       for {
         _ <- EitherT.right(table.toJson map { json => log.trace("Starting load from " + json.toList.map(_.renderCompact)) })
         paths <- EitherT.right(pathsM(table))
-        projections <- paths.toList.traverse[({ type l[a] = EitherT[Future, ResourceError, a] })#l, ProjectionLike[Future, Slice]] { path =>
+        projections <- paths.toList.traverse[({ type l[a] = EitherT[Future, ResourceError, a] })#l, Projection] { path =>
           log.debug("Loading path: " + path)
           vfs.readProjection(apiKey, path, Version.Current, AccessMode.Read) leftMap { error =>
             log.warn("An error was encountered in loading path %s: %s".format(path, error))
@@ -55,8 +55,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
         val length = projections.map(_.length).sum
         val stream = projections.foldLeft(StreamT.empty[Future, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints = proj.structure.map { struct => 
-            Some(Schema.flatten(tpe, struct.toList)) 
+          val constraints = proj.structure.map { struct =>
+            Some(Schema.flatten(tpe, struct.toList))
           }
 
           log.debug("Appending from projection: " + proj)
@@ -64,7 +64,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
         }
 
         Table(stream, ExactSize(length))
-      } 
+      }
     }
   }
 }

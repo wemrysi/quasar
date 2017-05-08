@@ -23,10 +23,10 @@ import quasar.yggdrasil.vfs._
 
 import scalaz._
 
-trait Execution[M[+_], +A] {
+trait Execution[M[+_], A] {
   def executorFor(apiKey: APIKey): EitherT[M, String, QueryExecutor[M, A]]
 }
 
-trait Platform[M[+_], Block, +A] extends Execution[M, A] with SecureVFSModule[M, Block] {
+trait Platform[M[+_], Block, A] extends Execution[M, A] with SecureVFSModule[M, Block] {
   def vfs: SecureVFS
 }
