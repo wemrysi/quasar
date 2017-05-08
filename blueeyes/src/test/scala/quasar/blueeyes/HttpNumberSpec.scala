@@ -14,22 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.precog.common.jobs
+package quasar.blueeyes
 
-import quasar.blueeyes.MimeType
+import org.specs2.mutable.Specification
 
-import scalaz.StreamT
+class HttpNumberSpec extends Specification{
 
-// FIXME include FileStorageSpec
-
-case class FileData[M[_]](mimeType: Option[MimeType], data: StreamT[M, Array[Byte]])
-
-/**
- * An abstraction for storing/manipulating/retrieving files.
- */
-trait FileStorage[M[_]] {
-  def exists(file: String): M[Boolean]
-  def save(file: String, data: FileData[M]): M[Unit]
-  def load(file: String): M[Option[FileData[M]]]
-  def remove(file: String): M[Unit]
+  "HttpNumbers:  Should return ContentLength or parse to None on bad input" in {
+    HttpNumbers.parseHttpNumbers("bees") mustEqual None
+  }
 }

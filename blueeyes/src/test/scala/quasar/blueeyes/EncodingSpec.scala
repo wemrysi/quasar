@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.precog.common.jobs
+package quasar.blueeyes
 
-import quasar.blueeyes.MimeType
+import org.specs2.mutable.Specification
+import Encodings._
 
-import scalaz.StreamT
+class EncodingSpec extends Specification{
 
-// FIXME include FileStorageSpec
+  "Encodings:  Should produce a encoding" in {
+    Encodings.parseEncodings("compress") mustEqual List(compress)
+  }
 
-case class FileData[M[_]](mimeType: Option[MimeType], data: StreamT[M, Array[Byte]])
+  "Encodings:  Should produce list of encodings" in {
+    Encodings.parseEncodings("x-compress, *") mustEqual List(`x-compress`, `*`)
+  }
 
-/**
- * An abstraction for storing/manipulating/retrieving files.
- */
-trait FileStorage[M[_]] {
-  def exists(file: String): M[Boolean]
-  def save(file: String, data: FileData[M]): M[Unit]
-  def load(file: String): M[Option[FileData[M]]]
-  def remove(file: String): M[Unit]
+  "Encodings:  Should produce custom encodings" in {
+    Encodings.parseEncodings("customa, customb") mustEqual List(CustomEncoding("customa"), CustomEncoding("customb"))
+  }
 }

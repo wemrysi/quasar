@@ -22,8 +22,6 @@ import quasar.precog.util.PrecogUnit
 
 import java.util.UUID
 
-import org.quartz.CronExpression
-
 import scalaz.EitherT
 
 trait ScheduleStorage[M[+_]] {
