@@ -16,9 +16,11 @@
               date_part(\"century\", timestamp(commit.committer.date)) as century,
               date_part(\"decade\", timestamp(commit.committer.date)) as decade,
               date_part(\"year\", timestamp(commit.committer.date)) as year,
+              date_part(\"doy\", timestamp(commit.committer.date)) as `dayOfYear`,
               date_part(\"quarter\", timestamp(commit.committer.date)) as quarter,
               date_part(\"month\", timestamp(commit.committer.date)) as month,
               date_part(\"day\", timestamp(commit.committer.date)) as dayOfMonth,
+              date_part(\"week\", timestamp(commit.committer.date)) as week,
               date_part(\"dow\", timestamp(commit.committer.date)) as dayOfWeek,
               date_part(\"isodow\", timestamp(commit.committer.date)) as `dayOfWeek (ISO)`,
               date_part(\"hour\", timestamp(commit.committer.date)) as hour,
@@ -31,12 +33,23 @@
 
   "predicate": "containsAtLeast",
 
-  "expected": [
-    {
-    "millennium": 3.0, "century": 21.0, "decade": 201.0, "year": 2015.0,
-    "quarter": 1.0, "month": 1.0, "dayOfMonth": 29.0, "dayOfWeek": 4.0, "dayOfWeek (ISO)": 4.0,
-    "hour": 15.0, "minute": 52.0, "second": 37.0, "millis": 37000.0, "micros": 3.7e7,
+  "expected": [{
+    "millennium": 3.0,
+    "century": 21.0,
+    "decade": 201.0,
+    "year": 2015.0,
+    "dayOfYear": 29,
+    "quarter": 1.0,
+    "month": 1.0,
+    "dayOfMonth": 29.0,
+    "week": 3,
+    "dayOfWeek": 4.0,
+    "dayOfWeek (ISO)": 4.0,
+    "hour": 15.0,
+    "minute": 52.0,
+    "second": 37.0,
+    "millis": 37000.0,
+    "micros": 3.7e7,
     "id": "33031"
-    }
-  ]
+    }]
 }
