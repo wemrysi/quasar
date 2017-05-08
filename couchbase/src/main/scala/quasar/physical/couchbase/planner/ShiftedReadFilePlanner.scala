@@ -22,14 +22,17 @@ import quasar.common.PhaseResultT
 import quasar.connector.PlannerErrT
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
-import quasar.physical.couchbase._, common.BucketName, N1QL.{Eq, Id, _}, Select.{Filter, Value, _}
+import quasar.physical.couchbase._,
+  common.BucketNameReader,
+  N1QL.{Eq, Id, _},
+  Select.{Filter, Value, _}
 import quasar.qscript, qscript._
 
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
+final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Monad: BucketNameReader: NameGenerator]
   extends Planner[T, F, Const[ShiftedRead[AFile], ?]] {
 
   def str(v: String) = Data[T[N1QL]](QData.Str(v))
@@ -37,7 +40,7 @@ final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: MonadReader[?[_]
 
   val plan: AlgebraM[M, Const[ShiftedRead[AFile], ?], T[N1QL]] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
-      (genId[T[N1QL], M] ⊛ MonadReader[F, BucketName].ask.liftM[PhaseResultT].liftM[PlannerErrT]) { (gId, bkt) =>
+      (genId[T[N1QL], M] ⊛ BucketNameReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]) { (gId, bkt) =>
         val collection = common.docTypeFromPath(absFile)
 
         val v =

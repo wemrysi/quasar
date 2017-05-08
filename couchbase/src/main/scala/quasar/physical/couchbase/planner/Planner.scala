@@ -19,7 +19,7 @@ package quasar.physical.couchbase.planner
 import quasar.NameGenerator
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.physical.couchbase._, common.BucketName
+import quasar.physical.couchbase._, common._
 import quasar.qscript._
 
 import matryoshka._
@@ -55,11 +55,11 @@ object Planner {
     : Planner[T, F, Const[ShiftedRead[ADir], ?]] =
     new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
-  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
+  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: BucketNameReader: NameGenerator]
     : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
     new ShiftedReadFilePlanner[T, F]
 
-  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
+  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
@@ -71,8 +71,7 @@ object Planner {
     : Planner[T, F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
-  // TODO: Create a type alias for MonadReader[?[_], BucketName], maybe call it BucketNameReader
-  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
+  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 

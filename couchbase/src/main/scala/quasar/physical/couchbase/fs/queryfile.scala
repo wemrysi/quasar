@@ -205,39 +205,26 @@ object queryfile {
       v       =  r >>= (Data._obj.getOption(_).foldMap(_.values.toVector))
     } yield v
 
-
-  // TODO: Make sure we are satisfying the monadReader laws and reusability
-  def monadReaderContext[S[_]](bucketName: Free[S, BucketName]): MonadReader[Free[S, ?], BucketName] = 
-    new MonadReader[Free[S, ?], BucketName] {
-        def ask = bucketName
-        // TODO: wartremover thinkgs override is needed, investigate!
-        def local[A](f: BucketName => BucketName)(fa: Free[S, A]) = ??? //fa.map(f)
-        def point[A](a: => A) = Free.pure(a)
-        def bind[A, B](fa: Free[S, A])(f: A => Free[S, B]) = fa flatMap f
-    }
-
   def lpToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan]
   )(implicit
-    S0: Read[Context, ?] :<: S,
-    S1: MonotonicSeq :<: S,
-    S2: Task :<: S
+    S0: MonotonicSeq :<: S,
+    S1: Task :<: S,
+    ctx: Read.Ops[Context, S]
   ): Plan[S, (T[N1QL], ISet[APath])] = {
     val lc: DiscoverPath.ListContents[Plan[S, ?]] =
       (d: ADir) => EitherT(listContents(d).liftM[PhaseResultT])
 
-    implicit val monadReaderCtx = monadReaderContext(Read.Ops[Context, S].ask.map(c => BucketName(c.bucket.name)))
-
-    lpLcToN1ql[T, S](lp, lc)
+    ctx.ask.liftF >>= (c => lpLcToN1ql[T, S](lp, lc, BucketName(c.bucket.name)))
   }
 
   def lpLcToN1ql[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, S[_]](
     lp: T[LogicalPlan],
-    lc: DiscoverPath.ListContents[Plan[S, ?]]
+    lc: DiscoverPath.ListContents[Plan[S, ?]],
+    bn: BucketName
   )(implicit
-    S1: MonotonicSeq :<: S,
-    S2: Task :<: S,
-    S3: MonadReader[Free[S, ?], BucketName]
+    S0: MonotonicSeq :<: S,
+    S1: Task :<: S
   ): Plan[S, (T[N1QL], ISet[APath])] = {
     type CBQSCP = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
     type CBQS[A]  = CBQSCP#M[A]
@@ -259,9 +246,9 @@ object queryfile {
                 optimize.optimize(reflNT[CBQS]),
                 Unicoalesce[T, CBQSCP])
       _    <- tell(Vector(tree("QScript (optimized)", opz)))
-      n1ql <- opz.cataM(
-                Planner[T, Free[S, ?], CBQS].plan
-              ).leftMap(FileSystemError.qscriptPlanningFailed(_))
+      n1ql <- EitherT(WriterT(
+                opz.cataM(Planner[T, Kleisli[Free[S, ?], BucketName, ?], CBQS].plan)
+                  .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.run.run(bn)))
       ipt  =  opz.cata(ExtractPath[CBQS, APath].extractPath[DList])
       q    <- RenderQuery.compact(n1ql).liftPE
       _    <- tell(Vector(detail("N1QL AST", n1ql.render.shows)))

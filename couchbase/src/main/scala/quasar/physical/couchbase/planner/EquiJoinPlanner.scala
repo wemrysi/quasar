@@ -25,7 +25,7 @@ import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
-  common.{BucketName, DocType},
+  common.{BucketNameReader, DocType},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
 import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
@@ -38,7 +38,7 @@ import scalaz._, Scalaz._
 
 // NB: Only handling a limited simple set of cases to start
 
-final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: MonadReader[?[_], BucketName]: NameGenerator]
+final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
@@ -101,7 +101,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: MonadReader[?[_]
     for {
       id1 <- genId[T[N1QL], M]
       id2 <- genId[T[N1QL], M]
-      bkt <- MonadReader[F, BucketName].ask.liftM[PhaseResultT].liftM[PlannerErrT]
+      bkt <- BucketNameReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]
       b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[M]), tPlan))
       k   <- key.cataM(interpretM(κ(id1.embed.η[M]), mfPlan))
       c   <- combine.cataM(interpretM({

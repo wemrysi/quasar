@@ -54,32 +54,32 @@ class BasicQueryEnablementSpec
 
   sequential
 
+  val bktStr = "beer-sample"
+
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =
     compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
 
   def listc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
-    Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName("beer-sample").right))
+    Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName(bktStr).right))
       .transform(λ[Id ~> Plan[S, ?]](_.η[Plan[S, ?]]))
       .run
 
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
-  implicit val monadReaderCtx = monadReaderContext(BucketName("beer-sample").η[Free[Eff, ?]])
+  val bn = BucketName("beer-sample")
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (r => RenderQuery.compact(r._1).liftPE))
+    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc, bn) >>= (r =>
+      RenderQuery.compact(r._1).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
 
-  implicit val monadReaderCtx2 = monadReaderContext(BucketName("beer-sample").η[Free[MonotonicSeq, ?]])
-
-
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Fix, Free[MonotonicSeq, ?], QST].plan) >>= (n1ql =>
-      EitherT(RenderQuery.compact(n1ql).η[Free[MonotonicSeq, ?]].liftM[PhaseResultT])
-    )).run.run.map(_._2)
+    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], BucketName, ?], QST].plan) >>= (n1ql =>
+      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], BucketName, ?]].liftM[PhaseResultT])
+    )).run.run.run(bn).map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)

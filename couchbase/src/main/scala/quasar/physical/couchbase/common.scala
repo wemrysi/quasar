@@ -19,6 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.MonadReader_
 import quasar.fs.FileSystemError
 
 import scala.collection.JavaConverters._
@@ -31,6 +32,12 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object common {
+
+  type BucketNameReader[F[_]] = MonadReader_[F, BucketName]
+
+  object BucketNameReader {
+    def apply[F[_]](implicit R: MonadReader_[F, BucketName]) = R
+  }
 
   final case class Context(bucket: Bucket)
 
