@@ -104,12 +104,14 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
         surviveRoundTrip(segment)
       }
     }
-    "roundtrip arbitrary large segments" in {
+
+    // this test can take a crazy long time
+    /*"roundtrip arbitrary large segments" in {
       implicit val arbSegment = Arbitrary(genSegment(10000))
       forAll { (segment: Segment) =>
         surviveRoundTrip(segment)
       }
-    }
+    }*/
   }
 }
 
