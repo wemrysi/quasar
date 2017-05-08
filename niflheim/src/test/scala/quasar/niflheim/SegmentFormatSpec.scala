@@ -19,15 +19,15 @@ package quasar.niflheim
 import quasar.precog.common._
 
 import quasar.precog.util._
-import quasar.precog.BitSetUtil.Implicits._
-
-import org.joda.time.DateTime
+import quasar.precog.util.BitSetUtil.Implicits._
 
 import org.specs2._
 import org.specs2.mutable.Specification
-import org.scalacheck._
+import org.scalacheck._, Prop._
 
 import scalaz._
+
+import java.time.LocalDateTime
 
 class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
@@ -44,11 +44,11 @@ class VersionedSegmentFormatSpec extends Specification with ScalaCheck with Segm
       implicit val arbSegment = Arbitrary(genSegment(100))
       val old = VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
 
-      check { (segment0: Segment) =>
+      forAll { (segment0: Segment) =>
         val out = new InMemoryWritableByteChannel
-        old.writer.writeSegment(out, segment0) must beLike { case Success(_) =>
+        old.writer.writeSegment(out, segment0) must beLike { case _root_.scalaz.Success(_) =>
           val in = new InMemoryReadableByteChannel(out.toArray)
-          format.reader.readSegment(in) must beLike { case Success(segment1) =>
+          format.reader.readSegment(in) must beLike { case _root_.scalaz.Success(segment1) =>
             areEqual(segment0, segment1)
           }
         }
@@ -64,8 +64,6 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
 
   val EmptyBitSet = BitSetUtil.create()
 
-  override val defaultPrettyParams = Pretty.Params(2)
-
   "segment formats" should {
     "roundtrip trivial null segments" in {
       surviveRoundTrip(NullSegment(1234L, CPath("a.b.c"), CNull, EmptyBitSet, 0))
@@ -78,7 +76,7 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[DateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[LocalDateTime](0)))
     }
     "roundtrip simple boolean segment" in {
       val segment = BooleanSegment(1234L, CPath("a.b.c"),
@@ -102,13 +100,13 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
     }
     "roundtrip arbitrary small segments" in {
       implicit val arbSegment = Arbitrary(genSegment(100))
-      check { (segment: Segment) =>
+      forAll { (segment: Segment) =>
         surviveRoundTrip(segment)
       }
     }
     "roundtrip arbitrary large segments" in {
       implicit val arbSegment = Arbitrary(genSegment(10000))
-      check { (segment: Segment) =>
+      forAll { (segment: Segment) =>
         surviveRoundTrip(segment)
       }
     }

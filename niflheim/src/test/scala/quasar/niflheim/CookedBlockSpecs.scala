@@ -18,12 +18,9 @@ package quasar.niflheim
 
 import quasar.precog.common._
 
-
-import java.io.File
-
 import org.specs2.mutable.Specification
 import org.specs2._
-import org.scalacheck._
+import org.scalacheck._, Prop._
 
 import scalaz._
 
@@ -37,8 +34,6 @@ case class VersionedCookedBlockFormatSpecs() extends CookedBlockFormatSpecs {
 
 trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentFormatSupport {
   def format: CookedBlockFormat
-
-  override val defaultPrettyParams = Pretty.Params(2)
 
   implicit val arbFile = Arbitrary(for {
     parts <- Gen.listOfN(3, Gen.identifier map { part =>
@@ -60,9 +55,9 @@ trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentF
     }
 
     "roundtrip arbitrary blocks" in {
-      check { files: List[(SegmentId, File)] =>
+      forAll { files: List[(SegmentId, File)] =>
         surviveRoundTrip(format)(CookedBlockMetadata(999L, files.length, files.toArray))
-      }.set(maxDiscarded -> 2000)
+      }.set(maxDiscardRatio = 20f)
     }
   }
 
@@ -70,10 +65,10 @@ trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentF
   def surviveRoundTrip(format: CookedBlockFormat)(segments0: CookedBlockMetadata) = {
     val out = new InMemoryWritableByteChannel
     format.writeCookedBlock(out, segments0) must beLike {
-      case Success(_) =>
+      case _root_.scalaz.Success(_) =>
         val in = new InMemoryReadableByteChannel(out.toArray)
         format.readCookedBlock(in) must beLike {
-          case Success(segments1) =>
+          case _root_.scalaz.Success(segments1) =>
             segments1 must_== segments0
         }
     }

@@ -425,7 +425,7 @@ private[niflheim] object ProjectionState {
   implicit val stateExtractor  = extractor[ProjectionState](v1Schema)
 
   def fromFile(input: File): IO[Validation[Error, ProjectionState]] = IO {
-    JParser.parseFromFile(input).bimap(Extractor.Thrown(_), x => x).flatMap { jv =>
+    JParser.parseFromFile(input).bimap(Extractor.Thrown(_): Extractor.Error, x => x).flatMap { jv =>
       jv.validated[ProjectionState]
     }
   }

@@ -22,6 +22,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 import scalaz.{Validation, Success, Failure}
+import scalaz.syntax.monad._
 
 /**
  * A `VersionedSegmentFormat` wraps formats and is used to deal with multiple

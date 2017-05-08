@@ -25,6 +25,7 @@ import java.nio.channels.WritableByteChannel
 import akka.actor._
 
 import scalaz._
+import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 

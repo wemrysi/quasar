@@ -23,6 +23,7 @@ import java.lang.ref.SoftReference
 import java.nio.channels._
 
 import scalaz._
+import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 

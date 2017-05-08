@@ -29,7 +29,8 @@ import scala.{ specialized => spec }
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import scalaz.{ Validation, Success, Failure }
+import scalaz.{Validation, Success, Failure}
+import scalaz.syntax.monad._
 
 object V1SegmentFormat extends SegmentFormat {
   private val checksum = true

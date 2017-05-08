@@ -23,6 +23,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 import scalaz._
+import scalaz.syntax.monad._
 
 case class CookedBlockMetadata(blockid: Long, length: Int, segments: Array[(SegmentId, File)]) {
   override def equals(that: Any): Boolean = that match {

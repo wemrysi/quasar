@@ -18,4 +18,20 @@ package quasar
 
 import quasar.precog.PackageAliases
 
-package object niflheim extends PackageAliases
+import scalaz._
+
+package object niflheim extends PackageAliases {
+
+  /**
+   * Dear god don't use this!  It's a shim to make old things work.  This is NOT
+   * a lawful monad!
+   */
+  @deprecated
+  private[niflheim] implicit def validationMonad[E]: Monad[Validation[E, ?]] =
+    new Monad[Validation[E, ?]] {
+      def point[A](a: => A) = Success(a)
+
+      def bind[A, B](fa: Validation[E, A])(f: A => Validation[E, B]): Validation[E, B] =
+        fa.fold(Failure(_), f)
+    }
+}

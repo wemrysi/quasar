@@ -16,18 +16,10 @@
 
 package quasar.niflheim
 
+import quasar.precog.BitSet
 import quasar.precog.common._
-
 import quasar.precog.util._
-import quasar.precog.BitSetUtil.Implicits._
-
-import org.joda.time.DateTime
-
-import scala.collection.mutable
-
-import java.io.IOException
-import java.nio.ByteBuffer
-import java.nio.channels._
+import quasar.precog.util.BitSetUtil.Implicits._
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
@@ -35,7 +27,12 @@ import org.scalacheck._
 
 import scalaz._
 
-import org.joda.time.Period
+import scala.collection.mutable
+import scala.reflect.ClassTag
+
+import java.nio.ByteBuffer
+import java.nio.channels._
+import java.time.{LocalDateTime, ZoneOffset}
 
 trait SegmentFormatSupport {
   import Gen._
@@ -49,26 +46,21 @@ trait SegmentFormatSupport {
     parts <- Gen.listOfN(len, Gen.identifier)
   } yield CPath(parts mkString ".")
 
-  def genBitSet(length: Int, density: Double): Gen[BitSet] = Gen { params =>
-    val bits = new mutable.ArrayBuffer[Int]
-    Loop.range(0, bits.length) { row =>
-      if (params.rng.nextDouble < density)
-        bits += row
-    }
-    Some(BitSetUtil.create(bits.toArray))
-  }
+  def genBitSet(length: Int, density: Double): Gen[BitSet] = for {
+    seeds <- Gen.listOfN(length, arbitrary[Double])
+  } yield BitSetUtil.create(seeds.map(_ < density).zipWithIndex.map(_._2))
 
   def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {
-    case CPeriod => arbitrary[Long].map(new Period(_))
+    case CPeriod => ??? // arbitrary[Long].map(new Period(_))
     case CBoolean => arbitrary[Boolean]
     case CString => arbitrary[String]
     case CLong => arbitrary[Long]
     case CDouble => arbitrary[Double]
     case CNum => arbitrary[BigDecimal]
-    case CDate => arbitrary[Long] map (new DateTime(_))
+    case CDate => arbitrary[Long].map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
     case CArrayType(elemType: CValueType[a]) =>
       val list: Gen[List[a]] = listOf(genForCType(elemType))
-      val array: Gen[Array[a]] = list map (_.toArray(elemType.manifest))
+      val array: Gen[Array[a]] = list map (_.toArray(elemType.classTag))
       array
   }
 
@@ -81,15 +73,9 @@ trait SegmentFormatSupport {
     }
   }
 
-  def genArray[A: Manifest](length: Int, g: Gen[A]): Gen[Array[A]] = for {
+  def genArray[A: ClassTag](length: Int, g: Gen[A]): Gen[Array[A]] = for {
     values <- listOfN(length, g)
-  } yield {
-    val array = manifest[A].newArray(length)
-    values.zipWithIndex foreach { case (v, i) =>
-      array(i) = v
-    }
-    array
-  }
+  } yield values.toArray
 
   def genArraySegmentForCType[A](ctype: CValueType[A], length: Int): Gen[ArraySegment[_]] = {
     val g = genForCType(ctype)
@@ -97,7 +83,7 @@ trait SegmentFormatSupport {
       blockId <- arbitrary[Long]
       cpath <- genCPath
       defined <- genBitSet(length, 0.5)
-      values <- genArray(length, g)(ctype.manifest) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
+      values <- genArray(length, g)(ctype.classTag) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
     } yield ArraySegment(blockId, cpath, ctype, defined, values)
   }
 
