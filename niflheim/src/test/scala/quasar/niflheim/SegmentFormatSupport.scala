@@ -57,10 +57,12 @@ trait SegmentFormatSupport {
     case CLong => arbitrary[Long]
     case CDouble => arbitrary[Double]
     case CNum => arbitrary[BigDecimal]
-    case CDate => arbitrary[Long].map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
+    case CDate =>
+      Gen.choose[Long](0, 1494284624296L).map(LocalDateTime.ofEpochSecond(_, 0, ZoneOffset.UTC))
     case CArrayType(elemType: CValueType[a]) =>
+      implicit val tag = elemType.classTag    // don't try to pass this explicitly!
       val list: Gen[List[a]] = listOf(genForCType(elemType))
-      val array: Gen[Array[a]] = list map (_.toArray(elemType.classTag))
+      val array: Gen[Array[a]] = list map (_.toArray)
       array
   }
 
