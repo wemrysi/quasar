@@ -91,6 +91,9 @@ object fn {
   def floor(n: XQuery): XQuery =
     XQuery(s"fn:floor($n)")
 
+  def formatDate(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-date($value, $picture)")
+
   def formatDateTime(value: XQuery, picture: XQuery): XQuery =
     XQuery(s"fn:format-dateTime($value, $picture)")
 

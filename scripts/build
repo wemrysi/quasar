@@ -19,17 +19,17 @@ TRAVIS_MAX_CONNECTOR_COMPILE_MINS=40
 TRAVIS_MAX_DOC_MINS=20
 
 # if we're building a pull request, DON'T clean and use the cache instead
+# coverage is disabled until we can have coverage in pull requests too
 if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
   CLEAN=clean
-  COVERAGE=coverage
-  COVERAGE_REPORT=coverageReport
+  COVERAGE= #coverage
+  COVERAGE_REPORT= #coverageReport
 else
   CLEAN=
   COVERAGE=
   COVERAGE_REPORT=
 fi
 
-# only do code coverage on job .1 AND on a non-pull request
 if [[ $CONNECTOR == "mongodb_2_6" ]]; then
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
