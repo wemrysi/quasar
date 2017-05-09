@@ -50,8 +50,6 @@ package object fs {
 
   final case class TmpPrefix(run: String) extends scala.AnyVal
 
-
-
   def fileSystem[S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]

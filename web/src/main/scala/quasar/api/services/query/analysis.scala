@@ -38,7 +38,7 @@ object analysis {
   type QST[A] = QScriptTotal[Fix, A]
 
   def service[S[_]](implicit
-      A: Analyze.Unsafe[S]
+      A: Analyze.Ops[S]
   ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
       Json(

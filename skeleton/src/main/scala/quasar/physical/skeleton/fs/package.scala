@@ -31,7 +31,6 @@ package object fs {
   def write[S[_]]: WriteFile ~> Free[S, ?] = Empty.writeFile[Free[S, ?]]
   def manage[S[_]]: ManageFile ~> Free[S, ?] = Empty.manageFile[Free[S, ?]]
 
-
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {

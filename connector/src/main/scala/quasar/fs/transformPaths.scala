@@ -202,11 +202,11 @@ object transformPaths {
   ): S ~> Free[S, ?] = {
     import Analyze._
 
-    val U = Analyze.Unsafe[S]
+    val O = Analyze.Ops[S]
 
     val g = λ[Analyze ~> Free[S, ?]] {
       case QueryCost(lp) =>
-        U.queryCost(transformFile(inPath)(lp)).leftMap(transformErrorPath(outPath)).run
+        O.queryCost(transformFile(inPath)(lp)).leftMap(transformErrorPath(outPath)).run
     }
     transformIn(g, liftFT[S])
   }

@@ -309,7 +309,6 @@ object QueryFile {
         .map(cs => Process.emitAll(cs) flatMap (Process.emitAll(_)))
     }
 
-
     /** Returns a description of how the the given logical plan will be
       * executed.
       */

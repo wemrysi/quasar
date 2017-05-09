@@ -31,14 +31,13 @@ object Analyze {
 
   final case class QueryCost(lp: Fix[LogicalPlan]) extends Analyze[FileSystemError \/ Int]
 
-  // TODO rename to Ops
-  final class Unsafe[S[_]](implicit S: Analyze :<: S) extends LiftedOps[Analyze, S] {
+  final class Ops[S[_]](implicit S: Analyze :<: S) extends LiftedOps[Analyze, S] {
     def queryCost(lp: Fix[LogicalPlan]): FileSystemErrT[Free[S, ?], Int] = EitherT(lift(QueryCost(lp)))
   }
 
-  object Unsafe {
-    implicit def apply[S[_]](implicit S: Analyze :<: S): Unsafe[S] =
-      new Unsafe[S]
+  object Ops {
+    implicit def apply[S[_]](implicit S: Analyze :<: S): Ops[S] =
+      new Ops[S]
   }
 
   def defaultInterpreter[S[_], F[_] : Traverse, T](toQS: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], T])(implicit

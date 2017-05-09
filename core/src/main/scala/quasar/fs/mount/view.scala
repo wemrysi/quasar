@@ -185,7 +185,7 @@ object view {
 
   def analyze[S[_]](implicit
     M: Mounting.Ops[S],
-    A: Analyze.Unsafe[S]
+    A: Analyze.Ops[S]
   ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
     def apply[A](from: Analyze[A]) = from match {
       case Analyze.QueryCost(lp) => resolveViewRefs[S](lp).run.flatMap(_.fold(
