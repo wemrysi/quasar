@@ -16,11 +16,13 @@
 
 package quasar.mimir
 
-import quasar.yggdrasil.bytecode._
+import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.blueeyes._
+import quasar.yggdrasil.execution.EvaluationContext
+
 import scalaz._, Scalaz._
 
 import java.time.LocalDateTime

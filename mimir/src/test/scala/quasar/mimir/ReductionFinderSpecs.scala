@@ -16,11 +16,13 @@
 
 package quasar.mimir
 
-import scalaz._
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.Identifier
 import quasar.yggdrasil._
+import quasar.yggdrasil.execution.EvaluationContext
+
+import scalaz._
 
 trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 

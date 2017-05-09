@@ -23,6 +23,7 @@ import scala.collection.mutable
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
+import quasar.yggdrasil.execution.EvaluationContext
 
 trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
   type TS1 = trans.TransSpec1

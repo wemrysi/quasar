@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.mimir
+package quasar.yggdrasil.execution
 
-import quasar.yggdrasil._
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import quasar.precog.common._, security._, accounts._
