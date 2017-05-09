@@ -23,6 +23,8 @@ import quasar.precog.common._
 import scalaz.Semigroup
 import quasar.precog._
 
+import java.time.LocalDateTime
+
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean
   def |>(f1: CF1): Option[Column] = f1(this)
@@ -134,7 +136,7 @@ object HomogeneousArrayColumn {
       new DateColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
-        def apply(row: Int): DateTime = col(row)(i)
+        def apply(row: Int): LocalDateTime = col(row)(i)
       }
     case col @ HomogeneousArrayColumn(CPeriod) =>
       new PeriodColumn {
@@ -243,8 +245,8 @@ trait StrColumn extends Column with (Int => String) {
   override def toString                   = "StrColumn"
 }
 
-trait DateColumn extends Column with (Int => DateTime) {
-  def apply(row: Int): DateTime
+trait DateColumn extends Column with (Int => LocalDateTime) {
+  def apply(row: Int): LocalDateTime
   def rowEq(row1: Int, row2: Int): Boolean = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
@@ -420,7 +422,7 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const(v: DateTime) = new InfiniteColumn with DateColumn {
+  @inline def const(v: LocalDateTime) = new InfiniteColumn with DateColumn {
     def apply(row: Int) = v
   }
 

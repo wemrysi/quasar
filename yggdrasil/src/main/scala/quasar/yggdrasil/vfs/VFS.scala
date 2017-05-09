@@ -24,7 +24,7 @@ import quasar.precog.common.security._
 import quasar.precog.util._
 
 import java.util.Arrays
-import java.nio.CharBuffer
+import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging

@@ -22,6 +22,8 @@ import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util._
 
+import java.time.LocalDateTime
+
 /**
   * Defines a base set of codecs that are often used in `RowFormat`s.
   */
@@ -31,7 +33,7 @@ trait StdCodecs {
   implicit def BigDecimalCodec: Codec[BigDecimal]
   implicit def StringCodec: Codec[String]
   implicit def BooleanCodec: Codec[Boolean]
-  implicit def DateTimeCodec: Codec[DateTime]
+  implicit def DateTimeCodec: Codec[LocalDateTime]
   implicit def PeriodCodec: Codec[Period]
   implicit def BitSetCodec: Codec[BitSet]
   implicit def RawBitSetCodec: Codec[RawBitSet]
@@ -56,7 +58,7 @@ trait RowFormatCodecs extends StdCodecs { self: RowFormat =>
   implicit def BigDecimalCodec: Codec[BigDecimal] = Codec.BigDecimalCodec
   implicit def StringCodec: Codec[String]         = Codec.Utf8Codec
   implicit def BooleanCodec: Codec[Boolean]       = Codec.BooleanCodec
-  implicit def DateTimeCodec: Codec[DateTime]     = Codec.DateCodec
+  implicit def DateTimeCodec: Codec[LocalDateTime]     = Codec.DateCodec
   implicit def PeriodCodec: Codec[Period]         = Codec.PeriodCodec
   // implicit def BitSetCodec: Codec[BitSet] = Codec.BitSetCodec
   //@transient implicit lazy val BitSetCodec: Codec[BitSet] = Codec.SparseBitSetCodec(columnRefs.size)

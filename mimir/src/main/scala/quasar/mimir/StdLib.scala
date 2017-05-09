@@ -23,6 +23,8 @@ import quasar.yggdrasil.table._
 import quasar.blueeyes._
 import scalaz._, Scalaz._
 
+import java.time.LocalDateTime
+
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
   implicit def M: Monad[M]
@@ -311,7 +313,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: DateTime => Boolean, f: DateTime => String) extends Map1Column(c) with StrColumn {
+    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -372,7 +374,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: DateTime => Boolean, f: DateTime => Long) extends Map1Column(c) with LongColumn {
+    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -748,7 +750,7 @@ object StdLib {
       def apply(row: Int) = f(c1(row), c2(row))
     }
 
-    class Dt(c: DateColumn, defined: DateTime => Boolean, f: DateTime => Boolean) extends Map1Column(c) with BoolColumn {
+    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Boolean) extends Map1Column(c) with BoolColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -756,7 +758,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class DtDt(c1: DateColumn, c2: DateColumn, defined: (DateTime, DateTime) => Boolean, f: (DateTime, DateTime) => Boolean)
+    class DtDt(c1: DateColumn, c2: DateColumn, defined: (LocalDateTime, LocalDateTime) => Boolean, f: (LocalDateTime, LocalDateTime) => Boolean)
         extends Map2Column(c1, c2)
         with BoolColumn {
 
