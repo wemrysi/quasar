@@ -455,6 +455,7 @@ lazy val it = project
 
 /***** PRECOG *****/
 
+// copied from sbt-slamdata (remove redundancy when slamdata/sbt-slamdata#23 is fixed)
 val headerSettings = Seq(
   headers := Map(
      ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
