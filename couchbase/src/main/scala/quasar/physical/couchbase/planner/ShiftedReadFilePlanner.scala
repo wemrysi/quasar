@@ -42,7 +42,7 @@ final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Monad: BucketNam
     case Const(ShiftedRead(absFile, idStatus)) =>
       (genId[T[N1QL], M] ⊛ BucketNameReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]) { (gId, bkt) =>
         val collection = common.docTypeFromPath(absFile)
-
+        
         val v =
           IfMissing(
             SelectField(gId.embed, str("value").embed).embed,

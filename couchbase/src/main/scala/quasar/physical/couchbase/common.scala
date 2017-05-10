@@ -51,7 +51,7 @@ object common {
   val CBDataCodec = DataCodec.Precise
 
   def docTypeFromPath(p: APath): DocType =
-    DocType(Path.flatten(None, None, None, Some(_), Some(_), p).toIList.intercalate("/".some).orZero)
+    DocType(Path.flatten(None, None, None, Some(_), Some(_), p).toIList.unite.intercalate("/"))
 
   def deleteHavingPrefix(
     bucket: Bucket,
