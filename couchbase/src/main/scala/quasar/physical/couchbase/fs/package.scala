@@ -40,7 +40,7 @@ import scalaz.concurrent.Task
 
 // TODO: Injection? Parameterized queries could help but don't appear to handle bucket names within ``
 // TODO: Handle query returned errors field
-// TODO: It might make sene to add connection uri parameter to configure collection field (currently always type)
+// TODO: It might make sense to add connection uri parameter to configure collection field (currently always type)
 //       So when people list a bucket they would see type values
 //       What about a bucket with no type field, should we make it optional? If optional Quasar would see the entire file
 

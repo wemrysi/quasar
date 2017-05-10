@@ -86,9 +86,6 @@ object common {
       case h :: _   => DirName(h).left
     }.toSet
 
-  //def pathSegmentsFromBucketCollections(bktCols: List[String]): Set[PathSegment] =
-  //  pathSegments(bktCols.map(bc => bc.bucket :: bc.collection.split("/").toList))
-
   def pathSegmentsFromPrefixTypes(prefix: String, types: List[DocType]): Set[PathSegment] =
     pathSegments(types.map(_.v.stripPrefix(prefix).stripPrefix("/").split("/").toList))
 
