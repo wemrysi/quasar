@@ -40,12 +40,6 @@ printf "\n\n"
 
 sleep 10
 
-echo "setting up couchbase default buckets..."
-curl -v $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=default&authType=sasl'
-printf "\n\n"
-
-sleep 10
-
 echo "setting up couchbase quasar-test buckets..."
 curl -v $CB:8091/pools/default/buckets -d 'ramQuotaMB=100&name=quasar-test&authType=sasl'
 printf "\n\n"

@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.connector.EnvironmentError, EnvironmentError.{connectionFailed, invalidCredentials}
+import quasar.connector.EnvironmentError, EnvironmentError.invalidCredentials
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._, ski.κ
@@ -26,15 +26,14 @@ import quasar.fs.mount._, FileSystemDef.{DefErrT, DefinitionError}
 
 import quasar.physical.couchbase.common.{Context, Cursor}
 
-import java.net.ConnectException
 import java.time.Duration
 import scala.math
 
+import com.couchbase.client.core.CouchbaseException
 import com.couchbase.client.java.{CouchbaseCluster, Cluster}
 import com.couchbase.client.java.env.{CouchbaseEnvironment, DefaultCouchbaseEnvironment}
-import com.couchbase.client.java.error.InvalidPasswordException
 import com.couchbase.client.java.util.features.Version
-import org.http4s.Uri
+import org.http4s.{Uri, Query}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -61,14 +60,6 @@ package object fs {
     KeyValueStore[WriteHandle,  writefile.State,  ?] :/:
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
-
-  object CBConnectException {
-    def unapply(ex: Throwable): Option[ConnectException] =
-      ex.getCause match {
-        case ex: ConnectException => ex.some
-        case _                    => none
-      }
-  }
 
   def context(connectionUri: ConnectionUri): DefErrT[Task, (Context, Cluster)] = {
     final case class ConnUriParams(bucket: String, pass: String, socketConnectTimeout: Duration, queryTimeout: Duration)
@@ -99,10 +90,10 @@ package object fs {
                    uri.params.get("password").toSuccessNel("No password in ConnectionUri")   |@|
                    duration(uri, "socketConnectTimeoutSeconds", defaultSocketConnectTimeout) |@|
                    duration(uri, "queryTimeoutSeconds", defaultQueryTimeout)
-                 )(ConnUriParams(uri.path, _, _, _)).disjunction)
+                 )(ConnUriParams(uri.path.stripPrefix("/"), _, _, _)).disjunction)
       ev      <- env(params).liftM[DefErrT]
       cluster <- EitherT(Task.delay(
-                   CouchbaseCluster.fromConnectionString(ev, uri.renderString).right
+                   CouchbaseCluster.fromConnectionString(ev, uri.copy(path = "", query = Query.empty).renderString).right
                  ).handle {
                    case e: Exception => e.getMessage.wrapNel.left[EnvironmentError].left
                  })
@@ -112,18 +103,15 @@ package object fs {
                      s"Couchbase Server must be ${minimumRequiredVersion}+"
                        .wrapNel.left[EnvironmentError].left)
                  ).handle {
-                   case _: InvalidPasswordException =>
+                   // NB: CB client issues an opque error when credentials or bucket are incorrect 
+                   case _: CouchbaseException => 
                      invalidCredentials(
-                       "Unable to obtain a ClusterManager with provided credentials."
-                     ).right[NonEmptyList[String]].left
-                   case CBConnectException(ex) =>
-                     connectionFailed(
-                       ex
+                       "Unable to obtain a ClusterManager with provided bucket name or password."
                      ).right[NonEmptyList[String]].left
                  })
       bkt     <- EitherT(Task.delay(cm.hasBucket(params.bucket).booleanValue).ifM(
                    Task.delay(cluster.openBucket(params.bucket, params.pass).right[DefinitionError]),
-                   Task.now("Bucket $name not found".wrapNel.left.left)))
+                   Task.now(s"Bucket ${params.bucket} not found".wrapNel.left.left)))
     } yield (Context(bkt), cluster)
   }
 
