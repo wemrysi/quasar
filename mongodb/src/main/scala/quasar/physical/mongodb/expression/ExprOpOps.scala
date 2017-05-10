@@ -17,9 +17,7 @@
 package quasar.physical.mongodb.expression
 
 import slamdata.Predef._
-import quasar._, Planner._
 import quasar.physical.mongodb.Bson
-import quasar.jscore, jscore.JsFn
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -33,9 +31,6 @@ trait ExprOpOps[IN[_]] {
   def simplify: AlgebraM[Option, IN, Fix[OUT]]
 
   def bson: Algebra[IN, Bson]
-
-  /** "Literal" translation to JS. */
-  def toJsSimple: AlgebraM[PlannerError \/ ?, IN, JsFn]
 
   def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]]
 
@@ -66,9 +61,6 @@ object ExprOpOps {
 
       val bson: Algebra[Coproduct[F, G, ?], Bson] =
         _.run.fold(F.bson(_), G.bson(_))
-
-      val toJsSimple: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], JsFn] =
-        _.run.fold(F.toJsSimple(_), G.toJsSimple(_))
 
       override def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
         val rf = F.rewriteRefs0(applyVar)

@@ -18,6 +18,7 @@ package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
 import quasar.RenderTree
+import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._
@@ -116,11 +117,11 @@ object JoinHandler {
       // field referenced on one side of the condition is not found.
       def filterExists(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
         WB.filter(wb,
-          List(ExprBuilder(wb, \/-($var(DocField(field))))),
+          List(ExprBuilder(wb, docVarToExpr(DocField(field)))),
           { case List(f) => Selector.Doc(f -> Selector.Exists(true)) })
 
       lKey match {
-        case Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(lField)))))) if src ≟ lSrc =>
+        case Fix(ExprBuilderF(src, HasThat($var(DocVar(_, Some(lField)))))) if src ≟ lSrc =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
           generateWorkflow(filtered).map { case (left, _) =>
@@ -194,7 +195,7 @@ object JoinHandler {
       arg match {
         case JoinSource(
               Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
-              List(Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(field))))))),
+              List(Fix(ExprBuilderF(src, HasThat($var(DocVar(_, Some(field))))))),
               _) if src ≟ arg.src =>
           (coll, field).some
         case _ =>
@@ -238,9 +239,10 @@ object JoinHandler {
       (DocBuilder(
         reduce(groupBy(src, key))($push(_)),
         ListMap(
-          rootField             -> \/-($$ROOT),
-          otherField            -> \/-($literal(Bson.Arr())),
-          BsonField.Name("_id") -> \/-($include()))),
+          rootField             -> docVarToExpr(DocVar.ROOT()),
+          // TODO: Use `ejsonToExpr` for this
+          otherField            -> \&/(JsFn.const(jscore.Arr(Nil)), $literal(Bson.Arr())),
+          BsonField.Name("_id") -> docVarToExpr(DocField(BsonField.Name("_id"))))),
         ι)
 
     val (left, right, leftField, rightField) =

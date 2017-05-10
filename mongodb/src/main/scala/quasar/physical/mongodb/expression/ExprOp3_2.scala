@@ -17,16 +17,12 @@
 package quasar.physical.mongodb.expression
 
 import slamdata.Predef._
-import quasar._, Planner._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.physical.mongodb.{Bson, javascript}
-import quasar.javascript.{Js}
-import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.physical.mongodb.{Bson}
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators added in MongoDB version 3.2. */
@@ -106,28 +102,6 @@ object ExprOp3_2F {
       case $arrayElemAtF(array, idx) => Bson.Doc("$arrayElemAt" -> Bson.Arr(array, idx))
       case $concatArraysF(value)     => Bson.Doc("$concatArrays" -> Bson.Arr(value: _*))
       case $isArrayF(value)          => Bson.Doc("$isArray" -> value)
-    }
-
-    // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
-    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-    def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_2F, JsFn] = {
-      import jscore._
-      val js = new javascript[JsCore](_.embed)
-
-      def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
-        \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
-      def expr2(x1: JsFn, x2: JsFn)(f: (JsCore, JsCore) => JsCore): PlannerError \/ JsFn =
-        \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)), x2(jscore.Ident(JsFn.defaultName)))))
-
-      {
-        case $truncF(a1) => expr1(a1)(x =>
-          Call(Select(ident("Math"), "trunc"), List(x)))
-        case $arrayElemAtF(a1, a2) => expr2(a1, a2)(Access(_, _))
-        case $concatArraysF(as) =>
-          as.foldRightM(JsFn.const(jscore.Literal(Js.AnonElem(Nil))))(expr2(_, _)(BinOp(jscore.Add, _, _)))
-        case $isArrayF(a1) => expr1(a1)(js.isArray)
-        case expr => UnsupportedJS(expr.toString).left
-      }
     }
 
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)

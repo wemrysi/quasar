@@ -22,6 +22,7 @@ import quasar.common.{PhaseResult, PhaseResults, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
@@ -156,6 +157,27 @@ object MongoDbPlanner {
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
   val check = new Check[Fix[ExprOp], ExprOp]
 
+  def ejsonToExpression[M[_]: Applicative, EJ]
+    (ej: EJ)
+    (implicit merr: MonadError_[M, FileSystemError], EJ: Recursive.Aux[EJ, EJson])
+      : M[Fix[ExprOp]] =
+    ej.cataM(BsonCodec.fromEJson).fold(pe => merr.raiseError(qscriptPlanningFailed(pe)), $literal(_).point[M])
+
+  // TODO: Use `JsonCodec.encode` and avoid failing.
+  def ejsonToJs[M[_]: Applicative, EJ: Show]
+    (ej: EJ)
+    (implicit merr: MonadError_[M, FileSystemError], EJ: Recursive.Aux[EJ, EJson])
+      : M[JsCore] =
+    ej.cata(Data.fromEJson).toJs.fold(
+      merr.raiseError[JsCore](qscriptPlanningFailed(NonRepresentableEJson(ej.shows))))(
+      _.point[M])
+
+  def ejsonToExpr[M[_]: Applicative, EJ: Show]
+    (ej: EJ)
+    (implicit merr: MonadError_[M, FileSystemError], EJ: Recursive.Aux[EJ, EJson])
+      : M[Expr] =
+    exprOrJs(ej)(ejsonToExpression[M, EJ], ejsonToJs[M, EJ](_) ∘ JsFn.const)
+
   def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
@@ -166,10 +188,7 @@ object MongoDbPlanner {
       funcHandler.run(mf).map(t => unpack(t.mapSuspension(inj)))
 
     val handleSpecial: MapFunc[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
-      case Constant(v1) =>
-        v1.cataM(BsonCodec.fromEJson).fold(
-          κ(merr.raiseError(qscriptPlanningFailed(NonRepresentableEJson(v1.shows)))),
-          $literal(_).point[M])
+      case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
       case Now() => unimplemented[M, Fix[ExprOp]]("Now expression")
 
       // FIXME: Will only work for Arrays, not Strings
@@ -276,11 +295,7 @@ object MongoDbPlanner {
       JsFuncHandler(mf).map(unpack[Fix, JsCoreF])
 
     val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {
-      case Constant(v1) =>
-        v1.cata(Data.fromEJson).toJs.fold(
-          merr.raiseError[JsCore](qscriptPlanningFailed(NonRepresentableEJson(v1.shows))))(
-          _.point[M])
-      // FIXME: Not correct
+      case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
       case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
         merr.raiseError[JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
@@ -326,8 +341,7 @@ object MongoDbPlanner {
             Literal(Js.Str(".")),
             pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).point[M]
       }
-      case ToTimestamp(a1) =>
-        New(Name("Date"), List(Select(a1, "epoch"))).point[M]
+      case ToTimestamp(a1) => New(Name("Date"), List(a1)).point[M]
 
       case ExtractCentury(date) =>
         Call(Select(ident("Math"), "ceil"), List(
@@ -342,7 +356,18 @@ object MongoDbPlanner {
             Literal(Js.Num(10, false)))).point[M]
       case ExtractDayOfWeek(date) =>
         Call(Select(date, "getUTCDay"), Nil).point[M]
-      case ExtractDayOfYear(date) => unimplemented[M, JsCore]("ExtractDayOfYear JS")
+      case ExtractDayOfYear(date) =>
+        Call(Select(ident("Math"), "floor"), List(
+          BinOp(jscore.Add,
+            BinOp(jscore.Div,
+              BinOp(Sub,
+                date,
+                New(Name("Date"), List(
+                  Call(Select(date, "getFullYear"), Nil),
+                  Literal(Js.Num(0, false)),
+                  Literal(Js.Num(0, false))))),
+              Literal(Js.Num(86400000, false))),
+            Literal(Js.Num(1, false))))).point[M]
       case ExtractEpoch(date) =>
         BinOp(jscore.Div,
           Call(Select(date, "valueOf"), Nil),
@@ -354,7 +379,8 @@ object MongoDbPlanner {
             BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
             Literal(Js.Num(7, false)),
             ident("x"))).point[M]
-      case ExtractIsoYear(date) => unimplemented[M, JsCore]("ExtractIsoYear JS")
+      case ExtractIsoYear(date) =>
+        Call(Select(date, "getUTCFullYear"), Nil).point[M]
       case ExtractMicroseconds(date) =>
         BinOp(jscore.Mult,
           BinOp(jscore.Add,
@@ -394,7 +420,25 @@ object MongoDbPlanner {
           BinOp(jscore.Div,
             Call(Select(date, "getUTCMilliseconds"), Nil),
             Literal(Js.Num(1000, false)))).point[M]
-      case ExtractWeek(date) => unimplemented[M, JsCore]("ExtractWeek JS")
+      case ExtractWeek(date) =>
+        Call(Select(ident("Math"), "floor"), List(
+          BinOp(jscore.Add,
+            BinOp(jscore.Div,
+              Let(Name("startOfYear"),
+                New(Name("Date"), List(
+                  Call(Select(date, "getFullYear"), Nil),
+                  Literal(Js.Num(0, false)),
+                  Literal(Js.Num(1, false)))),
+                BinOp(jscore.Add,
+                  BinOp(Div,
+                    BinOp(Sub, date, ident("startOfYear")),
+                    Literal(Js.Num(86400000, false))),
+                  BinOp(jscore.Add,
+                    Call(Select(ident("startOfYear"), "getDay"), Nil),
+                    Literal(Js.Num(1, false))))),
+              Literal(Js.Num(7, false))),
+            Literal(Js.Num(1, false))))).point[M]
+
       case ExtractYear(date) => Call(Select(date, "getUTCFullYear"), Nil).point[M]
 
       case Negate(a1)       => UnOp(Neg, a1).point[M]
@@ -453,7 +497,7 @@ object MongoDbPlanner {
         If(isInt(a1),
           // NB: This is a terrible way to turn an int into a string, but the
           //     only one that doesn’t involve converting to a decimal and
-          //     losing pre222222cision.
+          //     losing precision.
           Call(Select(Call(ident("String"), List(a1)), "replace"), List(
             Call(ident("RegExp"), List(
               Literal(Js.Str("[^-0-9]+")),
@@ -472,7 +516,6 @@ object MongoDbPlanner {
           List(a1)).point[M]
       case Substring(a1, a2, a3) =>
         Call(Select(a1, "substr"), List(a2, a3)).point[M]
-      // case ToId(a1) => Call(ident("ObjectId"), List(a1)).point[M]
 
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations
@@ -509,7 +552,17 @@ object MongoDbPlanner {
           merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
 
-      case Range(_, _)        => unimplemented[M, JsCore]("Range JS")
+      // FIXME: Doesn't work for Char.
+      case Range(start, end)        =>
+        Call(
+          Select(
+            Call(Select(ident("Array"), "apply"), List(
+              Literal(Js.Null),
+              Call(ident("Array"), List(BinOp(Sub, end, start))))),
+            "map"),
+          List(
+            Fun(List(Name("element"), Name("index")),
+              BinOp(jscore.Add, ident("index"), start)))).point[M]
     }
 
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
@@ -794,7 +847,7 @@ object MongoDbPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedReadFile[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+    implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
@@ -815,12 +868,13 @@ object MongoDbPlanner {
               coll => {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` from the value here?
-                (qs.getConst.idStatus match {
-                  case IdOnly => ExprBuilder(dataset, $field("_id").right)
-                  case IncludeId =>
-                    ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
-                  case ExcludeId => dataset
-                }).point[M]
+                (handleFreeMap[T, M, EX](funcHandler, Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id")))) ⊛
+                  handleFreeMap[T, M, EX](funcHandler, HoleF))((key, root) =>
+                  (qs.getConst.idStatus match {
+                    case IdOnly    => ExprBuilder(dataset, key)
+                    case IncludeId => ArrayBuilder(dataset, List(key, root))
+                    case ExcludeId => dataset
+                  }))
               })
       }
 
@@ -862,12 +916,12 @@ object MongoDbPlanner {
                 }
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
-                  red.map(_.sequence).sequence.fold(
-                    κ(GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
+                  semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
+                    GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
                       List(newB),
                       Contents.Doc(red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),
-                          accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap))),
+                          accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap)))(
                     exprs => GroupBuilder(src,
                       List(newB),
                       Contents.Doc(exprs.zipWithIndex.map(ai =>
@@ -1062,14 +1116,18 @@ object MongoDbPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def exprOrJs[M[_]: Functor, A]
+  def exprOrJs[M[_]: Applicative, A]
     (a: A)
     (exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
     (implicit merr: MonadError_[M, FileSystemError])
-      : M[Expr] =
-    merr.handleError(
-      exf(a).map(_.right[JsFn]))(
-      _ => jsf(a).map(_.left[Fix[ExprOp]]))
+      : M[Expr] = {
+    // TODO: Return _both_ errors
+    val js = jsf(a)
+    val expr = exf(a)
+    merr.handleError[Expr](
+      (js ⊛ expr)(\&/.Both(_, _)))(
+      _ => merr.handleError[Expr](js.map(-\&/))(_ => expr.map(\&/-)))
+  }
 
   def handleFreeMap[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
@@ -1119,7 +1177,7 @@ object MongoDbPlanner {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def HasLiteral[M[_]: Applicative, WF[_]]
     (wb: WorkflowBuilder[WF])
-    (implicit merr: MonadError_[M, FileSystemError])
+    (implicit merr: MonadError_[M, FileSystemError], ev0: WorkflowOpCoreF :<: WF)
       : M[Bson] =
     asLiteral(wb).fold(
       merr.raiseError[Bson](qscriptPlanningFailed(NonRepresentableEJson(wb.toString))))(
@@ -1128,7 +1186,7 @@ object MongoDbPlanner {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def HasInt[M[_]: Monad, WF[_]]
     (wb: WorkflowBuilder[WF])
-    (implicit merr: MonadError_[M, FileSystemError])
+    (implicit merr: MonadError_[M, FileSystemError], ev0: WorkflowOpCoreF :<: WF)
       : M[Long] =
     HasLiteral[M, WF](wb) >>= {
       case Bson.Int32(v) => v.toLong.point[M]

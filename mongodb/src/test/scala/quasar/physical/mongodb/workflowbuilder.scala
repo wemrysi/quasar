@@ -17,11 +17,11 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner._
-import quasar.common.SortDir
+import quasar._
+import quasar.contrib.scalaz._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.javascript._
+import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
@@ -52,154 +52,12 @@ class WorkflowBuilderSpec extends quasar.Qspec {
       op must beRightDisjunction($read[WorkflowF](collection("db", "zips")))
     }
 
-    "make simple projection" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city  <- lift(projectField(read, "city"))
-        city2 =  makeObject(city, "city")
-        rez   <- build(city2)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $project(Reshape(ListMap(
-          BsonField.Name("city") -> \/-($field("city")))),
-          IgnoreId)))
-    }
-
-    "elide array with known projection" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city   <- lift(projectField(read, "city"))
-        state  <- lift(projectField(read, "state"))
-        array  <- arrayConcat(makeArray(city), makeArray(state))
-        state2 <- lift(projectIndex(array, 1))
-      } yield state2).evalZero
-
-      op must_== projectField(read, "state")
-    }
-
-    "error with out-of-bounds projection" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city   <- lift(projectField(read, "city"))
-        state  <- lift(projectField(read, "state"))
-        array  <- arrayConcat(makeArray(city), makeArray(state))
-        state2 <- lift(projectIndex(array, 2))
-      } yield state2).evalZero
-
-      op must beLeftDisjunction(UnsupportedFunction(
-        quasar.std.StdLib.structural.ArrayProject,
-        Some("array does not contain index ‘2’.")))
-    }
-
-    "merge reads" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city   <- lift(projectField(read, "city"))
-        pop    <- lift(projectField(read, "pop"))
-        left   =  makeObject(city, "city")
-        right  =  makeObject(pop, "pop")
-        merged <- objectConcat(left, right)
-        rez    <- build(merged)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-          $read(collection("db", "zips")),
-          $project(Reshape(ListMap(
-            BsonField.Name("city") -> \/-($field("city")),
-            BsonField.Name("pop")  -> \/-($field("pop")))),
-            IgnoreId)))
-    }
-
-    "sorted" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        key  <- lift(projectField(read, "city"))
-        sort =  sortBy(read, List(key), SortDir.Ascending :: Nil)
-        rez  <- build(sort)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-    }
-
-    "merge index projections" in {
-      import jscore._
-
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        l    <- lift(projectField(read, "loc").flatMap(projectIndex(_, 1)))
-        r    <- lift(projectField(read, "enemies").flatMap(projectIndex(_, 0)))
-        lobj =  makeObject(l, "long")
-        robj =  makeObject(r, "public enemy #1")
-        merged <- objectConcat(lobj, robj)
-        rez    <- build(merged)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "long" ->
-            Access(Select(ident("x"), "loc"),
-              Literal(Js.Num(1, false))),
-          "public enemy #1" ->
-            Access(Select(ident("x"), "enemies"),
-              Literal(Js.Num(0, false))))))),
-          ListMap())))
-    }
-
-    "group on multiple fields" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city    <- lift(projectField(read, "city"))
-        state   <- lift(projectField(read, "state"))
-        grouped =  groupBy(read, List(city, state))
-        sum     <- lift(projectField(grouped, "pop")).map(reduce(_)($sum(_)))
-        rez     <- build(sum)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(chain[Workflow](
-        $read(collection("db", "zips")),
-        $group(
-          Grouped(ListMap(
-            BsonField.Name("__tmp0") -> $sum($field("pop")))),
-          -\/(Reshape(ListMap(
-            BsonField.Name("0") -> \/-($field("city")),
-            BsonField.Name("1") -> \/-($field("state")))))),
-        $project(
-          Reshape(ListMap(
-            BsonField.Name("value") -> \/-($field("__tmp0")))),
-            ExcludeId)))
-    }
-
-    "group in proj" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        pop     <- lift(projectField(read, "pop"))
-        grouped =  groupBy(pop, Nil)
-        total   =  reduce(grouped)($sum(_))
-        obj     =  makeObject(total, "total")
-        rez     <- build(obj)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow]($read(collection("db", "zips")),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("total") -> $sum($field("pop")))),
-            \/-($literal(Bson.Null)))))
-    }
-
     "group constant in proj" in {
       val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        one <- expr1(read)(κ($literal(Bson.Int32(1))))
-        grouped = groupBy(one, List(one))
-        obj =  makeObject(reduce(grouped)($sum(_)), "total")
-        rez <- build(obj)
-      } yield rez).evalZero
+      val one = ExprBuilder(read, \&/-($literal(Bson.Int32(1))))
+      val grouped = groupBy(one, List(one))
+      val obj = makeObject(reduce(grouped)($sum(_)), "total")
+      val op = build(obj).evalZero
 
       op must beRightDisjOrDiff(
         chain[Workflow]($read(collection("db", "zips")),
@@ -207,135 +65,6 @@ class WorkflowBuilderSpec extends quasar.Qspec {
             Grouped(ListMap(
               BsonField.Name("total") -> $sum($literal(Bson.Int32(1))))),
             \/-($literal(Bson.Null)))))
-    }
-
-    "group in two projs" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        one   <- expr1(read)(κ($literal(Bson.Int32(1))))
-        cp    =  makeObject(reduce(one)($sum(_)), "count")
-        pop   <- lift(projectField(read, "pop"))
-        total =  reduce(pop)($sum(_))
-        tp    =  makeObject(total, "total")
-
-        proj  <- objectConcat(cp, tp)
-        rez   <- build(proj)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow]($read(collection("db", "zips")),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("count") -> $sum($literal(Bson.Int32(1))),
-              BsonField.Name("total") -> $sum($field("pop")))),
-            \/-($literal(Bson.Null)))))
-    }
-
-    "group on a field" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city    <- lift(projectField(read, "city"))
-        pop     <- lift(projectField(read, "pop"))
-        grouped =  groupBy(pop, List(city))
-        total   =  reduce(grouped)($sum(_))
-        obj     =  makeObject(total, "total")
-        rez     <- build(obj)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow]($read(collection("db", "zips")),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("total") -> $sum($field("pop")))),
-            -\/(Reshape(ListMap(BsonField.Name("0") -> \/-($field("city"))))))))
-    }
-
-    "group on a field, with un-grouped projection" in {
-      val read = builder.read(collection("db", "zips"))
-      val op = (for {
-        city    <- lift(projectField(read, "city"))
-        grouped =  groupBy(read, List(city))
-        city2   <- lift(projectField(grouped, "city"))
-        pop     <- lift(projectField(grouped, "pop"))
-        total   =  reduce(pop)($sum(_))
-        proj0   =  makeObject(total, "total")
-        proj1   =  makeObject(city2, "city")
-        projs   <- objectConcat(proj0, proj1)
-        rez     <- build(projs)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow]($read(collection("db", "zips")),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("total") -> $sum($field("pop")),
-              BsonField.Name("city")  -> $push($field("city")))),
-            -\/(Reshape(ListMap(BsonField.Name("0") -> \/-($field("city")))))),
-          $unwind(DocField(BsonField.Name("city")))))
-    }
-
-    "group in expression" in {
-      val read    = builder.read(collection("db", "zips"))
-      val op = (for {
-        pop     <- lift(projectField(groupBy(read, Nil), "pop"))
-        total   =  reduce(pop)($sum(_))
-        expr    <- expr1(total)($divide(_, $literal(Bson.Int32(1000))))
-        inK     =  makeObject(expr, "totalInK")
-        rez     <- build(inK)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow]($read(collection("db", "zips")),
-          $group(
-            Grouped(ListMap(
-              BsonField.Name("__tmp0") -> $sum($field("pop")))),
-            \/-($literal(Bson.Null))),
-          $project(Reshape(ListMap(
-            BsonField.Name("totalInK") ->
-              \/-($divide($field("__tmp0"), $literal(Bson.Int32(1000)))))),
-          IgnoreId)))
-    }
-
-    "not flatten with nested exprs" in {
-      val read    = builder.read(collection("db", "zips"))
-      val op = (for {
-        check0 <- expr1(read)($cond($literal(Bson.Bool(true)), _, $literal(Bson.Int32(0))))
-        loc    <- lift(projectField(check0, "loc"))
-        check1 <- expr1(loc)($cond($literal(Bson.Bool(true)), _, $literal(Bson.Int32(1))))
-        flat   =  flattenArray(check1)
-
-        city   <- lift(projectField(read, "city"))
-        filtered = filter(city, List(flat), { case p :: Nil => Selector.Doc(p -> Selector.Lt(Bson.Int32(1000))) })
-
-        rez    <- build(filtered)
-      } yield rez).evalZero
-
-      op must beRightDisjOrDiff(
-        chain[Workflow](
-          $read(collection("db", "zips")),
-          $project(
-            Reshape(ListMap(
-              BsonField.Name("__tmp0") -> $cond($literal(Bson.Bool(true)), $$ROOT, $literal(Bson.Int32(0))).right,
-              BsonField.Name("__tmp1") -> $$ROOT.right)),
-            IgnoreId),
-          $project(
-            Reshape(ListMap(
-              BsonField.Name("__tmp2") -> $cond($literal(Bson.Bool(true)), $field("__tmp0", "loc"), $literal(Bson.Int32(1))).right,
-              BsonField.Name("__tmp3") -> $field("__tmp1").right)),
-            IgnoreId),
-          $unwind(DocField(BsonField.Name("__tmp2"))),
-          $project(
-            Reshape(ListMap(
-              BsonField.Name("__tmp4") -> $field("__tmp3", "city").right,
-              BsonField.Name("__tmp5") -> $field("__tmp2").right)),
-            IgnoreId),
-          $match(
-            Selector.Doc(
-              BsonField.Name("__tmp5") -> Selector.Lt(Bson.Int32(1000)))),
-          $project(
-            Reshape(ListMap(
-              BsonField.Name("value") -> $field("__tmp4").right)),
-            ExcludeId)))
     }
 
     "normalize" should {
@@ -346,13 +75,13 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp") -> -\/(jscore.JsFn(jscore.Name("x"), jscore.Literal(Js.Bool(true)))))),
+              BsonField.Name("__tmp") -> -\&/(jscore.JsFn(jscore.Name("x"), jscore.Literal(Js.Bool(true)))))),
           ListMap(
-            BsonField.Name("0") -> \/-($var(DocField(BsonField.Name("__tmp"))))))
+            BsonField.Name("0") -> \&/-($var(DocField(BsonField.Name("__tmp"))))))
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("0") -> -\/(jscore.JsFn(jscore.Name("y"), jscore.Literal(Js.Bool(true))))))
+            BsonField.Name("0") -> -\&/(jscore.JsFn(jscore.Name("y"), jscore.Literal(Js.Bool(true))))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
       }
@@ -362,13 +91,13 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp") -> \/-($var(DocField(BsonField.Name("foo")))))),
+              BsonField.Name("__tmp") -> \&/-($var(DocField(BsonField.Name("foo")))))),
           ListMap(
-            BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("__tmp")))))))
+            BsonField.Name("0") -> \&/-($toLower($var(DocField(BsonField.Name("__tmp")))))))
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("foo")))))))
+            BsonField.Name("0") -> \&/-($toLower($var(DocField(BsonField.Name("foo")))))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
       }
@@ -378,16 +107,18 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp") -> -\/(jscore.JsFn(jscore.Name("x"), jscore.Literal(Js.Str("ABC")))))),
+              BsonField.Name("__tmp") -> -\&/(jscore.JsFn(jscore.Name("x"), jscore.Literal(Js.Str("ABC")))))),
           ListMap(
-            BsonField.Name("0") -> \/-($toLower($var(DocField(BsonField.Name("__tmp")))))))
+            BsonField.Name("0") -> \&/.Both(
+              jscore.JsFn(jscore.Name("x"), jscore.Call(jscore.Select(jscore.Select(jscore.ident("x"), "__tmp"), "toLowerCase"), Nil)),
+              $toLower($var(DocField(BsonField.Name("__tmp")))))))
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("0") -> -\/(jscore.JsFn(jscore.Name("x"),
+            BsonField.Name("0") -> -\&/(jscore.JsFn(jscore.Name("x"),
               jscore.Call(
                 jscore.Select(jscore.Literal(Js.Str("ABC")), "toLowerCase"),
-                List())))))
+                Nil)))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
       }
@@ -397,13 +128,15 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp") -> \/-($$ROOT))),
+              BsonField.Name("__tmp") -> \&/-($$ROOT))),
           ListMap(
-            BsonField.Name("foo") -> \/-($var(DocField(BsonField.Name("__tmp") \ BsonField.Name("foo"))))))
+            BsonField.Name("foo") -> \&/-($var(DocField(BsonField.Name("__tmp") \ BsonField.Name("foo"))))))
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("foo") -> \/-($var(DocField(BsonField.Name("foo"))))))
+            BsonField.Name("foo") -> \&/(
+              JsFn(JsFn.defaultName, jscore.Select(jscore.Ident(JsFn.defaultName), "foo")),
+              $var(DocField(BsonField.Name("foo"))))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
       }
@@ -413,15 +146,17 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp") -> \/-($var(DocField(BsonField.Name("foo")))))),
+              BsonField.Name("__tmp") -> \&/.Both(
+                JsFn(JsFn.defaultName, jscore.Select(jscore.Ident(JsFn.defaultName), "foo")),
+                $var(DocField(BsonField.Name("foo")))))),
           ListMap(
-            BsonField.Name("0") -> -\/(jscore.JsFn(jscore.Name("x"),
+            BsonField.Name("0") -> -\&/(jscore.JsFn(jscore.Name("x"),
               jscore.Select(jscore.Select(jscore.ident("x"), "__tmp"), "length")))))
 
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("0") -> -\/(jscore.JsFn(jscore.Name("y"),
+            BsonField.Name("0") -> -\&/(jscore.JsFn(jscore.Name("y"),
               jscore.Select(jscore.Select(jscore.ident("y"), "foo"), "length")))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
@@ -432,16 +167,21 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           DocBuilder(
             readFoo,
             ListMap(
-              BsonField.Name("__tmp0") -> \/-($subtract($var(DocField(BsonField.Name("pop"))), $literal(Bson.Int64(1)))))),
+              BsonField.Name("__tmp0") -> \&/.Both(
+                JsFn(JsFn.defaultName,
+                  jscore.BinOp(jscore.Sub,
+                    jscore.Select(jscore.Ident(JsFn.defaultName), "pop"),
+                    jscore.Literal(Js.Num(1, false)))),
+                $subtract($var(DocField(BsonField.Name("pop"))), $literal(Bson.Int64(1)))))),
 
           ListMap(
-            BsonField.Name("__tmp3") -> -\/(jscore.JsFn(jscore.Name("x"),
+            BsonField.Name("__tmp3") -> -\&/(jscore.JsFn(jscore.Name("x"),
               jscore.Arr(List(jscore.Select(jscore.ident("x"), "__tmp0")))))))
 
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("__tmp3") -> -\/(jscore.JsFn(jscore.Name("x"),
+            BsonField.Name("__tmp3") -> -\&/(jscore.JsFn(jscore.Name("x"),
               jscore.Arr(List(jscore.BinOp(jscore.Sub,
                 jscore.Select(jscore.ident("x"), "pop"),
                 jscore.Literal(Js.Num(1, false)))))))))
@@ -457,51 +197,27 @@ class WorkflowBuilderSpec extends quasar.Qspec {
                 readFoo,
                 ListMap(
                   BsonField.Name("__tmp4") ->
-                    \/-($and($lt($literal(Bson.Null), $field("pop")), $lt($field("pop"), $literal(Bson.Text(""))))),
-                  BsonField.Name("__tmp5") -> \/-($$ROOT))),
+                    \&/-($and($lt($literal(Bson.Null), $field("pop")), $lt($field("pop"), $literal(Bson.Text(""))))),
+                  BsonField.Name("__tmp5") -> \&/-($$ROOT))),
               ListMap(
                 BsonField.Name("__tmp6") ->
-                  \/-($cond($field("__tmp4"), $field("__tmp5", "pop"), $literal(Bson.Null))),
-                BsonField.Name("__tmp7") -> \/-($field("__tmp5")))),
+                  \&/-($cond($field("__tmp4"), $field("__tmp5", "pop"), $literal(Bson.Null))),
+                BsonField.Name("__tmp7") -> \&/-($field("__tmp5")))),
             ListMap(
-              BsonField.Name("__tmp8") -> \/-($field("__tmp7", "city")),
-              BsonField.Name("__tmp9") -> \/-($field("__tmp6"))))
+              BsonField.Name("__tmp8") -> \&/-($field("__tmp7", "city")),
+              BsonField.Name("__tmp9") -> \&/-($field("__tmp6"))))
 
         val exp = DocBuilder[WorkflowF](
           readFoo,
           ListMap(
-            BsonField.Name("__tmp8") -> \/-($field("city")),
+            BsonField.Name("__tmp8") -> \&/(
+              JsFn(JsFn.defaultName, jscore.Select(jscore.Ident(JsFn.defaultName), "city")),
+              $field("city")),
             BsonField.Name("__tmp9") ->
-              \/-($cond($and($lt($literal(Bson.Null), $field("pop")), $lt($field("pop"), $literal(Bson.Text("")))), $field("pop"), $literal(Bson.Null)))))
+              \&/-($cond($and($lt($literal(Bson.Null), $field("pop")), $lt($field("pop"), $literal(Bson.Text("")))), $field("pop"), $literal(Bson.Null)))))
 
         normalize[WorkflowF].apply(w.project) must_== exp.project
       }
     }
-  }
-
-  "RenderTree[WorkflowBuilder]" should {
-    def render(op: WorkflowBuilder[WorkflowF])(implicit RO: RenderTree[WorkflowBuilder[WorkflowF]]):
-        String =
-      RO.render(op).draw.mkString("\n")
-
-    val read = builder.read(collection("db", "zips"))
-
-    "render in-process group" in {
-      val op = for {
-        pop     <- projectField(groupBy(read, Nil), "pop")
-      } yield reduce(pop)($sum(_))
-      op.map(render) must beRightDisjunction(
-        """GroupBuilder
-          |├─ ExprBuilder
-          |│  ├─ CollectionBuilder(Root())
-          |│  │  ├─ $ReadF(db; zips)
-          |│  │  ╰─ Schema
-          |│  ╰─ ExprOp("$pop")
-          |├─ By
-          |╰─ Content
-          |   ╰─ -\/
-          |      ╰─ AccumOp({ "$sum": "$$ROOT" })""".stripMargin)
-    }
-
   }
 }

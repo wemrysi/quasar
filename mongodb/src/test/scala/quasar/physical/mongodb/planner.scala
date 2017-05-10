@@ -4062,7 +4062,7 @@ class PlannerSpec extends
     }.pendingUntilFixed("SD-1249")
 
     "include correct phases with planner error" in {
-      planLog("""select date_part("isoyear", bar) from zips""").map(_.map(_.name)) must
+      planLog("""select interval(bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",

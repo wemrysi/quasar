@@ -19,8 +19,8 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
+import quasar.contrib.scalaz._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
@@ -160,6 +160,8 @@ object WorkflowBuilderF {
 }
 
 object WorkflowBuilder {
+  import fixExprOp._
+
   /** A partial description of a query that can be run on an instance of MongoDB */
   type WorkflowBuilder[F[_]] = Fix[WorkflowBuilderF[F, ?]]
   /** If we know what the shape is, represents the list of Fields. */
@@ -169,17 +171,27 @@ object WorkflowBuilder {
     * An arbitrary javascript is more powerful but less performant because it
     * gets materialized into a Map/Reduce operation.
     */
-  type Expr = JsFn \/ Fix[ExprOp]
+  // TODO: We should be able to handle _every_ MapFunc as JS, so this should
+  //       eventually be `AndMaybe[JsFn, Fix[ExprOp]]`
+  type Expr = JsFn \&/ Fix[ExprOp]
 
-  private def exprToJs(expr: Expr)(implicit ev: ExprOpOps.Uni[ExprOp])
-      : PlannerError \/ JsFn =
-    expr.fold(\/-(_), _.para(toJs))
-
-  implicit val ExprRenderTree: RenderTree[Expr] = new RenderTree[Expr] {
-    def render(x: Expr) = x.fold(_.render, _.render)
+  // FIXME: We should never need to convert to JS anymore, so get rid of this.
+  private def exprToJs(expr: Expr): PlannerError \/ JsFn = expr match {
+    case HasThis(js)        => js.right
+    case \&/.That($var(dv)) => dv.toJs.right
+    case _                  => UnsupportedJS(expr.render.shows).left
   }
 
-  import fixExprOp._
+  def docVarToExpr(dv: DocVar): Expr = \&/(dv.toJs, $var(dv))
+
+  def semiAlignExpr[F[_]: Traverse](fa: F[Expr])
+      : Option[F[Fix[ExprOp]]] =
+    fa.traverse(HasThat.unapply)
+
+  def alignExpr[F[_]: Traverse](fa: F[Expr])
+      : Option[F[JsFn] \/ F[Fix[ExprOp]]] =
+    Bitraverse[\/].leftTraverse.sequence(
+      fa.traverse(HasThat.unapply) \/> fa.traverse(HasThis.unapply))
 
   /** This is a Leaf node which can be used to construct a more complicated
     * WorkflowBuilder. Takes a value resulting from a Workflow and wraps it in a
@@ -365,8 +377,7 @@ object WorkflowBuilder {
   }
 
   /** Simplify/coalesce certain shapes, eliminating extra layers that make it
-    * harder to pattern match. Should be applied before `objectConcat`,
-    * `arrayConcat`, or `merge`.
+    * harder to pattern match. Should be applied before `merge`.
     */
   def normalizeƒ[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp])
     : WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]] => Option[WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]]] = {
@@ -375,55 +386,64 @@ object WorkflowBuilder {
       def rewriteExpr(t: Fix[ExprOp])(applyExpr: PartialFunction[ExprOp[Expr], Option[Expr]]): Option[Expr] =
         t.cataM[Option, Expr] { x =>
           applyExpr.lift(x).getOrElse {
-            x.sequence.fold(
-              κ(for {
-                op <- x.traverse(exprToJs).toOption
-                js <- exprOps.toJsSimple(op).toOption
-              } yield -\/(js)),
-              {
-                case $varF(_) => None
-                case op => \/-(Fix(op)).some
-              })
+            x.traverse {
+              case HasThat(op) => op.some
+              case _           => none
+            } >>= {
+              case $varF(_) => none
+              case op       => \&/-(Fix(op)).some
+            }
           }
         }
 
-      outer.fold(
-        js =>
-          for {
-            xs <- inner.map { case (n, x) =>
-                    jscore.Select(jscore.Ident(js.param), n.value) -> exprToJs(x)
-                  }.sequence.toOption
-            expr1 <- js.expr.apoM[JsCore] {
+
+      def collapseJs: JsFn => Option[JsFn] = js => for {
+        xs <- inner.map { case (n, x) =>
+                    jscore.Select(jscore.Ident(js.param), n.value) -> HasThis.unapply(x)
+                  }.sequence
+        expr1 <- js.expr.apoM[JsCore] {
                     case t @ jscore.Access(b, _) if b == jscore.Ident(js.param) =>
                       xs.get(t).map(_(jscore.Ident(js.param)).project.map(_.left[JsCore]))
                     case t => t.project.map(_.right[JsCore]).some
                   }
-          } yield -\/(JsFn(js.param, expr1)),
-        expr =>
-          rewriteExpr(expr) {
+      } yield JsFn(js.param, expr1)
+
+      def collapseExpr: Fix[ExprOp] => Option[Expr] = expr =>
+        rewriteExpr(expr) {
             case $varF(DocVar(_, Some(f))) =>
               f.flatten match {
                 case NonEmptyList(h @ BsonField.Name(_), INil()) => inner.get(h)
                 case ls =>
                   ls.head match {
                     case n @ BsonField.Name(_) => inner.get(n).flatMap {
-                      case \/-($var(DocVar(b, None))) => BsonField(ls.tail.toList).map(f => \/-($var(DocVar(b, Some(f)))))
-                      case \/-($var(DocVar(b, Some(f)))) => \/-($var(DocVar(b, Some(BsonField(f.flatten :::> ls.tail))))).some
+                      case HasThat($var(DocVar(b, None))) => BsonField(ls.tail.toList).map(f => docVarToExpr(DocVar(b, Some(f))))
+                      case HasThat($var(DocVar(b, Some(f)))) => docVarToExpr(DocVar(b, Some(BsonField(f.flatten :::> ls.tail)))).some
                       case _ => None
                     }
                     case _ => None
                   }
               }
-          })
+          }
+
+      // TODO: Should this succeed (losing some information) when either inner
+      //       or outer isn't Both, or should it fail, not collapsing?
+      outer match {
+        case \&/.This(js) => collapseJs(js) ∘ -\&/
+        case \&/.Both(js, expr) =>
+          (collapseExpr(expr) ∘ {
+            case \&/.That(expr) => collapseJs(js).fold[Expr](\&/-(expr))(\&/(_, expr))
+            case other          => other
+          }).orElse(collapseJs(js) ∘ -\&/)
+        case \&/.That(expr) => collapseExpr(expr)
+      }
     }
 
-    def inln(outerExpr: Expr, cont: DocContents[_ \/ Fix[ExprOp]]) =
-      outerExpr.fold(
-        κ(None),
+    def inln(outerExpr: Expr, cont: DocContents[_ \&/ Fix[ExprOp]]): Option[Fix[ExprOp]] =
+      HasThat.unapply(outerExpr) >>= (
         expr => (cont match {
-          case Expr(\/-($var(dv))) =>
+          case Expr(HasThat($var(dv))) =>
             Some(expr.cata(exprOps.rewriteRefs(prefixBase(dv))))
-          case Expr(\/-(ex)) => expr.cataM[Option, Fix[ExprOp]] {
+          case Expr(HasThat(ex)) => expr.cataM[Option, Fix[ExprOp]] {
             case $varF(DocVar.ROOT(None)) => ex.some
             case $varF(_)                 => None
             case x                        => Fix(x).some
@@ -432,10 +452,10 @@ object WorkflowBuilder {
             case $varF(DocField(field)) =>
               field.flatten.toList match {
                 case (name @ BsonField.Name(_)) :: Nil =>
-                  map.get(name).flatMap(_.toOption)
+                  map.get(name).flatMap(HasThat.unapply)
                 case (name @ BsonField.Name(_)) :: tail =>
                   map.get(name).flatMap {
-                    case \/-($var(dv)) => BsonField(tail).map(p => $var(dv \ p))
+                    case HasThat($var(dv)) => BsonField(tail).map(p => $var(dv \ p))
                     case _ => None
                   }
                 case _ => None
@@ -447,13 +467,13 @@ object WorkflowBuilder {
         }))
 
     {
-      case ExprBuilderF(src, \/-($$ROOT)) => src.project.some
+      case ExprBuilderF(src, \&/.Both(JsFn.identity, $$ROOT)) => src.project.some
       case ExprBuilderF(src, outerExpr) =>
         src.unFix match {
-          case ExprBuilderF(wb0, -\/(js1)) =>
-            exprToJs(outerExpr).map(js => ExprBuilderF[F, WorkflowBuilder[F]](wb0, -\/(js1 >>> js))).toOption
+          case ExprBuilderF(wb0, \&/.This(js1)) =>
+            HasThis.unapply(outerExpr).map(js => ExprBuilderF[F, WorkflowBuilder[F]](wb0, -\&/(js1 >>> js)))
           case ExprBuilderF(src0, contents) =>
-            inln(outerExpr, Expr(contents)).map(expr => ExprBuilderF(src0, \/-(expr)))
+            inln(outerExpr, Expr(contents)).map(expr => ExprBuilderF(src0, \&/-(expr)))
           case DocBuilderF(src, innerShape) =>
             collapse(outerExpr, innerShape).map(ExprBuilderF(src, _))
           case ShapePreservingBuilderF(src0, inputs, op) =>
@@ -467,13 +487,16 @@ object WorkflowBuilder {
               key,
               Expr(\/-($$ROOT))).some
           case GroupBuilderF(wb0, key, contents) =>
-            inln(outerExpr, contents).map(expr => GroupBuilderF(Fix(normalize[F].apply(ExprBuilderF(wb0, \/-(expr)))), key, Expr(\/-($$ROOT))))
+            inln(outerExpr, contents match {
+              case Expr(e) => Expr(e.fold(-\&/, \&/-))
+              case Doc(e) => Doc(e ∘ (_.fold(-\&/, \&/-)))
+            }).map(expr => GroupBuilderF(Fix(normalize[F].apply(ExprBuilderF(wb0, \&/-(expr)))), key, Expr(\/-($$ROOT))))
           case _ => None
         }
       case DocBuilderF(Fix(DocBuilderF(src, innerShape)), outerShape) =>
         outerShape.traverse(collapse(_, innerShape)).map(DocBuilderF(src, _))
       case DocBuilderF(Fix(ExprBuilderF(src, innerExpr)), outerShape) =>
-        outerShape.traverse(inln(_, Expr(innerExpr))).map(exes => DocBuilderF(src, exes ∘ (_.right)))
+        outerShape.traverse(inln(_, Expr(innerExpr))).map(exes => DocBuilderF(src, exes ∘ \&/-))
       case DocBuilderF(Fix(ShapePreservingBuilderF(src, inputs, op)), shape) =>
         ShapePreservingBuilderF(Fix(normalize[F].apply(DocBuilderF(src, shape))), inputs, op).some
       case _ => None
@@ -521,16 +544,6 @@ object WorkflowBuilder {
   def swapM[A](v: State[NameGen, PlannerError \/ A]): M[A] =
     StateT[EitherE, NameGen, A](s => { val (s1, x) = v.run(s); x.map(s1 -> _) })
 
-  def commonMap[K, A, B](m: ListMap[K, A \/ B])(f: B => PlannerError \/ A):
-      PlannerError \/ (ListMap[K, A] \/ ListMap[K, B]) = {
-    m.sequence.fold(
-      κ((m ∘ (_.fold(\/.right, f))).sequence.map(\/.left)),
-      l => \/-(\/-(l)))
-  }
-
-  private def commonShape(shape: ListMap[BsonField.Name, Expr])(implicit ev: ExprOpOps.Uni[ExprOp]) =
-    commonMap(shape)(_.para(toJs[Fix[ExprOp], ExprOp]))
-
   private val jsBase = jscore.Name("__val")
 
   private def toCollectionBuilder[F[_]: Coalesce]
@@ -548,7 +561,7 @@ object WorkflowBuilder {
               op.lift(_).fold(
                 fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
                 op =>
-                (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \/-($$ROOT))))) {
+                (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \&/.Both(JsFn.identity, $$ROOT))))) {
                   case (
                     CollectionBuilderF(_, _, srcStruct),
                     CollectionBuilderF(graph, _, _)) =>
@@ -596,7 +609,7 @@ object WorkflowBuilder {
                 case2(src, input1, base, op, _))
             }
         }
-      case ExprBuilderF(src, \/-($var(d))) =>
+      case ExprBuilderF(src, HasThat($var(d))) =>
         toCollectionBuilder(src).map {
           case CollectionBuilderF(graph, base, _) =>
             CollectionBuilderF(graph, base \ fromDocVar(d), None)
@@ -607,16 +620,19 @@ object WorkflowBuilder {
             case CollectionBuilderF(graph, base, _) =>
               CollectionBuilderF(
                 chain(graph,
-                  rewriteExprPrefix(expr, base).fold(
-                    js => $simpleMap[F](NonEmptyList(MapExpr(JsFn(jsBase, jscore.Obj(ListMap(jscore.Name(name.asText) -> js(jscore.Ident(jsBase))))))), ListMap()),
-                    op => $project[F](Reshape(ListMap(name -> \/-(op)))))),
+                  rewriteExprPrefix(expr, base) match {
+                    case HasThat(op) =>
+                      $project[F](Reshape(ListMap(name -> \/-(op))))
+                    case \&/.This(js) =>
+                      $simpleMap[F](NonEmptyList(MapExpr(JsFn(jsBase, jscore.Obj(ListMap(jscore.Name(name.asText) -> js(jscore.Ident(jsBase))))))), ListMap())
+                  }),
                 Field(name),
                 None)
           })
       case DocBuilderF(src, shape) =>
         generateWorkflow(src).flatMap { case (wf, base) =>
-          commonShape(rewriteDocPrefix(shape, base)).fold(
-            fail(_),
+          alignExpr(rewriteDocPrefix(shape, base)).fold(
+            fail[CollectionBuilderF[F]](InternalError fromMsg "Could not align the expressions"))(
             s => shape.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
               fail(InternalError fromMsg "A shape with no fields does not make sense"))(
               fields => emit(CollectionBuilderF(
@@ -651,7 +667,7 @@ object WorkflowBuilder {
             case Nil        => \/-($literal(Bson.Null))
             case (key, field) :: Nil => key.unFix match {
               // NB: normalize to Null, to ease merging
-              case ExprBuilderF(_, \/-($literal(_))) =>
+              case ExprBuilderF(_, HasThat($literal(_))) =>
                 \/-($literal(Bson.Null))
               case _ =>
                 field match {
@@ -687,7 +703,7 @@ object WorkflowBuilder {
             case Expr(\/-(expr)) =>
               // NB: This case just winds up a single value, then unwinds it.
               //     It’s effectively a no-op, so we just use the src and expr.
-              toCollectionBuilder(ExprBuilder(src, \/-(expr)))
+              toCollectionBuilder(ExprBuilder(src, \&/-(expr)))
             case Doc(obj) =>
               val (grouped, ungrouped) =
                 obj.foldLeft[(ListMap[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap[BsonField.Name, Fix[ExprOp]])]((ListMap.empty[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap.empty[BsonField.Name, Fix[ExprOp]]))((acc, item) =>
@@ -698,7 +714,7 @@ object WorkflowBuilder {
                       ((x: ListMap[BsonField.Name, Fix[ExprOp]]) => x + (k -> v)).second(acc)
                   })
               if (grouped.isEmpty && !ungrouped.isEmpty)
-                toCollectionBuilder(DocBuilder(src, ungrouped ∘ (_.right)))
+                toCollectionBuilder(DocBuilder(src, ungrouped ∘ \&/-))
               else
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
                   generateWorkflow(wb) ∘ { case (wf, base0) =>
@@ -817,9 +833,10 @@ object WorkflowBuilder {
     }
 
 
-  def asLiteral[F[_]](wb: WorkflowBuilder[F]): Option[Bson] = wb.unFix match {
-    case ExprBuilderF(_, \/-($literal(value))) => Some(value)
-    case _                                     => None
+  def asLiteral[F[_]](wb: WorkflowBuilder[F])(implicit ev0: WorkflowOpCoreF :<: F): Option[Bson] = wb.unFix match {
+    case CollectionBuilderF(Fix(ev0($PureF(value))), _, _) => value.some
+    case ExprBuilderF(_, HasThat($literal(value)))         => value.some
+    case _                                                 => none
   }
 
   private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
@@ -946,15 +963,15 @@ object WorkflowBuilder {
   //       shape of any DocVar in the source.
   @tailrec def findKeys[F[_]](wb: WorkflowBuilder[F]): Option[Base] = {
     wb.unFix match {
-      case CollectionBuilderF(_, _, s2)             => s2.map(s => Subset(s.toSet))
-      case DocBuilderF(_, shape)                    => Subset(shape.keySet).some
-      case FlatteningBuilderF(src, _)               => findKeys(src)
+      case CollectionBuilderF(_, _, s2)          => s2.map(s => Subset(s.toSet))
+      case DocBuilderF(_, shape)                 => Subset(shape.keySet).some
+      case FlatteningBuilderF(src, _)            => findKeys(src)
       case GroupBuilderF(src, _, Expr(\/-($$ROOT))) => findKeys(src)
-      case GroupBuilderF(_, _, Doc(obj))            => Subset(obj.keySet).some
-      case ShapePreservingBuilderF(src, _, _)       => findKeys(src)
-      case ExprBuilderF(src, \/-($$ROOT))           => findKeys(src)
-      case ExprBuilderF(_, _)                       => Root().some
-      case _                                        => None
+      case GroupBuilderF(_, _, Doc(obj))         => Subset(obj.keySet).some
+      case ShapePreservingBuilderF(src, _, _)    => findKeys(src)
+      case ExprBuilderF(src, \&/.Both(JsFn.identity, $$ROOT))           => findKeys(src)
+      case ExprBuilderF(_, _)                    => Root().some
+      case _                                     => None
     }
   }
 
@@ -967,8 +984,8 @@ object WorkflowBuilder {
 
     (left.unFix, right.unFix) match {
       case (
-        ExprBuilderF(src1, \/-($var(DocField(base1)))),
-        ExprBuilderF(src2, \/-($var(DocField(base2)))))
+        ExprBuilderF(src1, HasThat($var(DocField(base1)))),
+        ExprBuilderF(src2, HasThat($var(DocField(base2)))))
           if src1 ≟ src2 =>
         emit((Field(base1), Field(base2), src1))
 
@@ -979,9 +996,9 @@ object WorkflowBuilder {
           case ((lbase, rbase), cont) =>
             (lbase, rbase, contentsToBuilder(cont)(src1))
         }
-      case (ExprBuilderF(src, \/-($var(DocField(base)))), _) if src ≟ right =>
+      case (ExprBuilderF(src, HasThat($var(DocField(base)))), _) if src ≟ right =>
         emit((Field(base), Root(), right))
-      case (_, ExprBuilderF(src, \/-($var(DocField(_))))) if left ≟ src =>
+      case (_, ExprBuilderF(src, HasThat($var(DocField(_))))) if left ≟ src =>
         delegate
 
       case (DocBuilderF(src1, shape1), ExprBuilderF(src2, expr2)) =>
@@ -1021,7 +1038,7 @@ object WorkflowBuilder {
 
       case (ExprBuilderF(src, expr), _) =>
         merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(Expr(rewriteExprPrefix(expr, lbase)), Expr(\/-($var(rbase.toDocVar)))).map {
+          mergeContents(Expr(rewriteExprPrefix(expr, lbase)), Expr(docVarToExpr(rbase.toDocVar))).map {
             case ((lbase, rbase), cont) =>
               (lbase, rbase, contentsToBuilder(cont)(wb))
           }
@@ -1030,7 +1047,7 @@ object WorkflowBuilder {
 
       case (DocBuilderF(src1, shape1), _) =>
         merge(src1, right).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(Doc(rewriteDocPrefix(shape1, lbase)), Expr(\/-($var(rbase.toDocVar)))).map {
+          mergeContents(Doc(rewriteDocPrefix(shape1, lbase)), Expr(docVarToExpr(rbase.toDocVar))).map {
             case ((lbase, rbase), cont) =>
               (lbase, rbase, contentsToBuilder(cont)(wb))
           }
@@ -1045,8 +1062,8 @@ object WorkflowBuilder {
             splice <- lift(sb.toJs)
           } yield (Field(lName), Field(rName),
             DocBuilder(wb, ListMap(
-              lName -> -\/ (lbase.toDocVar.toJs >>> splice),
-              rName ->  \/-($var(rbase.toDocVar)))))
+              lName -> -\&/(lbase.toDocVar.toJs >>> splice),
+              rName -> docVarToExpr(rbase.toDocVar))))
         }
       case (_, SpliceBuilderF(_, _)) => delegate
 
@@ -1058,8 +1075,8 @@ object WorkflowBuilder {
             splice <- lift(sb.toJs)
           } yield (Field(lName), Field(rName),
             DocBuilder(wb, ListMap(
-              lName -> -\/ (lbase.toDocVar.toJs >>> splice),
-              rName ->  \/-($var(rbase.toDocVar)))))
+              lName -> -\&/(lbase.toDocVar.toJs >>> splice),
+              rName -> docVarToExpr(rbase.toDocVar))))
         }
       case (_, ArraySpliceBuilderF(_, _)) => delegate
 
@@ -1093,8 +1110,8 @@ object WorkflowBuilder {
               (Field(lName), Field(rName),
                 FlatteningBuilder(
                   DocBuilder(wb, ListMap(
-                    lName -> \/-($var(lbase.toDocVar)),
-                    rName -> \/-($var(rbase.toDocVar)))),
+                    lName -> docVarToExpr(lbase.toDocVar),
+                    rName -> docVarToExpr(rbase.toDocVar))),
                   fields.map(_.map(DocField(lName) \\ _))))
           else emit((lbase, rbase, FlatteningBuilder(wb, lfields)))
         }
@@ -1156,33 +1173,9 @@ object WorkflowBuilder {
       : WorkflowBuilder[F] =
       ShapePreservingBuilder(src, those, PartialFunction(fields => $match[F](sel(fields))))
 
-    def expr1
-      (wb: WorkflowBuilder[F])
-      (f: Fix[ExprOp] => Fix[ExprOp])
-      (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      expr(List(wb)) { case List(e) => f(e) }
-
-    def expr2
-      (wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (f: (Fix[ExprOp], Fix[ExprOp]) => Fix[ExprOp])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      expr(List(wb1, wb2)) { case List(e1, e2) => f(e1, e2) }
-
-    def expr
-      (wbs: List[WorkflowBuilder[F]])
-      (f: List[Fix[ExprOp]] => Fix[ExprOp])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] = {
-      fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
-        fail(InternalError fromMsg "impossible – no arguments"))(
-        _.map { case (wb, exprs) => Fix(normalize[F].apply(ExprBuilderF(wb, \/-(f(exprs))))) })
-    }
-
     // FIXME: no constraints
     def jsExpr1(wb: WorkflowBuilder[F], js: JsFn): WorkflowBuilder[F] =
-      Fix(normalize[F].apply(ExprBuilderF(wb, -\/(js))))
+      Fix(normalize[F].apply(ExprBuilderF(wb, -\&/(js))))
 
     // Like JsExpr, but accepts a JsFn that expects to receive an array of values.
     def jsArrayExpr(wbs: List[WorkflowBuilder[F]], js: JsFn)
@@ -1190,19 +1183,8 @@ object WorkflowBuilder {
       : M[WorkflowBuilder[F]] =
       fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
         fail(InternalError.fromMsg("impossible – no arguments")))(
-        _.flatMap { case (wb, exprs) =>
-          lift(exprs.traverse[PlannerError \/ ?, JsFn](_.para(toJs)).map(jses =>
-            jsExpr1(jsExpr1(wb, JsFn(jsBase, jscore.Arr(jses.map(_(jscore.Ident(jsBase)))))), js)))
-        })
-
-    def jsExpr(wbs: List[WorkflowBuilder[F]], f: List[JsCore] => JsCore)
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
-        fail(InternalError fromMsg "impossible – no arguments"))(
-        _.flatMap { case (wb, exprs) =>
-          lift(exprs.traverse[PlannerError \/ ?, JsFn](_.para(toJs)).map(jses =>
-            jsExpr1(wb, JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase))))))))
+        _.map { case (wb, exprs) =>
+          jsExpr1(ArrayBuilder(wb, exprs.map(\&/-)), js)
         })
 
     def makeObject(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
@@ -1214,12 +1196,8 @@ object WorkflowBuilder {
         case ShapePreservingBuilderF(src, inputs, op) =>
           ShapePreservingBuilder(makeObject(src, name), inputs, op)
         case _ =>
-          DocBuilder(wb, ListMap(BsonField.Name(name) -> \/-($$ROOT)))
+          DocBuilder(wb, ListMap(BsonField.Name(name) -> \&/.Both(JsFn.identity, $$ROOT)))
       }
-
-    def makeArray(wb: WorkflowBuilder[F]): WorkflowBuilder[F] = wb.unFix match {
-      case _ => ArrayBuilder(wb, List(\/-($$ROOT)))
-    }
 
     def flattenMap(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
       wb.unFix match {
@@ -1237,46 +1215,6 @@ object WorkflowBuilder {
         case GroupBuilderF(src, keys, Expr(\/-($$ROOT))) =>
           GroupBuilder(flattenArray(src), keys, Expr(\/-($$ROOT)))
         case _ => FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
-      }
-
-    def projectField(wb: WorkflowBuilder[F], name: String): PlannerError \/ WorkflowBuilder[F] =
-      wb.unFix match {
-        case ShapePreservingBuilderF(src, inputs, op) =>
-          projectField(src, name).map(ShapePreservingBuilder(_, inputs, op))
-        case GroupBuilderF(wb0, key, Expr(\/-($var(dv)))) =>
-          projectField(wb0, name).map(GroupBuilder(_, key, Expr(\/-($var(dv)))))
-        case GroupBuilderF(wb0, key, Doc(doc)) =>
-          doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject, Some("group does not contain a field ‘" + name + "’."))))(
-            x => \/-(GroupBuilder(wb0, key, Expr(x))))
-        case DocBuilderF(wb, doc) =>
-          doc.get(BsonField.Name(name)).fold[PlannerError \/ WorkflowBuilder[F]](
-            -\/(UnsupportedFunction(structural.ObjectProject, Some("document does not contain a field ‘" + name + "’."))))(
-            expr => \/-(ExprBuilder(wb, expr)))
-        case ExprBuilderF(wb0,  -\/(js1)) =>
-          \/-(ExprBuilder(wb0,
-            -\/(JsFn(jsBase, DocField(BsonField.Name(name)).toJs(js1(jscore.Ident(jsBase)))))))
-        case ExprBuilderF(wb, \/-($var(DocField(field)))) =>
-          \/-(ExprBuilder(wb, \/-($var(DocField(field \ BsonField.Name(name))))))
-        case _ => \/-(ExprBuilder(wb, \/-($var(DocField(BsonField.Name(name))))))
-      }
-
-    def projectIndex(wb: WorkflowBuilder[F], index: Int): PlannerError \/ WorkflowBuilder[F] =
-      wb.unFix match {
-        case ArrayBuilderF(wb0, elems) =>
-          if (index < elems.length) // UGH!
-            \/-(ExprBuilder(wb0, elems(index)))
-          else
-            -\/(UnsupportedFunction(
-              structural.ArrayProject,
-              Some(s"array does not contain index ‘$index’.")))
-        case DocBuilderF(_, _) =>
-          -\/(UnsupportedFunction(
-            structural.ArrayProject,
-            Some("value is not an array.")))
-        case _ =>
-          jsExpr1(wb, JsFn(jsBase,
-            jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.num(index.toLong))))).right
       }
 
     @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
@@ -1303,11 +1241,11 @@ object WorkflowBuilder {
           // TODO: Might not always want to delete `_id`?
           GroupBuilder(deleteField(src, "_id"), List(deleteField(src, "_id")), Expr(\/-($$ROOT)))) {
           case Root()   => GroupBuilder(src, keys, Expr(\/-($$ROOT)))
-          case Field(k) => GroupBuilder(src, List(Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k))))))), Expr(\/-($$ROOT)))
+          case Field(k) => GroupBuilder(src, List(Fix(normalize[F].apply(ExprBuilderF(src, docVarToExpr(DocField(k)))))), Expr(\/-($$ROOT)))
           case Subset(ks) =>
             GroupBuilder(
               src,
-              ks.toList.map(k => Fix(normalize[F].apply(ExprBuilderF(src, \/-($var(DocField(k))))))),
+              ks.toList.map(k => Fix(normalize[F].apply(ExprBuilderF(src, docVarToExpr(DocField(k)))))),
               Doc(ks.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).toListMap))
         },
         GroupBuilder(src, keys, Expr(\/-($$ROOT))))
@@ -1417,7 +1355,7 @@ object WorkflowBuilder {
               if keys1 ≟ keys2 =>
             mergeGroups(s1, s2, c1, c2, keys1).map { case ((glbase, grbase), g) =>
               DocBuilder(g, combine(
-                d1.transform { case (n, _) => \/-($var(DocField(n))) },
+                d1.transform { case (n, _) => docVarToExpr(DocField(n)) },
                 shape2 ∘ (rewriteExprPrefix(_, grbase)))(_ ++ _))
             }
           case (
@@ -1515,7 +1453,7 @@ object WorkflowBuilder {
             merge(src1, wb2).map { case (_, right, list) =>
               SpliceBuilder(list, combine(
                 structure1,
-                List(Expr(\/-($var(right.toDocVar)))))(_ ++ _))
+                List(Expr(docVarToExpr(right.toDocVar))))(_ ++ _))
             }
           case (CollectionBuilderF(_, _, _), SpliceBuilderF(_, _)) => delegate
 
@@ -1523,7 +1461,7 @@ object WorkflowBuilder {
             merge(src, wb2).map { case (left, right, list) =>
               SpliceBuilder(list, combine(
                 Doc(rewriteDocPrefix(shape, left)),
-                Expr(\/-($var(right.toDocVar))))(List(_, _)))
+                Expr(docVarToExpr(right.toDocVar)))(List(_, _)))
             }
           case (CollectionBuilderF(_, _, _), DocBuilderF(_, _)) => delegate
 
@@ -1536,7 +1474,7 @@ object WorkflowBuilder {
               DocBuilder(src,
                 combine(
                   rewriteDocPrefix(shape1, lbase),
-                  c2.map { case (n, _) => (n, rewriteExprPrefix(\/-($var(DocField(n))), rbase)) })(_ ++ _))
+                  c2.map { case (n, _) => (n, rewriteExprPrefix(docVarToExpr(DocField(n)), rbase)) })(_ ++ _))
             }
           case (GroupBuilderF(_, _, _), DocBuilderF(Fix(ArraySpliceBuilderF(_, _)), _)) => delegate
 
@@ -1547,107 +1485,6 @@ object WorkflowBuilder {
       }
 
       impl(wb1, wb2, unflipped)
-    }
-
-    def arrayConcat(left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] = {
-      def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine):
-          M[WorkflowBuilder[F]] = {
-        def delegate = impl(wb2, wb1, combine.flip)
-
-        (wb1.unFix, wb2.unFix) match {
-          case (
-            ArrayBuilderF(Fix(
-              v1 @ ShapePreservingBuilderF(src1, inputs1, op1)), shape1),
-            v2 @ ShapePreservingBuilderF(src2, inputs2, op2))
-            if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp =>
-            merge(src1, src2).map { case (lbase, rbase, wb) =>
-              ShapePreservingBuilder(
-                ArraySpliceBuilder(wb, combine(
-                  Array(shape1.map(rewriteExprPrefix(_, lbase))),
-                  Expr(\/-($var(rbase.toDocVar))))(List(_, _))),
-                inputs1, op1)
-            }
-          case (ShapePreservingBuilderF(_, in1, op1), ArrayBuilderF(Fix(ShapePreservingBuilderF(_, in2, op2)), _)) => delegate
-
-          case (
-            v1 @ ShapePreservingBuilderF(src1, inputs1, op1),
-            ArrayBuilderF(Fix(
-              GroupBuilderF(Fix(
-                v2 @ ShapePreservingBuilderF(src2, inputs2, _)),
-                Nil, cont2)),
-              shape2))
-              if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp =>
-            merge(src1, src2).flatMap { case (lbase, rbase, wb) =>
-              combine(Expr(\/-($var(lbase.toDocVar))), rewriteGroupRefs(cont2)(prefixBase0(rbase)))(mergeContents(_, _)).map { case ((lbase1, rbase1), cont) =>
-                ShapePreservingBuilder(
-                  ArraySpliceBuilder(
-                    GroupBuilder(wb, Nil, cont),
-                    combine(
-                      Expr(\/-($var(lbase1.toDocVar))),
-                      Array(shape2.map(rewriteExprPrefix(_, rbase1))))(List(_, _))),
-                  inputs1, op1)
-              }
-            }
-          case (
-            ArrayBuilderF(Fix(
-              GroupBuilderF(Fix(
-                v1 @ ShapePreservingBuilderF(_, inputs1, _)),
-                Nil, _)), _),
-            v2 @ ShapePreservingBuilderF(_, inputs2, _))
-              if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp => delegate
-
-          case (ShapePreservingBuilderF(s, i, o), _) =>
-            impl(s, wb2, combine).map(ShapePreservingBuilder(_, i, o))
-          case (_, ShapePreservingBuilderF(_, _, _)) => delegate
-
-          case (ArrayBuilderF(src1, shape1), ArrayBuilderF(src2, shape2)) =>
-            merge(src1, src2).map { case (lbase, rbase, wb) =>
-              ArrayBuilder(wb,
-                shape1.map(rewriteExprPrefix(_, lbase)) ++
-                  shape2.map(rewriteExprPrefix(_, rbase)))
-            }
-          case (ArrayBuilderF(src1, shape1), ExprBuilderF(src2, expr2)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              ArraySpliceBuilder(list, combine(
-                Array(shape1.map(rewriteExprPrefix(_, left))),
-                Expr(rewriteExprPrefix(expr2, right)))(List(_, _)))
-            }
-          case (ExprBuilderF(_, _), ArrayBuilderF(_, _)) => delegate
-
-          case (ArrayBuilderF(src1, shape1), GroupBuilderF(_, _, _)) =>
-            merge(src1, wb2).map { case (left, right, wb) =>
-              ArraySpliceBuilder(wb, combine(
-                Array(shape1.map(rewriteExprPrefix(_, left))),
-                Expr(\/-($var(right.toDocVar))))(List(_, _)))
-            }
-          case (GroupBuilderF(_, _, _), ArrayBuilderF(_, _)) => delegate
-
-          case (ArraySpliceBuilderF(src1, structure1), ArrayBuilderF(src2, shape2)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              ArraySpliceBuilder(list, combine(
-                structure1,
-                List(Array(shape2.map(rewriteExprPrefix(_, right)))))(_ ++ _))
-            }
-          case (ArrayBuilderF(_, _), ArraySpliceBuilderF(_, _)) => delegate
-
-          case (ArraySpliceBuilderF(src1, structure1), ExprBuilderF(src2, expr2)) =>
-            merge(src1, src2).map { case (_, right, list) =>
-              ArraySpliceBuilder(list, combine(
-                structure1,
-                List(Expr(rewriteExprPrefix(expr2, right))))(_ ++ _))
-            }
-          case (ExprBuilderF(_, _), ArraySpliceBuilderF(_, _)) => delegate
-
-          case _ =>
-            fail(UnsupportedFunction(
-              structural.ArrayConcat,
-              Some("values are not both arrays")))
-        }
-      }
-
-      impl(left, right, unflipped)
     }
 
     def unionAll

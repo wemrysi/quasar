@@ -18,8 +18,8 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar._
+import quasar.contrib.scalaz._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
-import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.FuncHandler
 import quasar.physical.mongodb.workflow._
@@ -40,10 +40,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Length, _)   => notHandled.left
-    case (string.Integer, _)  => notHandled.left
-    case (string.Decimal, _)  => notHandled.left
-    case (string.ToString, _) => notHandled.left
+    case (string.Length | string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
@@ -65,16 +62,16 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     queryModel match {
       case MongoQueryModel.`3.2` =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> expr.right))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
       case MongoQueryModel.`3.0` =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> expr.right))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> expr.right))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
     }

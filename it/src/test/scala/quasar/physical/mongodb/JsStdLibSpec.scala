@@ -46,9 +46,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
 
-    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
-    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
-    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
 
     case (structural.ConcatOp, _)      => Skipped("TODO").left
 
