@@ -155,24 +155,33 @@ lazy val root = project.in(file("."))
   .settings(transferPublishAndTagResources)
   .settings(aggregate in assembly := false)
   .aggregate(
+// NB: need to get dependencies to look like:
+//         ┌ common ┐
+//  ┌ frontend ┬ connector ┬─────────┬──────┐
+// sql       core      marklogic  mongodb  ...
+//  └──────────┼───────────┴─────────┴──────┘
+//         interface
+
         foundation,
-//     / / | | \ \    // NB: need to get dependencies to look like:
-//                    //         ┌ common ┐
-      ejson, js,      //  ┌ frontend ┬ connector ┬─────────┬──────┐
-//       \  /         // sql       core      marklogic  mongodb  ...
-        common,       //  └──────────┼───────────┴─────────┴──────┘
-//        |           //         interface
-    frontend, effect,
-//   |    \   |
-    sql, connector, marklogicValidation,
-//   |  /   | | \ \      |
-    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,
+//     / / | | \ \
+//
+      ejson, js,
+//       \  /
+        common,    // -------------------------------------------------------
+//        |    \                                                             \
+    frontend, effect,                                                       precog,
+//   |    |   |                                                               |
+                                                                           blueeyes,
+//   |    |   |                                                               |
+    sql, connector, marklogicValidation,                                   yggdrasil, niflheim,
+//   |  /   | | \ \      |                                                    |
+    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
 //      \ \ | / /
         interface,
 //        /   \
        repl,  web,
 //             |
-              it, precog, blueeyes, yggdrasil, mimir, niflheim)
+              it)
   .enablePlugins(AutomateHeaderPlugin)
 
 // common components
@@ -446,6 +455,7 @@ lazy val it = project
 
 /***** PRECOG *****/
 
+// copied from sbt-slamdata (remove redundancy when slamdata/sbt-slamdata#23 is fixed)
 val headerSettings = Seq(
   headers := Map(
      ("scala", Apache2_0("2014–2017", "SlamData Inc.")),

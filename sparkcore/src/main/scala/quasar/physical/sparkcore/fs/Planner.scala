@@ -200,7 +200,7 @@ object Planner {
             case Max(a) => a
             case Avg(a) => a >>> {
               case Data.Int(v) => Data.Arr(List(Data.Dec(BigDecimal(v)), Data.Int(1)))
-              case Data.Dec(v) => Data.Arr(List(Data.Dec(v), Data.Int(1)))
+              case Data.Dec(v) => Data.Arr(List(Data.Dec(v.apply(BigDecimal.defaultMathContext)), Data.Int(1)))
               case _ => Data.NA
             }
             case Arbitrary(a) => a
