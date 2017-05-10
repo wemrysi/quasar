@@ -121,10 +121,10 @@ class PlannerQScriptSpec extends
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def queryPlanner(expr: Blob[Fix[Sql]], model: MongoQueryModel,
+  def queryPlanner(block: Block[Fix[Sql]], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, 0L, None)
+    queryPlan(block, Variables.empty, basePath, 0L, None)
       .leftMap(es => scala.sys.error("errors while planning: ${es}"))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
@@ -136,7 +136,7 @@ class PlannerQScriptSpec extends
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]])
       : Either[FileSystemError, Crystallized[WorkflowF]] = {
-    fixParser.parse(Query(query)).fold(
+    fixParser.parseBlock(query).fold(
       e => scala.sys.error("parsing error: " + e.message),
       queryPlanner(_, model, stats, indexes).run).value.toEither
   }
@@ -175,7 +175,7 @@ class PlannerQScriptSpec extends
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- fixParser.parse(Query(query))
+      expr <- fixParser.parseBlock(query)
     } yield queryPlanner(expr, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))

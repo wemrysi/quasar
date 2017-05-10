@@ -26,9 +26,10 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
-import quasar.fs._, InMemory._
+import quasar.fs._, InMemory._, mount._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.{Blob, Sql, CIName}
+import quasar.sql.{Positive => _, _}
+import quasar.sql.fixpoint._
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -38,7 +39,6 @@ import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
 import org.http4s.argonaut._
-import org.scalacheck.Arbitrary
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -56,18 +56,15 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
-  // Remove if eventually included in upstream scala-pathy
-  implicit val arbitraryFileName: Arbitrary[FileName] =
-    Arbitrary(Arbitrary.arbitrary[AFile].map(fileName(_)))
-
   def executeServiceRef(
     mem: InMemState,
-    f: FileSystem ~> InMemoryFs
+    f: FileSystem ~> InMemoryFs,
+    mounts: Map[APath, MountConfig] = Map.empty
   ): (HttpService, Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).unsafePerformSync
     val svc = HttpService.lift(req =>
       execute.service[Eff]
-        .toHttpService(effRespOr(inter compose f))
+        .toHttpService(effRespOr(inter compose f, mountingInter(mounts).unsafePerformSync))
         .apply(req))
 
     (svc, ref)
@@ -119,9 +116,9 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.fixParser.parse(sql.Query(q)).fold(
+      sql.fixParser.parseExpr(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        ast => quasar.queryPlan(ast, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        expr => quasar.queryPlan(Block(expr, Nil), vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -224,6 +221,30 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         response = (a: String) => a.trim must_= "5"
       )
     }
+    "execute a query with imported functions" >> {
+      val sampleFile = rootDir </> file("foo")
+      val funcDec = {
+        val selectAll = SelectR(
+          SelectAll,
+          List(Proj(SpliceR(None), None)),
+          Some(TableRelationAST(unsandbox(sampleFile), None)),
+          None, None, None)
+        FunctionDecl(CIName("Trivial"), List(CIName("user_id")), selectAll)
+      }
+      val query =
+        """
+          |import `/mymodule/`;
+          |TRIVIAL("bob")
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "5"
+      )
+    }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
         post[String](fileSystem)(
@@ -277,7 +298,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(Block(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -298,7 +319,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(Blob(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(Block(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,

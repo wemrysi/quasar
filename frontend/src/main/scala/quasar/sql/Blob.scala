@@ -23,8 +23,12 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses final case class Blob[T](expr: T, scope: List[Statement[T]]) {
-  def mapExpressionM[M[_]:Functor](f: T => M[T]) =
+  def mapExpressionM[M[_]:Functor](f: T => M[T]): M[Blob[T]] =
     f(expr).map(Blob(_, scope))
+  def imports: List[Import[T]] =
+    scope.collect { case i: Import[_] => i }
+  def defs: List[FunctionDecl[T]] =
+    scope.collect { case d: FunctionDecl[_] => d }
 }
 
 object Blob {

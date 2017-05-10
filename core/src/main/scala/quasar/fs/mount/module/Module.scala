@@ -168,8 +168,8 @@ object Module {
             userArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
             parsedArgs   <- EitherT(userArgs.traverse(argString => fixParser.parseExpr(Query(argString)))
                               .leftMap(parsingErr(_)).point[Free[S, ?]])
-            sqlBlob      =  Blob(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, List(funcDec))
-            logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sqlBlob, Variables.empty, basePath = fileParent(file))
+            sqlBlock     =  Block(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, List(funcDec))
+            logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sqlBlock, Variables.empty, basePath = fileParent(file))
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
             handle       <- EitherT(query.eval(logicalPlan).run.value).leftMap(fsError(_))
           } yield ResultHandle(handle.run)).run

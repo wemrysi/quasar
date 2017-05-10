@@ -18,7 +18,9 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
+import quasar.contrib.pathy.DPath
 
+import pathy.Path.posixCodec
 import monocle.macros.Lenses
 import monocle.Prism
 import scalaz._, Scalaz._
@@ -39,7 +41,7 @@ object Statement {
     new RenderTree[Statement[BODY]] {
       def render(statement: Statement[BODY]) = statement match {
         case func: FunctionDecl[_] => func.render
-        case Import(path) => NonTerminal("Import" :: Nil, Some(path), Nil)
+        case Import(path) => NonTerminal("Import" :: Nil, Some(posixCodec.printPath(path)), Nil)
       }
     }
   implicit def equal[BODY:Equal]: Equal[Statement[BODY]] =
@@ -49,7 +51,7 @@ object Statement {
     case FunctionDecl(name, args, body) => (name, args, body)
   } ((FunctionDecl[BODY](_,_,_)).tupled)
 
-  def import_[BODY] = Prism.partial[Statement[BODY], String] {
+  def import_[BODY] = Prism.partial[Statement[BODY], DPath] {
     case Import(path) => path
   } (Import(_))
 }
@@ -69,9 +71,14 @@ object FunctionDecl {
       def render(funcDec: FunctionDecl[BODY]) =
         NonTerminal("Function Declaration" :: Nil, Some(funcDec.name.value), List(funcDec.body.render))
     }
+
+  implicit val traverse: Traverse[FunctionDecl] = new Traverse[FunctionDecl] {
+    def traverseImpl[G[_]:Applicative,A,B](funcDec: FunctionDecl[A])(f: A => G[B]): G[FunctionDecl[B]] =
+      funcDec.transformBodyM(f)
+  }
 }
 
-@Lenses final case class Import[BODY](path: String) extends Statement[BODY] {
+@Lenses final case class Import[BODY](path: DPath) extends Statement[BODY] {
   override def pprint(implicit ev: BODY <~< String) =
     s"import `$path`"
 }

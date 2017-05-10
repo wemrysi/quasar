@@ -18,6 +18,7 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar.common.JoinType
+import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp._
 
@@ -28,6 +29,7 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._
 import matryoshka.implicits._
+import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
@@ -156,8 +158,10 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     }
 
   def import_ : Parser[Import[T[Sql]]] =
-    keyword("import") ~> ident ^^ {
-      case i => Import(i)
+    keyword("import") ~> ident >> {
+      case i => posixCodec.parsePath[Option[DPath]](κ(none), κ(none), sandboxCurrent(_), sandboxAbs(_).some)(i).cata(
+        path => success(Import(path)),
+        failure("Import must identify a directory"))
     }
 
   @SuppressWarnings(Array(
@@ -169,6 +173,11 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def blob: Parser[Blob[T[Sql]]] =
     opt(statements <~ op(";")) ~ expr ^^ {
       case stats ~ expr => Blob(expr, stats.getOrElse(Nil))
+    }
+
+  def block: Parser[Block[T[Sql]]] =
+    opt(repsep(func_def, op(";")) <~ op(";")) ~ expr ^^ {
+      case defs ~ expr => Block(expr, defs.getOrElse(Nil))
     }
 
   def select_expr: Parser[T[Sql]] =
@@ -486,6 +495,9 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def parseBlob(blobString: String): ParsingError \/ Blob[T[Sql]] =
     parseWithParser(blobString, blob).map(_.map(normalize))
+
+  def parseBlock(blockString: String): ParsingError \/ Block[T[Sql]] =
+    parseWithParser(blockString, block).map(_.map(normalize))
 
   val parseExpr: Query => ParsingError \/ T[Sql] = query =>
     parseWithParser(query.value, expr).map(normalize)

@@ -592,7 +592,7 @@ class SQLParserSpec extends quasar.Qspec {
     "parse import statement" in {
       val importString = "import `/foo/bar/baz/`"
       fixParser.parseWithParser(importString, fixParser.import_) must beRightDisjunction(
-        Import("/foo/bar/baz/"))
+        Import(rootDir </> dir("foo") </> dir("bar") </> dir("baz")))
     }
 
     "parse module" in {
