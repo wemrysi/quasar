@@ -969,6 +969,12 @@ object MongoDbPlanner {
     implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {
+        private def extractBuilderList[WF[_]](wb: WorkflowBuilder[WF]): List[WorkflowBuilder[WF]] =
+          wb.unFix match {
+            // case ArrayBuilderF(src, es) => es.map(ExprBuilder(src, _))
+            case _                      => List(wb)
+          }
+
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -984,17 +990,22 @@ object MongoDbPlanner {
           qs =>
         // FIXME: we should take advantage of the already merged srcs
         (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.lBranch, qs.src) ⊛
-          rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src) ⊛
-          getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.lKey) ⊛
-          getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.rKey) ⊛
-          getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
-          getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
-          (lb, rb, lk, rk, lj, rj) =>
-          liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-            // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
-            LogicalPlan.funcFromJoinType(qs.f),
-            JoinSource(lb, List(lk), lj.map(List(_))),
-            JoinSource(rb, List(rk), rj.map(List(_)))))).join
+          rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src))(
+          (lb, rb) =>
+          (getExprBuilder[T, M, WF, EX](funcHandler)(lb, qs.lKey) ⊛
+            getExprBuilder[T, M, WF, EX](funcHandler)(rb, qs.rKey) ⊛
+            getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
+            getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
+            (lk, rk, lj, rj) =>
+            liftM[M, WorkflowBuilder[WF]](joinHandler.run(
+              // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
+              LogicalPlan.funcFromJoinType(qs.f),
+              JoinSource(lb, extractBuilderList(lk), lj.map(List(_))),
+              JoinSource(rb, extractBuilderList(rk), rj.map(List(_))))) >>=
+              (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
+                case LeftSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("left")))
+                case RightSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("right")))
+              }))).join).join
       }
 
     implicit def coproduct[T[_[_]], F[_], G[_]](
@@ -1017,7 +1028,6 @@ object MongoDbPlanner {
             F.plan[M, WF, EX](joinHandler, funcHandler),
             G.plan[M, WF, EX](joinHandler, funcHandler))
       }
-
 
     // TODO: All instances below here only need to exist because of `FreeQS`,
     //       but can’t actually be called.
