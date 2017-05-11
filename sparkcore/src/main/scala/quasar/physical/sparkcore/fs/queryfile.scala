@@ -185,7 +185,7 @@ object queryfile {
       rdd <- EitherT(read.asks { sc =>
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
       }.join)
-      _ <- kvs.put(h, RddState(rdd.zipWithIndex.some, 0)).liftM[PlannerErrT]
+      _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
 
     open
@@ -212,15 +212,20 @@ object queryfile {
               .filter(d => d._2 >= p && d._2 < (p + step))
               .map(_._1).collect.toVector
           }).into[S].liftM[FileSystemErrT]
-          rddState = if(collected.isEmpty) RddState(None, 0) else RddState(Some(rdd), p + step)
+          rddState <- lift(Task.delay {
+            if(collected.isEmpty) {
+              val unpersisted = rdd.unpersist()
+              RddState(None, 0)
+            } else RddState(Some(rdd), p + step)
+          }).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
-        } yield(collected)
+        } yield collected
     }.run
   }
 
   private def close[S[_]](h: ResultHandle)(implicit
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
-     ): Free[S, Unit] = kvs.delete(h)
+  ): Free[S, Unit] = kvs.delete(h)
 
   private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
     s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)
