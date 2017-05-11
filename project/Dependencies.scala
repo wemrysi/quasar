@@ -114,16 +114,14 @@ object Dependencies {
     "org.http4s"         %% "http4s-core" % http4sVersion
   )
 
-  def marklogicValidation = Seq(
-    CommonDependencies.refined.refined,
-    CommonDependencies.scalaz.core
-  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
+    "com.slamdata"               %% "xml-names-core"      % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
     CommonDependencies.refined.scalacheck                                   % Test,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+    "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
