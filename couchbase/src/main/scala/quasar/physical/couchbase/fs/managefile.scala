@@ -32,7 +32,7 @@ object managefile {
 
   def interpret[S[_]](implicit
     S0: MonotonicSeq :<: S,
-    S1: Read[Context, ?] :<:  S,
+    S1: Read[ClientContext, ?] :<:  S,
     S2: Task :<: S
   ): ManageFile ~> Free[S, ?] = λ[ManageFile ~> Free[S, ?]] {
     case Move(scenario, semantics) => move(scenario, semantics)
@@ -44,20 +44,20 @@ object managefile {
     scenario: MoveScenario, semantics: MoveSemantics
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Unit] =
     (for {
       ctx       <- context.ask.liftM[FileSystemErrT]
-      src       <- docTypeFromPath(scenario.src).η[FileSystemErrT[Free[S, ?], ?]]
-      dst       <- docTypeFromPath(scenario.dst).η[FileSystemErrT[Free[S, ?], ?]]
-      srcExists <- EitherT(lift(existsWithPrefix(ctx.bucket, src.v)).into)
+      src       <- docTypeValueFromPath(scenario.src).η[FileSystemErrT[Free[S, ?], ?]]
+      dst       <- docTypeValueFromPath(scenario.dst).η[FileSystemErrT[Free[S, ?], ?]]
+      srcExists <- EitherT(lift(existsWithPrefix(ctx, src.v)).into)
       _         <- EitherT((
                      if (!srcExists)
                        FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
                      else
                        ().right
                    ).η[Free[S, ?]])
-      dstExists <- EitherT(lift(existsWithPrefix(ctx.bucket, dst.v)).into)
+      dstExists <- EitherT(lift(existsWithPrefix(ctx, dst.v)).into)
       _         <- EitherT((semantics match {
                     case MoveSemantics.FailIfExists if dstExists =>
                       FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
@@ -68,8 +68,8 @@ object managefile {
                   }).η[Free[S, ?]])
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
       qStr      =  s"""update `${ctx.bucket.name}`
-                       set type=("${dst.v}" || REGEXP_REPLACE(type, "^${src.v}", ""))
-                       where type like "${src.v}%""""
+                       set `${ctx.docTypeKey.v}`=("${dst.v}" || REGEXP_REPLACE(`${ctx.docTypeKey.v}`, "^${src.v}", ""))
+                       where "${ctx.docTypeKey.v}" like "${src.v}%""""
       _         <- EitherT(lift(query(ctx.bucket, qStr)).into)
     } yield ()).run
 
@@ -77,17 +77,17 @@ object managefile {
     path: APath
   )(implicit
     S0: Task :<: S,
-    context: Read.Ops[Context, S]
+    context: Read.Ops[ClientContext, S]
   ): Free[S, FileSystemError \/ Unit] =
     (for {
       ctx       <- context.ask.liftM[FileSystemErrT]
-      col       <- docTypeFromPath(path).η[FileSystemErrT[Free[S, ?], ?]]
-      docsExist <- EitherT(lift(existsWithPrefix(ctx.bucket, col.v)).into)
+      col       <- docTypeValueFromPath(path).η[FileSystemErrT[Free[S, ?], ?]]
+      docsExist <- EitherT(lift(existsWithPrefix(ctx, col.v)).into)
       _         <- EitherT((
                      if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
                      else ().right
                    ).η[Free[S, ?]])
-      _         <- EitherT(lift(deleteHavingPrefix(ctx.bucket, col.v)).into)
+      _         <- EitherT(lift(deleteHavingPrefix(ctx, col.v)).into)
     } yield ()).run
 
   def tempFile[S[_]](

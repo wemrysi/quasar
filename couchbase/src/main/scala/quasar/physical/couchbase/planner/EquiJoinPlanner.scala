@@ -25,7 +25,7 @@ import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
-  common.{BucketNameReader, DocType},
+  common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
 import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
@@ -38,7 +38,7 @@ import scalaz._, Scalaz._
 
 // NB: Only handling a limited simple set of cases to start
 
-final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
+final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextReader: NameGenerator]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
@@ -64,12 +64,12 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNam
   val QC = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
   object BranchCollection {
-    def unapply(qs: FreeQS[T]): Option[DocType] = (qs match {
+    def unapply(qs: FreeQS[T]): Option[DocTypeValue] = (qs match {
       case Embed(CoEnv(\/-(CShiftedRead(c))))                              => c.some
       case Embed(CoEnv(\/-(QC(
         qscript.Filter(Embed(CoEnv(\/-(CShiftedRead(c)))),MetaGuard()))))) => c.some
       case _                                                               => none
-    }) ∘ (c =>  common.docTypeFromPath(c.getConst.path))
+    }) ∘ (c =>  common.docTypeValueFromPath(c.getConst.path))
   }
 
   object KeyMetaId {
@@ -101,7 +101,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNam
     for {
       id1 <- genId[T[N1QL], M]
       id2 <- genId[T[N1QL], M]
-      bkt <- BucketNameReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]
+      ctx <- ContextReader[F].ask.liftM[PhaseResultT].liftM[PlannerErrT]
       b   <- branch.cataM(interpretM(κ(N1QL.Null[T[N1QL]]().embed.η[M]), tPlan))
       k   <- key.cataM(interpretM(κ(id1.embed.η[M]), mfPlan))
       c   <- combine.cataM(interpretM({
@@ -112,10 +112,10 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNam
       Value(true),
       ResultExpr(c, none).wrapNel,
       Keyspace(b, id1.some).some,
-      LookupJoin(N1QL.Id(bkt.v), id2.some, k, joinType).some,
+      LookupJoin(N1QL.Id(ctx.bucket.v), id2.some, k, joinType).some,
       unnest = none, let = nil,
       Filter(Eq(
-        SelectField(id2.embed, Data[T[N1QL]](quasar.Data.Str("type")).embed).embed,
+        SelectField(id2.embed, Data[T[N1QL]](quasar.Data.Str(ctx.docTypeKey.v)).embed).embed,
         Data[T[N1QL]](quasar.Data.Str(col)).embed).embed).some,
       groupBy = none, orderBy = nil).embed
 

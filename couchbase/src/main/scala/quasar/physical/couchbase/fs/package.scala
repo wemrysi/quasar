@@ -24,7 +24,7 @@ import quasar.fp._, free._, ski.κ
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
 import quasar.fs.mount._, FileSystemDef.{DefErrT, DefinitionError}
 
-import quasar.physical.couchbase.common.{Context, Cursor}
+import quasar.physical.couchbase.common.{ClientContext, Cursor, DocTypeKey}
 
 import java.time.Duration
 import scala.math
@@ -38,10 +38,6 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 // TODO: Injection? Parameterized queries could help but don't appear to handle bucket names within ``
-// TODO: Handle query returned errors field
-// TODO: It might make sense to add connection uri parameter to configure collection field (currently always type)
-//       So when people list a bucket they would see type values
-//       What about a bucket with no type field, should we make it optional? If optional Quasar would see the entire file
 
 package object fs {
   val FsType = FileSystemType("couchbase")
@@ -53,7 +49,7 @@ package object fs {
 
   type Eff[A] = (
     Task                                             :\:
-    Read[Context, ?]                                 :\:
+    Read[ClientContext, ?]                           :\:
     MonotonicSeq                                     :\:
     GenUUID                                          :\:
     KeyValueStore[ReadHandle,   Cursor,  ?]          :\:
@@ -61,8 +57,8 @@ package object fs {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  def context(connectionUri: ConnectionUri): DefErrT[Task, (Context, Cluster)] = {
-    final case class ConnUriParams(bucket: String, pass: String, socketConnectTimeout: Duration, queryTimeout: Duration)
+  def context(connectionUri: ConnectionUri): DefErrT[Task, (ClientContext, Cluster)] = {
+    final case class ConnUriParams(bucket: String, pass: String, docTypeKey: String, socketConnectTimeout: Duration, queryTimeout: Duration)
 
     def liftDT[A](v: => NonEmptyList[String] \/ A): DefErrT[Task, A] =
       EitherT(Task.delay(
@@ -88,9 +84,10 @@ package object fs {
                  )
       params  <- liftDT((
                    uri.params.get("password").toSuccessNel("No password in ConnectionUri")   |@|
+                   uri.params.get("docTypeKey").toSuccessNel("No doctype in ConnectionUri")  |@|
                    duration(uri, "socketConnectTimeoutSeconds", defaultSocketConnectTimeout) |@|
                    duration(uri, "queryTimeoutSeconds", defaultQueryTimeout)
-                 )(ConnUriParams(uri.path.stripPrefix("/"), _, _, _)).disjunction)
+                 )(ConnUriParams(uri.path.stripPrefix("/"), _, _, _, _)).disjunction)
       ev      <- env(params).liftM[DefErrT]
       cluster <- EitherT(Task.delay(
                    CouchbaseCluster.fromConnectionString(ev, uri.copy(path = "", query = Query.empty).renderString).right
@@ -112,7 +109,7 @@ package object fs {
       bkt     <- EitherT(Task.delay(cm.hasBucket(params.bucket).booleanValue).ifM(
                    Task.delay(cluster.openBucket(params.bucket, params.pass).right[DefinitionError]),
                    Task.now(s"Bucket ${params.bucket} not found".wrapNel.left.left)))
-    } yield (Context(bkt), cluster)
+    } yield (ClientContext(bkt, DocTypeKey(params.docTypeKey)), cluster)
   }
 
   def interp[S[_]](
@@ -122,7 +119,7 @@ package object fs {
   ): DefErrT[Free[S, ?], (Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])] = {
 
     def taskInterp(
-      ctx: Context,
+      ctx: ClientContext,
       cluster: Cluster
     ): Task[(Free[Eff, ?] ~> Free[S, ?], Free[S, Unit])]  =
       (TaskRef(Map.empty[ReadHandle,   Cursor])          |@|
@@ -133,12 +130,12 @@ package object fs {
      )((kvR, kvW, kvQ, i, genUUID) =>
       (
         mapSNT(injectNT[Task, S] compose (
-          reflNT[Task]                          :+:
-          Read.constant[Task, Context](ctx)     :+:
-          MonotonicSeq.fromTaskRef(i)           :+:
-          genUUID                               :+:
-          KeyValueStore.impl.fromTaskRef(kvR)   :+:
-          KeyValueStore.impl.fromTaskRef(kvW)   :+:
+          reflNT[Task]                            :+:
+          Read.constant[Task, ClientContext](ctx) :+:
+          MonotonicSeq.fromTaskRef(i)             :+:
+          genUUID                                 :+:
+          KeyValueStore.impl.fromTaskRef(kvR)     :+:
+          KeyValueStore.impl.fromTaskRef(kvW)     :+:
           KeyValueStore.impl.fromTaskRef(kvQ))),
         lift(Task.delay(cluster.disconnect()).void).into
       ))

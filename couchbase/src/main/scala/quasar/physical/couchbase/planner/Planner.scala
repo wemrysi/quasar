@@ -55,11 +55,11 @@ object Planner {
     : Planner[T, F, Const[ShiftedRead[ADir], ?]] =
     new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
-  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: BucketNameReader: NameGenerator]
+  implicit def constShiftedReadFile[T[_[_]]: CorecursiveT, F[_]: Monad: ContextReader: NameGenerator]
     : Planner[T, F, Const[ShiftedRead[AFile], ?]] =
     new ShiftedReadFilePlanner[T, F]
 
-  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
+  implicit def equiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextReader: NameGenerator]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
@@ -71,7 +71,7 @@ object Planner {
     : Planner[T, F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
-  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: BucketNameReader: NameGenerator]
+  implicit def qScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextReader: NameGenerator]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 
