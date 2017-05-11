@@ -101,7 +101,7 @@ object queryfile {
                     uuid.toString,
                     JsonObject
                       .create()
-                      .put("${ctx.doctype.v}", col.v)
+                      .put(ctx.docTypeKey.v, col.v)
                       .put("value", jsonTranscoder.stringToJsonObject(d)))
                 )).liftF
       exists <- EitherT(lift(existsWithPrefix(ctx, col.v)).into.liftM[PhaseResultT])

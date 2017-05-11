@@ -52,7 +52,7 @@ object readfile {
       col     <- docTypeValueFromPath(file).η[FileSystemErrT[Free[S, ?], ?]]
       limit   =  readOpts.limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
-                     WHERE "${ctx.docTypeKey.v}"="${col.v}"
+                     WHERE `${ctx.docTypeKey.v}`="${col.v}"
                      $limit OFFSET ${readOpts.offset.unwrap.shows}"""
       qResult <- EitherT(lift(queryData(ctx.bucket, qStr)).into)
     } yield Cursor(qResult)).run

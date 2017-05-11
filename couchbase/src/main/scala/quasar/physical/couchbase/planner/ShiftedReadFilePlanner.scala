@@ -45,7 +45,7 @@ final class ShiftedReadFilePlanner[T[_[_]]: CorecursiveT, F[_]: Monad: ContextRe
         
         val v =
           IfMissing(
-            SelectField(gId.embed, str(ctx.docTypeKey.v).embed).embed,
+            SelectField(gId.embed, str("value").embed).embed,
             gId.embed).embed
 
         val mId = SelectField(Meta(gId.embed).embed, str("id").embed)

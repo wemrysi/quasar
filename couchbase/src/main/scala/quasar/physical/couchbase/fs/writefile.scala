@@ -91,7 +91,7 @@ object writefile {
                 .map(str =>
                   JsonObject
                     .create()
-                    .put("${ctx.docTypeKey.v}", st.collection)
+                    .put(ctx.docTypeKey.v, st.collection.v)
                     .put("value", jsonTranscoder.stringToJsonObject(str))))).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
       docs <- data.traverse(d => GenUUID.Ops[S].asks(uuid =>
                 JsonDocument.create(uuid.toString, d)

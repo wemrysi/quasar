@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.couchbase.common.BucketName
+import quasar.physical.couchbase.common.{BucketName, Context, DocTypeKey}
 import quasar.physical.couchbase.fs.queryfile._
 import quasar.physical.couchbase.planner._, Planner._
 import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
@@ -64,10 +64,10 @@ class BasicQueryEnablementSpec
 
   type Eff[A] = (MonotonicSeq :/: Task)#M[A]
 
-  val bn = BucketName("beer-sample")
+  val ctx = Context(BucketName("beer-sample"), DocTypeKey("type"))
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc, bn) >>= (r =>
+    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc, ctx) >>= (r =>
       RenderQuery.compact(r._1).liftPE))
       .run.run.map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
@@ -75,9 +75,9 @@ class BasicQueryEnablementSpec
       .fold(e => scala.sys.error(e.shows), ι)
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], BucketName, ?], QST].plan) >>= (n1ql =>
-      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], BucketName, ?]].liftM[PhaseResultT])
-    )).run.run.run(bn).map(_._2)
+    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], Context, ?], QST].plan) >>= (n1ql =>
+      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]].liftM[PhaseResultT])
+    )).run.run.run(ctx).map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)

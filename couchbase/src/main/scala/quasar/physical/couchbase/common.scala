@@ -43,7 +43,6 @@ object common {
 
   final case class Context(bucket: BucketName, docTypeKey: DocTypeKey)
 
-
   final case class BucketName(v: String)
 
   // type field in Couchbase documents
@@ -61,7 +60,7 @@ object common {
     ctx: ClientContext,
     prefix: String
   ): Task[FileSystemError \/ Unit] = {
-    val qStr = s"""DELETE FROM `${ctx.bucket.name}` WHERE "${ctx.docTypeKey.v}" LIKE "${prefix}%""""
+    val qStr = s"""DELETE FROM `${ctx.bucket.name}` WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
 
     query(ctx.bucket, qStr).map(_.void)
   }
@@ -71,7 +70,7 @@ object common {
     prefix: String
   ): Task[FileSystemError \/ List[DocTypeValue]] = {
     val qStr = s"""SELECT distinct type FROM `${ctx.bucket.name}`
-                   WHERE "${ctx.docTypeKey.v}" LIKE "${prefix}%""""
+                   WHERE `${ctx.docTypeKey.v}` LIKE "${prefix}%""""
     query(ctx.bucket, qStr).map(_.map(_.toList.map(r => DocTypeValue(r.value.getString(ctx.docTypeKey.v)))))
   }
 
@@ -80,7 +79,7 @@ object common {
     prefix: String
   ): Task[FileSystemError \/ Boolean] = {
     val qStr = s"""SELECT count(*) > 0 v FROM `${ctx.bucket.name}`
-                   WHERE "${ctx.docTypeKey.v}" = "${prefix}" OR "${ctx.docTypeKey.v}" like "${prefix}/%""""
+                   WHERE `${ctx.docTypeKey.v}` = "${prefix}" OR `${ctx.docTypeKey.v}` like "${prefix}/%""""
     query(ctx.bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
   }
 

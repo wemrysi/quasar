@@ -69,7 +69,7 @@ object managefile {
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
       qStr      =  s"""update `${ctx.bucket.name}`
                        set `${ctx.docTypeKey.v}`=("${dst.v}" || REGEXP_REPLACE(`${ctx.docTypeKey.v}`, "^${src.v}", ""))
-                       where "${ctx.docTypeKey.v}" like "${src.v}%""""
+                       where `${ctx.docTypeKey.v}` like "${src.v}%""""
       _         <- EitherT(lift(query(ctx.bucket, qStr)).into)
     } yield ()).run
 
