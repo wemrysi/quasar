@@ -54,6 +54,9 @@ object metastore {
   type QErrsCnxIOM[A]  = Free[QErrsCnxIO, A]
   type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
 
+  private val metastorePrompt: String =
+    "Is the metastore database running?"
+
   object QErrsTCnxIO {
     def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
       val f: QErrsTCnxIOM ~> MainErrT[ConnectionIO, ?] =
@@ -127,7 +130,7 @@ object metastore {
     val verifyMS = Hoist[MainErrT].hoist(transactor.trans)
       .apply(verifyMetaStoreSchema(schema))
     EitherT(verifyMS.run.attempt.map(_.valueOr(t =>
-      s"While verifying MetaStore schema: ${t.getMessage}".left)))
+      s"While verifying MetaStore schema: ${t.getMessage}. $metastorePrompt".left)))
   }
 
   def initUpdateMetaStore[A](
@@ -160,7 +163,7 @@ object metastore {
         jCfg)
 
     EitherT(transactor.trans(op).attempt ∘ (
-      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}")))
+      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}. $metastorePrompt")))
   }
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
