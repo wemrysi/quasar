@@ -24,7 +24,7 @@ import quasar.precog.common.security._
 import quasar.precog.util._
 
 import java.util.Arrays
-import java.nio.CharBuffer
+import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
@@ -172,5 +172,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
     def findDirectChildren(path: Path): EitherT[M, ResourceError, Set[PathMetadata]]
 
     def findPathMetadata(path: Path): EitherT[M, ResourceError, PathMetadata]
+
+    def currentVersion(path: Path): M[Option[VersionEntry]]
   }
 }

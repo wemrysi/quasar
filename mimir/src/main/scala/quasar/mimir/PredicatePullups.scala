@@ -18,6 +18,8 @@ package quasar.mimir
 
 import scalaz._, Scalaz._
 
+import quasar.yggdrasil.execution.EvaluationContext
+
 trait PredicatePullupsModule[M[+ _]] extends TransSpecableModule[M] {
   trait PredicatePullups extends TransSpecable {
     import dag._

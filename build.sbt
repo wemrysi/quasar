@@ -173,7 +173,7 @@ lazy val root = project.in(file("."))
 //   |    |   |                                                               |
                                                                            blueeyes,
 //   |    |   |                                                               |
-    sql, connector, marklogicValidation,                                   yggdrasil,
+    sql, connector, marklogicValidation,                                   yggdrasil, niflheim,
 //   |  /   | | \ \      |                                                    |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
 //      \ \ | / /
@@ -486,5 +486,16 @@ lazy val yggdrasil = project.setup
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val niflheim = project.setup.noArtifacts
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
+      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)

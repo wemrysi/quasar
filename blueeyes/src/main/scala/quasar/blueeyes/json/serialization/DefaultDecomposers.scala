@@ -22,6 +22,8 @@ import json._
 import java.util.{ Date => JDate }
 import java.math.MathContext
 
+import java.time.LocalDateTime
+
 /** Decomposers for all basic types.
   */
 trait DefaultDecomposers {
@@ -121,6 +123,9 @@ trait DefaultDecomposers {
         JField(key, valueDecomposer(tvalue.apply(key)))
       })
   }
-}
 
+  implicit val LocalDateTimeDecomposer = new Decomposer[LocalDateTime] {
+    def decompose(dateTime: LocalDateTime): JValue = JNum(dateTime.getMillis)
+  }
+}
 object DefaultDecomposers extends DefaultDecomposers
