@@ -55,15 +55,11 @@ object WorkflowBuilderF {
             eq.equal(s1, s2) && e1 == e2
           case (DocBuilderF(s1, e1), DocBuilderF(s2, e2)) =>
             eq.equal(s1, s2) && e1 == e2
-          case (ArrayBuilderF(s1, e1), ArrayBuilderF(s2, e2)) =>
-            eq.equal(s1, s2) && e1 == e2
           case (GroupBuilderF(s1, k1, c1), GroupBuilderF(s2, k2, c2)) =>
             eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
           case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
             eq.equal(s1, s2) && f1 == f2
           case (SpliceBuilderF(s1, i1), SpliceBuilderF(s2, i2)) =>
-            eq.equal(s1, s2) && i1 == i2
-          case (ArraySpliceBuilderF(s1, i1), ArraySpliceBuilderF(s2, i2)) =>
             eq.equal(s1, s2) && i1 == i2
           case _ => false
         })
@@ -83,21 +79,18 @@ object WorkflowBuilderF {
             (f(src) |@| inputs.traverse(f))(ShapePreservingBuilderF(_, _, op))
           case ExprBuilderF(src, expr) => f(src).map(ExprBuilderF(_, expr))
           case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
-          case ArrayBuilderF(src, shape) => f(src).map(ArrayBuilderF(_, shape))
           case GroupBuilderF(src, keys, contents) =>
             (f(src) |@| keys.traverse(f))(GroupBuilderF(_, _, contents))
           case FlatteningBuilderF(src, fields) =>
             f(src).map(FlatteningBuilderF(_, fields))
           case SpliceBuilderF(src, structure) =>
             f(src).map(SpliceBuilderF(_, structure))
-          case ArraySpliceBuilderF(src, structure) =>
-            f(src).map(ArraySpliceBuilderF(_, structure))
         }
     }
 
   implicit def renderTree[F[_]: Coalesce: Functor](implicit
-      RG: RenderTree[Contents[GroupValue[Fix[ExprOp]]]],
-      RC: RenderTree[Contents[Expr]],
+      RG: RenderTree[DocContents[GroupValue[Fix[ExprOp]]]],
+      RC: RenderTree[DocContents[Expr]],
       RF: RenderTree[Fix[F]],
       ev: WorkflowOpCoreF :<: F
     ): Delay[RenderTree, WorkflowBuilderF[F, ?]] =
@@ -128,12 +121,6 @@ object WorkflowBuilderF {
                     NonTerminal("Name" :: nodeType, Some(name.value), List(expr.render))
                 }) ::
               Nil)
-        case ArrayBuilderF(src, shape) =>
-          val nt = "ArrayBuilder" :: nodeType
-          NonTerminal(nt, None,
-            rt.render(src) ::
-              NonTerminal("Shape" :: nt, None, shape.map(_.render)) ::
-              Nil)
         case GroupBuilderF(src, keys, content) =>
           val nt = "GroupBuilder" :: nodeType
           NonTerminal(nt, None,
@@ -151,9 +138,6 @@ object WorkflowBuilderF {
               }) :: nt)))
         case SpliceBuilderF(src, structure) =>
           NonTerminal("SpliceBuilder" :: nodeType, None,
-            rt.render(src) :: structure.map(RC.render))
-        case ArraySpliceBuilderF(src, structure) =>
-          NonTerminal("ArraySpliceBuilder" :: nodeType, None,
             rt.render(src) :: structure.map(RC.render))
       }
     }))
@@ -267,39 +251,27 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new DocBuilderF(src, shape))
   }
 
-  final case class ArrayBuilderF[F[_], A](src: A, shape: List[Expr])
-      extends WorkflowBuilderF[F, A]
-  object ArrayBuilder {
-    def apply[F[_]](src: WorkflowBuilder[F], shape: List[Expr]) =
-      Fix[WorkflowBuilderF[F, ?]](new ArrayBuilderF(src, shape))
-  }
-
-  sealed abstract class Contents[+A] extends Product with Serializable
-  sealed abstract class DocContents[+A] extends Contents[A]
-  sealed trait ArrayContents[+A] extends Contents[A]
-  object Contents {
-    final case class Expr[A](contents: A) extends DocContents[A] with ArrayContents[A]
+  sealed abstract class DocContents[A] extends Product with Serializable
+  object DocContents {
+    final case class Expr[A](contents: A) extends DocContents[A]
     final case class Doc[A](contents: ListMap[BsonField.Name, A]) extends DocContents[A]
-    final case class Array[A](contents: List[A]) extends ArrayContents[A]
 
-    implicit def ContentsRenderTree[A: RenderTree]: RenderTree[Contents[A]] =
-      new RenderTree[Contents[A]] {
+    implicit def DocContentsRenderTree[A: RenderTree]: RenderTree[DocContents[A]] =
+      new RenderTree[DocContents[A]] {
         val nodeType = "Contents" :: Nil
 
-        def render(v: Contents[A]) =
+        def render(v: DocContents[A]) =
           v match {
             case Expr(a)   => NonTerminal("Expr" :: nodeType, None, a.render :: Nil)
             case Doc(b)    => NonTerminal("Doc" :: nodeType, None, b.render :: Nil)
-            case Array(as) => NonTerminal("Array" :: nodeType, None, as.map(_.render))
           }
       }
   }
-  import Contents._
+  import DocContents._
 
-  def contentsToBuilder[F[_]]: Contents[Expr] => WorkflowBuilder[F] => WorkflowBuilder[F] = {
+  def contentsToBuilder[F[_]]: DocContents[Expr] => WorkflowBuilder[F] => WorkflowBuilder[F] = {
     case Expr(expr) => ExprBuilder(_, expr)
     case Doc(doc)   => DocBuilder(_, doc)
-    case Array(arr) => ArrayBuilder(_, arr)
   }
 
   type GroupValue[A] = AccumOp[A] \/ A
@@ -359,21 +331,6 @@ object WorkflowBuilder {
   object SpliceBuilder {
     def apply[F[_]](src: WorkflowBuilder[F], structure: List[DocContents[Expr]]) =
       Fix[WorkflowBuilderF[F, ?]](new SpliceBuilderF(src, structure))
-  }
-
-  final case class ArraySpliceBuilderF[F[_], A](src: A, structure: List[ArrayContents[Expr]])
-      extends WorkflowBuilderF[F, A] {
-    def toJs(implicit ev: ExprOpOps.Uni[ExprOp]): PlannerError \/ JsFn =
-      structure.traverse {
-        case Expr(unknown) => exprToJs(unknown)
-        case Array(known)  => known.traverse(exprToJs).map(
-            ms => JsFn(jsBase, jscore.Arr(ms.map(_(jscore.Ident(jsBase))))))
-      }.map(srcs =>
-        JsFn(jsBase, jscore.SpliceArrays(srcs.map(_(jscore.Ident(jsBase))))))
-  }
-  object ArraySpliceBuilder {
-    def apply[F[_]](src: WorkflowBuilder[F], structure: List[ArrayContents[Expr]]) =
-      Fix[WorkflowBuilderF[F, ?]](new ArraySpliceBuilderF(src, structure))
   }
 
   /** Simplify/coalesce certain shapes, eliminating extra layers that make it
@@ -648,19 +605,6 @@ object WorkflowBuilder {
                 Root(),
                 fields.some))))
         }
-      case ArrayBuilderF(src, shape) =>
-        generateWorkflow(src).flatMap { case (wf, base) =>
-          lift(shape.traverse(exprToJs).map(jsExprs =>
-            CollectionBuilderF(
-              chain(wf,
-                $simpleMap[F](NonEmptyList(
-                  MapExpr(JsFn(jsBase,
-                    jscore.Arr(jsExprs.map(_(base.toDocVar.toJs(jscore.Ident(jsBase))
-                    )).toList)))),
-                  ListMap())),
-              Root(),
-              None)))
-        }
       case GroupBuilderF(src, keys, content) =>
         (foldBuilders(src, keys) |@| toCollectionBuilder(src)){ case ((wb, base, fields), CollectionBuilderF(_, _, struct)) =>
           def key(base: Base) = keys.zip(fields) match {
@@ -785,17 +729,6 @@ object WorkflowBuilder {
                 None)
             })
         }
-      case sb @ ArraySpliceBuilderF(_, _) =>
-        generateWorkflow(sb.src).flatMap { case (wf, base) =>
-          lift(
-            sb.toJs.map { splice =>
-              CollectionBuilderF(
-                chain(wf,
-                  $simpleMap[F](NonEmptyList(MapExpr(JsFn(jsBase, (base.toDocVar.toJs >>> splice)(jscore.Ident(jsBase))))), ListMap())),
-                Root(),
-                None)
-            })
-        }
     }
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
@@ -838,22 +771,6 @@ object WorkflowBuilder {
     case ExprBuilderF(_, HasThat($literal(value)))         => value.some
     case _                                                 => none
   }
-
-  private def fold1Builders[F[_]: Coalesce](builders: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
-    : Option[M[(WorkflowBuilder[F], List[Fix[ExprOp]])]] =
-    builders match {
-      case Nil             => None
-      case builder :: Nil  => Some(emit((builder, List($$ROOT))))
-      case builder :: rest =>
-        Some(rest.foldLeftM[M, (WorkflowBuilder[F], List[Fix[ExprOp]])](
-          (builder, List($$ROOT))) {
-          case ((wf, fields), x) =>
-            merge(wf, x).map { case (lbase, rbase, src) =>
-              (src, fields.map(_.cata(exprOps.rewriteRefs(prefixBase0(lbase)))) :+ $var(rbase.toDocVar))
-            }
-        })
-    }
 
   private def foldBuilders[F[_]: Coalesce](src: WorkflowBuilder[F], others: List[WorkflowBuilder[F]])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
@@ -1067,19 +984,6 @@ object WorkflowBuilder {
         }
       case (_, SpliceBuilderF(_, _)) => delegate
 
-      case (sb @ ArraySpliceBuilderF(_, _), _) =>
-        merge(sb.src, right).flatMap { case (lbase, rbase, wb) =>
-          for {
-            lName  <- emitSt(freshName)
-            rName  <- emitSt(freshName)
-            splice <- lift(sb.toJs)
-          } yield (Field(lName), Field(rName),
-            DocBuilder(wb, ListMap(
-              lName -> -\&/(lbase.toDocVar.toJs >>> splice),
-              rName -> docVarToExpr(rbase.toDocVar))))
-        }
-      case (_, ArraySpliceBuilderF(_, _)) => delegate
-
       case (
         FlatteningBuilderF(src0, fields0),
         FlatteningBuilderF(src1, fields1)) =>
@@ -1126,31 +1030,6 @@ object WorkflowBuilder {
           }
         }
 
-      case (ArrayBuilderF(src, shape), _) =>
-        merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          generateWorkflow(ArrayBuilder(wb, shape.map(rewriteExprPrefix(_, lbase)))).flatMap { case (wf, base) =>
-            I.prj(wf.unFix).cata(
-              {
-                case $ProjectF(psrc, Reshape(shape), idx) =>
-                  emitSt(freshName.map(rName =>
-                    (lbase, Field(rName),
-                      CollectionBuilder(
-                        chain(psrc,
-                          $project[F](Reshape(shape + (rName -> \/-($var(rbase.toDocVar)))))),
-                        Root(),
-                        None))))
-                case _ => fail(InternalError fromMsg s"couldn’t merge array")
-              },
-              {
-                // TODO: Find a way to print this without using toString
-                @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
-                val msg = "couldn’t merge unrecognized op: " + wf.toString
-                fail(InternalError.fromMsg(msg))
-              })
-          }
-        }
-      case (_, ArrayBuilderF(_, _)) => delegate
-
       case _ =>
         fail(InternalError.fromMsg("failed to merge:\n" + left.render.shows + "\n" + right.render.shows))
     }
@@ -1176,16 +1055,6 @@ object WorkflowBuilder {
     // FIXME: no constraints
     def jsExpr1(wb: WorkflowBuilder[F], js: JsFn): WorkflowBuilder[F] =
       Fix(normalize[F].apply(ExprBuilderF(wb, -\&/(js))))
-
-    // Like JsExpr, but accepts a JsFn that expects to receive an array of values.
-    def jsArrayExpr(wbs: List[WorkflowBuilder[F]], js: JsFn)
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] =
-      fold1Builders(wbs).fold[M[WorkflowBuilder[F]]](
-        fail(InternalError.fromMsg("impossible – no arguments")))(
-        _.map { case (wb, exprs) =>
-          jsExpr1(ArrayBuilder(wb, exprs.map(\&/-)), js)
-        })
 
     def makeObject(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
@@ -1464,19 +1333,6 @@ object WorkflowBuilder {
                 Expr(docVarToExpr(right.toDocVar)))(List(_, _)))
             }
           case (CollectionBuilderF(_, _, _), DocBuilderF(_, _)) => delegate
-
-          case (
-            DocBuilderF(s1 @ Fix(
-              ArraySpliceBuilderF(_, _)),
-              shape1),
-            GroupBuilderF(_, _, Doc(c2))) =>
-            merge(s1, wb2).map { case (lbase, rbase, src) =>
-              DocBuilder(src,
-                combine(
-                  rewriteDocPrefix(shape1, lbase),
-                  c2.map { case (n, _) => (n, rewriteExprPrefix(docVarToExpr(DocField(n)), rbase)) })(_ ++ _))
-            }
-          case (GroupBuilderF(_, _, _), DocBuilderF(Fix(ArraySpliceBuilderF(_, _)), _)) => delegate
 
           case _ => fail(UnsupportedFunction(
             structural.ObjectConcat,

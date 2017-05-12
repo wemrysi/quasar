@@ -67,6 +67,12 @@ object MapFunc {
     * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
+    def apply[T[_[_]]: CorecursiveT, A](elems: List[FreeMapA[T, A]]): FreeMapA[T, A] =
+      elems.map(e => Free.roll(MakeArray[T, FreeMapA[T, A]](e))) match {
+        case Nil    => Free.roll(EmptyArray[T, FreeMapA[T, A]])
+        case h :: t => t.foldLeft(h)((a, e) => Free.roll(ConcatArrays(a, e)))
+      }
+
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[FreeMapA[T, A]]] =
       mf match {

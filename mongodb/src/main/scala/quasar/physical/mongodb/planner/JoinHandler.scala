@@ -98,8 +98,6 @@ object JoinHandler {
 
     def sourceDb: Algebra[WorkflowBuilderF[WF, ?], Option[DatabaseName]] = {
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
-      case ArrayBuilderF(src, _)              => src
-      case ArraySpliceBuilderF(src, _)        => src
       case DocBuilderF(src, _)                => src
       case ExprBuilderF(src, _)               => src
       case FlatteningBuilderF(src, _)         => src

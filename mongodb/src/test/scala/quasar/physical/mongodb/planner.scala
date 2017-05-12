@@ -1562,10 +1562,11 @@ class PlannerSpec extends
             IgnoreId)))
     }.pendingUntilFixed(notOnPar)
 
+    // FIXME: Needs an actual expectation
     "plan expr3 with grouping" in {
       plan("select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan trivial group by with wildcard" in {
       plan("select * from zips group by city") must

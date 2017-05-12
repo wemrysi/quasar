@@ -868,13 +868,21 @@ object MongoDbPlanner {
               coll => {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` from the value here?
-                (handleFreeMap[T, M, EX](funcHandler, Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id")))) ⊛
-                  handleFreeMap[T, M, EX](funcHandler, HoleF))((key, root) =>
-                  (qs.getConst.idStatus match {
-                    case IdOnly    => ExprBuilder(dataset, key)
-                    case IncludeId => ArrayBuilder(dataset, List(key, root))
-                    case ExcludeId => dataset
-                  }))
+                qs.getConst.idStatus match {
+                    case IdOnly    =>
+                      handleFreeMap[T, M, EX](
+                        funcHandler,
+                        Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id")))) ∘
+                        (ExprBuilder(dataset, _))
+                    case IncludeId =>
+                      handleFreeMap[T, M, EX](
+                        funcHandler,
+                        MapFunc.StaticArray(List(
+                          Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id"))),
+                          HoleF))) ∘
+                        (ExprBuilder(dataset, _))
+                    case ExcludeId => dataset.point[M]
+                  }
               })
       }
 
@@ -898,33 +906,41 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) => getExprBuilder[T, M, WF, EX](funcHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
-            (getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) ⊛
+            (handleFreeMap[T, M, EX](funcHandler, struct) ⊛
+              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) ⊛
               (if (repair.contains(LeftSideF))
                  getJsMerge[T, M](
                    repair,
-                   jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Num(0, false))),
-                   jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Num(1, false)))).map(_.left)
+                   jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
+                   jscore.Select(jscore.Ident(JsFn.defaultName), "f")).map(_.left)
                else
-                 getJsFn[T, M](repair.as(SrcHole)).map(_.right)))(
-              (expr, jm) => jm.fold(WB.jsArrayExpr(List(src, WB.flattenMap(expr)), _), WB.jsExpr1(WB.flattenMap(expr), _).point[WorkflowBuilder.M])).map(liftM[M, WorkflowBuilder[WF]]).join
+                 handleFreeMap[T, M, EX](funcHandler, repair.as(SrcHole)).map(_.right)))(
+              (expr, builder, jm) => jm.fold(j =>
+                ExprBuilder(
+                  FlatteningBuilder(
+                    DocBuilder(
+                      src,
+                      ListMap(
+                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                        BsonField.Name("f") -> expr)),
+                    // TODO: Handle arrays properly
+                    Set(StructureType.Object(DocField(BsonField.Name("f"))))),
+                  -\&/(j)),
+                  ExprBuilder(WB.flattenMap(builder), _)))
           case Reduce(src, bucket, reducers, repair) =>
             (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
               reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
-                val newB = b.unFix match {
-                  case ArrayBuilderF(src, elems) => DocBuilder(src, elems.zipWithIndex.map(_.map(i => BsonField.Name(i.toString)).swap).toListMap)
-                  case _ => b
-                }
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
                     GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
-                      List(newB),
-                      Contents.Doc(red.zipWithIndex.map(ai =>
+                      List(b),
+                      DocContents.Doc(red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),
                           accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap)))(
                     exprs => GroupBuilder(src,
-                      List(newB),
-                      Contents.Doc(exprs.zipWithIndex.map(ai =>
+                      List(b),
+                      DocContents.Doc(exprs.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),
                           accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                     repair)
@@ -969,12 +985,6 @@ object MongoDbPlanner {
     implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
       new Planner[EquiJoin[T, ?]] {
-        private def extractBuilderList[WF[_]](wb: WorkflowBuilder[WF]): List[WorkflowBuilder[WF]] =
-          wb.unFix match {
-            // case ArrayBuilderF(src, es) => es.map(ExprBuilder(src, _))
-            case _                      => List(wb)
-          }
-
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
@@ -1000,8 +1010,8 @@ object MongoDbPlanner {
             liftM[M, WorkflowBuilder[WF]](joinHandler.run(
               // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
               LogicalPlan.funcFromJoinType(qs.f),
-              JoinSource(lb, extractBuilderList(lk), lj.map(List(_))),
-              JoinSource(rb, extractBuilderList(rk), rj.map(List(_))))) >>=
+              JoinSource(lb, List(lk), lj.map(List(_))),
+              JoinSource(rb, List(rk), rj.map(List(_))))) >>=
               (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
                 case LeftSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("left")))
                 case RightSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("right")))
@@ -1087,9 +1097,6 @@ object MongoDbPlanner {
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
     fm.project match {
-      // TODO: identify cases for SpliceBuilder.
-      case MapFunc.StaticArray(elems) =>
-        elems.traverse(handler) ∘ (ArrayBuilder(src, _))
       case MapFunc.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
           case Embed(MapFunc.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
@@ -1097,7 +1104,7 @@ object MongoDbPlanner {
         },
           handler)) ∘
         (es => DocBuilder(src, es.toListMap))
-      case co => handler(co.embed) ∘ (ExprBuilder(src, _))
+      case _ => handler(fm) ∘ (ExprBuilder(src, _))
     }
 
   def getExprBuilder
