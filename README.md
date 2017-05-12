@@ -97,7 +97,7 @@ After running this command your `testing.conf` file should look similar to this:
 ```
 > cat it/testing.conf
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
-couchbase="couchbase://192.168.99.101/quasar-test?password=password&docTypeKey=type&socketConnectTimeoutSeconds=15"
+couchbase="couchbase://192.168.99.101/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15"
 marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
 postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
 mongodb_3_0="mongodb://192.168.99.101:27019"
@@ -126,7 +126,7 @@ java -jar [<path to jar>] [-c <config file>]
 As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/data-bucket?password=password&docTypeKey=type" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
 ```
 
 You can find examples of `connectionUri` values [here](#database-mounts).
@@ -237,9 +237,9 @@ To connect to Couchbase use the following `connectionUri` format:
 Prerequisites
 - Couchbase Server 4.5.1 or greater
 - A "default" bucket with anonymous access
-- Documents must have a "type" field to be listed
+- Documents must have a `docTypeKey` field to be listed
 - Primary index on queried buckets
-- Secondary index on "type" field for queried buckets
+- Secondary index on `docTypeKey` field for queried buckets
 - Additional indices and tuning as recommended by Couchbase for proper N1QL performance
 
 Known Limitations

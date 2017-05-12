@@ -34,7 +34,7 @@ configure_marklogic_json() {
 #
 configure_couchbase() {
   CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}/quasar-test?password=&docTypeKey=type&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
+  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
 }
 
 ##########################################
@@ -51,7 +51,7 @@ configure_metastore() {
 #
 configure_postgresql() {
   CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}:5433/quasar-test?user=postgres&password=postgres\"" >> $CONFIGFILE
+  echo "$CONTAINERNAME=\"jdbc:postgresql://${DOCKERIP}:5433/beer-sample?user=postgres&password=postgres\"" >> $CONFIGFILE
 }
 
 ##########################################
