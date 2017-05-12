@@ -55,9 +55,11 @@ package object analysis {
       case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
     }
 
-    val lpFromPath: FPath => Fix[LogicalPlan] = (p: FPath) => Fix(agg.Count(Fix(LPRead(p))))
+    def lpFromPath[LP](p: FPath)(implicit LP: Corecursive.Aux[LP, LogicalPlan]): LP =
+      LP.embed(agg.Count(LP.embed(LPRead(p))))
+
     val lp: FileSystemErrT[Free[S, ?], Fix[LogicalPlan]] =
-      EitherT.fromDisjunction(afile.map(lpFromPath) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
+      EitherT.fromDisjunction(afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
     val dataFromLp: Fix[LogicalPlan] => FileSystemErrT[Free[S, ?], Option[Data]] =
       (lp: Fix[LogicalPlan]) => queryOps.first(lp).mapT(_.value)
     
