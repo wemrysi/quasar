@@ -24,12 +24,9 @@ import quasar.effect.Failure
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
-import quasar.frontend.logicalplan.LogicalPlan
 import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
-import MongoDbQScriptPlanner.MongoQScript
 
-import matryoshka.data.Fix
 import com.mongodb.async.client.MongoClient
 import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
@@ -96,10 +93,6 @@ package object fs {
 
   val QScriptFsType = FileSystemType("mongodbq")
 
-  val toQS: Fix[LogicalPlan] => FileSystemErrT[Free[QueryFile, ?], Fix[MongoQScript[Fix, ?]]] =
-    (lp: Fix[LogicalPlan]) => ???//toMongoQScript(lp, ???).mapT(_.value)
-    // (lp: Fix[LogicalPlan]) => (QueryContext.queryContext(lp) flatMap (qc => toMongoQScript(lp, qc.listContents))).mapT(_.value)
-
   def qscriptFileSystem[S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]
@@ -123,10 +116,7 @@ package object fs {
         wfile compose writefile.interpret,
         mfile compose managefile.interpret)
 
-      val querFileInterpter = fileSystemInterpreter compose Inject[QueryFile, FileSystem]
-      val analyze0: Analyze ~> Free[QueryFile, ?] =
-        Analyze.defaultInterpreter[QueryFile, MongoQScript[Fix, ?], Fix[MongoQScript[Fix, ?]]](toQS)
-      val analyzeInterpreter: Analyze ~> Free[S, ?] = analyze0 andThen flatMapSNT(querFileInterpter)
+      val analyzeInterpreter = Empty.analyze[Free[S, ?]]
 
       analyzeInterpreter :+: fileSystemInterpreter
     })
