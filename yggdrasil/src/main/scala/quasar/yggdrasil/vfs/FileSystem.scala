@@ -20,6 +20,7 @@ import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._
 import DefaultSerialization._
+import quasar.niflheim._
 
 import quasar.precog.common.Path
 import quasar.precog.common.ingest.FileContent
@@ -71,3 +72,19 @@ object PathData {
   case class BLOB(contentType: MimeType) extends DataType("blob")
   case object NIHDB extends DataType("nihdb") { val contentType = FileContent.XQuirrelData }
 }
+
+case class BlobData(data: Array[Byte], mimeType: MimeType) extends PathData(PathData.BLOB(mimeType))
+case class NIHDBData(data: Seq[NIHDB.Batch]) extends PathData(PathData.NIHDB)
+
+object NIHDBData {
+  val Empty = NIHDBData(Seq.empty)
+}
+
+sealed trait PathOp {
+  def path: Path
+}
+
+case class Read(path: Path, version: Version) extends PathOp
+case class FindChildren(path: Path) extends PathOp
+case class FindPathMetadata(path: Path) extends PathOp
+case class CurrentVersion(path: Path) extends PathOp
