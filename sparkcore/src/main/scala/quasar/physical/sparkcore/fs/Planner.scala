@@ -18,7 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar._, quasar.Planner._
-import quasar.common.{JoinType, SortDir}
+import quasar.common.SortDir
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
@@ -298,48 +298,7 @@ object Planner {
       }
     }
 
-  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]:
-      Planner[EquiJoin[T, ?]] =
-    new Planner[EquiJoin[T, ?]] {
-      
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
-        case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
-          val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-          val srcState = src.point[SparkState]
-
-          def genKey(kf: FreeMap[T]): SparkState[Data => Data] =
-            EitherT(CoreMap.changeFreeMap(kf).point[Task]).liftM[SparkStateT]
-
-          val merger: SparkState[(Data, Data) => Data] =
-            EitherT(CoreMap.changeJoinFunc(combine).point[Task]).liftM[SparkStateT]
-
-          for {
-            lk <- genKey(lKey)
-            rk <- genKey(rKey)
-            lRdd <- lBranch.cataM(interpretM(κ(srcState), algebraM))
-            rRdd <- rBranch.cataM(interpretM(κ(srcState), algebraM))
-            merge <- merger
-          } yield {
-            val klRdd = lRdd.map(d => (lk(d), d))
-            val krRdd = rRdd.map(d => (rk(d), d))
-
-            jt match {
-              case JoinType.Inner => klRdd.join(krRdd).map {
-                case (_, (l, r)) => merge(l, r)
-              }
-              case JoinType.LeftOuter => klRdd.leftOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(l, r.getOrElse(Data.NA))
-              }
-              case JoinType.RightOuter => klRdd.rightOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(l.getOrElse(Data.NA), r)
-              }
-              case JoinType.FullOuter => klRdd.fullOuterJoin(krRdd).map {
-                case (_, (l, r)) => merge(l.getOrElse(Data.NA), r.getOrElse(Data.NA))
-              }
-            }
-          }
-      }
-    }
+  implicit def equiJoin[T[_[_]]: RecursiveT: ShowT]: Planner[EquiJoin[T, ?]] = new EquiJoinPlanner
 
   implicit def coproduct[F[_], G[_]](
     implicit F: Planner[F], G: Planner[G]):
