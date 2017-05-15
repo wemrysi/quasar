@@ -89,28 +89,7 @@ object Planner {
   implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
   implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
 
-  implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] =
-    new Planner[Const[ShiftedRead[AFile], ?]] {
-      
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]) =
-        (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
-          StateT((sc: SparkContext) => {
-            val filePath = qs.getConst.path
-            val idStatus = qs.getConst.idStatus
-
-            EitherT(fromFile(sc, filePath).map { rdd =>
-              (sc,
-                idStatus match {
-                  case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))
-                  case IncludeId =>
-                    rdd.zipWithIndex.map[Data](p =>
-                      Data.Arr(List(Data.Int(p._2), p._1)))
-                  case ExcludeId => rdd
-                }).right[PlannerError]
-            })
-          })
-        }
-    }
+  implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] = ShiftedReadPlanner
 
   implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]:
       Planner[QScriptCore[T, ?]] =
