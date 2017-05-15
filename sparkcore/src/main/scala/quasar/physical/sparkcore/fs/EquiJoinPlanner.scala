@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 
-class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT] (implicit P: Planner[QScriptTotal[T, ?]]) extends Planner[EquiJoin[T, ?]] {
+class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT]  extends Planner[EquiJoin[T, ?]] {
 
   import Planner.{SparkState, SparkStateT}
 

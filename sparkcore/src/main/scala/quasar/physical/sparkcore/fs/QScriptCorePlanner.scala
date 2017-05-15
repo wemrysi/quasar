@@ -34,7 +34,7 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT](implicit P: Planner[QScriptTotal[T, ?]])
+class QScriptCorePlanner[T[_[_]]: RecursiveT: ShowT]
     extends Planner[QScriptCore[T, ?]] {
 
   import Planner.{SparkState, SparkStateT}
