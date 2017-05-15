@@ -19,6 +19,7 @@ package quasar.mimir
 import quasar.precog.common._
 import quasar.precog.common.accounts._
 import quasar.yggdrasil._
+import quasar.yggdrasil.execution.EvaluationContext
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._
 

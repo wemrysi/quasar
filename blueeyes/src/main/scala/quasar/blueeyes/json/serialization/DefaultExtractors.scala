@@ -16,10 +16,13 @@
 
 package quasar.blueeyes.json.serialization
 
-import quasar.blueeyes._, json._
-import quasar.precog._
-import Extractor._
+import quasar.blueeyes.json.{JArray, JObject, JValue, JUndefined, JNum, JString, JNull, JBool}
+import quasar.blueeyes.json.serialization.Extractor._
+import quasar.precog.CTag
+
 import scalaz._, Scalaz._
+
+import java.time.{Instant, LocalDateTime, ZoneId}
 
 /** Extractors for all basic types.
   */
@@ -196,6 +199,14 @@ trait DefaultExtractors {
 
       case other =>
         ListExtractor(Tuple2Extractor(StringExtractor, valueExtractor)).validated(other).map(_.toMap)
+    }
+  }
+
+  implicit val DateTimeExtractor = new Extractor[LocalDateTime] {
+    def validated(jvalue: JValue) = {
+      LongExtractor.validated(jvalue) map { millis =>
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC"))
+      }
     }
   }
 }

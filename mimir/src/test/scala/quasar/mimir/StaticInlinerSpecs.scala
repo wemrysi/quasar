@@ -18,6 +18,8 @@ package quasar.mimir
 
 import quasar.blueeyes._
 import quasar.precog.common._
+import quasar.yggdrasil.execution.EvaluationContext
+
 import scalaz.Need
 
 trait StaticInlinerSpecs[M[+_]] extends EvaluatorSpecification[M] {

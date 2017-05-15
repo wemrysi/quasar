@@ -21,6 +21,7 @@ import quasar.precog.common._, accounts._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule._
+import quasar.yggdrasil.execution.EvaluationContext
 import quasar.yggdrasil.vfs._
 import quasar.precog.util._
 
