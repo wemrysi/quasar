@@ -16,21 +16,23 @@
 
 package quasar.mimir
 
+import quasar.blueeyes._, json._
+
+import quasar.precog.TestSupport._
 import quasar.precog.common._
 import quasar.precog.common.accounts._
+import quasar.precog.common.security._
 import quasar.precog.util._
 
 import quasar.yggdrasil._
+import quasar.yggdrasil.bytecode._
+import quasar.yggdrasil.execution.EvaluationContext
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.vfs._
 import quasar.yggdrasil.util._
 
-import quasar.precog.common.security._
-import quasar.yggdrasil.bytecode._
-
 import scalaz._, Scalaz._, Validation._
-import quasar.blueeyes._, json._
-import quasar.precog.TestSupport._
+
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
 }

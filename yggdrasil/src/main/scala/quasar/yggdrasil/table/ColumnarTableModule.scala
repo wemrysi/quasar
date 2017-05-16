@@ -29,7 +29,9 @@ import org.slf4j.Logger
 import org.slf4s.Logging
 import quasar.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
+
 import java.nio.CharBuffer
+import java.time.LocalDateTime
 
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1
@@ -395,7 +397,7 @@ trait ColumnarTableModule[M[+ _]]
       Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDate(v: collection.Set[DateTime]): Table = {
+    def constDate(v: collection.Set[LocalDateTime]): Table = {
       val column = ArrayDateColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }

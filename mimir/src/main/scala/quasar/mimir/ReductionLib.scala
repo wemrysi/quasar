@@ -17,12 +17,14 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import quasar.yggdrasil.bytecode._
 import quasar.precog.util._
 import quasar.precog.common._
-
+import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
+
 import scalaz._, Scalaz._
+
+import java.time.LocalDateTime
 
 class LongAdder {
   var t = 0L
@@ -84,7 +86,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
 
     object MaxTime extends Reduction(ReductionNamespace, "maxTime") {
-      type Result = Option[DateTime]
+      type Result = Option[LocalDateTime]
 
       implicit val monoid = new Monoid[Result] {
         def zero = None
@@ -106,7 +108,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: DateTime = dateTime.minimum
+              var zmax: LocalDateTime = dateTime.minimum
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (NumericComparisons.compare(z, zmax) > 0) zmax = z
@@ -129,7 +131,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
 
     object MinTime extends Reduction(ReductionNamespace, "minTime") {
-      type Result = Option[DateTime]
+      type Result = Option[LocalDateTime]
 
       implicit val monoid = new Monoid[Result] {
         def zero = None
@@ -151,7 +153,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: DateTime = dateTime.maximum
+              var zmax: LocalDateTime = dateTime.maximum
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (NumericComparisons.compare(z, zmax) < 0) zmax = z

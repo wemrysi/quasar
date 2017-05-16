@@ -17,6 +17,8 @@
 package quasar.yggdrasil
 package util
 
+import java.time.LocalDateTime
+
 import quasar.precog._
 import quasar.blueeyes._
 import quasar.precog.common._
@@ -59,8 +61,8 @@ trait CPathComparator { self =>
 object CPathComparator {
   import MaybeOrdering._
 
-  implicit object DateTimeOrder extends SpireOrder[DateTime] {
-    def compare(a: DateTime, b: DateTime) = a compareTo b
+  implicit object DateTimeOrder extends SpireOrder[LocalDateTime] {
+    def compare(a: LocalDateTime, b: LocalDateTime) = a compareTo b
   }
 
   def apply[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
@@ -108,7 +110,7 @@ object CPathComparator {
       case (CNum, CNum)         => new ArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rPath, rCol)
       case (CBoolean, CBoolean) => new ArrayCPathComparator[Boolean, Boolean](lPath, lCol, rPath, rCol)
       case (CString, CString)   => new ArrayCPathComparator[String, String](lPath, lCol, rPath, rCol)
-      case (CDate, CDate)       => new ArrayCPathComparator[DateTime, DateTime](lPath, lCol, rPath, rCol)
+      case (CDate, CDate)       => new ArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rPath, rCol)
       case (tpe1, tpe2) =>
         val ordering = MaybeOrdering.fromInt(implicitly[ScalazOrder[CType]].apply(lCol.tpe, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {
@@ -147,7 +149,7 @@ object CPathComparator {
       case (CNum, rCol: NumColumn)       => new HalfArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rCol(_))
       case (CBoolean, rCol: BoolColumn)  => new HalfArrayCPathComparator[Boolean, Boolean](lPath, lCol, rCol(_))
       case (CString, rCol: StrColumn)    => new HalfArrayCPathComparator[String, String](lPath, lCol, rCol(_))
-      case (CDate, rCol: DateColumn)     => new HalfArrayCPathComparator[DateTime, DateTime](lPath, lCol, rCol(_))
+      case (CDate, rCol: DateColumn)     => new HalfArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rCol(_))
       case (tpe1, _) =>
         val ordering = MaybeOrdering.fromInt(implicitly[ScalazOrder[CType]].apply(tpe1, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {

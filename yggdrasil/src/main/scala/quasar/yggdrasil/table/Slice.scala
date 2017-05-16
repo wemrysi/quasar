@@ -28,7 +28,9 @@ import TransSpecModule._
 import quasar.blueeyes._, json._
 
 import scalaz._, Scalaz._, Ordering._
+
 import java.nio.CharBuffer
+import java.time.LocalDateTime
 
 trait Slice { source =>
   import Slice._
@@ -869,7 +871,7 @@ trait Slice { source =>
 
         case col: DateColumn =>
           val defined = col.definedAt(0, source.size)
-          val values  = new Array[DateTime](source.size)
+          val values  = new Array[LocalDateTime](source.size)
           Loop.range(0, source.size) { row =>
             if (defined(row)) values(row) = col(row)
           }
@@ -1265,7 +1267,7 @@ trait Slice { source =>
         }
 
         @inline
-        def renderDate(date: DateTime) {
+        def renderDate(date: LocalDateTime) {
           renderString(date.toString)
         }
 

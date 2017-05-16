@@ -173,7 +173,7 @@ lazy val root = project.in(file("."))
 //   |    |   |                                                               |
                                                                            blueeyes,
 //   |    |   |                                                               |
-    sql, connector, marklogicValidation,                                   yggdrasil,
+    sql, connector,                                                        yggdrasil, niflheim,
 //   |  /   | | \ \      |                                                    |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
 //      \ \ | / /
@@ -318,21 +318,12 @@ lazy val couchbase = project
   */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(connector % BothScopes, marklogicValidation)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
-
-lazy val marklogicValidation = project.in(file("marklogic-validation"))
-  .settings(name := "quasar-marklogic-validation-internal")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.marklogicValidation)
-  // TODO: Disabled until a new release of sbt-headers with exclusion is available
-  //       as we don't want our headers applied to XMLChar.java
-  //.enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
   */
@@ -486,5 +477,16 @@ lazy val yggdrasil = project.setup
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val niflheim = project.setup.noArtifacts
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
+      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)

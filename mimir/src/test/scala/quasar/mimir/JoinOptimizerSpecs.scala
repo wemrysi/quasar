@@ -18,11 +18,14 @@ package quasar.mimir
 
 import quasar.blueeyes._
 import quasar.precog.common._
-import org.specs2.execute.Result
-import quasar.yggdrasil.bytecode.JType.JUniverseT
-import quasar.yggdrasil._
 import quasar.precog.util.IdGen
+import quasar.yggdrasil._
+import quasar.yggdrasil.bytecode.JType.JUniverseT
+import quasar.yggdrasil.execution.EvaluationContext
+
 import scalaz._
+
+import org.specs2.execute.Result
 
 trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>

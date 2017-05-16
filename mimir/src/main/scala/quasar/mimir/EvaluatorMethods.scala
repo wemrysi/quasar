@@ -20,6 +20,7 @@ import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule.paths
+import quasar.yggdrasil.execution.EvaluationContext
 
 trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableLibModule[M] with OpFinderModule[M] {
   import dag._

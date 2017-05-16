@@ -19,6 +19,8 @@ package table
 
 import quasar.blueeyes._
 
+import java.time.LocalDateTime
+
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {
   private[this] var row0          = -1
   private[this] var memo: Boolean = _
@@ -71,7 +73,7 @@ class MemoStrColumn(c: StrColumn) extends StrColumn {
 
 class MemoDateColumn(c: DateColumn) extends DateColumn {
   private[this] var row0           = -1
-  private[this] var memo: DateTime = _
+  private[this] var memo: LocalDateTime = _
   def isDefinedAt(row: Int) = c.isDefinedAt(row)
   def apply(row: Int) = {
     if (row != row0) { row0 = row; memo = c(row) }
