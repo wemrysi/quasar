@@ -28,7 +28,7 @@ final case class XmlSafeData(data: Data) extends AnyVal
 
 object XmlSafeData {
   implicit val arbitrary: Arbitrary[XmlSafeData] = genNested(
-    genKey = Gen.nonEmptyListOf(Gen.alphaChar) ^^ (_.mkString),
+    genKey = Gen.nonEmptyListOf(Gen.alphaNumChar) ^^ (_.mkString),
     genAtomicData = genAtomicData(
       strSrc = genAlphaNumString,
       intSrc = genInt ^^ (x => BigInt(x)),

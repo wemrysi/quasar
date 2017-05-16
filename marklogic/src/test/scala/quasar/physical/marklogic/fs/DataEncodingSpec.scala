@@ -66,13 +66,11 @@ final class DataEncodingSpec extends quasar.Qspec {
       (parseXML(orig) >>= decodeXml[Result](_ => Data._dec(42.0).right)) must_= exp.some.right
     }
 
-    "error when object key is not a valid QName" >> {
+    "encode when a key is not a valid QName" >> {
       val k = "42 not qname"
       val d = Data.singletonObj(k, Data.Str("foo"))
 
-      encodeXml[Result](d) must beLike {
-        case -\/(NonEmptyList(msg, _)) => msg must contain(k)
-      }
+      encodeXml[Result](d) must beRight
     }
 
     "error for Data.Set" >> {
