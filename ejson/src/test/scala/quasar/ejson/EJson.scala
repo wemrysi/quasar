@@ -16,29 +16,41 @@
 
 package quasar.ejson
 
-import slamdata.Predef._
+import slamdata.Predef.{Int => SInt, _}
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
 
+import scala.Predef.implicitly
+
 import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import org.specs2.scalacheck._
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
 class EJsonSpecs extends Spec with EJsonArbitrary {
-  checkAll(order.laws[Common[String]])
-  checkAll(traverse.laws[Common])
+  // To keep generated EJson managable
+  implicit val params = Parameters(maxSize = 10)
 
-  checkAll(order.laws[Obj[String]])
-  checkAll(traverse.laws[Obj])
+  type J = Fix[EJson]
 
-  checkAll(order.laws[Extension[String]])
-  checkAll(traverse.laws[Extension])
+  checkAll("Common", order.laws[Common[String]])
+  checkAll("Common", traverse.laws[Common])
 
-  "extension" >> {
-    "ordering ignores metadata" >> prop { (a: String, b: String, m: String, n: String) =>
-      (meta(a, m) ?|? meta(b, n)) ≟ (a ?|? b)
-    }
+  checkAll("Obj", order.laws[Obj[String]])
+  checkAll("Obj", traverse.laws[Obj])
+
+  checkAll("Extension", traverse.laws[Extension](implicitly, implicitly, Extension.order(Order[SInt])))
+  checkAll("Extension", order.laws[Extension[SInt]](Extension.order(Order[SInt]), implicitly))
+
+  checkAll("EJson", order.laws[J])
+
+  "ordering ignores metadata" >> prop { (x: J, y: J, m: J) =>
+    val xMeta = ExtEJson(meta[J](x, m)).embed
+    (xMeta ?|? y) ≟ (x ?|? y)
   }
 }

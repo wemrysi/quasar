@@ -18,8 +18,8 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar.{ Data, Type }
-import quasar.common.SortDir
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.common.{JoinType, SortDir}
+import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan => LP}
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
 import matryoshka.data.Fix
@@ -82,6 +82,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.constant(Data.Set(List(Data.Str("b"), Data.Str("c")))))
     }
 
+    "compile reduced constant" in {
+      testTypedLogicalPlanCompile(
+        "select count(*) as total from (select \"Hello world\") as lit",
+        lpf.constant(Data.Obj("total" -> Data.Int(1))))
+    }
+
     "compile expression with timestamp, date, time, and interval" in {
       import java.time.{Instant, LocalDate, LocalTime}
 
@@ -99,317 +105,279 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile with typecheck in join condition" in {
-      testTypedLogicalPlanCompile("select * from zips join smallZips on zips.x = smallZips.foo.bar",
+      val query = "select * from zips join smallZips on zips.x = smallZips.foo.bar"
+
+      testTypedLogicalPlanCompile(query,
         lpf.let('__tmp0,
           lpf.let('__tmp1,
-            read("zips"),
-            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
-          lpf.let('__tmp2,
-            lpf.let('__tmp3,
+            lpf.let('__tmp2,
               read("smallZips"),
-              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+              lpf.typecheck(lpf.free('__tmp2), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp2), lpf.constant(Data.NA))),
+            lpf.join(
+              lpf.let('__tmp3,
+                read("zips"),
+                lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+              lpf.invoke2(Filter,
+                lpf.free('__tmp1),
+                lpf.typecheck(
+                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("foo"))),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  lpf.constant(Data.Bool(true)),
+                  lpf.constant(Data.Bool(false)))),
+              JoinType.Inner,
+              JoinCondition('__leftJoin9, '__rightJoin10,
+                lpf.invoke2(Eq,
+                  lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("x"))),
+                  lpf.invoke2(ObjectProject,
+                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo"))),
+                    lpf.constant(Data.Str("bar"))))))),
+          lpf.invoke1(Squash,
             lpf.let('__tmp4,
-              lpf.let('__tmp5,
-                lpf.invoke2(Filter,
-                  lpf.free('__tmp2),
+              JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+              lpf.typecheck(
+                lpf.free('__tmp4),
+                Type.Obj(Map(), Some(Type.Top)),
+                lpf.let('__tmp5,
+                  JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                   lpf.typecheck(
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("foo"))),
+                    lpf.free('__tmp5),
                     Type.Obj(Map(), Some(Type.Top)),
-                    lpf.constant(Data.Bool(true)),
-                    lpf.constant(Data.Bool(false)))),
-                lpf.invoke3(InnerJoin,
-                  lpf.free('__tmp0),
-                  lpf.free('__tmp5),
-                  lpf.invoke2(Eq,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("foo"))),
-                      lpf.constant(Data.Str("bar")))))),
-              lpf.invoke1(Squash,
-                lpf.let('__tmp6,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
-                  lpf.typecheck(
-                    lpf.free('__tmp6),
-                    Type.Obj(Map(), Some(Type.Top)),
-                    lpf.let('__tmp7,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
-                      lpf.typecheck(
-                        lpf.free('__tmp7),
-                        Type.Obj(Map(), Some(Type.Top)),
-                        lpf.invoke2(ObjectConcat, lpf.free('__tmp7), lpf.free('__tmp6)),
-                        lpf.constant(Data.NA))),
-                      lpf.constant(Data.NA))))))))
-
+                    lpf.invoke2(ObjectConcat, lpf.free('__tmp5), lpf.free('__tmp4)),
+                    lpf.constant(Data.NA))),
+                  lpf.constant(Data.NA))))))
     }
 
-    "compile with typecheck in multiple join condition" in {
-      testTypedLogicalPlanCompile("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits_dup as r on r.sha = l.parents[0].sha and l.author.login = r.author.login",
-        lpf.let('__tmp0,
-          lpf.let('__tmp1,
-            read("slamengine_commits"),
-            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
+    def complexJoinTypecheck(postJoin: Fix[LP]): Fix[LP] =
+      lpf.let('__tmp0,
+        lpf.let('__tmp1,
           lpf.let('__tmp2,
-            lpf.let('__tmp3,
-              read("slamengine_commits_dup"),
-              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
+            read("slamengine_commits"),
+            lpf.typecheck(lpf.free('__tmp2), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp2), lpf.constant(Data.NA))),
+          lpf.let('__tmp3,
             lpf.let('__tmp4,
-              lpf.let('__tmp5,
-                lpf.invoke2(Filter, // filter left side types
-                  lpf.free('__tmp0),
+              read("slamengine_commits_dup"),
+              lpf.typecheck(lpf.free('__tmp4), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp4), lpf.constant(Data.NA))),
+            lpf.join(
+              lpf.invoke2(Filter, // filter left side types
+                lpf.free('__tmp1),
+                lpf.invoke2(And,
                   lpf.invoke2(And,
-                    lpf.invoke2(And,
-                      lpf.typecheck(
-                        lpf.invoke2(ArrayProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
-                          lpf.constant(Data.Int(0))),
-                        Type.Obj(Map(), Some(Type.Top)),
-                        lpf.constant(Data.Bool(true)),
-                        lpf.constant(Data.Bool(false))),
-                      lpf.typecheck(
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
-                        Type.FlexArr(0, None, Type.Top),
-                        lpf.constant(Data.Bool(true)),
-                        lpf.constant(Data.Bool(false)))),
                     lpf.typecheck(
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("author"))),
+                      lpf.invoke2(ArrayProject,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
+                        lpf.constant(Data.Int(0))),
                       Type.Obj(Map(), Some(Type.Top)),
                       lpf.constant(Data.Bool(true)),
-                      lpf.constant(Data.Bool(false))))),
-                lpf.let('__tmp6,
-                  lpf.invoke2(Filter, // filter right side types
-                    lpf.free('__tmp2),
+                      lpf.constant(Data.Bool(false))),
                     lpf.typecheck(
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("author"))),
-                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
+                      Type.FlexArr(0, None, Type.Top),
                       lpf.constant(Data.Bool(true)),
                       lpf.constant(Data.Bool(false)))),
-                  lpf.invoke3(InnerJoin, // join post type filters
-                    lpf.free('__tmp5),
-                    lpf.free('__tmp6),
-                    lpf.invoke2(And,
-                      lpf.invoke2(Eq,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("sha"))),
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ArrayProject,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("parents"))),
-                            lpf.constant(Data.Int(0))),
-                          lpf.constant(Data.Str("sha")))),
-                      lpf.invoke2(Eq,
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("author"))),
-                          lpf.constant(Data.Str("login"))),
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
-                          lpf.constant(Data.Str("login")))))))),
-              lpf.invoke1(Squash,
+                  lpf.typecheck(
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("author"))),
+                    Type.Obj(Map(), Some(Type.Top)),
+                    lpf.constant(Data.Bool(true)),
+                    lpf.constant(Data.Bool(false))))),
+              lpf.invoke2(Filter, // filter right side types
+                lpf.free('__tmp3),
+                lpf.typecheck(
+                  lpf.invoke2(ObjectProject, lpf.free('__tmp3), lpf.constant(Data.Str("author"))),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  lpf.constant(Data.Bool(true)),
+                  lpf.constant(Data.Bool(false)))),
+              JoinType.Inner,
+              JoinCondition('__leftJoin9, '__rightJoin10,
+                lpf.invoke2(And, // join post type filters
+                  lpf.invoke2(Eq,
+                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("sha"))),
+                    lpf.invoke2(ObjectProject,
+                      lpf.invoke2(ArrayProject,
+                        lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("parents"))),
+                        lpf.constant(Data.Int(0))),
+                      lpf.constant(Data.Str("sha")))),
+                  lpf.invoke2(Eq,
+                    lpf.invoke2(ObjectProject,
+                      lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("author"))),
+                      lpf.constant(Data.Str("login"))),
+                    lpf.invoke2(ObjectProject,
+                      lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("author"))),
+                      lpf.constant(Data.Str("login"))))))))),
+        postJoin)
+
+    "compile with typecheck in multiple join condition" in {
+      val query =
+        "select l.sha as child, " +
+          "l.author.login as c_auth, " +
+          "r.sha as parent, " +
+          "r.author.login as p_auth " +
+          "from slamengine_commits as l join slamengine_commits_dup as r " +
+          "on r.sha = l.parents[0].sha and l.author.login = r.author.login"
+
+      testTypedLogicalPlanCompile(query,
+        complexJoinTypecheck(
+          lpf.invoke1(Squash,
+            lpf.invoke2(ObjectConcat,
+              lpf.invoke2(ObjectConcat,
                 lpf.invoke2(ObjectConcat,
-                  lpf.invoke2(ObjectConcat,
-                    lpf.invoke2(ObjectConcat,
-                      lpf.invoke2(MakeObject,
-                        lpf.constant(Data.Str("child")),
+                  lpf.invoke2(MakeObject,
+                    lpf.constant(Data.Str("child")),
+                    lpf.let('__tmp5,
+                      JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                      lpf.typecheck(
+                        lpf.free('__tmp5),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("sha"))),
+                        lpf.constant(Data.NA)))),
+                  lpf.invoke2(MakeObject,
+                    lpf.constant(Data.Str("c_auth")),
+                    lpf.let('__tmp6,
+                      JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                      lpf.typecheck(
+                        lpf.free('__tmp6),
+                        Type.Obj(Map(), Some(Type.Top)),
                         lpf.let('__tmp7,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
                           lpf.typecheck(
                             lpf.free('__tmp7),
                             Type.Obj(Map(), Some(Type.Top)),
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("sha"))),
-                            lpf.constant(Data.NA)))),
-                      lpf.invoke2(MakeObject,
-                        lpf.constant(Data.Str("c_auth")),
-                        lpf.let('__tmp8,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
-                          lpf.typecheck(
-                            lpf.free('__tmp8),
-                            Type.Obj(Map(), Some(Type.Top)),
-                            lpf.let('__tmp9,
-                              lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("author"))),
-                              lpf.typecheck(
-                                lpf.free('__tmp9),
-                                Type.Obj(Map(), Some(Type.Top)),
-                                lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("login"))),
-                                lpf.constant(Data.NA))),
-                            lpf.constant(Data.NA))))),
-                    lpf.invoke2(MakeObject,
-                      lpf.constant(Data.Str("parent")),
-                      lpf.let('__tmp10,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
-                        lpf.typecheck(
-                          lpf.free('__tmp10),
-                          Type.Obj(Map(), Some(Type.Top)),
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("sha"))),
-                          lpf.constant(Data.NA))))),
-                  lpf.invoke2(MakeObject,
-                    lpf.constant(Data.Str("p_auth")),
-                    lpf.let('__tmp11,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
-                      lpf.typecheck(
-                        lpf.free('__tmp11),
-                        Type.Obj(Map(), Some(Type.Top)),
-                        lpf.let('__tmp12,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp11), lpf.constant(Data.Str("author"))),
-                          lpf.typecheck(
-                            lpf.free('__tmp12),
-                            Type.Obj(Map(), Some(Type.Top)),
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("login"))),
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
                             lpf.constant(Data.NA))),
-                        lpf.constant(Data.NA))))))))))
-    }
-
-    "compile with typecheck in multiple join condition followed by filter" in {
-      testTypedLogicalPlanCompile("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits_dup as r on r.sha = l.parents[0].sha and l.author.login = r.author.login where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\"",
-        lpf.let('__tmp0,
-          lpf.let('__tmp1,
-            read("slamengine_commits"),
-            lpf.typecheck(lpf.free('__tmp1), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp1), lpf.constant(Data.NA))),
-          lpf.let('__tmp2,
-            lpf.let('__tmp3,
-              read("slamengine_commits_dup"),
-              lpf.typecheck(lpf.free('__tmp3), Type.Obj(Map(), Some(Type.Top)), lpf.free('__tmp3), lpf.constant(Data.NA))),
-            lpf.let('__tmp4,
-              lpf.let('__tmp5,
-                lpf.invoke2(Filter, // filter left side types
-                  lpf.free('__tmp0),
-                  lpf.invoke2(And,
-                    lpf.invoke2(And,
-                      lpf.typecheck(
-                        lpf.invoke2(ArrayProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
-                          lpf.constant(Data.Int(0))),
-                        Type.Obj(Map(), Some(Type.Top)),
-                        lpf.constant(Data.Bool(true)),
-                        lpf.constant(Data.Bool(false))),
-                      lpf.typecheck(
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("parents"))),
-                        Type.FlexArr(0, None, Type.Top),
-                        lpf.constant(Data.Bool(true)),
-                        lpf.constant(Data.Bool(false)))),
-                    lpf.typecheck(
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("author"))),
-                      Type.Obj(Map(), Some(Type.Top)),
-                      lpf.constant(Data.Bool(true)),
-                      lpf.constant(Data.Bool(false))))),
-                lpf.let('__tmp6,
-                  lpf.invoke2(Filter, // filter right side types
-                    lpf.free('__tmp2),
-                    lpf.typecheck(
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("author"))),
-                      Type.Obj(Map(), Some(Type.Top)),
-                      lpf.constant(Data.Bool(true)),
-                      lpf.constant(Data.Bool(false)))),
-                  lpf.invoke3(InnerJoin, // join post type filters
-                    lpf.free('__tmp5),
-                    lpf.free('__tmp6),
-                    lpf.invoke2(And,
-                      lpf.invoke2(Eq,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("sha"))),
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ArrayProject,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("parents"))),
-                            lpf.constant(Data.Int(0))),
-                          lpf.constant(Data.Str("sha")))),
-                      lpf.invoke2(Eq,
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("author"))),
-                          lpf.constant(Data.Str("login"))),
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
-                          lpf.constant(Data.Str("login")))))))),
-              lpf.let('__tmp7,
-                lpf.invoke2(Filter,
-                  lpf.free('__tmp4),
+                        lpf.constant(Data.NA))))),
+                lpf.invoke2(MakeObject,
+                  lpf.constant(Data.Str("parent")),
                   lpf.let('__tmp8,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("left"))),
+                    JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.typecheck(
                       lpf.free('__tmp8),
                       Type.Obj(Map(), Some(Type.Top)),
-                      lpf.let('__tmp9,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("author"))),
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("sha"))),
+                      lpf.constant(Data.NA))))),
+              lpf.invoke2(MakeObject,
+                lpf.constant(Data.Str("p_auth")),
+                lpf.let('__tmp9,
+                  JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+                  lpf.typecheck(
+                    lpf.free('__tmp9),
+                    Type.Obj(Map(), Some(Type.Top)),
+                    lpf.let('__tmp10,
+                      lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
+                      lpf.typecheck(
+                        lpf.free('__tmp10),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
+                        lpf.constant(Data.NA))),
+                    lpf.constant(Data.NA))))))))
+    }
+
+    "compile with typecheck in multiple join condition followed by filter" in {
+      val query =
+        "select l.sha as child, " +
+          "l.author.login as c_auth, " +
+          "r.sha as parent, " +
+          "r.author.login as p_auth " +
+          "from slamengine_commits as l join slamengine_commits_dup as r " +
+          "on r.sha = l.parents[0].sha and l.author.login = r.author.login " +
+          "where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\""
+
+      testTypedLogicalPlanCompile(query,
+        complexJoinTypecheck(
+          lpf.let('__tmp5,
+            lpf.invoke2(Filter,
+              lpf.free('__tmp0),
+              lpf.let('__tmp6,
+                JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                lpf.typecheck(
+                  lpf.free('__tmp6),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  lpf.let('__tmp7,
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
+                    lpf.typecheck(
+                      lpf.free('__tmp7),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.let('__tmp8,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
                         lpf.typecheck(
-                          lpf.free('__tmp9),
-                          Type.Obj(Map(), Some(Type.Top)),
-                          lpf.let('__tmp10,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("login"))),
+                          lpf.free('__tmp8),
+                          Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
+                          lpf.let('__tmp9,
+                            JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                             lpf.typecheck(
-                              lpf.free('__tmp10),
-                              Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
-                              lpf.let('__tmp11,
-                                lpf.invoke2(ObjectProject, lpf.free('__tmp4), lpf.constant(Data.Str("right"))),
+                              lpf.free('__tmp9),
+                              Type.Obj(Map(), Some(Type.Top)),
+                              lpf.let('__tmp10,
+                                lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
                                 lpf.typecheck(
-                                  lpf.free('__tmp11),
+                                  lpf.free('__tmp10),
                                   Type.Obj(Map(), Some(Type.Top)),
-                                  lpf.let('__tmp12,
-                                    lpf.invoke2(ObjectProject, lpf.free('__tmp11), lpf.constant(Data.Str("author"))),
+                                  lpf.let('__tmp11,
+                                    lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
                                     lpf.typecheck(
-                                      lpf.free('__tmp12),
-                                      Type.Obj(Map(), Some(Type.Top)),
-                                      lpf.let('__tmp13,
-                                        lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("login"))),
-                                        lpf.typecheck(
-                                          lpf.free('__tmp13),
-                                          Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
-                                          lpf.invoke2(Eq,
-                                            lpf.invoke2(Concat,
-                                              lpf.invoke2(Concat, lpf.free('__tmp13), lpf.constant(Data.Str(","))),
-                                              lpf.free('__tmp10)),
-                                            lpf.constant(Data.Str("jdegoes,jdegoes"))),
-                                          lpf.constant(Data.NA))),
+                                      lpf.free('__tmp11),
+                                      Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
+                                      lpf.invoke2(Eq,
+                                        lpf.invoke2(Concat,
+                                          lpf.invoke2(Concat, lpf.free('__tmp11), lpf.constant(Data.Str(","))),
+                                          lpf.free('__tmp8)),
+                                        lpf.constant(Data.Str("jdegoes,jdegoes"))),
                                       lpf.constant(Data.NA))),
                                   lpf.constant(Data.NA))),
                               lpf.constant(Data.NA))),
                           lpf.constant(Data.NA))),
-                      lpf.constant(Data.NA)))),
-                lpf.invoke1(Squash,
+                      lpf.constant(Data.NA))),
+                  lpf.constant(Data.NA)))),
+            lpf.invoke1(Squash,
+              lpf.invoke2(ObjectConcat,
+                lpf.invoke2(ObjectConcat,
                   lpf.invoke2(ObjectConcat,
-                    lpf.invoke2(ObjectConcat,
-                      lpf.invoke2(ObjectConcat,
-                        lpf.invoke2(MakeObject,
-                          lpf.constant(Data.Str("child")),
+                    lpf.invoke2(MakeObject,
+                      lpf.constant(Data.Str("child")),
+                      lpf.let('__tmp12,
+                        JoinDir.Left.projectFrom(lpf.free('__tmp5)),
+                        lpf.typecheck(
+                          lpf.free('__tmp12),
+                          Type.Obj(Map(), Some(Type.Top)),
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("sha"))),
+                          lpf.constant(Data.NA)))),
+                    lpf.invoke2(MakeObject,
+                      lpf.constant(Data.Str("c_auth")),
+                      lpf.let('__tmp13,
+                        JoinDir.Left.projectFrom(lpf.free('__tmp5)),
+                        lpf.typecheck(
+                          lpf.free('__tmp13),
+                          Type.Obj(Map(), Some(Type.Top)),
                           lpf.let('__tmp14,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("left"))),
+                            lpf.invoke2(ObjectProject, lpf.free('__tmp13), lpf.constant(Data.Str("author"))),
                             lpf.typecheck(
                               lpf.free('__tmp14),
                               Type.Obj(Map(), Some(Type.Top)),
-                              lpf.invoke2(ObjectProject, lpf.free('__tmp14), lpf.constant(Data.Str("sha"))),
-                              lpf.constant(Data.NA)))),
-                        lpf.invoke2(MakeObject,
-                          lpf.constant(Data.Str("c_auth")),
-                          lpf.let('__tmp15,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("left"))),
-                            lpf.typecheck(
-                              lpf.free('__tmp15),
-                              Type.Obj(Map(), Some(Type.Top)),
-                              lpf.let('__tmp16,
-                                lpf.invoke2(ObjectProject, lpf.free('__tmp15), lpf.constant(Data.Str("author"))),
-                                lpf.typecheck(
-                                  lpf.free('__tmp16),
-                                  Type.Obj(Map(), Some(Type.Top)),
-                                  lpf.invoke2(ObjectProject, lpf.free('__tmp16), lpf.constant(Data.Str("login"))),
-                                  lpf.constant(Data.NA))),
-                              lpf.constant(Data.NA))))),
-                      lpf.invoke2(MakeObject,
-                        lpf.constant(Data.Str("parent")),
-                        lpf.let('__tmp17,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("right"))),
-                          lpf.typecheck(
-                            lpf.free('__tmp17),
-                            Type.Obj(Map(), Some(Type.Top)),
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp17), lpf.constant(Data.Str("sha"))),
-                            lpf.constant(Data.NA))))),
-                    lpf.invoke2(MakeObject,
-                      lpf.constant(Data.Str("p_auth")),
-                      lpf.let('__tmp18,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("right"))),
-                        lpf.typecheck(
-                          lpf.free('__tmp18),
-                          Type.Obj(Map(), Some(Type.Top)),
-                          lpf.let('__tmp19,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp18), lpf.constant(Data.Str("author"))),
-                            lpf.typecheck(
-                              lpf.free('__tmp19),
-                              Type.Obj(Map(), Some(Type.Top)),
-                              lpf.invoke2(ObjectProject, lpf.free('__tmp19), lpf.constant(Data.Str("login"))),
+                              lpf.invoke2(ObjectProject, lpf.free('__tmp14), lpf.constant(Data.Str("login"))),
                               lpf.constant(Data.NA))),
-                          lpf.constant(Data.NA)))))))))))
+                          lpf.constant(Data.NA))))),
+                  lpf.invoke2(MakeObject,
+                    lpf.constant(Data.Str("parent")),
+                    lpf.let('__tmp15,
+                      JoinDir.Right.projectFrom(lpf.free('__tmp5)),
+                      lpf.typecheck(
+                        lpf.free('__tmp15),
+                        Type.Obj(Map(), Some(Type.Top)),
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp15), lpf.constant(Data.Str("sha"))),
+                        lpf.constant(Data.NA))))),
+                lpf.invoke2(MakeObject,
+                  lpf.constant(Data.Str("p_auth")),
+                  lpf.let('__tmp16,
+                    JoinDir.Right.projectFrom(lpf.free('__tmp5)),
+                    lpf.typecheck(
+                      lpf.free('__tmp16),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.let('__tmp17,
+                        lpf.invoke2(ObjectProject, lpf.free('__tmp16), lpf.constant(Data.Str("author"))),
+                        lpf.typecheck(
+                          lpf.free('__tmp17),
+                          Type.Obj(Map(), Some(Type.Top)),
+                          lpf.invoke2(ObjectProject, lpf.free('__tmp17), lpf.constant(Data.Str("login"))),
+                          lpf.constant(Data.NA))),
+                      lpf.constant(Data.NA)))))))))
     }
 
     "compile select substring" in {
@@ -441,14 +409,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select foo.*, bar.address from foo, bar",
         lpf.let('__tmp0,
-          lpf.invoke3(InnerJoin, read("foo"), read("bar"), lpf.constant(Data.Bool(true))),
+          lpf.join(
+            read("foo"),
+            read("bar"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectConcat,
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Left.const[Fix[LogicalPlan]]),
+              JoinDir.Left.projectFrom(lpf.free('__tmp0)),
               makeObj(
                 "address" ->
                   lpf.invoke2(ObjectProject,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Right.const[Fix[LogicalPlan]]),
+                    JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.constant(Data.Str("address"))))))))
     }
 
@@ -456,18 +428,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select foo.bar.baz.*, bar.address from foo, bar",
         lpf.let('__tmp0,
-          lpf.invoke3(InnerJoin, read("foo"), read("bar"), lpf.constant(Data.Bool(true))),
+          lpf.join(
+            read("foo"),
+            read("bar"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectConcat,
               lpf.invoke2(ObjectProject,
                 lpf.invoke2(ObjectProject,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Left.const[Fix[LogicalPlan]]),
+                  JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                   lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Str("baz"))),
               makeObj(
                 "address" ->
                   lpf.invoke2(ObjectProject,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Right.const[Fix[LogicalPlan]]),
+                    JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.constant(Data.Str("address"))))))))
     }
 
@@ -506,9 +482,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.invoke1(ShiftArray,
             lpf.invoke2(ArrayConcat,
               lpf.invoke2(ArrayConcat,
-                MakeArrayN[Fix[LogicalPlan]](lpf.constant(Data.Int(1))).embed,
-                MakeArrayN[Fix[LogicalPlan]](lpf.constant(Data.Int(2))).embed),
-              MakeArrayN[Fix[LogicalPlan]](lpf.constant(Data.Int(3))).embed)))
+                MakeArrayN[Fix[LP]](lpf.constant(Data.Int(1))).embed,
+                MakeArrayN[Fix[LP]](lpf.constant(Data.Int(2))).embed),
+              MakeArrayN[Fix[LP]](lpf.constant(Data.Int(3))).embed)))
 
       testLogicalPlanCompile(query, expectation)
     }
@@ -851,25 +827,33 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         "select * from person, car",
         lpf.let('__tmp0,
-          lpf.invoke3(InnerJoin, read("person"), read("car"), lpf.constant(Data.Bool(true))),
+          lpf.join(
+            read("person"),
+            read("car"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
             lpf.invoke2(ObjectConcat,
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Left.const[Fix[LogicalPlan]]),
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Right.const[Fix[LogicalPlan]])))))
+              JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+              JoinDir.Right.projectFrom(lpf.free('__tmp0))))))
     }
 
     "compile two term multiplication from two tables" in {
       testLogicalPlanCompile(
         "select person.age * car.modelYear from person, car",
         lpf.let('__tmp0,
-          lpf.invoke3(InnerJoin, read("person"), read("car"), lpf.constant(Data.Bool(true))),
+          lpf.join(
+            read("person"),
+            read("car"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
             lpf.invoke2(Multiply,
               lpf.invoke2(ObjectProject,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Left.const[Fix[LogicalPlan]]),
+                JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("age"))),
               lpf.invoke2(ObjectProject,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), JoinDir.Right.const[Fix[LogicalPlan]]),
+                JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("modelYear")))))))
     }
 
@@ -904,7 +888,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke1(Count,
               lpf.invoke2(GroupBy,
                 lpf.free('__tmp0),
-                MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject,
+                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject,
                   lpf.free('__tmp0),
                   lpf.constant(Data.Str("name")))).embed)))))
     }
@@ -916,7 +900,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('__tmp0),
-              MakeArrayN[Fix[LogicalPlan]](
+              MakeArrayN[Fix[LP]](
                 lpf.invoke1(Lower,
                   lpf.invoke2(ObjectProject,
                     lpf.free('__tmp0),
@@ -947,7 +931,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.invoke2(ObjectProject,
                 lpf.invoke2(GroupBy,
                   lpf.free('__tmp0),
-                  MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject,
+                  MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject,
                     lpf.free('__tmp0),
                     lpf.constant(Data.Str("name")))).embed),
                 lpf.constant(Data.Str("name")))))))
@@ -1315,7 +1299,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.let('__tmp2,    // group by gender, height
               lpf.invoke2(GroupBy,
                 lpf.free('__tmp1),
-                MakeArrayN[Fix[LogicalPlan]](
+                MakeArrayN[Fix[LP]](
                   lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("gender"))),
                   lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("height")))).embed),
               lpf.let('__tmp3,
@@ -1347,149 +1331,140 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile simple inner equi-join" in {
-      testLogicalPlanCompile(
-        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
-        lpf.let('__tmp0, read("foo"),
-          lpf.let('__tmp1, read("bar"),
-            lpf.let('__tmp2,
-              lpf.invoke3(InnerJoin, lpf.free('__tmp0), lpf.free('__tmp1),
-                lpf.invoke2(Eq,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("id"))),
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))))),
-              lpf.invoke1(Squash,
+      val query =
+        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
+
+      testLogicalPlanCompile(query,
+        lpf.let('__tmp0,
+          lpf.join(
+            read("foo"),
+            read("bar"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin9, '__rightJoin10,
+              lpf.invoke2(Eq,
+                lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))),
+                lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id")))))),
+          lpf.invoke1(Squash,
                 makeObj(
                   "name" ->
                     lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), JoinDir.Left.const[Fix[LogicalPlan]]),
+                      JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                       lpf.constant(Data.Str("name"))),
                   "address" ->
                     lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), JoinDir.Right.const[Fix[LogicalPlan]]),
-                      lpf.constant(Data.Str("address")))))))))
+                      JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+                      lpf.constant(Data.Str("address")))))))
     }
 
     "compile cross join to the equivalent inner equi-join" in {
       val query = "select foo.name, bar.address from foo, bar where foo.id = bar.foo_id"
       val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id"
 
-      testLogicalPlanCompile(query, compileExp(equiv))
+      val expected = renameJoinSides(compileExp(equiv))(
+        '__leftJoin9, '__leftJoin23, '__rightJoin10, '__rightJoin24)
+
+      testLogicalPlanCompile(query, expected)
     }
 
     "compile inner join with additional equi-condition to the equivalent inner equi-join" in {
       val query = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x = bar.y"
       val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id and foo.x = bar.y"
 
-      testLogicalPlanCompile(query, compileExp(equiv))
+      val expected = renameJoinSides(compileExp(equiv))(
+        '__leftJoin9, '__leftJoin23, '__rightJoin10, '__rightJoin24)
+
+      testLogicalPlanCompile(query, expected)
     }
 
     "compile inner non-equi join to the equivalent cross join" in {
       val query = "select foo.name, bar.address from foo join bar on foo.x < bar.y"
       val equiv = "select foo.name, bar.address from foo, bar where foo.x < bar.y"
 
-      testLogicalPlanCompile(query, compileExp(equiv))
+      val expected = renameJoinSides(compileExp(equiv))(
+        '__leftJoin23, '__leftJoin9, '__rightJoin24, '__rightJoin10)
+
+      testLogicalPlanCompile(query, expected)
     }
 
     "compile nested cross join to the equivalent inner equi-join" in {
-      val query = "select a.x, b.y, c.z from a, b, c where a.id = b.a_id and b._id = c.b_id"
-      val equiv = "select a.x, b.y, c.z from (a join b on a.id = b.a_id) join c on b._id = c.b_id"
+      val query = "select a.x, b.y, c.z from a, b, c where a.id = b.a_id and b.`_id` = c.b_id"
+      val equiv = "select a.x, b.y, c.z from (a join b on a.id = b.a_id) join c on b.`_id` = c.b_id"
 
       testLogicalPlanCompile(query, compileExp(equiv))
-    }.pendingUntilFixed("SD-1190")
+    }.pendingUntilFixed("SD-1190 (should these really be identical as of #1943?)")
 
     "compile filtered cross join with one-sided conditions" in {
-      val query = "select foo.name, bar.address from foo, bar where foo.id = bar.foo_id and foo.x < 10 and bar.y = 20"
+      val query =
+        "select foo.name, bar.address from foo, bar " +
+          "where foo.id = bar.foo_id and foo.x < 10 and bar.y = 20"
 
-      // NB: this query produces what we want but currently doesn't match due to spurious SQUASHes
-      // val equiv = "select foo.name, bar.address from (select * from foo where x < 10) foo join (select * from bar where y = 20) bar on foo.id = bar.foo_id"
+      val equiv =
+        "select foo.name, bar.address from foo join bar " +
+          "on foo.id = bar.foo_id " +
+          "where foo.x < 10 and bar.y = 20"
 
-      testLogicalPlanCompile(query,
-        lpf.let('__tmp0, read("foo"),
-          lpf.let('__tmp1,
-             lpf.invoke2(Filter,
-               lpf.free('__tmp0),
-               lpf.invoke2(Lt,
-                 lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
-                 lpf.constant(Data.Int(10)))),
-             lpf.let('__tmp2, read("bar"),
-               lpf.let('__tmp3,
-                 lpf.invoke2(Filter,
-                   lpf.free('__tmp2),
-                   lpf.invoke2(Eq,
-                     lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("y"))),
-                     lpf.constant(Data.Int(20)))),
-                  lpf.let('__tmp4,
-                    lpf.invoke3(InnerJoin, lpf.free('__tmp1), lpf.free('__tmp3),
-                      lpf.invoke2(Eq,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("id"))),
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp3), lpf.constant(Data.Str("foo_id"))))),
-                    lpf.invoke1(Squash,
-                       makeObj(
-                         "name" -> lpf.invoke2(ObjectProject,
-                           lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Left.const[Fix[LogicalPlan]]),
-                           lpf.constant(Data.Str("name"))),
-                         "address" -> lpf.invoke2(ObjectProject,
-                           lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Right.const[Fix[LogicalPlan]]),
-                           lpf.constant(Data.Str("address")))))))))))
+      testLogicalPlanCompile(query, compileExp(equiv))
     }
 
     "compile filtered join with one-sided conditions" in {
-      val query = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x < 10 and bar.y = 20"
-
-      // NB: this should be identical to the same query written as a cross join
-      // (but cannot be written as in "must compile to the equivalent ..." style
-      // because both require optimization)
+      val query =
+        "select foo.name, bar.address from foo join bar " +
+          "on foo.id = bar.foo_id " +
+          "where foo.x < 10 and bar.y = 20"
 
       testLogicalPlanCompile(query,
         lpf.let('__tmp0, read("foo"),
           lpf.let('__tmp1, read("bar"),
             lpf.let('__tmp2,
-              lpf.invoke2(Filter,
-                lpf.free('__tmp0),
-                lpf.invoke2(Lt,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
-                  lpf.constant(Data.Int(10)))),
-              lpf.let('__tmp3,
+              lpf.join(
+                lpf.invoke2(Filter,
+                  lpf.free('__tmp0),
+                  lpf.invoke2(Lt,
+                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
+                    lpf.constant(Data.Int(10)))),
                 lpf.invoke2(Filter,
                   lpf.free('__tmp1),
                   lpf.invoke2(Eq,
                     lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("y"))),
                     lpf.constant(Data.Int(20)))),
-                lpf.let('__tmp4,
-                  lpf.invoke3(InnerJoin, lpf.free('__tmp2), lpf.free('__tmp3),
-                    lpf.invoke2(Eq,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("id"))),
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp3), lpf.constant(Data.Str("foo_id"))))),
-                  lpf.invoke1(Squash,
-                    makeObj(
-                      "name" -> lpf.invoke2(ObjectProject,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Left.const[Fix[LogicalPlan]]),
-                        lpf.constant(Data.Str("name"))),
-                      "address" -> lpf.invoke2(ObjectProject,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Right.const[Fix[LogicalPlan]]),
-                        lpf.constant(Data.Str("address")))))))))))
+                JoinType.Inner,
+                JoinCondition('__leftJoin23, '__rightJoin24,
+                  lpf.invoke2(Eq,
+                    lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin23), lpf.constant(Data.Str("id"))),
+                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin24), lpf.constant(Data.Str("foo_id")))))),
+              lpf.invoke1(Squash,
+                makeObj(
+                  "name" -> lpf.invoke2(ObjectProject,
+                    JoinDir.Left.projectFrom(lpf.free('__tmp2)),
+                    lpf.constant(Data.Str("name"))),
+                  "address" -> lpf.invoke2(ObjectProject,
+                    JoinDir.Right.projectFrom(lpf.free('__tmp2)),
+                    lpf.constant(Data.Str("address")))))))))
     }
 
     "compile simple left ineq-join" in {
       testLogicalPlanCompile(
         "select foo.name, bar.address " +
           "from foo left join bar on foo.id < bar.foo_id",
-        lpf.let('__tmp0, read("foo"),
-          lpf.let('__tmp1, read("bar"),
-            lpf.let('__tmp2,
-              lpf.invoke3(LeftOuterJoin, lpf.free('__tmp0), lpf.free('__tmp1),
-                lpf.invoke2(Lt,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("id"))),
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("foo_id"))))),
-              lpf.invoke1(Squash,
-                makeObj(
-                  "name" ->
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), JoinDir.Left.const[Fix[LogicalPlan]]),
-                      lpf.constant(Data.Str("name"))),
-                  "address" ->
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp2), JoinDir.Right.const[Fix[LogicalPlan]]),
-                      lpf.constant(Data.Str("address")))))))))
+        lpf.let('__tmp0,
+          lpf.join(
+            read("foo"),
+            read("bar"),
+            JoinType.LeftOuter,
+            JoinCondition('left1, 'right2,
+              lpf.invoke2(Lt,
+                lpf.invoke2(ObjectProject, lpf.joinSideName('left1), lpf.constant(Data.Str("id"))),
+                lpf.invoke2(ObjectProject, lpf.joinSideName('right2), lpf.constant(Data.Str("foo_id")))))),
+          lpf.invoke1(Squash,
+            makeObj(
+              "name" ->
+                lpf.invoke2(ObjectProject,
+                  JoinDir.Left.projectFrom(lpf.free('__tmp0)),
+                  lpf.constant(Data.Str("name"))),
+              "address" ->
+                lpf.invoke2(ObjectProject,
+                  JoinDir.Right.projectFrom(lpf.free('__tmp0)),
+                  lpf.constant(Data.Str("address")))))))
     }
 
     "compile complex equi-join" in {
@@ -1497,41 +1472,39 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         "select foo.name, bar.address " +
           "from foo join bar on foo.id = bar.foo_id " +
           "join baz on baz.bar_id = bar.id",
-        lpf.let('__tmp0, read("foo"),
-          lpf.let('__tmp1, read("bar"),
-            lpf.let('__tmp2,
-              lpf.invoke3(InnerJoin, lpf.free('__tmp0), lpf.free('__tmp1),
+        lpf.let('__tmp0,
+          lpf.join(
+            lpf.join(
+              read("foo"),
+              read("bar"),
+              JoinType.Inner,
+              JoinCondition('left3, 'right4,
                 lpf.invoke2(Eq,
                   lpf.invoke2(ObjectProject,
-                    lpf.free('__tmp0),
+                    lpf.joinSideName('left3),
                     lpf.constant(Data.Str("id"))),
                   lpf.invoke2(ObjectProject,
-                    lpf.free('__tmp1),
-                    lpf.constant(Data.Str("foo_id"))))),
-              lpf.let('__tmp3, read("baz"),
-                lpf.let('__tmp4,
-                  lpf.invoke3(InnerJoin, lpf.free('__tmp2), lpf.free('__tmp3),
-                    lpf.invoke2(Eq,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp3),
-                        lpf.constant(Data.Str("bar_id"))),
-                      lpf.invoke2(ObjectProject,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp2),
-                          JoinDir.Right.const[Fix[LogicalPlan]]),
-                        lpf.constant(Data.Str("id"))))),
-                  lpf.invoke1(Squash,
-                    makeObj(
-                      "name" ->
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Left.const[Fix[LogicalPlan]]),
-                            JoinDir.Left.const[Fix[LogicalPlan]]),
-                          lpf.constant(Data.Str("name"))),
-                      "address" ->
-                        lpf.invoke2(ObjectProject,
-                          lpf.invoke2(ObjectProject,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp4), JoinDir.Left.const[Fix[LogicalPlan]]),
-                            JoinDir.Right.const[Fix[LogicalPlan]]),
-                          lpf.constant(Data.Str("address")))))))))))
+                    lpf.joinSideName('right4),
+                    lpf.constant(Data.Str("foo_id")))))),
+            read("baz"),
+            JoinType.Inner,
+            JoinCondition('__leftJoin23, '__rightJoin24,
+              lpf.invoke2(Eq,
+                lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin24),
+                  lpf.constant(Data.Str("bar_id"))),
+                lpf.invoke2(ObjectProject,
+                  JoinDir.Right.projectFrom(lpf.joinSideName('__leftJoin23)),
+                  lpf.constant(Data.Str("id")))))),
+          lpf.invoke1(Squash,
+            makeObj(
+              "name" ->
+                lpf.invoke2(ObjectProject,
+                  JoinDir.Left.projectFrom(JoinDir.Left.projectFrom(lpf.free('__tmp0))),
+                  lpf.constant(Data.Str("name"))),
+              "address" ->
+                lpf.invoke2(ObjectProject,
+                  JoinDir.Right.projectFrom(JoinDir.Left.projectFrom(lpf.free('__tmp0))),
+                  lpf.constant(Data.Str("address")))))))
     }
 
     "compile sub-select in filter" in {
@@ -1693,7 +1666,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
             lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("city")))))
       val exp =
         lpf.let('tmp0, read("zips"),
@@ -1701,7 +1674,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(ObjectProject,
               lpf.invoke2(GroupBy,
                 lpf.free('tmp0),
-                MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
+                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
@@ -1712,7 +1685,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
             lpf.let('tmp2,
               lpf.invoke2(Filter, lpf.free('tmp1), lpf.invoke2(Gt, lpf.invoke1(Count, lpf.free('tmp1)), lpf.constant(Data.Int(10)))),
               lpf.invoke2(ObjectProject, lpf.free('tmp2), lpf.constant(Data.Str("city"))))))
@@ -1721,7 +1694,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
             lpf.invoke1(Arbitrary,
               lpf.invoke2(ObjectProject,
                 lpf.invoke2(Filter,
@@ -1739,7 +1712,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(ObjectProject,
               lpf.invoke2(GroupBy,
                 lpf.free('tmp0),
-                MakeArrayN[Fix[LogicalPlan]](lpf.invoke2(ObjectProject, lpf.free('tmp0),
+                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0),
                   lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(lp)
@@ -1752,7 +1725,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LogicalPlan]](
+              MakeArrayN[Fix[LP]](
                 lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
                 lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
             makeObj(
@@ -1766,7 +1739,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LogicalPlan]](
+              MakeArrayN[Fix[LP]](
                 lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
                 lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
             makeObj(
@@ -1788,7 +1761,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke2(Modulo,
           lpf.constant(Data.Dec(10.4)),
           lpf.constant(Data.Int(1))))
-    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+    Compiler.compile[Fix[LP]](expr, funcs).toEither must beRight(equalToPlan(expected))
   }
 
   "compile expression and functions that depend on themselves" >> {
@@ -1806,7 +1779,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke2(Modulo,
           floorArgumentLP,
           lpf.constant(Data.Int(1))))
-    Compiler.compile[Fix[LogicalPlan]](expr, funcs).toEither must beRight(equalToPlan(expected))
+    Compiler.compile[Fix[LP]](expr, funcs).toEither must beRight(equalToPlan(expected))
   }
 
   "constant folding" >> {

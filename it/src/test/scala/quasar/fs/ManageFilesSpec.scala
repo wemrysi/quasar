@@ -19,7 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.{BackendCapability, Data}
 import quasar.contrib.pathy._
-import quasar.fp._
+import quasar.contrib.scalaz.foldable._
 import quasar.fs.FileSystemTest.allFsUT
 
 import pathy.Path._

@@ -1,5 +1,6 @@
 {
     "name": "perform inner equi-join with wildcard",
+
     "backends": {
         "mongodb_read_only": "pending",
         "mongodb_q_3_2": "pending",
@@ -8,9 +9,16 @@
         "marklogic_xml":     "skip",
         "couchbase":         "skip"
     },
+
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
+
     "query": "select * from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
+
     "predicate": "containsAtLeast",
+
     "expected": [
         {"_id":"01001", "city":"AGAWAM",       "loc":[-72.622739,42.070206], "pop":15338, "state":"MA"},
         {"_id":"01002", "city":"CUSHMAN",      "loc":[-72.51565,42.377017],  "pop":36963, "state":"MA"},

@@ -41,6 +41,7 @@ trait AggLib extends Library {
     noSimplification,
     partialTyper[nat._1] {
       case Sized(Type.Const(Data.Set(xs))) => Type.Const(Data.Int(xs.length))
+      case Sized(Type.Const(_))            => Type.Const(Data.Int(1))
       case Sized(_)                        => Type.Int
     },
     basicUntyper)

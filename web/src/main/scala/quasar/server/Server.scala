@@ -21,14 +21,13 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd, Cmd._
 import quasar.config._
-import quasar.console.{logErrors, stderr}
+import quasar.console.logErrors
 import quasar.db.StatefulTransactor
 import quasar.fp._, ski.κ
 import quasar.fp.free._
-import quasar.main._, metastore._
+import quasar.main._, config._, metastore._
 import quasar.metastore.Schema
 
-import argonaut.DecodeJson
 import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
@@ -61,28 +60,6 @@ object Server {
             .map(some))) ((content, cfgPath) =>
         QuasarConfig(
           opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
-  }
-
-  /** Attempts to load the specified config file or one found at any of the
-    * default paths. If an error occurs, it is logged to STDERR and the
-    * default configuration is returned.
-    */
-  def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(implicit cfgOps: ConfigOps[C]): Task[C] = {
-    import ConfigError._
-    configFile.fold(cfgOps.fromDefaultPaths)(cfgOps.fromFile).run flatMap {
-      case \/-(c) => c.point[Task]
-
-      case -\/(FileNotFound(f)) => for {
-        codec <- FsPath.systemCodec
-        fstr  =  FsPath.printFsPath(codec, f)
-        _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
-        cfg   <- cfgOps.default
-      } yield cfg
-
-      case -\/(MalformedConfig(_, rsn)) =>
-        stderr(s"Error in configuration file, using default configuration: $rsn") *>
-        cfgOps.default
-    }
   }
 
   def nonApiService(

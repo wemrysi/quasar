@@ -19,7 +19,6 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
   SemanticError._
-import quasar.common.JoinType
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -204,27 +203,6 @@ final class Compiler[M[_], T: Equal]
       CIName("avg")                     -> agg.Avg,
       CIName("arbitrary")               -> agg.Arbitrary,
       CIName("array_length")            -> array.ArrayLength,
-      CIName("extract_century")         -> date.ExtractCentury,
-      CIName("extract_day_of_month")    -> date.ExtractDayOfMonth,
-      CIName("extract_decade")          -> date.ExtractDecade,
-      CIName("extract_day_of_week")     -> date.ExtractDayOfWeek,
-      CIName("extract_day_of_year")     -> date.ExtractDayOfYear,
-      CIName("extract_epoch")           -> date.ExtractEpoch,
-      CIName("extract_hour")            -> date.ExtractHour,
-      CIName("extract_iso_day_of_week") -> date.ExtractIsoDayOfWeek,
-      CIName("extract_iso_year")        -> date.ExtractIsoYear,
-      CIName("extract_microseconds")    -> date.ExtractMicroseconds,
-      CIName("extract_millennium")      -> date.ExtractMillennium,
-      CIName("extract_milliseconds")    -> date.ExtractMilliseconds,
-      CIName("extract_minute")          -> date.ExtractMinute,
-      CIName("extract_month")           -> date.ExtractMonth,
-      CIName("extract_quarter")         -> date.ExtractQuarter,
-      CIName("extract_second")          -> date.ExtractSecond,
-      CIName("extract_timezone")        -> date.ExtractTimezone,
-      CIName("extract_timezone_hour")   -> date.ExtractTimezoneHour,
-      CIName("extract_timezone_minute") -> date.ExtractTimezoneMinute,
-      CIName("extract_week")            -> date.ExtractWeek,
-      CIName("extract_year")            -> date.ExtractYear,
       CIName("date")                    -> date.Date,
       CIName("clock_timestamp")         -> date.Now, // Postgres (instantaneous)
       CIName("current_timestamp")       -> date.Now, // *, SQL92
@@ -382,25 +360,16 @@ final class Compiler[M[_], T: Equal]
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
-            val leftFree: T = lpr.free(leftName)
-            val rightFree: T = lpr.free(rightName)
+            val leftFree: T = lpr.joinSideName(leftName)
+            val rightFree: T = lpr.joinSideName(rightName)
 
             (compileRelation(left) ⊛
               compileRelation(right) ⊛
               CompilerState.contextual(
                 BindingContext(Map()),
-                tableContext(leftFree, left) ++ tableContext(rightFree, right))(
-                compile1(clause).map(c =>
-                  lpr.invoke(
-                    tpe match {
-                      case JoinType.Inner => set.InnerJoin
-                      case JoinType.LeftOuter => set.LeftOuterJoin
-                      case JoinType.RightOuter => set.RightOuterJoin
-                      case JoinType.FullOuter => set.FullOuterJoin
-                    },
-                    Func.Input3(leftFree, rightFree, c)))))((left0, right0, join) =>
-              lpr.let(leftName, left0,
-                lpr.let(rightName, right0, join)))
+                tableContext(leftFree, left) ++ tableContext(rightFree, right))
+              (compile1(clause)))((left0, right0, clause0) =>
+                lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
           }).join
       }
 

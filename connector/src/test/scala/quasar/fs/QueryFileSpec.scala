@@ -18,9 +18,8 @@ package quasar.fs
 
 import slamdata.Predef._
 import quasar.{Data, DataArbitrary}
-import quasar.common.PhaseResults
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._, stateT._
+import quasar.contrib.scalaz.stream._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.scalacheck._
@@ -39,6 +38,9 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   "QueryFile" should {
     "descendantFiles" >> {
       "returns all descendants of the given directory" >> prop {
@@ -50,25 +52,25 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
           val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget).map((_,data)).toMap
           val expected = descendants.list.toList.distinct
 
-          Mem.interpret(query.descendantFiles(target)).eval(state).toEither must
+          Mem.interpret(query.descendantFiles(target).run).eval(state).toEither must
             beRight(containTheSameElementsAs(expected))
       }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
       "returns not found when dir does not exist" >> prop { d: ADir => (d =/= rootDir) ==> {
-        Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
+        Mem.interpretEmpty(query.descendantFiles(d).run)
           .toEither must beLeft(pathErr(pathNotFound(d)))
       }}
     }
 
     "fileExists" >> {
       "return true when file exists" >> prop { s: SingleFileMemState =>
-        Mem.interpret(query.fileExists(s.file)).eval(s.state) ==== true
+        Mem.interpret(query.fileExists(s.file)).eval(s.state) must_=== true
       }
 
       "return false when file doesn't exist" >> prop { (absentFile: AFile, s: SingleFileMemState) =>
         absentFile ≠ s.file ==> {
-          Mem.interpret(query.fileExists(absentFile)).eval(s.state) ==== false
+          Mem.interpret(query.fileExists(absentFile)).eval(s.state) must_=== false
         }
       }
 
@@ -76,7 +78,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
         val n = fileName(f)
         val fd = parentDir(f).get </> dir(n.value) </> file("different.txt")
 
-        Mem.interpret(query.fileExists(f)).eval(InMemState fromFiles Map(fd -> data)) ==== false
+        Mem.interpret(query.fileExists(f)).eval(InMemState fromFiles Map(fd -> data)) must_=== false
       }
     }
 
@@ -84,8 +86,8 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
       "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
         val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = MemTask.runLogWE[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
-        result.unsafePerformSync._2.toEither must beRight(s.contents)
+        val result = Mem.interpret(evaluate(query).runLogCatch.run.value).eval(state)
+        result must_=== s.contents.right.right
       }
     }
 
@@ -95,11 +97,10 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
 
         val query = lpf.read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = MemTask.interpret(results(query).map(_.toVector).run.value)
+        val result = Mem.interpret(results(query).map(_.toVector).run.value)
 
         result.run(state)
-          .unsafePerformSync
-          .leftMap(_.resultMap) ==== ((Map.empty, \/.right(s.contents)))
+          .leftMap(_.resultMap) must_=== ((Map.empty, s.contents.right))
       }
     }
   }

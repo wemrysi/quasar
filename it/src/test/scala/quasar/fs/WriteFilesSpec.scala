@@ -19,6 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.BackendCapability
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.foldable._
 import quasar.fp._
 
 import monocle.std.{disjunction => D}

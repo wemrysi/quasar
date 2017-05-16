@@ -147,7 +147,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  implicit def equal[T[_[_]]: OrderT: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
+  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
@@ -276,7 +276,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT]:
+  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]

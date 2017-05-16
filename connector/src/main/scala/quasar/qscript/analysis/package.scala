@@ -44,7 +44,7 @@ package object analysis {
 
   @typeclass
   trait Cost[F[_]] {
-    def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, F, Int]
+    def evaluate[M[_] : Monad](pathCard : APath => M[Int]): GAlgebraM[(Int, ?), M, F, Int]
   }
 
   def pathCard[S[_]](
