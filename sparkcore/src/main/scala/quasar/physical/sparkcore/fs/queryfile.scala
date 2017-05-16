@@ -214,7 +214,7 @@ object queryfile {
           }).into[S].liftM[FileSystemErrT]
           rddState <- lift(Task.delay {
             if(collected.isEmpty) {
-              val unpersisted = rdd.unpersist()
+              ignore(rdd.unpersist())
               RddState(None, 0)
             } else RddState(Some(rdd), p + step)
           }).into[S].liftM[FileSystemErrT]
