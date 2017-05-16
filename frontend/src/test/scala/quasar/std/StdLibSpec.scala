@@ -1090,7 +1090,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gt" >> {
@@ -1117,8 +1119,9 @@ abstract class StdLibSpec extends Qspec {
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
         }
-
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gte" >> {
@@ -1146,7 +1149,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Between" >> {
