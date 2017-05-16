@@ -242,15 +242,6 @@ class PrettifySpecs extends quasar.Qspec {
       case _ => true
     }
 
-    def parseNumericString(str: String): String =
-      str.parseBigDecimal.toOption.map(_.toString).getOrElse(str)
-
-    def removeLeadingZero(data: Data): Data = data match {
-      case Data.Str(str) => Data.Str(parseNumericString(str))
-      case Data.Id(str) => Data.Id(parseNumericString(str))
-      case data => data
-    }
-
     "handle an integer string with a leading zero" in {
       val data = Data.Id("012345")
       val r = render(data).value
@@ -261,6 +252,15 @@ class PrettifySpecs extends quasar.Qspec {
       val data = Data.Str("00.12345")
       val r = render(data).value
       parse(r).map(render(_).value) must beSome("0.12345")
+    }
+
+    def trimNumericString(str: String): String =
+      str.parseBigDecimal.toOption.map(_.toString).getOrElse(str)
+
+    def removeLeadingZero(data: Data): Data = data match {
+      case Data.Str(str) => Data.Str(trimNumericString(str))
+      case Data.Id(str) => Data.Id(trimNumericString(str))
+      case data => data
     }
 
     "round-trip all flat rendered values that aren't \"\"" >> prop { (data0: Data) =>
