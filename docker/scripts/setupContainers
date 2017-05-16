@@ -76,21 +76,23 @@ configure_containers() {
 # this allows us to run docker commands
 #
 enable_docker_env() {
-  if [[ -x "$(command -v docker-machine)" ]]
-  then
-    echo "found docker-machine, adding it to env..."
-    eval "$(docker-machine env --shell sh/bash default)"
-    DOCKERIP=$(docker-machine ip default)
-  else
-    if [[ -x "$(command -v docker)" ]]
-    then
-      echo "docker is in your path, proceeding..."
-      DOCKERIP=localhost
-    else
-      echo "docker needs to be installed in order to run: $0"
-      exit 1
-    fi
-  fi
+if [[ ${TRAVIS:-} ]]
+then
+  DOCKERIP=localhost
+  echo "We are in a Travis-CI environment, setting docker IP to $DOCKERIP..."
+elif [[ "$(command -v docker-machine)" && "$(docker-machine ls | grep default)" ]]
+then
+  DOCKERIP=$(docker-machine ip default)
+  echo "found docker-machine, adding it to env and using $DOCKERIP as your docker IP..."
+  eval "$(docker-machine env --shell sh/bash default)"
+elif [[ "$(command -v docker)" && "$(ps aux | grep '[d]ockerd')" ]]
+then
+  DOCKERIP=$(ps -p $(pidof dockerd) -o args --no-headers | awk -F"tcp://" '{print $2}' | cut -d":" -f 1)
+  echo "docker is in your path and you have a docker host running, proceeding with your docker IP set to $DOCKERIP ..."
+else
+  echo "We can't find docker on your system, please install it before running: $0"
+  exit 1
+fi
 }
 
 find_containers() {
