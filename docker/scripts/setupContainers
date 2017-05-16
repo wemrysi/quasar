@@ -89,6 +89,12 @@ elif [[ "$(command -v docker)" && "$(ps aux | grep '[d]ockerd')" ]]
 then
   DOCKERIP=$(ps -p $(pidof dockerd) -o args --no-headers | awk -F"tcp://" '{print $2}' | cut -d":" -f 1)
   echo "docker is in your path and you have a docker host running, proceeding with your docker IP set to $DOCKERIP ..."
+elif [[ "$(command -v docker)" ]]
+then
+  DOCKERIP=localhost
+  echo "We found docker in your path, but we are unsure about your docker host, we'll assume your docker IP is $DOCKERIP."
+  echo "But you may need to set up your own docker host, either by using Virtualbox or Docker Toolbox."
+  echo "If you do have a docker host up and running that we can't detect, don't worry things should work just fine."
 else
   echo "We can't find docker on your system, please install it before running: $0"
   exit 1
