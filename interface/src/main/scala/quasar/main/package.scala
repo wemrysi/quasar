@@ -59,7 +59,7 @@ package object main {
     mongodb.fs.definition[PhysFsEff],
     mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],
-    skeleton.fs.definition[PhysFsEff],
+    skeleton.Skeleton.definition[PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
   ).fold
