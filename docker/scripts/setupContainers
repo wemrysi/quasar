@@ -84,9 +84,9 @@ enable_docker_env() {
   elif [[ "$(command -v docker)" ]]
   then
     DOCKERIP=localhost
-    echo "We found docker in your path, but we are unsure about of your docker host, we'll assume your docker IP is $DOCKERIP."
+    echo "We found docker in your path, but we are unsure of your docker host, we'll assume your docker IP is $DOCKERIP."
     echo "You may need to set up your own docker host, either by using Docker Toolbox or Docker for Mac or something else."
-    echo "If you have a docker host we can't detect, and you usually reach your docker containers via $DOCKERIP, things should work just fine."
+    echo "If you usually reach your docker containers via $DOCKERIP, things should work just fine."
   else
     echo "We can't find Docker on your system, please install it before running: $0"
     exit 1
