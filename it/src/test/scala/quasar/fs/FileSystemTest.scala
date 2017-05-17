@@ -150,7 +150,6 @@ object FileSystemTest {
       fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
       fsTestConfig(mongodb.fs.QScriptFsType,  mongodb.fs.qscriptDefinition)  orElse
       fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
-      fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)        orElse
       fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
     }
