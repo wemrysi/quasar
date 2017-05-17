@@ -58,10 +58,14 @@ trait BackendModule {
         compile(cfg) map {
           case (int, close) =>
             val runK = λ[Kleisli[M, Config, ?] ~> M](_.run(cfg))
-            FileSystemDef.DefinitionResult(int compose runK compose fsInterpreter, close)
+            val interpreter: AnalyticalFileSystem ~> Kleisli[M, Config, ?] = analyzeInterpreter :+: fsInterpreter
+            FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
         }
       }
   }
+
+  private final def analyzeInterpreter: Analyze ~> Kleisli[M, Config, ?] =
+    Empty.analyze[Kleisli[M, Config, ?]]
 
   private final def fsInterpreter: FileSystem ~> Kleisli[M, Config, ?] = {
     type Back[A] = Kleisli[M, Config, A]
