@@ -172,9 +172,12 @@ lazy val root = project.in(file("."))
     frontend, effect,                                                       precog,
 //   |    |   |                                                               |
                                                                            blueeyes,
+//                                                                            |
+                                                                           niflheim,
 //   |    |   |                                                               |
-    sql, connector,                                                        yggdrasil, niflheim,
-//   |  /   | | \ \      |                                                    |
+    sql, connector,                                                        yggdrasil,
+//   |   /  | | \ \______ __________________________________________________  |
+//   |  /   | |  \                                                          \ |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
 //      \ \ | / /
         interface,
@@ -466,11 +469,7 @@ lazy val precog = project.setup
 
 lazy val blueeyes = project.setup
   .dependsOn(precog % BothScopes)
-  .settings(headerSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val yggdrasil = project.setup
-  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -488,5 +487,10 @@ lazy val niflheim = project.setup.noArtifacts
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
       "org.spire-math"     %% "spire"      % "0.3.0-M2",
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
+  .settings(headerSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val yggdrasil = project.setup
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
