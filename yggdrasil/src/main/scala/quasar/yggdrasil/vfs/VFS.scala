@@ -17,6 +17,8 @@
 package quasar.yggdrasil
 package vfs
 
+import quasar.niflheim.NIHDB
+
 import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.common.ingest._
@@ -105,6 +107,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
   }
 
   trait ProjectionResource extends Resource {
+    def append(data: NIHDB.Batch): IO[PrecogUnit]
     def recordCount(implicit M: Monad[M]): M[Long]
     def projection(implicit M: Monad[M]): M[Projection]
 
