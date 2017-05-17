@@ -65,6 +65,14 @@ object data {
     def ejsElem(name: QName, tpe: DataType, ns: NamespaceBinding, children: Seq[Node]): Elem =
       Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, typeAttr(tpe), ns, true, children: _*)
 
+    def keyElem(unwrappedLabel: String, ns: NamespaceBinding, children: Seq[Node]): Elem = {
+      val name       = NSPrefix(NCName("ejson"))(NCName("key"))
+      val attrObject = typeAttr(DataType.Object)
+      val attrKeyId  = Attribute(ejsBinding.prefix, "key-id", unwrappedLabel, attrObject)
+
+      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, attrKeyId, ns, true, children: _*)
+    }
+
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, tpe, TopScope, children)
 
@@ -75,16 +83,6 @@ object data {
       elem: (QName, DataType, Seq[Node]) => Elem,
       loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
-
-      val wrappedNcName: String => (QName, Attribute) = { unwrapped =>
-        val attrObject = typeAttr(DataType.Object)
-        val attrKeyId = Attribute(ejsBinding.prefix, "key-id", unwrapped, attrObject)
-        val name  = QName.prefixed(ejsBinding.prefix, NCName("key"))
-
-        (QName.prefixed(ejsBinding.prefix, NCName("key")),
-          Attribute(ejsBinding.prefix, "key-id", unwrapped, Null))
-      }
-
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => for {
           nc <- NCName.fromString(k).fold(wrapNcName, κ)
@@ -154,7 +152,7 @@ object data {
 
       case EJsonTyped(DT.Interval, ivl) =>
         ivl.string.flatMap(isoDuration.getOption(_)).map(Data._interval(_)).cata(
-          _.point[
+          _.point[F], error(s"Expected an ISO-8601 formatted duration, found: $ivl"))
 
       case EJsonTyped(DT.Time, t) =>
         t.string.flatMap(isoLocalTime.getOption(_)).map(Data._time(_)).cata(
