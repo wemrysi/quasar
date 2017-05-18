@@ -82,7 +82,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
   type Projection = NIHDBProjection
 
   def permissionsFinder: PermissionsFinder[Future]
-  def jobManager: JobManager[Future]
+  // def jobManager: JobManager[Future]
   def resourceBuilder: ResourceBuilder
 
   case class ReadSuccess(path: Path, resource: Resource) extends ReadResult
@@ -583,7 +583,8 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
     private def maybeCompleteJob(msg: EventMessage, terminal: Boolean, response: PathActionResponse) = {
       //TODO: Add job progress updates
-      (response == UpdateSuccess(msg.path) && terminal).option(msg.jobId).join traverse { jobManager.finish(_, clock.now()) } map { _ => response }
+      // TODO reenable job management
+      (response == UpdateSuccess(msg.path) && terminal).option(msg.jobId).join traverse { _ => Future.successful(()) /*jobManager.finish(_, clock.now())*/ } map { _ => response }
     }
 
     def processEventMessages(msgs: Stream[(Long, EventMessage)], permissions: Map[APIKey, Set[WritePermission]], requestor: ActorRef): IO[PrecogUnit] = {
