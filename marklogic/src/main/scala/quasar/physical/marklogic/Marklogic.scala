@@ -53,15 +53,9 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
 
   type Config = Unit
 
-  def parseConfig[S[_]](uri: ConnectionUri)(
-    implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S): EitherT[Free[S, ?], ErrorMessages, Config] = ???
+  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] = ???
 
-  def compile[S[_]](cfg: Config)(
-    implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S): FileSystemDef.DefErrT[Free[S, ?], (M ~> Free[S, ?], Free[S, Unit])] = ???
+  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
 
   val Type = FileSystemType("marklogic")
 

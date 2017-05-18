@@ -52,15 +52,11 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  final def definition[S[_]](
-    implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] = {
-
+  final val definition: FileSystemDef[Task] =
     FileSystemDef fromPF {
       case (Type, uri) =>
         parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
-          compile[S](cfg) map {
+          compile(cfg) map {
             case (int, close) =>
               val runK = λ[Configured ~> M](_.run(cfg))
               val interpreter: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
@@ -68,7 +64,6 @@ trait BackendModule {
           }
         }
     }
-  }
 
   private final def analyzeInterpreter: Analyze ~> Configured =
     Empty.analyze[Configured]
@@ -167,15 +162,9 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
-  def parseConfig[S[_]](uri: ConnectionUri)(
-    implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S): EitherT[Free[S, ?], ErrorMessages, Config]
+  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config]
 
-  def compile[S[_]](cfg: Config)(
-    implicit
-      S0: Task :<: S,
-      S1: PhysErr :<: S): FileSystemDef.DefErrT[Free[S, ?], (M ~> Free[S, ?], Free[S, Unit])]
+  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
 
   val Type: FileSystemType
 

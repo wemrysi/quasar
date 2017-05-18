@@ -59,7 +59,7 @@ package object main {
     mongodb.fs.definition[PhysFsEff],
     mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],
-    skeleton.Skeleton.definition[PhysFsEff],
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
   ).fold
@@ -231,13 +231,10 @@ package object main {
       S0 :+: S1
 
     /** Replace non-fatal failed `Task`s with a PhysicalError. */
-    def reifyNonFatalErrors[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): S ~> Free[S, ?] = {
-      val handle = λ[Task ~> Free[S, ?]](t => Free.roll(S0(t map (_.point[Free[S, ?]]) handle {
+    def reifyNonFatalErrors[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): Task ~> Free[S, ?] =
+      λ[Task ~> Free[S, ?]](t => Free.roll(S0(t map (_.point[Free[S, ?]]) handle {
         case NonFatal(ex: Exception) => Failure.Ops[PhysicalError, S].fail(unhandledFSError(ex))
       })))
-
-      transformIn(handle, liftFT[S])
-    }
   }
 
 
@@ -247,7 +244,9 @@ package object main {
     * filesystem whenever a mount is added or removed.
     */
   val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
-    physicalFileSystems translate flatMapSNT(PhysFsEff.reifyNonFatalErrors[PhysFsEff]))
+    physicalFileSystems translate flatMapSNT(
+      PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+
   import mountHandler.HierarchicalFsRef
 
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
