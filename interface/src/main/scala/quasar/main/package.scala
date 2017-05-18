@@ -60,6 +60,7 @@ package object main {
     mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
+    mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
   ).fold

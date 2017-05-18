@@ -29,11 +29,23 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 
+import quasar.precog.common.Path
+import quasar.precog.common.security.APIKey
+import quasar.yggdrasil.PathMetadata
+import quasar.yggdrasil.vfs.ResourceError
+
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+
+import pathy.Path.{DirName, FileName}
+
+import delorean._
+
 import scala.Predef.implicitly
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object Mimir extends BackendModule {
 
@@ -64,9 +76,11 @@ object Mimir extends BackendModule {
 
   type Config = Unit
 
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] = ???
+  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] =
+    ().point[EitherT[Task, ErrorMessages, ?]]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
+  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
+    ((reflNT[Task], ().point[Task])).point[FileSystemDef.DefErrT[Task, ?]]
 
   val Type = FileSystemType("mimir")
 
@@ -81,7 +95,51 @@ object Mimir extends BackendModule {
     def more(h: ResultHandle): Backend[Vector[Data]] = ???
     def close(h: ResultHandle): Configured[Unit] = ???
     def explain(repr: Repr): Backend[String] = ???
-    def listContents(dir: ADir): Backend[Set[PathSegment]] = ???
+
+    def listContents(dir: ADir): Backend[Set[PathSegment]] = {
+      val path: Path = Path(pathy.Path.posixCodec.printPath(dir))
+
+      def toSegment: PathMetadata => PathSegment = {
+        case PathMetadata(path, PathMetadata.DataDir(_)) => DirName(path.path).left[FileName]
+        case PathMetadata(path, PathMetadata.DataOnly(_)) => FileName(path.path).right[DirName]
+        case PathMetadata(path, PathMetadata.PathOnly) => sys.error(s"found path $path")
+      }
+
+      def children(apiKey: APIKey): EitherT[Future, ResourceError, Set[PathSegment]] =
+        Precog.vfs.findDirectChildren(apiKey, path).map(_.map(toSegment))
+
+      def toFSError: ResourceError => FileSystemError = {
+        case ResourceError.Corrupt(msg) => ???
+        case ResourceError.IOError(ex) => ???
+        case ResourceError.IllegalWriteRequestError(msg) => ???
+        case ResourceError.PermissionsError(msg) => ???
+        case ResourceError.NotFound(msg) => ???
+        case ResourceError.ResourceErrors(errs) => ???
+      }
+
+      val segments: FileSystemErrT[Future, Set[PathSegment]] =
+        for {
+          key <- Precog.RootAPIKey.liftM[FileSystemErrT]
+          stuff <- children(key).leftMap(toFSError)
+        } yield stuff
+
+      val futureToTask: FileSystemErrT[Future, ?] ~> FileSystemErrT[Task, ?] =
+        Hoist[FileSystemErrT].hoist[Future, Task](λ[Future ~> Task](_.toTask))
+
+      val taskToConfigured: Task ~> Configured =
+        λ[Task ~> Configured](liftMT[Task, ConfiguredT].apply(_))
+
+      val configuredToPhaseResult: Configured ~> PhaseResultT[Configured, ?] =
+        λ[Configured ~> PhaseResultT[Configured, ?]](
+          liftMT[Configured, PhaseResultT].apply(_))
+
+      val result: FileSystemErrT[Task, ?] ~> Backend =
+        Hoist[FileSystemErrT].hoist[Task, PhaseResultT[Configured, ?]](
+          configuredToPhaseResult compose taskToConfigured)
+
+      result.apply(futureToTask.apply(segments))
+    }
+
     def fileExists(file: AFile): Configured[Boolean] = ???
   }
 

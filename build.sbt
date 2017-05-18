@@ -179,7 +179,7 @@ lazy val root = project.in(file("."))
 //   |   /  | | \ \______ __________________________________________________  |
 //   |  /   | |  \                                                          \ |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
-//      \ \ | / /
+//      \ \ | / /                                                           /
         interface,
 //        /   \
        repl,  web,
@@ -396,7 +396,8 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    skeleton)
+    skeleton,
+    mimir)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -476,6 +477,9 @@ lazy val blueeyes = project.setup
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
 

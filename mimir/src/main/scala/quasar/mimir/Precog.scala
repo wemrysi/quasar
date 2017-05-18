@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, CookedBlockFormat, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 import quasar.precog.common.accounts.AccountFinder
-import quasar.precog.common.security.{APIKeyFinder, APIKeyManager, DirectAPIKeyFinder, InMemoryAPIKeyManager, PermissionsFinder}
+import quasar.precog.common.security.{APIKey, APIKeyFinder, APIKeyManager, DirectAPIKeyFinder, InMemoryAPIKeyManager, PermissionsFinder}
 import quasar.yggdrasil.table.{Slice, VFSColumnarTableModule}
 import quasar.yggdrasil.vfs.{ActorVFSModule, SecureVFSModule}
 
@@ -52,10 +52,10 @@ object Precog
   }
 
   // for the time being, do everything with this key
-  def RootAPIKey = emptyAPIKeyManager.rootAPIKey
+  def RootAPIKey: Future[APIKey] = emptyAPIKeyManager.rootAPIKey
 
   // Members declared in quasar.yggdrasil.vfs.ActorVFSModule
-  private val emptyAPIKeyManager: APIKeyManager[Future] =
+  private lazy val emptyAPIKeyManager: APIKeyManager[Future] =
     new InMemoryAPIKeyManager[Future](Clock.System)
 
   private val apiKeyFinder: APIKeyFinder[Future] =
@@ -69,12 +69,14 @@ object Precog
   private val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
-  private def chefs(system: ActorSystem): IndexedSeq[Routee] = (1 to Config.howManyChefsInTheKitchen).map { _ =>
-    ActorRefRoutee(system.actorOf(
-      Props(Chef(
-        VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-        VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))))
-  }
+  private val props: Props = Props(Chef(
+    VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
+    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
+
+  private def chefs(system: ActorSystem): IndexedSeq[Routee] =
+    (1 to Config.howManyChefsInTheKitchen).map { _ =>
+      ActorRefRoutee(system.actorOf(props))
+    }
 
   private val routerConfig: RouterConfig = new CustomRouterConfig {
     def createRouter(system: ActorSystem): Router =
@@ -82,7 +84,7 @@ object Precog
   }
 
   private val masterChef: ActorRef =
-    actorSystem.actorOf(Props[Chef].withRouter(routerConfig))
+    actorSystem.actorOf(props.withRouter(routerConfig))
 
   private val clock: Clock = Clock.System
 
