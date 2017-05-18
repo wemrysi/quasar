@@ -52,16 +52,22 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  final def definition = FileSystemDef fromPF {
-    case (Type, uri) =>
-      parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
-        compile(cfg) map {
-          case (int, close) =>
-            val runK = λ[Kleisli[M, Config, ?] ~> M](_.run(cfg))
-            val interpreter: AnalyticalFileSystem ~> Kleisli[M, Config, ?] = analyzeInterpreter :+: fsInterpreter
-            FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
+  final def definition[S[_]](
+    implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] = {
+
+    FileSystemDef fromPF {
+      case (Type, uri) =>
+        parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
+          compile[S](cfg) map {
+            case (int, close) =>
+              val runK = λ[Kleisli[M, Config, ?] ~> M](_.run(cfg))
+              val interpreter: AnalyticalFileSystem ~> Kleisli[M, Config, ?] = analyzeInterpreter :+: fsInterpreter
+              FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
+          }
         }
-      }
+    }
   }
 
   private final def analyzeInterpreter: Analyze ~> Kleisli[M, Config, ?] =
@@ -173,9 +179,15 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config]
+  def parseConfig[S[_]](uri: ConnectionUri)(
+    implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): EitherT[Free[S, ?], ErrorMessages, Config]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
+  def compile[S[_]](cfg: Config)(
+    implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S): FileSystemDef.DefErrT[Free[S, ?], (M ~> Free[S, ?], Free[S, Unit])]
 
   val Type: FileSystemType
 

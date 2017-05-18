@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.precog.mimir
+package quasar
+package physical.skeleton
 
 import slamdata.Predef._
-import quasar._
-import quasar.common._
 import quasar.connector._
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
@@ -30,35 +27,30 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import matryoshka._
-import matryoshka.implicits._
-import scalaz._, Scalaz._
+import scalaz._
 import scalaz.concurrent.Task
 import scala.Predef.implicitly
 
-object Mimir extends BackendModule {
+object Skeleton extends BackendModule {
 
-  // optimistically equal to marklogic's
-  type QS[T[_[_]]] =
-    QScriptCore[T, ?] :\:
-    ThetaJoin[T, ?] :\:
-    Const[ShiftedRead[ADir], ?] :/:
-    Const[Read[AFile], ?]
+  // default QS subset; change if you're cool/weird/unique!
+  type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  // TODO
+  // make this your repr and monad
   type Repr = Unit
-  type M[A] = Task[A]
+  type M[A] = Nothing
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
-  def MonadM = Monad[M]
-  def MonadFsErrM = ???
-  def PhaseResultTellM = ???
-  def PhaseResultListenM = ???
+  def MonadM = ??? // Monad[M]
+  def MonadFsErrM = ??? // MonadFsErr[M]
+  def PhaseResultTellM = ??? // PhaseResultTell[M]
+  def PhaseResultListenM = ??? // PhaseResultListen[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
@@ -74,7 +66,7 @@ object Mimir extends BackendModule {
       S0: Task :<: S,
       S1: PhysErr :<: S): FileSystemDef.DefErrT[Free[S, ?], (M ~> Free[S, ?], Free[S, Unit])] = ???
 
-  val Type = FileSystemType("mimir")
+  val Type = FileSystemType("skeleton")
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): M[Repr] = ???
