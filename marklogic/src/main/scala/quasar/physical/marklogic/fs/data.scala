@@ -63,8 +63,8 @@ object data {
     def typeAttr(tpe: DataType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.localPart.shows, tpe.shows, Null)
 
-    def ejsElem(name: QName, attr: Attribute, ns: NamespaceBinding, children: Seq[Node]): Elem =
-      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, attr, ns, true, children: _*)
+    def ejsElem(name: QName, tpe: DataType, ns: NamespaceBinding, children: Seq[Node]): Elem =
+      Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, typeAttr(tpe), ns, true, children: _*)
 
     def keyElem(label: String): (QName, Option[Attribute]) =
       NCName.fromString(label).fold(κ(wrappedKey(label)), unwrappedKey(_))
@@ -79,14 +79,14 @@ object data {
       (name, attrKeyId.some)
     }
 
-    def innerElem(name: QName, attr: Attribute, children: Seq[Node]): Elem =
-      ejsElem(name, attr, TopScope, children)
+    def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
+      ejsElem(name, tpe, TopScope, children)
 
-    def rootElem(name: QName, attr: Attribute, children: Seq[Node]): Elem =
-      ejsElem(name, attr, ejsBinding, children)
+    def rootElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
+      ejsElem(name, tpe, ejsBinding, children)
 
     def encodeXml0(
-      elem: (QName, Attribute, Seq[Node]) => Elem,
+      elem: (QName, DataType, Seq[Node]) => Elem,
       loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
@@ -97,24 +97,24 @@ object data {
       }
 
       elementName => {
-        case Data.Binary(bytes) => elem(elementName, typeAttr(DT.Binary)    , Text(base64Bytes(bytes))     ).success
-        case Data.Bool(b)       => elem(elementName, typeAttr(DT.Boolean)   , Text(b.fold("true", "false"))).success
-        case Data.Date(d)       => elem(elementName, typeAttr(DT.Date)      , Text(isoLocalDate(d))        ).success
-        case Data.Dec(d)        => elem(elementName, typeAttr(DT.Decimal)   , Text(d.toString)             ).success
-        case Data.Id(id)        => elem(elementName, typeAttr(DT.Id)        , Text(id)                     ).success
-        case Data.Int(i)        => elem(elementName, typeAttr(DT.Integer)   , Text(i.toString)             ).success
-        case Data.Interval(d)   => elem(elementName, typeAttr(DT.Interval)  , Text(isoDuration(d))         ).success
-        case Data.NA            => elem(elementName, typeAttr(DT.NA)        , Nil                          ).success
-        case Data.Null          => elem(elementName, typeAttr(DT.Null)      , Nil                          ).success
-        case Data.Str(s)        => elem(elementName, typeAttr(DT.String)    , Text(s)                      ).success
-        case Data.Time(t)       => elem(elementName, typeAttr(DT.Time)      , Text(isoLocalTime(t))        ).success
-        case Data.Timestamp(ts) => elem(elementName, typeAttr(DT.Timestamp) , Text(isoInstant(ts))         ).success
+        case Data.Binary(bytes) => elem(elementName, DT.Binary   , Text(base64Bytes(bytes))     ).success
+        case Data.Bool(b)       => elem(elementName, DT.Boolean  , Text(b.fold("true", "false"))).success
+        case Data.Date(d)       => elem(elementName, DT.Date     , Text(isoLocalDate(d))        ).success
+        case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
+        case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
+        case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
+        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(isoDuration(d))         ).success
+        case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
+        case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
+        case Data.Str(s)        => elem(elementName, DT.String   , Text(s)                      ).success
+        case Data.Time(t)       => elem(elementName, DT.Time     , Text(isoLocalTime(t))        ).success
+        case Data.Timestamp(ts) => elem(elementName, DT.Timestamp, Text(isoInstant(ts))         ).success
 
         case Data.Arr(elements) =>
-          elements traverse loop(ejsonArrayElt) map (elem(elementName, typeAttr(DT.Array), _))
+          elements traverse loop(ejsonArrayElt) map (elem(elementName, DT.Array, _))
 
         case Data.Obj(entries)  =>
-          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, typeAttr(DT.Object), _))
+          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, DT.Object, _))
 
         case other              => s"No representation for '$other' in XML.".failureNel[Elem]
       }
