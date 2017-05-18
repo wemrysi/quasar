@@ -51,6 +51,9 @@ object Precog
     val dataDir: File = new File("/tmp")
   }
 
+  // for the time being, do everything with this key
+  def RootAPIKey = emptyAPIKeyManager.rootAPIKey
+
   // Members declared in quasar.yggdrasil.vfs.ActorVFSModule
   private val emptyAPIKeyManager: APIKeyManager[Future] =
     new InMemoryAPIKeyManager[Future](Clock.System)
@@ -58,7 +61,7 @@ object Precog
   private val apiKeyFinder: APIKeyFinder[Future] =
     new DirectAPIKeyFinder[Future](emptyAPIKeyManager)
 
-  private val accountFinder: AccountFinder[Future] = AccountFinder.Empty[Future]
+  private val accountFinder: AccountFinder[Future] = AccountFinder.Singleton(RootAPIKey)
 
   def permissionsFinder: PermissionsFinder[Future] =
     new PermissionsFinder(apiKeyFinder, accountFinder, Instant.EPOCH)
@@ -90,7 +93,7 @@ object Precog
   implicit def M: Monad[Future] = futureInstance
 
   // Members declared in quasar.yggdrasil.TableModule
-  sealed trait TableCompanion extends VFSColumnarTableCompanion 
+  sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
   // Members declared in quasar.yggdrasil.table.VFSColumnarTableModule

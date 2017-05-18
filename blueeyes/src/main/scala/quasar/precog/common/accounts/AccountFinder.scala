@@ -24,6 +24,8 @@ import org.slf4s.Logging
 import scalaz._
 import scalaz.syntax.monad._
 
+import java.time.LocalDateTime
+
 trait AccountFinder[M[+ _]] extends Logging { self =>
   def findAccountByAPIKey(apiKey: APIKey): M[Option[AccountId]]
 
@@ -37,8 +39,31 @@ trait AccountFinder[M[+ _]] extends Logging { self =>
 }
 
 object AccountFinder {
+  val DefaultId = "kris-nuttycombe"
+
   def Empty[M[+ _]: Monad] = new AccountFinder[M] {
     def findAccountByAPIKey(apiKey: APIKey)          = None.point[M]
     def findAccountDetailsById(accountId: AccountId) = None.point[M]
+  }
+
+  def Singleton[M[+_]: Monad](rootKeyM: M[APIKey]) = new AccountFinder[M] {
+    def findAccountByAPIKey(apiKey: APIKey) =
+      Some(DefaultId).point[M]
+
+    def findAccountDetailsById(accountId: AccountId) = {
+      rootKeyM flatMap { rootKey =>
+        val back = AccountDetails(
+          DefaultId,
+          "kris.nuttycombe@gmail.com",
+          LocalDateTime.now(),
+          rootKey,
+          Path.Root,
+          AccountPlan.Root,
+          None,
+          None)
+
+        Some(back).point[M]
+      }
+    }
   }
 }
