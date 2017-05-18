@@ -167,10 +167,10 @@ lazy val root = project.in(file("."))
 //
       ejson, js,
 //       \  /
-        common,    // -------------------------------------------------------
+        common,    // <------------------------------------------------------
 //        |    \                                                             \
-    frontend, effect,                                                       precog,
-//   |    |   |                                                               |
+    effect, frontend,                                                       precog,
+//   |       |  |  \________________________________________________________  |
                                                                            blueeyes,
 //                                                                            |
                                                                            niflheim,
@@ -468,7 +468,7 @@ lazy val precog = project.setup
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
-  .dependsOn(precog % BothScopes)
+  .dependsOn(precog % BothScopes, frontend)
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
