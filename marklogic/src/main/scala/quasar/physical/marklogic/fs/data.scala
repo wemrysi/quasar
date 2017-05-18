@@ -66,18 +66,17 @@ object data {
     def ejsElem(name: QName, attr: Attribute, ns: NamespaceBinding, children: Seq[Node]): Elem =
       Elem(name.prefix.map(_.shows).orNull, name.localPart.shows, attr, ns, true, children: _*)
 
-    def keyElem(label: String): (QName, Attribute) =
+    def keyElem(label: String): (QName, Option[Attribute]) =
       NCName.fromString(label).fold(κ(wrappedKey(label)), unwrappedKey(_))
 
-    def unwrappedKey(label: NCName): (QName, Attribute) =
-      (QName.unprefixed(label), typeAttr(DT.Object))
+    def unwrappedKey(label: NCName): (QName, Option[Attribute]) =
+      (QName.unprefixed(label), None)
 
-    def wrappedKey(unwrappedLabel: String): (QName, Attribute) = {
+    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) = {
       val name       = NSPrefix(NCName("ejson"))(NCName("key"))
-      val attrObject = typeAttr(DT.Object)
-      val attrKeyId  = Attribute(ejsBinding.prefix, "key-id", unwrappedLabel, attrObject)
+      val attrKeyId  = Attribute(ejsBinding.prefix, "key-id", unwrappedLabel, Null)
 
-      (name, attrKeyId)
+      (name, attrKeyId.some)
     }
 
     def innerElem(name: QName, attr: Attribute, children: Seq[Node]): Elem =
@@ -90,10 +89,10 @@ object data {
       elem: (QName, Attribute, Seq[Node]) => Elem,
       loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
-      val mapEntryToXml: ((String, Data)) => ErrorMessages \/ (Elem, Attribute) = {
+      val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => {
           val (name, attr) = keyElem(k)
-          loop(name)(v).map((_, attr)).disjunction
+          loop(name)(v).map(_ % attr.getOrElse(Null)).disjunction
         }
       }
 
@@ -115,7 +114,7 @@ object data {
           elements traverse loop(ejsonArrayElt) map (elem(elementName, typeAttr(DT.Array), _))
 
         case Data.Obj(entries)  =>
-          entries.toList traverse (mapEntryToXml andThen (_.validation)) map ((e: Elem, attr: Attribute) => elem(elementName, attr, e))
+          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, typeAttr(DT.Object), _))
 
         case other              => s"No representation for '$other' in XML.".failureNel[Elem]
       }
