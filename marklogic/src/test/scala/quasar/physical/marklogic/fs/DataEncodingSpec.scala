@@ -21,12 +21,12 @@ import quasar.{Data, DataArbitrary}, DataArbitrary._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data._
 import quasar.physical.marklogic.qscript.EJsonTypeKey
-import quasar.physical.marklogic.xml.SecureXML
+import quasar.physical.marklogic.xml._
 
-import scala.xml.Elem
+import scala.xml._
 
 import argonaut._, Argonaut._
-import scalaz._, Scalaz._
+import scalaz.{Node => _, _}, Scalaz._
 
 final class DataEncodingSpec extends quasar.Qspec {
   type Result[A] = ErrorMessages \/ A
@@ -66,11 +66,19 @@ final class DataEncodingSpec extends quasar.Qspec {
       (parseXML(orig) >>= decodeXml[Result](_ => Data._dec(42.0).right)) must_= exp.some.right
     }
 
-    "encode when a key is not a valid QName" >> {
+    "encode as an attribute when a key is not a valid QName" >> {
       val k = "42 not qname"
       val d = Data.singletonObj(k, Data.Str("foo"))
 
-      encodeXml[Result](d) must beRight
+      val ejsBinding     = NamespaceBinding(namespaces.ejsonNs.prefix.shows, namespaces.ejsonNs.uri.shows, TopScope)
+      val stringTypeAttr = Attribute("ejson", "type", "string", Null)
+      val objectTypeAttr = Attribute("ejson", "type", "object", Null)
+      val keyAttr        = Attribute("ejson", "key-id", k, stringTypeAttr)
+
+      val innerElem = Elem("ejson", "key", keyAttr, TopScope, true, Text("foo"))
+      val elem = Elem("ejson", "ejson", objectTypeAttr, ejsBinding, true, innerElem)
+
+      encodeXml[Result](d) must be_\/-(elem)
     }
 
     "error for Data.Set" >> {
