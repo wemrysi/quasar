@@ -27,6 +27,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.effect, effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.ejson.implicits._
 import quasar.fp.free._
+import quasar.fp.ignore
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._, FileSystemError._, QueryFile._
 import quasar.qscript._
