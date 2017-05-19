@@ -310,12 +310,20 @@ object QScriptCore {
             (mapL ≟ mapR).option {
               val funcL = func1 ∘ (_ ∘ (_ >> left))
               val funcR = func2 ∘ (_ ∘ (_ >> right))
-              val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
 
-              SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                Reduce(Extern, mapL, funcL ++ funcR, newRep),
-                lrep,
-                rrep)
+              (funcL ≟ funcR && rep1 ≟ rep2).fold(
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, mapL, funcL, rep1),
+                  HoleF,
+                  HoleF),
+              {
+                val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
+
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, mapL, funcL ++ funcR, newRep),
+                  lrep,
+                  rrep)
+              })
             }
 
           case (
