@@ -98,8 +98,18 @@ package object xml {
   def elements(nodes: Seq[Node]): Seq[Elem] =
     nodes.collect { case e: Elem => e }
 
-  def qualifiedName(elem: Elem): String =
-    Option(elem.prefix).fold("")(_ + ":") + elem.label
+  def qualifiedName(elem: Elem): Option[String] = {
+    def labelKeyAttr(elem: Elem): Option[String] =
+      elem.attributes collectFirst {
+        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === "ejson:key-id" => label
+      }
+
+    (Option(elem.prefix), elem.label) match {
+      case (Some("ejson"), "key") => labelKeyAttr(elem)
+      case (_, _) => (Option(elem.prefix).fold("")(_ + ":") + elem.label).some
+    }
+  }
+
 
   /** Extract the child sequence from a node. */
   object Children {
