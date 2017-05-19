@@ -38,14 +38,14 @@ quasar_metastore:
   image: postgres:9.6
   privileged: true
   ports:
-    - "5432:5432"
+   - "5432:5432"
 
 quasar_postgresql:
   container_name: quasar_postgresql
   image: postgres:9.6
   privileged: true
   ports:
-    - "5433:5432"
+   - "5433:5432"
 
 quasar_marklogic_xml:
   container_name: quasar_marklogic_xml
@@ -67,5 +67,7 @@ quasar_couchbase:
   container_name: quasar_couchbase
   image: couchbase/server:enterprise-4.5.1
   ports:
-    - "8091-8094:8091-8094"
-    - "11210:11210"
+   - "8091-8094:8091-8094"
+   - "11210:11210"
+  mem_limit: 2048m
+

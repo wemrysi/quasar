@@ -11,7 +11,7 @@ services:
 # needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
-
+ 
 # create all the docker containers we need for IT testing
 install:
   - cd $TRAVIS_BUILD_DIR/docker/scripts
@@ -54,6 +54,7 @@ branches:
 
 cache:
   directories:
+    - $HOME/.marklogic
     - $HOME/.coursier/cache
     - $HOME/.ivy2/cache
     - $HOME/.sbt
