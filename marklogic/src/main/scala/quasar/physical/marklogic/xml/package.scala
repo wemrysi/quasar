@@ -62,14 +62,16 @@ package object xml {
     *   }
     * }
     */
-  def toData(elem: Elem, config: KeywordConfig): Data = {
+  def toData(elem: Elem, config: KeywordConfig): Option[Data] = {
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
       case Seq() =>
         m.cata(attrsAndText(_,  ""), _str(""))
       case LeafText(txt) =>
         m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
-        val childrenByName = elements(xs) groupBy qualifiedName
+        val childrenAndLabel = (elements(xs) map withQualifiedName).toList.unite
+        val childrenByName = childrenAndLabel.groupBy(_._2).mapValues(elems => elems.map(_._1))
+
         val childrenData = childrenByName.mapValues {
           case Seq(single) => impl(single.child, single.attributes.some)
           case xs          => Arr(xs.map(x => impl(x.child, x.attributes.some)).toList)
@@ -88,15 +90,20 @@ package object xml {
         config.attributesKeyName -> d,
         config.textKeyName       -> _str(txt))))
 
-    Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
+    qualifiedName(elem).map { label: String =>
+      Obj(ListMap(label -> impl(elem.child, elem.attributes.some)))
+    }
   }
 
   /** Converts the given element to `Data` using EJson-compliant synthetic keys. */
-  def toEJsonData(elem: Elem): Data =
+  def toEJsonData(elem: Elem): Option[Data] =
     toData(elem, KeywordConfig.ejsonCompliant)
 
   def elements(nodes: Seq[Node]): Seq[Elem] =
     nodes.collect { case e: Elem => e }
+
+  def withQualifiedName(elem: Elem): Option[(Elem, String)] =
+   qualifiedName(elem) strengthL elem
 
   def qualifiedName(elem: Elem): Option[String] = {
     def labelKeyAttr(elem: Elem): Option[String] =
@@ -109,7 +116,6 @@ package object xml {
       case (_, _) => (Option(elem.prefix).fold("")(_ + ":") + elem.label).some
     }
   }
-
 
   /** Extract the child sequence from a node. */
   object Children {
