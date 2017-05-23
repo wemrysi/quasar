@@ -199,6 +199,9 @@ object data {
 
     implicit val G: Applicative[G] = Applicative[F].compose[V]
 
+    def toG[A](oa: Option[A], message: String): G[A] =
+      oa.cata(a => a.point[G], Validation.failureNel[String, A](message).point[F])
+
     def decodeXml0: Node => G[Data] = {
       case DataNode(DT.Array, children) =>
         elements(children).toList traverse decodeXml0 map (Data._arr(_))
@@ -247,7 +250,7 @@ object data {
 
       case DataNode(DT.Object, children) =>
         elements(children).toList
-          .traverse(el => decodeXml0(el) strengthL qualifiedName(el))
+          .traverse(el => (toG(qualifiedName(el), "") |@| decodeXml0(el))((_, _)))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
