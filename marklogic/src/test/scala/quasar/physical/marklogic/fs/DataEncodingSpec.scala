@@ -35,13 +35,13 @@ final class DataEncodingSpec extends quasar.Qspec {
     SecureXML.loadString(s).leftMap(_.toString.wrapNel)
 
   "Data <-> XML encoding" >> {
-    "roundtrip" >> prop { xd: XmlSafeData =>
-      (encodeXml[Result](xd.data) >>= decodeXmlStrict[Result] _) must_= xd.data.some.right
+    "roundtrip" >> prop { data: Data =>
+      (encodeXml[Result](data) >>= decodeXmlStrict[Result] _) must_= data.some.right
     }
 
-    "roundtrip through serialization" >> prop { xd: XmlSafeData =>
-      val rt = encodeXml[Result](xd.data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
-      rt must_= xd.data.some.right
+    "roundtrip through serialization" >> prop { data: Data =>
+      val rt = encodeXml[Result](data) >>= (e => parseXML(e.toString)) >>= decodeXmlStrict[Result] _
+      rt must_= data.some.right
     }
 
     "None on attempt to decode non-data XML" >> {
