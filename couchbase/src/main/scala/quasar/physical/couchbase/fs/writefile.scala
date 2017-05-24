@@ -37,7 +37,7 @@ abstract class writefile {
 
   def open(file: AFile): Backend[WriteHandle] =
     for {
-      ctx    <- MR.ask ∘ (_.ctx)
+      ctx    <- MR.asks(_.ctx)
       col    =  docTypeValueFromPath(file)
       i      <- MonotonicSeq.Ops[Eff].next.liftB
       handle =  WriteHandle(file, i)
@@ -46,7 +46,7 @@ abstract class writefile {
 
   def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
     (for {
-      ctx  <- MR.ask ∘ (_.ctx)
+      ctx  <- MR.asks(_.ctx)
       col  <- ME.unattempt(wh.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
       data <- lift(Task.delay(chunk.map(DataCodec.render).unite
                 .map(str =>

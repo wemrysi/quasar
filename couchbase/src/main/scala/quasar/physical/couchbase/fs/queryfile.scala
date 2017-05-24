@@ -40,7 +40,7 @@ abstract class queryfile {
 
   def n1qlResults[T[_[_]]: BirecursiveT, S[_]](n1ql: T[N1QL]): Backend[Vector[Data]] =
     for {
-      ctx <- MR.ask ∘ (_.ctx)
+      ctx <- MR.asks(_.ctx)
       q   <- ME.unattempt(
                RenderQuery.compact(n1ql).leftMap(FileSystemError.qscriptPlanningFailed(_)).η[Backend])
       _   <- MT.tell(Vector(detail("N1QL", q)))
@@ -50,7 +50,7 @@ abstract class queryfile {
 
   def executePlan(repr: Repr, out: AFile): Backend[AFile] =
     for {
-      ctx    <- MR.ask ∘ (_.ctx)
+      ctx    <- MR.asks(_.ctx)
       r      <- n1qlResults(repr)
       col    =  docTypeValueFromPath(out)
       docs   <- r.map(DataCodec.render).unite.traverse(d => GenUUID.Ops[Eff].asks(uuid =>
@@ -95,17 +95,16 @@ abstract class queryfile {
 
   def listContents(dir: ADir): Backend[Set[PathSegment]] =
     for {
-      ctx    <- MR.ask ∘ (_.ctx)
+      ctx    <- MR.asks(_.ctx)
       col    =  docTypeValueFromPath(dir)
       types  <- ME.unattempt(lift(docTypeValuesFromPrefix(ctx, col.v)).into[Eff].liftB)
-      _      <- types.isEmpty.fold(
-                  ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(dir))),
-                  ().η[Backend])
+      _      <- types.isEmpty.whenM(
+                  ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(dir))))
     } yield pathSegmentsFromPrefixDocTypeValues(col.v, types)
 
   def fileExists(file: AFile): Configured[Boolean] =
     (for {
-      ctx    <- MR.ask ∘ (_.ctx)
+      ctx    <- MR.asks(_.ctx)
       col    =  docTypeValueFromPath(file)
       exists <- ME.unattempt(lift(existsWithPrefix(ctx, col.v)).into[Eff].liftB)
     } yield exists).valueOr(κ(false)).value

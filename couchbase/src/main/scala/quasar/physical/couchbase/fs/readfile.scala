@@ -34,7 +34,7 @@ abstract class readfile {
   // TODO: Streaming
   def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
     for {
-      ctx     <- MR.ask ∘ (_.ctx)
+      ctx     <- MR.asks(_.ctx)
       col     =  docTypeValueFromPath(file)
       lmt     =  limit.map(lim => s"LIMIT ${lim.unwrap}").orZero
       qStr    =  s"""SELECT ifmissing(d.`value`, d).* FROM `${ctx.bucket.name}` d
