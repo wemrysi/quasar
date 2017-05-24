@@ -465,18 +465,21 @@ lazy val precog = project.setup
   .dependsOn(common % BothScopes)
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
   .dependsOn(precog % BothScopes)
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
   .settings(headerSettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project.setup.noArtifacts
@@ -488,9 +491,11 @@ lazy val niflheim = project.setup.noArtifacts
       "org.spire-math"     %% "spire"      % "0.3.0-M2",
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .settings(headerSettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
