@@ -489,7 +489,7 @@ lazy val niflheim = project.setup.noArtifacts
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
-      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
