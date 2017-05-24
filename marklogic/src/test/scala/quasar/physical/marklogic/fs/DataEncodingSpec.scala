@@ -70,15 +70,12 @@ final class DataEncodingSpec extends quasar.Qspec {
       val k = "42 not qname"
       val d = Data.singletonObj(k, Data.Str("foo"))
 
-      val ejsBinding     = NamespaceBinding(namespaces.ejsonNs.prefix.shows, namespaces.ejsonNs.uri.shows, TopScope)
-      val stringTypeAttr = Attribute("ejson", "type", "string", Null)
-      val objectTypeAttr = Attribute("ejson", "type", "object", Null)
-      val keyAttr        = Attribute("ejson", "key-id", k, stringTypeAttr)
+      val elem =
+        <ejson:ejson ejson:type="object" xmlns:ejson="http://quasar-analytics.org/ejson">
+          <ejson:key ejson:key-id="42 not qname" ejson:type="string">foo</ejson:key>
+        </ejson:ejson>
 
-      val innerElem = Elem("ejson", "key", keyAttr, TopScope, true, Text("foo"))
-      val elem = Elem("ejson", "ejson", objectTypeAttr, ejsBinding, true, innerElem)
-
-      encodeXml[Result](d) must be_\/-(elem)
+      encodeXml[Result](d) must be_\/-(Utility.trim(elem))
     }
 
     "error for Data.Set" >> {
