@@ -479,13 +479,16 @@ lazy val mimir = project.setup.noArtifacts
   .scalacArgs ("-Ypartial-unification")
   .settings(
     libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2"))
+      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
+
+      "co.fs2" %% "fs2-core"   % "0.9.6",
+      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project.setup.noArtifacts
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
-  .scalacArgs ("-Ypartial-unification")
+  .scalacArgs("-Ypartial-unification")
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",

@@ -18,6 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef._
 import quasar._
+import quasar.blueeyes.json.JValue
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.matryoshka._
@@ -34,6 +35,11 @@ import quasar.precog.common.security.APIKey
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 
+import fs2.{Handle, Pull, Stream}
+import fs2.async.mutable.Queue
+import fs2.interop.scalaz._
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
@@ -87,6 +93,16 @@ object Mimir extends BackendModule {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = ???
 
+  private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
+    StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
+      q.dequeue1 map { a =>
+        if (until(a))
+          None
+        else
+          Some((a, q))
+      }
+    }
+  }
 
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
@@ -149,9 +165,53 @@ object Mimir extends BackendModule {
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
-    def open(file: AFile): Backend[WriteHandle] = ???
-    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = ???
-    def close(h: WriteHandle): Configured[Unit] = ???
+    private val QueueLimit = 100
+
+    private val map: ConcurrentHashMap[WriteHandle, Queue[Task, Vector[Data]]] =
+      new ConcurrentHashMap
+
+    private val cur = new AtomicLong(0L)
+
+    def open(file: AFile): Backend[WriteHandle] = {
+      val run = Task suspend {
+        val id = cur.getAndIncrement()
+        val handle = WriteHandle(file, id)
+
+        for {
+          queue <- Queue.bounded[Task, Vector[Data]](QueueLimit)
+
+          path = fileToPath(file)
+          jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
+
+          _ <- Precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+          _ <- Task.delay(map.put(handle, queue))
+        } yield handle
+      }
+
+      run.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+      if (chunk.isEmpty) {
+        Vector.empty[FileSystemError].point[Configured]
+      } else {
+        val t = for {
+          optQueue <- Task.delay(Option(map.get(h)))
+          _ <- optQueue.map(_.enqueue1(chunk)).getOrElse(Task.now(()))
+        } yield Vector.empty[FileSystemError]
+
+        t.liftM[ConfiguredT]
+      }
+    }
+
+    def close(h: WriteHandle): Configured[Unit] = {
+      val t = for {
+        optQueue <- Task.delay(Option(map.get(h)))
+        _ <- optQueue.map(_.enqueue1(Vector.empty)).getOrElse(Task.now(()))
+      } yield ()
+
+      t.liftM[ConfiguredT]
+    }
   }
 
   object ManageFileModule extends ManageFileModule {
