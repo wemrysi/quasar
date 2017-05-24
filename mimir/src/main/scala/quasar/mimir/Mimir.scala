@@ -32,6 +32,7 @@ import quasar.qscript._
 
 import quasar.precog.common.Path
 import quasar.precog.common.security.APIKey
+import quasar.precog.util.IOUtils
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 
@@ -45,13 +46,14 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-import pathy.Path.{DirName, FileName}
+import pathy.Path._
 
 import delorean._
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Random
 
 object Mimir extends BackendModule {
 
@@ -214,11 +216,41 @@ object Mimir extends BackendModule {
     }
   }
 
+  // move and delete assume nihdb semantics
   object ManageFileModule extends ManageFileModule {
+    import java.io.File
+
     import ManageFile._
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ???
-    def delete(path: APath): Backend[Unit] = ???
-    def tempFile(near: APath): Backend[AFile] = ???
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+      def inner(fpath: APath, dpath: APath): Task[Unit] = {
+        val from = new File(Precog.Config.dataDir, pathy.Path.posixCodec.printPath(fpath))
+        val dest = new File(Precog.Config.dataDir, pathy.Path.posixCodec.printPath(dpath))
+
+        // yolo (for context, renameTo really doesn't work well)
+        Task delay { from.renameTo(dest); () }
+      }
+
+      inner(scenario.src, scenario.dst).liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def delete(path: APath): Backend[Unit] = {
+      val target = new File(Precog.Config.dataDir, pathy.Path.posixCodec.printPath(path))
+      val t = Task delay { IOUtils.recursiveDelete(target).unsafePerformIO(); () }
+      t.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def tempFile(near: APath): Backend[AFile] = {
+      for {
+        seed <- Task.delay(Random.nextLong.toString).liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+
+        // yolo
+        target = parentDir(near).get </> file(seed)
+
+        h <- WriteFileModule.open(target)
+        _ <- WriteFileModule.write(h, Vector(Data.Obj())).liftM[PhaseResultT].liftM[FileSystemErrT]
+        _ <- WriteFileModule.close(h).liftM[PhaseResultT].liftM[FileSystemErrT]
+      } yield target
+    }
   }
 }
