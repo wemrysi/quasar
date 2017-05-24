@@ -87,6 +87,19 @@ object Mimir extends BackendModule {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = ???
 
+
+  private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
+  private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
+
+  private def toFSError: ResourceError => FileSystemError = {
+    case ResourceError.Corrupt(msg) => ???
+    case ResourceError.IOError(ex) => ???
+    case ResourceError.IllegalWriteRequestError(msg) => ???
+    case ResourceError.PermissionsError(msg) => ???
+    case ResourceError.NotFound(msg) => ???
+    case ResourceError.ResourceErrors(errs) => ???
+  }
+
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
@@ -97,8 +110,6 @@ object Mimir extends BackendModule {
     def explain(repr: Repr): Backend[String] = ???
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
-      val path: Path = Path(pathy.Path.posixCodec.printPath(dir))
-
       def toSegment: PathMetadata => PathSegment = {
         case PathMetadata(path, PathMetadata.DataDir(_)) => DirName(path.path).left[FileName]
         case PathMetadata(path, PathMetadata.DataOnly(_)) => FileName(path.path).right[DirName]
@@ -106,16 +117,7 @@ object Mimir extends BackendModule {
       }
 
       def children(apiKey: APIKey): EitherT[Future, ResourceError, Set[PathSegment]] =
-        Precog.vfs.findDirectChildren(apiKey, path).map(_.map(toSegment))
-
-      def toFSError: ResourceError => FileSystemError = {
-        case ResourceError.Corrupt(msg) => ???
-        case ResourceError.IOError(ex) => ???
-        case ResourceError.IllegalWriteRequestError(msg) => ???
-        case ResourceError.PermissionsError(msg) => ???
-        case ResourceError.NotFound(msg) => ???
-        case ResourceError.ResourceErrors(errs) => ???
-      }
+        Precog.vfs.findDirectChildren(apiKey, dirToPath(dir)).map(_.map(toSegment))
 
       val segments: FileSystemErrT[Future, Set[PathSegment]] =
         for {
