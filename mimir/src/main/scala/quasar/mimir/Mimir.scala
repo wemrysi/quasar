@@ -126,16 +126,9 @@ object Mimir extends BackendModule {
       val futureToTask: FileSystemErrT[Future, ?] ~> FileSystemErrT[Task, ?] =
         Hoist[FileSystemErrT].hoist[Future, Task](λ[Future ~> Task](_.toTask))
 
-      val taskToConfigured: Task ~> Configured =
-        λ[Task ~> Configured](liftMT[Task, ConfiguredT].apply(_))
-
-      val configuredToPhaseResult: Configured ~> PhaseResultT[Configured, ?] =
-        λ[Configured ~> PhaseResultT[Configured, ?]](
-          liftMT[Configured, PhaseResultT].apply(_))
-
       val result: FileSystemErrT[Task, ?] ~> Backend =
         Hoist[FileSystemErrT].hoist[Task, PhaseResultT[Configured, ?]](
-          configuredToPhaseResult compose taskToConfigured)
+          liftMT[Configured, PhaseResultT] compose liftMT[Task, ConfiguredT])
 
       result.apply(futureToTask.apply(segments))
     }
