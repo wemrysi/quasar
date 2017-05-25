@@ -110,17 +110,21 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
         log.debug("Defaulting on root-level child browse to account path")
         for {
           children <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
+          _ = log.debug(s"Browsable children are $children")
           nonRoot = children.filterNot(_ == Path.Root)
           childMetadata <- nonRoot.toList.traverseU(vfs.findPathMetadata)
         } yield {
+          log.debug(s"Found root-level children $childMetadata.")
           childMetadata.toSet
         }
 
       case other =>
+        log.debug("Using non-root-level child browse.")
         for {
           children  <- vfs.findDirectChildren(path)
           permitted <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
         } yield {
+          log.debug(s"Found non-root-level children $children.")
           children filter { case PathMetadata(child, _) => permitted.exists(_.isEqualOrParentOf(path / child)) }
         }
     }

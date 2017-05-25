@@ -33,13 +33,14 @@ import quasar.precog.common.security.{
   PermissionsFinder
 }
 
+import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.table.{Slice, VFSColumnarTableModule}
-import quasar.yggdrasil.vfs.{ActorVFSModule, SecureVFSModule}
+import quasar.yggdrasil.vfs.{ActorVFSModule, ResourceError, SecureVFSModule}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.routing.{CustomRouterConfig, ActorRefRoutee, RouterConfig, RoundRobinGroup, RoundRobinRoutingLogic, Routee, Router}
 
-import scalaz.{Monad, StreamT}
+import scalaz.{EitherT, Monad, StreamT}
 import scalaz.std.scalaFuture.futureInstance
 import scalaz.syntax.show._
 
@@ -119,6 +120,9 @@ object Precog
 
   private val actorVFS: ActorVFS =
     new ActorVFS(projectionsActor, Config.storageTimeout, Config.storageTimeout)
+
+  def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] =
+    actorVFS.findDirectChildren(path)
 
   val vfs: SecureVFS = new SecureVFS(actorVFS, permissionsFinder, clock)
 

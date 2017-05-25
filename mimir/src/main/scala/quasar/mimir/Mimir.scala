@@ -111,6 +111,17 @@ object Mimir extends BackendModule with Logging {
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
 
+  private def toSegment: PathMetadata => PathSegment = {
+    case PathMetadata(path, PathMetadata.DataDir(_)) => DirName(path.path).left[FileName]
+    case PathMetadata(path, PathMetadata.DataOnly(_)) => FileName(path.path).right[DirName]
+    case PathMetadata(path, PathMetadata.PathOnly) => sys.error(s"found path $path")
+  }
+
+  private def children(dir: ADir): EitherT[Future, ResourceError, Set[PathSegment]] = {
+    log.debug(s"children of $dir")
+    Precog.showContents(dirToPath(dir)).map(_.map(toSegment))
+  }
+
   private def toFSError: ResourceError => FileSystemError = {
     case ResourceError.Corrupt(msg) => ???
     case ResourceError.IOError(ex) => ???
@@ -130,19 +141,10 @@ object Mimir extends BackendModule with Logging {
     def explain(repr: Repr): Backend[String] = ???
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
-      def toSegment: PathMetadata => PathSegment = {
-        case PathMetadata(path, PathMetadata.DataDir(_)) => DirName(path.path).left[FileName]
-        case PathMetadata(path, PathMetadata.DataOnly(_)) => FileName(path.path).right[DirName]
-        case PathMetadata(path, PathMetadata.PathOnly) => sys.error(s"found path $path")
-      }
-
-      def children(apiKey: APIKey): EitherT[Future, ResourceError, Set[PathSegment]] =
-        Precog.vfs.findDirectChildren(apiKey, dirToPath(dir)).map(_.map(toSegment))
-
       val segments: FileSystemErrT[Future, Set[PathSegment]] =
         for {
           key <- Precog.RootAPIKey.liftM[FileSystemErrT]
-          stuff <- children(key).leftMap(toFSError)
+          stuff <- children(dir).leftMap(toFSError)
         } yield stuff
 
       val futureToTask: FileSystemErrT[Future, ?] ~> FileSystemErrT[Task, ?] =
@@ -155,7 +157,16 @@ object Mimir extends BackendModule with Logging {
       result.apply(futureToTask.apply(segments))
     }
 
-    def fileExists(file: AFile): Configured[Boolean] = ???
+    def fileExists(file: AFile): Configured[Boolean] = {
+      val dir: ADir = pathy.Path.fileParent(file)
+
+      def res: Future[Boolean] = for {
+        key <- Precog.RootAPIKey
+        back <- children(dir).fold(_ => false, _.contains(pathy.Path.fileName(file).right))
+      } yield back
+
+      res.toTask.liftM[ConfiguredT]
+    }
   }
 
   object ReadFileModule extends ReadFileModule {
