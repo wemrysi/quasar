@@ -38,8 +38,6 @@ import scalaz.concurrent.Task
 trait BackendModule {
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
-  type ErrorMessages = NonEmptyList[String]
-
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
   type Configured[A]        = ConfiguredT[M, A]
   type BackendT[F[_], A]    = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
@@ -53,10 +51,14 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
+  implicit class LiftBackend[A](m: M[A]) {
+    val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
   final val definition: FileSystemDef[Task] =
     FileSystemDef fromPF {
       case (Type, uri) =>
-        parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
+        parseConfig(uri) flatMap { cfg =>
           compile(cfg) map {
             case (int, close) =>
               val runK = λ[Configured ~> M](_.run(cfg))
@@ -163,7 +165,7 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config]
+  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config]
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
 

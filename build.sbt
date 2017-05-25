@@ -114,8 +114,10 @@ lazy val assemblySettings = Seq(
     cp filter { af =>
       val file = af.data
 
-      (file.getName == "scala-library-" + scalaVersion.value + ".jar") &&
-        (file.getPath contains "org/scala-lang")
+      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.11\.\d+\.jar""")
+      val excludeByPath: Boolean = file.getPath.contains("org/scala-lang")
+
+      excludeByName && excludeByPath
     }
   }
 )
@@ -466,12 +468,16 @@ lazy val precog = project.setup
   .dependsOn(common % BothScopes)
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
   .dependsOn(precog % BothScopes, frontend)
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
@@ -484,6 +490,8 @@ lazy val mimir = project.setup.noArtifacts
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project.setup.noArtifacts
@@ -495,9 +503,13 @@ lazy val niflheim = project.setup.noArtifacts
       "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .settings(headerSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)

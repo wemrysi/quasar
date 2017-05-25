@@ -27,7 +27,7 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._
+import quasar.physical._, couchbase.Couchbase
 
 import scala.util.control.NonFatal
 
@@ -51,7 +51,7 @@ package object main {
 
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
-    couchbase.fs.definition[PhysFsEff],
+    Couchbase.definition translate injectFT[Task, PhysFsEff],
     marklogic.fs.definition(
       readChunkSize  = 10000L,
       writeChunkSize =  1000L
