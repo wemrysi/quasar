@@ -126,7 +126,8 @@ object Dependencies {
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    "org.http4s"           %% "http4s-core" % http4sVersion
+    "org.http4s"           %% "http4s-core" % http4sVersion,
+    "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,

@@ -53,7 +53,7 @@ final class Marklogic(val config: (Positive, Positive)) extends BackendModule {
 
   type Config = Unit
 
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] = ???
+  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] = ???
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = ???
 
