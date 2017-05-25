@@ -76,8 +76,8 @@ object Mimir extends BackendModule {
 
   type Config = Unit
 
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config] =
-    ().point[EitherT[Task, ErrorMessages, ?]]
+  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] =
+    ().point[FileSystemDef.DefErrT[Task, ?]]
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
     ((reflNT[Task], ().point[Task])).point[FileSystemDef.DefErrT[Task, ?]]
