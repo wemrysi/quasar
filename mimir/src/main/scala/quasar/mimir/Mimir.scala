@@ -46,6 +46,8 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
+import org.slf4s.Logging
+
 import pathy.Path._
 
 import delorean._
@@ -55,7 +57,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
 
-object Mimir extends BackendModule {
+object Mimir extends BackendModule with Logging {
 
   // optimistically equal to marklogic's
   type QS[T[_[_]]] =
@@ -176,16 +178,20 @@ object Mimir extends BackendModule {
 
     def open(file: AFile): Backend[WriteHandle] = {
       val run = Task suspend {
+        log.debug(s"open file $file")
+
         val id = cur.getAndIncrement()
         val handle = WriteHandle(file, id)
 
         for {
           queue <- Queue.bounded[Task, Vector[Data]](QueueLimit)
+          _ <- Task.delay(log.debug(s"got a queue $queue"))
 
           path = fileToPath(file)
           jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
 
           _ <- Precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+          _ <- Task.delay(log.debug(s"did some ingest"))
           _ <- Task.delay(map.put(handle, queue))
         } yield handle
       }
@@ -194,6 +200,8 @@ object Mimir extends BackendModule {
     }
 
     def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+      log.debug(s"write to $h and $chunk")
+
       if (chunk.isEmpty) {
         Vector.empty[FileSystemError].point[Configured]
       } else {
@@ -209,6 +217,9 @@ object Mimir extends BackendModule {
     def close(h: WriteHandle): Configured[Unit] = {
       val t = for {
         optQueue <- Task.delay(Option(map.get(h)))
+
+        _ <- Task.delay(log.debug(s"close $h"))
+
         _ <- optQueue.map(_.enqueue1(Vector.empty)).getOrElse(Task.now(()))
       } yield ()
 
