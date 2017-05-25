@@ -18,7 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef._
 import quasar._
-import quasar.blueeyes.json.JValue
+import quasar.blueeyes.json.{JNum, JValue}
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.matryoshka._
@@ -107,7 +107,26 @@ object Mimir extends BackendModule with Logging {
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
 
-    val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
+    lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
+      _.run.fold(
+        planQScriptCore,
+        _.run.fold(
+          _ => ???,   // ProjectBucket
+          _.run.fold(
+            _ => ???,   // ThetaJoin
+            _.run.fold(
+              planEquiJoin,
+              _.run.fold(
+                _ => ???,    // ShiftedRead[ADir]
+                _.run.fold(
+                  planShiftedRead,
+                  _.run.fold(
+                    _ => ???,   // Read[ADir]
+                    _.run.fold(
+                      _ => ???,   // Read[AFile]
+                      _ => ???))))))))    // DeadEnd
+
+    lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
       // EJson => Data => JValue => RValue => Table
       case MapFuncs.Constant(ejson) =>
         val data: Data = ejson.cata(Data.fromEJson)
@@ -117,20 +136,39 @@ object Mimir extends BackendModule with Logging {
       case _ => ???
     }
 
-    val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
+    lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) => f.cataM(interpretM(κ(src.point[Backend]), planMapFunc))
       case qscript.LeftShift(src, struct, id, repair) => ???
       case qscript.Reduce(src, bucket, reducers, repair) => ???
       case qscript.Sort(src, bucket, order) => ???
       case qscript.Filter(src, f) => ???
       case qscript.Union(src, lBranch, rBranch) => ???
-      case qscript.Subset(src, from, op, count) => ???
-      case qscript.Unreferenced() => ???
+      case qscript.Subset(src, from, op, count) =>
+        for {
+          fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
+          countRepr <- count.cataM(interpretM(κ(src.point[Backend]), planQST))
+          back <- {
+            def result = for {
+              vals <- countRepr.toJson
+              nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+              number = nums.head
+              back <- op match {
+                case Take => Future.successful(fromRepr.takeRange(0, number))
+                case Drop => Future.successful(fromRepr.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                case Sample => fromRepr.sample(number, List(Precog.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
+              }
+            } yield back
+
+            result.toTask.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+          }
+        } yield back
+
+      case qscript.Unreferenced() => Precog.Table.empty.point[Backend]
     }
 
-    val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
+    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
 
-    val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
+    lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
       case Const(ShiftedRead(path, status)) => {
         val pathStr: String = pathy.Path.posixCodec.printPath(path)
         val loaded: EitherT[Task, FileSystemError, Repr] =
