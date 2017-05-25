@@ -240,10 +240,33 @@ object Mimir extends BackendModule with Logging {
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
-    def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
-    def more(h: ResultHandle): Backend[Vector[Data]] = ???
-    def close(h: ResultHandle): Configured[Unit] = ???
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
+
+    private val map = new ConcurrentHashMap[ResultHandle, Vector[Data]]
+    private val cur = new AtomicLong(0L)
+
+    def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
+      val t = for {
+        results <- repr.toJson.toTask     // dear god delete me please!!! halp alissa halp
+        handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
+        _ <- Task.delay(map.put(handle, results.toVector.map(JValue.toData)))
+      } yield handle
+
+      t.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def more(h: ResultHandle): Backend[Vector[Data]] = {
+      val t = for {
+        back <- Task.delay(map.get(h))
+        _ <- Task.delay(map.put(h, Vector.empty))
+      } yield back
+
+      t.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def close(h: ResultHandle): Configured[Unit] =
+      (Task delay { map.remove(h); () }).liftM[ConfiguredT]
+
     def explain(repr: Repr): Backend[String] = ???
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
