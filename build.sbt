@@ -469,6 +469,7 @@ lazy val precog = project.setup
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
   .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
@@ -476,6 +477,7 @@ lazy val blueeyes = project.setup
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
   .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
@@ -486,6 +488,7 @@ lazy val mimir = project.setup.noArtifacts
       "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2"))
   .settings(headerSettings)
   .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project.setup.noArtifacts
@@ -498,10 +501,12 @@ lazy val niflheim = project.setup.noArtifacts
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
   .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .settings(headerSettings)
   .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
