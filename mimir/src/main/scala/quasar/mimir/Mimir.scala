@@ -190,8 +190,12 @@ object Mimir extends BackendModule with Logging {
           path = fileToPath(file)
           jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
 
-          _ <- Precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
-          _ <- Task.delay(log.debug(s"did some ingest"))
+          ingestion = Precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+
+          // run asynchronously forever
+          _ <- Task.delay(ingestion.unsafePerformAsync(_ => ()))
+          _ <- Task.delay(log.debug(s"started the ingest stuff"))
+
           _ <- Task.delay(map.put(handle, queue))
         } yield handle
       }
