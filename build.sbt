@@ -114,8 +114,10 @@ lazy val assemblySettings = Seq(
     cp filter { af =>
       val file = af.data
 
-      (file.getName == "scala-library-" + scalaVersion.value + ".jar") &&
-        (file.getPath contains "org/scala-lang")
+      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.11\.\d+\.jar""")
+      val excludeByPath: Boolean = file.getPath.contains("org/scala-lang")
+
+      excludeByName && excludeByPath
     }
   }
 )
@@ -167,10 +169,10 @@ lazy val root = project.in(file("."))
 //
       ejson, js,
 //       \  /
-        common,    // -------------------------------------------------------
+        common,    // <------------------------------------------------------
 //        |    \                                                             \
-    frontend, effect,                                                       precog,
-//   |    |   |                                                               |
+    effect, frontend,                                                       precog,
+//   |       |  |  \________________________________________________________  |
                                                                            blueeyes,
 //                                                                            |
                                                                            niflheim,
@@ -179,7 +181,7 @@ lazy val root = project.in(file("."))
 //   |   /  | | \ \______ __________________________________________________  |
 //   |  /   | |  \                                                          \ |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
-//      \ \ | / /
+//      \ \ | / /                                                           /
         interface,
 //        /   \
        repl,  web,
@@ -396,7 +398,8 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    skeleton)
+    skeleton,
+    mimir)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -465,20 +468,26 @@ lazy val precog = project.setup
   .dependsOn(common % BothScopes)
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
-  .dependsOn(precog % BothScopes)
+  .dependsOn(precog % BothScopes, frontend)
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup.noArtifacts
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs ("-Ypartial-unification")
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2"))
   .settings(headerSettings)
+  .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -488,14 +497,16 @@ lazy val niflheim = project.setup.noArtifacts
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
-      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .settings(headerSettings)
+  .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)

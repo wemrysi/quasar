@@ -144,7 +144,7 @@ object Dependencies {
   )
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.13",
-    "org.spire-math"       %% "spire"           % "0.13.0",
+    "org.typelevel"        %% "spire"           % spireVersion,
     "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",

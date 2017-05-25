@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, CookedBlockFormat, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 import quasar.precog.common.accounts.AccountFinder
-import quasar.precog.common.security.{APIKeyFinder, APIKeyManager, DirectAPIKeyFinder, InMemoryAPIKeyManager, PermissionsFinder}
+import quasar.precog.common.security.{APIKey, APIKeyFinder, APIKeyManager, DirectAPIKeyFinder, InMemoryAPIKeyManager, PermissionsFinder}
 import quasar.yggdrasil.table.{Slice, VFSColumnarTableModule}
 import quasar.yggdrasil.vfs.{ActorVFSModule, SecureVFSModule}
 
@@ -51,14 +51,17 @@ object Precog
     val dataDir: File = new File("/tmp")
   }
 
+  // for the time being, do everything with this key
+  def RootAPIKey: Future[APIKey] = emptyAPIKeyManager.rootAPIKey
+
   // Members declared in quasar.yggdrasil.vfs.ActorVFSModule
-  private val emptyAPIKeyManager: APIKeyManager[Future] =
+  private lazy val emptyAPIKeyManager: APIKeyManager[Future] =
     new InMemoryAPIKeyManager[Future](Clock.System)
 
   private val apiKeyFinder: APIKeyFinder[Future] =
     new DirectAPIKeyFinder[Future](emptyAPIKeyManager)
 
-  private val accountFinder: AccountFinder[Future] = AccountFinder.Empty[Future]
+  private val accountFinder: AccountFinder[Future] = AccountFinder.Singleton(RootAPIKey)
 
   def permissionsFinder: PermissionsFinder[Future] =
     new PermissionsFinder(apiKeyFinder, accountFinder, Instant.EPOCH)
@@ -66,12 +69,14 @@ object Precog
   private val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
-  private def chefs(system: ActorSystem): IndexedSeq[Routee] = (1 to Config.howManyChefsInTheKitchen).map { _ =>
-    ActorRefRoutee(system.actorOf(
-      Props(Chef(
-        VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-        VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))))
-  }
+  private val props: Props = Props(Chef(
+    VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
+    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))))
+
+  private def chefs(system: ActorSystem): IndexedSeq[Routee] =
+    (1 to Config.howManyChefsInTheKitchen).map { _ =>
+      ActorRefRoutee(system.actorOf(props))
+    }
 
   private val routerConfig: RouterConfig = new CustomRouterConfig {
     def createRouter(system: ActorSystem): Router =
@@ -79,7 +84,7 @@ object Precog
   }
 
   private val masterChef: ActorRef =
-    actorSystem.actorOf(Props[Chef].withRouter(routerConfig))
+    actorSystem.actorOf(props.withRouter(routerConfig))
 
   private val clock: Clock = Clock.System
 
@@ -90,7 +95,7 @@ object Precog
   implicit def M: Monad[Future] = futureInstance
 
   // Members declared in quasar.yggdrasil.TableModule
-  sealed trait TableCompanion extends VFSColumnarTableCompanion 
+  sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
   // Members declared in quasar.yggdrasil.table.VFSColumnarTableModule
