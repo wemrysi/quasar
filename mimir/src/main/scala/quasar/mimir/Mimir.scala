@@ -26,11 +26,12 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 
-import quasar.precog.common.Path
+import quasar.precog.common.{Path, RValue}
 import quasar.precog.common.security.APIKey
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.PathMetadata
@@ -44,6 +45,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import matryoshka._
 import matryoshka.implicits._
+import matryoshka.data._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -96,7 +99,35 @@ object Mimir extends BackendModule with Logging {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
-    val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = _ => ???
+// M = Backend
+// F[_] = MapFunc[T, ?]
+// B = Repr
+// A = SrcHole
+// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFunc[T, ?], ?], Repr]
+//def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
+// f.cataM(interpretM)
+
+    val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
+      // EJson => Data => JValue => RValue => Table
+      case MapFuncs.Constant(ejson) =>
+        val data: Data = ejson.cata(Data.fromEJson)
+        val jvalue: JValue = JValue.fromData(data)
+        val rvalue: RValue = RValue.fromJValue(jvalue)
+        Precog.Table.fromRValues(scala.Stream(rvalue)).point[Backend]
+      case _ => ???
+    }
+
+    val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
+      case qscript.Map(src, f) => f.cataM(interpretM(κ(src.point[Backend]), planMapFunc))
+      case qscript.LeftShift(src, struct, id, repair) => ???
+      case qscript.Reduce(src, bucket, reducers, repair) => ???
+      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Filter(src, f) => ???
+      case qscript.Union(src, lBranch, rBranch) => ???
+      case qscript.Subset(src, from, op, count) => ???
+      case qscript.Unreferenced() => ???
+    }
+
     val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
 
     val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
