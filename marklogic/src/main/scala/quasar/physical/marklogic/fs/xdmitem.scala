@@ -147,11 +147,9 @@ object xdmitem {
       } getOrElse d
 
     elem flatMap (e => OptionT(data.decodeXml[F]({
-      case n: Elem =>
-        embedOption[F, Data](xml.toEJsonData(n).map(singletonValue(_)), "")
-      case other =>
-        noReprError[F, Data](other.toString)
-    })(e)) getOrElseF embedOption[F, Data](xml.toEJsonData(e), ""))
+      case n: Elem => singletonValue(xml.toEJsonData(n)).point[F]
+      case other   => noReprError[F, Data](other.toString)
+    })(e)) getOrElse xml.toEJsonData(e))
   }
 
   private def embedOption[F[_]: MonadErrMsgs, A](oa: Option[A], message: String): F[A] =

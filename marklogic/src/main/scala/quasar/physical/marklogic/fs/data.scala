@@ -250,7 +250,7 @@ object data {
 
       case DataNode(DT.Object, children) =>
         elements(children).toList
-          .traverse(el => (toG(qualifiedName(el), "") |@| decodeXml0(el))((_, _)))
+          .traverse(el => (toG(encodedQualifiedName(el), "") |@| decodeXml0(el))((_, _)))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
@@ -375,4 +375,16 @@ object data {
 
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
+
+  private def encodedQualifiedName(elem: Elem): Option[String] = {
+    def labelKeyAttr(elem: Elem): Option[String] =
+      elem.attributes collectFirst {
+        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === "ejson:key-id" => label
+      }
+
+    (Option(elem.prefix), elem.label) match {
+      case (Some("ejson"), "key") => labelKeyAttr(elem)
+      case _ => qualifiedName(elem).some
+    }
+  }
 }

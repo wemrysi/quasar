@@ -62,16 +62,14 @@ package object xml {
     *   }
     * }
     */
-  def toData(elem: Elem, config: KeywordConfig): Option[Data] = {
+  def toData(elem: Elem, config: KeywordConfig): Data = {
     def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
       case Seq() =>
         m.cata(attrsAndText(_,  ""), _str(""))
       case LeafText(txt) =>
         m.cata(attrsAndText(_, txt), _str(txt))
       case xs =>
-        val childrenAndLabel = (elements(xs) map withQualifiedName).toList.unite
-        val childrenByName = childrenAndLabel.groupBy(_._2).mapValues(elems => elems.map(_._1))
-
+        val childrenByName = elements(xs) groupBy qualifiedName
         val childrenData = childrenByName.mapValues {
           case Seq(single) => impl(single.child, single.attributes.some)
           case xs          => Arr(xs.map(x => impl(x.child, x.attributes.some)).toList)
@@ -90,32 +88,18 @@ package object xml {
         config.attributesKeyName -> d,
         config.textKeyName       -> _str(txt))))
 
-    qualifiedName(elem).map { label: String =>
-      Obj(ListMap(label -> impl(elem.child, elem.attributes.some)))
-    }
+    Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
 
   /** Converts the given element to `Data` using EJson-compliant synthetic keys. */
-  def toEJsonData(elem: Elem): Option[Data] =
+  def toEJsonData(elem: Elem): Data =
     toData(elem, KeywordConfig.ejsonCompliant)
 
   def elements(nodes: Seq[Node]): Seq[Elem] =
     nodes.collect { case e: Elem => e }
 
-  def withQualifiedName(elem: Elem): Option[(Elem, String)] =
-   qualifiedName(elem) strengthL elem
-
-  def qualifiedName(elem: Elem): Option[String] = {
-    def labelKeyAttr(elem: Elem): Option[String] =
-      elem.attributes collectFirst {
-        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === "ejson:key-id" => label
-      }
-
-    (Option(elem.prefix), elem.label) match {
-      case (Some("ejson"), "key") => labelKeyAttr(elem)
-      case (_, _) => (Option(elem.prefix).fold("")(_ + ":") + elem.label).some
-    }
-  }
+  def qualifiedName(elem: Elem): String =
+    Option(elem.prefix).fold("")(_ + ":") + elem.label
 
   /** Extract the child sequence from a node. */
   object Children {
