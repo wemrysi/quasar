@@ -35,6 +35,7 @@ import quasar.precog.common.security.APIKey
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.bytecode.JType
 
 import fs2.{Handle, Pull, Stream}
 import fs2.async.mutable.Queue
@@ -59,18 +60,16 @@ import scala.util.Random
 
 object Mimir extends BackendModule with Logging {
 
-  // optimistically equal to marklogic's
+  // pessimisticaly equal to couchbase's
   type QS[T[_[_]]] =
     QScriptCore[T, ?] :\:
-    ThetaJoin[T, ?] :\:
-    Const[ShiftedRead[ADir], ?] :/:
-    Const[Read[AFile], ?]
+    EquiJoin[T, ?] :/:
+    Const[ShiftedRead[AFile], ?]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  // TODO
-  type Repr = Unit
+  type Repr = Precog.Table
   type M[A] = Task[A]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
@@ -95,7 +94,40 @@ object Mimir extends BackendModule with Logging {
   val Type = FileSystemType("mimir")
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): Backend[Repr] = ???
+      cp: T[QSM[T, ?]]): Backend[Repr] = {
+
+    val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = _ => ???
+    val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
+
+    val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
+      case Const(ShiftedRead(path, status)) => {
+        val pathStr: String = pathy.Path.posixCodec.printPath(path)
+        val loaded: EitherT[Task, FileSystemError, Repr] =
+          for {
+            apiKey <- Precog.RootAPIKey.toTask.liftM[EitherT[?[_], FileSystemError, ?]]
+            table <- Precog.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask).leftMap(toFSError)
+          } yield {
+            status match {
+              case IdOnly => table.transform(Precog.trans.constants.SourceKey.Single)
+              case IncludeId => table
+              case ExcludeId => table.transform(Precog.trans.constants.SourceValue.Single)
+            }
+          }
+
+        // TODO duplicated in listContents
+        val result: FileSystemErrT[Task, ?] ~> Backend =
+          Hoist[FileSystemErrT].hoist[Task, PhaseResultT[Configured, ?]](
+            liftMT[Configured, PhaseResultT] compose liftMT[Task, ConfiguredT])
+
+        result.apply(loaded)
+      }
+    }
+
+    def planQSM(in: QSM[T, Repr]): Backend[Repr] =
+      in.run.fold(planQScriptCore, _.run.fold(planEquiJoin, planShiftedRead))
+
+    cp.cataM(planQSM _)
+  }
 
   private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
     StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
