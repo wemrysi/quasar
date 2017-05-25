@@ -40,7 +40,8 @@ trait BackendModule {
 
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
   type Configured[A]        = ConfiguredT[M, A]
-  type Backend[A]           = FileSystemErrT[PhaseResultT[Configured, ?], A]
+  type BackendT[F[_], A]    = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
+  type Backend[A]           = BackendT[M, A]
 
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
   private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
