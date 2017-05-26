@@ -27,6 +27,10 @@ object namespaces {
   val ejsonArrayElt   = ejsonNs(NCName("array-element"))
   val ejsonType       = ejsonNs(NCName("type"))
 
+  // Related to encoding of non-QName elements
+  val ejsonEncodedName = NSPrefix(NCName("ejson"))(NCName("key"))
+  val ejsonEncodedAttr = "key-id"
+
   val filesystemNs    = Namespace(NSPrefix(NCName("filesystem")), NSUri("http://quasar-analytics.org/filesystem"))
   val filesystemError = filesystemNs(NCName("error"))
 

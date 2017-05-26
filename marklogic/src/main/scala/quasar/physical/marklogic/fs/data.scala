@@ -72,12 +72,8 @@ object data {
     def unwrappedKey(label: NCName): (QName, Option[Attribute]) =
       (QName.unprefixed(label), None)
 
-    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) = {
-      val name       = NSPrefix(NCName("ejson"))(NCName("key"))
-      val attrKeyId  = Attribute(ejsBinding.prefix, "key-id", unwrappedLabel, Null)
-
-      (name, attrKeyId.some)
-    }
+    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) =
+      (ejsonEncodedName, Attribute(ejsBinding.prefix, ejsonEncodedAttr, unwrappedLabel, Null).some)
 
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, tpe, TopScope, children)
@@ -199,8 +195,10 @@ object data {
 
     implicit val G: Applicative[G] = Applicative[F].compose[V]
 
-    def toG[A](oa: Option[A], message: String): G[A] =
-      oa.cata(a => a.point[G], Validation.failureNel[String, A](message).point[F])
+    def qname[A](e: Elem): G[String] =
+      encodedQualifiedName(e)
+        .toSuccessNel("Expected a ejson:key-id for an ejson:key element")
+        .point[F]
 
     def decodeXml0: Node => G[Data] = {
       case DataNode(DT.Array, children) =>
@@ -250,7 +248,7 @@ object data {
 
       case DataNode(DT.Object, children) =>
         elements(children).toList
-          .traverse(el => (toG(encodedQualifiedName(el), "") |@| decodeXml0(el))((_, _)))
+          .traverse(el => (qname(el) |@| decodeXml0(el))((_, _)))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
