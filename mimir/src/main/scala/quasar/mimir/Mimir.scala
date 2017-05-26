@@ -112,9 +112,14 @@ object Mimir extends BackendModule with Logging {
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
 
   private def toSegment: PathMetadata => PathSegment = {
-    case PathMetadata(path, PathMetadata.DataDir(_)) => DirName(path.path).left[FileName]
-    case PathMetadata(path, PathMetadata.DataOnly(_)) => FileName(path.path).right[DirName]
-    case PathMetadata(path, PathMetadata.PathOnly) => sys.error(s"found path $path")
+    case PathMetadata(path, PathMetadata.DataDir(_)) =>
+      DirName(path.components.mkString("/")).left[FileName]
+
+    case PathMetadata(path, PathMetadata.DataOnly(_)) =>
+      FileName(path.components.mkString("/")).right[DirName]
+
+    case PathMetadata(path, PathMetadata.PathOnly) =>
+      sys.error(s"found path $path")
   }
 
   private def children(dir: ADir): EitherT[Future, ResourceError, Set[PathSegment]] = {
