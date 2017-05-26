@@ -18,7 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef._
 import quasar._
-import quasar.blueeyes.json.JValue
+import quasar.blueeyes.json.{JNum, JValue}
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.matryoshka._
@@ -26,15 +26,17 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 
-import quasar.precog.common.Path
+import quasar.precog.common.{Path, RValue}
 import quasar.precog.common.security.APIKey
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.bytecode.JType
 
 import fs2.{Handle, Pull, Stream}
 import fs2.async.mutable.Queue
@@ -43,6 +45,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import matryoshka._
 import matryoshka.implicits._
+import matryoshka.data._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -59,18 +63,16 @@ import scala.util.Random
 
 object Mimir extends BackendModule with Logging {
 
-  // optimistically equal to marklogic's
+  // pessimisticaly equal to couchbase's
   type QS[T[_[_]]] =
     QScriptCore[T, ?] :\:
-    ThetaJoin[T, ?] :\:
-    Const[ShiftedRead[ADir], ?] :/:
-    Const[Read[AFile], ?]
+    EquiJoin[T, ?] :/:
+    Const[ShiftedRead[AFile], ?]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  // TODO
-  type Repr = Unit
+  type Repr = Precog.Table
   type M[A] = Task[A]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
@@ -95,7 +97,106 @@ object Mimir extends BackendModule with Logging {
   val Type = FileSystemType("mimir")
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): Backend[Repr] = ???
+      cp: T[QSM[T, ?]]): Backend[Repr] = {
+
+// M = Backend
+// F[_] = MapFunc[T, ?]
+// B = Repr
+// A = SrcHole
+// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFunc[T, ?], ?], Repr]
+//def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
+// f.cataM(interpretM)
+
+    lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
+      _.run.fold(
+        planQScriptCore,
+        _.run.fold(
+          _ => ???,   // ProjectBucket
+          _.run.fold(
+            _ => ???,   // ThetaJoin
+            _.run.fold(
+              planEquiJoin,
+              _.run.fold(
+                _ => ???,    // ShiftedRead[ADir]
+                _.run.fold(
+                  planShiftedRead,
+                  _.run.fold(
+                    _ => ???,   // Read[ADir]
+                    _.run.fold(
+                      _ => ???,   // Read[AFile]
+                      _ => ???))))))))    // DeadEnd
+
+    lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
+      // EJson => Data => JValue => RValue => Table
+      case MapFuncs.Constant(ejson) =>
+        val data: Data = ejson.cata(Data.fromEJson)
+        val jvalue: JValue = JValue.fromData(data)
+        val rvalue: RValue = RValue.fromJValue(jvalue)
+        Precog.Table.fromRValues(scala.Stream(rvalue)).point[Backend]
+      case _ => ???
+    }
+
+    lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
+      case qscript.Map(src, f) => f.cataM(interpretM(κ(src.point[Backend]), planMapFunc))
+      case qscript.LeftShift(src, struct, id, repair) => ???
+      case qscript.Reduce(src, bucket, reducers, repair) => ???
+      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Filter(src, f) => ???
+      case qscript.Union(src, lBranch, rBranch) => ???
+      case qscript.Subset(src, from, op, count) =>
+        for {
+          fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
+          countRepr <- count.cataM(interpretM(κ(src.point[Backend]), planQST))
+          back <- {
+            def result = for {
+              vals <- countRepr.toJson
+              nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+              number = nums.head
+              back <- op match {
+                case Take => Future.successful(fromRepr.takeRange(0, number))
+                case Drop => Future.successful(fromRepr.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                case Sample => fromRepr.sample(number, List(Precog.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
+              }
+            } yield back
+
+            result.toTask.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+          }
+        } yield back
+
+      case qscript.Unreferenced() => Precog.Table.empty.point[Backend]
+    }
+
+    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
+
+    lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
+      case Const(ShiftedRead(path, status)) => {
+        val pathStr: String = pathy.Path.posixCodec.printPath(path)
+        val loaded: EitherT[Task, FileSystemError, Repr] =
+          for {
+            apiKey <- Precog.RootAPIKey.toTask.liftM[EitherT[?[_], FileSystemError, ?]]
+            table <- Precog.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask).leftMap(toFSError)
+          } yield {
+            status match {
+              case IdOnly => table.transform(Precog.trans.constants.SourceKey.Single)
+              case IncludeId => table
+              case ExcludeId => table.transform(Precog.trans.constants.SourceValue.Single)
+            }
+          }
+
+        // TODO duplicated in listContents
+        val result: FileSystemErrT[Task, ?] ~> Backend =
+          Hoist[FileSystemErrT].hoist[Task, PhaseResultT[Configured, ?]](
+            liftMT[Configured, PhaseResultT] compose liftMT[Task, ConfiguredT])
+
+        result.apply(loaded)
+      }
+    }
+
+    def planQSM(in: QSM[T, Repr]): Backend[Repr] =
+      in.run.fold(planQScriptCore, _.run.fold(planEquiJoin, planShiftedRead))
+
+    cp.cataM(planQSM _)
+  }
 
   private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
     StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
@@ -139,10 +240,33 @@ object Mimir extends BackendModule with Logging {
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
-    def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
-    def more(h: ResultHandle): Backend[Vector[Data]] = ???
-    def close(h: ResultHandle): Configured[Unit] = ???
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
+
+    private val map = new ConcurrentHashMap[ResultHandle, Vector[Data]]
+    private val cur = new AtomicLong(0L)
+
+    def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
+      val t = for {
+        results <- repr.toJson.toTask     // dear god delete me please!!! halp alissa halp
+        handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
+        _ <- Task.delay(map.put(handle, results.toVector.map(JValue.toData)))
+      } yield handle
+
+      t.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def more(h: ResultHandle): Backend[Vector[Data]] = {
+      val t = for {
+        back <- Task.delay(map.get(h))
+        _ <- Task.delay(map.put(h, Vector.empty))
+      } yield back
+
+      t.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    }
+
+    def close(h: ResultHandle): Configured[Unit] =
+      (Task delay { map.remove(h); () }).liftM[ConfiguredT]
+
     def explain(repr: Repr): Backend[String] = ???
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
