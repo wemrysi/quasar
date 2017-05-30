@@ -1,0 +1,15 @@
+{
+    "name": "select invalid numbers",
+    "backends": {},
+    "description": "select of NaN and infinite should be treated as null",
+    "data": "NaNs.data",
+    "query": "select * from NaNs",
+    "predicate": "containsExactly",
+    "expected": [
+      { "name": "NaN",   "val": null  },
+      { "name": "inf",   "val": null  },
+      { "name": "-inf",  "val": null  },
+      { "name": "valid", "val": 42.42 },
+      { "name": "null",  "val": null  }
+    ]
+}

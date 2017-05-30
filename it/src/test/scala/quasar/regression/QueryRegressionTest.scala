@@ -19,7 +19,7 @@ package quasar.regression
 import slamdata.Predef._
 import quasar._
 import quasar.build.BuildInfo
-import quasar.common._
+import quasar.common.{Map => _, _}
 import quasar.contrib.argonaut._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
@@ -30,7 +30,7 @@ import quasar.fp._, free._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.FilesystemQueries
-import quasar.fs.mount.{Mounts, hierarchical}
+import quasar.fs.mount._
 import quasar.sql, sql.{Blob, Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
@@ -109,7 +109,7 @@ abstract class QueryRegressionTest[S[_]](
 
       tests.toList foreach { case (f, t) =>
         val fsʹ = t.data.nonEmpty.fold(fs, fsNonChrooted)
-        regressionExample(f, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
+        regressionExample(fs.ref, f, fs.testDir, t, fsʹ.ref.name, fsʹ.setupInterpM, fsʹ.testInterpM)
         step(print("."))
       }
 
@@ -121,8 +121,10 @@ abstract class QueryRegressionTest[S[_]](
   ////
 
   /** Returns an `Example` verifying the given `RegressionTest`. */
-  def regressionExample(
+  def regressionExample[S[_]](
+    ref: BackendRef,
     loc: RFile,
+    testDir: ADir,
     test: RegressionTest,
     backendName: BackendName,
     setup: Run,
@@ -134,7 +136,7 @@ abstract class QueryRegressionTest[S[_]](
         test.query,
         test.variables)
 
-      (test.data.nonEmpty.whenM(ensureTestData(loc, test, setup)) *>
+      (test.data.nonEmpty.whenM(ensureTestData(ref, loc, testDir, test, setup)) *>
        verifyResults(test.expected, data, run, backendName))
         .timed(5.minutes)
         .unsafePerformSync
@@ -160,11 +162,11 @@ abstract class QueryRegressionTest[S[_]](
   /** Ensures the data for the given test exists in the Quasar filesystem, inserting
     * it if not. Returns whether any data was inserted.
     */
-  def ensureTestData(testLoc: RFile, test: RegressionTest, run: Run): Task[Boolean] = {
+  def ensureTestData[S[_]](ref: BackendRef, testLoc: RFile, testDir: ADir, test: RegressionTest, run: Run): Task[Boolean] = {
     def ensureTestFile(loc: RFile): Task[Boolean] =
       run(query.fileExists(dataFile(loc))).ifM(
         false.point[Task],
-        loadTestData(loc, run).as(true))
+        loadData(ref, loc, testDir, run).as(true))
 
     val locs: Set[RFile] = test.data.flatMap(resolveData(testLoc, _).toOption).toSet
 
@@ -245,6 +247,9 @@ abstract class QueryRegressionTest[S[_]](
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars), loc))
   }
+
+  def loadData[S[_]](ref: BackendRef, dataLoc: RFile, testDir: ADir, run: Run): Task[Unit] =
+    loadTestData(dataLoc, run)
 
   /** Load the contents of the test data file into the filesytem under test at
     * the same path, relative to the test `DataDir`.
