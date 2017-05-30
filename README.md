@@ -15,7 +15,7 @@ Quasar is an open source NoSQL analytics engine that can be used as a library or
 
 SQL² is the dialect of SQL that Quasar understands.
 
-SQL² is a superset of standard SQL. Therefore, in the following documentation SQL² will be used interchangeably with SQL.
+In the following documentation SQL² will be used interchangeably with SQL.
 
 See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
@@ -298,15 +298,17 @@ A view can be mounted at any file path. If a view's path is nested inside the pa
 
 If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.
 
-A module function can be thought of a parameterized view, i.e. a view with "holes" that can be filled dynamically.
+A module function can be thought of as a parameterized view, i.e. a view with "holes" that can be filled dynamically.
 
-The value of a module mount is simply the SQL string which will be parsed into a collection of SQL Statements.
+The value of a module mount is simply the SQL string which will be parsed into a list of SQL Statements.
 
 To create a new module one would send a json blob similar to this one to the mount endpoint:
 
 ```json
 { "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
 ```
+
+See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
 
 Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
 
