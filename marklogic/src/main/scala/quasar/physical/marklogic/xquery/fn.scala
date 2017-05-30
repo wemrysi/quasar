@@ -17,11 +17,11 @@
 package quasar.physical.marklogic.xquery
 
 import slamdata.Predef._
-import quasar.physical.marklogic.xml._
 
 import java.lang.SuppressWarnings
 
 import eu.timepit.refined.auto._
+import xml.name._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
@@ -90,6 +90,9 @@ object fn {
 
   def floor(n: XQuery): XQuery =
     XQuery(s"fn:floor($n)")
+
+  def formatDate(value: XQuery, picture: XQuery): XQuery =
+    XQuery(s"fn:format-date($value, $picture)")
 
   def formatDateTime(value: XQuery, picture: XQuery): XQuery =
     XQuery(s"fn:format-dateTime($value, $picture)")

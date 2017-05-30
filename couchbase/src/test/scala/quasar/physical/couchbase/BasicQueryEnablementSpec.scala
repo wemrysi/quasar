@@ -19,20 +19,20 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Planner => _, _}
 import quasar.common.PhaseResultT
-import quasar.contrib.pathy.{ADir, PathSegment}
+import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
-import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.physical.couchbase.fs.queryfile._
-import quasar.physical.couchbase.planner._, Planner._
 import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
 import quasar.sql.CompilerHelpers
 
+import scala.collection.JavaConverters._
+
+import com.couchbase.client._, core._, java._, java.env._
 import eu.timepit.refined.auto._
-import matryoshka._
+import matryoshka._, data._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute.Pending
@@ -50,30 +50,47 @@ class BasicQueryEnablementSpec
   extends Qspec
   with QScriptHelpers
   with CompilerHelpers {
+  import common._, planner._
 
   sequential
+
+  object CB extends Couchbase {
+    override val QueryFileModule = new fs.queryfile with QueryFileModule {
+      override def listContents(dir: ADir): Backend[Set[PathSegment]] =
+        Set[PathSegment](FileName("beer").right, FileName("brewery")).η[Backend]
+    }
+  }
+
+  val cbEnv = DefaultCouchbaseEnvironment.builder.build
+
+  val cfg =
+    Config(
+      ClientContext(
+        new CouchbaseBucket(
+          cbEnv,
+          new CouchbaseCore(cbEnv),
+          "beer-sample",
+          "",
+          List[transcoder.Transcoder[_, _]]().asJava),
+        DocTypeKey("type")),
+      CouchbaseCluster.create(cbEnv))
 
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =
     compile(query).map(optimizer.optimize).fold(e => scala.sys.error(e.shows), ι)
 
-  def listc[S[_]]: DiscoverPath.ListContents[Plan[S, ?]] =
-    Kleisli[Id, ADir, Set[PathSegment]](listContents >>> (_ + FileName("beer-sample").right))
-      .transform(λ[Id ~> Plan[S, ?]](_.η[Plan[S, ?]]))
-      .run
-
-  type Eff[A] = (MonotonicSeq :/: Task)#M[A]
+  def interp: CB.Eff ~> Task = fs.interp.unsafePerformSync
 
   def n1qlFromSql2(sql2: String): String =
-    (lpLcToN1ql[Fix, Eff](compileLogicalPlan(sql2), listc) >>= (r => RenderQuery.compact(r._1).liftPE))
-      .run.run.map(_._2)
-      .foldMap(MonotonicSeq.fromZero.unsafePerformSync :+: reflNT[Task])
+    (CB.lpToRepr(compileLogicalPlan(sql2)) ∘ (_.repr) >>= (CB.QueryFileModule.explain))
+      .run.value.run(cfg)
+      .foldMap(interp)
+      .flatMap(_.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now))
       .unsafePerformSync
-      .fold(e => scala.sys.error(e.shows), ι)
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Fix, Free[MonotonicSeq, ?], QST].plan) >>= (n1ql =>
-      EitherT(RenderQuery.compact(n1ql).η[Free[MonotonicSeq, ?]].liftM[PhaseResultT])
-    )).run.run.map(_._2)
+    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], Context, ?], QST].plan) >>= (n1ql =>
+      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]].liftM[PhaseResultT])
+    )).run.run.run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey)).map(_._2)
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)
@@ -86,32 +103,32 @@ class BasicQueryEnablementSpec
 
   "SQL² to N1QL" should {
     testSql2ToN1ql(
-      "select * from `beer-sample`",
-      """select value v from (select value `_1` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      "select * from `beer`",
+      """select v from (select value `_1` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name from `beer-sample`",
-      """select value v from (select value `_1`.['name'] from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      "select name from `beer`",
+      """select v from (select value `_1`.['name'] from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name, type from `beer-sample`",
-      """select value v from (select value {'name': `_1`.['name'], 'type': `_1`.['type']} from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      "select name, type from `beer`",
+      """select v from (select value {'name': `_1`.['name'], 'type': `_1`.['type']} from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1`) v""")
 
     testSql2ToN1ql(
-      "select name from `beer-sample` offset 1",
-      """select value v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5`) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
+      "select name from `beer` offset 1",
+      """select v from (select value `_7`.['name'] from (select value `_4` from (select (select value ifmissing(`_5`.['value'], `_5`) from `beer-sample` as `_5` where (`type` = 'beer')) as `_1`, (select value 1 from (select value (select value [])) as `_6`) as `_2` from (select value []) as `_0`) as `_3` unnest `_1`[`_2`[0]:] as `_4`) as `_7`) v""")
 
     testSql2ToN1ql(
-      "select count(*) from `beer-sample`",
-      """select value v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
+      "select count(*) from `beer`",
+      """select v from (select value `_2` from (select count(`_1`) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
-      "select count(name) from `beer-sample`",
-      """select value v from (select value `_2` from (select count(`_1`.['name']) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
+      "select count(name) from `beer`",
+      """select v from (select value `_2` from (select count(`_1`.['name']) as `_2` from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'beer')) as `_1` group by null) as `_3` where (`_2` is not null)) v""")
 
     testSql2ToN1ql(
-      "select geo.lat + geo.lon from `beer-sample`",
-      """select value v from (select value (`_1`.['geo'].['lat'] + `_1`.['geo'].['lon']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0`) as `_1`) v""")
+      "select geo.lat + geo.lon from `brewery`",
+      """select v from (select value (`_1`.['geo'].['lat'] + `_1`.['geo'].['lon']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'brewery')) as `_1`) v""")
   }
 
   "QScript to N1QL" should {
@@ -128,7 +145,7 @@ class BasicQueryEnablementSpec
 
       val n1ql = n1qlFromQS(qs)
 
-      n1ql must_= """select value v from (select value (`_1`.['a'] + `_1`.['b']) from (select value ifmissing(`_0`.['value'], `_0`) from `foo` as `_0`) as `_1`) v"""
+      n1ql must_= """select v from (select value (`_1`.['a'] + `_1`.['b']) from (select value ifmissing(`_0`.['value'], `_0`) from `beer-sample` as `_0` where (`type` = 'foo')) as `_1`) v"""
     }
   }
 

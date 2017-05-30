@@ -23,6 +23,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{toMonadError_Ops => _, _}
 import quasar.effect.{Kvs, MonoSeq}
+import quasar.ejson.implicits._
 import quasar.fp._, eitherT._
 import quasar.fp.numeric.Positive
 import quasar.fs._
@@ -118,35 +119,48 @@ object queryfile {
     queryFileFromProcess[F, G](fToG, exec, eval, explain, listContents, ops.pathHavingFormatExists[G, FMT])
   }
 
-  def lpToXQuery[
-    F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
-    T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT: RenderTreeT,
+  private def logPhase[F[_]](pr: PhaseResult)(implicit
+    PRT: PhaseResultTell[F]
+  ): F[Unit] = PRT.tell(Vector(pr))
+
+  def lpToQScript[
+    F[_]   : Monad: MonadFsErr: PhaseResultTell: Xcc,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     FMT: SearchOptions
-  ](
-    lp: T[LogicalPlan]
-  )(implicit
-    planner: Planner[F, FMT, MLQScript[T, ?]]
-  ): F[(MainModule, ISet[APath])] = {
+  ](lp: T[LogicalPlan]): F[T[MLQScript[T, ?]]] = {
     type MLQ[A]  = MLQScript[T, A]
     type QSR[A]  = QScriptRead[T, A]
-
-    val R = new Rewrite[T]
     val O = new Optimize[T]
-
-    def logPhase(pr: PhaseResult): F[Unit] =
-      MonadTell_[F, PhaseResults].tell(Vector(pr))
-
-    def plan(qs: T[MLQ]): F[MainModule] =
-      MainModule.fromWritten(qs.cataM(planner.plan) strengthL Version.`1.0-ml`)
+    val R = new Rewrite[T]
 
     for {
       qs        <- convertToQScriptRead[T, F, QSR](ops.directoryContents[F, FMT])(lp)
       shifted   <- Unirewrite[T, MLQScriptCP[T], F](R, ops.directoryContents[F, FMT]).apply(qs)
       _         <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
       optimized =  shifted.transHylo(
-                     O.optimize(reflNT[MLQ]),
-                     Unicoalesce[T, MLQScriptCP[T]])
+        O.optimize(reflNT[MLQ]),
+        Unicoalesce[T, MLQScriptCP[T]])
       _         <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
+    } yield optimized
+  }
+
+  def lpToXQuery[
+    F[_]   : Monad: MonadFsErr: PhaseResultTell: PrologL: Xcc,
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    FMT: SearchOptions
+  ](
+    lp: T[LogicalPlan]
+  )(implicit
+    planner: Planner[F, FMT, MLQScript[T, ?]]
+  ): F[(MainModule, ISet[APath])] = {
+
+    type MLQ[A]  = MLQScript[T, A]
+
+    def plan(qs: T[MLQ]): F[MainModule] =
+      MainModule.fromWritten(qs.cataM(planner.plan) strengthL Version.`1.0-ml`)
+
+    for {
+      optimized <- lpToQScript[F, T, FMT](lp)
       main      <- plan(optimized)
       inputs    =  optimized.cata(ExtractPath[MLQ, APath].extractPath[DList])
       pp        <- prettyPrint[F](main.queryBody)

@@ -17,7 +17,7 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.config, config.MetaStoreConfig
+import quasar.config.MetaStoreConfig
 import quasar.console.stdout
 import quasar.contrib.scalaz.catchable._
 import quasar.db, db.{DbConnectionConfig, StatefulTransactor}
@@ -34,7 +34,6 @@ import doobie.syntax.connectionio._
 import eu.timepit.refined.auto._
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
-
 
 object metastore {
   type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
@@ -54,6 +53,9 @@ object metastore {
 
   type QErrsCnxIOM[A]  = Free[QErrsCnxIO, A]
   type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
+
+  private val metastorePrompt: String =
+    "Is the metastore database running?"
 
   object QErrsTCnxIO {
     def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
@@ -90,7 +92,7 @@ object metastore {
   }
 
   def jdbcMounter[S[_]](
-    hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+    hfsRef: TaskRef[AnalyticalFileSystem~> HierarchicalFsEffM],
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,
@@ -128,42 +130,45 @@ object metastore {
     val verifyMS = Hoist[MainErrT].hoist(transactor.trans)
       .apply(verifyMetaStoreSchema(schema))
     EitherT(verifyMS.run.attempt.map(_.valueOr(t =>
-      s"While verifying MetaStore schema: ${t.getMessage}".left)))
+      s"While verifying MetaStore schema: ${t.getMessage}. $metastorePrompt".left)))
   }
 
   def initUpdateMetaStore[A](
-    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Json
-  ): MainTask[Json] = {
+    schema: db.Schema[A], transactor: Transactor[Task], jCfg: Option[Json]
+  ): MainTask[Option[Json]] = {
     val mntsFieldName = "mountings"
 
     val mountingsConfigDecodeJson: DecodeJson[Option[MountingsConfig]] =
       DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
 
-    val migrateMounts: ConnectionIO[Unit] =
-      mountingsConfigDecodeJson.decodeJson(jCfg).fold(
-        { case (e, _) => taskToConnectionIO(Task.fail(new RuntimeException(e.shows))) },
-        _.cata(
-          m => m.toMap.toList.traverse {
-            case (p, m) => MetaStoreAccess.insertMount(p, m)
-          }.void,
-          ().η[ConnectionIO]))
+    val mountingsConfig: ConnectionIO[Option[MountingsConfig]] =
+      taskToConnectionIO(jCfg.traverse(
+        mountingsConfigDecodeJson.decodeJson(_).fold({
+          case (e, _) => Task.fail(new RuntimeException(
+            s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))},
+          Task.now)
+        ) ∘ (_.unite))
 
-    val op: ConnectionIO[Json] =
+    def migrateMounts(cfg: Option[MountingsConfig]): ConnectionIO[Unit] =
+      cfg.traverse_(_.toMap.toList.traverse_((MetaStoreAccess.insertMount _).tupled))
+
+    val op: ConnectionIO[Option[Json]] =
       for {
+        cfg <- mountingsConfig
         ver <- schema.readVersion
         _   <- schema.updateToLatest
-        r   <- ver.isEmpty.whenM(migrateMounts)
+        _   <- ver.isEmpty.whenM(migrateMounts(cfg))
       } yield ver.isEmpty.fold(
-        jCfg.obj.cata(o => jObject(o - mntsFieldName), jCfg),
+        jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
 
     EitherT(transactor.trans(op).attempt ∘ (
-      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}")))
+      _.leftMap(t => s"While initializing and updating MetaStore: ${t.getMessage}. $metastorePrompt")))
   }
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {
-      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephmralMnt   =  KvsMounter.interpreter[Task, QErrsTCnxIO](

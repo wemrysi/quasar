@@ -8,6 +8,7 @@ import sbt._, Keys._
 import slamdata.CommonDependencies
 
 object Dependencies {
+  private val algebraVersion           = "0.7.0"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.10.4"
   private val jacksonVersion           = "2.4.4"
@@ -19,12 +20,15 @@ object Dependencies {
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
+  private val spireVersion             = "0.14.1"
 
   def foundation = Seq(
     CommonDependencies.scalaz.core,
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
+    "org.typelevel" %% "algebra"     % algebraVersion,
+    "org.typelevel" %% "spire"       % spireVersion,
     CommonDependencies.argonaut.argonaut,
     CommonDependencies.argonaut.scalaz,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
@@ -34,7 +38,9 @@ object Dependencies {
     CommonDependencies.shapeless.shapeless,
     CommonDependencies.scalacheck.scalacheck                  % Test,
     CommonDependencies.simulacrum.simulacrum                  % Test,
+    "org.typelevel" %% "algebra-laws"    % algebraVersion     % Test,
     "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
+    "org.typelevel" %% "spire-laws"      % spireVersion       % Test,
     "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
     CommonDependencies.scalaz.scalacheckBinding               % Test,
     CommonDependencies.typelevel.shapelessScalacheck          % Test,
@@ -43,7 +49,8 @@ object Dependencies {
 
   def frontend = Seq(
     CommonDependencies.monocle.`macro`,
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
+    "org.typelevel"          %% "algebra-laws"             % algebraVersion  % Test
   )
 
   def ejson = Seq(
@@ -107,21 +114,20 @@ object Dependencies {
     "org.http4s"         %% "http4s-core" % http4sVersion
   )
 
-  def marklogicValidation = Seq(
-    CommonDependencies.refined.refined,
-    CommonDependencies.scalaz.core
-  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
+    "com.slamdata"               %% "xml-names-core"      % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
     CommonDependencies.refined.scalacheck                                   % Test,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+    "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    "org.http4s"           %% "http4s-core" % http4sVersion
+    "org.http4s"           %% "http4s-core" % http4sVersion,
+    "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
@@ -135,6 +141,16 @@ object Dependencies {
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
     CommonDependencies.refined.scalacheck                          % Test
+  )
+  def precog = Seq(
+    "org.slf4s"            %% "slf4s-api"       % "1.7.13",
+    "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
+    "org.typelevel"        %% "spire"           % spireVersion,
+    "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
+    "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
+    "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
+    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,

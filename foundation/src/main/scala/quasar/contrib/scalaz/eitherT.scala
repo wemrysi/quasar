@@ -35,6 +35,14 @@ trait EitherTInstances extends EitherTInstances0 {
         EitherT[F, E, A](Catchable[F].fail(t))
     }
 
+  implicit def eitherTThrowableCatchable[M[_]: Monad]: Catchable[EitherT[M, Throwable, ?]] =
+    new Catchable[EitherT[M, Throwable, ?]] {
+      def attempt[A](f: EitherT[M, Throwable, A]): EitherT[M, Throwable, Throwable \/ A] =
+        EitherT.right(f.run)
+      def fail[A](err: Throwable): EitherT[M, Throwable, A] =
+        EitherT.left(err.point[M])
+    }
+
   implicit def eitherTMonadState[F[_], S, E](implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
     new MonadState[EitherT[F, E, ?], S] {
       def init = F.init.liftM[EitherT[?[_], E, ?]]
