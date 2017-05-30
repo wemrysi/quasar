@@ -25,7 +25,9 @@ import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
-import quasar.physical._, couchbase.Couchbase
+import quasar.physical._
+import quasar.physical.couchbase.Couchbase
+import quasar.physical.marklogic.MarkLogic
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
@@ -142,7 +144,7 @@ object FileSystemTest {
 
   def externalFsUT = {
     val marklogicDef =
-      marklogic.fs.definition(10000L, 10000L) translate injectFT[Task, filesystems.Eff]
+      MarkLogic(10000L, 10000L).definition translate injectFT[Task, filesystems.Eff]
 
     TestConfig.externalFileSystems {
       fsTestConfig(couchbase.fs.FsType,       Couchbase.definition translate injectFT[Task, filesystems.Eff]) orElse
