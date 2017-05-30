@@ -52,8 +52,9 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
   class SecureVFS(
       vfs: VFS,
       permissionsFinder: PermissionsFinder[M],
-      jobManager: JobManager[M],
+      // jobManager: JobManager[M],
       clock: Clock)(implicit M: Monad[M]) extends VFSMetadata[M] {
+
     final val unsecured = vfs
 
     private def verifyResourceAccess(apiKey: APIKey, path: Path, readMode: ReadMode): Resource => EitherT[M, ResourceError, Resource] = { resource =>
@@ -109,17 +110,21 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
         log.debug("Defaulting on root-level child browse to account path")
         for {
           children <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
+          _ = log.debug(s"Browsable children are $children")
           nonRoot = children.filterNot(_ == Path.Root)
           childMetadata <- nonRoot.toList.traverseU(vfs.findPathMetadata)
         } yield {
+          log.debug(s"Found root-level children $childMetadata.")
           childMetadata.toSet
         }
 
       case other =>
+        log.debug("Using non-root-level child browse.")
         for {
           children  <- vfs.findDirectChildren(path)
           permitted <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
         } yield {
+          log.debug(s"Found non-root-level children $children.")
           children filter { case PathMetadata(child, _) => permitted.exists(_.isEqualOrParentOf(path / child)) }
         }
     }
@@ -196,19 +201,20 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
                   )
                 }
               }
-              job <- EitherT.right(
+              /*job <- EitherT.right(
                 jobManager.createJob(ctx.apiKey, jobName getOrElse "Cache run for path %s".format(path.path), "Cached query run.", None, Some(clock.now()))
-              )
+              )*/
+              jobId = "fubarbaz"      // TODO reenable job management
             } yield {
               log.debug("Building caching stream for path %s writing to %s".format(path.path, cachePath.path))
               // FIXME: determination of authorities with which to write the cached data needs to be implemented;
               // for right now, simply using the authorities with which the query itself was written is probably
               // best.
-              val stream = persistingStream(ctx.apiKey, cachePath, queryRes.authorities, Some(job.id), raw, clock) {
+              val stream = persistingStream(ctx.apiKey, cachePath, queryRes.authorities, Some(jobId), raw, clock) {
                 VFS.derefValue
               }
 
-              StoredQueryResult(stream, None, Some(job.id))
+              StoredQueryResult(stream, None, Some(jobId))
             }
 
           case None =>

@@ -126,7 +126,8 @@ object Dependencies {
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    "org.http4s"           %% "http4s-core" % http4sVersion
+    "org.http4s"           %% "http4s-core" % http4sVersion,
+    "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
@@ -143,11 +144,13 @@ object Dependencies {
   )
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.13",
-    "org.spire-math"       %% "spire"           % "0.13.0",
+    "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
+    "org.typelevel"        %% "spire"           % spireVersion,
     "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
-    "org.quartz-scheduler" %  "quartz"          % "2.3.0"
+    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
     CommonDependencies.argonaut.monocle                         % Test,

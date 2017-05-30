@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package vfs
+package quasar.yggdrasil.vfs
 
 import quasar.blueeyes.json.serialization.Extractor
-import scalaz._
-import scalaz.NonEmptyList._
+
+import scalaz.{NonEmptyList, Semigroup, Show}
+import scalaz.NonEmptyList.nels
 
 sealed trait ResourceError {
   def fold[A](fatalError: ResourceError.FatalError => A, userError: ResourceError.UserError => A): A

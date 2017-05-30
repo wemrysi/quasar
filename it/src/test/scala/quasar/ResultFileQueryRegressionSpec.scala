@@ -38,11 +38,11 @@ object ResultFileQueryRegressionSpec {
 }
 
 class ResultFileQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](
+  extends QueryRegressionTest[AnalyticalFileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(ResultFileQueryRegressionSpec.isSupported))
   ) {
 
-  val read = ReadFile.Ops[FileSystemIO]
+  val read = ReadFile.Ops[AnalyticalFileSystemIO]
 
   val suiteName = "ResultFile Queries"
 
