@@ -80,7 +80,7 @@ object TestConfig {
   def isMongo(backendRef: BackendRef): Boolean =
     (findExternalBackendRef(backendRef) map (eref =>
       isMongo(eref.fsType)
-    )).isDefined
+    )).getOrElse(false)
 
   /** Returns the name of the environment variable used to configure the
     * given backend.
