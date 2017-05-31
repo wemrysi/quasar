@@ -36,6 +36,8 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait BackendModule {
+  import FileSystemDef.{DefErrT, DefinitionResult}
+
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
@@ -58,14 +60,15 @@ trait BackendModule {
   final val definition: FileSystemDef[Task] =
     FileSystemDef fromPF {
       case (Type, uri) =>
-        parseConfig(uri) flatMap { cfg =>
-          compile(cfg) map {
-            case (int, close) =>
-              val runK = λ[Configured ~> M](_.run(cfg))
-              val interpreter: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
-              FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
-          }
-        }
+        (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
+    }
+
+  def interpreter(cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] =
+    compile(cfg) map {
+      case (runM, close) =>
+        val runCfg = λ[Configured ~> M](_.run(cfg))
+        val runFs: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
+        (runM compose runCfg compose runFs, close)
     }
 
   private final def analyzeInterpreter: Analyze ~> Configured =
@@ -147,6 +150,9 @@ trait BackendModule {
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
   }
 
+  final def config[F[_]](implicit C: MonadReader_[F, Config]): F[Config] =
+    C.ask
+
   // everything abstract below this line
 
   type QS[T[_[_]]] <: CoM
@@ -165,9 +171,9 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
-  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config]
+  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])]
 
   val Type: FileSystemType
 
