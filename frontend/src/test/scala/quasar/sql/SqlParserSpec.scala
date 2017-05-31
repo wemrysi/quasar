@@ -670,9 +670,15 @@ class SQLParserSpec extends quasar.Qspec {
       parsed must beRightDisjOrDiff(node)
     }.set(minTestsOk = 1000) // one cannot test a parser too much
 
-    "round-trip quoted variable names through the pretty-printer" >> {
-      val q = "select * from :`A.results`"
-      (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
+    "round-trip through the pretty-printer" >> {
+      def roundTrip(q: String) =
+        (parse(q) map (pprint[Fix[Sql]] _) map (Query(_)) >>= (parse _)) must beRightDisjunction
+
+      "quoted variable names" in
+        roundTrip("select * from :`A.results`")
+
+      "field deref with string literal" in
+        roundTrip("select a.`_id` from z as a")
     }
   }
 }
