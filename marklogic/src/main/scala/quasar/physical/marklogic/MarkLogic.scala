@@ -51,10 +51,10 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
-  extends BackendModule
-  with ManagedQueryFile[XccDataStream]
-  with ManagedWriteFile[AFile]
-  with ManagedReadFile[XccDataStream] {
+    extends BackendModule
+    with ManagedQueryFile[XccDataStream]
+    with ManagedWriteFile[AFile]
+    with ManagedReadFile[XccDataStream] {
 
   type QS[T[_[_]]] = queryfile.MLQScriptCP[T]
   type Repr        = MainModule
