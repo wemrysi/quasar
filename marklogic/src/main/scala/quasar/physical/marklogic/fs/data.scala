@@ -72,8 +72,12 @@ object data {
     def unwrappedKey(label: NCName): (QName, Option[Attribute]) =
       (QName.unprefixed(label), None)
 
-    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) =
-      (ejsonEncodedName, Attribute(ejsBinding.prefix, ejsonEncodedAttr, unwrappedLabel, Null).some)
+    def wrappedKey(unwrappedLabel: String): (QName, Option[Attribute]) = {
+      (ejsonEncodedName, Attribute(
+        ejsonNs.prefix.shows,
+        ejsonEncodedAttr.localPart.shows,
+        unwrappedLabel, Null).some)
+    }
 
     def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, tpe, TopScope, children)
@@ -197,7 +201,7 @@ object data {
 
     def qname[A](e: Elem): G[String] =
       encodedQualifiedName(e)
-        .toSuccessNel("Expected a ejson:key-id for an ejson:key element")
+        .toSuccessNel(s"Expected a ${ejsonEncodedAttr.shows} for an ${ejsonEncodedName.shows} element")
         .point[F]
 
     def decodeXml0: Node => G[Data] = {
@@ -371,18 +375,29 @@ object data {
       (EJsType.unapply(jobj) |@| EJsValue.unapply(jobj)).tupled
   }
 
+  private object ElemName {
+    def unapply(elem: Elem): Option[QName] =
+      (Option(elem.prefix), elem.label) match {
+        case (Some(prefix), label) =>
+          (NCName.fromString(prefix) ⊛ NCName.fromString(label))((p, l) =>
+            QName(NSPrefix(p).some, l)).toOption
+        case (None, label) =>
+          NCName.fromString(label).toOption.flatMap(QName.unprefixed(_).some)
+      }
+  }
+
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
 
   private def encodedQualifiedName(elem: Elem): Option[String] = {
     def labelKeyAttr(elem: Elem): Option[String] =
       elem.attributes collectFirst {
-        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === "ejson:key-id" => label
+        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === ejsonEncodedAttr.shows => label
       }
 
-    (Option(elem.prefix), elem.label) match {
-      case (Some("ejson"), "key") => labelKeyAttr(elem)
-      case _ => qualifiedName(elem).some
+    elem match {
+      case ElemName(qn) if qn === ejsonEncodedName => labelKeyAttr(elem)
+      case _                                       => qualifiedName(elem).some
     }
   }
 }

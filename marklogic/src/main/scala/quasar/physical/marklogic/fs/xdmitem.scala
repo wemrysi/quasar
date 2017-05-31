@@ -152,9 +152,6 @@ object xdmitem {
     })(e)) getOrElse xml.toEJsonData(e))
   }
 
-  private def embedOption[F[_]: MonadErrMsgs, A](oa: Option[A], message: String): F[A] =
-    oa.cata(s => s.point[F], message.wrapNel.raiseError[F, A])
-
   private def noReprError[F[_]: MonadErrMsgs, A](form: String): F[A] =
     s"No Data representation for '$form'.".wrapNel.raiseError[F, A]
 }
