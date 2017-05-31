@@ -352,11 +352,7 @@ object data {
 
   private object DataNode {
     def unapply(node: Node): Option[(DataType, Seq[Node])] = {
-      val tpe = node.attributes collectFirst {
-        case PrefixedAttribute(p, n, Seq(Text(t)), _) if s"$p:$n" === ejsonType.shows => t
-      }
-
-      tpe flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
+      attribute(node, ejsonType) flatMap (DataType.stringCodec.getOption(_)) strengthR node.child
     }
   }
 
@@ -389,14 +385,14 @@ object data {
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
 
-  private def encodedQualifiedName(elem: Elem): Option[String] = {
-    def labelKeyAttr(elem: Elem): Option[String] =
-      elem.attributes collectFirst {
-        case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === ejsonEncodedAttr.shows => label
-      }
+  private def attribute(elem: Node, qn: QName): Option[String] =
+    elem.attributes collectFirst {
+      case PrefixedAttribute(p, n, Seq(Text(label)), _) if s"$p:$n" === qn.shows => label
+    }
 
+  private def encodedQualifiedName(elem: Elem): Option[String] = {
     elem match {
-      case ElemName(qn) if qn === ejsonEncodedName => labelKeyAttr(elem)
+      case ElemName(qn) if qn === ejsonEncodedName => attribute(elem, ejsonEncodedAttr)
       case _                                       => qualifiedName(elem).some
     }
   }
