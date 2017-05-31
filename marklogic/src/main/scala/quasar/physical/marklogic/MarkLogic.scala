@@ -119,9 +119,9 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   }
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] =
-    MonadReader_[Backend, Config].ask >>= { config =>
+    config[Backend] >>= { cfg =>
       MainModule.fromWritten(
-        qs.cataM(config.planner[T].plan) strengthL Version.`1.0-ml`
+        qs.cataM(cfg.planner[T].plan) strengthL Version.`1.0-ml`
       ).liftQB
     }
 
@@ -140,7 +140,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
       val deleteOutIfExists =
-        config flatMap { cfg =>
+        config[Backend] flatMap { cfg =>
           import cfg.{FMT, searchOptions}
           fs.ops.pathHavingFormatExists[M, FMT](out)
             .flatMap(_.whenM(fs.ops.deleteFile[M](out)))
@@ -159,7 +159,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       repr.render.point[Backend]
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg.{FMT, searchOptions}
         ops.pathHavingFormatExists[M, FMT](dir).liftB.ifM(
           ops.directoryContents[M, FMT](dir).liftB,
@@ -167,7 +167,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     def fileExists(file: AFile): Configured[Boolean] =
-      MonadReader_[Configured, Config].ask >>= { cfg =>
+      config[Configured] >>= { cfg =>
         import cfg.{FMT, searchOptions}
         ops.pathHavingFormatExists[M, FMT](file).liftM[ConfiguredT]
       }
@@ -187,7 +187,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     ////
 
     private def saveTo(dst: AFile, results: XQuery): Backend[XQuery] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         cfg.structuralPlannerM.seqToArray(results)
           .map(xdmp.documentInsert(pathUri(dst).xs, _))
           .liftQB
@@ -196,7 +196,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
 
   object ManagedReadFileModule extends ManagedReadFileModule {
     def readCursor(file: AFile, offset: Natural, limit: Option[Positive]): Backend[XccDataStream] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         xccEvalToMLFSQ(ops.pathHavingFormatExists[XccEval, FMT](file))
           .map(_.fold(
@@ -219,7 +219,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       ops.ensureLineage[Backend](fileParent(file)) as file
 
     def writeChunk(f: AFile, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
-      MonadReader_[Configured, Config].ask >>= { cfg =>
+      config[Configured] >>= { cfg =>
         import cfg._
         chunk.grouped(writeChunkSize.value.toInt)
           .toStream
@@ -258,7 +258,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     def delete(path: APath): Backend[Unit] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         ifExists(path)(refineType(path).fold(
           ops.deleteDir[Backend, FMT],
@@ -278,7 +278,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     ////
 
     private def ifExists[A](path: APath)(thenDo: => Backend[A]): Backend[A] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         ops.pathHavingFormatExists[Backend, FMT](path)
           .ifM(thenDo, pathErr(pathNotFound(path)).raiseError[Backend, A])
@@ -286,7 +286,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     private def checkMoveSemantics(dst: APath, sem: MoveSemantics): Backend[Unit] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         sem match {
           case MoveSemantics.Overwrite =>
@@ -303,7 +303,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     private def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): Backend[Unit] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         ifExists(src)(
           checkMoveSemantics(dst, sem) *>
@@ -311,7 +311,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       }
 
     private def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): Backend[Unit] =
-      config >>= { cfg =>
+      config[Backend] >>= { cfg =>
         import cfg._
         ifExists(src)(
           checkMoveSemantics(dst, sem) *>

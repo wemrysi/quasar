@@ -150,8 +150,8 @@ trait BackendModule {
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
   }
 
-  final def config: Backend[Config] =
-    MonadReader_[Backend, Config].ask
+  final def config[F[_]](implicit C: MonadReader_[F, Config]): F[Config] =
+    C.ask
 
   // everything abstract below this line
 
