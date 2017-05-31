@@ -127,28 +127,6 @@ object ops {
     })
   }
 
-  /** Ensure the given directory exists, creating it if necessary. */
-  def ensureDirectory[F[_]: Monad: Xcc](dir: ADir): F[Executed] = {
-    import XccError.Code
-
-    def isDirExists(code: String) =
-      Code.string.getOption(code) exists (_ === Code.DirExists)
-
-    Xcc[F].executeQuery(xdmp.directoryCreate(pathUri(dir).xs)) handle {
-      case XccError.QueryError(_, c) if isDirExists(c.getCode) => Executed.executed
-    }
-  }
-
-  /** Ensure the given directory and all ancestors exist, creating them if necessary. */
-  def ensureLineage[F[_]: Monad: Xcc](dir: ADir): F[Executed] = {
-    def ensureLineage0(d: ADir): F[Executed] =
-      ensureDirectory[F](d) <* parentDir(d).traverse(ensureLineage0)
-
-    automaticDirectoryCreationEnabled[F]
-      .ifM(ensureDirectory[F](dir), ensureLineage0(dir))
-      .transact
-  }
-
   /** Returns whether the file exists, regardless of format. */
   def fileExists[F[_]: Functor: Xcc](file: AFile): F[Boolean] =
     Xcc[F].queryResults(fn.docAvailable(pathUri(file).xs)) map booleanResult
@@ -205,7 +183,6 @@ object ops {
     val doMoveDir = for {
       items <- Xcc[F].results(main10ml(dstDirs).value)
       dirs  =  items.map(decodeDir).unite
-      _     <- dirs traverse_ (ensureLineage[F](_).void)
       _     <- deleteEmptyDescendantDirectories[F](src)
     } yield ()
 

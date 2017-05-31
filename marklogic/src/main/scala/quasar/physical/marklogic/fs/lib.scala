@@ -159,7 +159,7 @@ object lib {
         fn.concat(~prefix, str))
     })
 
-  def moveFile[F[_]: PrologW: Monad, T: SearchOptions]: F[FunctionDecl2] =
+  def moveFile[F[_]: PrologW: Bind, T: SearchOptions]: F[FunctionDecl2] =
     fileInOtherFormatExists[F, T].fn flatMap { otherFmtExists =>
       fs.declare[F]("move-file") map (_(
         $("srcUri") as ST("xs:string"),
@@ -175,16 +175,62 @@ object lib {
       })
     }
 
-  def subDirectories[F[_]: PrologW: Functor]: F[FunctionDecl2] =
-    fs.declare[F]("sub-directories") map (_(
-      $("uri")                as ST("xs:string"),
-      $("includeDescendants") as ST("xs:boolean")
-    ).as(ST("xs:string*")) { (uri: XQuery, includeDescendants: XQuery) =>
-      val depth = if_(includeDescendants) then_ "infinity".xs else_ "1".xs
-      fn.map(fn.ns(NCName("base-uri")) :# 1, xdmp.directoryProperties(uri, depth) `/` child(propProperties) `/` child(propDirectory))
-    })
+  def subDirectories[F[_]: PrologW: Bind]: F[FunctionDecl2] =
+    (
+      discoverChildren[F].fn    |@|
+      discoverDescendants[F].fn
+    ).tupled flatMap { case (discKids, discDescs) =>
+      fs.declare[F]("sub-directories") map (_(
+        $("uri")                as ST("xs:string"),
+        $("includeDescendants") as ST("xs:boolean")
+      ).as(ST("xs:string*")) { (uri: XQuery, includeDescendants: XQuery) =>
+        if_ (includeDescendants) then_ discDescs(uri, emptySeq) else_ discKids(uri, emptySeq)
+      })
+    }
 
   ////
+
+  private def asChildDir[F[_]: PrologW: Functor]: F[FunctionDecl2] =
+    fs.declare[F]("as-child-dir") map (_(
+      $("parent") as ST("xs:string"),
+      $("child")  as ST("xs:string")
+    ).as(ST("xs:string")) { (parent: XQuery, child: XQuery) =>
+      fn.concat(parent, fn.tokenize(fn.substringAfter(child, parent), "/".xs)(1.xqy), "/".xs)
+    })
+
+  // NB: Apparently, as of ML8, TCO doesn't kick in unless the function is untyped.
+  // https://stackoverflow.com/questions/41746814/marklogic-xquery-tail-call-optimization
+  private def discoverChildren[F[_]: PrologW: Bind]: F[FunctionDecl2] =
+    (fs.name("discover-children").qn[F] |@| asChildDir[F].fn)((fname, childDir) =>
+      declare(fname)(
+        $("parent") as ST("xs:string"),
+        $("known")  as ST("xs:string*")
+      ) { (parent: XQuery, known: XQuery) =>
+        val (knownq, uri, d) = ($("knownq"), $("uri"), $("d"))
+        let_(
+          knownq := cts.notQuery(cts.orQuery(fn.map(func(d.render) { cts.directoryQuery(~d, "infinity".xs) }, known))),
+          uri    := cts.uriMatch(fn.concat(parent, "*/*".xs), IList("document".xs), some(~knownq))(1.xqy)
+        ) return_ (
+          if_(fn.exists(~uri))
+          .then_(fname(parent, mkSeq_(childDir(parent, ~uri), known)))
+          .else_(known)
+        )
+      })
+
+  private def discoverDescendants[F[_]: PrologW: Bind]: F[FunctionDecl2] =
+    (fs.name("discover-descendants").qn[F] |@| discoverChildren[F].fn)((fname, discKids) =>
+      declare(fname)(
+        $("uris")  as ST("xs:string*"),
+        $("known") as ST("xs:string*")
+      ) { (uris: XQuery, known: XQuery) =>
+        val (d, kids) = ($("d"), $("kids"))
+        let_(
+          kids := fn.map(func(d.render) { discKids(~d, emptySeq) }, uris))
+        .return_(
+          if_(fn.exists(~kids))
+          .then_(fname(~kids, mkSeq_(known, ~kids)))
+          .else_(known))
+      })
 
   // 0xffffffffffff
   private val baseSeed: Long = 281474976710655L
