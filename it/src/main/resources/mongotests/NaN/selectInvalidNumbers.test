@@ -6,9 +6,9 @@
     "query": "select * from NaNs",
     "predicate": "containsExactly",
     "expected": [
-      { "name": "NaN",   "val": null  },
-      { "name": "inf",   "val": null  },
-      { "name": "-inf",  "val": null  },
+      { "name": "NaN"                 },
+      { "name": "inf"                 },
+      { "name": "-inf"                },
       { "name": "valid", "val": 42.42 },
       { "name": "null",  "val": null  }
     ]
