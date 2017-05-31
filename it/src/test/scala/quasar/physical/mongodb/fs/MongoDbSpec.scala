@@ -18,7 +18,7 @@ package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
 import quasar._
-import quasar.contrib.pathy._
+import quasar.contrib.pathy.ADir
 import quasar.fs.FileSystemType
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.mongodb.Collection
@@ -36,13 +36,11 @@ object MongoDbSpec {
       err => Task.fail(new RuntimeException(err.toString)),
       Task.now))
 
-  def asColl(file: AFile): Task[Collection] =
-      Collection.fromFile(file).fold(
-        err => Task.fail(new RuntimeException(err.shows)),
-        Task.now)
-
   def tempColl(prefix: ADir): Task[Collection] =
-    NameGenerator.salt >>= (n => asColl(prefix </> file(n)))
+    NameGenerator.salt >>= (n =>
+      Collection.fromFile(prefix </> file(n)).fold(
+        err => Task.fail(new RuntimeException(err.shows)),
+        Task.now))
 
   def clientShould(fsType: FileSystemType)(examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
     TestConfig.testDataPrefix.flatMap { prefix =>

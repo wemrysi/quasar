@@ -16,8 +16,6 @@
 
 package quasar
 
-import slamdata.Predef._
-
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp.liftMT
@@ -29,17 +27,13 @@ import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
-object ResultFileQueryRegressionSpec {
-  def isSupported[S[_]](fs: SupportedFs[S]): Boolean =
-    fs.ref.supports(BackendCapability.query()) &&
-    fs.ref.supports(BackendCapability.write()) &&
-    // NB: These are prohibitively slow on Couchbase
-    !TestConfig.isCouchbase(fs.ref)
-}
-
 class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[AnalyticalFileSystemIO](
-    QueryRegressionTest.externalFS.map(_.filter(ResultFileQueryRegressionSpec.isSupported))
+    QueryRegressionTest.externalFS.map(_.filter(fs =>
+      fs.ref.supports(BackendCapability.query()) &&
+      fs.ref.supports(BackendCapability.write()) &&
+      // NB: These are prohibitively slow on Couchbase
+      !TestConfig.isCouchbase(fs.ref)))
   ) {
 
   val read = ReadFile.Ops[AnalyticalFileSystemIO]

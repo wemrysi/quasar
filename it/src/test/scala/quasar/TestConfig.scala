@@ -66,21 +66,10 @@ object TestConfig {
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
 
-  def findExternalBackendRef(backendRef: BackendRef): Option[ExternalBackendRef] =
-    backendRefs.find(_.ref == backendRef)
-
   /** True if this backend configuration is for a couchbase connection.
     */
   def isCouchbase(backendRef: BackendRef): Boolean =
     backendRef === COUCHBASE.ref
-
-  def isMongo(fsType: FileSystemType): Boolean =
-    fsType == mongodb.fs.FsType || fsType == mongodb.fs.QScriptFsType
-
-  def isMongo(backendRef: BackendRef): Boolean =
-    (findExternalBackendRef(backendRef) map (eref =>
-      isMongo(eref.fsType)
-    )).getOrElse(false)
 
   /** Returns the name of the environment variable used to configure the
     * given backend.
