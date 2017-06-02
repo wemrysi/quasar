@@ -103,7 +103,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.Step(_) =>
         (obj `/` key).point[F]
 
-      case XQuery.StringLit(ValidQName(qn)) =>
+      case XQuery.StringLit(QName.string(qn)) =>
         freshName[F] map ( m =>
           if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
@@ -112,11 +112,11 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         )
 
       case XQuery.StringLit(s) =>
-        freshName[F] map ( m =>
+        freshName[F] flatMap ( m =>
           if (XQuery.flwor.nonEmpty(obj))
-            let_(m := obj) return_ (~m `/` child(ejsonEncodedName)(axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs))
+            encodedChild(~m, s.xqy).map((el: XQuery) => let_(m := obj) return_ el)
           else
-            obj `/` child(ejsonEncodedName)(axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs))
+            encodedChild(obj, s.xqy))
 
       case _ => childrenNamed(obj, xs.QName(key))
     }
@@ -127,11 +127,18 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def objectMerge(o1: XQuery, o2: XQuery) =
     elementMerge(o1, o2)
 
-  private object ValidQName {
-    def unapply(name: String): Option[QName] = QName.string.getOption(name)
-  }
-
   ////
+
+  // ejson:encoded-child($src as element(), $name as xs:string) as element()*
+  lazy val encodedChild: F[FunctionDecl2] =
+    ejs.declare[F]("encoded-child") map (_(
+      $("src") as ST("element()"),
+      $("name") as ST("xs:string")
+    ).as(ST("element()*")) { (elt: XQuery, field: XQuery) =>
+      val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
+      elt `/` child(ejsonEncodedName)(pred)
+    })
+
 
   // ejson:is-container($item as item()?) as xs:boolean
   lazy val isContainer: F[FunctionDecl1] =
