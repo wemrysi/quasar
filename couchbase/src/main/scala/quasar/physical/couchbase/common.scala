@@ -24,7 +24,7 @@ import quasar.fs.FileSystemError
 
 import scala.collection.JavaConverters._
 
-import com.couchbase.client.java.Bucket
+import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.query.{N1qlParams, N1qlQuery, N1qlQueryRow}
 import com.couchbase.client.java.query.consistency.ScanConsistency
 import pathy.Path, Path._
@@ -39,13 +39,16 @@ object common {
     def apply[F[_]](implicit R: MonadReader_[F, Context]) = R
   }
 
+  final case class BucketName(v: String)
+
+  final case class Config(ctx: ClientContext, cluster: Cluster)
+
   final case class ClientContext(bucket: Bucket, docTypeKey: DocTypeKey)
 
   final case class Context(bucket: BucketName, docTypeKey: DocTypeKey)
 
-  final case class BucketName(v: String)
+  final case class Collection(bucket: Bucket, docTypeValue: DocTypeValue)
 
-  // type field in Couchbase documents
   final case class DocTypeKey(v: String)
   final case class DocTypeValue(v: String)
 

@@ -36,13 +36,14 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait BackendModule {
-  type QSM[T[_[_]], A] = QS[T]#M[A]
+  import FileSystemDef.{DefErrT, DefinitionResult}
 
-  type ErrorMessages = NonEmptyList[String]
+  type QSM[T[_[_]], A] = QS[T]#M[A]
 
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
   type Configured[A]        = ConfiguredT[M, A]
-  type Backend[A]           = FileSystemErrT[PhaseResultT[Configured, ?], A]
+  type BackendT[F[_], A]    = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
+  type Backend[A]           = BackendT[M, A]
 
   private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
   private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
@@ -52,17 +53,22 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
+  implicit class LiftBackend[A](m: M[A]) {
+    val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
   final val definition: FileSystemDef[Task] =
     FileSystemDef fromPF {
       case (Type, uri) =>
-        parseConfig(uri).leftMap(_.left[EnvironmentError]) flatMap { cfg =>
-          compile(cfg) map {
-            case (int, close) =>
-              val runK = λ[Configured ~> M](_.run(cfg))
-              val interpreter: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
-              FileSystemDef.DefinitionResult(int compose runK compose interpreter, close)
-          }
-        }
+        (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
+    }
+
+  def interpreter(cfg: Config): DefErrT[Task, (AnalyticalFileSystem ~> Task, Task[Unit])] =
+    compile(cfg) map {
+      case (runM, close) =>
+        val runCfg = λ[Configured ~> M](_.run(cfg))
+        val runFs: AnalyticalFileSystem ~> Configured = analyzeInterpreter :+: fsInterpreter
+        (runM compose runCfg compose runFs, close)
     }
 
   private final def analyzeInterpreter: Analyze ~> Configured =
@@ -144,6 +150,9 @@ trait BackendModule {
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
   }
 
+  final def config[F[_]](implicit C: MonadReader_[F, Config]): F[Config] =
+    C.ask
+
   // everything abstract below this line
 
   type QS[T[_[_]]] <: CoM
@@ -162,9 +171,9 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   type Config
-  def parseConfig(uri: ConnectionUri): EitherT[Task, ErrorMessages, Config]
+  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])]
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])]
 
   val Type: FileSystemType
 

@@ -27,7 +27,10 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 @Lenses
-final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType)
+final case class MarkLogicConfig(xccUri: URI, rootDir: ADir, docType: DocType) {
+  def asUriString: String =
+    s"${xccUri}${posixCodec.printPath(rootDir)}?format=${DocType.name(docType)}"
+}
 
 object MarkLogicConfig {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -66,10 +69,9 @@ object MarkLogicConfig {
           case other       => List()
         })
         .find(_._1 === "format")
-        .fold(DocType.xml.successNel[String]) {
-          case (_, "json") => DocType.json.successNel[String]
-          case (_, "xml")  => DocType.xml.successNel[String]
-          case (_, other)  => s"Unsupported document format: $other".failureNel[DocType]
+        .fold(DocType.xml.successNel[String]) { case (_, fmt) =>
+          DocType.name.getOption(fmt)
+            .toSuccessNel(s"Unsupported document format: $fmt")
         }
 
     \/.fromTryCatchNonFatal(new URI(str))
