@@ -26,6 +26,7 @@ import quasar.physical.marklogic.xquery.syntax._
 
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
+import xml.name.QName
 
 private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: PrologW: QNameGenerator]
   extends StructuralPlanner[F, DocType.Xml] {
@@ -102,12 +103,20 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.Step(_) =>
         (obj `/` key).point[F]
 
-      case XQuery.StringLit(s) =>
-        (asQName[F](s) |@| freshName[F])((qn, m) =>
+      case XQuery.StringLit(ValidQName(qn)) =>
+        freshName[F] map ( m =>
           if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
           else
-            obj `/` child(qn))
+            obj `/` child(qn)
+        )
+
+      case XQuery.StringLit(s) =>
+        freshName[F] map ( m =>
+          if (XQuery.flwor.nonEmpty(obj))
+            let_(m := obj) return_ (~m `/` child(ejsonEncodedName)(axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs))
+          else
+            obj `/` child(ejsonEncodedName)(axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs))
 
       case _ => childrenNamed(obj, xs.QName(key))
     }
@@ -117,6 +126,10 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   def objectMerge(o1: XQuery, o2: XQuery) =
     elementMerge(o1, o2)
+
+  private object ValidQName {
+    def unapply(name: String): Option[QName] = QName.string.getOption(name)
+  }
 
   ////
 
