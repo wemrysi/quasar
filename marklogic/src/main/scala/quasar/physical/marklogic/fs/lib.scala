@@ -30,10 +30,6 @@ object lib {
   import expr.{emptySeq, for_, func, if_, let_}, axes.child
   import FunctionDecl._
 
-  val prop           = NSPrefix(NCName("prop"))
-  val propProperties = prop(NCName("properties"))
-  val propDirectory  = prop(NCName("directory"))
-
   val fs = NamespaceDecl(filesystemNs)
 
   def formatConflictError(uri: XQuery) = {
@@ -41,7 +37,10 @@ object lib {
     fn.error(filesystemError.xqy, some(fn.concat(msg, uri)))
   }
 
-  /** Appends the given nodes as children of `dst` in a format-appropriate manner. */
+  /** filesystem:append-child-nodes($dst as node(), $nodes as node()*) as item()*
+    *
+    * Appends the given nodes as children of `dst` in a format-appropriate manner.
+    */
   def appendChildNodes[F[_]: PrologW: Monad, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     fs.declare[F]("append-child-nodes") flatMap (_(
       $("dst")   as ST("node()"),
@@ -73,6 +72,7 @@ object lib {
         })
     })
 
+  // filesystem:descendants-having-format-exist($uri as xs:string) as xs:boolean
   def descendantsHavingFormatExist[F[_]: PrologW: Functor, T: SearchOptions]: F[FunctionDecl1] =
     fs.declare[F]("descendants-having-format-exist") map (_(
       $("uri") as ST("xs:string")
@@ -80,11 +80,12 @@ object lib {
       fn.exists(directoryDocuments[T](uri, true))
     })
 
+  // filesystem:directory-contents($uri as xs:string) as xs:string*
   def directoryContents[F[_]: PrologW: Bind, T: SearchOptions]: F[FunctionDecl1] =
     (
-      subDirectories[F].fn                  |@|
+      discoverChildren[F].fn                |@|
       descendantsHavingFormatExist[F, T].fn
-    ).tupled flatMap { case (subDirs, descsExist) =>
+    ).tupled flatMap { case (discKids, descsExist) =>
       fs.declare[F]("directory-contents") map (_(
         $("uri") as ST("xs:string")
       ).as(ST("xs:string*")) { uri: XQuery =>
@@ -98,7 +99,7 @@ object lib {
         val childDirs =
           fn.filter(
             func(sdir.render) { descsExist(~sdir) },
-            subDirs(uri, fn.False))
+            discKids(uri, emptySeq))
 
         fn.map(
           func(kid.render) { fn.substringAfter(~kid, uri) },
@@ -106,26 +107,8 @@ object lib {
       })
     }
 
-  def directoryIsEmpty[F[_]: PrologW: Functor]: F[FunctionDecl1] =
-    fs.declare[F]("directory-is-empty") map (_(
-      $("uri") as ST("xs:string")
-    ).as(ST.Top) { uri: XQuery =>
-      fn.empty(cts.uriMatch(fn.concat(uri, "*".xs), IList("document".xs)))
-    })
-
-  def emptyDescendantDirectories[F[_]: PrologW: Bind]: F[FunctionDecl1] =
-    (
-      subDirectories[F].fn    |@|
-      directoryIsEmpty[F].ref
-    ).tupled flatMap { case (subDirs, dirIsEmptyRef) =>
-      fs.declare[F]("empty-descendant-directories") map (_(
-        $("uri") as ST("xs:string")
-      ).as(ST.Top) { uri: XQuery =>
-        fn.filter(dirIsEmptyRef, subDirs(uri, fn.True))
-      })
-    }
-
-  def fileInOtherFormatExists[F[_]: PrologW: Functor, T: SearchOptions]: F[FunctionDecl1] =
+  // filesystem:file-exists-in-other-format($uri as xs:string) as xs:boolean
+  def fileExistsInOtherFormat[F[_]: PrologW: Functor, T: SearchOptions]: F[FunctionDecl1] =
     fs.declare[F]("file-exists-in-other-format") map (_(
       $("uri") as ST("xs:string")
     ).as(ST("xs:boolean")) { uri: XQuery =>
@@ -134,16 +117,7 @@ object lib {
       .else_(fn.False)
     })
 
-  def fileParent[F[_]: PrologW: Functor]: F[FunctionDecl1] =
-    fs.declare[F]("file-parent") map (_(
-      $("uri") as ST("xs:string")
-    ).as(ST("xs:string")) { uri: XQuery =>
-      val toks = $("toks")
-      let_(toks := fn.tokenize(uri, "/".xs)) return_ {
-        fn.stringJoin(mkSeq_((~toks)(1.xqy to (fn.last - 1.xqy)), "".xs), "/".xs)
-      }
-    })
-
+  // filesystem:lpad-to-length($padChar as xs:string, $length as xs:integer, $str as xs:string) as xs:string
   def lpadToLength[F[_]: PrologW: Functor]: F[FunctionDecl3] =
     fs.declare[F]("lpad-to-length") map (_(
       $("padchar") as ST("xs:string"),
@@ -159,8 +133,9 @@ object lib {
         fn.concat(~prefix, str))
     })
 
+  // filesystem:move-file($srcUri as xs:string, $dstUri as xs:string) as item()*
   def moveFile[F[_]: PrologW: Bind, T: SearchOptions]: F[FunctionDecl2] =
-    fileInOtherFormatExists[F, T].fn flatMap { otherFmtExists =>
+    fileExistsInOtherFormat[F, T].fn flatMap { otherFmtExists =>
       fs.declare[F]("move-file") map (_(
         $("srcUri") as ST("xs:string"),
         $("dstUri") as ST("xs:string")
@@ -175,21 +150,9 @@ object lib {
       })
     }
 
-  def subDirectories[F[_]: PrologW: Bind]: F[FunctionDecl2] =
-    (
-      discoverChildren[F].fn    |@|
-      discoverDescendants[F].fn
-    ).tupled flatMap { case (discKids, discDescs) =>
-      fs.declare[F]("sub-directories") map (_(
-        $("uri")                as ST("xs:string"),
-        $("includeDescendants") as ST("xs:boolean")
-      ).as(ST("xs:string*")) { (uri: XQuery, includeDescendants: XQuery) =>
-        if_ (includeDescendants) then_ discDescs(uri, emptySeq) else_ discKids(uri, emptySeq)
-      })
-    }
-
   ////
 
+  // filesystem:as-child-dir($parent as xs:string, $child as xs:string) as xs:string
   private def asChildDir[F[_]: PrologW: Functor]: F[FunctionDecl2] =
     fs.declare[F]("as-child-dir") map (_(
       $("parent") as ST("xs:string"),
@@ -198,6 +161,7 @@ object lib {
       fn.concat(parent, fn.tokenize(fn.substringAfter(child, parent), "/".xs)(1.xqy), "/".xs)
     })
 
+  // filesystem:discover-children($parent as xs:string, $known as xs:string*)
   // NB: Apparently, as of ML8, TCO doesn't kick in unless the function is untyped.
   // https://stackoverflow.com/questions/41746814/marklogic-xquery-tail-call-optimization
   private def discoverChildren[F[_]: PrologW: Bind]: F[FunctionDecl2] =
@@ -215,21 +179,6 @@ object lib {
           .then_(fname(parent, mkSeq_(childDir(parent, ~uri), known)))
           .else_(known)
         )
-      })
-
-  private def discoverDescendants[F[_]: PrologW: Bind]: F[FunctionDecl2] =
-    (fs.name("discover-descendants").qn[F] |@| discoverChildren[F].fn)((fname, discKids) =>
-      declare(fname)(
-        $("uris")  as ST("xs:string*"),
-        $("known") as ST("xs:string*")
-      ) { (uris: XQuery, known: XQuery) =>
-        val (d, kids) = ($("d"), $("kids"))
-        let_(
-          kids := fn.map(func(d.render) { discKids(~d, emptySeq) }, uris))
-        .return_(
-          if_(fn.exists(~kids))
-          .then_(fname(~kids, mkSeq_(known, ~kids)))
-          .else_(known))
       })
 
   // 0xffffffffffff

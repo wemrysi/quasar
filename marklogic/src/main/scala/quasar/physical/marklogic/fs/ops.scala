@@ -25,14 +25,13 @@ import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.physical.marklogic.xcc._, Xcc.ops._
+import quasar.physical.marklogic.xcc._
 
 import com.marklogic.xcc.types.{XdmItem, XSBoolean, XSString}
 import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
-import xml.name._
 
 object ops {
   import expr.{func, let_}
@@ -64,38 +63,13 @@ object ops {
     } yield errs)
   }
 
-  /** Returns whether the server is configured to create directories automatically. */
-  def automaticDirectoryCreationEnabled[F[_]: Functor: Xcc]: F[Boolean] = {
-    val main = main10ml {
-      admin.getConfiguration[W]
-        .flatMap(admin.databaseGetDirectoryCreation[W](_, xdmp.database()))
-    }
-
-    Xcc[F].results(main.value) map {
-      case Vector(createMode: XSString) => createMode.asString === "automatic"
-      case _                            => false
-    }
-  }
-
   /** Deletes the given directory and all descendants, recursively. */
   def deleteDir[F[_]: Xcc: Applicative, FMT: SearchOptions](dir: ADir): F[Executed] = {
     val file = $("file")
 
-    val deleteFiles =
-      fn.map(
-        func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
-        directoryDocuments[FMT](pathUri(dir).xs, true))
-
-    (Xcc[F].executeQuery(deleteFiles) *> deleteEmptyDescendantDirectories[F](dir)).transact
-  }
-
-  /** Delete all empty descendant directories. */
-  def deleteEmptyDescendantDirectories[F[_]: Xcc](dir: ADir): F[Executed] = {
-    val query =
-      lib.emptyDescendantDirectories[W].apply(pathUri(dir).xs)
-        .map(empties => fn.map(xdmp.ns(NCName("document-delete")) :# 1, empties))
-
-    Xcc[F].execute(main10ml(query).value)
+    Xcc[F].executeQuery(fn.map(
+      func(file.render) { xdmp.documentDelete(fn.baseUri(~file)) },
+      directoryDocuments[FMT](pathUri(dir).xs, true)))
   }
 
   /** Deletes the given file, erroring if it doesn't exist. */
@@ -156,37 +130,22 @@ object ops {
 
   /** Move `src` to `dst` overwriting any existing contents. */
   def moveDir[F[_]: Monad: Xcc, FMT: SearchOptions](src: ADir, dst: ADir): F[Executed] = {
-    val decodeDir: XdmItem => Option[ADir] = {
-      case str: XSString => UriPathCodec.parseAbsDir(str.asString) map (sandboxAbs(_))
-      case _             => None
-    }
-
     val (file, srcUri, dstUri) = ($("file"), $("srcUri"), $("dstUri"))
 
-    val dstDirs = (
-      lib.moveFile[W, FMT].apply(~srcUri, ~dstUri) |@|
-      lib.fileParent[W].apply(~dstUri)
-    ) { (doMove, parentDir) =>
-        fn.distinctValues(fn.map(
-          func(file.render) {
-            let_(
-              srcUri := fn.baseUri(~file),
-              dstUri := fn.concat(
-                          pathUri(dst).xs,
-                          fn.substringAfter(~srcUri, pathUri(src).xs)),
-              $("_") := doMove)
-            .return_(parentDir)
-          },
-          directoryDocuments[FMT](pathUri(src).xs, true)))
+    val doMoveDir = lib.moveFile[W, FMT].fn map { moveF =>
+      fn.map(
+        func(file.render) {
+          let_(
+            srcUri := fn.baseUri(~file),
+            dstUri := fn.concat(
+                        pathUri(dst).xs,
+                        fn.substringAfter(~srcUri, pathUri(src).xs)))
+          .return_(moveF(~srcUri, ~dstUri))
+        },
+        directoryDocuments[FMT](pathUri(src).xs, true))
     }
 
-    val doMoveDir = for {
-      items <- Xcc[F].results(main10ml(dstDirs).value)
-      dirs  =  items.map(decodeDir).unite
-      _     <- deleteEmptyDescendantDirectories[F](src)
-    } yield ()
-
-    (src =/= dst) whenM doMoveDir.transact as Executed.executed
+    (src =/= dst) whenM Xcc[F].execute(main10ml(doMoveDir).value) as Executed.executed
   }
 
   /** Move `src` to `dst` overwriting any existing contents. */
