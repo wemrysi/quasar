@@ -17,11 +17,10 @@
 package quasar.mimir
 
 import slamdata.Predef._
+
 import quasar._
-import quasar.blueeyes.json.{JNum, JValue}
 import quasar.common._
 import quasar.connector._
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
@@ -31,14 +30,13 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 
+import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{Path, RValue}
-import quasar.precog.common.security.APIKey
 import quasar.precog.util.IOUtils
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.{Handle, Pull, Stream}
 import fs2.async.mutable.Queue
 import fs2.interop.scalaz._
 import java.util.concurrent.ConcurrentHashMap

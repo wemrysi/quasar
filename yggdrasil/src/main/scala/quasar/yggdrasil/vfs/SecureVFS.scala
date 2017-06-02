@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package vfs
+package quasar.yggdrasil.vfs
 
 import quasar.precog.common._
-import quasar.precog.common.accounts._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
+import quasar.precog.common.security.Permission._
 import quasar.precog.common.jobs._
+import quasar.yggdrasil._
 import quasar.yggdrasil.execution._
-import quasar.yggdrasil.metadata._
-// import quasar.yggdrasil.nihdb._
 import quasar.yggdrasil.scheduling._
-import quasar.precog.util._
-import ResourceError._
-import Permission._
+import quasar.yggdrasil.vfs.ResourceError._
 
 import quasar.blueeyes.util.Clock
 

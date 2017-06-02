@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
-package service
+package quasar.precog.common.security.service
 
-import quasar.blueeyes._, json._, serialization._
-import quasar.precog.common.accounts._
+import quasar.blueeyes._
+import quasar.blueeyes.json.serialization._
+import quasar.blueeyes.json.serialization.IsoSerialization._
+import quasar.blueeyes.json.serialization.Iso8601Serialization._
+
+import quasar.precog.common.security._
 
 import java.time.LocalDateTime
-
-import IsoSerialization._, Iso8601Serialization._
 
 object v1 {
   case class GrantDetails(grantId: GrantId,

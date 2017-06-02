@@ -17,7 +17,7 @@
 package quasar.yggdrasil.execution
 
 import quasar.blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
+import Iso8601Serialization._, Versioned._
 import quasar.precog.common._, security._, accounts._
 
 import java.time.LocalDateTime

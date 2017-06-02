@@ -18,16 +18,15 @@ package quasar.blueeyes.json
 
 import quasar.Data
 import quasar.blueeyes._
-import quasar.precog._
+import quasar.precog.ToString
 
-import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
+import scalaz._, Scalaz._
 
 import scala.collection.immutable.ListMap
 import scala.util.Sorting.quickSort
+import scala.util.Try
 
 import java.lang.Double.isInfinite
-
-import JValue.{ RenderMode, Compact, Pretty, Canonical }
 
 /**
   * Data type for Json AST.

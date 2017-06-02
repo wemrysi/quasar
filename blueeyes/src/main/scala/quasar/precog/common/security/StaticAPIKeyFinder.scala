@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar.precog.common.security
 
 import quasar.blueeyes._
+import quasar.precog.common._
 import quasar.precog.common.accounts._
-import quasar.precog.common.security.service._
+import quasar.precog.common.security.Permission._
+import quasar.precog.common.security.service.v1
 
 import org.slf4s.Logging
 
 import scalaz._
-import scalaz.std.option._
 import scalaz.syntax.monad._
 
 import java.time.LocalDateTime
-
-import Permission._
 
 class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging { self =>
   private val permissions = Set[Permission](

@@ -18,7 +18,6 @@ package quasar.niflheim
 
 import quasar.precog.common._
 
-import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 import scalaz._

@@ -16,7 +16,7 @@
 
 package quasar.precog.common.jobs
 
-import quasar.blueeyes.json.{ jfield, jobject, JNum, JObject, JValue }
+import quasar.blueeyes.json.{ jfield, jobject, JObject, JValue }
 import quasar.blueeyes.json.serialization.{ Decomposer, Extractor }
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 

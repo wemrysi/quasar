@@ -16,9 +16,6 @@
 
 package quasar.blueeyes.json
 
-import quasar.blueeyes._
-
-
 /** A difference between two JSONs (j1 diff j2).
   */
 case class Diff(changed: JValue, added: JValue, deleted: JValue) {

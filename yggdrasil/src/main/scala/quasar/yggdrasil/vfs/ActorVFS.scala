@@ -23,19 +23,15 @@ import quasar.yggdrasil.vfs.ResourceError._
 import quasar.niflheim._
 
 import quasar.precog.common._
-import quasar.precog.common.accounts.AccountId
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
-import quasar.precog.common.jobs._
 import quasar.precog.util._
 
 import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.table.ColumnarTableModule
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, ReceiveTimeout}
-import akka.dispatch._
-import akka.pattern.ask
-import akka.pattern.pipe
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 
 import quasar.blueeyes.MimeType
@@ -52,17 +48,15 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz._
-import scalaz.NonEmptyList._
 import scalaz.EitherT._
 import scalaz.effect.IO
 import scalaz.std.scalaFuture
 
 import Scalaz.{futureInstance => _, _}   // have to import like this because of syntax ambiguities
 
-import scala.concurrent.{Future, Promise, Await}
+import scala.concurrent.{Future, Await}
 
 import java.io.{File, IOException, FileInputStream, FileOutputStream}
-import java.nio.CharBuffer
 import java.util.UUID
 import java.util.concurrent.{ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger

@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._

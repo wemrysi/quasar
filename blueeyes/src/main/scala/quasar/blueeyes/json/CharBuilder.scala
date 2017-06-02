@@ -16,8 +16,6 @@
 
 package quasar.blueeyes.json
 
-import quasar.blueeyes._
-
 // efficient char-by-char string builder, taken from jawn under MIT license.
 // (https://github.com/non/jawn)
 

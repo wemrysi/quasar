@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
-
-import quasar.blueeyes._
-import org.slf4s.Logging
+package quasar.precog.common.security
 
 import scalaz._
-import scalaz.std.option._
 import scalaz.syntax.monad._
 
 import java.time.LocalDateTime

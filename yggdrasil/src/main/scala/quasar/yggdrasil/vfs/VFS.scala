@@ -23,7 +23,6 @@ import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
-import quasar.precog.util._
 
 import java.util.Arrays
 import java.nio.{ByteBuffer, CharBuffer}
