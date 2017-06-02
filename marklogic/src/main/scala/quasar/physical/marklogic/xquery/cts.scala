@@ -26,6 +26,9 @@ import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object cts {
+  def andQuery(queries: XQuery): XQuery =
+    XQuery(s"cts:and-query($queries)")
+
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
     XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")
 

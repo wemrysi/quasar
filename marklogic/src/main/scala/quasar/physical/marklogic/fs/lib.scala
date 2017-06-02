@@ -81,9 +81,11 @@ object lib {
     })
 
   // filesystem:directory-contents($uri as xs:string) as xs:string*
-  def directoryContents[F[_]: PrologW: Bind, T: SearchOptions]: F[FunctionDecl1] =
+  def directoryContents[F[_]: PrologW: Bind, T: SearchOptions](
+    nextUri: (XQuery, XQuery) => XQuery
+  ): F[FunctionDecl1] =
     (
-      discoverChildren[F].fn                |@|
+      discoverChildren[F](nextUri).fn       |@|
       descendantsHavingFormatExist[F, T].fn
     ).tupled flatMap { case (discKids, descsExist) =>
       fs.declare[F]("directory-contents") map (_(
@@ -150,6 +152,33 @@ object lib {
       })
     }
 
+  // filesystem:descendant-uri-from-lexicon($parent as xs:string, $filter as cts:query) as xs:string?
+  def descendantUriFromDocQuery[F[_]: PrologW: Functor]: F[FunctionDecl2] =
+    fs.declare[F]("descendant-uri-from-doc-query") map (_(
+      $("parent") as ST("xs:string"),
+      $("filter") as ST("cts:query")
+    ).as(ST("xs:string?")) { (parent: XQuery, filter: XQuery) =>
+			val s = $("s")
+			fn.filter(
+				func(s.render) {
+					fn.contains(fn.substringAfter(~s, parent), "/".xs)
+        },
+        fn.baseUri(cts.search(fn.doc(), cts.andQuery(mkSeq_(
+          cts.directoryQuery(parent, "infinity".xs),
+          cts.notQuery(cts.directoryQuery(parent, "1".xs)),
+          filter))
+        )(1.xqy)))
+    })
+
+  // filesystem:descendant-uri-from-lexicon($parent as xs:string, $filter as cts:query) as xs:string?
+  def descendantUriFromLexicon[F[_]: PrologW: Functor]: F[FunctionDecl2] =
+    fs.declare[F]("descendant-uri-from-lexicon") map (_(
+      $("parent") as ST("xs:string"),
+      $("filter") as ST("cts:query")
+    ).as(ST("xs:string?")) { (parent: XQuery, filter: XQuery) =>
+      cts.uriMatch(fn.concat(parent, "*/*".xs), IList("document".xs), some(filter))(1.xqy)
+    })
+
   ////
 
   // filesystem:as-child-dir($parent as xs:string, $child as xs:string) as xs:string
@@ -161,10 +190,15 @@ object lib {
       fn.concat(parent, fn.tokenize(fn.substringAfter(child, parent), "/".xs)(1.xqy), "/".xs)
     })
 
-  // filesystem:discover-children($parent as xs:string, $known as xs:string*)
-  // NB: Apparently, as of ML8, TCO doesn't kick in unless the function is untyped.
-  // https://stackoverflow.com/questions/41746814/marklogic-xquery-tail-call-optimization
-  private def discoverChildren[F[_]: PrologW: Bind]: F[FunctionDecl2] =
+  /** filesystem:discover-children($parent as xs:string, $known as xs:string*)
+    *
+    * @param nextUri function that returns the next descendant URI given a parent directory
+    *                and filtering cts:query.
+    *
+    * NB: Apparently, as of ML8, TCO doesn't kick in unless the function is untyped.
+    * https://stackoverflow.com/questions/41746814/marklogic-xquery-tail-call-optimization
+    */
+  private def discoverChildren[F[_]: PrologW: Bind](nextUri: (XQuery, XQuery) => XQuery): F[FunctionDecl2] =
     (fs.name("discover-children").qn[F] |@| asChildDir[F].fn)((fname, childDir) =>
       declare(fname)(
         $("parent") as ST("xs:string"),
@@ -173,7 +207,7 @@ object lib {
         val (knownq, uri, d) = ($("knownq"), $("uri"), $("d"))
         let_(
           knownq := cts.notQuery(cts.orQuery(fn.map(func(d.render) { cts.directoryQuery(~d, "infinity".xs) }, known))),
-          uri    := cts.uriMatch(fn.concat(parent, "*/*".xs), IList("document".xs), some(~knownq))(1.xqy)
+          uri    := nextUri(parent, ~knownq)
         ) return_ (
           if_(fn.exists(~uri))
           .then_(fname(parent, mkSeq_(childDir(parent, ~uri), known)))

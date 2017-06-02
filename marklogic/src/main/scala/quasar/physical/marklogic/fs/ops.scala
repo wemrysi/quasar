@@ -83,22 +83,32 @@ object ops {
   }
 
   /** The set of child directories and files of the given directory. */
-  def directoryContents[F[_]: Functor: Xcc, FMT: SearchOptions](dir: ADir): F[Set[PathSegment]] = {
+  def directoryContents[F[_]: Bind: Xcc, FMT: SearchOptions](dir: ADir): F[Set[PathSegment]] = {
     def parseDir(s: String): Option[PathSegment] =
       UriPathCodec.parseRelDir(s) flatMap dirName map (_.left)
 
     def parseFile(s: String): Option[PathSegment] =
       UriPathCodec.parseRelFile(s) map (f => fileName(f).right)
 
-    val main = main10ml(lib.directoryContents[W, FMT] apply pathUri(dir).xs)
+    val nextUri =
+      uriLexiconEnabled[F] map (_.fold(
+        lib.descendantUriFromLexicon[W].fn,
+        lib.descendantUriFromDocQuery[W].fn))
 
-    Xcc[F].results(main.value) map (_ foldMap {
+    val asSegments: XdmItem => Set[PathSegment] = {
       case item: XSString =>
         val str = item.asString
         (parseDir(str) orElse parseFile(str)).toSet
 
       case _ => Set()
-    })
+    }
+
+    Xcc[F].transact(for {
+      f     <- nextUri
+      mm    =  main10ml((f >>= lib.directoryContents[W, FMT])(pathUri(dir).xs))
+      items <- Xcc[F].results(mm.value)
+      segs  =  items foldMap asSegments
+    } yield segs)
   }
 
   /** Returns whether the file exists, regardless of format. */
@@ -187,6 +197,15 @@ object ops {
     fileExists[F](file).ifM(
       appendToFile[F, FMT, A](file, contents),
       insertFile[F, FMT, A](file, contents))
+
+  /** Returns whether the URI lexicon is enabled. */
+  def uriLexiconEnabled[F[_]: Functor: Xcc]: F[Boolean] = {
+    val main = main10ml {
+      admin.getConfiguration[W] >>= (admin.databaseGetUriLexicon[W](_, xdmp.database()))
+    }
+
+    Xcc[F].results(main.value) map booleanResult
+  }
 
   ////
 
