@@ -72,9 +72,14 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     mkObjectFn(entries)
 
   def mkObjectEntry(key: XQuery, value: XQuery) =
-    XQuery.stringLit.getOption(key).cata(
-      s => asQName(s) >>= (qn => renameOrWrap(qn.xqy, value)),
-      renameOrWrap(xs.QName(key), value))
+    key match {
+      case XQuery.StringLit(QName.string(qn)) =>
+        renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(key) =>
+        renameOrWrapAttr(key.xqy, value)
+      case _ =>
+        renameOrWrap(xs.QName(key), value)
+    }
 
   def nodeCast(node: XQuery) =
     castAsAscribed(node)
@@ -114,7 +119,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(s) =>
         freshName[F] flatMap ( m =>
           if (XQuery.flwor.nonEmpty(obj))
-            encodedChild(~m, s.xqy).map((el: XQuery) => let_(m := obj) return_ el)
+            encodedChild(~m, s.xqy) map ((el: XQuery) => let_(m := obj) return_ el)
           else
             encodedChild(obj, s.xqy))
 
@@ -259,6 +264,27 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         ) default (element { name } { mkSeq_(typeAttr(value), value) })
       })
     }
+
+  // ejson:rename-or-wrap-encoded($name as xs:string, $value as item()*) as element()
+  lazy val renameOrWrapAttr: F[FunctionDecl2] =
+    typeAttrFor.fn flatMap { typeAttr =>
+      ejs.declare[F]("rename-or-wrap-attr") map (_(
+        $("name")  as ST("xs:string"),
+        $("value") as ST.Top
+      ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
+        typeswitch(value)(
+          $("e") as ST("element()") return_ (e =>
+            element { ejsonEncodedName.xqy } {
+              mkSeq_(e `/` axes.attribute.node(),
+                     e `/` child.node(),
+                     attribute { ejsonEncodedAttr.shows.xqy } { name })}
+          )
+        ) default (element { ejsonEncodedName.shows.xqy }
+                           { mkSeq_(typeAttr(value), value,
+                             attribute { ejsonEncodedAttr.shows.xqy } { name }) })
+      })
+    }
+
 
   lazy val ascribedType: F[FunctionDecl1] =
     typeAttrN.qn[F] flatMap { tname =>
