@@ -41,7 +41,6 @@ import org.http4s.{Query, _}
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
 import pathy.scalacheck.PathyArbitrary._
-import pathy.Path
 import pathy.Path._
 import matryoshka.data.Fix
 import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
@@ -67,13 +66,13 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
       invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
     })
 
-  def sampleStatements(name: String, readFrom: Path[_, Path.File, Path.Sandboxed]): List[Statement[Fix[Sql]]] = {
+  def sampleStatement(name: String): Statement[Fix[Sql]] = {
     val selectAll = SelectR(
       SelectAll,
       List(Proj(SpliceR(None), None)),
-      Some(TableRelationAST(unsandbox(readFrom), None)),
+      Some(VariRelationAST(Vari("Bar"), None)),
       None, None, None)
-    List(FunctionDecl(CIName(name), List(CIName("Bar")), selectAll))
+    FunctionDecl(CIName(name), List(CIName("Bar")), selectAll)
   }
 
   def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
@@ -101,7 +100,7 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
       "produce a 400 bad request if not all params are supplied with explanation of " +
       "which function parameters are missing from the query string" >>
         prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
-          val statements = sampleStatements(fileName(functionFile).value, dataFile)
+          val statements = List(sampleStatement(fileName(functionFile).value))
           val mounts = Map((fileParent(functionFile): APath) -> MountConfig.moduleConfig(statements))
           val state = InMemState.fromFiles(Map(dataFile -> sampleData))
           val response = service(state, mounts)(Request(uri = pathUri(functionFile))).unsafePerformSync
@@ -112,23 +111,25 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
       "return evaluation of sql statement contained within function body if all params are supplied" >> {
         "in straightforward case" >>
           prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
-            val statements = sampleStatements(fileName(functionFile).value, dataFile)
+            val statements = List(sampleStatement(fileName(functionFile).value))
             val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
             val state = InMemState.fromFiles(Map(dataFile -> sampleData))
-            val request = Request(uri = pathUri(functionFile).copy(query = Query.fromPairs("bar" -> "2")))
+            val arg = "`" + posixCodec.printPath(dataFile) + "`"
+            val request = Request(uri = pathUri(functionFile).copy(query = Query.fromPairs("bar" -> arg)))
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
-          }
+          }.pendingUntilFixed
         "if file in module function is relative" >>
           prop { (functionFile: AFile, rDataFile: RFile, sampleData: Vector[Data]) =>
-            val statements = sampleStatements(fileName(functionFile).value, rDataFile)
+            val statements = List(sampleStatement(fileName(functionFile).value))
             val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
             val dataFile = fileParent(functionFile) </> rDataFile
             val state = InMemState.fromFiles(Map(dataFile -> sampleData))
-            val request = Request(uri = pathUri(functionFile).copy(query = Query.fromPairs("bar" -> "2")))
+            val arg = "`" + posixCodec.printPath(rDataFile) + "`"
+            val request = Request(uri = pathUri(functionFile).copy(query = Query.fromPairs("bar" -> arg)))
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
-          }
+          }.pendingUntilFixed
       }
     }
   }
