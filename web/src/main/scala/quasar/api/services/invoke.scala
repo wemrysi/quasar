@@ -29,7 +29,7 @@ import quasar.fs.mount.module.Module
 import org.http4s.dsl._
 import org.http4s.headers.Accept
 import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object invoke {
@@ -41,15 +41,15 @@ object invoke {
     S1: Failure[Module.Error, ?] :<: S
   ): QHttpService[S] = QHttpService {
 
-    case req @ GET -> AsPath(path) =>
-      respond_ {
+    case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
+      respond_ {(offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)){ (offset, limit) =>
         refineType(path).fold(
           dir => apiError(BadRequest withReason "Path must be a file").toResponse[S],
           file => {
             val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-            invoke[S](requestedFormat, file, req.params)
+            invoke[S](requestedFormat, file, req.params, offset, limit)
           })
-      }
+      }}
   }
 
   ////
@@ -57,11 +57,13 @@ object invoke {
   private def invoke[S[_]](
     format: MessageFormat,
     filePath: AFile,
-    args: Map[String, String]
+    args: Map[String, String],
+    offest: Natural,
+    limit: Option[Positive]
   )(implicit
     I: Module.Ops[S],
     S0: Failure[Module.Error, ?] :<: S,
     S1: Task :<: S
   ): QResponse[S] =
-      formattedDataResponse(format, I.invokeFunction(filePath, args))
+      formattedDataResponse(format, I.invokeFunction(filePath, args, offest, limit))
 }
