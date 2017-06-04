@@ -16,7 +16,7 @@ object Dependencies {
   private val pathyVersion             = "0.2.9"
   private val raptureVersion           = "2.0.0-M6"
   private val scodecBitsVersion        = "1.1.0"
-  private val http4sVersion            = "0.15.9a"
+  private val http4sVersion            = "0.15.13a"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
