@@ -91,6 +91,13 @@ final class XmlStructuralPlannerSpec
 
         eval(obj >>= (SP.objectLookup(_, xs.QName("baz".xs)))) must resultIn(Data._arr(List(y, z)))
       }
+
+      "returns non-QName keys" >> prop { x: Data =>
+        val obj = lit(x).flatMap(a     => SP.mkObjectEntry("12 not qname".xs, a))
+                        .flatMap(entry => SP.mkObject(mkSeq_(entry)))
+
+        eval(obj >>= (SP.objectLookup(_, "12 not qname".xs))) must resultIn (x)
+      }
     }
   }
 }

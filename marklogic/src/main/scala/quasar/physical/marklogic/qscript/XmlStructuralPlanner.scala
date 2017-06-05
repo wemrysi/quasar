@@ -76,7 +76,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(QName.string(qn)) =>
         renameOrWrap(qn.xqy, value)
       case XQuery.StringLit(key) =>
-        renameOrWrapAttr(key.xqy, value)
+        renameOrWrapAttr(key.xs, value)
       case _ =>
         renameOrWrap(xs.QName(key), value)
     }
@@ -119,9 +119,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(s) =>
         freshName[F] flatMap ( m =>
           if (XQuery.flwor.nonEmpty(obj))
-            encodedChild(~m, s.xqy) map ((el: XQuery) => let_(m := obj) return_ el)
+            encodedChild(~m, s.xs) map ((el: XQuery) => let_(m := obj) return_ el)
           else
-            encodedChild(obj, s.xqy))
+            encodedChild(obj, s.xs))
 
       case _ => childrenNamed(obj, xs.QName(key))
     }
@@ -265,7 +265,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       })
     }
 
-  // ejson:rename-or-wrap-encoded($name as xs:string, $value as item()*) as element()
+  // ejson:rename-or-wrap-attr($name as xs:string, $value as item()*) as element()
   lazy val renameOrWrapAttr: F[FunctionDecl2] =
     typeAttrFor.fn flatMap { typeAttr =>
       ejs.declare[F]("rename-or-wrap-attr") map (_(
@@ -275,13 +275,13 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { ejsonEncodedName.xqy } {
-              mkSeq_(e `/` axes.attribute.node(),
-                     e `/` child.node(),
-                     attribute { ejsonEncodedAttr.shows.xqy } { name })}
+              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
+                     e `/` axes.attribute.node(),
+                     e `/` child.node())}
           )
-        ) default (element { ejsonEncodedName.shows.xqy }
-                           { mkSeq_(typeAttr(value), value,
-                             attribute { ejsonEncodedAttr.shows.xqy } { name }) })
+        ) default (element { ejsonEncodedName.xqy }
+                           { mkSeq_(value, typeAttr(value),
+                             attribute { ejsonEncodedAttr.xqy } { name }) })
       })
     }
 
