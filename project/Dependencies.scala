@@ -9,6 +9,7 @@ import slamdata.CommonDependencies
 
 object Dependencies {
   private val algebraVersion           = "0.7.0"
+  private val argonautVersion          = "6.2"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.10.4"
   private val jacksonVersion           = "2.4.4"
@@ -27,10 +28,10 @@ object Dependencies {
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
-    "org.typelevel" %% "algebra"     % algebraVersion,
-    "org.typelevel" %% "spire"       % spireVersion,
-    CommonDependencies.argonaut.argonaut,
-    CommonDependencies.argonaut.scalaz,
+    "org.typelevel" %% "algebra"         % algebraVersion,
+    "org.typelevel" %% "spire"           % spireVersion,
+    "io.argonaut"   %% "argonaut"        % argonautVersion,
+    "io.argonaut"   %% "argonaut-scalaz" % argonautVersion,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
     "com.slamdata"  %% "pathy-core"      % pathyVersion,
     "com.slamdata"  %% "pathy-argonaut"  % pathyVersion,
@@ -54,7 +55,6 @@ object Dependencies {
   )
 
   def ejson = Seq(
-    CommonDependencies.argonaut.argonaut,
     "org.spire-math" %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
@@ -153,8 +153,8 @@ object Dependencies {
     "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
-    CommonDependencies.argonaut.monocle                         % Test,
-    CommonDependencies.http4s.blazeClient                       % Test,
-    CommonDependencies.refined.scalacheck                       % Test,
-    "io.verizon.knobs" %% "core"  % "4.0.30-scalaz-7.2"         % Test)
+    "io.argonaut"      %% "argonaut-monocle" % argonautVersion     % Test,
+    CommonDependencies.http4s.blazeClient                          % Test,
+    CommonDependencies.refined.scalacheck                          % Test,
+    "io.verizon.knobs" %% "core"             % "4.0.30-scalaz-7.2" % Test)
 }
