@@ -42,14 +42,16 @@ object invoke {
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
-      respond_ {(offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)){ (offset, limit) =>
-        refineType(path).fold(
-          dir => apiError(BadRequest withReason "Path must be a file").toResponse[S],
-          file => {
-            val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-            invoke[S](requestedFormat, file, req.params, offset, limit)
-          })
-      }}
+      respond_ {
+        (offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
+          refineType(path).fold(
+            dir => apiError(BadRequest withReason "Path must be a file").toResponse[S],
+            file => {
+              val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
+              invoke[S](requestedFormat, file, req.params, offset, limit)
+            })
+        }
+      }
   }
 
   ////
@@ -58,12 +60,12 @@ object invoke {
     format: MessageFormat,
     filePath: AFile,
     args: Map[String, String],
-    offest: Natural,
+    offset: Natural,
     limit: Option[Positive]
   )(implicit
     I: Module.Ops[S],
     S0: Failure[Module.Error, ?] :<: S,
     S1: Task :<: S
   ): QResponse[S] =
-      formattedDataResponse(format, I.invokeFunction(filePath, args, offest, limit))
+      formattedDataResponse(format, I.invokeFunction(filePath, args, offset, limit))
 }
