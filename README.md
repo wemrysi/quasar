@@ -494,6 +494,7 @@ Returns a Json object with the following shape:
   "inputs": [<filePath>, ...],
   "physicalPlan": "Description of physical plan"
 }
+```
 
 where `inputs` is a field containing a list of files that are referenced by the query.
 where `physicalPlan` is a string description of the physical plan that would be executed by this query. `null` if no physical plan is required in order to execute this query. A query may not need a physical plan in order to be executed if the query is "constant", that is that no data needs to be read from a backend.
