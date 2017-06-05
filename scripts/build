@@ -87,7 +87,7 @@ elif [[ $CONNECTOR == "mongodb_3_0" ]]; then
 
   # Require that all header comments are present before proceeding, then
   # build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE "testOnly -- xonly" "exclusive:test -- xonly" $COVERAGE_REPORT
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION checkHeaders $COVERAGE "testOnly -- xonly" "exclusive:testOnly -- xonly" $COVERAGE_REPORT
 else
   # Compiling `connector` can take awhile, so allow it some extra time when
   # running on travis to avoid having the build killed due to lack of output.
