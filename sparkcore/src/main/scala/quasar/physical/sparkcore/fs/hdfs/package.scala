@@ -96,8 +96,9 @@ package object hdfs {
     }
 
     val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
-      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
-    ) 
+      uri.params.get("hdfsUrl").map(url => URLDecoder.decode(url, "UTF-8")).fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
     val rootPathOrErr: DefinitionError \/ ADir =
       uriOrErr
         .flatMap(uri =>
@@ -170,7 +171,7 @@ package object hdfs {
     fs <- Task.delay {
       val conf = new Configuration()
       conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-      HdfsFileSystem.get(new URI(URLDecoder.decode(sfsConf.hdfsUriStr, "UTF-8")), conf)
+      HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
     }
     uriStr = fs.getUri().toASCIIString()
     _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
