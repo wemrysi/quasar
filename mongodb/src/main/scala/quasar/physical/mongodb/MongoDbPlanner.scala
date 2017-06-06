@@ -523,7 +523,10 @@ object MongoDbPlanner {
        Arr(List(Arr(List(a1, a2)))))).point[M]
       case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
         Arr(a1 |+| a2).point[M]
-      case ConcatArrays(a1, a2) => BinOp(jscore.Add, a1, a2).point[M]
+      case ConcatArrays(a1, a2) =>
+        If(BinOp(jscore.Or, isArray(a1), isArray(a2)),
+          Call(Select(a1, "concat"), List(a2)),
+          BinOp(jscore.Add, a1, a2)).point[M]
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
@@ -936,12 +939,12 @@ object MongoDbPlanner {
                   funcHandler)(
                   // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
-                    GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap + (BsonField.Name("bucket") -> b)), // FIXME: Doesn’t work with UnshiftMap
+                    WB.groupBy(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap + (BsonField.Name("bucket") -> b)), // FIXME: Doesn’t work with UnshiftMap
                       List(\&/-($field("bucket"))),
                       DocContents.Doc(red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),
                           accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap)))(
-                    exprs => GroupBuilder(src,
+                    exprs => WB.groupBy(src,
                       List(b),
                       DocContents.Doc(exprs.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),

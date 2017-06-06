@@ -3,14 +3,13 @@
     "backends": {
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": ["marklogic_json", "mongodb_3_2"],
     "expected": [{ "arr": [-72.51565,  42.377017, 1, 2], "city": "CUSHMAN"          },
                  { "arr": [-72.576142, 42.176443, 1, 2], "city": "CHICOPEE"         },
                  { "arr": [-72.626193, 42.202007, 1, 2], "city": "HOLYOKE"          },
