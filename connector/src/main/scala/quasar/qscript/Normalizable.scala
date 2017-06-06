@@ -87,8 +87,9 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+  def freeMF[A: Equal: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     fm.transCata[Free[MapFunc, A]](MapFunc.normalize[T, A])
+      .transCata[Free[MapFunc, A]](repeatedly(MapFunc.extractGuards[T, A]))
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(

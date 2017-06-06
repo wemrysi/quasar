@@ -147,7 +147,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 object QScriptCore {
-  implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {

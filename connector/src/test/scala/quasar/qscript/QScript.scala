@@ -890,11 +890,10 @@ class QScriptSpec
           NullLit(),
           (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
-          MakeArrayR(DeleteFieldR(
-            ConcatMapsR(
-              MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
-              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
-            StrLit("__sd__0"))),
+          MakeArrayR(
+            MakeMapR(
+              StrLit("city"),
+              ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city")))),
           List(
             ReduceFuncs.First(ConcatMapsR(
               MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
@@ -952,11 +951,7 @@ class QScriptSpec
           NullLit(),
           (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
-          MakeArrayR(DeleteFieldR(
-            ConcatMapsR(
-              MakeMapR(StrLit("name"), cond),
-              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))),
-            StrLit("__sd__0"))),
+          MakeArrayR(MakeMapR(StrLit("name"), cond)),
           List(
             ReduceFuncs.First(ConcatMapsR(
               MakeMapR(StrLit("name"), cond),

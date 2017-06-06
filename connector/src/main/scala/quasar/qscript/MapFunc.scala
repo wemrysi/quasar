@@ -112,6 +112,12 @@ object MapFunc {
   }
 
   object StaticMap {
+    def apply[T [_ [_]]: CorecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] =
+      elems.map(e => Free.roll(MakeMap[T, FreeMapA[T, A]](Free.roll(Constant(e._1)), e._2))) match {
+        case Nil    => Free.roll(EmptyMap[T, FreeMapA[T, A]])
+        case h :: t => t.foldLeft(h)((a, e) => Free.roll(ConcatMaps(a, e)))
+      }
+
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
       mf match {
@@ -130,8 +136,13 @@ object MapFunc {
   }
 
   object EmptyArray {
-    def apply[T[_[_]]: CorecursiveT, A]: Constant[T, A] =
+    def apply[T[_[_]]: CorecursiveT, A]: MapFunc[T, A] =
       Constant[T, A](EJson.fromCommon(ejson.Arr[T[EJson]](Nil)))
+  }
+
+  object EmptyMap {
+    def apply[T[_[_]]: CorecursiveT, A]: MapFunc[T, A] =
+      Constant[T, A](EJson.fromExt(ejson.Map[T[EJson]](Nil)))
   }
 
   // TODO: subtyping is preventing embedding of MapFuncs
@@ -227,10 +238,42 @@ object MapFunc {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
+  // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
+  //     take way too long, so instead we apply it separately afterward.
+  def extractGuards[T[_[_]]: BirecursiveT, A]
+      : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+    _.run.toOption >>= {
+      // NB: The last case pulls guards into a wider scope, and we want to avoid
+      //     doing that for certain MapFuncs, so we add explicit `none`s.
+      case ConcatArrays(_, _) | ConcatMaps(_, _)
+         | Guard(_, _, _, _)
+         | IfUndefined(_, _)
+         | MakeArray(_) | MakeMap(_, _)          => none
+      // TODO: This should be able to extract a guard where _either_ side is
+      //       `Undefined`, and should also extract `Cond` with `Undefined` on a
+      //       branch.
+      case func =>
+        val meh =
+          func.traverse[Writer[List[(FreeMapA[T, A], Type)], ?], FreeMapA[T, A]] {
+            case Embed(CoEnv(\/-(Guard(e, t, s, Embed(CoEnv(\/-(Undefined()))))))) =>
+              Writer(List((e, t)), s)
+            case arg => Writer(Nil, arg)
+          }
+        meh.written match {
+          case Nil    => none
+          case guards =>
+            rollMF(guards.distinct.foldRight(meh.value) {
+              case ((e, t), s) =>
+                Guard(e, t, Free.roll(s), Free.roll(Undefined[T, FreeMapA[T, A]]()))
+            }).some
+        }
+    }
+
+  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    (repeatedly(rewrite[T, A]) _) ⋘
-      orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))))
+    repeatedly(applyTransforms(
+      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](Constant(const))),
+      rewrite[T, A]))
 
   def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
       : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =
@@ -242,60 +285,44 @@ object MapFunc {
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
-      CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-    _.run.fold(
-      κ(None),
-      {
-        case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
-          rollMF[T, A](
-            Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2)))).some
+  private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]:
+      CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+    _.run.toOption >>= {
+      case Eq(v1, v2) if v1 ≟ v2 =>
+        rollMF[T, A](
+          Constant(EJson.fromCommon(ejson.Bool[T[EJson]](true)))).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Int(index)))))))) =>
-          if (index.isValidInt)
-            as.lift(index.intValue).map(_.project)
-          else None
+      case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
+        rollMF[T, A](
+          Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2)))).some
 
-        case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Constant(field))))) =>
-          as.collectFirst {
-            // TODO: Perhaps we could have an extractor so these could be
-            //       handled by the same case
-            case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Constant(src)))), Embed(value))))) if field ≟ src =>
-              value.some
-            case Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Map(m))))))) =>
-              m.collectFirst {
-                case (k, v) if k ≟ field => rollMF[T, A](Constant(v))
-              }
-          }.flatten
+      case DeleteField(
+        Embed(StaticMap(map)),
+        Embed(CoEnv(\/-(Constant(field))))) =>
+        StaticMap(map.filter(_._1 ≠ field)).project.some
 
-        // elide Nil array on the left
-        case ConcatArrays(
-          Embed(CoEnv(\/-(Constant(Embed(EC(ejson.Arr(Nil))))))),
-          Embed(CoEnv(\/-(rhs)))) =>
-            rollMF[T, A](rhs).some
+      case ProjectIndex(
+        Embed(StaticArrayPrefix(as)),
+        Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Int(index))))))))
+          if index.isValidInt =>
+        as.lift(index.intValue).map(_.project)
 
-        // elide Nil array on the right
-        case ConcatArrays(
-          Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Constant(Embed(EC(ejson.Arr(Nil)))))))) =>
-            rollMF[T, A](lhs).some
+      // TODO: Replace this with the above version
+      case ProjectField(
+        Embed(StaticMap(map)),
+        Embed(CoEnv(\/-(Constant(field))))) =>
+        map.reverse.find(_._1 ≟ field) ∘ (_._2.project)
 
-        // elide Nil map on the left
-        case ConcatMaps(
-          Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Map(Nil))))))),
-          Embed(CoEnv(\/-(rhs)))) =>
-            rollMF[T, A](rhs).some
+      case ConcatArrays(Embed(StaticArray(Nil)), Embed(rhs)) => rhs.some
 
-        // elide Nil map on the right
-        case ConcatMaps(
-          Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Map(Nil)))))))) =>
-            rollMF[T, A](lhs).some
+      case ConcatArrays(Embed(lhs), Embed(StaticArray(Nil))) => lhs.some
 
-        case _ => None
-      })
-  }
+      case ConcatMaps(Embed(StaticMap(Nil)), Embed(rhs)) => rhs.some
+
+      case ConcatMaps(Embed(lhs), Embed(StaticMap(Nil))) => lhs.some
+
+      case _ => none
+    }
 
   implicit def traverse[T[_[_]]]: Traverse[MapFunc[T, ?]] =
     new Traverse[MapFunc[T, ?]] {
@@ -388,12 +415,14 @@ object MapFunc {
       }
   }
 
-  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFunc[T, ?]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, A]: Delay[Equal, MapFunc[T, ?]] =
     new Delay[Equal, MapFunc[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
         // nullary
-        case (Constant(v1), Constant(v2)) => v1.equals(v2)
-        case (JoinSideName(n1), JoinSideName(n2)) => n1.equals(n2)
+        case (Constant(v1), Constant(v2)) =>
+          // FIXME: Ensure we’re using _structural_ equality here.
+          v1 ≟ v2
+        case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
 

@@ -524,6 +524,8 @@ object MongoDbPlanner {
       case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
         Arr(a1 |+| a2).point[M]
       case ConcatArrays(a1, a2) => BinOp(jscore.Add, a1, a2).point[M]
+      case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
+        Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
       case ProjectField(a1, a2) => Access(a1, a2).point[M]
       case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
@@ -928,13 +930,14 @@ object MongoDbPlanner {
                   -\&/(j)),
                   ExprBuilder(WB.flattenMap(builder), _)))
           case Reduce(src, bucket, reducers, repair) =>
-            (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
+            (handleFreeMap[T, M, EX](funcHandler, bucket) ⊛
               reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
+                  // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
-                    GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
-                      List(b),
+                    GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap + (BsonField.Name("bucket") -> b)), // FIXME: Doesn’t work with UnshiftMap
+                      List(\&/-($field("bucket"))),
                       DocContents.Doc(red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName(ai._2)),
                           accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap)))(
@@ -950,19 +953,23 @@ object MongoDbPlanner {
               case MapFuncs.NullLit() => order
               case _                  => (bucket, SortDir.Ascending) <:: order
             }).unzip
-            keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
+            keys.traverse(handleFreeMap[T, M, EX](funcHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>
             getSelector[T, M, EX](cond).fold(
-              // FIXME: If this is an ExprOp, then do this, but if it’s JS, we
-              //        should use a `Where` selector instead.
-              _ => getExprBuilder[T, M, WF, EX](funcHandler)(src, cond).map(cond =>
-                WB.filter(src, List(cond), {
+              _ => handleFreeMap[T, M, EX](funcHandler, cond).map {
+                // TODO: Postpone decision until we know whether we are going to
+                //       need mapReduce anyway.
+                case cond @ HasThat(_) => WB.filter(src, List(cond), {
                   case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-                })),
+                })
+                case \&/.This(js) => WB.filter(src, Nil, {
+                  case Nil => Selector.Where(js(jscore.ident("this")).toJs)
+                })
+              },
               {
                 case (sel, inputs) =>
-                  inputs.traverse(f => getExprBuilder[T, M, WF, EX](funcHandler)(src, f(cond))).map(WB.filter(src, _, sel))
+                  inputs.traverse(f => handleFreeMap[T, M, EX](funcHandler, f(cond))).map(WB.filter(src, _, sel))
               })
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, lBranch, src) ⊛
@@ -1002,8 +1009,8 @@ object MongoDbPlanner {
         (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.lBranch, qs.src) ⊛
           rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src))(
           (lb, rb) =>
-          (getExprBuilder[T, M, WF, EX](funcHandler)(lb, qs.lKey) ⊛
-            getExprBuilder[T, M, WF, EX](funcHandler)(rb, qs.rKey) ⊛
+          (handleFreeMap[T, M, EX](funcHandler, qs.lKey) ⊛
+            handleFreeMap[T, M, EX](funcHandler, qs.rKey) ⊛
             getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
             getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
             (lk, rk, lj, rj) =>
@@ -1331,7 +1338,7 @@ object MongoDbPlanner {
           .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript](Type.AnyObject))))).liftM[GenT]
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
+        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler)))
       wf1 <- log("Workflow (raw)", liftM[GenT[M, ?], Fix[WF]](WorkflowBuilder.build(wb)))
       wf2 <- log(
         "Workflow (crystallized)",

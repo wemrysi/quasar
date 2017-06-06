@@ -42,7 +42,7 @@ final case class JoinHandler[WF[_], F[_]](run: (MongoJoinType, JoinSource[WF], J
     run(tpe, left, right)
 }
 
-final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[WorkflowBuilder[WF]], js: Option[List[JsFn]])
+final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[Expr], js: Option[List[JsFn]])
 
 object JoinHandler {
 
@@ -103,11 +103,10 @@ object JoinHandler {
       case FlatteningBuilderF(src, _)         => src
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
-      case SpliceBuilderF(src, _)             => src
     }
 
     def lookup(
-        lSrc: WorkflowBuilder[WF], lKey: WorkflowBuilder[WF], lName: BsonField.Name,
+        lSrc: WorkflowBuilder[WF], lKey: Expr, lName: BsonField.Name,
         rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
 
       // NB: filtering on the left prior to the join is not strictly necessary,
@@ -115,11 +114,11 @@ object JoinHandler {
       // field referenced on one side of the condition is not found.
       def filterExists(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
         WB.filter(wb,
-          List(ExprBuilder(wb, docVarToExpr(DocField(field)))),
+          List(docVarToExpr(DocField(field))),
           { case List(f) => Selector.Doc(f -> Selector.Exists(true)) })
 
       lKey match {
-        case Fix(ExprBuilderF(src, HasThat($var(DocVar(_, Some(lField)))))) if src ≟ lSrc =>
+        case HasThat($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
           generateWorkflow(filtered).map { case (left, _) =>
@@ -134,11 +133,11 @@ object JoinHandler {
 
         case _ =>
           for {
-            tmpName  <- emitSt(freshName)
-            left     <- WB.objectConcat(
-                          WB.makeObject(lSrc, lName.asText),
-                          WB.makeObject(lKey, tmpName.asText))
-            t        <- generateWorkflow(left)
+            tmpName <- emitSt(freshName)
+            t       <- generateWorkflow(
+              DocBuilder(lSrc, ListMap(
+                lName   -> docVarToExpr(DocVar.ROOT()),
+                tmpName -> lKey)))
             (src, _) = t
           } yield CollectionBuilder(
               chain[Fix[WF]](
@@ -193,8 +192,8 @@ object JoinHandler {
       arg match {
         case JoinSource(
               Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
-              List(Fix(ExprBuilderF(src, HasThat($var(DocVar(_, Some(field))))))),
-              _) if src ≟ arg.src =>
+              List(HasThat($var(DocVar(_, Some(field))))),
+              _) =>
           (coll, field).some
         case _ =>
           None
@@ -231,7 +230,7 @@ object JoinHandler {
       (src, $map[WF](keyMap(key, rootField, otherField), ListMap()))
 
     def wbReduce
-      (src: WorkflowBuilder[WF], key: List[WorkflowBuilder[WF]],
+      (src: WorkflowBuilder[WF], key: List[Expr],
         rootField: BsonField.Name, otherField: BsonField.Name)
         : (WorkflowBuilder[WF], FixOp[WF]) =
       (DocBuilder(

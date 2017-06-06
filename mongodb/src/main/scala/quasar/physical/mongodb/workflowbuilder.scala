@@ -19,12 +19,13 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
+import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
-import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
@@ -59,8 +60,6 @@ object WorkflowBuilderF {
             eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
           case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
             eq.equal(s1, s2) && f1 == f2
-          case (SpliceBuilderF(s1, i1), SpliceBuilderF(s2, i2)) =>
-            eq.equal(s1, s2) && i1 == i2
           case _ => false
         })
       }
@@ -76,15 +75,13 @@ object WorkflowBuilderF {
         fa match {
           case x @ CollectionBuilderF(_, _, _) => G.point(x)
           case ShapePreservingBuilderF(src, inputs, op) =>
-            (f(src) |@| inputs.traverse(f))(ShapePreservingBuilderF(_, _, op))
+            f(src).map(ShapePreservingBuilderF(_, inputs, op))
           case ExprBuilderF(src, expr) => f(src).map(ExprBuilderF(_, expr))
           case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
           case GroupBuilderF(src, keys, contents) =>
-            (f(src) |@| keys.traverse(f))(GroupBuilderF(_, _, contents))
+            f(src).map(GroupBuilderF(_, keys, contents))
           case FlatteningBuilderF(src, fields) =>
             f(src).map(FlatteningBuilderF(_, fields))
-          case SpliceBuilderF(src, structure) =>
-            f(src).map(SpliceBuilderF(_, structure))
         }
     }
 
@@ -107,7 +104,7 @@ object WorkflowBuilderF {
         case spb @ ShapePreservingBuilderF(src, inputs, op) =>
           val nt = "ShapePreservingBuilder" :: nodeType
           NonTerminal(nt, None,
-            rt.render(src) :: (inputs.map(rt.render) :+ spb.dummyOp.render))
+            rt.render(src) :: (inputs.map(_.render) :+ spb.dummyOp.render))
         case ExprBuilderF(src, expr) =>
           NonTerminal("ExprBuilder" :: nodeType, None,
             rt.render(src) :: expr.render :: Nil)
@@ -125,7 +122,7 @@ object WorkflowBuilderF {
           val nt = "GroupBuilder" :: nodeType
           NonTerminal(nt, None,
             rt.render(src) ::
-              NonTerminal("By" :: nt, None, keys.map(rt.render)) ::
+              NonTerminal("By" :: nt, None, keys.map(_.render)) ::
               RG.render(content).copy(nodeType = "Content" :: nt) ::
               Nil)
         case FlatteningBuilderF(src, fields) =>
@@ -136,9 +133,6 @@ object WorkflowBuilderF {
                 case StructureType.Array(_) => "Array"
                 case StructureType.Object(_) => "Object"
               }) :: nt)))
-        case SpliceBuilderF(src, structure) =>
-          NonTerminal("SpliceBuilder" :: nodeType, None,
-            rt.render(src) :: structure.map(RC.render))
       }
     }))
 }
@@ -200,7 +194,7 @@ object WorkflowBuilder {
   /** For instance, \$match, \$skip, \$limit, \$sort */
   final case class ShapePreservingBuilderF[F[_], A](
     src: A,
-    inputs: List[A],
+    inputs: List[Expr],
     op: PartialFunction[List[BsonField], FixOp[F]])
       extends WorkflowBuilderF[F, A]
   {
@@ -215,7 +209,7 @@ object WorkflowBuilder {
   object ShapePreservingBuilder {
     def apply[F[_]: Coalesce](
       src: WorkflowBuilder[F],
-      inputs: List[WorkflowBuilder[F]],
+      inputs: List[Expr],
       op: PartialFunction[List[BsonField], FixOp[F]])
       (implicit ev: WorkflowOpCoreF :<: F) =
       Fix[WorkflowBuilderF[F, ?]](new ShapePreservingBuilderF(src, inputs, op))
@@ -253,7 +247,7 @@ object WorkflowBuilder {
 
   sealed abstract class DocContents[A] extends Product with Serializable
   object DocContents {
-    final case class Expr[A](contents: A) extends DocContents[A]
+    final case class Exp[A](contents: A) extends DocContents[A]
     final case class Doc[A](contents: ListMap[BsonField.Name, A]) extends DocContents[A]
 
     implicit def DocContentsRenderTree[A: RenderTree]: RenderTree[DocContents[A]] =
@@ -262,28 +256,28 @@ object WorkflowBuilder {
 
         def render(v: DocContents[A]) =
           v match {
-            case Expr(a)   => NonTerminal("Expr" :: nodeType, None, a.render :: Nil)
-            case Doc(b)    => NonTerminal("Doc" :: nodeType, None, b.render :: Nil)
+            case Exp(a) => NonTerminal("Exp" :: nodeType, None, a.render :: Nil)
+            case Doc(b) => NonTerminal("Doc" :: nodeType, None, b.render :: Nil)
           }
       }
   }
   import DocContents._
 
   def contentsToBuilder[F[_]]: DocContents[Expr] => WorkflowBuilder[F] => WorkflowBuilder[F] = {
-    case Expr(expr) => ExprBuilder(_, expr)
-    case Doc(doc)   => DocBuilder(_, doc)
+    case Exp(expr) => ExprBuilder(_, expr)
+    case Doc(doc)  => DocBuilder(_, doc)
   }
 
   type GroupValue[A] = AccumOp[A] \/ A
   type GroupContents = DocContents[GroupValue[Fix[ExprOp]]]
 
   final case class GroupBuilderF[F[_], A](
-    src: A, keys: List[A], contents: GroupContents)
+    src: A, keys: List[Expr], contents: GroupContents)
       extends WorkflowBuilderF[F, A]
   object GroupBuilder {
     def apply[F[_]](
       src: WorkflowBuilder[F],
-      keys: List[WorkflowBuilder[F]],
+      keys: List[Expr],
       contents: GroupContents) =
       Fix[WorkflowBuilderF[F, ?]](new GroupBuilderF(src, keys, contents))
   }
@@ -313,172 +307,6 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields))
   }
 
-  /** Holds a partially-unknown structure. `Expr` entries are unknown and `Doc`
-    * entries are known. There should be at least one Expr in the list,
-    * otherwise it should be a DocBuilder.
-    */
-  final case class SpliceBuilderF[F[_], A](src: A, structure: List[DocContents[Expr]])
-      extends WorkflowBuilderF[F, A] {
-    def toJs(implicit ev: ExprOpOps.Uni[ExprOp]): PlannerError \/ JsFn =
-      structure.traverse {
-        case Expr(unknown) => exprToJs(unknown)
-        case Doc(known)    => known.toList.traverse { case (k, v) =>
-          exprToJs(v).map(k.asText -> _)
-        }.map(ms => JsFn(jsBase, jscore.Obj(ms.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(jsBase)) }.toListMap)))
-      }.map(srcs =>
-        JsFn(jsBase, jscore.SpliceObjects(srcs.map(_(jscore.Ident(jsBase))))))
-  }
-  object SpliceBuilder {
-    def apply[F[_]](src: WorkflowBuilder[F], structure: List[DocContents[Expr]]) =
-      Fix[WorkflowBuilderF[F, ?]](new SpliceBuilderF(src, structure))
-  }
-
-  /** Simplify/coalesce certain shapes, eliminating extra layers that make it
-    * harder to pattern match. Should be applied before `merge`.
-    */
-  def normalizeƒ[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp])
-    : WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]] => Option[WorkflowBuilderF[F, Fix[WorkflowBuilderF[F, ?]]]] = {
-
-    def collapse(outer: Expr, inner: ListMap[BsonField.Name, Expr]): Option[Expr] = {
-      def rewriteExpr(t: Fix[ExprOp])(applyExpr: PartialFunction[ExprOp[Expr], Option[Expr]]): Option[Expr] =
-        t.cataM[Option, Expr] { x =>
-          applyExpr.lift(x).getOrElse {
-            x.traverse {
-              case HasThat(op) => op.some
-              case _           => none
-            } >>= {
-              case $varF(_) => none
-              case op       => \&/-(Fix(op)).some
-            }
-          }
-        }
-
-
-      def collapseJs: JsFn => Option[JsFn] = js => for {
-        xs <- inner.map { case (n, x) =>
-                    jscore.Select(jscore.Ident(js.param), n.value) -> HasThis.unapply(x)
-                  }.sequence
-        expr1 <- js.expr.apoM[JsCore] {
-                    case t @ jscore.Access(b, _) if b == jscore.Ident(js.param) =>
-                      xs.get(t).map(_(jscore.Ident(js.param)).project.map(_.left[JsCore]))
-                    case t => t.project.map(_.right[JsCore]).some
-                  }
-      } yield JsFn(js.param, expr1)
-
-      def collapseExpr: Fix[ExprOp] => Option[Expr] = expr =>
-        rewriteExpr(expr) {
-            case $varF(DocVar(_, Some(f))) =>
-              f.flatten match {
-                case NonEmptyList(h @ BsonField.Name(_), INil()) => inner.get(h)
-                case ls =>
-                  ls.head match {
-                    case n @ BsonField.Name(_) => inner.get(n).flatMap {
-                      case HasThat($var(DocVar(b, None))) => BsonField(ls.tail.toList).map(f => docVarToExpr(DocVar(b, Some(f))))
-                      case HasThat($var(DocVar(b, Some(f)))) => docVarToExpr(DocVar(b, Some(BsonField(f.flatten :::> ls.tail)))).some
-                      case _ => None
-                    }
-                    case _ => None
-                  }
-              }
-          }
-
-      // TODO: Should this succeed (losing some information) when either inner
-      //       or outer isn't Both, or should it fail, not collapsing?
-      outer match {
-        case \&/.This(js) => collapseJs(js) ∘ -\&/
-        case \&/.Both(js, expr) =>
-          (collapseExpr(expr) ∘ {
-            case \&/.That(expr) => collapseJs(js).fold[Expr](\&/-(expr))(\&/(_, expr))
-            case other          => other
-          }).orElse(collapseJs(js) ∘ -\&/)
-        case \&/.That(expr) => collapseExpr(expr)
-      }
-    }
-
-    def inln(outerExpr: Expr, cont: DocContents[_ \&/ Fix[ExprOp]]): Option[Fix[ExprOp]] =
-      HasThat.unapply(outerExpr) >>= (
-        expr => (cont match {
-          case Expr(HasThat($var(dv))) =>
-            Some(expr.cata(exprOps.rewriteRefs(prefixBase(dv))))
-          case Expr(HasThat(ex)) => expr.cataM[Option, Fix[ExprOp]] {
-            case $varF(DocVar.ROOT(None)) => ex.some
-            case $varF(_)                 => None
-            case x                        => Fix(x).some
-          }
-          case Doc(map) => expr.cataM[Option, Fix[ExprOp]] {
-            case $varF(DocField(field)) =>
-              field.flatten.toList match {
-                case (name @ BsonField.Name(_)) :: Nil =>
-                  map.get(name).flatMap(HasThat.unapply)
-                case (name @ BsonField.Name(_)) :: tail =>
-                  map.get(name).flatMap {
-                    case HasThat($var(dv)) => BsonField(tail).map(p => $var(dv \ p))
-                    case _ => None
-                  }
-                case _ => None
-              }
-            case $varF(_) => None
-            case x => Some(Fix(x))
-          }
-          case _ => None
-        }))
-
-    {
-      case ExprBuilderF(src, \&/.Both(JsFn.identity, $$ROOT)) => src.project.some
-      case ExprBuilderF(src, outerExpr) =>
-        src.unFix match {
-          case ExprBuilderF(wb0, \&/.This(js1)) =>
-            HasThis.unapply(outerExpr).map(js => ExprBuilderF[F, WorkflowBuilder[F]](wb0, -\&/(js1 >>> js)))
-          case ExprBuilderF(src0, contents) =>
-            inln(outerExpr, Expr(contents)).map(expr => ExprBuilderF(src0, \&/-(expr)))
-          case DocBuilderF(src, innerShape) =>
-            collapse(outerExpr, innerShape).map(ExprBuilderF(src, _))
-          case ShapePreservingBuilderF(src0, inputs, op) =>
-            ShapePreservingBuilderF(
-              Fix(normalize[F].apply(ExprBuilderF(src0, outerExpr))),
-              inputs,
-              op).some
-          case GroupBuilderF(wb0, key, Expr(\/-($var(DocVar.ROOT(None))))) =>
-            GroupBuilderF(
-              Fix(normalize[F].apply(ExprBuilderF(wb0, outerExpr))),
-              key,
-              Expr(\/-($$ROOT))).some
-          case GroupBuilderF(wb0, key, contents) =>
-            inln(outerExpr, contents match {
-              case Expr(e) => Expr(e.fold(-\&/, \&/-))
-              case Doc(e) => Doc(e ∘ (_.fold(-\&/, \&/-)))
-            }).map(expr => GroupBuilderF(Fix(normalize[F].apply(ExprBuilderF(wb0, \&/-(expr)))), key, Expr(\/-($$ROOT))))
-          case _ => None
-        }
-      case DocBuilderF(Fix(DocBuilderF(src, innerShape)), outerShape) =>
-        outerShape.traverse(collapse(_, innerShape)).map(DocBuilderF(src, _))
-      case DocBuilderF(Fix(ExprBuilderF(src, innerExpr)), outerShape) =>
-        outerShape.traverse(inln(_, Expr(innerExpr))).map(exes => DocBuilderF(src, exes ∘ \&/-))
-      case DocBuilderF(Fix(ShapePreservingBuilderF(src, inputs, op)), shape) =>
-        ShapePreservingBuilderF(Fix(normalize[F].apply(DocBuilderF(src, shape))), inputs, op).some
-      case _ => None
-    }
-  }
-
-  def normalize[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, exprOps: ExprOpOps.Uni[ExprOp]) =
-    repeatedly(normalizeƒ[F]) _
-
-  private def rewriteObjRefs
-    (obj: ListMap[BsonField.Name, GroupValue[Fix[ExprOp]]])
-    (f: PartialFunction[DocVar, DocVar])
-    (implicit exprOps: ExprOpOps.Uni[ExprOp]) =
-    obj ∘ (_.bimap(accumulator.rewriteGroupRefs(_)(f), _.cata(exprOps.rewriteRefs(f))))
-
-  private def rewriteGroupRefs
-    (contents: GroupContents)
-    (f: PartialFunction[DocVar, DocVar])
-    (implicit exprOps: ExprOpOps.Uni[ExprOp]) =
-    contents match {
-      case Expr(expr) =>
-        Expr(expr.bimap(accumulator.rewriteGroupRefs(_)(f), _.cata(exprOps.rewriteRefs(f))))
-      case Doc(doc)   => Doc(rewriteObjRefs(doc)(f))
-    }
-
   private def rewriteDocPrefix(doc: ListMap[BsonField.Name, Expr], base: Base)
       (implicit exprOps: ExprOpOps.Uni[ExprOp]): ListMap[BsonField.Name, Expr] =
     doc ∘ (rewriteExprPrefix(_, base))
@@ -503,151 +331,104 @@ object WorkflowBuilder {
 
   private val jsBase = jscore.Name("__val")
 
-  private def toCollectionBuilder[F[_]: Coalesce]
-    (wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], exprOps: ExprOpOps.Uni[ExprOp])
-    : M[CollectionBuilderF[F]] =
-    wb.unFix match {
-      case cb @ CollectionBuilderF(_, _, _) => emit(cb)
-      case ShapePreservingBuilderF(src, inputs, op) =>
-        // At least one argument has no deref (e.g. $$ROOT)
-        def case1(src: WorkflowBuilder[F], input: WorkflowBuilder[F], op: PartialFunction[List[BsonField], FixOp[F]], fields: List[Base]): M[CollectionBuilderF[F]] = {
-          emitSt(freshName).flatMap(name =>
-            fields.traverse(f => (DocField(name) \\ f.toDocVar).deref).fold(
-              scala.sys.error("prefixed ${name}, but still no field"))(
-              op.lift(_).fold(
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
-                op =>
-                (toCollectionBuilder(src) |@| toCollectionBuilder(DocBuilder(input, ListMap(name -> \&/.Both(JsFn.identity, $$ROOT))))) {
-                  case (
-                    CollectionBuilderF(_, _, srcStruct),
-                    CollectionBuilderF(graph, _, _)) =>
-                    CollectionBuilderF(
-                      chain(graph, op),
-                      Field(name),
-                      srcStruct)
-                })))
-        }
-        // Every argument has a deref (so, a BsonField that can be given to the op)
-        def case2(
-          src: WorkflowBuilder[F],
-          input: WorkflowBuilder[F],
-          base: Base,
-          op: PartialFunction[List[BsonField], FixOp[F]],
-          fields: List[BsonField]):
-            M[CollectionBuilderF[F]] = {
-          ((toCollectionBuilder(src) |@| toCollectionBuilder(input)) {
-            case (
-              CollectionBuilderF(_, _, srcStruct),
-              CollectionBuilderF(graph, base0, bothStruct)) =>
-              op.lift(fields.map(f => base0.toDocVar.deref.map(_ \ f).getOrElse(f))).fold[M[CollectionBuilderF[F]]](
-                fail[CollectionBuilderF[F]](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
-                { op =>
-                  val g = chain(graph, op)
-                  if (srcStruct ≟ bothStruct)
-                    emit(CollectionBuilderF(g, base0 \ base, srcStruct))
-                  else {
-                    val (g1, base1) = shift(base0 \ base, srcStruct, g)
-                    emit(CollectionBuilderF(g1, base1, srcStruct))
-                  }
-                })
-          }).join
-        }
-        inputs match {
-          case Nil =>
-            toCollectionBuilder(src).map {
-              case CollectionBuilderF(g, b, s) =>
-                CollectionBuilderF(op(Nil)(g), b, s)
-            }
-          case _ =>
-            foldBuilders(src, inputs).flatMap { case (input1, base, fields) =>
-              fields.traverse(_.toDocVar.deref).fold(
-                case1(src, input1, op, fields))(
-                case2(src, input1, base, op, _))
-            }
-        }
-      case ExprBuilderF(src, HasThat($var(d))) =>
-        toCollectionBuilder(src).map {
-          case CollectionBuilderF(graph, base, _) =>
-            CollectionBuilderF(graph, base \ fromDocVar(d), None)
-        }
-      case ExprBuilderF(src, expr) =>
-        (toCollectionBuilder(src) ⊛ emitSt(freshName))((cb, name) =>
-          cb match {
-            case CollectionBuilderF(graph, base, _) =>
-              CollectionBuilderF(
-                chain(graph,
-                  rewriteExprPrefix(expr, base) match {
-                    case HasThat(op) =>
-                      $project[F](Reshape(ListMap(name -> \/-(op))))
-                    case \&/.This(js) =>
-                      $simpleMap[F](NonEmptyList(MapExpr(JsFn(jsBase, jscore.Obj(ListMap(jscore.Name(name.asText) -> js(jscore.Ident(jsBase))))))), ListMap())
-                  }),
-                Field(name),
-                None)
-          })
-      case DocBuilderF(src, shape) =>
-        generateWorkflow(src).flatMap { case (wf, base) =>
-          alignExpr(rewriteDocPrefix(shape, base)).fold(
-            fail[CollectionBuilderF[F]](InternalError fromMsg "Could not align the expressions"))(
-            s => shape.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-              fail(InternalError fromMsg "A shape with no fields does not make sense"))(
-              fields => emit(CollectionBuilderF(
-                chain(wf,
-                  s.fold(
-                    jsExprs => $simpleMap[F](NonEmptyList(
-                      MapExpr(JsFn(jsBase,
-                        jscore.Obj(jsExprs.map {
-                          case (name, expr) => jscore.Name(name.asText) -> expr(jscore.Ident(jsBase))
-                        })))),
-                      ListMap()),
-                    exprOps => $project[F](Reshape(exprOps ∘ \/.right)))),
-                Root(),
-                fields.some))))
-        }
-      case GroupBuilderF(src, keys, content) =>
-        (foldBuilders(src, keys) |@| toCollectionBuilder(src)){ case ((wb, base, fields), CollectionBuilderF(_, _, struct)) =>
-          def key(base: Base) = keys.zip(fields) match {
-            case Nil        => \/-($literal(Bson.Null))
-            case (key, field) :: Nil => key.unFix match {
-              // NB: normalize to Null, to ease merging
-              case ExprBuilderF(_, HasThat($literal(_))) =>
-                \/-($literal(Bson.Null))
-              case _ =>
-                field match {
-                  // NB: MongoDB doesn’t allow arrays _as_ `_id`, but it allows
-                  //     them _in_ `_id`, so we wrap any field in a document to
-                  //     protect against arrays.
-                  // TODO: Once we have type information available to the
-                  //       planner, don’t wrap fields that can’t be arrays.
-                  case Root() | Field(_) => -\/(Reshape(ListMap(
-                    BsonField.Name("0") -> \/-($var(field.toDocVar).cata(exprOps.rewriteRefs(prefixBase0(base)))))))
-                  case Subset(fields) => -\/(Reshape(fields.toList.map(fld =>
-                    fld -> \/-($var(DocField(fld)))).toListMap))
-                }
-            }
-            case _ => -\/(Reshape(fields.map(_.toDocVar).zipWithIndex.map {
-              case (field, index) =>
-                BsonField.Name(index.toString) -> \/-($var(field))
-            }.toListMap).rewriteRefs(prefixBase0(base)))
-          }
+  def schema[WF[_]]: Algebra[WorkflowBuilderF[WF, ?], Schema] = {
+    case CollectionBuilderF(_, _, schema)   => schema
+    case ShapePreservingBuilderF(src, _, _) => src
+    case ExprBuilderF(_, _)                 => none
+    case DocBuilderF(_, shape)              => shape.keys.toList.toNel
+    case GroupBuilderF(src, _, contents)    => contents match {
+      case Exp(-\/(_)) => src
+      case Exp(\/-(_)) => none
+      case Doc(shape)  => shape.keys.toList.toNel
+    }
+    case FlatteningBuilderF(src, _)         => src
+  }
+
+  // FIXME: There are a few recursive references to this function. We need to
+  //        eliminate those.
+  // TODO: See if we can extract `WB => Base` from this.
+  def toWorkflow[WF[_]: Coalesce]
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
+      : AlgebraM[M, WorkflowBuilderF[WF, ?], (Fix[WF], Base)] = {
+    case CollectionBuilderF(graph, base, _) => (graph, base).point[M]
+    case ShapePreservingBuilderF((g, b), inputs, op) =>
+      inputs match {
+        case Nil => (op(Nil)(g), b).point[M]
+        case _ =>
+          inputs.traverse {
+            case HasThat($var(DocField(x))) => x.some
+            case _                          => none
+          }.fold(
+            emitSt(inputs.traverse(i => freshName.map((_, i)))) >>= (pairs =>
+              emitSt(freshName) >>= (srcName =>
+                op.lift(pairs.map(_._1)).fold(
+                  fail[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
+                  op => toWorkflow.apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
+                    case (graph, _) => (chain(graph, op), Field(srcName))
+                  }))))(
+            op.lift(_).fold(
+              fail[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
+              op => (chain(g, op), b).point[M]))
+      }
+    case ExprBuilderF((g, b), HasThat($var(d))) =>
+      (g, b \ fromDocVar(d)).point[M]
+    case ExprBuilderF((g, b), expr) =>
+      emitSt(freshName) ∘ (name =>
+        (
+          chain(g,
+            rewriteExprPrefix(expr, b) match {
+              case HasThat(op) =>
+                $project[WF](Reshape(ListMap(name -> \/-(op))))
+              case \&/.This(js) =>
+                $simpleMap[WF](NonEmptyList(MapExpr(JsFn(jsBase, jscore.Obj(ListMap(jscore.Name(name.asText) -> js(jscore.Ident(jsBase))))))), ListMap())
+            }),
+          Field(name)))
+    case DocBuilderF((wf, base), shape) =>
+      alignExpr(rewriteDocPrefix(shape, base)).fold(
+        fail[(Fix[WF], Base)](InternalError fromMsg "Could not align the expressions"))(
+        s => shape.keys.toList.toNel.fold[M[(Fix[WF], Base)]](
+          fail(InternalError fromMsg "A shape with no fields does not make sense"))(
+          fields => (
+            chain(wf,
+              s.fold(
+                jsExprs => {
+                  $simpleMap[WF](NonEmptyList(
+                    MapExpr(JsFn(jsBase,
+                      jscore.Obj(jsExprs.map {
+                        case (name, expr) => jscore.Name(name.asText) -> expr(jscore.Ident(jsBase))
+                      })))),
+                    ListMap()) },
+                exprOps => $project[WF](Reshape(exprOps ∘ \/.right)))),
+            Root(): Base).point[M]))
+    case GroupBuilderF((gʹ, bʹ), keysʹ, content) =>
+      semiAlignExpr(keysʹ).fold(
+        keysʹ.traverse(emitSt(freshName) strengthR _) >>= (ks =>
+          toWorkflow.apply(DocBuilderF((gʹ, bʹ), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(DocVar.ROOT())))) strengthR
+            ((Field(BsonField.Name("content")): Base, ks.map(key => $var(DocField(key._1)))))))(
+        ks => ((gʹ, bʹ), (bʹ, ks)).point[M]) >>= { case ((g, b), (c, keys)) =>
+
+          def key(base: Base): Reshape.Shape[ExprOp] =
+            (keys.all {
+              case $literal(_) => true
+              case _           => false
+            }).fold(
+              \/-($literal(Bson.Null)),
+              -\/(Reshape(keys.zipWithIndex.map {
+                case (key, index) => BsonField.Name(index.toString) -> \/-(key)
+              }.toListMap)))
 
           content match {
-            case Expr(-\/(grouped)) =>
-              (toCollectionBuilder(wb) ⊛ emitSt(freshName))((cb, rootName) =>
-                cb match {
-                  case CollectionBuilderF(wf, base0, _) =>
-                    CollectionBuilderF(
-                      chain(wf,
-                        $group[F](Grouped(ListMap(rootName -> grouped)).rewriteRefs(prefixBase0(base0 \ base)),
-                          key(base0))),
-                      Field(rootName),
-                      struct)
-                })
-            case Expr(\/-(expr)) =>
+            case Exp(-\/(grouped)) =>
+              emitSt(freshName.map(rootName =>
+                (
+                  chain(g,
+                    $group[WF](Grouped(ListMap(rootName -> grouped)).rewriteRefs(prefixBase0(b)),
+                      key(b))),
+                  Field(rootName))))
+            case Exp(\/-(expr)) =>
               // NB: This case just winds up a single value, then unwinds it.
               //     It’s effectively a no-op, so we just use the src and expr.
-              toCollectionBuilder(ExprBuilder(src, \&/-(expr)))
+              toWorkflow.apply(ExprBuilderF((g, c), \&/-(expr)))
             case Doc(obj) =>
               val (grouped, ungrouped) =
                 obj.foldLeft[(ListMap[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap[BsonField.Name, Fix[ExprOp]])]((ListMap.empty[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap.empty[BsonField.Name, Fix[ExprOp]]))((acc, item) =>
@@ -658,83 +439,63 @@ object WorkflowBuilder {
                       ((x: ListMap[BsonField.Name, Fix[ExprOp]]) => x + (k -> v)).second(acc)
                   })
               if (grouped.isEmpty && !ungrouped.isEmpty)
-                toCollectionBuilder(DocBuilder(src, ungrouped ∘ \&/-))
+                toWorkflow.apply(DocBuilderF((g, c), ungrouped ∘ \&/-))
               else
-                obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
-                  generateWorkflow(wb) ∘ { case (wf, base0) =>
-                    CollectionBuilderF(
-                      chain(wf, $group(Grouped(ListMap()), key(base0))),
-                      Field(BsonField.Name("_id")),
-                      none)
-                  })(
-                  fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
-                    emitSt(ungrouped.toList match {
-                      case Nil =>
-                        state[NameGen, Fix[F]](chain(wf,
-                          $group[F](Grouped(grouped).rewriteRefs(prefixBase0(base0 \ base)), key(base0))))
-                      case (name -> _) :: Nil =>
-                        state[NameGen, Fix[F]](chain(wf,
-                          $group[F](Grouped(
-                            obj.transform {
-                              case (_, -\/(v)) =>
-                                accumulator.rewriteGroupRefs(v)(prefixBase0(base0 \ base))
-                              case (_, \/-(v)) =>
-                                $push(v.cata(exprOps.rewriteRefs(prefixBase0(base0 \ base))))
-                            }),
-                            key(base0)),
-                          $unwind[F](DocField(name))))
-                      case _ => for {
-                        ungroupedName <- freshName
-                        groupedName <- freshName
-                      } yield
-                        chain(wf,
-                          $project[F](Reshape(ListMap(
+                obj.keys.toList.toNel.fold[M[(Fix[WF], Base)]](
+                  (
+                    chain(g, $group(Grouped(ListMap()), key(b))),
+                    Field(BsonField.Name("_id")): Base).point[M])(
+                  fields => emitSt(ungrouped.toList match {
+                    case Nil =>
+                      state[NameGen, Fix[WF]](chain(g,
+                        $group[WF](Grouped(grouped).rewriteRefs(prefixBase0(c)), key(b))))
+                    case (name, _) :: Nil =>
+                      state[NameGen, Fix[WF]](chain(g,
+                        $group[WF](Grouped(
+                          obj.transform {
+                            case (_, -\/(v)) =>
+                              accumulator.rewriteGroupRefs(v)(prefixBase0(c))
+                            case (_, \/-(v)) =>
+                              $push(v.cata(exprOps.rewriteRefs(prefixBase0(c))))
+                          }),
+                          key(b)),
+                        $unwind[WF](DocField(name))))
+                    case _ => for {
+                      ungroupedName <- freshName
+                      groupedName <- freshName
+                    } yield
+                        chain(g,
+                          $project[WF](Reshape(ListMap(
                             ungroupedName -> -\/(Reshape(ungrouped.map {
-                              case (k, v) => k -> \/-(v.cata(exprOps.rewriteRefs(prefixBase0(base0 \ base))))
+                              case (k, v) => k -> \/-(v.cata(exprOps.rewriteRefs(prefixBase0(c))))
                             })),
                             groupedName -> \/-($$ROOT)))),
-                          $group[F](Grouped(
-                            (grouped ∘ (accumulator.rewriteGroupRefs(_)(prefixBase0(Field(groupedName) \ base0)))) +
+                          $group[WF](Grouped(
+                            (grouped ∘ (accumulator.rewriteGroupRefs(_)(prefixBase0(Field(groupedName) \ c)))) +
                               (ungroupedName -> $push($var(DocField(ungroupedName))))),
-                            key(Field(groupedName) \ base0)),
-                          $unwind[F](DocField(ungroupedName)),
-                          $project[F](Reshape(obj.transform {
+                            key(Field(groupedName) \ b)),
+                          $unwind[WF](DocField(ungroupedName)),
+                          $project[WF](Reshape(obj.transform {
                             case (k, -\/ (_)) => \/-($var(DocField(k)))
                             case (k,  \/-(_)) => \/-($var(DocField(ungroupedName \ k)))
                           })))
-                    }).map(CollectionBuilderF(
-                      _,
-                      Root(),
-                      fields.some))
-                  })
+                  }).map((_, Root())))
           }
-        }.join
-      case FlatteningBuilderF(src, fields) =>
-        toCollectionBuilder(src).map {
-          case CollectionBuilderF(graph, base, struct) =>
-            CollectionBuilderF(fields.foldRight(graph) {
-              case (StructureType.Array(field), acc) => $unwind[F](base.toDocVar \\ field).apply(acc)
-              case (StructureType.Object(field), acc) =>
-                $simpleMap[F](NonEmptyList(FlatExpr(JsFn(jsBase, (base.toDocVar \\ field).toJs(jscore.Ident(jsBase))))), ListMap()).apply(acc)
-            }, base, struct)
-        }
-      case sb @ SpliceBuilderF(_, _) =>
-        generateWorkflow(sb.src).flatMap { case (wf, base) =>
-          lift(
-            sb.toJs.map { splice =>
-              CollectionBuilderF(
-                chain(wf,
-                  $simpleMap[F](NonEmptyList(MapExpr(JsFn(jsBase, (base.toDocVar.toJs >>> splice)(jscore.Ident(jsBase))))), ListMap())),
-                Root(),
-                None)
-            })
-        }
-    }
+      }
+    case FlatteningBuilderF((graph, base), fields) =>
+      (
+        fields.foldRight(graph) {
+          case (StructureType.Array(field), acc) => $unwind[WF](base.toDocVar \\ field).apply(acc)
+          case (StructureType.Object(field), acc) =>
+            $simpleMap[WF](NonEmptyList(FlatExpr(JsFn(jsBase, (base.toDocVar \\ field).toJs(jscore.Ident(jsBase))))), ListMap()).apply(acc)
+        },
+        base).point[M]
+  }
 
   def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[(Fix[F], Base)] =
-    toCollectionBuilder(wb).map(x => (x.src, x.base))
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow)
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
     (implicit ev: WorkflowOpCoreF :<: F)
@@ -758,30 +519,17 @@ object WorkflowBuilder {
 
   def build[F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[Fix[F]] =
-    toCollectionBuilder(wb).map {
-      case CollectionBuilderF(graph, base, struct) =>
-        if (base == Root()) graph
-        else shift(base, struct, graph)._1
+      : M[Fix[F]] =
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow, schema.generalizeM[M])) ∘ {
+      case ((graph, Root()), _)      => graph
+      case ((graph, base),   struct) => shift(base, struct, graph)._1
     }
-
 
   def asLiteral[F[_]](wb: WorkflowBuilder[F])(implicit ev0: WorkflowOpCoreF :<: F): Option[Bson] = wb.unFix match {
     case CollectionBuilderF(Fix(ev0($PureF(value))), _, _) => value.some
     case ExprBuilderF(_, HasThat($literal(value)))         => value.some
     case _                                                 => none
   }
-
-  private def foldBuilders[F[_]: Coalesce](src: WorkflowBuilder[F], others: List[WorkflowBuilder[F]])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
-    : M[(WorkflowBuilder[F], Base, List[Base])] =
-    others.foldLeftM[M, (WorkflowBuilder[F], Base, List[Base])](
-      (src, Root(), Nil)) {
-      case ((wf, base, fields), x) =>
-        merge(wf, x).map { case (lbase, rbase, src) =>
-          (src, lbase \ base, fields.map(lbase \ _) :+ rbase)
-        }
-    }
 
   /** The location of the desired content relative to the current $$ROOT.
     *
@@ -821,217 +569,22 @@ object WorkflowBuilder {
 
   val fromDocVar: DocVar => Base = {
     case DocVar.ROOT(None) => Root()
-    case DocField(name)   => Field(name)
-  }
-
-  def mergeContents[A](c1: DocContents[A], c2: DocContents[A]):
-      M[((Base, Base), DocContents[A])] = {
-    def documentize(c: DocContents[A]):
-        State[NameGen, (Base, ListMap[BsonField.Name, A])] =
-      c match {
-        case Doc(d) => state(Subset(d.keySet) -> d)
-        case Expr(cont) =>
-          freshName.map(name => (Field(name), ListMap(name -> cont)))
-      }
-
-    lazy val doc =
-      swapM((documentize(c1) |@| documentize(c2)) {
-        case ((lb, lshape), (rb, rshape)) =>
-          Reshape.mergeMaps(lshape, rshape).fold[PlannerError \/ ((Base, Base), DocContents[A])](
-            -\/(InternalError.fromMsg(s"conflicting fields when merging contents: $lshape, $rshape")))(
-            map => {
-              val llb = if (Subset(map.keySet) == lb) Root() else lb
-              val rrb = if (Subset(map.keySet) == rb) Root() else rb
-              \/-((llb, rrb) -> Doc(map))
-            })
-      })
-
-    if (c1 == c2)
-      emit((Root(), Root()) -> c1)
-    else
-      (c1, c2) match {
-        case (Expr(v), Doc(o)) =>
-          o.find { case (_, e) => v == e }.fold(doc) {
-            case (lField, _) =>
-              emit((Field(lField), Root()) -> Doc(o))
-          }
-        case (Doc(o), Expr(v)) =>
-          o.find { case (_, e) => v == e }.fold(doc) {
-            case (rField, _) =>
-              emit((Root(), Field(rField)) -> Doc(o))
-          }
-        case _ => doc
-      }
-  }
-
-  trait Combine {
-    def apply[A, B](a1: A, a2: A)(f: (A, A) => B): B
-    def flip: Combine
-  }
-  val unflipped: Combine = new Combine { outer =>
-    def apply[A, B](a1: A, a2: A)(f: (A, A) => B) = f(a1, a2)
-    val flip = new Combine {
-      def apply[A, B](a1: A, a2: A)(f: (A, A) => B) = f(a2, a1)
-      val flip = outer
-    }
+    case DocField(name)    => Field(name)
   }
 
   // TODO: Cases that match on `$$ROOT` should be generalized to look up the
   //       shape of any DocVar in the source.
   @tailrec def findKeys[F[_]](wb: WorkflowBuilder[F]): Option[Base] = {
     wb.unFix match {
-      case CollectionBuilderF(_, _, s2)          => s2.map(s => Subset(s.toSet))
-      case DocBuilderF(_, shape)                 => Subset(shape.keySet).some
-      case FlatteningBuilderF(src, _)            => findKeys(src)
-      case GroupBuilderF(src, _, Expr(\/-($$ROOT))) => findKeys(src)
-      case GroupBuilderF(_, _, Doc(obj))         => Subset(obj.keySet).some
-      case ShapePreservingBuilderF(src, _, _)    => findKeys(src)
-      case ExprBuilderF(src, \&/.Both(JsFn.identity, $$ROOT))           => findKeys(src)
-      case ExprBuilderF(_, _)                    => Root().some
-      case _                                     => None
-    }
-  }
-
-  private def merge[F[_]: Coalesce]
-    (left: Fix[WorkflowBuilderF[F, ?]], right: Fix[WorkflowBuilderF[F, ?]])
-    (implicit I: WorkflowOpCoreF :<: F, ev0: RenderTree[Fix[WorkflowBuilderF[F, ?]]], ev1: ExprOpOps.Uni[ExprOp])
-    : M[(Base, Base, Fix[WorkflowBuilderF[F, ?]])] = {
-    def delegate =
-      merge(right, left).map { case (r, l, merged) => (l, r, merged) }
-
-    (left.unFix, right.unFix) match {
-      case (
-        ExprBuilderF(src1, HasThat($var(DocField(base1)))),
-        ExprBuilderF(src2, HasThat($var(DocField(base2)))))
-          if src1 ≟ src2 =>
-        emit((Field(base1), Field(base2), src1))
-
-      case _ if left ≟ right => emit((Root(), Root(), left))
-
-      case (ExprBuilderF(src1, expr1), ExprBuilderF(src2, expr2)) if src1 ≟ src2 =>
-        mergeContents(Expr(expr1), Expr(expr2)).map {
-          case ((lbase, rbase), cont) =>
-            (lbase, rbase, contentsToBuilder(cont)(src1))
-        }
-      case (ExprBuilderF(src, HasThat($var(DocField(base)))), _) if src ≟ right =>
-        emit((Field(base), Root(), right))
-      case (_, ExprBuilderF(src, HasThat($var(DocField(_))))) if left ≟ src =>
-        delegate
-
-      case (DocBuilderF(src1, shape1), ExprBuilderF(src2, expr2)) =>
-        merge(src1, src2).flatMap { case (lb, rb, wb) =>
-          mergeContents(Doc(rewriteDocPrefix(shape1, lb)), Expr(rewriteExprPrefix(expr2, rb))).map {
-            case ((lbase, rbase), cont) =>
-              (lbase, rbase, contentsToBuilder(cont)(wb))
-          }
-        }
-      case (ExprBuilderF(_, _), DocBuilderF(_, _)) =>
-        delegate
-
-      case (DocBuilderF(src1, shape1), DocBuilderF(src2, shape2)) =>
-        merge(src1, src2).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(
-            Doc(rewriteDocPrefix(shape1, lbase)),
-            Doc(rewriteDocPrefix(shape2, rbase))).map {
-            case ((lbase, rbase), cont) =>
-              (lbase, rbase, contentsToBuilder(cont)(wb))
-          }
-        }
-
-      // NB: The SPB cases need to be handled fairly early, because it allows
-      //     them to stay closer to the root of the Builder.
-      case (
-        spb1 @ ShapePreservingBuilderF(src1, inputs1, op1),
-        spb2 @ ShapePreservingBuilderF(src2, inputs2, _))
-          if inputs1 ≟ inputs2 && spb1.dummyOp == spb2.dummyOp =>
-        merge(src1, src2).map { case (lbase, rbase, wb) =>
-          (lbase, rbase, ShapePreservingBuilder(wb, inputs1, op1))
-        }
-      case (ShapePreservingBuilderF(src, inputs, op), _) =>
-        merge(src, right).map { case (lbase, rbase, wb) =>
-          (lbase, rbase, ShapePreservingBuilder(wb, inputs, op))
-        }
-      case (_, ShapePreservingBuilderF(src, inputs, op)) => delegate
-
-      case (ExprBuilderF(src, expr), _) =>
-        merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(Expr(rewriteExprPrefix(expr, lbase)), Expr(docVarToExpr(rbase.toDocVar))).map {
-            case ((lbase, rbase), cont) =>
-              (lbase, rbase, contentsToBuilder(cont)(wb))
-          }
-        }
-      case (_, ExprBuilderF(src, _)) => delegate
-
-      case (DocBuilderF(src1, shape1), _) =>
-        merge(src1, right).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(Doc(rewriteDocPrefix(shape1, lbase)), Expr(docVarToExpr(rbase.toDocVar))).map {
-            case ((lbase, rbase), cont) =>
-              (lbase, rbase, contentsToBuilder(cont)(wb))
-          }
-        }
-      case (_, DocBuilderF(_, _)) => delegate
-
-      case (sb @ SpliceBuilderF(_, _), _) =>
-        merge(sb.src, right).flatMap { case (lbase, rbase, wb) =>
-          for {
-            lName  <- emitSt(freshName)
-            rName  <- emitSt(freshName)
-            splice <- lift(sb.toJs)
-          } yield (Field(lName), Field(rName),
-            DocBuilder(wb, ListMap(
-              lName -> -\&/(lbase.toDocVar.toJs >>> splice),
-              rName -> docVarToExpr(rbase.toDocVar))))
-        }
-      case (_, SpliceBuilderF(_, _)) => delegate
-
-      case (
-        FlatteningBuilderF(src0, fields0),
-        FlatteningBuilderF(src1, fields1)) =>
-        left.cata(height) cmp right.cata(height) match {
-          case Ordering.LT =>
-            merge(left, src1).map { case (lbase, rbase, wb) =>
-              (lbase, rbase, FlatteningBuilder(wb, fields1.map(_.map(rbase.toDocVar \\ _))))
-            }
-          case Ordering.EQ =>
-            merge(src0, src1).map { case (lbase, rbase, wb) =>
-              val lfields = fields0.map(_.map(lbase.toDocVar \\ _))
-              val rfields = fields1.map(_.map(rbase.toDocVar \\ _))
-              (lbase, rbase, FlatteningBuilder(wb, lfields union rfields))
-            }
-          case Ordering.GT =>
-            merge(src0, right).map { case (lbase, rbase, wb) =>
-              (lbase, rbase, FlatteningBuilder(wb, fields0.map(_.map(lbase.toDocVar \\ _))))
-            }
-        }
-      case (FlatteningBuilderF(src, fields), _) =>
-        merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          val lfields = fields.map(_.map(lbase.toDocVar \\ _))
-          if (lfields.exists(x => x.field.startsWith(rbase.toDocVar) || rbase.toDocVar.startsWith(x.field)))
-            for {
-              lName <- emitSt(freshName)
-              rName <- emitSt(freshName)
-            } yield
-              (Field(lName), Field(rName),
-                FlatteningBuilder(
-                  DocBuilder(wb, ListMap(
-                    lName -> docVarToExpr(lbase.toDocVar),
-                    rName -> docVarToExpr(rbase.toDocVar))),
-                  fields.map(_.map(DocField(lName) \\ _))))
-          else emit((lbase, rbase, FlatteningBuilder(wb, lfields)))
-        }
-      case (_, FlatteningBuilderF(_, _)) => delegate
-
-      case (GroupBuilderF(src1, key1, cont1), GroupBuilderF(src2, key2, cont2))
-          if key1 ≟ key2 =>
-        merge(src1, src2).flatMap { case (lbase, rbase, wb) =>
-          mergeContents(rewriteGroupRefs(cont1)(prefixBase0(lbase)), rewriteGroupRefs(cont2)(prefixBase0(rbase))).map {
-            case ((lb, rb), contents) =>
-              (lb, rb, GroupBuilder(wb, key1, contents))
-          }
-        }
-
-      case _ =>
-        fail(InternalError.fromMsg("failed to merge:\n" + left.render.shows + "\n" + right.render.shows))
+      case CollectionBuilderF(_, _, s2)            => s2.map(s => Subset(s.toSet))
+      case DocBuilderF(_, shape)                   => Subset(shape.keySet).some
+      case FlatteningBuilderF(src, _)              => findKeys(src)
+      case GroupBuilderF(src, _, Exp(\/-($$ROOT))) => findKeys(src)
+      case GroupBuilderF(_, _, Doc(obj))           => Subset(obj.keySet).some
+      case ShapePreservingBuilderF(src, _, _)      => findKeys(src)
+      case ExprBuilderF(src, \&/.Both(JsFn.identity, $$ROOT)) => findKeys(src)
+      case ExprBuilderF(_, _)                      => Root().some
+      case _                                       => None
     }
   }
 
@@ -1047,18 +600,14 @@ object WorkflowBuilder {
 
     def filter
       (src: WorkflowBuilder[F],
-        those: List[WorkflowBuilder[F]],
+        those: List[Expr],
         sel: PartialFunction[List[BsonField], Selector])
       : WorkflowBuilder[F] =
       ShapePreservingBuilder(src, those, PartialFunction(fields => $match[F](sel(fields))))
 
-    // FIXME: no constraints
-    def jsExpr1(wb: WorkflowBuilder[F], js: JsFn): WorkflowBuilder[F] =
-      Fix(normalize[F].apply(ExprBuilderF(wb, -\&/(js))))
-
     def makeObject(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
-        case GroupBuilderF(src, key, Expr(cont)) =>
+        case GroupBuilderF(src, key, Exp(cont)) =>
           GroupBuilder(src, key, Doc(ListMap(BsonField.Name(name) -> cont)))
         case ExprBuilderF(src, expr) =>
           DocBuilder(src, ListMap(BsonField.Name(name) -> expr))
@@ -1069,279 +618,72 @@ object WorkflowBuilder {
       }
 
     def flattenMap(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
-      wb.unFix match {
-        case ShapePreservingBuilderF(src, inputs, op) =>
-          ShapePreservingBuilder(flattenMap(src), inputs, op)
-        case GroupBuilderF(src, keys, Expr(\/-($var(DocVar.ROOT(None))))) =>
-          GroupBuilder(flattenMap(src), keys, Expr(\/-($$ROOT)))
-        case _ => FlatteningBuilder(wb, Set(StructureType.Object(DocVar.ROOT())))
-      }
+      FlatteningBuilder(wb, Set(StructureType.Object(DocVar.ROOT())))
 
     def flattenArray(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
-      wb.unFix match {
-        case ShapePreservingBuilderF(src, inputs, op) =>
-          ShapePreservingBuilder(flattenArray(src), inputs, op)
-        case GroupBuilderF(src, keys, Expr(\/-($$ROOT))) =>
-          GroupBuilder(flattenArray(src), keys, Expr(\/-($$ROOT)))
-        case _ => FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
-      }
+      FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
 
-    @SuppressWarnings(scala.Array("org.wartremover.warts.ToString"))
     def deleteField(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
-        case ShapePreservingBuilderF(src, inputs, op) =>
-          ShapePreservingBuilder(deleteField(src, name), inputs, op)
-        case GroupBuilderF(wb0, key, Expr(\/-($$ROOT))) =>
-          GroupBuilder(deleteField(wb0, name), key, Expr(\/-($$ROOT)))
-        case GroupBuilderF(wb0, key, Doc(doc)) =>
-          GroupBuilder(wb0, key, Doc(doc - BsonField.Name(name)))
         case DocBuilderF(wb0, doc) =>
           DocBuilder(wb0, doc - BsonField.Name(name))
-        case _ => jsExpr1(wb, JsFn(jsBase,
-          // FIXME: Need to pull this back up from the top level (SD-665)
-          jscore.Call(jscore.ident("remove"),
-            List(jscore.Ident(jsBase), jscore.Literal(Js.Str(name))))))
+        case ExprBuilderF(wb0, HasThis(js)) =>
+          ExprBuilder(
+            wb0,
+            -\&/(JsFn(jsBase,
+              jscore.Call(jscore.ident("remove"),
+                List(js(jscore.Ident(jsBase)), jscore.Literal(Js.Str(name)))))))
+        case _ =>
+          ExprBuilder(
+            wb,
+            -\&/(JsFn(jsBase,
+              jscore.Call(jscore.ident("remove"),
+                List(jscore.Ident(jsBase), jscore.Literal(Js.Str(name)))))))
       }
 
-    def groupBy(src: Fix[WorkflowBuilderF[F, ?]], keys: List[Fix[WorkflowBuilderF[F, ?]]])
+    def groupBy(src: Fix[WorkflowBuilderF[F, ?]], keys: List[Expr])
         : WorkflowBuilder[F] =
-      (List(src) ≟ keys).fold(
-        findKeys(src).fold(
-          // TODO: Might not always want to delete `_id`?
-          GroupBuilder(deleteField(src, "_id"), List(deleteField(src, "_id")), Expr(\/-($$ROOT)))) {
-          case Root()   => GroupBuilder(src, keys, Expr(\/-($$ROOT)))
-          case Field(k) => GroupBuilder(src, List(Fix(normalize[F].apply(ExprBuilderF(src, docVarToExpr(DocField(k)))))), Expr(\/-($$ROOT)))
-          case Subset(ks) =>
-            GroupBuilder(
-              src,
-              ks.toList.map(k => Fix(normalize[F].apply(ExprBuilderF(src, docVarToExpr(DocField(k)))))),
-              Doc(ks.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).toListMap))
-        },
-        GroupBuilder(src, keys, Expr(\/-($$ROOT))))
+      keys match {
+        case List(HasThat($$ROOT)) =>
+          findKeys(src).fold(
+            // TODO: Might not always want to delete `_id`?
+            GroupBuilder(deleteField(src, "_id"), List(docVarToExpr(DocVar.ROOT())), Exp(\/-($$ROOT)))) {
+            case Root()   => GroupBuilder(src, keys, Exp(\/-($$ROOT)))
+            case Field(k) => GroupBuilder(src, List(docVarToExpr(DocField(k))), Exp(\/-($$ROOT)))
+            case Subset(ks) =>
+              GroupBuilder(
+                src,
+                ks.toList.map(k => docVarToExpr(DocField(k))),
+                Doc(ks.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).toListMap))
+          }
+        case _ => GroupBuilder(src, keys, Exp(\/-($$ROOT)))
+      }
 
     def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]])
         : WorkflowBuilder[F] =
       wb.unFix match {
-        case GroupBuilderF(wb0, keys, Expr(\/-(expr))) =>
-          GroupBuilder(wb0, keys, Expr(-\/(f(expr))))
+        case GroupBuilderF(wb0, keys, Exp(\/-(expr))) =>
+          GroupBuilder(wb0, keys, Exp(-\/(f(expr))))
         // FIXME: Might need to identify Arbitrary distinct from First here.
         case GroupBuilderF(_, _, _) if f($include()) == $first($include) =>
           wb
-        case ShapePreservingBuilderF(src @ Fix(GroupBuilderF(_, _, Expr(\/-(_)))), inputs, op) =>
-          ShapePreservingBuilder(reduce(src)(f), inputs, op)
+        // case ShapePreservingBuilderF(src @ Fix(GroupBuilderF(_, _, Exp(\/-(_)))), inputs, op) =>
+        //   ShapePreservingBuilder(reduce(src)(f), inputs, op)
         case _ =>
-          GroupBuilder(wb, Nil, Expr(-\/(f($$ROOT))))
+          GroupBuilder(wb, Nil, Exp(-\/(f($$ROOT))))
       }
 
     def sortBy
-      (src: WorkflowBuilder[F], keys: List[WorkflowBuilder[F]], sortTypes: List[SortDir])
+      (src: WorkflowBuilder[F], keys: List[Expr], sortTypes: List[SortDir])
         : WorkflowBuilder[F] =
       ShapePreservingBuilder(
         src,
         keys,
-        // TODO[ASP]: This pattern match is non total!
+        // FIXME: This pattern match is non total!
         // possible solution: make sortTypes and the argument to this partial function NonEmpty
         _.zip(sortTypes) match {
           case x :: xs => $sort[F](NonEmptyList.nel(x, IList.fromList(xs)))
         })
-
-    // TODO: handle concating value, expr, or collection with group (#439)
-    def objectConcat(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-      : M[WorkflowBuilder[F]] = {
-      def impl(wb1: WorkflowBuilder[F], wb2: WorkflowBuilder[F], combine: Combine): M[WorkflowBuilder[F]] = {
-        def delegate = impl(wb2, wb1, combine.flip)
-
-        def mergeGroups(s1: WorkflowBuilder[F], s2: WorkflowBuilder[F], c1: GroupContents, c2: GroupContents, keys: List[WorkflowBuilder[F]]):
-            M[((Base, Base), WorkflowBuilder[F])] =
-          merge(s1, s2).flatMap { case (lbase, rbase, src) =>
-            combine(
-              rewriteGroupRefs(c1)(prefixBase0(lbase)),
-              rewriteGroupRefs(c2)(prefixBase0(rbase)))(mergeContents(_, _)).map {
-              case ((lb, rb), contents) =>
-                combine(lb, rb)((_, _) -> GroupBuilder(src, keys, contents))
-            }
-          }
-
-        (wb1.unFix, wb2.unFix) match {
-          case (ShapePreservingBuilderF(s1, i1, o1), ShapePreservingBuilderF(s2, i2, o2))
-              if i1 == i2 && o1 == o2 =>
-            impl(s1, s2, combine).map(ShapePreservingBuilder(_, i1, o1))
-
-          case (
-            v1 @ ShapePreservingBuilderF(
-              Fix(DocBuilderF(_, shape1)), inputs1, _),
-            GroupBuilderF(
-              Fix(v2 @ ShapePreservingBuilderF(_, inputs2, _)),
-              Nil, _))
-            if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp =>
-            impl(GroupBuilder(wb1, Nil, Doc(shape1.keys.toList.map(n => n -> \/-($var(DocField(n)))).toListMap)), wb2, combine)
-          case (
-            GroupBuilderF(
-            Fix(v1 @ ShapePreservingBuilderF(_, inputs1, op1)),
-              Nil, _),
-            v2 @ ShapePreservingBuilderF(Fix(DocBuilderF(_, _)), inputs2, op2))
-            if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp => delegate
-
-          case (
-            v1 @ ShapePreservingBuilderF(
-              Fix(DocBuilderF(_, shape1)), inputs1, _),
-            DocBuilderF(
-              Fix(GroupBuilderF(
-                Fix(v2 @ ShapePreservingBuilderF(_, inputs2, _)),
-                Nil, _)),
-             shape2))
-            if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp =>
-            impl(GroupBuilder(wb1, Nil, Doc(shape1.keys.toList.map(n => n -> \/-($var(DocField(n)))).toListMap)), wb2, combine)
-          case (
-            DocBuilderF(
-              Fix(GroupBuilderF(
-                Fix(v1 @ ShapePreservingBuilderF(_, inputs1, _)),
-                Nil, _)),
-              shape2),
-            v2 @ ShapePreservingBuilderF(Fix(DocBuilderF(_, _)), inputs2, _))
-            if inputs1 ≟ inputs2 && v1.dummyOp == v2.dummyOp => delegate
-
-          case (ShapePreservingBuilderF(s, i, o), _) =>
-            impl(s, wb2, combine).map(ShapePreservingBuilder(_, i, o))
-          case (_, ShapePreservingBuilderF(_, _, _)) => delegate
-
-          case (
-            GroupBuilderF(src1, keys1, Expr(\/-($$ROOT))),
-            GroupBuilderF(src2, keys2, Expr(\/-($$ROOT))))
-              if keys1 ≟ keys2 =>
-            impl(src1, src2, combine).map(GroupBuilder(_, keys1, Expr(\/-($$ROOT))))
-
-          case (
-            GroupBuilderF(s1, keys1, c1 @ Doc(_)),
-            GroupBuilderF(s2, keys2,    c2 @ Doc(_)))
-              if keys1 ≟ keys2 =>
-            mergeGroups(s1, s2, c1, c2, keys1).map(_._2)
-
-          case (
-            GroupBuilderF(s1, keys1, c1 @ Doc(d1)),
-            DocBuilderF(Fix(GroupBuilderF(s2, keys2, c2)), shape2))
-              if keys1 ≟ keys2 =>
-            mergeGroups(s1, s2, c1, c2, keys1).map { case ((glbase, grbase), g) =>
-              DocBuilder(g, combine(
-                d1.transform { case (n, _) => docVarToExpr(DocField(n)) },
-                shape2 ∘ (rewriteExprPrefix(_, grbase)))(_ ++ _))
-            }
-          case (
-            DocBuilderF(Fix(GroupBuilderF(_, k1, _)), _),
-            GroupBuilderF(_, k2, Doc(_)))
-              if k1 ≟ k2 =>
-            delegate
-
-          case (
-            DocBuilderF(Fix(GroupBuilderF(s1, keys1, c1)), shape1),
-            DocBuilderF(Fix(GroupBuilderF(s2, keys2, c2)), shape2))
-              if keys1 ≟ keys2 =>
-            mergeGroups(s1, s2, c1, c2, keys1).flatMap {
-              case ((glbase, grbase), g) =>
-                emit(DocBuilder(g, combine(
-                  shape1 ∘ (rewriteExprPrefix(_, glbase)),
-                  shape2 ∘ (rewriteExprPrefix(_, grbase)))(_ ++ _)))
-            }
-
-          case (
-            DocBuilderF(_, shape),
-            GroupBuilderF(_, Nil, _)) =>
-            impl(
-              GroupBuilder(wb1, Nil, Doc(shape.map { case (n, _) => n -> \/-($var(DocField(n))) })),
-              wb2,
-              combine)
-          case (
-            GroupBuilderF(_, Nil, _),
-            DocBuilderF(_, _)) =>
-            delegate
-
-          case (
-            GroupBuilderF(_, _, Doc(cont1)),
-            GroupBuilderF(_, Nil, _)) =>
-            impl(
-              GroupBuilder(wb1, Nil, Doc(cont1.map { case (n, _) => n -> \/-($var(DocField(n))) })),
-              wb2,
-              combine)
-          case (
-            GroupBuilderF(_, Nil, _),
-            GroupBuilderF(_, _, _)) =>
-            delegate
-
-          case (
-            DocBuilderF(_, shape),
-            DocBuilderF(Fix(GroupBuilderF(_, Nil, _)), _)) =>
-            impl(
-              GroupBuilder(wb1, Nil, Doc(shape.map { case (n, _) => n -> \/-($var(DocField(n))) })),
-              wb2,
-              combine)
-          case (
-            DocBuilderF(Fix(GroupBuilderF(_, Nil, _)), _),
-            DocBuilderF(_, _)) =>
-            delegate
-
-          case (DocBuilderF(s1, shape1), DocBuilderF(s2, shape2)) =>
-            merge(s1, s2).map { case (lbase, rbase, src) =>
-              DocBuilder(src, combine(
-                rewriteDocPrefix(shape1, lbase),
-                rewriteDocPrefix(shape2, rbase))(_ ++ _))
-            }
-
-          case (DocBuilderF(src1, shape), ExprBuilderF(src2, expr)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              SpliceBuilder(list, combine(
-                Doc(rewriteDocPrefix(shape, left)),
-                Expr(rewriteExprPrefix(expr, right)))(List(_, _)))
-            }
-          case (ExprBuilderF(_, _), DocBuilderF(_, _)) => delegate
-
-          case (ExprBuilderF(src1, expr1), ExprBuilderF(src2, expr2)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              SpliceBuilder(list, combine(
-                Expr(rewriteExprPrefix(expr1, left)),
-                Expr(rewriteExprPrefix(expr2, right)))(List(_, _)))
-            }
-
-          case (SpliceBuilderF(src1, structure1), DocBuilderF(src2, shape2)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              SpliceBuilder(list, combine(
-                structure1,
-                List(Doc(rewriteDocPrefix(shape2, right))))(_ ++ _))
-            }
-          case (DocBuilderF(_, _), SpliceBuilderF(_, _)) => delegate
-
-          case (SpliceBuilderF(src1, structure1), ExprBuilderF(src2, expr2)) =>
-            merge(src1, src2).map { case (left, right, list) =>
-              SpliceBuilder(list, combine(
-                structure1,
-                List(Expr(rewriteExprPrefix(expr2, right))))(_ ++ _))
-            }
-          case (ExprBuilderF(_, _), SpliceBuilderF(_, _)) => delegate
-
-          case (SpliceBuilderF(src1, structure1), CollectionBuilderF(_, _, _)) =>
-            merge(src1, wb2).map { case (_, right, list) =>
-              SpliceBuilder(list, combine(
-                structure1,
-                List(Expr(docVarToExpr(right.toDocVar))))(_ ++ _))
-            }
-          case (CollectionBuilderF(_, _, _), SpliceBuilderF(_, _)) => delegate
-
-          case (DocBuilderF(src, shape), CollectionBuilderF(_, _, _)) =>
-            merge(src, wb2).map { case (left, right, list) =>
-              SpliceBuilder(list, combine(
-                Doc(rewriteDocPrefix(shape, left)),
-                Expr(docVarToExpr(right.toDocVar)))(List(_, _)))
-            }
-          case (CollectionBuilderF(_, _, _), DocBuilderF(_, _)) => delegate
-
-          case _ => fail(UnsupportedFunction(
-            structural.ObjectConcat,
-            Some("unrecognized shapes:\n" + wb1.render.shows + "\n" + wb2.render.shows)))
-        }
-      }
-
-      impl(wb1, wb2, unflipped)
-    }
 
     def unionAll
       (left: WorkflowBuilder[F], right: WorkflowBuilder[F])

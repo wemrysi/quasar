@@ -252,7 +252,7 @@ package qscript {
   @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
 
   object Ann {
-    implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
+    implicit def equal[T[_[_]]: BirecursiveT: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
       Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
 
     implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
@@ -262,7 +262,7 @@ package qscript {
   @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
 
   object Target {
-    implicit def equal[T[_[_]]: EqualT, F[_]: Functor](
+    implicit def equal[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor](
       implicit F: Delay[Equal, F], J: Equal[T[EJson]]
     ): Equal[Target[T, F]] =
       Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)

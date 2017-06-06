@@ -43,7 +43,7 @@ import scalaz._, Scalaz._
   combine: JoinFunc[T])
 
 object EquiJoin {
-  implicit def equal[T[_[_]]: EqualT]:
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]:
       Delay[Equal, EquiJoin[T, ?]] =
     new Delay[Equal, EquiJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
