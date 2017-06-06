@@ -216,7 +216,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
 
   object ManagedWriteFileModule extends ManagedWriteFileModule {
     def writeCursor(file: AFile): Backend[AFile] =
-      ops.ensureLineage[Backend](fileParent(file)) as file
+      file.point[Backend]
 
     def writeChunk(f: AFile, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
       config[Configured] >>= { cfg =>
