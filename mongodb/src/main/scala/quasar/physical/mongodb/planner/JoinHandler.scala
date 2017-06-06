@@ -235,13 +235,9 @@ object JoinHandler {
       (src: WorkflowBuilder[WF], key: List[Expr],
         rootField: BsonField.Name, otherField: BsonField.Name)
         : (WorkflowBuilder[WF], FixOp[WF]) =
-      (DocBuilder(
-        groupBy(src, key, DocContents.Exp(-\/($push($$ROOT)))),
-        ListMap(
-          rootField             -> docVarToExpr(DocVar.ROOT()),
-          // TODO: Use `ejsonToExpr` for this
-          otherField            -> \&/(JsFn.const(jscore.Arr(Nil)), $literal(Bson.Arr())),
-          BsonField.Name("_id") -> docVarToExpr(DocField(BsonField.Name("_id"))))),
+      (groupBy(src, key, DocContents.Doc(ListMap(
+        rootField  -> -\/($push($$ROOT)),
+        otherField -> \/-($literal(Bson.Arr()))))),
         ι)
 
     val (left, right, leftField, rightField) =
