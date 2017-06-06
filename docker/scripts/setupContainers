@@ -76,20 +76,22 @@ configure_containers() {
 # this allows us to run docker commands
 #
 enable_docker_env() {
-  if [[ -x "$(command -v docker-machine)" ]]
+  if [[ "$(command -v docker-machine)" && "$(docker-machine ls | grep default)" ]]
   then
-    echo "found docker-machine, adding it to env..."
-    eval "$(docker-machine env --shell sh/bash default)"
     DOCKERIP=$(docker-machine ip default)
+    echo "found docker-machine, adding it to env and using $DOCKERIP as your docker IP..."
+    eval "$(docker-machine env --shell sh/bash default)"
+  elif [[ "$(command -v docker)" ]]
+  then
+    DOCKERIP=localhost
+    cat << EOF 
+We found docker in your path, but we are unsure of your docker host, we'll assume your docker IP is $DOCKERIP.
+You may need to set up your own docker host, either by using Docker Toolbox or Docker for Mac or something else.
+If you usually reach your docker containers via $DOCKERIP, things should work just fine.
+EOF
   else
-    if [[ -x "$(command -v docker)" ]]
-    then
-      echo "docker is in your path, proceeding..."
-      DOCKERIP=localhost
-    else
-      echo "docker needs to be installed in order to run: $0"
-      exit 1
-    fi
+    echo "We can't find Docker on your system, please install it before running: $0"
+    exit 1
   fi
 }
 

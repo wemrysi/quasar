@@ -34,7 +34,7 @@ configure_marklogic_json() {
 #
 configure_couchbase() {
   CONTAINERNAME=$1
-  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}?username=Administrator&password=password&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
+  echo "$CONTAINERNAME=\"couchbase://${DOCKERIP}/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15\"" >> $CONFIGFILE
 }
 
 ##########################################
@@ -63,7 +63,7 @@ configure_mongo() {
   if [[ $CONTAINERNAME == "mongodb_2_6"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27018\"" >> $CONFIGFILE; fi
   if [[ $CONTAINERNAME == "mongodb_3_0"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27019\"" >> $CONFIGFILE; fi
   if [[ $CONTAINERNAME == "mongodb_read_only" ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27020\"" >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; echo "mongodb_q_3_2=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi
+  if [[ $CONTAINERNAME == "mongodb_3_2"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27021\"" >> $CONFIGFILE; fi
   if [[ $CONTAINERNAME == "mongodb_3_4"       ]]; then echo "$CONTAINERNAME=\"mongodb://${DOCKERIP}:27022\"" >> $CONFIGFILE; fi
 }
 
@@ -85,15 +85,14 @@ define_needed_evn_vars() {
   then
     CONFIGFILE=$TRAVIS_BUILD_DIR/it/testing.conf
     DOCKERIP="localhost"
+  elif [[ "$(command -v docker-machine)" && "$(docker-machine ls | grep default)" ]]
+  then
+    CONFIGFILE=$(dirname $0)/../../it/testing.conf
+    eval "$(docker-machine env --shell sh/bash default)"
+    DOCKERIP=$(docker-machine ip default)
   else
     CONFIGFILE=$(dirname $0)/../../it/testing.conf
-    if [[ -x "$(command -v docker-machine)" ]]
-    then
-      eval "$(docker-machine env --shell sh/bash default)"
-      DOCKERIP=$(docker-machine ip default)
-    else
-      DOCKERIP="localhost"
-    fi
+    DOCKERIP="localhost"
   fi
 }
 

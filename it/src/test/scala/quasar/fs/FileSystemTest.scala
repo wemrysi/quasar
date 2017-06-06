@@ -20,12 +20,14 @@ import slamdata.Predef._
 import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.fp.{TaskRef, reflNT}
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.physical._
+import quasar.physical.couchbase.Couchbase
+import quasar.physical.marklogic.MarkLogic
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
@@ -129,33 +131,32 @@ object FileSystemTest {
 
   //--- FileSystems to Test ---
 
-  def allFsUT: Task[IList[SupportedFs[FileSystem]]] =
+  def allFsUT: Task[IList[SupportedFs[AnalyticalFileSystem]]] =
     (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.fileSystem[FileSystem](ut.testDir)))))
+      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.analyticalFileSystem[AnalyticalFileSystem](ut.testDir)))))
     }
 
   def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
-    : PartialFunction[(MountConfig, ADir), Task[(FileSystem ~> Task, Task[Unit])]] = {
+    : PartialFunction[(MountConfig, ADir), Task[(AnalyticalFileSystem ~> Task, Task[Unit])]] = {
     case (MountConfig.FileSystemConfig(FileSystemType(fsType.value), uri), dir) =>
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
   }
 
   def externalFsUT = {
     val marklogicDef =
-      marklogic.fs.definition(10000L, 10000L) translate injectFT[Task, filesystems.Eff]
+      MarkLogic(10000L, 10000L).definition translate injectFT[Task, filesystems.Eff]
 
     TestConfig.externalFileSystems {
-      fsTestConfig(couchbase.fs.FsType,       couchbase.fs.definition)       orElse
+      fsTestConfig(couchbase.fs.FsType,       Couchbase.definition translate injectFT[Task, filesystems.Eff]) orElse
       fsTestConfig(marklogic.fs.FsType,       marklogicDef)                  orElse
       fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
       fsTestConfig(postgresql.fs.FsType,      postgresql.fs.definition)      orElse
-      fsTestConfig(skeleton.fs.FsType,        skeleton.fs.definition)        orElse
       fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition)
     }
   }
 
-  def localFsUT: Task[IList[SupportedFs[FileSystem]]] =
+  def localFsUT: Task[IList[SupportedFs[AnalyticalFileSystem]]] =
     (inMemUT |@| hierarchicalUT |@| nullViewUT) { (mem, hier, nullUT) =>
       IList(
         SupportedFs(mem.ref, mem.some),
@@ -164,13 +165,13 @@ object FileSystemTest {
       )
     }
 
-  def nullViewUT: Task[FileSystemUT[FileSystem]] =
+  def nullViewUT: Task[FileSystemUT[AnalyticalFileSystem]] =
     (
       inMemUT                                             |@|
       TaskRef(0L)                                         |@|
       ViewState.toTask(Map())                             |@|
       TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty.fileSystem[HierarchicalFsEffM])       |@|
+      TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM])       |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
@@ -183,27 +184,34 @@ object FileSystemTest {
           .compose(toPhysFs)
       }
 
-      val memPlus: ViewFileSystem ~> Task =
-        ViewFileSystem.interpret(
-          mounting,
-          Failure.toRuntimeError[Task, Mounting.PathTypeMismatch],
-          Failure.toRuntimeError[Task, MountingError],
-          viewState,
-          MonotonicSeq.fromTaskRef(seqRef),
-          mem.testInterp)
+      type ViewAnalyticalFileSystem[A] = (
+        Mounting
+          :\: PathMismatchFailure
+          :\: MountingFailure
+          :\: ViewState
+          :\: MonotonicSeq
+          :/: AnalyticalFileSystem
+      )#M[A]
 
-      val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem]
+      val memPlus: ViewAnalyticalFileSystem ~> Task = mounting :+:
+      Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
+      Failure.toRuntimeError[Task, MountingError] :+:
+      viewState :+:
+      MonotonicSeq.fromTaskRef(seqRef) :+:
+      mem.testInterp
+
+      val fs = foldMapNT(memPlus) compose view.analyticalFileSystem[ViewAnalyticalFileSystem]
       val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
 
       FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
     }
 
-  def hierarchicalUT: Task[FileSystemUT[FileSystem]] = {
+  def hierarchicalUT: Task[FileSystemUT[AnalyticalFileSystem]] = {
     val mntDir: ADir = rootDir </> dir("mnt") </> dir("inmem")
 
-    def fs(f: HfsIO ~> Task, r: FileSystem ~> Task) =
+    def fs(f: HfsIO ~> Task, r: AnalyticalFileSystem ~> Task) =
       foldMapNT[HfsIO, Task](f) compose
-        hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mntDir, r))
+        hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mntDir, r))
 
     (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(
@@ -214,11 +222,12 @@ object FileSystemTest {
         mem.close))
   }
 
-  def inMemUT: Task[FileSystemUT[FileSystem]] = {
+  def inMemUT: Task[FileSystemUT[AnalyticalFileSystem]] = {
     val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
 
     InMemory.runStatefully(InMemory.InMemState.empty)
       .map(_ compose InMemory.fileSystem)
+      .map(f => Empty.analyze[Task] :+: f)
       .map(f => FileSystemUT(ref, f, f, rootDir, ().point[Task]))
   }
 }

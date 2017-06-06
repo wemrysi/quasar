@@ -19,6 +19,7 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 import quasar.Data
 import quasar.fp._
+import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
@@ -33,7 +34,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   DP: Planner[F, FMT, Const[Data, ?]],
   SP: StructuralPlanner[F, FMT]
 ) extends Planner[F, FMT, MapFunc[T, ?]] {
-  import expr.{emptySeq, if_, let_, some}, XQuery.flwor
+  import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
   val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
@@ -94,12 +95,12 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 
     // relations
     case Not(x)                       => SP.castIfNode(x) map (fn.not)
-    case MapFuncs.Eq(x, y)            => castedBinOpF(x, y)(lib.compEq[F].apply(_, _))
-    case Neq(x, y)                    => castedBinOpF(x, y)(lib.compNe[F].apply(_, _))
-    case Lt(x, y)                     => castedBinOpF(x, y)(lib.compLt[F].apply(_, _))
-    case Lte(x, y)                    => castedBinOpF(x, y)(lib.compLe[F].apply(_, _))
-    case Gt(x, y)                     => castedBinOpF(x, y)(lib.compGt[F].apply(_, _))
-    case Gte(x, y)                    => castedBinOpF(x, y)(lib.compGe[F].apply(_, _))
+    case MapFuncs.Eq(x, y)            => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
+    case Neq(x, y)                    => castedBinOp(x, y)((a, b) => handleWith(a ne b, fn.True))
+    case Lt(x, y)                     => castedBinOp(x, y)(_ lt _)
+    case Lte(x, y)                    => castedBinOp(x, y)(_ le _)
+    case Gt(x, y)                     => castedBinOp(x, y)(_ gt _)
+    case Gte(x, y)                    => castedBinOp(x, y)(_ ge _)
     case IfUndefined(x, alternate)    => if_(fn.empty(x)).then_(alternate).else_(x).point[F]
     case And(x, y)                    => castedBinOp(x, y)(_ and _)
     case Or(x, y)                     => castedBinOp(x, y)(_ or _)
@@ -143,6 +144,9 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 
   private def asDate(x: XQuery)     = SP.castIfNode(x) >>= (lib.asDate[F] apply _)
   private def asDateTime(x: XQuery) = SP.castIfNode(x) >>= (lib.asDateTime[F] apply _)
+
+  private def handleWith(xqy: XQuery, alt: XQuery): XQuery =
+    try_(xqy).catch_($("_"))(κ(alt))
 
   private def binOpF(x: XQuery, y: XQuery)(op: (XQuery, XQuery) => F[XQuery]): F[XQuery] =
     if (flwor.nonEmpty(x) || flwor.nonEmpty(y))
