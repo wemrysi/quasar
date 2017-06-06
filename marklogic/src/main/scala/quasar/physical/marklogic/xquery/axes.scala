@@ -53,7 +53,7 @@ object axes {
       xqy("element()")
 
     def elementNamed(name: String): XQuery =
-      xqy(s"element(${name.xs})")
+      xqy(s"element(${name})")
 
     def node(): XQuery =
       xqy("node()")
