@@ -200,7 +200,9 @@ object JoinHandler {
       }
   }
 
-  /** Plan an arbitrary join using only "core" operators, which always means a map-reduce. */
+  /** Plan an arbitrary join using only "core" operators, which always means a
+    * map-reduce.
+    */
   def mapReduce[WF[_]: Functor: Coalesce: Crush: Crystallize]
     (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : JoinHandler[WF, WorkflowBuilder.M] = JoinHandler({ (tpe, left0, right0) =>
@@ -234,7 +236,7 @@ object JoinHandler {
         rootField: BsonField.Name, otherField: BsonField.Name)
         : (WorkflowBuilder[WF], FixOp[WF]) =
       (DocBuilder(
-        reduce(groupBy(src, key))($push(_)),
+        groupBy(src, key, DocContents.Exp(-\/($push($$ROOT)))),
         ListMap(
           rootField             -> docVarToExpr(DocVar.ROOT()),
           // TODO: Use `ejsonToExpr` for this

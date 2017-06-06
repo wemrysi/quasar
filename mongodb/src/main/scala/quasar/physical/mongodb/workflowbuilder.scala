@@ -641,36 +641,22 @@ object WorkflowBuilder {
                 List(jscore.Ident(jsBase), jscore.Literal(Js.Str(name)))))))
       }
 
-    def groupBy(src: Fix[WorkflowBuilderF[F, ?]], keys: List[Expr])
+    def groupBy(src: Fix[WorkflowBuilderF[F, ?]], keys: List[Expr], contents: GroupContents)
         : WorkflowBuilder[F] =
       keys match {
         case List(HasThat($$ROOT)) =>
           findKeys(src).fold(
             // TODO: Might not always want to delete `_id`?
-            GroupBuilder(deleteField(src, "_id"), List(docVarToExpr(DocVar.ROOT())), Exp(\/-($$ROOT)))) {
+            GroupBuilder(deleteField(src, "_id"), List(docVarToExpr(DocVar.ROOT())), contents)) {
             case Root()   => GroupBuilder(src, keys, Exp(\/-($$ROOT)))
-            case Field(k) => GroupBuilder(src, List(docVarToExpr(DocField(k))), Exp(\/-($$ROOT)))
+            case Field(k) => GroupBuilder(src, List(docVarToExpr(DocField(k))), contents)
             case Subset(ks) =>
               GroupBuilder(
                 src,
                 ks.toList.map(k => docVarToExpr(DocField(k))),
                 Doc(ks.toList.map(k => k -> $first($var(DocField(k))).left[Fix[ExprOp]]).toListMap))
           }
-        case _ => GroupBuilder(src, keys, Exp(\/-($$ROOT)))
-      }
-
-    def reduce(wb: WorkflowBuilder[F])(f: Fix[ExprOp] => AccumOp[Fix[ExprOp]])
-        : WorkflowBuilder[F] =
-      wb.unFix match {
-        case GroupBuilderF(wb0, keys, Exp(\/-(expr))) =>
-          GroupBuilder(wb0, keys, Exp(-\/(f(expr))))
-        // FIXME: Might need to identify Arbitrary distinct from First here.
-        case GroupBuilderF(_, _, _) if f($include()) == $first($include) =>
-          wb
-        // case ShapePreservingBuilderF(src @ Fix(GroupBuilderF(_, _, Exp(\/-(_)))), inputs, op) =>
-        //   ShapePreservingBuilder(reduce(src)(f), inputs, op)
-        case _ =>
-          GroupBuilder(wb, Nil, Exp(-\/(f($$ROOT))))
+        case _ => GroupBuilder(src, keys, contents)
       }
 
     def sortBy
