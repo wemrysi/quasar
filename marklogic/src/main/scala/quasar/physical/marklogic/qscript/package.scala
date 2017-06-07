@@ -32,7 +32,6 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import _root_.xml.name._
 
 package object qscript {
   type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
@@ -55,11 +54,6 @@ package object qscript {
 
   val EJsonTypeKey  = "_ejson.type"
   val EJsonValueKey = "_ejson.value"
-
-  /** Converts the given string to a QName if valid, failing with an error otherwise. */
-  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
-    (QName.string.getOption(s) orElse QName.string.getOption(encodeForQName(s)))
-      .fold(invalidQName[F, QName](s))(_.point[F])
 
   /** XQuery evaluating to the documents having the specified format in the directory. */
   def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =

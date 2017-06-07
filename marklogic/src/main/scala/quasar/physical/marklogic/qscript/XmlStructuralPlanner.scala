@@ -76,7 +76,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(QName.string(qn)) =>
         renameOrWrap(qn.xqy, value)
       case XQuery.StringLit(nonQNameKey) =>
-        renameOrWrapEncoded(xs.string(nonQNameKey.xqy), value)
+        renameOrWrapEncoded(xs.string(nonQNameKey.xs), value)
       case _ =>
         handleWithF(renameOrWrap(xs.QName(key), value),
           renameOrWrapEncoded(xs.string(key), value))
@@ -245,15 +245,14 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       val (s, n, e) = ($("s"), $("n"), $("e"))
       fn.map(func(s.render) {
         element { fn.nodeName(~s) } {
-          mkSeq_(
-            ~s `/` axes.attribute.node(),
+          mkSeq_(~s `/` axes.attribute.node(),
             for_ (n in (~s `/` child.element()))
             .return_(
               typeswitch(~n)(
                 e as ST(s"element($ejsonEncodedName)") return_ ((_: XQuery) =>
                   if_(~n `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows) eq name)
-                    .then_(emptySeq)
-                    .else_(~n))
+                  .then_(emptySeq)
+                  .else_(~n))
               ) default ~n))
         }
       }, src)

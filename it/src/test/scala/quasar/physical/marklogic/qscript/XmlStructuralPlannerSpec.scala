@@ -80,6 +80,20 @@ final class XmlStructuralPlannerSpec
       }
     }
 
+    "objectMerge" >> {
+      "merges non-QName keys" >> prop { (x: Data, y: Data) =>
+        val obj1 = lit(x).flatMap(a     => SP.mkObjectEntry("1".xs, a))
+                         .flatMap(entry => SP.mkObject(mkSeq_(entry)))
+
+        val obj2 = lit(y).flatMap(a     => SP.mkObjectEntry("2".xs, a))
+                         .flatMap(entry => SP.mkObject(mkSeq_(entry)))
+
+        val merged = (obj1 |@| obj2)(SP.objectMerge(_, _)).join
+
+        eval(merged) must resultIn(Data.Obj("1" -> x, "2" -> y))
+      }
+    }
+
     "objectDelete" >> {
       "deletes non-QName keys" >> prop { (x: Data, y: Data) =>
         val obj = (lit(x) |@| lit(y))((a, b) => for {
