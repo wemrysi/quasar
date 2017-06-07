@@ -100,10 +100,10 @@ object Mimir extends BackendModule with Logging {
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
 // M = Backend
-// F[_] = MapFunc[T, ?]
+// F[_] = MapFuncCore[T, ?]
 // B = Repr
 // A = SrcHole
-// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFunc[T, ?], ?], Repr]
+// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFuncCore[T, ?], ?], Repr]
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
 
@@ -126,7 +126,7 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
-    lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
+    lazy val planMapFunc: AlgebraM[Backend, MapFuncCore[T, ?], Repr] = {
       // EJson => Data => JValue => RValue => Table
       case MapFuncsCore.Constant(ejson) =>
         val data: Data = ejson.cata(Data.fromEJson)

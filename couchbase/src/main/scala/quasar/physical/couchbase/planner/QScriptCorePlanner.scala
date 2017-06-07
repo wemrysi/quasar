@@ -45,11 +45,11 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: Contex
 
   def processFreeMap(f: FreeMap[T], id: Id[T[N1QL]]): M[T[N1QL]] =
     f.project match {
-      case MapFunc.StaticMap(elems) =>
+      case MapFuncCore.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
           {
-            case Embed(MapFunc.EC(ejson.Str(key))) =>
+            case Embed(MapFuncCore.EC(ejson.Str(key))) =>
               Data[T[N1QL]](QData.Str(key)).embed.η[M]
             case key =>
               EitherT(

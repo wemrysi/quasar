@@ -34,7 +34,7 @@ trait TTypes[T[_[_]]] {
   type QScriptTotal[A]  = quasar.qscript.QScriptTotal[T, A]
   type ProjectBucket[A] = quasar.qscript.ProjectBucket[T, A]
   type ThetaJoin[A]     = quasar.qscript.ThetaJoin[T, A]
-  type MapFunc[A]       = quasar.qscript.MapFunc[T, A]
+  type MapFuncCore[A]   = quasar.qscript.MapFuncCore[T, A]
   type FreeMapA[A]      = quasar.qscript.FreeMapA[T, A]
   type FreeMap          = quasar.qscript.FreeMap[T]
   type JoinFunc         = quasar.qscript.JoinFunc[T]

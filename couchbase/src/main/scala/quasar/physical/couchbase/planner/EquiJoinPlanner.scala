@@ -28,7 +28,7 @@ import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFunc.StaticArray
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
 
 import matryoshka._
 import matryoshka.data._
@@ -76,7 +76,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
         case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2)))))) => true
           case _                                                                       => false
         }
         case v => false
@@ -88,7 +88,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
   lazy val tPlan: AlgebraM[M, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[M, MapFuncCore[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
   def unimpl[F[_]: Applicative, A] =

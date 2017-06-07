@@ -22,7 +22,7 @@ import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
-import quasar.qscript, qscript.{MapFunc, MapFuncsCore => MF}
+import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import quasar.std.TemporalPart, TemporalPart._
 
@@ -31,7 +31,7 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator]
-  extends Planner[T, F, MapFunc[T, ?]] {
+  extends Planner[T, F, MapFuncCore[T, ?]] {
 
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed
   def int(i: Int): T[N1QL]      = Data[T[N1QL]](QData.Int(i)).embed
@@ -188,7 +188,7 @@ final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenera
       Else(Null[T[N1QL]].embed)
     ).embed
 
-  def plan: AlgebraM[M, MapFunc[T, ?], T[N1QL]] = {
+  def plan: AlgebraM[M, MapFuncCore[T, ?], T[N1QL]] = {
     // nullary
     case MF.Constant(v) =>
       Data[T[N1QL]](v.cata(QData.fromEJson)).embed.η[M]

@@ -168,7 +168,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Count(ProjectFieldR(HoleF, StrLit("country"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -187,7 +187,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Sum(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -206,7 +206,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = Nil
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(None))
+            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(None))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -227,7 +227,7 @@ class PlannerSpec
 
         //     def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
         //     def reducers: List[ReduceFunc[FreeMap]] = List(Arbitrary(ProjectFieldR(HoleF, StrLit("age"))))
-        //     def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0))
+        //     def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0))
         //     val reduce = Reduce(src, bucket, reducers, repair)
 
         //     val state: SparkState[RDD[Data]] = compile(reduce)
@@ -246,7 +246,7 @@ class PlannerSpec
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
             def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -272,7 +272,7 @@ class PlannerSpec
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
-              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
@@ -296,7 +296,7 @@ class PlannerSpec
 
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
-              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
@@ -320,7 +320,7 @@ class PlannerSpec
               // when avg is calcualted
               def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
-              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.some))
               val reduce = Reduce(src, bucket, reducers, repair)
               val program: SparkState[RDD[Data]] = compile(reduce)
               program.eval(sc).run

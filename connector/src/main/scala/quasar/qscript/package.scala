@@ -22,7 +22,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
-import quasar.qscript.MapFunc._
+import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
@@ -103,23 +103,23 @@ package object qscript {
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
-  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
+  type FreeMapA[T[_[_]], A] = Free[MapFuncCore[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
-  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
+  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFuncCore[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
   type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
-  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFuncCore[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
+    Free.point[MapFuncCore[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFunc[T, ?], JoinSide](RightSide)
+    Free.point[MapFuncCore[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Option[Int]): FreeMapA[T, ReduceIndex] =
-    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
+    Free.point[MapFuncCore[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 

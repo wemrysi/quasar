@@ -20,14 +20,14 @@ import slamdata.Predef._
 import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
-import quasar.qscript.MapFunc
+import quasar.qscript.MapFuncCore
 import quasar.qscript.MapFuncsCore, MapFuncsCore._
 import quasar.std.TemporalPart._
 
 import scalaz.{Free, Scalaz}, Scalaz._
 
 object JsFuncHandler {
-  def apply[T[_[_]], A](func: MapFunc[T, A]): Option[Free[JsCoreF, A]] = {
+  def apply[T[_[_]], A](func: MapFuncCore[T, A]): Option[Free[JsCoreF, A]] = {
     type JS = Free[JsCoreF, A]
 
     implicit def hole(a: A): JS = Free.pure(a)

@@ -31,7 +31,7 @@ import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.MapFunc
+import quasar.qscript.MapFuncCore
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -156,7 +156,7 @@ object MongoDbPlanner {
       }
 
       ((func, args) match {
-        // NB: this one is missing from MapFunc.
+        // NB: this one is missing from MapFuncCore.
         case (ToId, _) => None
 
         // NB: this would get mapped to the same MapFunc as string.Concat, which
@@ -164,13 +164,13 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          val mf = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           JsFuncHandler(mf).map(exp => Arity1(exp.eval))
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           JsFuncHandler(mf).map(exp => Arity2(exp.eval))
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          val mf = MapFuncCore.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           JsFuncHandler(mf).map(exp => Arity3(exp.eval))
         case _ => None
       }).getOrElse(func match {
@@ -622,7 +622,7 @@ object MongoDbPlanner {
         f.mapSuspension(inj)
 
       ((func, args) match {
-        // NB: this one is missing from MapFunc.
+        // NB: this one is missing from MapFuncCore.
         case (ToId, _) => None
 
         // NB: this would get mapped to the same MapFunc as string.Concat, which
@@ -630,14 +630,14 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          val mf = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
             funcHandler.run(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             funcHandler.run(mf)) { (wb1, wb2, f) =>
@@ -645,7 +645,7 @@ object MongoDbPlanner {
             WB.expr2(wb1, wb2)(exp.eval)
           }
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          val mf = MapFuncCore.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|

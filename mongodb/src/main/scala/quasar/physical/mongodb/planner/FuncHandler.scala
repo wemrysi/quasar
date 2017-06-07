@@ -24,11 +24,11 @@ import quasar.qscript.{Coalesce => _, _}, MapFuncsCore._
 import matryoshka._
 import scalaz.{Divide => _, _}, Scalaz._
 
-final case class FuncHandler[T[_[_]], F[_]](run: MapFunc[T, ?] ~> λ[α => Option[Free[F, α]]]) { self =>
+final case class FuncHandler[T[_[_]], F[_]](run: MapFuncCore[T, ?] ~> λ[α => Option[Free[F, α]]]) { self =>
 
   def orElse[G[_], H[_]](other: FuncHandler[T, G])
       (implicit injF: F :<: H, injG: G :<: H): FuncHandler[T, H] =
-    new FuncHandler[T, H](λ[MapFunc[T, ?] ~> λ[α => Option[Free[H, α]]]](f =>
+    new FuncHandler[T, H](λ[MapFuncCore[T, ?] ~> λ[α => Option[Free[H, α]]]](f =>
       self.run(f).map(_.mapSuspension(injF)) orElse
       other.run(f).map(_.mapSuspension(injG))))
 }
@@ -39,8 +39,8 @@ object FuncHandler {
   def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {
     implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
-    new FuncHandler[T, EX](new (MapFunc[T, ?] ~> M[EX, ?]) {
-      def apply[A](fa: MapFunc[T, A]): M[EX, A] = {
+    new FuncHandler[T, EX](new (MapFuncCore[T, ?] ~> M[EX, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): M[EX, A] = {
         val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
         import fp._
 
@@ -164,8 +164,8 @@ object FuncHandler {
 
   def handleOps3_0[T[_[_]]]: FuncHandler[T, ExprOp3_0F] = {
     implicit def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
-    new FuncHandler[T, ExprOp3_0F](new (MapFunc[T, ?] ~> M[ExprOp3_0F, ?]) {
-      def apply[A](fa: MapFunc[T, A]): M[ExprOp3_0F, A] = {
+    new FuncHandler[T, ExprOp3_0F](new (MapFuncCore[T, ?] ~> M[ExprOp3_0F, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): M[ExprOp3_0F, A] = {
         val fp = new ExprOp3_0F.fixpoint[Free[ExprOp3_0F, A], ExprOp3_0F](Free.roll)
         import fp._
         import FormatSpecifier._
@@ -180,8 +180,8 @@ object FuncHandler {
 
   def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
     implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
-    new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
-      def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
+    new FuncHandler[T, ExprOp3_2F](new (MapFuncCore[T, ?] ~> M[ExprOp3_2F, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): M[ExprOp3_2F, A] = {
         val fp = new ExprOp3_2F.fixpoint[Free[ExprOp3_2F, A], ExprOp3_2F](Free.roll)
         import fp._
 

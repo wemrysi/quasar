@@ -21,7 +21,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
-import quasar.qscript.MapFunc._
+import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
@@ -57,7 +57,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       : Option[(IdStatus, JoinFunc)] =
     (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
       def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFunc, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+        Free.roll[MapFuncCore, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
 
       val zeroRef: JoinFunc = makeRef(0)
       val oneRef: JoinFunc = makeRef(1)
