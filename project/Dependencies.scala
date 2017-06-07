@@ -61,6 +61,7 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
+    "org.scalactic" %% "scalactic" % "3.0.1",     // this is just for the Position macro
     CommonDependencies.doobie.core,
     CommonDependencies.doobie.hikari,
     CommonDependencies.doobie.postgres,

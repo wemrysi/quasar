@@ -28,6 +28,10 @@ import quasar.std.StdLib.set._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+import org.scalactic.source.Position
+import scala.NotImplementedError
+import scala.annotation.unchecked.uncheckedVariance
+import scala.reflect.runtime.universe.WeakTypeTag
 import scalaz._, Scalaz._
 
 package object quasar {
@@ -97,4 +101,11 @@ package object quasar {
       skipped)(
       l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
   }
+
+  // better type hole
+  type UnsafeWeakTypeTag[+A] = WeakTypeTag[A @uncheckedVariance]
+
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  def ???[A](implicit A: UnsafeWeakTypeTag[A], pos: Position): A =
+    throw new NotImplementedError(s"unimplemented value of type ${A.tpe} at ${pos.fileName}:${pos.lineNumber}")
 }
