@@ -73,9 +73,13 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   def mkObjectEntry(key: XQuery, value: XQuery) =
     key match {
-      case XQuery.StringLit(QName.string(qn)) => renameOrWrap(qn.xqy, value)
-      case XQuery.StringLit(key) => renameOrWrapEncoded(key.xs, value)
-      case _ => handleWithF(renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(key, value))
+      case XQuery.StringLit(QName.string(qn)) =>
+        renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(nonQNameKey) =>
+        renameOrWrapEncoded(xs.string(nonQNameKey.xqy), value)
+      case _ =>
+        handleWithF(renameOrWrap(xs.QName(key), value),
+          renameOrWrapEncoded(xs.string(key), value))
     }
 
   def nodeCast(node: XQuery) =
@@ -301,7 +305,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   // ejson:rename-or-wrap-encoded($name as xs:string, $value as item()*) as element()
   lazy val renameOrWrapEncoded: F[FunctionDecl2] =
     typeAttrFor.fn flatMap { typeAttr =>
-      ejs.declare[F]("rename-or-wrap-attr") map (_(
+      ejs.declare[F]("rename-or-wrap-encoded") map (_(
         $("name")  as ST("xs:string"),
         $("value") as ST.Top
       ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
