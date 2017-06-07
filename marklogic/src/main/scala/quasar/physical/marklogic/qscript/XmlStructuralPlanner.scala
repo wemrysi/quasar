@@ -230,7 +230,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       $("name") as ST("xs:string?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
-      fn.filter(func(n.render)(fn.data(~n `/` child.attributeNamed(ejsonEncodedAttr.shows)) eq field),
+      fn.filter(func(n.render)(~n `/` child.attributeNamed(ejsonEncodedAttr.shows) eq field),
                 src `/` child.elementNamed(ejsonEncodedName.shows))
     })
 
@@ -250,14 +250,19 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       $("src")  as ST("element()?"),
       $("name") as ST("xs:string")
     ).as(ST("element()?")) { (src: XQuery, name: XQuery) =>
-      val (s, n) = ($("s"), $("n"))
+      val (s, n, e) = ($("s"), $("n"), $("e"))
       fn.map(func(s.render) {
         element { fn.nodeName(~s) } {
           mkSeq_(
             ~s `/` axes.attribute.node(),
-            for_    (n in (~s `/` child.element()))
-            .where_ ((fn.data(~n `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows))) ne name)
-            .return_(~n))
+            for_ (n in (~s `/` child.element()))
+            .return_(
+              typeswitch(~n)(
+                e as ST(s"element($ejsonEncodedName)") return_ ((_: XQuery) =>
+                  if_(~n `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows) eq name)
+                    .then_(emptySeq)
+                    .else_(~n))
+              ) default ~n))
         }
       }, src)
     })
