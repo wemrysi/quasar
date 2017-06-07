@@ -73,16 +73,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   def mkObjectEntry(key: XQuery, value: XQuery) =
     key match {
-      case XQuery.StringLit(QName.string(qn)) =>
-        renameOrWrap(qn.xqy, value)
-      case XQuery.StringLit(key) =>
-        renameOrWrapEncoded(key.xs, value)
-      case _ => {
-        val validQName = renameOrWrap(xs.QName(key), value)
-        val nonQName   = renameOrWrapEncoded(key, value)
-
-        (validQName |@| nonQName)((raw, encoded) => handleWith(raw, encoded))
-      }
+      case XQuery.StringLit(QName.string(qn)) => renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(key) => renameOrWrapEncoded(key.xs, value)
+      case _ => handleWithF(renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(key, value))
     }
 
   def nodeCast(node: XQuery) =
@@ -101,7 +94,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     key match {
       case XQuery.StringLit(QName.string(qn)) => withoutNamed(obj, qn.xqy)
       case XQuery.StringLit(name) => withoutNamedEncoded(obj, name.xs)
-      case _                      => withoutNamed(obj, key)
+      case _ => handleWithF(withoutNamed(obj, key), withoutNamedEncoded(obj, key))
     }
 
   // TODO: This assumes the `key` is not present in the object, for performance.
@@ -129,12 +122,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           else
             encodedChildren(obj, s.xs))
 
-      case _ => {
-        val validQName = childrenNamed(obj, key)
-        val nonQName   = childrenNamedEncoded(obj, key)
-
-        (validQName |@| nonQName)((raw, encoded) => handleWith(raw, encoded))
-      }
+      case _ => handleWithF(childrenNamed(obj, key), childrenNamedEncoded(obj, key))
     }
 
     prj >>= (manyToArray(_))
@@ -322,12 +310,11 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             element { ejsonEncodedName.xqy } {
               mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
                      e `/` axes.attribute.node(),
-                     e `/` child.node())}
-          )
+                     e `/` child.node())})
         ) default (element { ejsonEncodedName.xqy }
                            { mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
                              typeAttr(value),
-                             value)} )
+                             value)})
       })
     }
 
@@ -415,6 +402,6 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
 
-  private def handleWith(xqy: XQuery, alt: XQuery): XQuery =
-    try_(xqy).catch_($("_"))(κ(alt))
+  private def handleWithF[F[_]: Applicative](l: F[XQuery], r: F[XQuery]): F[XQuery] =
+    (l |@| r)((left, right) => try_(left).catch_($("_"))(κ(right)))
 }
