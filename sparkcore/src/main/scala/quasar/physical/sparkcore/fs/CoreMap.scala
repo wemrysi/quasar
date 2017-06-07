@@ -21,7 +21,7 @@ import quasar.{Data, DataCodec}
 import quasar.Planner._
 import quasar.common.PrimaryType
 import quasar.fp.ski._
-import quasar.qscript._, MapFuncs._
+import quasar.qscript._, MapFuncsCore._
 import quasar.std.{DateLib, StringLib}
 import quasar.std.TemporalPart
 

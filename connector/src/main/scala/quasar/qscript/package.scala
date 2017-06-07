@@ -23,7 +23,7 @@ import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
 import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._

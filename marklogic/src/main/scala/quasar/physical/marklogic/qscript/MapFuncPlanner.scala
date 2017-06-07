@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncsCore}, MapFuncsCore._
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
@@ -95,7 +95,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 
     // relations
     case Not(x)                       => SP.castIfNode(x) map (fn.not)
-    case MapFuncs.Eq(x, y)            => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
+    case MapFuncsCore.Eq(x, y)        => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
     case Neq(x, y)                    => castedBinOp(x, y)((a, b) => handleWith(a ne b, fn.True))
     case Lt(x, y)                     => castedBinOp(x, y)(_ lt _)
     case Lte(x, y)                    => castedBinOp(x, y)(_ le _)

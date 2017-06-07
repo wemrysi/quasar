@@ -62,7 +62,7 @@ object SimplifyJoin {
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
       import MapFunc._
-      import MapFuncs._
+      import MapFuncsCore._
 
       type IT[F[_]] = T[F]
       type G[A] = F[A]

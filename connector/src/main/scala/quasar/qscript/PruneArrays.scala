@@ -20,7 +20,7 @@ import slamdata.Predef.{ Map => ScalaMap, _ }
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
 import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._

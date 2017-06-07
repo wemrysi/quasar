@@ -52,7 +52,7 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 
 // TODO all `Free` should be generalized to `T` once we can handle recursive `Free`
 object MapFunc {
-  import MapFuncs._
+  import MapFuncsCore._
 
   val EC = Inject[Common,    EJson]
   val EX = Inject[Extension, EJson]
@@ -128,7 +128,7 @@ object MapFunc {
       Constant[T, A](EJson.fromCommon(ejson.Arr[T[EJson]](Nil)))
   }
 
-  // TODO: subtyping is preventing embedding of MapFuncs
+  // TODO: subtyping is preventing embedding of MapFuncsCore
   /** This returns the set of expressions that are concatenated together. It can
     * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
     * also arbitrary expressions that may evaluate to an array of any size.
@@ -157,7 +157,7 @@ object MapFunc {
 
   }
 
-  // TODO subtyping is preventing embeding of MapFuncs
+  // TODO subtyping is preventing embedding of MapFuncsCore
   object ConcatMapsN {
     def apply[T[_[_]]: BirecursiveT, A](args: List[FreeMapA[T, A]])
         : CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]] = {
@@ -754,7 +754,7 @@ object MapFunc {
   }
 }
 
-object MapFuncs {
+object MapFuncsCore {
   // nullary
   /** A value that is statically known.
     */

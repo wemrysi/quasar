@@ -114,7 +114,7 @@ object MongoDbQScriptPlanner {
       : OutputM[PartialSelector[T]] =
     fm.zygo(
       interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
-        κ(MapFuncs.Undefined[T, T[MapFunc[T, ?]]]().embed),
+        κ(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]().embed),
         _.embed),
       ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
         κ(defaultSelector[T].point[OutputM]),
@@ -160,7 +160,7 @@ object MongoDbQScriptPlanner {
     (funcHandler: FuncHandler[T, EX])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
       AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
-    import MapFuncs._
+    import MapFuncsCore._
 
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler.run(mf).map(t => unpack(t.mapSuspension(inj)))
@@ -260,7 +260,7 @@ object MongoDbQScriptPlanner {
       And => _, Or => _, Not => _,
       _}
 
-    import MapFuncs._
+    import MapFuncsCore._
 
     val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
@@ -546,7 +546,7 @@ object MongoDbQScriptPlanner {
    */
   def selector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
-    import MapFuncs._
+    import MapFuncsCore._
 
     type Output = OutputM[PartialSelector[T]]
 
@@ -877,7 +877,7 @@ object MongoDbQScriptPlanner {
               }).join
           case Sort(src, bucket, order) =>
             val (keys, dirs) = (bucket match {
-              case MapFuncs.NullLit() => order
+              case MapFuncsCore.NullLit() => order
               case _                  => (bucket, SortDir.Ascending) <:: order
             }).unzip
             keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
@@ -1145,14 +1145,14 @@ object MongoDbQScriptPlanner {
     (subType: Type)
     (implicit merr: MonadError_[M, FileSystemError])
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb))) =>
+    case free @ CoEnv(\/-(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb))) =>
       if (typ.contains(subType)) cont.project.point[M]
       // TODO: Error if there is no overlap between the types.
       else {
         val union = subType ⨯ typ
         if (union ≟ Type.Bottom)
           merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-        else CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MapFuncs.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb).right).point[M]
+        else CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb).right).point[M]
       }
     case x => x.point[M]
   }

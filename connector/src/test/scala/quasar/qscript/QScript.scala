@@ -22,7 +22,7 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 import quasar.sql.{CompilerHelpers, JoinDir}
 import quasar.std.StdLib, StdLib._
 
@@ -511,7 +511,7 @@ class QScriptSpec
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val query =
-        lpf.let('__tmp0, 
+        lpf.let('__tmp0,
           lpf.join(
             lpRead("/foo"),
             lpRead("/bar"),

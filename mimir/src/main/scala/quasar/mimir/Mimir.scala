@@ -128,7 +128,7 @@ object Mimir extends BackendModule with Logging {
 
     lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
       // EJson => Data => JValue => RValue => Table
-      case MapFuncs.Constant(ejson) =>
+      case MapFuncsCore.Constant(ejson) =>
         val data: Data = ejson.cata(Data.fromEJson)
         val jvalue: JValue = JValue.fromData(data)
         val rvalue: RValue = RValue.fromJValue(jvalue)

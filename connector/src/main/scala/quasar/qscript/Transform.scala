@@ -25,7 +25,7 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 

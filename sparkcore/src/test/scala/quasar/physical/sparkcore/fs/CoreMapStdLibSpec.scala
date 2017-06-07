@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.qscript.{MapFunc, MapFuncs, MapFuncStdLibTestRunner, FreeMapA}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
 import quasar.std._
 
 import matryoshka._

@@ -22,7 +22,7 @@ import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
-import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
+import quasar.qscript, qscript.{MapFunc, MapFuncsCore => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import quasar.std.TemporalPart, TemporalPart._
 

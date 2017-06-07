@@ -143,8 +143,8 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
 
         val bucketNormConst: Option[FreeMap] =
           bucketNormOpt.getOrElse(bucket).resume.fold({
-            case MapFuncs.Constant(ej) =>
-              (!EJson.isNull(ej)).option(MapFuncs.NullLit[T, Hole]())
+            case MapFuncsCore.Constant(ej) =>
+              (!EJson.isNull(ej)).option(MapFuncsCore.NullLit[T, Hole]())
             case _ => bucketNormOpt
           }, κ(bucketNormOpt))
 

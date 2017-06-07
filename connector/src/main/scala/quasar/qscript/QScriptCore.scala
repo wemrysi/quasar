@@ -66,7 +66,7 @@ object ReduceIndex {
   * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then
   * that’s what [[LeftSide]] is. And [[RightSide]] is values like `1`, `2`, and
   * `3`, because that’s what you get from flattening the struct.So then our
-  * right-biased [[quasar.qscript.MapFuncs.ConcatMaps]] says to concat
+  * right-biased [[quasar.qscript.MapFuncsCore.ConcatMaps]] says to concat
   * `{ foo: 7, bar: [1, 2, 3] }` with `{ bar: 1 }`, resulting in
   * `{ foo: 7, bar: 1 }` (then again with `{ foo: 7, bar: 2 }` and
   * `{ foo: 7, bar: 3 }`, finishing up the handling of that one element in the
@@ -335,9 +335,9 @@ object QScriptCore {
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
             val proj0: FreeMap[IT] =
-              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](0)))
+              Free.roll(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](0)))
             val proj1: FreeMap[IT] =
-              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](1)))
+              Free.roll(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](1)))
 
             def constructMerge(
               struct: FreeMap[IT],

@@ -22,7 +22,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -124,7 +124,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   // TODO: These optimizations should give rise to various property tests:
   //       • elideNopMap ⇒ no `Map(???, HoleF)`
-  //       • normalize ⇒ a whole bunch, based on MapFuncs
+  //       • normalize ⇒ a whole bunch, based on MapFuncsCore
   //       • elideNopJoin ⇒ no `ThetaJoin(???, HoleF, HoleF, LeftSide === RightSide, ???, ???)`
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`

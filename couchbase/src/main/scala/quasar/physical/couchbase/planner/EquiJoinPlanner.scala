@@ -28,7 +28,7 @@ import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFunc.StaticArray
 
 import matryoshka._
 import matryoshka.data._
