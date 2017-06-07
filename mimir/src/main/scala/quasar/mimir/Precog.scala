@@ -179,5 +179,5 @@ class Precog(dataDir0: File)
     stream.foldLeft(())((_, _) => ())
   }
 
-  def shutdown: Future[Unit] = Future.successful(())
+  def shutdown: Future[Unit] = actorSystem.terminate.map(_ => ())
 }
