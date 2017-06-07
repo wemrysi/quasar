@@ -54,8 +54,8 @@ object Main {
 
   private def driver(f: Command => Free[DriverEff, Unit], e: Task[Unit]): Task[Unit] = {
     def shutdownConsole(c: Console): Task[Unit] =
-      Task.delay(c.getShell.out.println("Exiting...")) *>
-      e.attempt                                        *>
+      Task.delay(c.getShell.out.println("Exiting...")) >>
+      e.attempt                                        >>
       Task.delay(c.stop)
 
     Task delay {
