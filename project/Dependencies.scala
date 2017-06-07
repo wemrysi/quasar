@@ -15,6 +15,7 @@ object Dependencies {
   private val jacksonVersion           = "2.4.4"
   private val matryoshkaVersion        = "0.18.3"
   private val pathyVersion             = "0.2.9"
+  private val slamdataPredefVersion    = "0.0.4"
   private val raptureVersion           = "2.0.0-M6"
   private val scodecBitsVersion        = "1.1.0"
   private val http4sVersion            = "0.15.13a"
@@ -35,6 +36,7 @@ object Dependencies {
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
     "com.slamdata"  %% "pathy-core"      % pathyVersion,
     "com.slamdata"  %% "pathy-argonaut"  % pathyVersion,
+    "com.slamdata"  %% "slamdata-predef" % slamdataPredefVersion,
     CommonDependencies.refined.refined,
     CommonDependencies.shapeless.shapeless,
     CommonDependencies.scalacheck.scalacheck                  % Test,
@@ -61,7 +63,6 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    "org.scalactic" %% "scalactic" % "3.0.1",     // this is just for the Position macro
     CommonDependencies.doobie.core,
     CommonDependencies.doobie.hikari,
     CommonDependencies.doobie.postgres,
