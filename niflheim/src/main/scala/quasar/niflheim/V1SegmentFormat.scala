@@ -18,7 +18,6 @@ package quasar.niflheim
 
 import quasar.precog.common._
 
-import quasar.precog.util.PrecogUnit
 import quasar.precog.BitSet
 import quasar.precog.util.BitSetUtil.Implicits._
 
@@ -103,7 +102,7 @@ object V1SegmentFormat extends SegmentFormat {
   }
 
   object writer extends SegmentWriter {
-    def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, PrecogUnit] = {
+    def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] = {
       for {
         _ <- writeSegmentId(channel, segment)
         _ <- segment match {
@@ -114,10 +113,10 @@ object V1SegmentFormat extends SegmentFormat {
           case seg: NullSegment =>
             writeNullSegment(channel, seg)
         }
-      } yield PrecogUnit
+      } yield Unit
     }
 
-    private def writeSegmentId(channel: WritableByteChannel, segment: Segment): Validation[IOException, PrecogUnit] = {
+    private def writeSegmentId(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] = {
       val tpeFlag = CTypeFlags.getFlagFor(segment.ctype)
       val strPath = segment.cpath.toString
       val maxSize = Codec.Utf8Codec.maxSize(strPath) + tpeFlag.length + 8
@@ -126,12 +125,12 @@ object V1SegmentFormat extends SegmentFormat {
         buffer.putLong(segment.blockid)
         Codec.Utf8Codec.writeUnsafe(strPath, buffer)
         buffer.put(tpeFlag)
-        PrecogUnit
+        Unit
       }
     }
 
     private def writeArraySegment[@spec(Boolean,Long,Double) A](channel: WritableByteChannel,
-        segment: ArraySegment[A], codec: Codec[A]): Validation[IOException, PrecogUnit] = {
+        segment: ArraySegment[A], codec: Codec[A]): Validation[IOException, Unit] = {
       var maxSize = Codec.BitSetCodec.maxSize(segment.defined) + 4
       segment.defined.foreach { row =>
         maxSize += codec.maxSize(segment.values(row))
@@ -143,7 +142,7 @@ object V1SegmentFormat extends SegmentFormat {
         segment.defined.foreach { row =>
           codec.writeUnsafe(segment.values(row), buffer)
         }
-        PrecogUnit
+        Unit
       }
     }
 
@@ -153,7 +152,7 @@ object V1SegmentFormat extends SegmentFormat {
         buffer.putInt(segment.length)
         Codec.BitSetCodec.writeUnsafe(segment.defined, buffer)
         Codec.BitSetCodec.writeUnsafe(segment.values, buffer)
-        PrecogUnit
+        Unit
       }
     }
 
@@ -162,7 +161,7 @@ object V1SegmentFormat extends SegmentFormat {
       writeChunk(channel, maxSize) { buffer =>
         buffer.putInt(segment.length)
         Codec.BitSetCodec.writeUnsafe(segment.defined, buffer)
-        PrecogUnit
+        Unit
       }
     }
   }
