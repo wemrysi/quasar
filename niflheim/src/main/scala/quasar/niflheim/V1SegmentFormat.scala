@@ -113,7 +113,7 @@ object V1SegmentFormat extends SegmentFormat {
           case seg: NullSegment =>
             writeNullSegment(channel, seg)
         }
-      } yield Unit
+      } yield ()
     }
 
     private def writeSegmentId(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] = {
@@ -125,7 +125,6 @@ object V1SegmentFormat extends SegmentFormat {
         buffer.putLong(segment.blockid)
         Codec.Utf8Codec.writeUnsafe(strPath, buffer)
         buffer.put(tpeFlag)
-        Unit
       }
     }
 
@@ -139,10 +138,9 @@ object V1SegmentFormat extends SegmentFormat {
       writeChunk(channel, maxSize) { buffer =>
         buffer.putInt(segment.values.length)
         Codec.BitSetCodec.writeUnsafe(segment.defined, buffer)
-        segment.defined.foreach { row =>
+        segment.defined foreach { row =>
           codec.writeUnsafe(segment.values(row), buffer)
         }
-        Unit
       }
     }
 
@@ -152,7 +150,6 @@ object V1SegmentFormat extends SegmentFormat {
         buffer.putInt(segment.length)
         Codec.BitSetCodec.writeUnsafe(segment.defined, buffer)
         Codec.BitSetCodec.writeUnsafe(segment.values, buffer)
-        Unit
       }
     }
 
@@ -161,7 +158,6 @@ object V1SegmentFormat extends SegmentFormat {
       writeChunk(channel, maxSize) { buffer =>
         buffer.putInt(segment.length)
         Codec.BitSetCodec.writeUnsafe(segment.defined, buffer)
-        Unit
       }
     }
   }

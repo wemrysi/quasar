@@ -163,7 +163,7 @@ final class StubSegmentFormat extends SegmentFormat {
 
   object writer extends SegmentWriter {
     def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] =
-      Success(Unit)
+      Success(())
   }
 }
 

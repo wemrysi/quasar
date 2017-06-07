@@ -43,7 +43,7 @@ case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends Segm
       for {
         _ <- writeVersion(channel)
         _ <- format.writer.writeSegment(channel, segment)
-      } yield Unit
+      } yield ()
     }
   }
 

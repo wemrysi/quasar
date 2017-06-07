@@ -157,7 +157,7 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
     IO(actor ! Quiesce)
 
   def close(implicit actorSystem: ActorSystem): Future[Unit] =
-    gracefulStop(actor, timeout.duration) map { _ => Unit }
+    gracefulStop(actor, timeout.duration).map(_ => ())
 }
 
 private[niflheim] object NIHDBActor extends Logging {

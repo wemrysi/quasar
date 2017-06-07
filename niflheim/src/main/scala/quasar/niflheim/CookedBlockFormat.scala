@@ -69,7 +69,6 @@ object V1CookedBlockFormat extends CookedBlockFormat with Chunker {
       buffer.putLong(metadata.blockid)
       buffer.putInt(metadata.length)
       SegmentsCodec.writeUnsafe(metadata.segments, buffer)
-      Unit
     }
   }
 
@@ -94,7 +93,7 @@ case class VersionedCookedBlockFormat(formats: Map[Int, CookedBlockFormat]) exte
     for {
       _ <- writeVersion(channel)
       _ <- format.writeCookedBlock(channel, segments)
-    } yield Unit
+    } yield ()
   }
 
   def readCookedBlock(channel: ReadableByteChannel): Validation[IOException, CookedBlockMetadata] = {

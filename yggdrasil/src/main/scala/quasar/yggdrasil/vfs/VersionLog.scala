@@ -149,13 +149,12 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   }
 
   def addVersion(entry: VersionEntry): IO[Unit] = allVersions.find(_ == entry) map { _ =>
-    IO(Unit): IO[Unit]
+    IO(())
   } getOrElse {
     log.debug("Adding version entry: " + entry)
-    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) map { _ =>
-      allVersions = allVersions :+ entry
-      Unit
-    }: IO[Unit]
+    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) flatMap { _ =>
+      IO(allVersions = allVersions :+ entry)
+    }
   }
 
   def completeVersion(version: UUID): IO[Unit] = {
@@ -163,7 +162,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
       !isCompleted(version) whenM {
         log.debug("Completing version " + version)
         IOUtils.writeToFile(version.serialize.renderCompact + "\n", completedFile, false)
-      } map { _ => Unit }
+      } map { _ => () }
     } else {
       IO.throwIO(new IllegalStateException("Cannot make nonexistent version %s current" format version))
     }
@@ -179,7 +178,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
       } flatMap {
         _.isEmpty.whenM(IO.throwIO(new IllegalStateException("Attempt to set head to nonexistent version %s" format newHead)))
       }
-    } map { _ => Unit }
+    } map { _ => () }
   }
 
   def clearHead = IOUtils.writeToFile(unsetSentinelJV, headFile, false).map { _ =>

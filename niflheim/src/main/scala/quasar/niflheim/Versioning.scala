@@ -35,7 +35,7 @@ trait Versioning {
       while (buffer.remaining() > 0) {
         channel.write(buffer)
       }
-      Success(Unit)
+      Success(())
     } catch { case ioe: IOException =>
       Failure(ioe)
     }

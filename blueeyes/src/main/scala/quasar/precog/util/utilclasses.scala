@@ -171,13 +171,11 @@ object IOUtils extends Logging {
 
   def overwriteFile(s: String, f: File): IO[Unit] = writeToFile(s, f, append = false)
   def writeToFile(s: String, f: File, append: Boolean): IO[Unit] = IO {
-    Files.write(f.toPath, s.getBytes);
-    Unit
+    Files.write(f.toPath, s.getBytes)
   }
 
   def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
     Files.write(f.toPath, s0.map("" + _: CharSequence).asJava, Utf8Charset)
-    Unit
   }
 
   /** Performs a safe write to the file. Returns true
@@ -192,14 +190,16 @@ object IOUtils extends Logging {
   }
 
   def makeDirectory(dir: File): IO[Unit] = IO {
-    if (dir.isDirectory || dir.mkdirs) Unit
-    else throw new IOException("Failed to create directory " + dir)
+    if (dir.isDirectory || dir.mkdirs)
+      ()
+    else
+      throw new IOException("Failed to create directory " + dir)
   }
 
   def recursiveDelete(files: Seq[File]): IO[Unit] = {
     files.toList match {
-      case Nil      => IO(Unit)
-      case hd :: tl => recursiveDelete(hd) flatMap (_ => recursiveDelete(tl))
+      case Nil      => IO(())
+      case hd :: tl => recursiveDelete(hd).flatMap(_ => recursiveDelete(tl))
     }
   }
 
@@ -212,12 +212,12 @@ object IOUtils extends Logging {
 
   /** Deletes `file`, recursively if it is a directory. */
   def recursiveDelete(file: File): IO[Unit] = {
-    def del(): Unit = { file.delete() ; Unit }
+    def del(): Unit = { file.delete(); () }
 
     if (!file.isDirectory) IO(del())
     else listFiles(file) flatMap {
       case Array() => IO(del())
-      case xs      => recursiveDelete(xs) map (_ => del())
+      case xs      => recursiveDelete(xs).map(_ => del())
     }
   }
 
@@ -226,7 +226,7 @@ object IOUtils extends Logging {
     */
   def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[Unit] = {
     if (startDir == upTo) {
-      IO { log.debug("Stopping recursive clean at root: " + upTo); Unit }
+      IO { log.debug("Stopping recursive clean at root: " + upTo) }
     } else if (startDir.isDirectory) {
       if (Option(startDir.list).exists(_.length == 0)) {
         IO {
@@ -235,10 +235,10 @@ object IOUtils extends Logging {
           recursiveDeleteEmptyDirs(startDir.getParentFile, upTo)
         }
       } else {
-        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir); Unit }
+        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir) }
       }
     } else {
-      IO { log.warn("Asked to clean a non-directory: " + startDir); Unit }
+      IO { log.warn("Asked to clean a non-directory: " + startDir) }
     }
   }
 
@@ -248,7 +248,6 @@ object IOUtils extends Logging {
 
   def copyFile(src: File, dest: File): IO[Unit] = IO {
     Files.copy(src.toPath, dest.toPath)
-    Unit
   }
 }
 

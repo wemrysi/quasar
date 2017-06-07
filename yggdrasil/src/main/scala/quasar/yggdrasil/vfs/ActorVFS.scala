@@ -485,7 +485,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
     override def postStop = {
       val closeAll = versions.values.toStream traverse {
         case NIHDBResource(db) => db.close(context.system)
-        case _ => Future.successful(Unit)
+        case _ => Future.successful(())
       }
 
       Await.result(closeAll, shutdownTimeout)
@@ -503,7 +503,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
     private def promoteVersion(version: UUID): IO[Unit] = {
       // we only promote if the requested version is in progress
       if (versionLog.isCompleted(version)) {
-        IO(Unit)
+        IO(())
       } else {
         versionLog.completeVersion(version)
       }
@@ -557,7 +557,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
           for {
             _ <- IO { versions += (version -> resource) }
             _ <- complete.whenM(versionLog.completeVersion(version) >> versionLog.setHead(version) >> maybeExpireCache(apiKey, resource))
-          } yield Unit
+          } yield ()
         }
       } yield {
         created.fold(
@@ -577,7 +577,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
             routingActor ! ArchiveMessage(apiKey, cachePath, None, EventId.fromLong(0l), clock.instant())
           }
         },
-        nihdbr => IO(Unit)
+        nihdbr => IO(())
       )
     }
 
@@ -612,8 +612,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
             } yield {
               log.trace("Sent insert message for " + msg + " to nihdb")
               // FIXME: We aren't actually guaranteed success here because NIHDB might do something screwy.
-              maybeCompleteJob(msg, terminal, UpdateSuccess(msg.path)) pipeTo requestor
-              Unit
+              maybeCompleteJob(msg, terminal, UpdateSuccess(msg.path)).pipeTo(requestor)
             }
           ).join
         } else if (createIfAbsent) {
@@ -636,8 +635,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
         // errors if we're already complete
         if (createIfAbsent) {
           performCreate(msg.apiKey, BlobData(msg.content.data, msg.content.mimeType), streamId, msg.writeAs, terminal) map { response =>
-            maybeCompleteJob(msg, terminal, response) pipeTo requestor
-            Unit
+            maybeCompleteJob(msg, terminal, response).pipeTo(requestor)
           }
         } else {
           //TODO: update job
@@ -662,7 +660,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
               for {
                 _ <- persistNIHDB(canCreate(msg.path, permissions(apiKey), msg.writeAs), offset, msg, streamId, false)
                 _ <- versionLog.completeVersion(streamId) >> versionLog.setHead(streamId)
-              } yield Unit: Unit
+              } yield ()
           }
 
         case (offset, msg @ StoreFileMessage(_, path, _, _, _, _, _, streamRef)) =>
@@ -684,10 +682,8 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
           }
 
         case (offset, ArchiveMessage(apiKey, path, jobId, _, timestamp)) =>
-          versionLog.clearHead >> IO(requestor ! UpdateSuccess(path)) >> IO(Unit: Unit)
-      } map {
-        _ => Unit: Unit
-      }
+          versionLog.clearHead >> IO(requestor ! UpdateSuccess(path)) >> IO(())
+      } map { _ => () }
     }
 
     def versionOpt(version: Version) = version match {

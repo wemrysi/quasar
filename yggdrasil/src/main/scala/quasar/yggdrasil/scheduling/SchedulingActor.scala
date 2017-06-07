@@ -171,7 +171,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
 
       if (running.contains((task.source, task.sink))) {
         // We don't allow for more than one concurrent instance of a given task
-        Future successful Unit // AP: in precog we called `Promise` instead of `Future`
+        Future.successful(()) // AP: in precog we called `Promise` instead of `Future`
       } else {
         def consumeStream(totalSize: Long, stream: StreamT[Future, Slice]): Future[Long] = {
           stream.uncons flatMap {
