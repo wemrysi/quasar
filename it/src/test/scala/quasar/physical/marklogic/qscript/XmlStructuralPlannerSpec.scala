@@ -80,6 +80,18 @@ final class XmlStructuralPlannerSpec
       }
     }
 
+    "objectDelete" >> {
+      "deletes non-QName keys" >> prop { (x: Data, y: Data) =>
+        val obj = (lit(x) |@| lit(y))((a, b) => for {
+          e1 <- SP.mkObjectEntry(xs.QName("bar".xs), a)
+          e2 <- SP.mkObjectEntry("12 not qname".xs, b)
+          o  <- SP.mkObject(mkSeq_(e1, e2))
+        } yield o).join
+
+        eval(obj.flatMap(SP.objectDelete(_, "12 not qname".xs))) must resultIn(Data.Obj("bar" -> x))
+      }
+    }
+
     "objectLookup" >> {
       "returns repeated elements as an array" >> prop { (x: Data, y: Data, z: Data) =>
         val obj = (lit(x) |@| lit(y) |@| lit(z))((a, b, c) => for {

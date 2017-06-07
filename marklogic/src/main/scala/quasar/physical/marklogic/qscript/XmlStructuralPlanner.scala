@@ -76,9 +76,13 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(QName.string(qn)) =>
         renameOrWrap(qn.xqy, value)
       case XQuery.StringLit(key) =>
-        renameOrWrapAttr(key.xs, value)
-      case _ =>
-        renameOrWrap(xs.QName(key), value)
+        renameOrWrapEncoded(key.xs, value)
+      case _ => {
+        val validQName = renameOrWrap(xs.QName(key), value)
+        val nonQName   = renameOrWrapEncoded(key, value)
+
+        (validQName |@| nonQName)((raw, encoded) => handleWith(raw, encoded))
+      }
     }
 
   def nodeCast(node: XQuery) =
@@ -96,7 +100,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   def objectDelete(obj: XQuery, key: XQuery) =
     key match {
       case XQuery.StringLit(QName.string(qn)) => withoutNamed(obj, qn.xqy)
-      case XQuery.StringLit(name) => ???
+      case XQuery.StringLit(name) => withoutNamedEncoded(obj, name.xs)
       case _                      => withoutNamed(obj, key)
     }
 
@@ -125,8 +129,12 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           else
             encodedChildren(obj, s.xs))
 
-      case _ => (childrenNamed(obj, key) |@| childrenNamedEncoded(obj, key))((raw, encoded) =>
-        handleWith(raw, encoded))
+      case _ => {
+        val validQName = childrenNamed(obj, key)
+        val nonQName   = childrenNamedEncoded(obj, key)
+
+        (validQName |@| nonQName)((raw, encoded) => handleWith(raw, encoded))
+      }
     }
 
     prj >>= (manyToArray(_))
@@ -222,7 +230,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       $("name") as ST("xs:string?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
-      fn.filter(func(n.render)(fn.data(~n`/`child.attributeNamed(ejsonEncodedAttr.shows)) eq field),
+      fn.filter(func(n.render)(fn.data(~n `/` child.attributeNamed(ejsonEncodedAttr.shows)) eq field),
                 src `/` child.elementNamed(ejsonEncodedName.shows))
     })
 
@@ -234,6 +242,24 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
       val n = $("n")
       fn.filter(func(n.render)(fn.nodeName(~n) eq xs.QName(field)), src `/` child.element())
+    })
+
+  // qscript:without-named-encoded($src as element()?, $name as xs:string) as element()?
+  lazy val withoutNamedEncoded: F[FunctionDecl2] =
+    ejs.declare[F]("without-named-encoded") map (_(
+      $("src")  as ST("element()?"),
+      $("name") as ST("xs:string")
+    ).as(ST("element()?")) { (src: XQuery, name: XQuery) =>
+      val (s, n) = ($("s"), $("n"))
+      fn.map(func(s.render) {
+        element { fn.nodeName(~s) } {
+          mkSeq_(
+            ~s `/` axes.attribute.node(),
+            for_    (n in (~s `/` child.element()))
+            .where_ ((fn.data(~n `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows))) ne name)
+            .return_(~n))
+        }
+      }, src)
     })
 
   // qscript:without-named($src as element()?, $name as xs:QName) as element()?
@@ -279,8 +305,8 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       })
     }
 
-  // ejson:rename-or-wrap-attr($name as xs:string, $value as item()*) as element()
-  lazy val renameOrWrapAttr: F[FunctionDecl2] =
+  // ejson:rename-or-wrap-encoded($name as xs:string, $value as item()*) as element()
+  lazy val renameOrWrapEncoded: F[FunctionDecl2] =
     typeAttrFor.fn flatMap { typeAttr =>
       ejs.declare[F]("rename-or-wrap-attr") map (_(
         $("name")  as ST("xs:string"),
