@@ -12,8 +12,7 @@ ML_USERNAME="marklogic"
 ML_PASSWORD="marklogic"
 
 await_restart() {
-  sleep 5
-  curl --silent --retry 20 --retry-connrefused --retry-delay 1 --retry-max-time 20 ${ML_ADMIN_PREFIX}/timestamp
+  sleep 20
 }
 
 # Initialize the server with the license info
