@@ -16,9 +16,6 @@
 
 package quasar.yggdrasil.scheduling
 
-import quasar.precog.common.Path
-import quasar.precog.common.security._
-
 import java.util.UUID
 
 import scalaz.EitherT

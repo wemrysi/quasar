@@ -25,8 +25,6 @@ import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
 import java.nio.ByteBuffer
 
 import scala.{ specialized => spec }
-import scala.annotation.tailrec
-import scala.collection.mutable
 
 import scalaz.{Validation, Success, Failure}
 import scalaz.syntax.monad._

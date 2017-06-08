@@ -17,20 +17,18 @@
 package quasar.yggdrasil.scheduling
 
 import quasar.precog.common.Path
-import quasar.precog.common.accounts.AccountFinder
 import quasar.precog.common.jobs._
 import quasar.precog.common.security._
 
-import quasar.yggdrasil._
 import quasar.yggdrasil.execution._
 import quasar.yggdrasil.table.Slice
 import quasar.yggdrasil.vfs._
 
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
-import akka.pattern.{ask, pipe}
+import akka.actor.{Actor, Cancellable}
+import akka.pattern.pipe
 import akka.util.Timeout
 
 import quasar.blueeyes.util.Clock
@@ -44,7 +42,7 @@ import org.quartz.CronExpression
 
 import org.slf4s.Logging
 
-import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
+import scala.collection.mutable.PriorityQueue
 import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
 
 import scalaz.{Ordering => _, idInstance => _, _}
@@ -52,7 +50,6 @@ import scalaz.std.option._
 import scalaz.std.scalaFuture._
 import scalaz.syntax.id._
 import scalaz.syntax.traverse._
-import scalaz.syntax.std.either._
 import scalaz.syntax.std.option._
 
 import scala.concurrent.ExecutionContext.Implicits.global     // wtf fix me??!!

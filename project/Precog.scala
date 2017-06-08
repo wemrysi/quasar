@@ -7,13 +7,13 @@ object Build {
   val BothScopes = "compile->compile;test->test"
 
   def warningOpts = Seq(
-    "-g:vars",
-    "-deprecation",
-    "-unchecked",
-    "-Ywarn-unused",
-    "-Ywarn-unused-import",
-    "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard")
+    //"-g:vars",
+    //"-deprecation",
+    //"-unchecked",
+    //"-Ywarn-value-discard",
+    //"-Ywarn-numeric-widen",
+    //"-Ywarn-unused",
+    "-Ywarn-unused-import")
 
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...

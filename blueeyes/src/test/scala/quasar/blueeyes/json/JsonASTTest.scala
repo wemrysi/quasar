@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
 
-import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 

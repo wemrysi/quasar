@@ -21,7 +21,6 @@ import quasar.blueeyes._
 import service._
 import quasar.precog.common.accounts.{ Account, AccountId }
 
-import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
 
 import scalaz._, Scalaz._

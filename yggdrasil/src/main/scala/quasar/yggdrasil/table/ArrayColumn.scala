@@ -16,11 +16,10 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
-import quasar.precog.util._
-import quasar.precog._
 import quasar.blueeyes._
+import quasar.precog._
 import quasar.precog.common._
+import quasar.precog.util._
 
 import java.time.LocalDateTime
 

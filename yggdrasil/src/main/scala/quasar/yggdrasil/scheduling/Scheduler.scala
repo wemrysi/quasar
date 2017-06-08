@@ -24,7 +24,6 @@ import akka.util.Timeout
 
 import quasar.precog.common.Path
 import quasar.precog.common.security._
-import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
 import java.util.UUID

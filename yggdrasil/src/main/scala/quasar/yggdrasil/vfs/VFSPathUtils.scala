@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package vfs
+package quasar.yggdrasil.vfs
 
 import quasar.precog.common.Path
-import quasar.precog.common.security.{APIKey, PermissionsFinder}
-import quasar.niflheim.NIHDBActor
-import quasar.yggdrasil.metadata._
-import ResourceError._
+import quasar.yggdrasil._
+import quasar.yggdrasil.vfs.ResourceError._
 
 import java.io.{File, FileFilter}
 
@@ -32,7 +29,6 @@ import org.apache.commons.io.filefilter.FileFilterUtils
 import scalaz._
 import scalaz.effect.IO
 import scalaz.std.list._
-import scalaz.syntax.std.boolean._
 import scalaz.syntax.traverse._
 
 object VFSPathUtils extends Logging {

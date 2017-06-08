@@ -16,8 +16,6 @@
 
 package quasar.yggdrasil.execution
 
-import quasar.blueeyes.json._
-import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.vfs._
 
