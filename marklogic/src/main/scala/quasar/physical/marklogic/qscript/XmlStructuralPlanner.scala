@@ -193,14 +193,19 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       $("obj2") as ST("element()?")
     ).as(ST(s"element()")) { (obj1: XQuery, obj2: XQuery) =>
       val (xs, ys, names, e, n1, n2) = ($("xs"), $("ys"), $("names"), $("e"), $("n1"), $("n2"))
+      val (elt, encodedNames) = ($("elt"), $("encodedNames"))
 
       mkObjectFn {
         let_(
           xs    := (obj2 `/` child.element()),
           names := fn.map("fn:node-name#1".xqy, ~xs),
+          encodedNames := ~xs `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows),
           ys    := fn.filter(func(e.render) {
-                     every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2)
-                   }, obj1 `/` child.element()))
+            typeswitch(~e)(
+              elt as ST(s"element($ejsonEncodedName)") return_ (_ =>
+                every(n1 in ~elt `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows), n2 in ~encodedNames) satisfies (~n1 ne ~n2))
+            ) default (every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2))
+          }, obj1 `/` child.element()))
         .return_(mkSeq_(~ys, ~xs))
       }
     })
