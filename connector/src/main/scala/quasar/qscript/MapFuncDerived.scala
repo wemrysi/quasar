@@ -16,8 +16,13 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
+
+import quasar._
+
 import matryoshka._
 import monocle.macros.Lenses
+import scalaz._, Scalaz._
 
 sealed abstract class MapFuncDerived[T[_[_]], A]
 
@@ -34,6 +39,61 @@ sealed abstract class TernaryDerived[T[_[_]], A] extends MapFuncDerived[T, A] {
   def a1: A
   def a2: A
   def a3: A
+}
+
+object MapFuncDerived {
+  import MapFuncsDerived._
+
+  implicit def traverse[T[_[_]]]: Traverse[MapFuncDerived[T, ?]] =
+    new Traverse[MapFuncDerived[T, ?]] {
+      def traverseImpl[G[_], A, B](
+        fa: MapFuncDerived[T, A])(
+        f: A => G[B])(
+        implicit G: Applicative[G]):
+          G[MapFuncDerived[T, B]] = fa match {
+            // unary
+            case Abs(a1) => f(a1) ∘ (Abs(_))
+          }
+    }
+
+  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFuncDerived[T, ?]] =
+    new Delay[Equal, MapFuncDerived[T, ?]] {
+      def apply[A](in: Equal[A]): Equal[MapFuncDerived[T, A]] = Equal.equal {
+        // unary
+        case (Abs(a1), Abs(a2)) => a1.equals(a2)
+      }
+    }
+
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, MapFuncDerived[T, ?]] =
+    new Delay[Show, MapFuncDerived[T, ?]] {
+      def apply[A](sh: Show[A]): Show[MapFuncDerived[T, A]] = {
+        def shz(label: String, a: A*) =
+          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
+
+        Show.show {
+          // unary
+          case Abs(a1) => shz("Abs", a1)
+        }
+      }
+    }
+
+  // TODO: replace this with some kind of pretty-printing based on a syntax for
+  // MapFunc + EJson.
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFuncDerived[T, ?]] =
+    new Delay[RenderTree, MapFuncDerived[T, ?]] {
+      val nt = "MapFuncDerived" :: Nil
+
+      @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+      def apply[A](r: RenderTree[A]): RenderTree[MapFuncDerived[T, A]] = {
+        def nAry(typ: String, as: A*): RenderedTree =
+          NonTerminal(typ :: nt, None, as.toList.map(r.render(_)))
+
+        RenderTree.make {
+          // unary
+          case Abs(a1) => nAry("Abs", a1)
+        }
+      }
+    }
 }
 
 object MapFuncsDerived {
