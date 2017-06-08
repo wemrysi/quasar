@@ -16,10 +16,6 @@
 
 package quasar.yggdrasil.scheduling
 
-import quasar.precog.common.Path
-import quasar.precog.common.security._
-import quasar.precog.util.PrecogUnit
-
 import java.util.UUID
 
 import scalaz.EitherT
@@ -29,7 +25,7 @@ trait ScheduleStorage[M[+_]] {
 
   def deleteTask(id: UUID): EitherT[M, String, Option[ScheduledTask]]
 
-  def reportRun(report: ScheduledRunReport): M[PrecogUnit]
+  def reportRun(report: ScheduledRunReport): M[Unit]
 
   def statusFor(id: UUID, lastLimit: Option[Int]): M[Option[(ScheduledTask, Seq[ScheduledRunReport])]]
 

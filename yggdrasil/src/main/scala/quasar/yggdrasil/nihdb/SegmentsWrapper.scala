@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory
 
 import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.precog.util._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import quasar.niflheim._

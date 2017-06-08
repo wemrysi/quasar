@@ -16,11 +16,11 @@
 
 package quasar.precog
 
-import scala.collection.mutable.Builder
-import scalaz._
-import java.io.File
-import java.math.MathContext, MathContext._
 import quasar.precog.TestSupport._
+
+import scala.collection.mutable.Builder
+
+import java.io.File
 
 object TestSupport extends TestSupport
 object TestSupportWithArb extends TestSupport with ArbitrarySupport
@@ -32,7 +32,7 @@ trait ArbitrarySupport {
 }
 
 trait SpecsSupport {
-  import org.specs2._, execute._, matcher._
+  import org.specs2._, matcher._
 
   type ScalaCheck         = org.specs2.ScalaCheck
   val SpecsFailure        = org.specs2.execute.Failure

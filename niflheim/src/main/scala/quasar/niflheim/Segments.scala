@@ -21,11 +21,9 @@ import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.util._
 
-import scala.collection.mutable
 import scala.collection.mutable.{Map => MMap}
 
-import java.io._
-import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.LocalDateTime
 
 case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[CTree], types: MMap[CType, Int]) {
   def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))

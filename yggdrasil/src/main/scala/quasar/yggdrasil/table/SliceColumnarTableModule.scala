@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
-import quasar.blueeyes._
 import quasar.precog.common._, security._
+import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
+
 import scalaz._, Scalaz._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule

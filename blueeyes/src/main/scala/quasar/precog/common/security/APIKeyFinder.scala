@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
+package quasar.precog.common.security
 
 import quasar.blueeyes._
-import service.v1
-import accounts.AccountId
-import accounts.AccountFinder
+import quasar.precog.common.accounts.AccountId
+import quasar.precog.common.security.service.v1
+
 import org.slf4s.Logging
 
 import scalaz._, Scalaz._

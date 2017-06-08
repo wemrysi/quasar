@@ -194,6 +194,15 @@ class PlannerSpec extends
         Selector.Doc(field -> Selector.Type(BsonType.Date)),
         Selector.Doc(field -> Selector.Type(BsonType.Bool))))
 
+  def divide(a1: Fix[ExprOp], a2: Fix[ExprOp]) =
+    $cond($eq(a2, $literal(Bson.Int32(0))),
+      $cond($eq(a1, $literal(Bson.Int32(0))),
+        $literal(Bson.Dec(Double.NaN)),
+        $cond($gt(a1, $literal(Bson.Int32(0))),
+          $literal(Bson.Dec(Double.PositiveInfinity)),
+          $literal(Bson.Dec(Double.NegativeInfinity)))),
+      $divide(a1, a2))
+
   "plan from query string" should {
     "plan simple select *" in {
       plan("select * from foo") must beWorkflow(
@@ -1123,7 +1132,7 @@ class PlannerSpec extends
                   $substr(
                     $literal(Bson.Text("fghijklmnop")),
                     $literal(Bson.Int32(0)),
-                    $divide($field("pop"), $literal(Bson.Int32(10000)))),
+                    divide($field("pop"), $literal(Bson.Int32(10000)))),
                   $literal(Bson.Undefined))),
             ExcludeId)))
     }
@@ -1187,7 +1196,7 @@ class PlannerSpec extends
                     $and(
                       $lte($literal(Check.minDate), $field("bar")),
                       $lt($field("bar"), $literal(Bson.Regex("", ""))))),
-                  $divide($field("bar"), $literal(Bson.Int32(10))),
+                  divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined))),
             IgnoreId),
           $sort(NonEmptyList(BsonField.Name("__tmp2") -> SortDir.Ascending)),
@@ -1266,7 +1275,7 @@ class PlannerSpec extends
     }.pendingUntilFixed(notOnPar)
 
     "plan sort with wildcard and expression in key" in {
-      plan("select * from zips order by pop/10 desc") must
+      plan("select * from zips order by pop*10 desc") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(
@@ -1275,15 +1284,12 @@ class PlannerSpec extends
               obj(
                 "__sd__0" ->
                   jscore.If(
-                    BinOp(jscore.Or, BinOp(jscore.Or,
+                    BinOp(jscore.Or,
                       Call(ident("isNumber"), List(Select(ident("__val"), "pop"))),
                       BinOp(jscore.Or,
                         BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberInt")),
                         BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberLong")))),
-                      BinOp(jscore.Or,
-                        BinOp(Instance, Select(ident("__val"), "pop"), ident("Date")),
-                        BinOp(Instance, Select(ident("__val"), "pop"), ident("Timestamp")))),
-                    BinOp(Div, Select(ident("__val"), "pop"), jscore.Literal(Js.Num(10, false))),
+                    BinOp(Mult, Select(ident("__val"), "pop"), jscore.Literal(Js.Num(10, false))),
                     ident("undefined")))))))),
             ListMap()),
           $simpleMap(
@@ -1329,7 +1335,7 @@ class PlannerSpec extends
                     $and(
                       $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                  $divide($field("pop"), $literal(Bson.Int32(1000))),
+                  divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
             IgnoreId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
@@ -1371,7 +1377,7 @@ class PlannerSpec extends
                     $and(
                       $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                  $divide($field("pop"), $literal(Bson.Int32(1000))),
+                  divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
             ExcludeId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
@@ -1701,7 +1707,7 @@ class PlannerSpec extends
             $unwind(DocField("pop")),
             $project(
               reshape(
-                "0"   -> $divide($field("__tmp3"), $literal(Bson.Int32(1000))),
+                "0"   -> divide($field("__tmp3"), $literal(Bson.Int32(1000))),
                 "pop" -> $field("pop")),
               IgnoreId))
         }
@@ -1776,7 +1782,7 @@ class PlannerSpec extends
                     $and(
                       $lte($literal(Check.minDate), $field("pop")),
                       $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                  $divide($field("pop"), $literal(Bson.Int32(1000))),
+                  divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
             "__tmp6" -> reshape(
               "__tmp2" ->
@@ -1819,7 +1825,7 @@ class PlannerSpec extends
         $project(
           reshape(
             "city" -> $field("_id", "0"),
-            "1"    -> $divide($field("__tmp6"), $literal(Bson.Int32(1000)))),
+            "1"    -> divide($field("__tmp6"), $literal(Bson.Int32(1000)))),
           IgnoreId)))
     }.pendingUntilFixed(notOnPar)
 
@@ -3904,7 +3910,7 @@ class PlannerSpec extends
         $read(collection("db", "foo")),
         $project(
           reshape(
-            "__tmp0" -> $divide($field("bar"), $literal(Bson.Dec(10.0))),
+            "__tmp0" -> divide($field("bar"), $literal(Bson.Dec(10.0))),
             "__tmp1" -> $$ROOT),
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
@@ -3954,7 +3960,7 @@ class PlannerSpec extends
         $project(
           reshape(
             "bar"    -> $field("bar"),
-            "__tmp0" -> $divide($field("bar"), $literal(Bson.Dec(10.0)))),
+            "__tmp0" -> divide($field("bar"), $literal(Bson.Dec(10.0)))),
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
         $project(

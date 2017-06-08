@@ -17,7 +17,6 @@
 package quasar.blueeyes
 
 import org.specs2.mutable.Specification
-import HttpHeaders._
 
 class CacheDirectiveSpec extends Specification{
 

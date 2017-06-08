@@ -18,11 +18,8 @@ package quasar.niflheim
 
 import quasar.blueeyes.json._
 import quasar.precog.common._
-import quasar.precog.util._
 
 import scala.collection.mutable
-
-import java.io._
 
 object RawHandler {
   // file doesn't exist -> create new file

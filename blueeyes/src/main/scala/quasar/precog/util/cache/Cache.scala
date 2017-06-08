@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.precog.util
-package cache
-
-import scala.concurrent.duration._
+package quasar.precog.util.cache
 
 import com.google.common.cache.{Cache => GCache, _}
 
-import java.util.concurrent.ExecutionException
-
-import scalaz.{Failure, Success, Validation}
+import scalaz.Validation
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.Map
+import scala.concurrent.duration.Duration
 
 class SimpleCache[K, V] (private val backing: GCache[K, V]) extends Map[K, V] {
   def += (kv: (K, V)) = { backing.put(kv._1, kv._2); this }
@@ -66,7 +62,7 @@ object Cache {
     def apply(builder: CacheBuilder[K, V]) = builder.expireAfterWrite(timeout.length, timeout.unit)
   }
 
-  case class OnRemoval[K, V](onRemove: (K, V, RemovalCause) => PrecogUnit) extends CacheOption[K, V] {
+  case class OnRemoval[K, V](onRemove: (K, V, RemovalCause) => Unit) extends CacheOption[K, V] {
     def apply(builder: CacheBuilder[K, V]) = builder.removalListener(new RemovalListener[K, V] {
       def onRemoval(notification: RemovalNotification[K, V]) = onRemove(notification.getKey, notification.getValue, notification.getCause)
     })

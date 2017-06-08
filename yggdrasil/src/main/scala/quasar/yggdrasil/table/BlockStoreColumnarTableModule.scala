@@ -22,7 +22,6 @@ import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.jdbm3._
-import quasar.precog.util._
 
 import java.util.SortedMap
 import java.util.Comparator
