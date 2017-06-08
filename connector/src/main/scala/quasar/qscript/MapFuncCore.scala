@@ -572,7 +572,7 @@ object MapFuncCore {
   // MapFunc + EJson.
   implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, MapFuncCore[T, ?]] =
     new Delay[RenderTree, MapFuncCore[T, ?]] {
-      val nt = "MapFunc" :: Nil
+      val nt = "MapFuncCore" :: Nil
 
       @SuppressWarnings(Array("org.wartremover.warts.ToString"))
       def apply[A](r: RenderTree[A]): RenderTree[MapFuncCore[T, A]] = {
