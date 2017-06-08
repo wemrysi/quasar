@@ -673,6 +673,9 @@ class SQLParserSpec extends quasar.Qspec {
     "round-trip through the pretty-printer" >> {
       def roundTrip(q: String) = {
         val ast = parse(q)
+
+        ast should beRightDisjunction
+
         ((ast ∘ ((pprint[Fix[Sql]] _) >>> (Query(_)))) >>= (parse(_))) must_=== ast
       }
 
@@ -681,6 +684,9 @@ class SQLParserSpec extends quasar.Qspec {
 
       "field deref with string literal" in
         roundTrip("select a.`_id` from z as a")
+
+      "let binding" in
+        roundTrip("a := 42; SELECT * FROM z")
     }
   }
 }
