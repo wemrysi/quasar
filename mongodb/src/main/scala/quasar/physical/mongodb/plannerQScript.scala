@@ -163,7 +163,7 @@ object MongoDbQScriptPlanner {
     import MapFuncsCore._
 
     def handleCommon(mf: MapFuncCore[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
-      funcHandler.run(mf).map(t => unpack(t.mapSuspension(inj)))
+      funcHandler.runCore(mf).map(t => unpack(t.mapSuspension(inj)))
 
     val handleSpecial: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) =>

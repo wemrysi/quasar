@@ -16,31 +16,56 @@
 
 package quasar.physical.mongodb.planner
 
+//import scala.Predef.implicitly
 import slamdata.Predef._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
-import quasar.qscript.{Coalesce => _, _}, MapFuncsCore._
+import quasar.qscript.{Coalesce => _, MapFuncsDerived => D, _}, MapFuncsCore._
 
 import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
-final case class FuncHandler[T[_[_]], F[_]](run: MapFuncCore[T, ?] ~> λ[α => Option[Free[F, α]]]) { self =>
+final case class FuncHandler[T[_[_]], F[_]]
+  (runCore: MapFuncCore[T, ?] ~> OptionFree[F, ?],
+    runDerived: MapFuncDerived[T, ?] ~> OptionFree[F, ?]
+  ) { self =>
 
   def orElse[G[_], H[_]](other: FuncHandler[T, G])
-      (implicit injF: F :<: H, injG: G :<: H): FuncHandler[T, H] =
-    new FuncHandler[T, H](λ[MapFuncCore[T, ?] ~> λ[α => Option[Free[H, α]]]](f =>
-      self.run(f).map(_.mapSuspension(injF)) orElse
-      other.run(f).map(_.mapSuspension(injG))))
+      (implicit injF: F :<: H, injG: G :<: H): FuncHandler[T, H] = {
+
+    val runCore = λ[MapFuncCore[T, ?] ~> OptionFree[H, ?]](f =>
+      self.runCore(f).map(_.mapSuspension(injF)) orElse
+      other.runCore(f).map(_.mapSuspension(injG)))
+
+    val runDerived = λ[MapFuncDerived[T, ?] ~> OptionFree[H, ?]](f =>
+      self.runDerived(f).map(_.mapSuspension(injF)) orElse
+      other.runDerived(f).map(_.mapSuspension(injG)))
+
+    new FuncHandler[T, H](runCore, runDerived)
+  }
 }
 
 object FuncHandler {
-  type M[F[_], A] = Option[Free[F, A]]
 
-  def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {
+  def handleUnhandled[T[_[_]]: CorecursiveT, A]
+    (derived: AlgebraM[Option, MapFuncDerived[T, ?], A], core: Algebra[MapFuncCore[T, ?], A])
+      : Algebra[MapFuncDerived[T, ?], A] = {
+
+    f => derived(f).getOrElse(
+      Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cata(interpret(x => x,core))
+    )
+  }
+
+  def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])
+    (implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {
+
     implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
-    new FuncHandler[T, EX](new (MapFuncCore[T, ?] ~> M[EX, ?]) {
-      def apply[A](fa: MapFuncCore[T, A]): M[EX, A] = {
+    val runCore = new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): OptionFree[EX, A] = {
         val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
         import fp._
 
@@ -159,13 +184,15 @@ object FuncHandler {
                                                                             $literal(Bson.Text("_bson.regularexpression"))))))))))))
         }
       }
-    })
+    }
+    new FuncHandler[T, EX](runCore, emptyDerived)
   }
 
   def handleOps3_0[T[_[_]]]: FuncHandler[T, ExprOp3_0F] = {
     implicit def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
-    new FuncHandler[T, ExprOp3_0F](new (MapFuncCore[T, ?] ~> M[ExprOp3_0F, ?]) {
-      def apply[A](fa: MapFuncCore[T, A]): M[ExprOp3_0F, A] = {
+
+    val runCore = new (MapFuncCore[T, ?] ~> OptionFree[ExprOp3_0F, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): OptionFree[ExprOp3_0F, A] = {
         val fp = new ExprOp3_0F.fixpoint[Free[ExprOp3_0F, A], ExprOp3_0F](Free.roll)
         import fp._
         import FormatSpecifier._
@@ -175,13 +202,15 @@ object FuncHandler {
             $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, a1)
         }
       }
-    })
+    }
+    new FuncHandler[T, ExprOp3_0F](runCore, emptyDerived)
   }
 
   def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
     implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
-    new FuncHandler[T, ExprOp3_2F](new (MapFuncCore[T, ?] ~> M[ExprOp3_2F, ?]) {
-      def apply[A](fa: MapFuncCore[T, A]): M[ExprOp3_2F, A] = {
+
+    val runCore = new (MapFuncCore[T, ?] ~> OptionFree[ExprOp3_2F, ?]) {
+      def apply[A](fa: MapFuncCore[T, A]): OptionFree[ExprOp3_2F, A] = {
         val fp = new ExprOp3_2F.fixpoint[Free[ExprOp3_2F, A], ExprOp3_2F](Free.roll)
         import fp._
 
@@ -190,8 +219,23 @@ object FuncHandler {
             $pow(a1, a2)
         }
       }
-    })
+    }
+
+    val runDerived = new (MapFuncDerived[T, ?] ~> OptionFree[ExprOp3_2F, ?]) {
+      def apply[A](fa: MapFuncDerived[T, A]): OptionFree[ExprOp3_2F, A] = {
+        val fp = new ExprOp3_2F.fixpoint[Free[ExprOp3_2F, A], ExprOp3_2F](Free.roll)
+        import fp._
+
+        fa.some collect {
+          case D.Abs(a1)       => $abs(a1)
+        }
+      }
+    }
+    new FuncHandler[T, ExprOp3_2F](runCore, runDerived)
   }
+
+  def emptyDerived[T[_[_]], F[_]]: MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
+     λ[MapFuncDerived[T, ?] ~> OptionFree[F, ?]] { _ => None }
 
   def trunc2_6[EX[_]: Functor](implicit inj: ExprOpCoreF :<: EX): Free[EX, ?] ~> Free[EX, ?] =
     new (Free[EX, ?] ~> Free[EX, ?]) {

@@ -632,7 +632,7 @@ object MongoDbPlanner {
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
           val mf = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
-            funcHandler.run(mf)) { (wb1, f) =>
+            funcHandler.runCore(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
@@ -640,7 +640,7 @@ object MongoDbPlanner {
           val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
-            funcHandler.run(mf)) { (wb1, wb2, f) =>
+            funcHandler.runCore(mf)) { (wb1, wb2, f) =>
             val exp: Binary[ExprOp] = createOp[BinaryArg](f)
             WB.expr2(wb1, wb2)(exp.eval)
           }
@@ -649,7 +649,7 @@ object MongoDbPlanner {
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|
-            funcHandler.run(mf)) { (wb1, wb2, wb3, f) =>
+            funcHandler.runCore(mf)) { (wb1, wb2, wb3, f) =>
             val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
               case List(_1, _2, _3) => exp.eval[Fix[ExprOp]](_1, _2, _3)
