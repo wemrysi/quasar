@@ -53,6 +53,7 @@ quasar_marklogic_xml:
   dockerfile: MarkLogic-Dockerfile
   ports:
     - "8000-8002:8000-8002"
+  mem_limit: 2048m
 
 quasar_marklogic_json:
   container_name: quasar_marklogic_json
@@ -60,6 +61,7 @@ quasar_marklogic_json:
   dockerfile: MarkLogic-Dockerfile
   ports:
     - "9000-9002:8000-8002"
+  mem_limit: 2048m
 
 quasar_couchbase:
   container_name: quasar_couchbase
