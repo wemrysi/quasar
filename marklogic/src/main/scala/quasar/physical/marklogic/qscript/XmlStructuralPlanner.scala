@@ -125,7 +125,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           else
             childrenNamedEncoded(obj, s.xs))
 
-      case _ => childrenWithName(obj, key)
+      case _ => childrenNamed(obj, key)
     }
 
     prj >>= (manyToArray(_))
@@ -221,15 +221,15 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       }
     })
 
-  // qscript:children-with-name($src as element()?, $field as item()?) as item()*
-  lazy val childrenWithName: F[FunctionDecl2] =
+  // qscript:children-named($src as element()?, $field as item()?) as item()*
+  lazy val childrenNamed: F[FunctionDecl2] =
     ejs.declare[F]("children-with-name") flatMap (_(
       $("src") as ST("element()?"),
       $("field") as ST.Top
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      (childrenNamed(src, field) |@| childrenNamedEncoded(src, field) |@| isQName(field)) {
-        (childrenNamed_, childrenNamedEncoded_, isQName_) =>
-        if_(isQName_).then_(childrenNamed_).else_(childrenNamedEncoded_)
+      (childrenNamedLiteral(src, xs.QName(field)) |@| childrenNamedEncoded(src, fn.string(field)) |@| isQName(field)) {
+        (childrenNamedLiteral_, childrenNamedEncoded_, isQName_) =>
+        if_(isQName_).then_(childrenNamedLiteral_).else_(childrenNamedEncoded_)
       }
     })
 
@@ -244,9 +244,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
 
-  // qscript:children-named($src as element()?, $name as xs:QName?) as item()*
-  lazy val childrenNamed: F[FunctionDecl2] =
-    ejs.declare[F]("children-named") map (_(
+  // qscript:children-named-literal($src as element()?, $name as xs:QName?) as item()*
+  lazy val childrenNamedLiteral: F[FunctionDecl2] =
+    ejs.declare[F]("children-named-literal") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
