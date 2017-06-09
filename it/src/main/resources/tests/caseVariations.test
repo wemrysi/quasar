@@ -2,12 +2,16 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
-        "couchbase":      "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "postgresql":     "pending",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "couchbase":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
 
     "NB": "Skipped for all connectors due to reduce/sort ordering bug.

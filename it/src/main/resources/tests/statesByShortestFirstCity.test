@@ -2,6 +2,8 @@
     "name": "states sorted by the length of name of their first city, alphabetically",
     "backends": {
         "couchbase":         "skip",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

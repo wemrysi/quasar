@@ -3894,7 +3894,7 @@ class PlannerSpec extends
           reshape("bar" -> $field("bar")),
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan Sort with expression" in {
       val lp =
@@ -3966,7 +3966,7 @@ class PlannerSpec extends
         $project(
           reshape("bar" -> $field("bar")),
           ExcludeId)))
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan with extra squash and flattening" in {
       // NB: this case occurs when a view's LP is embedded in a larger query
