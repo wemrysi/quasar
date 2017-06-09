@@ -122,9 +122,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(s) =>
         freshName[F] flatMap ( m =>
           if (XQuery.flwor.nonEmpty(obj))
-            encodedChildren(~m, s.xs) map ((el: XQuery) => let_(m := obj) return_ el)
+            childrenNamedEncoded(~m, s.xs) map ((el: XQuery) => let_(m := obj) return_ el)
           else
-            encodedChildren(obj, s.xs))
+            childrenNamedEncoded(obj, s.xs))
 
       case _ => handleWithF(childrenNamed(obj, key), childrenNamedEncoded(obj, key))
     }
@@ -137,16 +137,16 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   ////
 
-  // ejson:encoded-children($src as element(), $name as xs:string) as element()*
-  lazy val encodedChildren: F[FunctionDecl2] =
-    ejs.declare[F]("encoded-child") map (_(
-      $("src") as ST("element()"),
-      $("name") as ST("xs:string")
-    ).as(ST("element()*")) { (elt: XQuery, field: XQuery) =>
-      val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
-      elt `/` child(ejsonEncodedName)(pred)
+  // ejson:is-qname($candidate as xs:string) as xs:boolean
+  lazy val isQName: F[FunctionDecl1] =
+    ejs.declare[F]("is-qname") map (_(
+      $("candidate") as ST("xs:string")
+    ).as(ST("xs:boolean")) { candidate: XQuery =>
+      xdmp.castableAs(
+        "http://www.w3.org/2001/XMLSchema".xs,
+        "QName".xs,
+        candidate)
     })
-
 
   // ejson:is-container($item as item()?) as xs:boolean
   lazy val isContainer: F[FunctionDecl1] =
@@ -203,7 +203,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           ys    := fn.filter(func(e.render) {
             typeswitch(~e)(
               elt as ST(s"element($ejsonEncodedName)") return_ (_ =>
-                every(n1 in ~elt `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows), n2 in ~encodedNames) satisfies (~n1 ne ~n2))
+                every(
+                  n1 in ~elt `/` axes.attribute.attributeNamed(ejsonEncodedAttr.shows),
+                  n2 in ~encodedNames) satisfies (~n1 ne ~n2))
             ) default (every(n1 in fn.nodeName(~e), n2 in ~names) satisfies (~n1 ne ~n2))
           }, obj1 `/` child.element()))
         .return_(mkSeq_(~ys, ~xs))
@@ -220,16 +222,29 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       }
     })
 
-  // qscript:children-named($src as element()?, $name as xs:string?) as item()*
-  lazy val childrenNamedEncoded: F[FunctionDecl2] =
-    ejs.declare[F]("children-named-encoded") map (_(
-      $("src")  as ST("element()?"),
-      $("name") as ST("xs:string?")
-    ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      val n = $("n")
-      fn.filter(func(n.render)(~n `/` child.attributeNamed(ejsonEncodedAttr.shows) eq field),
-                src `/` child.elementNamed(ejsonEncodedName.shows))
+  // qscript:children-with-name($src as element()?, $name as item()?) as item()*
+  lazy val childrenWithName: F[FunctionDecl2] =
+    ejs.declare[F]("children-with-name") map (_(
+      $("src") as ST("element()?"),
+      $("name") as ST.Top
+    ).as(ST.Top) { (src: XQuery, name: XQuery) =>
+      (childrenNamed |@| childrenNamedEncoded |@| isQName)((childrenNamed_, childrenNamedEncoded_, isQName_) =>
+        if_(isQName_(name))
+        .then_(childrenNamed_(src, fn.QName(name)))
+        .else_(childrenNamedEncoded_(src, fn.string(name)))
+      )
     })
+
+  // qscript:children-named-encoded($src as element()?, $name as xs:string?) as item()*
+  lazy val childrenNamedEncoded: F[FunctionDecl2] =
+    ejs.declare[F]("encoded-child") map (_(
+      $("src") as ST("element()?"),
+      $("name") as ST("xs:string?")
+    ).as(ST.Top) { (elt: XQuery, field: XQuery) =>
+      val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
+      elt `/` child(ejsonEncodedName)(pred)
+    })
+
 
   // qscript:children-named($src as element()?, $name as xs:QName?) as item()*
   lazy val childrenNamed: F[FunctionDecl2] =
@@ -250,7 +265,8 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       val (s, n, e) = ($("s"), $("n"), $("e"))
       fn.map(func(s.render) {
         element { fn.nodeName(~s) } {
-          mkSeq_(~s `/` axes.attribute.node(),
+          mkSeq_(
+            ~s `/` axes.attribute.node(),
             for_ (n in (~s `/` child.element()))
             .return_(
               typeswitch(~n)(
@@ -316,13 +332,15 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { ejsonEncodedName.xqy } {
-              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
-                     e `/` axes.attribute.node(),
-                     e `/` child.node())})
+              mkSeq_(
+                attribute { ejsonEncodedAttr.xqy } { name },
+                e `/` axes.attribute.node(),
+                e `/` child.node())})
         ) default (element { ejsonEncodedName.xqy }
-                           { mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
-                             typeAttr(value),
-                             value)})
+          { mkSeq_(
+              attribute { ejsonEncodedAttr.xqy } { name },
+              typeAttr(value),
+              value)})
       })
     }
 
