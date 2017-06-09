@@ -483,7 +483,8 @@ lazy val blueeyes = project.setup
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val mimir = project.setup.noArtifacts
+lazy val mimir = project.setup
+  .settings(name := "quasar-mimir-internal")
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
@@ -494,11 +495,13 @@ lazy val mimir = project.setup.noArtifacts
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val niflheim = project.setup.noArtifacts
+lazy val niflheim = project.setup
+  .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
@@ -508,6 +511,7 @@ lazy val niflheim = project.setup.noArtifacts
       "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)

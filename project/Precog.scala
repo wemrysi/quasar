@@ -65,8 +65,7 @@ object Build {
 
     def setup: Project = (
       serialTests scalacPlugins (kindProjector) also(
-        organization := "quasar",
-        version := "0.1",
+        organization := "org.quasar-analytics",
         scalaVersion := "2.11.8",
         scalaOrganization := "org.typelevel",
         logBuffered in Test := false,
