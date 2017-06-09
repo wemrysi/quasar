@@ -116,8 +116,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           if (XQuery.flwor.nonEmpty(obj))
             let_(m := obj) return_ (~m `/` child(qn))
           else
-            obj `/` child(qn)
-        )
+            obj `/` child(qn))
 
       case XQuery.StringLit(s) =>
         freshName[F] flatMap ( m =>
@@ -126,7 +125,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           else
             childrenNamedEncoded(obj, s.xs))
 
-      case _ => handleWithF(childrenNamed(obj, key), childrenNamedEncoded(obj, key))
+      case _ => childrenWithName(obj, key)
     }
 
     prj >>= (manyToArray(_))
@@ -140,7 +139,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   // ejson:is-qname($candidate as xs:string) as xs:boolean
   lazy val isQName: F[FunctionDecl1] =
     ejs.declare[F]("is-qname") map (_(
-      $("candidate") as ST("xs:string")
+      $("candidate") as ST.Top
     ).as(ST("xs:boolean")) { candidate: XQuery =>
       xdmp.castableAs(
         "http://www.w3.org/2001/XMLSchema".xs,
@@ -222,24 +221,23 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       }
     })
 
-  // qscript:children-with-name($src as element()?, $name as item()?) as item()*
+  // qscript:children-with-name($src as element()?, $field as item()?) as item()*
   lazy val childrenWithName: F[FunctionDecl2] =
-    ejs.declare[F]("children-with-name") map (_(
+    ejs.declare[F]("children-with-name") flatMap (_(
       $("src") as ST("element()?"),
-      $("name") as ST.Top
-    ).as(ST.Top) { (src: XQuery, name: XQuery) =>
-      (childrenNamed |@| childrenNamedEncoded |@| isQName)((childrenNamed_, childrenNamedEncoded_, isQName_) =>
-        if_(isQName_(name))
-        .then_(childrenNamed_(src, fn.QName(name)))
-        .else_(childrenNamedEncoded_(src, fn.string(name)))
-      )
+      $("field") as ST.Top
+    ).as(ST.Top) { (src: XQuery, field: XQuery) =>
+      (childrenNamed(src, field) |@| childrenNamedEncoded(src, field) |@| isQName(field)) {
+        (childrenNamed_, childrenNamedEncoded_, isQName_) =>
+        if_(isQName_).then_(childrenNamed_).else_(childrenNamedEncoded_)
+      }
     })
 
-  // qscript:children-named-encoded($src as element()?, $name as xs:string?) as item()*
+  // qscript:children-named-encoded($src as element()?, $field as xs:string?) as item()*
   lazy val childrenNamedEncoded: F[FunctionDecl2] =
     ejs.declare[F]("encoded-child") map (_(
       $("src") as ST("element()?"),
-      $("name") as ST("xs:string?")
+      $("field") as ST("xs:string?")
     ).as(ST.Top) { (elt: XQuery, field: XQuery) =>
       val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
       elt `/` child(ejsonEncodedName)(pred)
