@@ -2,8 +2,7 @@
     "name": "flatten object",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending",
-        "marklogic_xml":     "pending"
+        "postgresql":        "pending"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",
