@@ -406,10 +406,12 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   lazy val guardQName: F[FunctionDecl3] =
     ejs.declare[F]("guard-qname") flatMap (_(
       $("candidate") as ST("item()*"),
-      $("if-qname") as ST("item()*"),
-      $("if-non-qname") as ST("item()*")
+      $("if-qname") as ST("(function() as item()*)"),
+      $("if-non-qname") as ST("(function() as item()*)")
     ).as(ST.Top) { (candidate: XQuery, ifQName: XQuery, ifNonQName: XQuery) =>
-      isQName(candidate) map (if_(_).then_(ifQName).else_(ifNonQName))
+      isQName(candidate) map (if_(_)
+      .then_(ifQName.fnapply())
+      .else_(ifNonQName.fnapply()))
     })
 
   // ejson:is-qname($candidate as item()?) as xs:boolean
@@ -424,5 +426,5 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
   private def guardQNameF(candidate: XQuery, left: F[XQuery], right: F[XQuery]): F[XQuery] =
-    (left |@| right)((l, r) => guardQName(candidate, l, r)).join
+    (left |@| right)((l, r) => guardQName(candidate, expr.func()(l), expr.func()(r))).join
 }
