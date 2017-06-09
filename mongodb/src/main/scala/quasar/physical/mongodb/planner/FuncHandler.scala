@@ -16,7 +16,6 @@
 
 package quasar.physical.mongodb.planner
 
-//import scala.Predef.implicitly
 import slamdata.Predef._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
@@ -25,13 +24,25 @@ import quasar.qscript.{Coalesce => _, MapFuncsDerived => D, _}, MapFuncsCore._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns._
+//import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
-final case class FuncHandler[T[_[_]], F[_]]
+final case class FuncHandler[T[_[_]]: CorecursiveT, F[_]]
   (runCore: MapFuncCore[T, ?] ~> OptionFree[F, ?],
     runDerived: MapFuncDerived[T, ?] ~> OptionFree[F, ?]
   ) { self =>
+
+  def coproduct[G[_], H[_]]
+      (runG: G ~> OptionFree[F, ?], runH: H ~> OptionFree[F, ?])
+      //(implicit G: FuncHandler[T, G], H: FuncHandler[T, H])
+      : Coproduct[G, H, ?] ~> OptionFree[F, ?] =
+    λ[Coproduct[G, H, ?] ~> OptionFree[F, ?]](_.run.fold(runG(_), runH(_)))
+
+  def run[MF[_]]
+      (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF):
+      MapFunc[T, ?] ~> OptionFree[F, ?] =
+      //TODO MF ~> OptionFree[F, ?] =
+    coproduct(runCore, FuncHandler.handleUnhandled(runDerived, runCore))
 
   def orElse[G[_], H[_]](other: FuncHandler[T, G])
       (implicit injF: F :<: H, injG: G :<: H): FuncHandler[T, H] = {
@@ -50,14 +61,22 @@ final case class FuncHandler[T[_[_]], F[_]]
 
 object FuncHandler {
 
-  def handleUnhandled[T[_[_]]: CorecursiveT, A]
-    (derived: AlgebraM[Option, MapFuncDerived[T, ?], A], core: Algebra[MapFuncCore[T, ?], A])
-      : Algebra[MapFuncDerived[T, ?], A] = {
-
-    f => derived(f).getOrElse(
-      Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cata(interpret(x => x,core))
-    )
-  }
+  def handleUnhandled[T[_[_]]: CorecursiveT, F[_]]
+    (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
+      : MapFuncDerived[T, ?] ~> OptionFree[F, ?] = derived
+        // new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
+        //   def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] =
+        //     derived(f)
+        //       .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+        //         _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_))))
+        //
+        //
+        // }
+        // λ[MapFuncDerived[T, ?] ~> OptionFree[F, ?]](f =>
+        //   derived(f)
+        //     .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+        //       _.run.fold(x => Free.point(x).some, core(_))))
+        //   )
 
   def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])
     (implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {

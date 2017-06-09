@@ -58,6 +58,9 @@ import scalaz._, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
+
+  type MapFunc[T[_[_]], A] = Coproduct[MapFuncCore[T, ?], MapFuncDerived[T, ?], A]
+  
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
