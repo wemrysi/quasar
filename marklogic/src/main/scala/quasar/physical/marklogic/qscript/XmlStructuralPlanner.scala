@@ -78,8 +78,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       case XQuery.StringLit(nonQNameKey) =>
         renameOrWrapEncoded(xs.string(nonQNameKey.xs), value)
       case _ =>
-        handleWithF(renameOrWrap(xs.QName(key), value),
-          renameOrWrapEncoded(xs.string(key), value))
+        guardQNameF(key, renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(xs.string(key), value))
     }
 
   def nodeCast(node: XQuery) =
@@ -98,7 +97,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     key match {
       case XQuery.StringLit(QName.string(qn)) => withoutNamed(obj, qn.xqy)
       case XQuery.StringLit(name) => withoutNamedEncoded(obj, name.xs)
-      case _ => handleWithF(withoutNamed(obj, key), withoutNamedEncoded(obj, key))
+      case _ => guardQNameF(key, withoutNamed(obj, xs.QName(key)), withoutNamedEncoded(obj, fn.string(key)))
     }
 
   // TODO: This assumes the `key` is not present in the object, for performance.
@@ -125,7 +124,8 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
           else
             childrenNamedEncoded(obj, s.xs))
 
-      case _ => childrenNamed(obj, key)
+      case _ =>
+        guardQNameF(key, childrenNamedLiteral(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
     }
 
     prj >>= (manyToArray(_))
@@ -135,17 +135,6 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     elementMerge(o1, o2)
 
   ////
-
-  // ejson:is-qname($candidate as xs:string) as xs:boolean
-  lazy val isQName: F[FunctionDecl1] =
-    ejs.declare[F]("is-qname") map (_(
-      $("candidate") as ST.Top
-    ).as(ST("xs:boolean")) { candidate: XQuery =>
-      xdmp.castableAs(
-        "http://www.w3.org/2001/XMLSchema".xs,
-        "QName".xs,
-        candidate)
-    })
 
   // ejson:is-container($item as item()?) as xs:boolean
   lazy val isContainer: F[FunctionDecl1] =
@@ -218,18 +207,6 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     ).as(ST.Top) { items: XQuery =>
       seqToArray(items) map { arr =>
         if_(fn.count(items) gt 1.xqy) then_ arr else_ items
-      }
-    })
-
-  // qscript:children-named($src as element()?, $field as item()?) as item()*
-  lazy val childrenNamed: F[FunctionDecl2] =
-    ejs.declare[F]("children-with-name") flatMap (_(
-      $("src") as ST("element()?"),
-      $("field") as ST.Top
-    ).as(ST.Top) { (src: XQuery, field: XQuery) =>
-      (childrenNamedLiteral(src, xs.QName(field)) |@| childrenNamedEncoded(src, fn.string(field)) |@| isQName(field)) {
-        (childrenNamedLiteral_, childrenNamedEncoded_, isQName_) =>
-        if_(isQName_).then_(childrenNamedLiteral_).else_(childrenNamedEncoded_)
       }
     })
 
@@ -425,7 +402,27 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         })
     })
 
+  // ejson:guard-qname($candidate as item()*, $if-qname as item()*, $if-non-qname as item()*) as item()*
+  lazy val guardQName: F[FunctionDecl3] =
+    ejs.declare[F]("guard-qname") flatMap (_(
+      $("candidate") as ST("item()*"),
+      $("if-qname") as ST("item()*"),
+      $("if-non-qname") as ST("item()*")
+    ).as(ST.Top) { (candidate: XQuery, ifQName: XQuery, ifNonQName: XQuery) =>
+      isQName(candidate) map (if_(_).then_(ifQName).else_(ifNonQName))
+    })
 
-  private def handleWithF[F[_]: Applicative](l: F[XQuery], r: F[XQuery]): F[XQuery] =
-    (l |@| r)((left, right) => try_(left).catch_($("_"))(κ(right)))
+  // ejson:is-qname($candidate as item()?) as xs:boolean
+  lazy val isQName: F[FunctionDecl1] =
+    ejs.declare[F]("is-qname") map (_(
+      $("candidate") as ST("item()?")
+    ).as(ST("xs:boolean")) { candidate: XQuery =>
+      xdmp.castableAs(
+        "http://www.w3.org/2001/XMLSchema".xs,
+        "QName".xs,
+        candidate)
+    })
+
+  private def guardQNameF(candidate: XQuery, left: F[XQuery], right: F[XQuery]): F[XQuery] =
+    (left |@| right)((l, r) => guardQName(candidate, l, r)).join
 }
