@@ -412,6 +412,12 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 Filter(
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
                   newCond))
+            case Some(Sort(Embed(innerSrc), bucket, ord)) =>
+              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProj(bucket) ⊛ ord.traverse(Bitraverse[(?, ?)].leftTraverse.traverse(_)(eliminateRightSideProj)))((const, newBucket, newOrd) =>
+                Sort(
+                  FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
+                  newBucket,
+                  newOrd))
             case _ => None
           }) ⊛ eliminateRightSideProj(mf))((newFilter, newMF) =>
             Map(
