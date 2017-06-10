@@ -546,15 +546,11 @@ class PlannerSpec extends
       plan3_0("select loc[0] from zips") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
-        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "__tmp0" ->
-            jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
-              Access(Select(ident("x"), "loc"), jscore.Literal(Js.Num(0, false))),
-              ident("undefined")))))),
-          ListMap()),
-        $project(
-          reshape("value" -> $field("__tmp0")),
-          ExcludeId)))
+        $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+          jscore.If(Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
+            Access(Select(ident("x"), "loc"), jscore.Literal(Js.Num(0, false))),
+            ident("undefined"))))),
+          ListMap())))
     }
 
     "plan select array element (3.2+)" in {
@@ -1216,7 +1212,7 @@ class PlannerSpec extends
                 obj(
                   "pop" -> Select(ident("x"), "pop"))))))),
             ListMap())))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan select with wildcard and two fields" in {
       plan("select *, city as city2, pop as pop2 from zips") must
@@ -1891,18 +1887,14 @@ class PlannerSpec extends
       plan("select length(city) + 1 from zips") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "__tmp0" ->
-              If(Call(ident("isString"), List(Select(ident("x"), "city"))),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+            If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 BinOp(jscore.Add,
                   Call(ident("NumberLong"),
                     List(Select(Select(ident("x"), "city"), "length"))),
                   jscore.Literal(Js.Num(1, false))),
-                ident("undefined")))))),
-            ListMap()),
-          $project(
-            reshape("value" -> $field("__tmp0")),
-            ExcludeId)))
+                ident("undefined"))))),
+            ListMap())))
     }
 
     "plan expressions with ~"in {
