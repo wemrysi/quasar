@@ -301,17 +301,32 @@ object MapFunc {
         Embed(CoEnv(\/-(Constant(field))))) =>
         StaticMap(map.filter(_._1 ≠ field)).project.some
 
+      // TODO: Generalize this to `StaticMapSuffix`.
+      case DeleteField(
+        Embed(CoEnv(\/-(ConcatMaps(m, Embed(CoEnv(\/-(MakeMap(k, _)))))))),
+        f)
+          if k ≟ f =>
+        rollMF[T, A](DeleteField(m, f)).some
+
       case ProjectIndex(
         Embed(StaticArrayPrefix(as)),
         Embed(CoEnv(\/-(Constant(Embed(EX(ejson.Int(index))))))))
           if index.isValidInt =>
         as.lift(index.intValue).map(_.project)
 
-      // TODO: Replace this with the above version
       case ProjectField(
         Embed(StaticMap(map)),
         Embed(CoEnv(\/-(Constant(field))))) =>
         map.reverse.find(_._1 ≟ field) ∘ (_._2.project)
+
+      // TODO: Generalize these to `StaticMapSuffix`
+      case ProjectField(Embed(CoEnv(\/-(MakeMap(k, Embed(v))))), f) if k ≟ f =>
+        v.some
+      case ProjectField(
+        Embed(CoEnv(\/-(ConcatMaps(_, Embed(CoEnv(\/-(MakeMap(k, Embed(v))))))))),
+        f)
+          if k ≟ f =>
+        v.some
 
       case ConcatArrays(Embed(StaticArray(Nil)), Embed(rhs)) => rhs.some
 
