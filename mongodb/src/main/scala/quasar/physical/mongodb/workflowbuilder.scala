@@ -373,16 +373,16 @@ object WorkflowBuilder {
     case ExprBuilderF((g, b), HasThat($var(d))) =>
       (g, b \ fromDocVar(d)).point[M]
     case ExprBuilderF((g, b), expr) =>
-      emitSt(freshName) ∘ (name =>
-        (
-          chain(g,
-            rewriteExprPrefix(expr, b) match {
-              case HasThat(op) =>
-                $project[WF](Reshape(ListMap(name -> \/-(op))))
-              case \&/.This(js) =>
-                $simpleMap[WF](NonEmptyList(MapExpr(JsFn(jsBase, jscore.Obj(ListMap(jscore.Name(name.asText) -> js(jscore.Ident(jsBase))))))), ListMap())
-            }),
-          Field(name)))
+      rewriteExprPrefix(expr, b) match {
+        case HasThat(op) =>
+          emitSt(freshName) ∘ (name =>
+            (chain(g, $project[WF](Reshape(ListMap(name -> \/-(op))))),
+              Field(name)))
+        case \&/.This(js) =>
+          emit(
+            (chain(g, $simpleMap[WF](NonEmptyList(MapExpr(js)), ListMap())),
+              Root()))
+      }
     case DocBuilderF((wf, base), shape) =>
       alignExpr(rewriteDocPrefix(shape, base)).fold(
         fail[(Fix[WF], Base)](InternalError fromMsg "Could not align the expressions"))(
@@ -422,7 +422,7 @@ object WorkflowBuilder {
               emitSt(freshName.map(rootName =>
                 (
                   chain(g,
-                    $group[WF](Grouped(ListMap(rootName -> grouped)).rewriteRefs(prefixBase0(b)),
+                    $group[WF](Grouped(ListMap(rootName -> grouped)).rewriteRefs(prefixBase0(c)),
                       key(b))),
                   Field(rootName))))
             case Exp(\/-(expr)) =>
