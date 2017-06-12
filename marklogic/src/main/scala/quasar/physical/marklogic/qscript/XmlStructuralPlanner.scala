@@ -125,7 +125,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             childrenNamedEncoded(obj, s.xs))
 
       case _ =>
-        guardQNameF(key, childrenNamedLiteral(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
+        guardQNameF(key, childrenNamedQName(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
     }
 
     prj >>= (manyToArray(_))
@@ -210,7 +210,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       }
     })
 
-  // qscript:children-named-encoded($src as element()?, $field as xs:string?) as item()*
+  // ejson:children-named-encoded($src as element()?, $field as xs:string?) as item()*
   lazy val childrenNamedEncoded: F[FunctionDecl2] =
     ejs.declare[F]("encoded-child") map (_(
       $("src") as ST("element()?"),
@@ -221,9 +221,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
 
-  // qscript:children-named-literal($src as element()?, $name as xs:QName?) as item()*
-  lazy val childrenNamedLiteral: F[FunctionDecl2] =
-    ejs.declare[F]("children-named-literal") map (_(
+  // ejson:children-named-qname($src as element()?, $name as xs:QName?) as item()*
+  lazy val childrenNamedQName: F[FunctionDecl2] =
+    ejs.declare[F]("children-named-qname") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
@@ -231,7 +231,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       fn.filter(func(n.render)(fn.nodeName(~n) eq xs.QName(field)), src `/` child.element())
     })
 
-  // qscript:without-named-encoded($src as element()?, $name as xs:string) as element()?
+  // ejson:without-named-encoded($src as element()?, $name as xs:string) as element()?
   lazy val withoutNamedEncoded: F[FunctionDecl2] =
     ejs.declare[F]("without-named-encoded") map (_(
       $("src")  as ST("element()?"),
