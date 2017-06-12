@@ -18,14 +18,12 @@ if [[ $CONTAINER == "quasar_spark_local_test" ]]
 then
   echo "$CONTAINER: not starting a container for spark_local_test..."
 else
-  if [[ ${TRAVIS:-} ]]
+  if [[ $CONTAINER =~ "marklogic" ]]
   then
-    cd $TRAVIS_BUILD_DIR
     downloadMLRPM $CONTAINER
     upContainer $CONTAINER
     sleep 5
   else
-    downloadMLRPM $CONTAINER
     upContainer $CONTAINER
     sleep 5
   fi

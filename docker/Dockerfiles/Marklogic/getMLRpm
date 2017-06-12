@@ -4,6 +4,7 @@ set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
 ML_VERSION="8.0-5.8"
+ML_SHA="48cfbd30d003547feb6b60e120abd4542e8b83f9"
 ML_DOWNLOAD_EMAIL="quasarci@slamdata.com"
 ML_DOWNLOAD_PASSWORD="quasarci"
 ML_DEV_COOKIES=".ml-dev-cookies"
@@ -18,46 +19,24 @@ function downloadMLRpm() {
   curl -X POST --data "download=$ML_ASSET_PATH" -b $ML_DEV_COOKIES $ML_DEV_GET_TOKEN > /tmp/json
   cat /tmp/json | cut -f 3 -d: | cut -c2- | rev | cut -c3- | rev > /tmp/url
   curl -o $ML_RPM_PATH -m 2000 "${ML_DEV_URL}$(cat /tmp/url)"
+  rm $ML_DEV_COOKIES /tmp/url /tmp/json
 }
 
-if [[ ${TRAVIS:-} ]]
-then
-  echo "In Travis, checking for cached MarkLogic.rpm..."
+mkdir -p $HOME/.marklogic
+CACHE_DIR="$HOME/.marklogic"
+ML_RPM_PATH="$CACHE_DIR/MarkLogic.rpm"
+ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"
 
-  if [[ $CONNECTOR =~ "marklogic" ]]
+echo "$ML_SHA  $ML_RPM_PATH" > $ML_RPM_SHA1
+
+if [ -f $CACHE_DIR/MarkLogic.rpm ]
   then
-    mkdir -p $HOME/.marklogic
-    ML_DIR="$TRAVIS_BUILD_DIR/docker/Dockerfiles/Marklogic"
-    ML_RPM_PATH="$ML_DIR/MarkLogic.rpm"
-    ML_RPM_SHA1="$ML_DIR/MarkLogic.rpm.sha1"
-
-    echo "48cfbd30d003547feb6b60e120abd4542e8b83f9  $ML_RPM_PATH" > $ML_RPM_SHA1
-
-    if [ ! -f $HOME/.marklogic/MarkLogic.rpm ]
-    then
-      echo "Didn't find MarkLogic.rpm in cache, downloading ..."
-      downloadMLRpm
-      cp $ML_RPM_PATH $HOME/.marklogic/MarkLogic.rpm
-    else
-      echo "Found MarkLogic.rpm in cache ..."
-      cp $HOME/.marklogic/MarkLogic.rpm $ML_RPM_PATH
-    fi
-  fi
-    shasum --status -c $ML_RPM_SHA1
-else
-  ML_DIR="$(dirname $0)"
-  ML_RPM_PATH="$ML_DIR/MarkLogic.rpm"
-  ML_RPM_SHA1="$ML_DIR/MarkLogic.rpm.sha1"
-
-  echo "48cfbd30d003547feb6b60e120abd4542e8b83f9  $ML_RPM_PATH" > $ML_RPM_SHA1
-
-  if [ ! -f ${ML_RPM_PATH} ]
-  then
+    echo "Found MarkLogic.rpm in cache ..."
+    cp $CACHE_DIR/MarkLogic.rpm docker/Dockerfiles/Marklogic/
+  else
     echo "Didn't find MarkLogic.rpm in cache, downloading ..."
     downloadMLRpm
-  else
-    echo "MarkLogic.rpm is already downloaded ..."
-  fi
-
-  shasum --status -c $ML_RPM_SHA1
+    cp $CACHE_DIR/MarkLogic.rpm docker/Dockerfiles/Marklogic/
 fi
+
+shasum --status -c $ML_RPM_SHA1
