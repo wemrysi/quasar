@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import slamdata.Predef.List
+import slamdata.Predef._
 import quasar.common.{JoinType, SortDir}
 import quasar.fp._
 import quasar.qscript.MapFuncs._
@@ -113,7 +113,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               HoleF,
               ExcludeId,
               initialArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
@@ -134,7 +134,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               HoleF,
               ExcludeId,
               expectedArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(2)), SortDir.Ascending)))).embed,
@@ -165,7 +165,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
               HoleF,
               ExcludeId,
               initialArray)).embed,
-            ProjectIndexR(HoleF, IntLit(0)),
+            List(ProjectIndexR(HoleF, IntLit(0))),
             NonEmptyList(
               (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
               (ProjectIndexR(HoleF, IntLit(3)), SortDir.Ascending)))).embed,
@@ -199,7 +199,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             ConcatArraysR(
               MakeArrayR(IntLit(6)),
               MakeArrayR(IntLit(7))))).embed,
-          ProjectIndexR(HoleF, IntLit(1)),
+          List(ProjectIndexR(HoleF, IntLit(1))),
           NonEmptyList(
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Ascending),
             (ProjectIndexR(HoleF, IntLit(1)), SortDir.Descending)))).embed
@@ -428,9 +428,9 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           QCT.inj(Filter(
             srcInitial,
             ProjectIndexR(HoleF, IntLit(3)))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(2)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
 
       val srcExpected: Fix[QST] =
         QCT.inj(LeftShift(
@@ -446,9 +446,9 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           QCT.inj(Filter(
             srcExpected,
             ProjectIndexR(HoleF, IntLit(1)))).embed,
-          NullLit(),
+          Nil,
           List(ReduceFuncs.Count(ProjectIndexR(HoleF, IntLit(0)))),
-          MakeMapR(IntLit(0), ReduceIndexF(0.some))))
+          MakeMapR(IntLit(0), ReduceIndexF(0.right))))
 
       initial.embed.pruneArraysF must equal(expected.embed)
     }

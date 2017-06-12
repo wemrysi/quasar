@@ -19,7 +19,6 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
@@ -130,6 +129,19 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
             combineNorm.getOrElse(tj.combine)).some
       }))
 
+  def rebucket(bucket: List[FreeMap]): Option[List[FreeMap]] = {
+    val bucketNormOpt: List[Option[FreeMap]] = bucket ∘ freeMFEq[Hole]
+
+    bucketNormOpt.any(_.isDefined).option(
+      (Zip[List].zipWith(bucketNormOpt, bucket)(_.getOrElse(_)): List[FreeMap]) >>= (b =>
+        b.resume.fold(
+          {
+            case MapFuncs.Constant(_) => Nil
+            case _                    => List(b)
+          },
+          κ(List(b)))))
+  }
+
   def QScriptCore = {
     make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
       case Reduce(src, bucket, reducers, repair) => {
@@ -140,16 +152,7 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
           reducersOpt.exists(_.nonEmpty).option(
             Zip[List].zipWith(reducersOpt, reducers)(_.getOrElse(_)))
 
-        val bucketNormOpt: Option[FreeMap] = freeMFEq(bucket)
-
-        val bucketNormConst: Option[FreeMap] =
-          bucketNormOpt.getOrElse(bucket).resume.fold({
-            case MapFuncs.Constant(ej) =>
-              (!EJson.isNull(ej)).option(MapFuncs.NullLit[T, Hole]())
-            case _ => bucketNormOpt
-          }, κ(bucketNormOpt))
-
-        (bucketNormConst, reducersNormOpt, freeMFEq(repair)) match {
+        (rebucket(bucket), reducersNormOpt, freeMFEq(repair)) match {
           case (None, None, None) =>
             None
           case (bucketNorm, reducersNorm, repairNorm)  =>
@@ -168,7 +171,7 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
         val orderNormOpt: Option[NonEmptyList[(FreeMap, SortDir)]] =
           orderOpt any (_.nonEmpty) option orderOpt.fzipWith(order)(_ | _)
 
-        makeNorm(bucket, order)(freeMFEq(_), _ => orderNormOpt)(Sort(src, _, _))
+        makeNorm(bucket, order)(rebucket, _ => orderNormOpt)(Sort(src, _, _))
 
       case Map(src, f)             => freeMFEq(f).map(Map(src, _))
       case LeftShift(src, s, i, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, _))

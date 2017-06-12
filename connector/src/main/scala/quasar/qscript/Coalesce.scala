@@ -236,9 +236,18 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
 
+
+      def sequenceBucket[A: Equal, B](b: List[(A, B)]): Option[(Option[A], List[B])] =
+        b.foldRightM[Option, (Option[A], List[B])](
+          (None, Nil)) {
+          case ((a, b), (as, bs)) =>
+            as.fold[Option[Option[A]]](Some(a.some))(oldA => (oldA ≟ a).option(as)) strengthR (b :: bs)
+        }
+
+
       // TODO: I feel like this must be some standard fold.
-      def sequenceReduce(rf: ReduceFunc[(IdStatus, JoinFunc)])
-          : Option[(IdStatus, ReduceFunc[JoinFunc])] =
+      def sequenceReduce[A: Equal, B](rf: ReduceFunc[(A, B)])
+          : Option[(A, ReduceFunc[B])] =
         rf match {
           case ReduceFuncs.Count(a)           => (a._1, ReduceFuncs.Count(a._2)).some
           case ReduceFuncs.Sum(a)             => (a._1, ReduceFuncs.Sum(a._2)).some
@@ -296,7 +305,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 Map(
                   FToOut.reverseGet(QC.inj(Sort(
                     doubleInner,
-                    buckets >> mfInner,
+                    buckets ∘ (_ >> mfInner),
                     ordering ∘ (_.leftMap(_ >> mfInner))))).embed,
                   mf >> mfInner).some
               case _ => None
@@ -319,10 +328,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
+                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(id match {
                 case IncludeId =>
                   Free.roll(ConcatArrays[T, FreeMap](
@@ -336,7 +345,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, struct, id, shiftRepair)
                 if shiftRepair =/= RightSideF =>
-              (rightOnly(HoleF)(nm.freeMF(bucket >> shiftRepair)) ⊛
+              (bucket.traverse(b => rightOnly(HoleF)(nm.freeMF(b >> shiftRepair))) ⊛
                 reducers.traverse(_.traverse(mf => rightOnly(HoleF)(nm.freeMF(mf >> shiftRepair)))))((sb, sr) =>
                 Reduce(
                   FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, RightSideF))).embed,
@@ -344,16 +353,15 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                   sr,
                   redRepair))
             case LeftShift(innerSrc, struct, id, shiftRepair) =>
-              (rewrite.rewriteShift(id, nm.freeMF(bucket >> shiftRepair)) ⊛
+              (bucket.traverse(b => rewrite.rewriteShift(id, nm.freeMF(b >> shiftRepair))).flatMap(sequenceBucket[IdStatus, JoinFunc]) ⊛
                 reducers.traverse(_.traverse(mf =>
-                  rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))))((b, r) =>
-                r.foldRightM[Option, (IdStatus, (JoinFunc, List[ReduceFunc[JoinFunc]]))]((b._1, (b._2, Nil)))((elem, acc) => {
-                  sequenceReduce(elem) >>= (e =>
-                    (e._1 ≟ acc._1).option(
-                      (acc._1, (acc._2._1, e._2 :: acc._2._2))))
-                })).join >>= {
+                  rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))).flatMap(_.traverse(sequenceReduce[IdStatus, JoinFunc]) >>= sequenceBucket[IdStatus, ReduceFunc[JoinFunc]])) {
+                case ((bId, bucket), (rId, reducers)) =>
+                  val newId = bId.fold(rId.getOrElse(ExcludeId).some)(b => rId.fold(b.some)(r => (b ≟ r).option(b)))
+                  newId strengthR ((bucket, reducers))
+              }.join >>= {
                 case (newId, (bucket, reducers)) =>
-                  (rightOnly(HoleF)(bucket) ⊛
+                  (bucket.traverse(rightOnly(HoleF)) ⊛
                     (reducers.traverse(_.traverse(rightOnly(HoleF)))))((sb, sr) =>
                     Reduce(
                       FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, newId, RightSideF))).embed,
@@ -364,7 +372,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Map(innerSrc, mf) =>
               Reduce(
                 innerSrc,
-                bucket >> mf,
+                bucket ∘ (_ >> mf),
                 reducers.map(_.map(_ >> mf)),
                 redRepair).some
             case Sort(innerSrc, _, _)
@@ -413,7 +421,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
                   newCond))
             case Some(Sort(Embed(innerSrc), bucket, ord)) =>
-              ((FToOut.get(innerSrc) >>= SR.prj) ⊛ eliminateRightSideProj(bucket) ⊛ ord.traverse(Bitraverse[(?, ?)].leftTraverse.traverse(_)(eliminateRightSideProj)))((const, newBucket, newOrd) =>
+              ((FToOut.get(innerSrc) >>= SR.prj) ⊛
+                bucket.traverse(eliminateRightSideProj) ⊛
+                ord.traverse(Bitraverse[(?, ?)].leftTraverse.traverse(_)(eliminateRightSideProj)))(
+                (const, newBucket, newOrd) =>
                 Sort(
                   FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,
                   newBucket,
@@ -424,7 +435,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
               FToOut.reverseGet(QC.inj(newFilter)).embed,
               newMF))
         case Reduce(Embed(src), bucket, reducers, repair) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProj(bucket) ⊛ reducers.traverse(_.traverse(eliminateRightSideProj)))(
+          ((FToOut.get(src) >>= SR.prj) ⊛ bucket.traverse(eliminateRightSideProj) ⊛ reducers.traverse(_.traverse(eliminateRightSideProj)))(
             (const, newBuck, newRed) =>
             Reduce(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(const.getConst.path, ExcludeId)))).embed,

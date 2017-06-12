@@ -828,7 +828,7 @@ object MongoDbPlanner {
       : M[A] =
     mst.gets(meh.eval) >>= (liftErr[M, A](_))
 
-  def createFieldName(i: Int): String = "f" + i.toString
+  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 
   trait Planner[F[_]] {
     type IT[G[_]]
@@ -933,29 +933,26 @@ object MongoDbPlanner {
                   -\&/(j)),
                   ExprBuilder(WB.flattenMap(builder), _)))
           case Reduce(src, bucket, reducers, repair) =>
-            (handleFreeMap[T, M, EX](funcHandler, bucket) ⊛
-              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
+            (bucket.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              reducers.traverse(_.traverse(handleFreeMap[T, M, EX](funcHandler, _))))((b, red) => {
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
                   // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
-                    WB.groupBy(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap + (BsonField.Name("bucket") -> b)), // FIXME: Doesn’t work with UnshiftMap
-                      List(\&/-($field("bucket"))),
+                    WB.groupBy(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("f", i))).swap).toListMap ++ b.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("b", i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
+                      b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
                       DocContents.Doc(red.zipWithIndex.map(ai =>
-                        (BsonField.Name(createFieldName(ai._2)),
-                          accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap)))(
+                        (BsonField.Name(createFieldName("f", ai._2)),
+                          accumulator(ai._1.as($field(createFieldName("f", ai._2)))).left[Fix[ExprOp]])).toListMap)))(
                     exprs => WB.groupBy(src,
-                      List(b),
+                      b,
                       DocContents.Doc(exprs.zipWithIndex.map(ai =>
-                        (BsonField.Name(createFieldName(ai._2)),
+                        (BsonField.Name(createFieldName("f", ai._2)),
                           accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
                     repair)
               }).join
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = (bucket match {
-              case MapFuncs.NullLit() => order
-              case _                  => (bucket, SortDir.Ascending) <:: order
-            }).unzip
+            val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
             keys.traverse(handleFreeMap[T, M, EX](funcHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>
@@ -1173,13 +1170,17 @@ object MongoDbPlanner {
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(createFieldName)))
+    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(_.idx.fold(
+      i => $field("_id", i.toString),
+      i => $field(createFieldName("f", i))))
 
   def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Str(ri.idx.fold("_id")(createFieldName))))) ∘
+    processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
+      i => jscore.Select(jscore.Select(jscore.Ident(JsFn.defaultName), "_id"), i.toString),
+      i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i)))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
@@ -1280,7 +1281,7 @@ object MongoDbPlanner {
     case r @ Reduce(src, b, red, rep) =>
       SR.prj(src.project) match {
         case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          (b.transCataM(elideMoreGeneralGuards[M, T](typ)) ⊛
+          (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
             red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
             (b, red) => QC.inj(Reduce(src, b, red, rep)))
         case _ => QC.inj(r).point[M]

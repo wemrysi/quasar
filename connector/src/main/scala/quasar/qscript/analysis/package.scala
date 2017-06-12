@@ -88,9 +88,9 @@ package object analysis {
         def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, QScriptCore[T, ?], Int] = {
           case Map(card, f) => card.point[M]
           case Reduce(card, bucket, reducers, repair) =>
-            bucket.fold(κ(card / 2), {
-              case MapFuncs.Constant(v) => 1
-              case _ => card / 2
+            (bucket match {
+              case Nil => 1
+              case _   => card / 2
             }).point[M]
           case Sort(card, bucket, orders) => card.point[M]
           case Filter(card, f) => (card / 2).point[M]

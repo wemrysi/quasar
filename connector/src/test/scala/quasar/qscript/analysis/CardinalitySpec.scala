@@ -86,15 +86,15 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         */
       "Reduce" should {
         "returns cardinality of 1 when bucket is Const" in {
-          val bucket: FreeMap = Free.liftF(MapFunc.EmptyArray.apply)
-          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+          val bucket: List[FreeMap] = Nil
+          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
           val reduce = Reduce(100, bucket, List.empty, repair)
           compile(reduce) must_== 1
         }
         "returns cardinality of half fo already processed part of qscript" in {
           val cardinality = 100
-          val bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
-          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+          val bucket: List[FreeMap] = List(ProjectFieldR(HoleF, StrLit("country")))
+          val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
           val reduce = Reduce(cardinality, bucket, List.empty, repair)
           compile(reduce) must_== cardinality / 2
         }
@@ -102,8 +102,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "Sort" should {
         "returns cardinality of already processed part of qscript" in {
           val cardinality = 60
-          def bucket = ProjectFieldR(HoleF, StrLit("field"))
-          def order = (bucket, SortDir.asc).wrapNel
+          def bucket = List(ProjectFieldR(HoleF, StrLit("field")))
+          def order = (ProjectFieldR(HoleF, StrLit("field")), SortDir.asc).wrapNel
           val sort = quasar.qscript.Sort(cardinality, bucket, order)
           compile(sort) must_== cardinality
         }

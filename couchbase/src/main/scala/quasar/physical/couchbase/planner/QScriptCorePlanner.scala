@@ -128,11 +128,11 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: Contex
         id1 <- genId[T[N1QL], M]
         id2 <- genId[T[N1QL], M]
         id3 <- genId[T[N1QL], M]
-        b   <- processFreeMap(bucket, id1)
+        b   <- processFreeMap(MapFunc.StaticArray(bucket), id1)
         red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
                  reduceFuncPlanner[T, F].plan)
         rep <- repair.cataM(interpretM(
-                 _.idx.fold(SelectElem(ArrAgg(b).embed, int(0)).embed)(red(_)).point[M],
+                 _.idx.fold(i => SelectElem(SelectElem(ArrAgg(b).embed, int(0)).embed, int(i)).embed, red(_)).point[M],
                  mapFuncPlanner[T, F].plan))
       } yield {
         val s = Select(
@@ -163,7 +163,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: Contex
         id1 <- genId[T[N1QL], M]
         id2 <- genId[T[N1QL], M]
         id3 <- genId[T[N1QL], M]
-        b   <- processFreeMap(bucket, id1)
+        b   <- processFreeMap(MapFunc.StaticArray(bucket), id1)
         o   <- order.traverse { case (or, d) =>
                  (processFreeMap(or, id3) ∘ (OrderBy(_, d)))
                }

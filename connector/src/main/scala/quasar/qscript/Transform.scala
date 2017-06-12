@@ -249,7 +249,7 @@ class Transform
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     provs.tailOption.fold(values(0)) { tail =>
-      prov.genBuckets(tail) match {
+      prov.genBucketList(tail) match {
         case Some((newProvs, buckets)) =>
           Target(Ann(
             prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
@@ -258,17 +258,19 @@ class Transform
               values(0).value,
               buckets,
               List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
+              StaticArray(List(
+                StaticArray(buckets.zipWithIndex.map {
+                  case (_, i) =>  Free.point[MapFunc, ReduceIndex](ReduceIndex(i.left))
+                }),
+                Free.point(ReduceIndex(0.right)))))).embed)
         case None =>
           Target(
             Ann(provs, HoleF),
             QC.inj(Reduce[T, T[F]](
               values(0).value,
-              NullLit(),
+              Nil,
               List(ReduceFunc.translateUnaryReduction[FreeMap](func)(reduce)),
-              Free.point(ReduceIndex(0.some)))).embed)
+              Free.point(ReduceIndex(0.right)))).embed)
       }
     }
   }
@@ -280,7 +282,7 @@ class Transform
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     join.base.buckets.tailOption.fold(Target(EmptyAnn[T], join.base.src)) { tail =>
-      prov.genBuckets(tail) match {
+      prov.genBucketList(tail) match {
         case Some((newProvs, buckets)) =>
           Target(Ann(
             prov.rebase(Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))), newProvs),
@@ -290,17 +292,19 @@ class Transform
               buckets,
               List(
                 ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.point(ReduceIndex(none)))),
-                Free.roll(MakeArray(Free.point(ReduceIndex(0.some)))))))).embed)
+              StaticArray(List(
+                StaticArray(buckets.zipWithIndex.map {
+                  case (_, i) =>  Free.point[MapFunc, ReduceIndex](ReduceIndex(i.left))
+                }),
+                Free.point(ReduceIndex(0.right)))))).embed)
         case None =>
           Target(
             Ann(join.base.buckets, HoleF),
             QC.inj(Reduce[T, T[F]](
               values(0).value,
-              NullLit(),
+              Nil,
               List(ReduceFunc.translateBinaryReduction[FreeMap](func)(join.lval, join.rval)),
-              Free.point(ReduceIndex(0.some)))).embed)
+              Free.point(ReduceIndex(0.right)))).embed)
       }
     }
   }
@@ -446,7 +450,7 @@ class Transform
           Ann[T](base.buckets, dset),
           QC.inj(Sort(
             base.src,
-            prov.genBuckets(base.buckets.drop(1)).fold(NullLit[T, Hole]())(_._2),
+            prov.genBucketList(base.buckets.drop(1)).fold[List[FreeMap]](Nil)(_._2),
             os)).embed))
 
     case lp.TemporalTrunc(part, src) =>

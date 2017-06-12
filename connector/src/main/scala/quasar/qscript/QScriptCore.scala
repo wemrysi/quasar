@@ -34,7 +34,7 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class ReduceIndex(idx: Option[Int]) {
+@Lenses final case class ReduceIndex(idx: Int \/ Int) {
   def incr(j: Int): ReduceIndex = ReduceIndex(idx ∘ (_ + j))
 }
 
@@ -92,7 +92,7 @@ object ReduceIndex {
 // TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
-  bucket: FreeMap[T],
+  bucket: List[FreeMap[T]],
   reducers: List[ReduceFunc[FreeMap[T]]], // FIXME: Use Vector instead
   repair: FreeMapA[T, ReduceIndex])
     extends QScriptCore[T, A]
@@ -109,7 +109,7 @@ object ReduceIndex {
 // so that a backend without a native sort could eliminate this node.
 @Lenses final case class Sort[T[_[_]], A](
   src: A,
-  bucket: FreeMap[T],
+  bucket: List[FreeMap[T]],
   order: NonEmptyList[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
@@ -304,8 +304,8 @@ object QScriptCore {
           case (
             Reduce(_, bucket1, func1, rep1),
             Reduce(_, bucket2, func2, rep2)) =>
-            val mapL = norm.freeMF(bucket1 >> left)
-            val mapR = norm.freeMF(bucket2 >> right)
+            val mapL = bucket1 ∘ (b => norm.freeMF(b >> left))
+            val mapR = bucket2 ∘ (b => norm.freeMF(b >> right))
 
             (mapL ≟ mapR).option {
               val funcL = func1 ∘ (_ ∘ (_ >> left))
@@ -365,8 +365,8 @@ object QScriptCore {
             (lCond ≟ rCond).option(SrcMerge(Filter(s1, lCond), left, right))
 
           case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
-            val lBucket = norm.freeMF(b1 >> left)
-            val rBucket = norm.freeMF(b2 >> right)
+            val lBucket = b1.map(b => norm.freeMF(b >> left))
+            val rBucket = b2.map(b => norm.freeMF(b >> right))
             val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> left)))
             val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> right)))
             (lBucket ≟ rBucket && lOrder ≟ rOrder).option(

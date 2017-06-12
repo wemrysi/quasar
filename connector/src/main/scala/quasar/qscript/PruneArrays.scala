@@ -372,7 +372,10 @@ object PruneArrays {
 
           case Reduce(src, bucket, reducers, _) =>
             val bucketIndices: RewriteState =
-              liftHole(findIndicesInFunc[Hole](bucket))
+              liftHole(
+                ScalaMap(
+                  SrcHole ->
+                    bucket.traverse(findIndicesInFunc(_).get(SrcHole).join).map(_.unite.toSet)))
             val reducersIndices: RewriteState =
               reducers.foldMap(_.foldMap[RewriteState](f => liftHole(findIndicesInFunc[Hole](f))))
 
@@ -385,7 +388,11 @@ object PruneArrays {
           case Filter(_, func) => M.modify(liftHole(findIndicesInFunc[Hole](func)) |+| _).as(Ignore)
 
           case Sort(_, bucket, order) =>
-            val bucketState: RewriteState = liftHole(findIndicesInFunc[Hole](bucket))
+            val bucketState: RewriteState =
+              liftHole(
+                ScalaMap(
+                  SrcHole ->
+                    bucket.traverse(findIndicesInFunc(_).get(SrcHole).join).map(_.unite.toSet)))
             val orderState: RewriteState = order.foldMap {
               case (f, _) => liftHole(findIndicesInFunc(f))
             }
@@ -423,7 +430,7 @@ object PruneArrays {
             def replacement(repl: IndexMapping): QScriptCore[A] =
               Reduce(
                 src,
-                remapIndicesInFunc(bucket0, repl),
+                bucket0 ∘ (remapIndicesInFunc(_, repl)),
                 reducers0.map(_.map(remapIndicesInFunc(_, repl))),
                 repair)
             M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacement)))
@@ -448,7 +455,7 @@ object PruneArrays {
             def replacement(repl: IndexMapping): QScriptCore[A] =
               Sort(
                 src,
-                remapIndicesInFunc(bucket0, repl),
+                bucket0 ∘ (remapIndicesInFunc(_, repl)),
                 order0.map(_.leftMap(remapIndicesInFunc(_, repl))))
             M.get ∘ (remapState(_, in, indexMapping >>> replacement))
 

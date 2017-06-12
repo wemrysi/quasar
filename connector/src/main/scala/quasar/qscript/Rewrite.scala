@@ -302,7 +302,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
     case Reduce(src, bucket, reducers, repair0) =>
       // `indices`: the indices into `reducers` that are used
-      val Empty   = ReduceIndex(-1.some)
+      val Empty   = ReduceIndex(-1.right)
       val used    = repair0.map(_.idx).toList.unite.toSet
       val indices = reducers.indices filter used
       val repair  = repair0 map (r => r.copy(r.idx ∘ indices.indexOf))
@@ -313,12 +313,9 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     case _ => None
   }
 
-  private def findUniqueBuckets(bucket0: FreeMap): Option[FreeMap] =
-    bucket0.project match {
-      case StaticArray(array) =>
-        val bucket: FreeMap = rebuildArray(array.distinctE.toList)
-        if (bucket0 ≟ bucket) None else bucket.some
-     case _ => None
+  private def findUniqueBuckets(buckets: List[FreeMap]): Option[List[FreeMap]] = {
+    val uniqued = buckets.distinctE.toList
+    (uniqued ≠ buckets).option(uniqued)
   }
 
   val uniqueBuckets = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
