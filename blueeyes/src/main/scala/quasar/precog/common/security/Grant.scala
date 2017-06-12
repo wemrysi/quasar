@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
-
-import accounts.AccountId
+package quasar.precog.common.security
 
 import org.slf4s.Logging
 
-import quasar.blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
+import quasar.blueeyes._
+import quasar.blueeyes.json._
+import quasar.blueeyes.json.serialization._
+import quasar.blueeyes.json.serialization.IsoSerialization._
+import quasar.blueeyes.json.serialization.Iso8601Serialization._
+import quasar.blueeyes.json.serialization.Versioned._
+
 import scalaz._, Scalaz._
 
 import java.time.LocalDateTime

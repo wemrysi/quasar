@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package accounts
+package quasar.precog.common.accounts
 
+import quasar.precog.common.Path
 import quasar.precog.common.security.APIKey
 
 import quasar.blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
+import Iso8601Serialization._, Versioned._
 
 import java.time.LocalDateTime
 

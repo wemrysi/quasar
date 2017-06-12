@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package util
+package quasar.yggdrasil.util
 
-import quasar.blueeyes._
-import quasar.precog.common._
 import quasar.blueeyes.json._
+import quasar.precog.common._
 
 object CPathUtils {
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {

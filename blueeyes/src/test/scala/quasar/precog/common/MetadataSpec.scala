@@ -16,10 +16,11 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._
+import quasar.blueeyes._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
-import scalaz._, Scalaz._
 import quasar.precog._, JsonTestSupport._, Gen._
+
+import scalaz._, Scalaz._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   val sampleSize = 100

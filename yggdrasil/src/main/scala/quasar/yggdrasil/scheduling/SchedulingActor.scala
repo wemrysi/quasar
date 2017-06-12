@@ -17,21 +17,18 @@
 package quasar.yggdrasil.scheduling
 
 import quasar.precog.common.Path
-import quasar.precog.common.accounts.AccountFinder
 import quasar.precog.common.jobs._
 import quasar.precog.common.security._
-import quasar.precog.util.PrecogUnit
 
-import quasar.yggdrasil._
 import quasar.yggdrasil.execution._
 import quasar.yggdrasil.table.Slice
 import quasar.yggdrasil.vfs._
 
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
-import akka.pattern.{ask, pipe}
+import akka.actor.{Actor, Cancellable}
+import akka.pattern.pipe
 import akka.util.Timeout
 
 import quasar.blueeyes.util.Clock
@@ -45,7 +42,7 @@ import org.quartz.CronExpression
 
 import org.slf4s.Logging
 
-import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
+import scala.collection.mutable.PriorityQueue
 import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
 
 import scalaz.{Ordering => _, idInstance => _, _}
@@ -53,7 +50,6 @@ import scalaz.std.option._
 import scalaz.std.scalaFuture._
 import scalaz.syntax.id._
 import scalaz.syntax.traverse._
-import scalaz.syntax.std.either._
 import scalaz.syntax.std.option._
 
 import scala.concurrent.ExecutionContext.Implicits.global     // wtf fix me??!!
@@ -167,12 +163,12 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
       pendingRemovals += id
     }
 
-    def executeTask(task: ScheduledTask): Future[PrecogUnit] = {
+    def executeTask(task: ScheduledTask): Future[Unit] = {
       import EvaluationError._
 
       if (running.contains((task.source, task.sink))) {
         // We don't allow for more than one concurrent instance of a given task
-        Future successful PrecogUnit // AP: in precog we called `Promise` instead of `Future`
+        Future.successful(()) // AP: in precog we called `Promise` instead of `Future`
       } else {
         def consumeStream(totalSize: Long, stream: StreamT[Future, Slice]): Future[Long] = {
           stream.uncons flatMap {
@@ -197,15 +193,14 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
 
         } yield cachingResult
 
-        val back = execution.fold[Future[PrecogUnit]](
+        val back = execution.fold[Future[Unit]](
           failure => M point {
             log.error("An error was encountered processing a scheduled query execution: " + failure)
-            ourself ! TaskComplete(task.id, clock.now(), 0, Some(failure.toString)) : PrecogUnit
+            ourself ! TaskComplete(task.id, clock.now(), 0, Some(failure.toString)) : Unit
           },
           storedQueryResult => {
             consumeStream(0, storedQueryResult.data) map { totalSize =>
               ourself ! TaskComplete(task.id, clock.now(), totalSize, None)
-              PrecogUnit
             } recoverWith {
               case t: Throwable =>
                 for {
@@ -216,17 +211,17 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
                       case Left(jobAbortFailure) => sys.error(jobAbortFailure.toString)
                     }
                   }
-                } yield PrecogUnit
+                } yield ()
             }
           }
         ) flatMap {
-          identity[Future[PrecogUnit]](_)
+          identity[Future[Unit]](_)
         }
 
         back onFailure {
           case t: Throwable =>
             log.error("Scheduled query execution failed by thrown error.", t)
-            ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString)) : PrecogUnit
+            ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString)) : Unit
         }
 
         back
@@ -238,7 +233,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         val ourself = self
         val taskId = UUID.randomUUID()
         val newTask = ScheduledTask(taskId, repeat, apiKey, authorities, context, source, sink, timeout)
-        val addResult: EitherT[Future, String, PrecogUnit] = repeat match {
+        val addResult: EitherT[Future, String, Unit] = repeat match {
           case None =>
             EitherT.right(executeTask(newTask))
 

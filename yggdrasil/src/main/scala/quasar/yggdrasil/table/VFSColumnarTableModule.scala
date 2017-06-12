@@ -18,7 +18,6 @@ package quasar.yggdrasil.table
 
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode.JType
-import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.vfs._
 
@@ -29,12 +28,9 @@ import akka.pattern.AskSupport
 
 import scalaz._
 import scalaz.std.list._
-import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
 import org.slf4s.Logging
-
-import TableModule._
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with SecureVFSModule[Future, Slice] with AskSupport with Logging {
   def vfs: SecureVFS

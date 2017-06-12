@@ -19,8 +19,6 @@ package quasar.mimir
 import quasar.blueeyes._
 import quasar.yggdrasil.TableModule
 
-import scala.collection.mutable
-
 trait CrossOrdering extends DAG {
   import TableModule.CrossOrder // TODO: Move CrossOrder out somewhere else.
   import dag._

@@ -21,12 +21,10 @@ import quasar.precog.common.security._
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization.{ Decomposer, Extractor }
 import quasar.blueeyes.json.serialization.DefaultSerialization._
-import quasar.blueeyes.json.serialization.IsoSerialization._
 import quasar.blueeyes.json.serialization.Versioned._
 
 import shapeless._
 
-import scalaz._
 import scalaz.syntax.std.boolean._
 
 case class Job(id: JobId, apiKey: APIKey, name: String, jobType: String, data: Option[JValue], state: JobState)

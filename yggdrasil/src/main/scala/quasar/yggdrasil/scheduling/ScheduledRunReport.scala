@@ -16,18 +16,12 @@
 
 package quasar.yggdrasil.scheduling
 
-import quasar.yggdrasil
-
-import quasar.blueeyes.json._
-import quasar.blueeyes.json.serialization._
 import quasar.blueeyes.json.serialization.Versioned._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 
 import java.util.UUID
 
 import java.time.LocalDateTime
-
-import scalaz._
 
 import shapeless._
 

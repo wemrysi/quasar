@@ -19,9 +19,7 @@ package quasar.mimir
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
-import quasar.precog.util._
 
-import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 import java.util.regex.{ Pattern, PatternSyntaxException }
 
@@ -138,7 +136,6 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     object matches extends Op2SSB("matches", _ matches _)
 
     object regexMatch extends Op2(StringNamespace, "regexMatch") with Op2Array {
-      import trans._
 
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JArrayHomogeneousT(JTextT))

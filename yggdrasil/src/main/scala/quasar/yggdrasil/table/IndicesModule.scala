@@ -19,7 +19,6 @@ package table
 
 import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.precog.util._
 
 import scalaz._, Scalaz._
 import scala.collection.mutable

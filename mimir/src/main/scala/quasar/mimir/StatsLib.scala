@@ -1163,7 +1163,6 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       * This provides scaffolding that is useful in all cases.
       */
     trait BaseRankScanner extends CScanner {
-      import scala.collection.mutable
 
       // collapses number columns into one decimal column.
       //
@@ -1352,7 +1351,6 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       * rows that are identical.
       */
     trait UniqueRankScanner extends BaseRankScanner {
-      import scala.collection.mutable
 
       /**
         * Determines whether row is a duplicate of lastRow.

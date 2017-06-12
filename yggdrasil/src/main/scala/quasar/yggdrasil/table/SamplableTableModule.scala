@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
 import quasar.blueeyes._
 import quasar.precog.common._
-import scala.collection.mutable
+import quasar.yggdrasil._
+
 import scalaz._, Scalaz._
 
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>
-    import trans._
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
+    def sample(sampleSize: Int, specs: Seq[trans.TransSpec1]): M[Seq[Table]]
   }
 }
 

@@ -20,9 +20,7 @@ import quasar.precog.common._
 
 import org.specs2.mutable.Specification
 import org.specs2._
-import org.scalacheck._, Prop._
-
-import scalaz._
+import org.scalacheck._
 
 class V1CookedBlockFormatSpecs extends CookedBlockFormatSpecs {
   val format = V1CookedBlockFormat

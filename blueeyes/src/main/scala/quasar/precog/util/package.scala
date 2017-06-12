@@ -16,11 +16,7 @@
 
 package quasar.precog
 
-import quasar.blueeyes._
-import java.util.Comparator
-import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicInteger
-import scalaz._, Scalaz._
 
 package object util {
   /**
