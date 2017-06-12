@@ -103,4 +103,12 @@ object SemanticError {
   val unboundVariable: Prism[SemanticError, VarName] = Prism.partial[SemanticError, VarName] {
     case UnboundVariable(varname) => varname
   }(UnboundVariable(_))
+
+  val duplicateAlias: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
+    case DuplicateAlias(name) => name
+  }(DuplicateAlias(_))
+
+  val wrongArgumentCount: Prism[SemanticError, (CIName, Int, Int)] = Prism.partial[SemanticError, (CIName, Int, Int)] {
+    case WrongArgumentCount(name, expected, found) => (name, expected, found)
+  }(WrongArgumentCount.tupled)
 }
