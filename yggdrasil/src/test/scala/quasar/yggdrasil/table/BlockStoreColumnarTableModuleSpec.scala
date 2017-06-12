@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
-import quasar.blueeyes._
-import scalaz._
-import TableModule._
+import quasar.yggdrasil.TableModuleSpec
+import quasar.yggdrasil.TableModule._
+
+import scalaz.Need
 
 trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
   type MemoId = Int

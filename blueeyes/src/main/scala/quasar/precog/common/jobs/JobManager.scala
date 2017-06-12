@@ -16,11 +16,8 @@
 
 package quasar.precog.common.jobs
 
-import quasar.precog.common._
-
 import quasar.blueeyes.json._
 import quasar.blueeyes.MimeType
-
 import quasar.precog.common.security._
 
 import java.time.LocalDateTime
@@ -40,8 +37,6 @@ object JobManager {
 }
 
 trait JobManager[M[+_]] { self =>
-  import Message._
-
   /**
    * Create a new Job with the given API key, name, type and possibly an
    * initial status message and expiration. If a started time is provided, then

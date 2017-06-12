@@ -31,12 +31,6 @@ class HdfsPackageSpec extends quasar.Qspec {
       hdfsUri(url).unsafePerformSync must_== new URI(url)
     }
 
-    "create a valid HDFS file system if URL is valid but encoded" in {
-      val encodedUrl = "hdfs%3A%2F%2Flocalhost%3A9000"
-      val decodedUrl = "hdfs://localhost:9000"
-      hdfsUri(encodedUrl).unsafePerformSync must_== new URI(decodedUrl)
-    }
-
     "fail if URL is not valid" in {
       val url = "blabalbab"
       hdfsUri(url).attempt.map(_.leftMap(_.getMessage)).unsafePerformSync must_== -\/("Provided URL is not valid HDFS URL")

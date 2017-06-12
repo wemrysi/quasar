@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
+package quasar.mimir
 
-package object security {
-  type APIKey  = String
-  type GrantId = String
+// TODO move to quasar.contrib.fp
+// TODO if this turns out to be useful, macro-ize a DepFn1.apply implementation
+trait DepFn1[In <: AnyRef with Singleton, Out[_ <: In]] {
+  def apply(In: In): Out[In.type]
 }

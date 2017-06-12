@@ -49,4 +49,3 @@ final class InMemoryFileStorage[M[+_]](implicit M: Monad[M]) extends FileStorage
 
   def remove(file: String): M[Unit] = M.point { files -= file }
 }
-import scalaz.syntax.comonad._

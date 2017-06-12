@@ -16,15 +16,13 @@
 
 package quasar
 
-import scalaz._
-import scalaz.std.scalaFuture._
+import quasar.precog.util._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scalaz._
+
+import scala.concurrent.ExecutionContext
 
 import java.nio.ByteBuffer
-import java.time.ZoneOffset.UTC
-
-import quasar.precog.util._
 
 package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type spec    = scala.specialized

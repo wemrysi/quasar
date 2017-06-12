@@ -18,8 +18,6 @@ package quasar.mimir
 
 import quasar.yggdrasil.bytecode._
 
-import quasar.yggdrasil._
-
 trait TypeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait TypeLib extends ColumnarTableLib {
     import trans._

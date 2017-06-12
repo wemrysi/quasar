@@ -16,12 +16,9 @@
 
 package quasar.niflheim
 
-import quasar.precog.util.PrecogUnit
-
-import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
-import scalaz.{Validation, Success, Failure}
+import scalaz.{Validation, Failure}
 import scalaz.syntax.monad._
 
 /**
@@ -45,7 +42,7 @@ case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends Segm
       for {
         _ <- writeVersion(channel)
         _ <- format.writer.writeSegment(channel, segment)
-      } yield PrecogUnit
+      } yield ()
     }
   }
 

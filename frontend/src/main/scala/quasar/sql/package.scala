@@ -225,7 +225,7 @@ package object sql {
       case Splice(expr) => expr.fold("*")("(" + _._2 + ").*")
       case Binop(lhs, rhs, op) => op match {
         case FieldDeref => rhs._1.project match {
-          case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("\"", str)
+          case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("`", str)
           case _                   => "(" + lhs._2 + "){" + rhs._2 + "}"
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
@@ -266,7 +266,7 @@ package object sql {
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
       case Let(ident, bindTo, in) =>
-        ident.shows ++ " :: " ++ bindTo._2 ++ "; " ++ in._2
+        ident.shows ++ " := " ++ bindTo._2 ++ "; " ++ in._2
       case IntLiteral(v) => v.toString
       case FloatLiteral(v) => v.toString
       case StringLiteral(v) => _q(v)

@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.util.PrecogUnit
 
 import scalaz.{ Validation, Success, Failure }
 
@@ -58,6 +57,7 @@ object CTypeFlags {
           case CArrayType(tpe) =>
             buffer += FArray
             flagForCValueType(tpe)
+          case CPeriod => ???
         }
       }
 

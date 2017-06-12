@@ -145,18 +145,19 @@ final class CompressionSpec extends quasar.Qspec
 
   "coalesceWithUnknown" >> {
     "merges known map entry with unknown entry when same primary type appears in unknown" >> prop {
-      (xs: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
+      (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
 
-      val h = xs.head
-      val u1 = h.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
-      val u2 = h.bimap(c =>
+      val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
+
+      val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
+      val u2 = head.bimap(c =>
         envT(
           TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed).some,
           TypeF.simple[J, S](SimpleType.Char)).embed,
         _.toSST)
       val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
-      val cs = xs.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
-      val m = IMap.fromFoldable(kv1 <:: cs)
+      val cs = xs.toList.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
+      val m = IMap.fromFoldable(kv1 :: cs)
       val sst1 = envT(cnt1, TypeF.map(m, u1.some)).embed
       val sst2 = envT(cnt1, TypeF.map(m, u2.some)).embed
 
@@ -170,11 +171,12 @@ final class CompressionSpec extends quasar.Qspec
     }
 
     "merges known map entry with unknown when primary type appears in unknown union" >> prop {
-      (xs: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
+      (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
 
-      val h = xs.head
-      val u1 = h.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
-      val u2 = h.bimap(c =>
+      val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
+
+      val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
+      val u2 = head.bimap(c =>
         envT(
           TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed).some,
           TypeF.simple[J, S](SimpleType.Char)).embed,
@@ -184,8 +186,8 @@ final class CompressionSpec extends quasar.Qspec
       val u1u = u1.leftMap(s => envT(cnt1, TypeF.union[J, S](tp, s, IList(st))).embed)
       val u2u = u2.leftMap(s => envT(cnt1, TypeF.union[J, S](s, st, IList(tp))).embed)
       val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
-      val cs = xs.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
-      val m = IMap.fromFoldable(kv1 <:: cs)
+      val cs = xs.toList.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
+      val m = IMap.fromFoldable(kv1 :: cs)
       val sst1 = envT(cnt1, TypeF.map(m, u1u.some)).embed
       val sst2 = envT(cnt1, TypeF.map(m, u2u.some)).embed
 

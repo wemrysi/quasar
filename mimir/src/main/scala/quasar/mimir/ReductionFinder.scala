@@ -18,8 +18,6 @@ package quasar.mimir
 
 import scalaz._
 
-import scala.collection.mutable
-
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._

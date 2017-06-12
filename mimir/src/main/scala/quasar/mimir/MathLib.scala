@@ -16,9 +16,7 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.yggdrasil.bytecode._
-import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
 trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {

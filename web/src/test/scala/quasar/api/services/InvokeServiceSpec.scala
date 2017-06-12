@@ -37,6 +37,10 @@ import quasar.fs.mount.module.Module
 import quasar.sql._
 import quasar.sql.fixpoint._
 
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
+import shapeless.tag.@@
 import org.http4s.{Query, _}
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
@@ -90,13 +94,14 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
         response.as[ApiError].unsafePerformSync must beApiErrorLike[Module.Error](
           Module.Error.FSError(pathErr(pathNotFound(file))))
       }
-      "produce a 400 bad request if path is a directory instead of a file" >> prop { (file: AFile, sampleData: Vector[Data]) =>
-        val state = InMemState.fromFiles(Map(file -> sampleData))
-        val response = service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
-        response.status must_= Status.BadRequest
-        response.as[ApiError].unsafePerformSync must_=
-          apiError(BadRequest withReason "Path must be a file")
-      }
+      "produce a 400 bad request if path is a directory instead of a file" >>
+        prop { (file: AFile, sampleData: Vector[Data]) =>
+          val state = InMemState.fromFiles(Map(file -> sampleData))
+          val response = service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
+          response.status must_= Status.BadRequest
+          response.as[ApiError].unsafePerformSync must_=
+            apiError(BadRequest withReason "Path must be a file")
+        }
       "produce a 400 bad request if not all params are supplied with explanation of " +
       "which function parameters are missing from the query string" >>
         prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
@@ -130,6 +135,21 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
           }.pendingUntilFixed
+      }
+      "support offset and limit" >> {
+        prop { (functionFile: AFile,
+                dataFile: AFile,
+                sampleData: Vector[Data],
+                offset: Int @@ NonNegative,
+                limit: Int @@ RPositive) =>
+          val statements = List(sampleStatement(fileName(functionFile).value, dataFile))
+          val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
+          val state = InMemState.fromFiles(Map(dataFile -> sampleData))
+          val request = Request(uri = pathUri(functionFile).copy(
+            query = Query.fromPairs("bar" -> "2", "offset" -> offset.toString, "limit" -> limit.toString)))
+          val response = service(state, mounts)(request).unsafePerformSync
+          isExpectedResponse(sampleData.drop(offset).take(limit), response, MessageFormat.Default)
+        }
       }
     }
   }
