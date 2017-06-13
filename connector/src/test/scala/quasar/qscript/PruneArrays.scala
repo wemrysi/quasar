@@ -561,8 +561,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             HoleQS,
             ProjectIndexR(HoleF, IntLit[Fix, Hole](2))))),
           HoleQS,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(StrLit("xyz"), LeftSideF))).embed
 
@@ -575,8 +574,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           arrayBranch3,
           HoleQS,
-          HoleF,  // reference entire left branch
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit("xyz"),
@@ -608,8 +606,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           arrayBranch3,
           HoleQS,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-          HoleF,
+          List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit("xyz"),
@@ -642,8 +639,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
             UnreferencedRT.embed,
             arrayBranch3,
             HoleQS,
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-            HoleF,
+            List((ProjectIndexR(HoleF, IntLit[Fix, Hole](2)), HoleF)),
             JoinType.Inner,
             ConcatArraysR(MakeArrayR(LeftSideF), MakeArrayR(RightSideF)))).embed,
           ProjectIndexR(
@@ -678,10 +674,11 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           Free.roll(QCT.inj(Filter(arrayBranch3, ProjectIndexR(HoleF, IntLit[Fix, Hole](1))))),
           HoleQS,
-          EqR(
-            ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-            StrLit[Fix, Hole]("foo")),
-          HoleF,
+          List(
+            (EqR(
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+              StrLit[Fix, Hole]("foo")),
+              HoleF)),
           JoinType.Inner,
           MakeMapR(
             StrLit[Fix, JoinSide]("bar"),
@@ -765,8 +762,9 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           arrayBranch3,
           rBranch,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          List(
+            (ProjectIndexR(HoleF, IntLit[Fix, Hole](2)),
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
           JoinType.Inner,
           MakeMapR(
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](2)),
@@ -794,8 +792,9 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           lBranchExpected,
           rBranchExpected,
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
-          ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+          List(
+            (ProjectIndexR(HoleF, IntLit[Fix, Hole](0)),
+              ProjectIndexR(HoleF, IntLit[Fix, Hole](0)))),
           JoinType.Inner,
           MakeMapR(
             ProjectIndexR(LeftSideF, IntLit[Fix, JoinSide](0)),
@@ -1049,8 +1048,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           branch,
           HoleQS,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(LeftSideF, RightSideF))).embed
 
@@ -1063,8 +1061,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           HoleQS,
           branch,
-          HoleF,
-          HoleF,
+          List((HoleF, HoleF)),
           JoinType.Inner,
           MakeMapR(LeftSideF, RightSideF))).embed
 

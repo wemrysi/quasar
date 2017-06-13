@@ -218,7 +218,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func)))
         val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
-        val join = quasar.qscript.EquiJoin(cardinality, left, right, func, func, JoinType.Inner, joinFunc)
+        val join = quasar.qscript.EquiJoin(cardinality, left, right, List((func, func)), JoinType.Inner, joinFunc)
         compile(join) must_== cardinality * (cardinality / 2)
       }
     }

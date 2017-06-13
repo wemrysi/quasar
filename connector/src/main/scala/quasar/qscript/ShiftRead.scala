@@ -116,8 +116,7 @@ object ShiftRead {
           Free.point(ej.src),
           applyToBranch(ej.lBranch),
           applyToBranch(ej.rBranch),
-          ej.lKey,
-          ej.rKey,
+          ej.key,
           ej.f,
           ej.combine)))
       )

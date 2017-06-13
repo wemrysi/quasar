@@ -128,7 +128,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: Contex
         id1 <- genId[T[N1QL], M]
         id2 <- genId[T[N1QL], M]
         id3 <- genId[T[N1QL], M]
-        b   <- processFreeMap(MapFunc.StaticArray(bucket), id1)
+        b   <- processFreeMap(bucket match {
+          case Nil => MapFuncs.NullLit()
+          case _   => MapFunc.StaticArray(bucket)
+        }, id1)
         red <- reducers.traverse(_.traverse(processFreeMap(_, id1)) >>=
                  reduceFuncPlanner[T, F].plan)
         rep <- repair.cataM(interpretM(

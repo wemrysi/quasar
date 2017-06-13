@@ -284,8 +284,8 @@ object PruneArrays {
 
       def find[M[_], A](in: EquiJoin[A])(implicit M: MonadState[M, RewriteState]) = {
         val state: RewriteState =
-          liftJoinSide(findIndicesInFunc[Hole](in.lKey).collect { case (SrcHole, v) => (LeftSide, v) }) |+|
-            liftJoinSide(findIndicesInFunc[Hole](in.rKey).collect { case (SrcHole, v) => (RightSide, v) }) |+|
+          liftJoinSide((in.key ∘ (_._1)).foldRight(ScalaMap.empty[Hole, KnownIndices])(findIndicesInFunc[Hole](_) |++| _).collect { case (SrcHole, v) => (LeftSide, v) }) |+|
+            liftJoinSide((in.key ∘ (_._2)).foldRight(ScalaMap.empty[Hole, KnownIndices])(findIndicesInFunc[Hole](_) |++| _).collect { case (SrcHole, v) => (RightSide, v) }) |+|
             liftJoinSide(findIndicesInFunc[JoinSide](in.combine))
         M.put(Ignore).as(state) // annotate computed state as environment
       }
@@ -310,8 +310,9 @@ object PruneArrays {
             EquiJoin(in.src,
               lBranch.pruneArraysBranch,
               rBranch.pruneArraysBranch,
-              remapIndicesInFunc(in.lKey, lrepl),
-              remapIndicesInFunc(in.rKey, rrepl),
+              in.key ∘ (_.bimap(
+                remapIndicesInFunc(_, lrepl),
+                remapIndicesInFunc(_, rrepl))),
               in.f,
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
           }

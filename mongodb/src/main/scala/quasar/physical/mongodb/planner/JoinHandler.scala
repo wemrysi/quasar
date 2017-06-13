@@ -42,7 +42,7 @@ final case class JoinHandler[WF[_], F[_]](run: (MongoJoinType, JoinSource[WF], J
     run(tpe, left, right)
 }
 
-final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[Expr], js: Option[List[JsFn]])
+final case class JoinSource[WF[_]](src: Fix[WorkflowBuilderF[WF, ?]], keys: List[Expr])
 
 object JoinHandler {
 
@@ -155,25 +155,25 @@ object JoinHandler {
     }
 
     (tpe, left, right) match {
-      case (set.InnerJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
+      case (set.InnerJoin, JoinSource(src, List(key)), IsLookupFrom(coll, field))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.LeftOuterJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
+      // case (set.LeftOuterJoin, JoinSource(src, List(key)), IsLookupFrom(coll, field))
       //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
       //   ???
 
-      case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
+      case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
+      // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key)))
       //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
       //   ???
 
@@ -192,8 +192,7 @@ object JoinHandler {
       arg match {
         case JoinSource(
               Fix(CollectionBuilderF(Fix(ev0($ReadF(coll))), Root(), None)),
-              List(HasThat($var(DocVar(_, Some(field))))),
-              _) =>
+              List(HasThat($var(DocVar(_, Some(field)))))) =>
           (coll, field).some
         case _ =>
           None
@@ -244,7 +243,7 @@ object JoinHandler {
         ι)
 
     val (left, right, leftField, rightField) =
-      (left0.js, right0.js) match {
+      (left0.keys.map(HasThis.unapply).sequence, right0.keys.map(HasThis.unapply).sequence) match {
         case (Some(js), _)
             if preferMapReduce(left0.src) && !preferMapReduce(right0.src) =>
           (wbReduce(right0.src, right0.keys, rightField0, leftField0),

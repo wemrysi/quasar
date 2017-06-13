@@ -21,14 +21,13 @@ import quasar.common.{JoinType, PhaseResultT}
 import quasar.connector.PlannerErrT
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
-import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
+import quasar.qscript, qscript.{MapFuncs => mfs, _}
 
 import matryoshka._
 import matryoshka.data._
@@ -73,15 +72,9 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
   }
 
   object KeyMetaId {
-    def unapply(mf: FreeMap[T]): Boolean = mf match {
-      case Embed(StaticArray(v :: Nil)) => v.resume match {
-        case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
-          case _                                                                       => false
-        }
-        case v => false
-      }
-      case _ => false
+    def unapply(mf: FreeMap[T]): Boolean = mf.resume match {
+      case -\/(mfs.ProjectField(Embed(CoEnv(\/-(mfs.Meta(_)))), mfs.StrLit("id"))) => true
+      case _                                                                       => false
     }
   }
 
@@ -123,7 +116,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
     case EquiJoin(
         Embed(Unreferenced()),
         lBranch, BranchCollection(rCol),
-        lKey, KeyMetaId(),
+        List((lKey, KeyMetaId())),
         joinType, combine) =>
       joinType match {
         case JoinType.Inner     =>
@@ -136,7 +129,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: ContextRe
     case EquiJoin(
         Embed(Unreferenced()),
         BranchCollection(lCol), rBranch,
-        KeyMetaId(), rKey,
+        List((KeyMetaId(), rKey)),
         joinType, combine) =>
       joinType match {
         case JoinType.Inner     =>

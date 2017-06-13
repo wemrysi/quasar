@@ -562,25 +562,25 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
           val branched: Option[EquiJoin[T[F]]] = makeBranched(
             ej.lBranch, ej.rBranch)(
             ifNeq(freeQC))(
-            EquiJoin(ej.src, _, _, ej.lKey, ej.rKey, ej.f, ej.combine))
+            EquiJoin(ej.src, _, _, ej.key, ej.f, ej.combine))
 
           val qct = Inject[QScriptCore, QScriptTotal]
 
           def coalesceBranchMaps(ej: EquiJoin[T[F]]): Option[EquiJoin[T[F]]] = {
-            def coalesceSide(branch: FreeQS, key: FreeMap, side: JoinSide):
-                Option[(FreeQS, FreeMap, JoinFunc)] =
+            def coalesceSide(branch: FreeQS, key: List[FreeMap], side: JoinSide):
+                Option[(FreeQS, List[FreeMap], JoinFunc)] =
               branch.project.run.map(qct.prj) match {
-                case \/-(Some(Map(innerSrc, mf))) => (innerSrc, key >> mf, mf.as(side)).some
+                case \/-(Some(Map(innerSrc, mf))) => (innerSrc, key ∘ (_ >> mf), mf.as(side)).some
                 case _ => none
               }
 
-            (coalesceSide(ej.lBranch, ej.lKey, LeftSide) |@| coalesceSide(ej.rBranch, ej.rKey, RightSide)) {
+            (coalesceSide(ej.lBranch, ej.key ∘ (_._1), LeftSide) |@| coalesceSide(ej.rBranch, ej.key ∘ (_._2), RightSide)) {
               case ((lSrc, lKey, lComb), (rSrc, rKey, rComb)) =>
                 val combine = ej.combine >>= {
                   case LeftSide => lComb
                   case RightSide => rComb
                 }
-                EquiJoin(ej.src, lSrc, rSrc, lKey, rKey, ej.f, combine)
+                EquiJoin(ej.src, lSrc, rSrc, lKey zip rKey, ej.f, combine)
             }
           }
           coalesceBranchMaps(branched.getOrElse(ej)) orElse branched
@@ -592,7 +592,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         ej => makeBranched(
           ej.lBranch, ej.rBranch)(
           ifNeq(freeSR))(
-          EquiJoin(ej.src, _, _, ej.lKey, ej.rKey, ej.f, ej.combine))
+          EquiJoin(ej.src, _, _, ej.key, ej.f, ej.combine))
 
       def coalesceEJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
@@ -600,7 +600,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         ej => makeBranched(
           ej.lBranch, ej.rBranch)(
           ifNeq(freeEJ))((l, r) =>
-          EJ.inj(EquiJoin(ej.src, l, r, ej.lKey, ej.rKey, ej.f, ej.combine)))
+          EJ.inj(EquiJoin(ej.src, l, r, ej.key, ej.f, ej.combine)))
 
       def coalesceTJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
@@ -608,7 +608,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         ej => makeBranched(
           ej.lBranch, ej.rBranch)(
           ifNeq(freeTJ))((l, r) =>
-          EJ.inj(EquiJoin(ej.src, l, r, ej.lKey, ej.rKey, ej.f, ej.combine)))
+          EJ.inj(EquiJoin(ej.src, l, r, ej.key, ej.f, ej.combine)))
     }
 }
 

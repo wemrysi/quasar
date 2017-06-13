@@ -1005,24 +1005,24 @@ object MongoDbPlanner {
             ev2: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) =
           qs =>
-        // FIXME: we should take advantage of the already merged srcs
         (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.lBranch, qs.src) ⊛
           rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src))(
-          (lb, rb) =>
-          (handleFreeMap[T, M, EX](funcHandler, qs.lKey) ⊛
-            handleFreeMap[T, M, EX](funcHandler, qs.rKey) ⊛
-            getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
-            getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
-            (lk, rk, lj, rj) =>
-            liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-              // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
-              LogicalPlan.funcFromJoinType(qs.f),
-              JoinSource(lb, List(lk), lj.map(List(_))),
-              JoinSource(rb, List(rk), rj.map(List(_))))) >>=
-              (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
-                case LeftSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("left")))
-                case RightSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("right")))
-              }))).join).join
+          (lb, rb) => {
+            val (lKey, rKey) = Unzip[List].unzip(qs.key)
+
+            (lKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              rKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)))(
+              (lk, rk) =>
+              liftM[M, WorkflowBuilder[WF]](joinHandler.run(
+                // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
+                LogicalPlan.funcFromJoinType(qs.f),
+                JoinSource(lb, lk),
+                JoinSource(rb, rk))) >>=
+                (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
+                  case LeftSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("left")))
+                  case RightSide => Free.roll(MapFuncs.ProjectField(HoleF, MapFuncs.StrLit("right")))
+                }))).join
+          }).join
       }
 
     implicit def coproduct[T[_[_]], F[_], G[_]](

@@ -101,19 +101,27 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     }
 
   def EquiJoin = make(
-    λ[EquiJoin ~> (Option ∘ EquiJoin)#λ](ej =>
-      (freeTCEq(ej.lBranch), freeTCEq(ej.rBranch), freeMFEq(ej.lKey), freeMFEq(ej.rKey), freeMFEq(ej.combine)) match {
-        case (None, None, None, None, None) => None
-        case (lBranchNorm, rBranchNorm, lKeyNorm, rKeyNorm, combineNorm) =>
+    λ[EquiJoin ~> (Option ∘ EquiJoin)#λ](ej => {
+      val keyOpt: List[(Option[FreeMap], Option[FreeMap])] =
+        ej.key ∘ (_.bimap(freeMFEq[Hole], freeMFEq[Hole]))
+
+      val keyNormOpt: Option[List[(FreeMap, FreeMap)]] =
+        keyOpt.exists(p => p._1.nonEmpty || p._2.nonEmpty).option(
+          Zip[List].zipWith(keyOpt, ej.key)((p1, p2) =>
+            (p1._1.getOrElse(p2._1), p1._2.getOrElse(p2._2))))
+
+      (freeTCEq(ej.lBranch), freeTCEq(ej.rBranch), keyNormOpt, freeMFEq(ej.combine)) match {
+        case (None, None, None, None) => None
+        case (lBranchNorm, rBranchNorm, keyNorm, combineNorm) =>
           quasar.qscript.EquiJoin(
             ej.src,
             lBranchNorm.getOrElse(ej.lBranch),
             rBranchNorm.getOrElse(ej.rBranch),
-            lKeyNorm.getOrElse(ej.lKey),
-            rKeyNorm.getOrElse(ej.rKey),
+            keyNorm.getOrElse(ej.key),
             ej.f,
             combineNorm.getOrElse(ej.combine)).some
-      }))
+      }
+    }))
 
   def ThetaJoin = make(
     λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj =>
@@ -146,6 +154,8 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     make(λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
       case Reduce(src, bucket, reducers, repair) => {
         val reducersOpt: List[Option[ReduceFunc[FreeMap]]] =
+          // FIXME: This shouldn’t use `traverse` because it does the wrong
+          //        thing on UnshiftMap.
           reducers.map(_.traverse(freeMFEq[Hole](_)))
 
         val reducersNormOpt: Option[List[ReduceFunc[FreeMap]]] =
