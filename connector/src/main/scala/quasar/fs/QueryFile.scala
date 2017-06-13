@@ -49,7 +49,7 @@ object QueryFile {
   }
 
   def convertAndNormalize
-    [T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT, QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (eval: QS[T[QS]] => QS[T[QS]])
     (implicit
@@ -75,7 +75,7 @@ object QueryFile {
   }
 
   def simplifyAndNormalize
-    [T[_[_]]: BirecursiveT: OrderT: EqualT: ShowT,
+    [T[_[_]]: BirecursiveT: EqualT: ShowT,
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
     (implicit
@@ -113,7 +113,7 @@ object QueryFile {
     * LogicalPlan no longer needs to be exposed.
     */
   def convertToQScript
-    [T[_[_]]: BirecursiveT: OrderT: EqualT: RenderTreeT: ShowT, QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (implicit
       CQ: Coalesce.Aux[T, QS, QS],
@@ -140,7 +140,7 @@ object QueryFile {
   }
 
   def convertToQScriptRead
-    [T[_[_]]: BirecursiveT: OrderT: EqualT: RenderTreeT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
@@ -283,6 +283,12 @@ object QueryFile {
       }
     }
 
+    def first(plan: Fix[LogicalPlan]): ExecM[Option[Data]] = for {
+      h  <- unsafe.eval(plan)
+      vs <- hoistToExec(unsafe.more(h))
+      _  <- toExec(unsafe.close(h))
+    } yield vs.headOption
+
     /** Returns a stream of data resulting from evaluating the given
       * `LogicalPlan`.
       *
@@ -411,6 +417,9 @@ object QueryFile {
 
     val toCompExec: F ~> CompExecM =
       execToCompExec compose toExec
+
+    val dropPhases: ExecM ~> FileSystemErrT[F, ?] =
+      Hoist[FileSystemErrT].hoist(λ[PhaseResultT[F, ?] ~> F](_.value))
   }
 
   object Transforms {

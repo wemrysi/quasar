@@ -16,7 +16,7 @@
 
 package quasar
 
-import quasar.ejson.{Common, EJson, Extension}
+import quasar.ejson.{BinaryTag, Common, EJson, Extension, SizeKey, TypeKey}
 import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.fp._
@@ -262,11 +262,11 @@ object Data {
 
   object EJsonType {
     def apply(typ: String): Data =
-      Data.Obj(ListMap("_ejson.type" -> Data.Str(typ)))
+      Data.Obj(ListMap(TypeKey -> Data.Str(typ)))
 
     def unapply(data: Data) = data match {
       case Data.Obj(map) =>
-        map.get("_ejson.type") >>= {
+        map.get(TypeKey) >>= {
           case Data.Str(str) => str.some
           case _             => None
         }
@@ -277,12 +277,12 @@ object Data {
   object EJsonTypeSize {
     def apply(typ: String, size: BigInt): Data =
       Obj(ListMap(
-        "_ejson.type" -> Data.Str(typ),
-        "_ejson.size" -> Data.Int(size)))
+        TypeKey -> Data.Str(typ),
+        SizeKey -> Data.Int(size)))
 
     def unapply(data: Data) = data match {
       case Data.Obj(map) =>
-        ((map.get("_ejson.type") ⊛ map.get("_ejson.size")) {
+        ((map.get(TypeKey) ⊛ map.get(SizeKey)) {
           case (Data.Str(str), Data.Int(size)) => (str, size).some
           case _                               => None
         }).join
@@ -307,7 +307,7 @@ object Data {
   val fromExtension: Algebra[Extension, Data] = {
     case ejson.Meta(value, meta) => (meta, value) match {
       case (EJsonType("_bson.oid"), Data.Str(oid)) => Data.Id(oid)
-      case (EJsonTypeSize("_ejson.binary", size), Data.Str(data)) =>
+      case (EJsonTypeSize(BinaryTag, size), Data.Str(data)) =>
         if (size.isValidInt)
           ejson.z85.decode(data).fold[Data](
             Data.NA)(
@@ -409,7 +409,7 @@ object Data {
       case Binary(value)    =>
         E.inj(ejson.Meta(
           Str(ejson.z85.encode(ByteVector.view(value.toArray))),
-          EJsonTypeSize("_ejson.binary", value.size))).right
+          EJsonTypeSize(BinaryTag, value.size))).right
       case Id(value)        =>
         // FIXME: This evilly guesses the backend-specific OID formats
         E.inj(ejson.Meta(Str(value), EJsonType("_bson.oid"))).right

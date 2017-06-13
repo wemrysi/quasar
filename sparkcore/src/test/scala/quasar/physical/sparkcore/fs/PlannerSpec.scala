@@ -27,6 +27,9 @@ import quasar.Data
 import quasar.qscript._
 import quasar.sql.JoinDir
 
+
+import java.math.MathContext
+
 import matryoshka.{Hole => _, _}
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -303,6 +306,27 @@ class PlannerSpec
                   results.toList must contain(exactly(Data._dec(1.71), Data._dec(1.23)))
               })
             }
+          }
+
+          "bugfix: calculate even if Data.Dec has BigDecimal with precision 0" in {
+            withSpark { sc =>
+              // given avg height is 10.(3)
+              val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+              val src: RDD[Data] = sc.parallelize(List(
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(3,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(4,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
+                Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(3,MathContext.UNLIMITED))),("country" -> Data.Str("Poland"))))
+              ))
+              // when avg is calcualted
+              def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
+              def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.some))
+              val reduce = Reduce(src, bucket, reducers, repair)
+              val program: SparkState[RDD[Data]] = compile(reduce)
+              program.eval(sc).run
+              // then nof ArithmeticException is thrown
+            }
+            ok
           }
         }
       }

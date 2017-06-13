@@ -21,6 +21,7 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson, ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}

@@ -96,8 +96,9 @@ package object hdfs {
     }
 
     val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
-      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
-    ) 
+      uri.params.get("hdfsUrl").map(url => URLDecoder.decode(url, "UTF-8")).fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
     val rootPathOrErr: DefinitionError \/ ADir =
       uriOrErr
         .flatMap(uri =>
@@ -166,17 +167,23 @@ package object hdfs {
     ))
   }
 
+  def generateHdfsFS(sfsConf: SparkFSConf): Task[HdfsFileSystem] = for {
+    fs <- Task.delay {
+      val conf = new Configuration()
+      conf.setBoolean("fs.hdfs.impl.disable.cache", true)
+      HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
+    }
+    uriStr = fs.getUri().toASCIIString()
+    _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
+  } yield fs
+
   val fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) = (sparkFsConf: SparkFSConf) => {
 
     def hdfsPathStr: AFile => Task[String] = (afile: AFile) => Task.delay {
       sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
     }
 
-    def fileSystem: Task[HdfsFileSystem] = Task.delay {
-      val conf = new Configuration()
-      conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-      HdfsFileSystem.get(new URI(sparkFsConf.hdfsUriStr), conf)
-    }
+    val fileSystem = generateHdfsFS(sparkFsConf)
 
     interpretFileSystem(
       corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),

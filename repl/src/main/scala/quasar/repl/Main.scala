@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main._, metastore._
+import quasar.main._, config._, metastore._
 import quasar.metastore.{MetaStoreAccess, Schema}
 
 import doobie.syntax.connectionio._
@@ -52,42 +52,48 @@ object Main {
   type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
-  private def driver(f: Command => Free[DriverEff, Unit], e: Task[Unit]): Task[Unit] = Task.delay {
-    val console =
-      new Console(new SettingsBuilder()
-        .parseOperators(false)
-        .enableExport(false)
-        .interruptHook(new InterruptHook {
-          def handleInterrupt(console: Console, action: Action) = {
-            console.getShell.out.println("exit")
-            e.unsafePerformSync
-            console.stop
+  private def driver(f: Command => Free[DriverEff, Unit], e: Task[Unit]): Task[Unit] = {
+    def shutdownConsole(c: Console): Task[Unit] =
+      Task.delay(c.getShell.out.println("Exiting...")) >>
+      e.attempt                                        >>
+      Task.delay(c.stop)
+
+    Task delay {
+      val console =
+        new Console(new SettingsBuilder()
+          .parseOperators(false)
+          .enableExport(false)
+          .interruptHook(new InterruptHook {
+            def handleInterrupt(console: Console, action: Action) =
+              shutdownConsole(console).unsafePerformSync
+          })
+          .create())
+
+      console.setPrompt(new Prompt("💪 $ "))
+
+      val i: DriverEff ~> MainTask =
+        Failure.toError[MainTask, String]                  :+:
+        liftMT[Task, MainErrT].compose(consoleIO(console)) :+:
+        liftMT[Task, MainErrT]
+
+      console.setConsoleCallback(new AeshConsoleCallback() {
+        override def execute(input: ConsoleOperation): Int = {
+          Command.parse(input.getBuffer.trim) match {
+            case Command.Exit =>
+              shutdownConsole(console).unsafePerformSync
+
+            case command      =>
+              f(command).foldMap(i).run.unsafePerformSync.valueOr(
+                err => console.getShell.out.println("Quasar error: " + err))
           }
-        })
-        .create())
-    console.setPrompt(new Prompt("💪 $ "))
-
-    val i: DriverEff ~> MainTask =
-      Failure.toError[MainTask, String]                  :+:
-      liftMT[Task, MainErrT].compose(consoleIO(console)) :+:
-      liftMT[Task, MainErrT]
-
-    console.setConsoleCallback(new AeshConsoleCallback() {
-      override def execute(input: ConsoleOperation): Int = {
-        Command.parse(input.getBuffer.trim) match {
-          case Command.Exit =>
-            console.stop()
-          case command      =>
-            f(command).foldMap(i).run.unsafePerformSync.valueOr(
-              err => console.getShell.out.println("Quasar error: " + err))
+          0
         }
-        0
-      }
-    })
+      })
 
-    console.start()
+      console.start()
 
-    ()
+      ()
+    }
   }
 
   type ReplEff[S[_], A] = (
@@ -160,9 +166,7 @@ object Main {
                    FsPath.parseSystemFile(cfg)
                      .toRight(s"Invalid path to config file: $cfg.")
                      .map(some))
-      cfg     <- cfgPath.cata(
-                   cfgOpsCore.fromFile, cfgOpsCore.fromDefaultPaths
-                 ).leftMap(_.shows)
+      cfg     <- loadConfigFile[CoreConfig](cfgPath).liftM[MainErrT]
       msCfg   <- cfg.metastore.cata(
                    Task.now, MetaStoreConfig.configOps.default
                  ).liftM[MainErrT]

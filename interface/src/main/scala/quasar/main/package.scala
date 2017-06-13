@@ -17,17 +17,17 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.config.{ConfigOps, FsFile}
+import quasar.config.{ConfigOps, FsFile, ConfigError}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.db.Schema
-import quasar.fp._
+import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._
+import quasar.physical._, couchbase.Couchbase
 
 import scala.util.control.NonFatal
 
@@ -51,15 +51,16 @@ package object main {
 
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
-    couchbase.fs.definition[PhysFsEff],
-    marklogic.fs.definition(
+    Couchbase.definition translate injectFT[Task, PhysFsEff],
+    marklogic.MarkLogic(
       readChunkSize  = 10000L,
-      writeChunkSize =  1000L
-    ) translate injectFT[Task, PhysFsEff],
+      writeChunkSize = 10000L
+    ).definition translate injectFT[Task, PhysFsEff],
     mongodb.fs.definition[PhysFsEff],
     mongodb.fs.qscriptDefinition[PhysFsEff],
     postgresql.fs.definition[PhysFsEff],
-    skeleton.fs.definition[PhysFsEff],
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
+    mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.elastic.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
@@ -85,11 +86,11 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Module :\: Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
-      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
     )(
       implicit
       S0: Task :<: S,
@@ -100,17 +101,18 @@ package object main {
       S5: FileSystemFailure :<: S,
       S6: Module.Failure    :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
-      def moduleInter(fs: FileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
-        val wtv: Coproduct[Mounting, FileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
-        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+      def moduleInter(fs: AnalyticalFileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
+        val wtv: Coproduct[Mounting, AnalyticalFileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
+        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, AnalyticalFileSystem, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
         moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
-        (compFs compose Inject[QueryFile, FileSystem])  :+:
-        (compFs compose Inject[ReadFile, FileSystem])   :+:
-        (compFs compose Inject[WriteFile, FileSystem])  :+:
-        (compFs compose Inject[ManageFile, FileSystem]) :+:
+        (compFs compose Inject[Analyze, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[QueryFile, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[ReadFile, AnalyticalFileSystem])   :+:
+        (compFs compose Inject[WriteFile, AnalyticalFileSystem])  :+:
+        (compFs compose Inject[ManageFile, AnalyticalFileSystem]) :+:
         injectFT[Module.Failure, S]                     :+:
         injectFT[PathMismatchFailure, S]                :+:
         injectFT[MountingFailure, S]                    :+:
@@ -144,21 +146,21 @@ package object main {
       *       for more flexible production of interpreters.
       */
     def interpreter[S[_]](
-      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
     )(implicit
       S0: Task :<: S,
       S1: PhysErr :<: S,
       S2: Mounting :<: S,
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S
-    ): Task[FileSystem ~> Free[S, ?]] =
+    ): Task[AnalyticalFileSystem ~> Free[S, ?]] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
         seqRef     <- TaskRef(startSeq)
         viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
         mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
       } yield {
-        val hierarchicalFs: FileSystem ~> Free[S, ?] =
+        val hierarchicalFs: AnalyticalFileSystem ~> Free[S, ?] =
           HierarchicalFsEff.dynamicFileSystem(
             hfsRef,
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
@@ -169,7 +171,7 @@ package object main {
           :\: Mounting
           :\: MountingFailure
           :\: PathMismatchFailure
-          :/: FileSystem
+          :/: AnalyticalFileSystem
         )#M[A]
 
         val compFs: V ~> Free[S, ?] =
@@ -180,7 +182,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose flatMapSNT(transformIn[FileSystem, V, Free[V, ?]](module.fileSystem[V], liftFT)) compose view.fileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[AnalyticalFileSystem, V, Free[V, ?]](module.analyticalFileSystem[V], liftFT)) compose view.analyticalFileSystem[V]
       }
   }
 
@@ -209,13 +211,13 @@ package object main {
       * time as the ref is updated.
       */
     def dynamicFileSystem[S[_]](
-      ref: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      ref: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       hfs: HierarchicalFsEff ~> Free[S, ?]
     )(implicit
       S: Task :<: S
-    ): FileSystem ~> Free[S, ?] =
-      new (FileSystem ~> Free[S, ?]) {
-        def apply[A](fs: FileSystem[A]) =
+    ): AnalyticalFileSystem ~> Free[S, ?] =
+      new (AnalyticalFileSystem ~> Free[S, ?]) {
+        def apply[A](fs: AnalyticalFileSystem[A]) =
           lift(ref.read.map(free.foldMapNT(hfs) compose _))
             .into[S]
             .flatMap(_ apply fs)
@@ -231,13 +233,10 @@ package object main {
       S0 :+: S1
 
     /** Replace non-fatal failed `Task`s with a PhysicalError. */
-    def reifyNonFatalErrors[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): S ~> Free[S, ?] = {
-      val handle = λ[Task ~> Free[S, ?]](t => Free.roll(S0(t map (_.point[Free[S, ?]]) handle {
+    def reifyNonFatalErrors[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): Task ~> Free[S, ?] =
+      λ[Task ~> Free[S, ?]](t => Free.roll(S0(t map (_.point[Free[S, ?]]) handle {
         case NonFatal(ex: Exception) => Failure.Ops[PhysicalError, S].fail(unhandledFSError(ex))
       })))
-
-      transformIn(handle, liftFT[S])
-    }
   }
 
 
@@ -247,7 +246,9 @@ package object main {
     * filesystem whenever a mount is added or removed.
     */
   val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
-    physicalFileSystems translate flatMapSNT(PhysFsEff.reifyNonFatalErrors[PhysFsEff]))
+    physicalFileSystems translate flatMapSNT(
+      PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+
   import mountHandler.HierarchicalFsRef
 
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
@@ -259,7 +260,7 @@ package object main {
 
   object MountEff {
     def interpreter[S[_]](
-      hrchRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      hrchRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: Task :<: S,
@@ -293,7 +294,7 @@ package object main {
       */
     def interpreter[F[_], S[_]](
       cfgsImpl: MountConfigs ~> F,
-      hrchFsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      hrchFsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
       mntdFsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: F :<: S,
@@ -368,8 +369,10 @@ package object main {
     schema: Schema[A], tx: Transactor[Task], cfgFile: Option[FsFile]
   ): MainTask[Unit] =
     for {
-      j  <- ConfigOps.jsonFromFile(cfgFile).leftMap(_.shows)
+      j  <- EitherT(ConfigOps.jsonFromFile(cfgFile).fold(
+              e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
+              _.some.right))
       jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
-      _  <- EitherT.right(ConfigOps.jsonToFile(jʹ, cfgFile))
+      _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

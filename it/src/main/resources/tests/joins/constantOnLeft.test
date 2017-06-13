@@ -10,6 +10,9 @@
         "postgresql":        "pending"
     },
 
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
     "data": ["../smallZips.data", "../zips.data"],
 
     "query": "select smallZips.city, zips.state from `../smallZips`, `../zips`

@@ -18,6 +18,7 @@ package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar._
+import quasar.common.JoinType
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
@@ -136,6 +137,16 @@ final class Optimizer[T: Equal]
     case _ => None
   }
 
+  // TODO delete this when old mongo is deleted
+  val reconstructOldJoins: Algebra[LP, T] = {
+    case JoinSideName(name) => lpr.free(name)
+    case Join(left, right, tpe, JoinCondition(lName, rName, cond)) =>
+      lpr.let(lName, left,
+        lpr.let(rName, right,
+          lpr.invoke3(LP.funcFromJoinType(tpe), lpr.free(lName), lpr.free(rName), cond)))
+    case lp => lp.embed
+  }
+
   val namesƒ: Algebra[LP, Set[Symbol]] = {
     case Free(name) => Set(name)
     case x          => x.fold
@@ -168,7 +179,7 @@ final class Optimizer[T: Equal]
     case InvokeUnapply(Take, Sized(src, _)) => src._2
     case InvokeUnapply(Drop, Sized(src, _)) => src._2
     case InvokeUnapply(Filter, Sized(src, _)) => src._2
-    case InvokeUnapply(InnerJoin | LeftOuterJoin | RightOuterJoin | FullOuterJoin, _) =>
+    case Join(_, _, _, _) =>
       Some(List(JoinDir.Left.const, JoinDir.Right.const))
     case InvokeUnapply(GroupBy, Sized(src, _)) => src._2
     case InvokeUnapply(Distinct, Sized(src, _)) => src._2
@@ -293,11 +304,13 @@ final class Optimizer[T: Equal]
       val neithers = comps.collect { case c @ NeitherCond(_) => c }
 
       for {
-        lName  <- freshName("leftSrc")
-        lFName <- freshName("left")
-        rName  <- freshName("rightSrc")
-        rFName <- freshName("right")
-        jName  <- freshName("joined")
+        lName     <- freshName("leftSrc")
+        rName     <- freshName("rightSrc")
+        lJoinName <- freshName("leftJoin")
+        rJoinName <- freshName("rightJoin")
+        lFName    <- freshName("left")
+        rFName    <- freshName("right")
+        jName     <- freshName("joined")
       } yield {
         // NB: simplifying eagerly to make matching easier up the tree
         simplify(
@@ -308,8 +321,8 @@ final class Optimizer[T: Equal]
                 lpr.let(rFName,
                   Filter(lpr.free(rName), assembleCond(rights.map(_.run0(lpr.free(rName))))).embed,
                   lpr.let(jName,
-                    InnerJoin(lpr.free(lFName), lpr.free(rFName),
-                      assembleCond(equis.map(_.run(lpr.free(lFName), lpr.free(rFName))))).embed,
+                    Join(lpr.free(lFName), lpr.free(rFName), JoinType.Inner,
+                      JoinCondition(lJoinName, rJoinName, assembleCond(equis.map(_.run(lpr.joinSideName(lJoinName), lpr.joinSideName(rJoinName)))))).embed,
                     Filter(lpr.free(jName), assembleCond(
                       others.map(_.run0(JoinDir.Left.projectFrom(lpr.free(jName)), JoinDir.Right.projectFrom(lpr.free(jName)))) ++
                       neithers.map(_.run0))).embed))))))
@@ -318,18 +331,18 @@ final class Optimizer[T: Equal]
 
 
     node match {
-      case InvokeUnapply(Filter, Sized((src, Embed(InvokeUnapply(InnerJoin, Sized(joinL, joinR, joinCond0)))), (cond0, _))) =>
-        val joinCond = joinCond0.transCata[T](orOriginal(elideLets)) // TODO unduplicate
+      case InvokeUnapply(Filter, Sized((src, Embed(Join(joinL, joinR, JoinType.Inner, JoinCondition(lName, rName, joinCond0)))), (cond0, _))) =>
+        val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
         val cond = cond0.transCata[T](orOriginal(elideLets))
         val comps =
-          flattenAnd(joinCond).traverse(toComp(joinL, joinR)).bifoldMap(ι)(ι) ++
+          flattenAnd(joinCond).traverse(toComp(lpr.joinSideName(lName), lpr.joinSideName(rName))).bifoldMap(ι)(ι) ++
           flattenAnd(cond).traverse(toComp(
             JoinDir.Left.projectFrom(src),
             JoinDir.Right.projectFrom(src))).bifoldMap(ι)(ι)
         newJoin(joinL, joinR, comps)
-      case InvokeUnapply(InnerJoin, Sized((srcL, _), (srcR, _), (_, joinCond0))) =>
+      case Join((srcL, _), (srcR, _), JoinType.Inner, JoinCondition(lName, rName, (_, joinCond0))) =>
         val joinCond = joinCond0.transCata[T](orOriginal(elideLets))
-        newJoin(srcL, srcR, flattenAnd(joinCond).traverse(toComp(srcL, srcR)(_)).bifoldMap(ι)(ι))
+        newJoin(srcL, srcR, flattenAnd(joinCond).traverse(toComp(lpr.joinSideName(lName), lpr.joinSideName(rName))(_)).bifoldMap(ι)(ι))
       case _ => State.state(node.map(preserveFree).embed)
     }
   }

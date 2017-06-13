@@ -26,17 +26,21 @@ import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.api.PathUtils._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.effect.KeyValueStore
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.InMemory._
 import quasar.fs.mount._
+import quasar.fs.mount.Fixture.runConstantMount
 import quasar.fs.mount.module.Module
 import quasar.sql._
 import quasar.sql.fixpoint._
 
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
+import shapeless.tag.@@
 import org.http4s.{Query, _}
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
@@ -60,32 +64,20 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
     failureResponseOr[Module.Error]      :+:
     (liftMT[Task, ResponseT] compose inter)
 
-  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
-    type MEff[A] = Coproduct[Task, MountConfigs, A]
-    TaskRef(mounts).map { configsRef =>
-
-      val mounter: Mounting ~> Free[MEff, ?] = Mounter.trivial[MEff]
-
-      val meff: MEff ~> Task =
-        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
-
-      foldMapNT(meff) compose mounter
-    }
-  }
-
   def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
-    HttpService.lift(req => (runFs(mem) |@| mountingInter(mounts)).tupled.flatMap { case (fs, mount) =>
-      val moduleInter = foldMapNT(mount :+: fs) compose Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
-      invoke.service[Eff].toHttpService(effRespOr(moduleInter)).apply(req)
+    HttpService.lift(req => runFs(mem).flatMap { fs =>
+      val module = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
+      val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
+      invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
     })
 
-  def sampleStatements(name: String, readFrom: Path[_, Path.File, Path.Sandboxed]): List[Statement[Fix[Sql]]] = {
+  def sampleStatement(name: String, readFrom: Path[_, Path.File, Path.Sandboxed]): Statement[Fix[Sql]] = {
     val selectAll = SelectR(
       SelectAll,
       List(Proj(SpliceR(None), None)),
       Some(TableRelationAST(unsandbox(readFrom), None)),
       None, None, None)
-    List(FunctionDecl(CIName(name), List(CIName("Bar")), selectAll))
+    FunctionDecl(CIName(name), List(CIName("Bar")), selectAll)
   }
 
   def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
@@ -103,17 +95,18 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
         response.as[ApiError].unsafePerformSync must beApiErrorLike[Module.Error](
           Module.Error.FSError(pathErr(pathNotFound(file))))
       }
-      "produce a 400 bad request if path is a directory instead of a file" >> prop { (file: AFile, sampleData: Vector[Data]) =>
-        val state = InMemState.fromFiles(Map(file -> sampleData))
-        val response = service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
-        response.status must_= Status.BadRequest
-        response.as[ApiError].unsafePerformSync must_=
-          apiError(BadRequest withReason "Path must be a file")
-      }
+      "produce a 400 bad request if path is a directory instead of a file" >>
+        prop { (file: AFile, sampleData: Vector[Data]) =>
+          val state = InMemState.fromFiles(Map(file -> sampleData))
+          val response = service(state)(Request(uri = pathUri(fileParent(file)))).unsafePerformSync
+          response.status must_= Status.BadRequest
+          response.as[ApiError].unsafePerformSync must_=
+            apiError(BadRequest withReason "Path must be a file")
+        }
       "produce a 400 bad request if not all params are supplied with explanation of " +
       "which function parameters are missing from the query string" >>
         prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
-          val statements = sampleStatements(fileName(functionFile).value, dataFile)
+          val statements = List(sampleStatement(fileName(functionFile).value, dataFile))
           val mounts = Map((fileParent(functionFile): APath) -> MountConfig.moduleConfig(statements))
           val state = InMemState.fromFiles(Map(dataFile -> sampleData))
           val response = service(state, mounts)(Request(uri = pathUri(functionFile))).unsafePerformSync
@@ -124,7 +117,7 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
       "return evaluation of sql statement contained within function body if all params are supplied" >> {
         "in straightforward case" >>
           prop { (functionFile: AFile, dataFile: AFile, sampleData: Vector[Data]) =>
-            val statements = sampleStatements(fileName(functionFile).value, dataFile)
+            val statements = List(sampleStatement(fileName(functionFile).value, dataFile))
             val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
             val state = InMemState.fromFiles(Map(dataFile -> sampleData))
             val request = Request(uri = pathUri(functionFile).copy(query = Query.fromPairs("bar" -> "2")))
@@ -133,7 +126,7 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
           }
         "if file in module function is relative" >>
           prop { (functionFile: AFile, rDataFile: RFile, sampleData: Vector[Data]) =>
-            val statements = sampleStatements(fileName(functionFile).value, rDataFile)
+            val statements = List(sampleStatement(fileName(functionFile).value, rDataFile))
             val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
             val dataFile = fileParent(functionFile) </> rDataFile
             val state = InMemState.fromFiles(Map(dataFile -> sampleData))
@@ -141,6 +134,21 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
           }
+      }
+      "support offset and limit" >> {
+        prop { (functionFile: AFile,
+                dataFile: AFile,
+                sampleData: Vector[Data],
+                offset: Int @@ NonNegative,
+                limit: Int @@ RPositive) =>
+          val statements = List(sampleStatement(fileName(functionFile).value, dataFile))
+          val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
+          val state = InMemState.fromFiles(Map(dataFile -> sampleData))
+          val request = Request(uri = pathUri(functionFile).copy(
+            query = Query.fromPairs("bar" -> "2", "offset" -> offset.toString, "limit" -> limit.toString)))
+          val response = service(state, mounts)(request).unsafePerformSync
+          isExpectedResponse(sampleData.drop(offset).take(limit), response, MessageFormat.Default)
+        }
       }
     }
   }
