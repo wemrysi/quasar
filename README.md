@@ -123,13 +123,31 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
+
+Once you have a running metastore you can start the web api service with [these](#web-jar) instructions and issue curl commands 
+of the following format to create new mount points.
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol://><uri>" } }'
+```
+The `<mountPath>` is the name of your mount point and the remaining parameters are listed below:
+
+| mountKey        | protocol         | uri                                    |
+|-----------------|------------------|----------------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#hdfs-using-apache-spark) |
+| `spark-local`   | `spark_local=`   | [Spark](#hdfs-using-apache-spark)      |
+
+See [here](#get-mountfspath) for more details on the mount web api service.
+
+For example, to create a couchbase mount point, issue a `curl` command like:
 
 ```bash
 curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
 ```
-
-You can find examples of `connectionUri` values [here](#database-mounts).
 
 #### Web JAR
 
