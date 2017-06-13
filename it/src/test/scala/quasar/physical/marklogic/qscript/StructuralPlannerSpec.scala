@@ -199,13 +199,12 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
         val obj = Data._obj(testCase.obj)
         val expectedObj = testCase.obj - testCase.key
 
-        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectDelete).join) must resultIn(
-          Data._obj(expectedObj))
+        evalF(lit(obj) >>= (SP.objectDelete(_, testCase.key.xs))) must resultIn(Data._obj(expectedObj))
       }
 
       "identity when key not present in object" >> prop { testCase: WithoutKeyTestCase =>
         val obj = Data._obj(testCase.obj)
-        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectDelete).join) must resultIn(obj)
+        evalF(lit(obj) >>= (SP.objectDelete(_, testCase.key.xs))) must resultIn(obj)
       }
 
       "identity on empty object" >> {
