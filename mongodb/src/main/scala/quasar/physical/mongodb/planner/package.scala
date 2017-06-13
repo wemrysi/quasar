@@ -21,6 +21,5 @@ import slamdata.Predef._
 import scalaz._
 
 package object planner {
-
   type OptionFree[F[_], A] = Option[Free[F, A]]
 }

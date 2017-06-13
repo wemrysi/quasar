@@ -24,7 +24,7 @@ import quasar.qscript.{Coalesce => _, MapFuncsDerived => D, _}, MapFuncsCore._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-//import matryoshka.patterns._
+import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
 final case class FuncHandler[T[_[_]]: CorecursiveT, F[_]]
@@ -63,22 +63,17 @@ object FuncHandler {
 
   def handleUnhandled[T[_[_]]: CorecursiveT, F[_]]
     (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
-      : MapFuncDerived[T, ?] ~> OptionFree[F, ?] = derived
-        // new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
-        //   def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] =
-        //     derived(f)
-        //       .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        //         _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_))))
-        //
-        //
-        // }
-        // λ[MapFuncDerived[T, ?] ~> OptionFree[F, ?]](f =>
-        //   derived(f)
-        //     .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        //       _.run.fold(x => Free.point(x).some, core(_))))
-        //   )
+      : MapFuncDerived[T, ?] ~> OptionFree[F, ?] = //derived
+        new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
+          def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] = {
+            val alg: AlgebraM[Option, CoEnv[A, MapFuncCore[T,?], ?], Free[F,A]] =
+              _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_).map(_.join))
+            derived(f)
+              .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(alg))
+        }
+      }
 
-  def handleOpsCore[T[_[_]], EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])
+  def handleOpsCore[T[_[_]]: CorecursiveT, EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])
     (implicit inj: ExprOpCoreF :<: EX): FuncHandler[T, EX] = {
 
     implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
@@ -207,7 +202,7 @@ object FuncHandler {
     new FuncHandler[T, EX](runCore, emptyDerived)
   }
 
-  def handleOps3_0[T[_[_]]]: FuncHandler[T, ExprOp3_0F] = {
+  def handleOps3_0[T[_[_]]: CorecursiveT]: FuncHandler[T, ExprOp3_0F] = {
     implicit def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
 
     val runCore = new (MapFuncCore[T, ?] ~> OptionFree[ExprOp3_0F, ?]) {
@@ -225,7 +220,7 @@ object FuncHandler {
     new FuncHandler[T, ExprOp3_0F](runCore, emptyDerived)
   }
 
-  def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
+  def handleOps3_2[T[_[_]]: CorecursiveT]: FuncHandler[T, ExprOp3_2F] = {
     implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
 
     val runCore = new (MapFuncCore[T, ?] ~> OptionFree[ExprOp3_2F, ?]) {
@@ -276,12 +271,12 @@ object FuncHandler {
       }
     }
 
-  def handle2_6[T[_[_]]]: FuncHandler[T, Expr2_6] =
+  def handle2_6[T[_[_]]: CorecursiveT]: FuncHandler[T, Expr2_6] =
     handleOpsCore(trunc2_6[Expr2_6])
-  def handle3_0[T[_[_]]]: FuncHandler[T, Expr3_0] =
+  def handle3_0[T[_[_]]: CorecursiveT]: FuncHandler[T, Expr3_0] =
     handleOps3_0 orElse
     handleOpsCore(trunc2_6[Expr3_0])
-  def handle3_2[T[_[_]]]: FuncHandler[T, Expr3_2] =
+  def handle3_2[T[_[_]]: CorecursiveT]: FuncHandler[T, Expr3_2] =
     handleOps3_2[T].orElse[ExprOp3_0F, Expr3_2](
     handleOps3_0[T]) orElse
     handleOpsCore(trunc3_2[Expr3_2])
