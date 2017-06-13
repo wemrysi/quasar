@@ -2,7 +2,8 @@
   "name": "numeric field names",
 
   "backends": {
-    "postgresql":    "pending"
+    "mimir": "skip",
+    "postgresql": "pending"
   },
 
   "data": "smallZips.data",
