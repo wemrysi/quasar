@@ -16,14 +16,17 @@
 
 package quasar.blueeyes.json
 
+import quasar.Data
 import quasar.blueeyes._
-import quasar.precog._
+import quasar.precog.ToString
 
-import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
+import scalaz._, Scalaz._
+
+import scala.collection.immutable.ListMap
 import scala.util.Sorting.quickSort
-import java.lang.Double.isInfinite
+import scala.util.Try
 
-import JValue.{ RenderMode, Compact, Pretty, Canonical }
+import java.lang.Double.isInfinite
 
 /**
   * Data type for Json AST.
@@ -50,6 +53,34 @@ object JValue {
   case object Canonical extends RenderMode
 
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
+
+  def fromData(data: Data): JValue = data match {
+    case Data.Null => JNull
+    case Data.Str(value) => JString(value)
+    case Data.Bool(b) => JBool(b)
+    case Data.Dec(value) => JNumStr(value.toString)
+    case Data.Int(value) => JNumStr(value.toString)
+    case Data.Obj(fields) => JObject(fields.mapValues(fromData))
+    case Data.Arr(values) => JArray(values.map(fromData))
+    case Data.Set(values) => JArray(values.map(fromData))
+    case Data.Timestamp(value) => JString(value.toString)
+    case Data.Date(value) => JString(value.toString)
+    case Data.Time(value) => JString(value.toString)
+    case Data.Interval(value) => JString(value.toString)
+    case Data.Binary(values) => JArray(values.map(JNumLong(_)): _*)
+    case Data.Id(value) => JString(value)
+    case Data.NA => JUndefined
+  }
+
+  def toData(jv: JValue): Data = jv match {
+    case JUndefined => Data.NA
+    case JNull => Data.Null
+    case JBool(value) => Data.Bool(value)
+    case num: JNum => Data.Dec(num.toBigDecimal)
+    case JString(value) => Data.Str(value)
+    case JObject(fields) => Data.Obj(ListMap(fields.mapValues(toData).toSeq: _*))
+    case JArray(values) => Data.Arr(values.map(toData))
+  }
 
   private def unflattenArray(elements: Seq[(JPath, JValue)]): JArray = {
     elements.foldLeft(JArray(Nil)) { (arr, t) =>

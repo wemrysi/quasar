@@ -20,26 +20,14 @@ import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._
 import DefaultSerialization._
+import quasar.niflheim._
 
 import quasar.precog.common.Path
 import quasar.precog.common.ingest.FileContent
-import quasar.precog.common.jobs._
-import quasar.precog.common.security._
 
-//import quasar.precog.yggdrasil.nihdb._
-
-import scalaz.{NonEmptyList => NEL, _}
 import scalaz.Validation._
-import scalaz.std.list._
-import scalaz.std.stream._
-import scalaz.std.option._
-import scalaz.std.tuple._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.list._
 import scalaz.syntax.std.option._
 import scalaz.syntax.apply._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.traverse._
 
 sealed class PathData(val typeName: PathData.DataType)
 object PathData {
@@ -71,3 +59,19 @@ object PathData {
   case class BLOB(contentType: MimeType) extends DataType("blob")
   case object NIHDB extends DataType("nihdb") { val contentType = FileContent.XQuirrelData }
 }
+
+case class BlobData(data: Array[Byte], mimeType: MimeType) extends PathData(PathData.BLOB(mimeType))
+case class NIHDBData(data: Seq[NIHDB.Batch]) extends PathData(PathData.NIHDB)
+
+object NIHDBData {
+  val Empty = NIHDBData(Seq.empty)
+}
+
+sealed trait PathOp {
+  def path: Path
+}
+
+case class Read(path: Path, version: Version) extends PathOp
+case class FindChildren(path: Path) extends PathOp
+case class FindPathMetadata(path: Path) extends PathOp
+case class CurrentVersion(path: Path) extends PathOp

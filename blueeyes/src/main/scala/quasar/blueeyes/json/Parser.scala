@@ -20,7 +20,6 @@ import quasar.blueeyes._
 
 import scala.annotation.{ switch, tailrec }
 import java.lang.Integer.parseInt
-import java.nio.charset.Charset
 
 // underlying parser code adapted from jawn under MIT license.
 // (https://github.com/non/jawn)

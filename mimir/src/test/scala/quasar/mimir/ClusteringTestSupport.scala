@@ -18,7 +18,6 @@ package quasar.mimir
 
 import scala.util.Random._
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.IOUtils
 import spire.implicits._

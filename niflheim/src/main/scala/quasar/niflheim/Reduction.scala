@@ -17,11 +17,7 @@
 package quasar.niflheim
 
 import quasar.precog.BitSet
-import quasar.precog.util._
 import quasar.precog.util.BitSetUtil.Implicits._
-import quasar.precog.common._
-
-import scala.{ specialized => sepc }
 
 import scalaz._
 

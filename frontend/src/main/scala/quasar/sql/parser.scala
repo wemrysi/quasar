@@ -496,6 +496,9 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def parseBlob(blobString: String): ParsingError \/ Blob[T[Sql]] =
     parseWithParser(blobString, blob).map(_.map(normalize))
 
+  def parseModule(moduleString: String): ParsingError \/ List[Statement[T[Sql]]] =
+    parseWithParser(moduleString, statements).map(_.map(_.map(normalize)))
+
   def parseBlock(blockString: String): ParsingError \/ Block[T[Sql]] =
     parseWithParser(blockString, block).map(_.map(normalize))
 

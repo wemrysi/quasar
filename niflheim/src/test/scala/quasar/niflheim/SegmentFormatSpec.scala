@@ -19,13 +19,10 @@ package quasar.niflheim
 import quasar.precog.common._
 
 import quasar.precog.util._
-import quasar.precog.util.BitSetUtil.Implicits._
 
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck._, Prop._
-
-import scalaz._
 
 import java.time.LocalDateTime
 
@@ -36,8 +33,7 @@ class V1SegmentFormatSpec extends SegmentFormatSpec {
 class VersionedSegmentFormatSpec extends Specification with ScalaCheck with SegmentFormatSupport with SegmentFormatMatchers {
   val format = VersionedSegmentFormat(Map(
     1 -> V1SegmentFormat,
-    2 -> new StubSegmentFormat // Much faster version of segment formats.
-  ))
+    2 -> new StubSegmentFormat)) // Much faster version of segment formats.
 
   "versioned segment formats" should {
     "read older versions" in {

@@ -9,14 +9,16 @@ import slamdata.CommonDependencies
 
 object Dependencies {
   private val algebraVersion           = "0.7.0"
+  private val argonautVersion          = "6.2"
   private val disciplineVersion        = "0.5"
   private val jawnVersion              = "0.10.4"
   private val jacksonVersion           = "2.4.4"
   private val matryoshkaVersion        = "0.18.3"
   private val pathyVersion             = "0.2.9"
+  private val slamdataPredefVersion    = "0.0.4"
   private val raptureVersion           = "2.0.0-M6"
   private val scodecBitsVersion        = "1.1.0"
-  private val http4sVersion            = "0.15.9a"
+  private val http4sVersion            = "0.15.13a"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion             = "3.8.4"
@@ -27,13 +29,14 @@ object Dependencies {
     CommonDependencies.scalaz.concurrent,
     CommonDependencies.scalazStream.scalazStream,
     CommonDependencies.monocle.core,
-    "org.typelevel" %% "algebra"     % algebraVersion,
-    "org.typelevel" %% "spire"       % spireVersion,
-    CommonDependencies.argonaut.argonaut,
-    CommonDependencies.argonaut.scalaz,
+    "org.typelevel" %% "algebra"         % algebraVersion,
+    "org.typelevel" %% "spire"           % spireVersion,
+    "io.argonaut"   %% "argonaut"        % argonautVersion,
+    "io.argonaut"   %% "argonaut-scalaz" % argonautVersion,
     "com.slamdata"  %% "matryoshka-core" % matryoshkaVersion,
     "com.slamdata"  %% "pathy-core"      % pathyVersion,
     "com.slamdata"  %% "pathy-argonaut"  % pathyVersion,
+    "com.slamdata"  %% "slamdata-predef" % slamdataPredefVersion,
     CommonDependencies.refined.refined,
     CommonDependencies.shapeless.shapeless,
     CommonDependencies.scalacheck.scalacheck                  % Test,
@@ -54,7 +57,6 @@ object Dependencies {
   )
 
   def ejson = Seq(
-    CommonDependencies.argonaut.argonaut,
     "org.spire-math" %% "jawn-parser" % jawnVersion
   )
   def effect = Seq(
@@ -114,21 +116,20 @@ object Dependencies {
     "org.http4s"         %% "http4s-core" % http4sVersion
   )
 
-  def marklogicValidation = Seq(
-    CommonDependencies.refined.refined,
-    CommonDependencies.scalaz.core
-  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
+    "com.slamdata"               %% "xml-names-core"      % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5",
     CommonDependencies.refined.scalacheck                                   % Test,
-    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
+    "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.5",
     "io.reactivex"         %% "rxscala"     % "0.26.3",
-    "org.http4s"           %% "http4s-core" % http4sVersion
+    "org.http4s"           %% "http4s-core" % http4sVersion,
+    "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
@@ -145,15 +146,17 @@ object Dependencies {
   )
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % "1.7.13",
-    "org.spire-math"       %% "spire"           % "0.13.0",
+    "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
+    "org.typelevel"        %% "spire"           % spireVersion,
     "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
-    "org.quartz-scheduler" %  "quartz"          % "2.3.0"
+    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    "commons-io"           %  "commons-io"      % "2.5"
   )
   def it = Seq(
-    CommonDependencies.argonaut.monocle                         % Test,
-    CommonDependencies.http4s.blazeClient                       % Test,
-    CommonDependencies.refined.scalacheck                       % Test,
-    "io.verizon.knobs" %% "core"  % "4.0.30-scalaz-7.2"         % Test)
+    "io.argonaut"      %% "argonaut-monocle" % argonautVersion     % Test,
+    CommonDependencies.http4s.blazeClient                          % Test,
+    CommonDependencies.refined.scalacheck                          % Test,
+    "io.verizon.knobs" %% "core"             % "4.0.30-scalaz-7.2" % Test)
 }

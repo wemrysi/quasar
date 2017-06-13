@@ -104,6 +104,7 @@ lazy val assemblySettings = Seq(
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
+    case "log4j.properties" => MergeStrategy.discard
 
     case other => (assemblyMergeStrategy in assembly).value apply other
   },
@@ -114,8 +115,10 @@ lazy val assemblySettings = Seq(
     cp filter { af =>
       val file = af.data
 
-      (file.getName == "scala-library-" + scalaVersion.value + ".jar") &&
-        (file.getPath contains "org/scala-lang")
+      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.11\.\d+\.jar""")
+      val excludeByPath: Boolean = file.getPath.contains("org/scala-lang")
+
+      excludeByName && excludeByPath
     }
   }
 )
@@ -167,16 +170,19 @@ lazy val root = project.in(file("."))
 //
       ejson, js,
 //       \  /
-        common,    // -------------------------------------------------------
+        common,    // <------------------------------------------------------
 //        |    \                                                             \
-    frontend, effect,                                                       precog,
-//   |    |   |                                                               |
+    effect, frontend,                                                       precog,
+//   |       |  |  \________________________________________________________  |
                                                                            blueeyes,
+//                                                                            |
+                                                                           niflheim,
 //   |    |   |                                                               |
-    sql, connector, marklogicValidation,                                   yggdrasil, niflheim,
-//   |  /   | | \ \      |                                                    |
+    sql, connector,                                                        yggdrasil,
+//   |   /  | | \ \______ __________________________________________________  |
+//   |  /   | |  \                                                          \ |
     core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
-//      \ \ | / /
+//      \ \ | / /                                                           /
         interface,
 //        /   \
        repl,  web,
@@ -318,21 +324,12 @@ lazy val couchbase = project
   */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(connector % BothScopes, marklogicValidation)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
-
-lazy val marklogicValidation = project.in(file("marklogic-validation"))
-  .settings(name := "quasar-marklogic-validation-internal")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.marklogicValidation)
-  // TODO: Disabled until a new release of sbt-headers with exclusion is available
-  //       as we don't want our headers applied to XMLChar.java
-  //.enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
   */
@@ -402,7 +399,8 @@ lazy val interface = project
     mongodb,
     postgresql,
     sparkcore,
-    skeleton)
+    skeleton,
+    mimir)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
@@ -468,34 +466,66 @@ val headerSettings = Seq(
 import precogbuild.Build._
 
 lazy val precog = project.setup
+  .settings(name := "quasar-precog-internal")
   .dependsOn(common % BothScopes)
+  .withWarnings
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
-  .dependsOn(precog % BothScopes)
+  .settings(name := "quasar-blueeyes-internal")
+  .dependsOn(precog % BothScopes, frontend)
+  .withWarnings
+  .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val yggdrasil = project.setup
-  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
-  .settings(headerSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val mimir = project.setup.noArtifacts
+lazy val mimir = project.setup
+  .settings(name := "quasar-mimir-internal")
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
-  .scalacArgs ("-Ypartial-unification")
+  .scalacArgs("-Ypartial-unification")
+  .withWarnings
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
+
+      "co.fs2" %% "fs2-core"   % "0.9.6",
+      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val niflheim = project.setup.noArtifacts
+lazy val niflheim = project.setup
+  .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
-  .scalacArgs ("-Ypartial-unification")
+  .scalacArgs("-Ypartial-unification")
+  .withWarnings
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
-      "org.spire-math"     %% "spire"      % "0.3.0-M2",
+      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val yggdrasil = project.setup
+  .settings(name := "quasar-yggdrasil-internal")
+  .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
+  .withWarnings
+  .settings(headerSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
