@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import quasar.ejson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
@@ -44,7 +45,12 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 
       override def expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
-          case D.Abs(a) => MFC(Negate(a.point[Free[OUT,?]]))
+          case D.Abs(a) =>
+            MFC(Cond(
+              Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
+              Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
+              a.point[Free[OUT, ?]]
+            ))
         }
     }
 
