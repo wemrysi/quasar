@@ -3,49 +3,49 @@ quasar_mongodb_2_6:
   image: tutum/mongodb:2.6
   command: mongod --smallfiles
   ports:
-   - "27018:27017"
+    - "27018:27017"
 
 quasar_mongodb_3_0:
   container_name: quasar_mongodb_3_0
   image: mongo:3.0
   command: mongod --smallfiles
   ports:
-   - "27019:27017"
+    - "27019:27017"
 
 quasar_mongodb_read_only:
   container_name: quasar_mongodb_read_only
   image: mongo:3.0
   command: mongod --smallfiles
   ports:
-   - "27020:27017"
+    - "27020:27017"
 
 quasar_mongodb_3_2:
   container_name: quasar_mongodb_3_2
   image: mongo:3.2
   command: ["mongod", "--smallfiles"]
   ports:
-   - "27021:27017"
+    - "27021:27017"
 
 quasar_mongodb_3_4:
   container_name: quasar_mongodb_3_4
   image: mongo:3.4
   command: ["mongod", "--smallfiles"]
   ports:
-   - "27022:27017"
+    - "27022:27017"
 
 quasar_metastore:
   container_name: quasar_metastore
   image: postgres:9.6
   privileged: true
   ports:
-   - "5432:5432"
+    - "5432:5432"
 
 quasar_postgresql:
   container_name: quasar_postgresql
   image: postgres:9.6
   privileged: true
   ports:
-   - "5433:5432"
+    - "5433:5432"
 
 quasar_marklogic_xml:
   container_name: quasar_marklogic_xml
@@ -67,7 +67,6 @@ quasar_couchbase:
   container_name: quasar_couchbase
   image: couchbase/server:enterprise-4.5.1
   ports:
-   - "8091-8094:8091-8094"
-   - "11210:11210"
+    - "8091-8094:8091-8094"
+    - "11210:11210"
   mem_limit: 2048m
-

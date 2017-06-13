@@ -10,7 +10,6 @@ function downloadMLRPM() {
 }
 
 function upContainer() {
-  echo "pwd: $(pwd)"
   docker-compose -f docker/docker-compose.yml up -d $1
 }
 
