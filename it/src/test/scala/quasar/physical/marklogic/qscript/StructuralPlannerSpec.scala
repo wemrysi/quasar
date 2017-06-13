@@ -82,19 +82,26 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   val emptyObj: Data              = Data._obj(ListMap())
   val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
 
-  implicit val withKey: Arbitrary[(String, NonEmptyList[(String, Data)])] =
-    Arbitrary(for {
-      obj <- arbitrary[NonEmptyList[(String, Data)]]
-      keys: List[String] = obj.map(_._1).toList
-      key <- Gen.oneOf(keys)
-    } yield (key, obj))
+  case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
+  case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
 
-  implicit val withoutKey: Arbitrary[(String, NonEmptyList[(String, Data)])] =
+  implicit val mapEntry: Arbitrary[(String, Data)] =
+    Arbitrary((Gen.alphaNumStr |@| arbitrary[Data])((_, _)))
+
+  implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
     Arbitrary(for {
       obj <- arbitrary[NonEmptyList[(String, Data)]]
-      keys: List[String] = obj.map(_._1).toList
-      key <- arbitrary[String].suchThat(!keys.contains(_))
-    } yield (key, obj))
+      keys = obj.map(_._1).toList
+      key <- Gen.alphaNumStr.suchThat(!keys.contains(_))
+    } yield (WithoutKeyTestCase(key, ListMap(obj.toList: _*))))
+
+  implicit val withKey: Arbitrary[WithKeyTestCase] =
+    Arbitrary(for {
+      obj <- arbitrary[NonEmptyList[(String, Data)]]
+      keys = obj.map(_._1).toList
+      key <- Gen.oneOf(keys)
+    } yield WithKeyTestCase(key, ListMap(obj.toList: _*)))
+
 
   def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
     xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
@@ -187,22 +194,22 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     "leftShift" >> todo
 
     "objectDelete" >> {
-      val somekey = asMapKey(QName.unprefixed(NCName("somekey")))
 
-      "removes existing key from an object" >> prop { values: NonEmptyList[Data] =>
-        val entries = keyed(values).toList
-        val obj = Data._obj(ListMap(entries: _*))
-        val k0  = QName.unprefixed(NCName("k0"))
-        evalF((lit(obj) |@| asMapKey(k0))(SP.objectDelete).join) must resultIn(
-          Data._obj(ListMap(entries.tail: _*)))
+      "removes existing key from an object" >> prop { testCase: WithKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        val expectedObj = testCase.obj - testCase.key
+
+        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectDelete).join) must resultIn(
+          Data._obj(expectedObj))
       }
 
-      "identity when key not present in object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-        evalF((lit(obj) |@| somekey)(SP.objectDelete).join) must resultIn(obj)
+      "identity when key not present in object" >> prop { testCase: WithoutKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectDelete).join) must resultIn(obj)
       }
 
       "identity on empty object" >> {
+        val somekey = asMapKey(QName.unprefixed(NCName("somekey")))
         evalF((lit(emptyObj) |@| somekey)(SP.objectDelete).join) must resultIn(emptyObj)
       }
     }
