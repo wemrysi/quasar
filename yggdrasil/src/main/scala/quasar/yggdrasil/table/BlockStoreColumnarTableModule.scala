@@ -23,8 +23,8 @@ import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.jdbm3._
 
-import java.util.SortedMap
-import java.util.Comparator
+import java.io.File
+import java.util.{Comparator, SortedMap}
 
 import org.apache.jdbm.DBMaker
 import org.apache.jdbm.DB

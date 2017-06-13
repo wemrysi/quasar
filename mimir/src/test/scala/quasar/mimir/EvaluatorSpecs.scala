@@ -33,6 +33,8 @@ import quasar.yggdrasil.util._
 
 import scalaz._, Scalaz._, Validation._
 
+import java.io.File
+
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
 }

@@ -24,7 +24,7 @@ import quasar.precog.common._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
 
-import java.util.Arrays
+import java.util.{Arrays, UUID}
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CoderResult }
 

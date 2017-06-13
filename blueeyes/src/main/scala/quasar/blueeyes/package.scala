@@ -23,6 +23,8 @@ import scalaz._
 import scala.concurrent.ExecutionContext
 
 import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.util.UUID
 
 package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type spec    = scala.specialized
@@ -42,13 +44,13 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
 
-  def Utf8Charset: Charset                                               = java.nio.charset.Charset forName "UTF-8"
+  def Utf8Charset: Charset                                               = Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
-  def uuid(s: String): UUID                                              = java.util.UUID fromString s
-  def randomUuid(): UUID                                                 = java.util.UUID.randomUUID
+  def uuid(s: String): UUID                                              = UUID fromString s
+  def randomUuid(): UUID                                                 = UUID.randomUUID
   def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
-  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
+  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = ByteBuffer.wrap(xs)
+  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)

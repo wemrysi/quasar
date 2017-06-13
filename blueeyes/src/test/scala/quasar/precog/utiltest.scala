@@ -18,7 +18,10 @@ package quasar.precog.util
 
 import quasar.blueeyes._
 import quasar.precog._, TestSupport._
+
 import scalaz._
+
+import java.io.File
 
 class IOUtilsSpecs extends Specification {
   "IOUtils" should {

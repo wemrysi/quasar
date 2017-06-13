@@ -38,6 +38,7 @@ import scalaz._
 import scalaz.Validation._
 import scalaz.syntax.monad._
 
+import java.io.File
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
 

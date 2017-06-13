@@ -34,25 +34,6 @@ trait PackageAliases {
   val scmMap                = scm.HashMap
   val scmSet                = scm.HashSet
 
-  // java stdlib
-  type AtomicInt            = java.util.concurrent.atomic.AtomicInteger
-  type AtomicLong           = java.util.concurrent.atomic.AtomicLong
-  type BufferedOutputStream = java.io.BufferedOutputStream
-  type BufferedReader       = java.io.BufferedReader
-  type CharBuffer           = java.nio.CharBuffer
-  type Charset              = java.nio.charset.Charset
-  type File                 = java.io.File
-  type FileInputStream      = java.io.FileInputStream
-  type FileOutputStream     = java.io.FileOutputStream
-  type IOException          = java.io.IOException
-  type InputStream          = java.io.InputStream
-  type InputStreamReader    = java.io.InputStreamReader
-  type OutputStream         = java.io.OutputStream
-  type OutputStreamWriter   = java.io.OutputStreamWriter
-  type Properties           = java.util.Properties
-  type PrintStream          = java.io.PrintStream
-  type UUID                 = java.util.UUID
-
   // other outside libs: scalaz, spire, shapeless, scodec
   type ByteVector     = scodec.bits.ByteVector
   type IO[A]          = scalaz.effect.IO[A]

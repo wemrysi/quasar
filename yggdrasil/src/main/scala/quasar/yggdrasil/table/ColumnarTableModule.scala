@@ -30,6 +30,7 @@ import org.slf4s.Logging
 import quasar.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 
+import java.io.File
 import java.nio.CharBuffer
 import java.time.LocalDateTime
 

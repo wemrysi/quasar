@@ -20,6 +20,7 @@ import quasar.precog.util.FileLock
 
 import org.objectweb.howl.log._
 
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.ScheduledExecutorService
 

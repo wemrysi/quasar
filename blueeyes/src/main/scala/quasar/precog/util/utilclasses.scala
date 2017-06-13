@@ -33,12 +33,13 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 import scala.{ collection => sc }
 
-import java.io.FileReader
+import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.util.Arrays.fill
+import java.util.Properties
 
 trait FileLock {
   def release: Unit
