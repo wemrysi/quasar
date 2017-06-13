@@ -47,7 +47,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   implicit def listToTraversable[A](as: List[A]): Traversable[A] = as
 
   implicit val arbitraryData: Arbitrary[Data] = {
-    val genKey = Gen.alphaChar flatMap (c => Gen.alphaStr map (c.toString + _))
+    val genKey = Gen.alphaNumChar flatMap (c => Gen.alphaNumStr map (c.toString + _))
     val genDbl = Gen.choose(-1000.0, 1000.0)
 
     val secondsInDay: Long        = 24L * 60 * 60
@@ -81,6 +81,20 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   val emptyArr: Data              = Data._arr(List())
   val emptyObj: Data              = Data._obj(ListMap())
   val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
+
+  implicit val withKey: Arbitrary[(String, NonEmptyList[(String, Data)])] =
+    Arbitrary(for {
+      obj <- arbitrary[NonEmptyList[(String, Data)]]
+      keys: List[String] = obj.map(_._1).toList
+      key <- Gen.oneOf(keys)
+    } yield (key, obj))
+
+  implicit val withoutKey: Arbitrary[(String, NonEmptyList[(String, Data)])] =
+    Arbitrary(for {
+      obj <- arbitrary[NonEmptyList[(String, Data)]]
+      keys: List[String] = obj.map(_._1).toList
+      key <- arbitrary[String].suchThat(!keys.contains(_))
+    } yield (key, obj))
 
   def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
     xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
