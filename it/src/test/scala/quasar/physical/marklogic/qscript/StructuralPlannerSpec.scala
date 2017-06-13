@@ -86,13 +86,14 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
 
   implicit val mapEntry: Arbitrary[(String, Data)] =
-    Arbitrary((Gen.alphaNumStr |@| arbitrary[Data])((_, _)))
+    Arbitrary((Gen.alphaNumChar |@| Gen.alphaNumStr |@| arbitrary[Data])
+      ((start, key, value) => (start + key, value)))
 
   implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
     Arbitrary(for {
       obj <- arbitrary[NonEmptyList[(String, Data)]]
       keys = obj.map(_._1).toList
-      key <- Gen.alphaNumStr.suchThat(!keys.contains(_))
+      key <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _).suchThat(!keys.contains(_))
     } yield (WithoutKeyTestCase(key, ListMap(obj.toList: _*))))
 
   implicit val withKey: Arbitrary[WithKeyTestCase] =
@@ -194,7 +195,6 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     "leftShift" >> todo
 
     "objectDelete" >> {
-
       "removes existing key from an object" >> prop { testCase: WithKeyTestCase =>
         val obj = Data._obj(testCase.obj)
         val expectedObj = testCase.obj - testCase.key
@@ -214,20 +214,17 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     }
 
     "objectInsert" >> {
-      val newKey  = QName.unprefixed(NCName("NEW_KEY"))
+      "adds new assoc to non-empty object" >> prop { (testCase: WithoutKeyTestCase, y: Data) =>
+        val res = evalF((lit(Data._obj(ListMap(testCase.obj.toList: _*))) |@| lit(y))(
+          (SP.objectInsert(_, testCase.key.xs, _))).join)
+        val expected = testCase.obj + (testCase.key -> y)
 
-      "adds new assoc to non-empty object" >> prop { (y: Data, ys: NonEmptyList[Data]) =>
-        val entries = keyed(ys)
-
-        val res = evalF((lit(Data._obj(ListMap(entries.toList: _*))) |@| asMapKey(newKey) |@| lit(y))(
-          SP.objectInsert).join)
-
-        res must resultIn(Data._obj(ListMap(((newKey.shows -> y) <:: entries).toList: _*)))
+        res must resultIn(Data._obj(expected))
       }
 
-      "adds new assoc to empty object" >> prop { y: Data =>
-        val res = evalF((lit(emptyObj) |@| asMapKey(newKey) |@| lit(y))(SP.objectInsert).join)
-        res must resultIn(Data._obj(ListMap(newKey.shows -> y)))
+      "adds new assoc to empty object" >> prop { (testCase: WithoutKeyTestCase, y: Data) =>
+        val res = evalF((lit(emptyObj) |@| testCase.key.xs.point[F] |@| lit(y))(SP.objectInsert).join)
+        res must resultIn(Data._obj(ListMap(testCase.key -> y)))
       }
     }
 

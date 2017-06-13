@@ -102,8 +102,15 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   // TODO: This assumes the `key` is not present in the object, for performance.
   //       may need to switch to `objectUpdate` if we need to check that here.
-  def objectInsert(obj: XQuery, key: XQuery, value: XQuery) =
-    renameOrWrap(key, value) >>= (mem.nodeInsertChild[F](obj, _))
+  def objectInsert(obj: XQuery, key: XQuery, value: XQuery) = {
+    val elt = key match {
+      case XQuery.StringLit(QName.string(qn)) => renameOrWrap(qn.xqy, value)
+      case XQuery.StringLit(name) => renameOrWrapEncoded(xs.string(name.xs), value)
+      case _ => guardQNameF(key, renameOrWrap(xs.QName(key), value), renameOrWrapEncoded(fn.string(key), value))
+    }
+
+    elt >>= (mem.nodeInsertChild[F](obj, _))
+  }
 
   def objectLookup(obj: XQuery, key: XQuery) = {
     val prj = key match {
