@@ -466,24 +466,29 @@ val headerSettings = Seq(
 import precogbuild.Build._
 
 lazy val precog = project.setup
+  .settings(name := "quasar-precog-internal")
   .dependsOn(common % BothScopes)
   .withWarnings
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
+  .settings(name := "quasar-blueeyes-internal")
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val mimir = project.setup.noArtifacts
+lazy val mimir = project.setup
+  .settings(name := "quasar-mimir-internal")
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
@@ -494,11 +499,13 @@ lazy val mimir = project.setup.noArtifacts
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val niflheim = project.setup.noArtifacts
+lazy val niflheim = project.setup
+  .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
@@ -508,14 +515,17 @@ lazy val niflheim = project.setup.noArtifacts
       "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
+  .settings(name := "quasar-yggdrasil-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .withWarnings
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)

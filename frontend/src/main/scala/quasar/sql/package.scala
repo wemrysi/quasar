@@ -266,7 +266,7 @@ package object sql {
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
       case Let(ident, bindTo, in) =>
-        ident.shows ++ " :: " ++ bindTo._2 ++ "; " ++ in._2
+        ident.shows ++ " := " ++ bindTo._2 ++ "; " ++ in._2
       case IntLiteral(v) => v.toString
       case FloatLiteral(v) => v.toString
       case StringLiteral(v) => _q(v)
