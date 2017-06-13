@@ -16,7 +16,6 @@
 
 package quasar.precog.util
 
-import quasar.blueeyes._
 import quasar.precog._, TestSupport._
 
 import scalaz._
@@ -75,7 +74,7 @@ class IOUtilsSpecs extends Specification {
 
 object MapUtilsSpecs extends Specification with ScalaCheck with MapUtils {
   private type Ints     = List[Int]
-  private type IntsPair = Ints -> Ints
+  private type IntsPair = (Ints, Ints)
   private type IntMap   = Map[Int, Ints]
 
   "cogroup" should {

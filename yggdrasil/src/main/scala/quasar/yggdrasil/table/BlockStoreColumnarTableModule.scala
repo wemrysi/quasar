@@ -34,6 +34,8 @@ import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
 
+import scala.collection.mutable
+
 trait BlockStoreColumnarTableModuleConfig {
   def maxSliceSize: Int
   def hashJoins: Boolean = true
@@ -130,8 +132,8 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         }
 
         new CellMatrix {
-          private[this] val allCells: scmMap[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
-          private[this] val comparatorMatrix                 = fillMatrix(initialCells)
+          private[this] val allCells: mutable.Map[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
+          private[this] val comparatorMatrix = fillMatrix(initialCells)
 
           def cells = allCells.values
 
@@ -892,7 +894,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                                         rightKeySpec: TransSpec1,
-                                                                                        joinSpec: TransSpec2): M[JoinOrder -> Table] = {
+                                                                                        joinSpec: TransSpec2): M[(JoinOrder, Table)] = {
 
       def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)

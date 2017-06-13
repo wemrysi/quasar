@@ -21,6 +21,7 @@ import quasar.precog.util._
 import scalaz._
 
 import scala.concurrent.ExecutionContext
+import scala.math.BigDecimal
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -39,7 +40,7 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   type BitSet             = quasar.precog.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = quasar.precog.util.RawBitSet
-  type ByteBufferPoolS[A] = State[quasar.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+  type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
@@ -66,7 +67,7 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
+  implicit def bigDecimalOrder: scalaz.Order[BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
 
   implicit class ScalaSeqOps[A](xs: scala.collection.Seq[A]) {

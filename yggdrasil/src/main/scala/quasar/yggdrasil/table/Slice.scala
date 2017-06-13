@@ -32,6 +32,8 @@ import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 import java.time.LocalDateTime
 
+import scala.collection.mutable
+
 trait Slice { source =>
   import Slice._
   import TableModule._
@@ -1089,7 +1091,7 @@ trait Slice { source =>
         // we have the schema, now emit
 
         var buffer = CharBuffer.allocate(BufferSize)
-        val vector = new ArrayBuffer[CharBuffer](math.max(1, size / 10))
+        val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
         def checkPush(length: Int) {

@@ -16,24 +16,7 @@
 
 package quasar.precog
 
-import scala.collection.{ mutable => scm }
-
 trait PackageAliases {
-  // scala stdlib
-  type ->[+A, +B]           = (A, B)
-  type ArrayBuffer[A]       = scm.ArrayBuffer[A]
-  type BigDecimal           = scala.math.BigDecimal
-  type ListBuffer[A]        = scm.ListBuffer[A]
-  type Regex                = scala.util.matching.Regex
-  type ScalaMathOrdering[A] = scala.math.Ordering[A] // so many orders
-  type scmMap[K, V]         = scm.Map[K, V]
-  type scmSet[A]            = scm.Set[A]
-  val ArrayBuffer           = scm.ArrayBuffer
-  val BigDecimal            = scala.math.BigDecimal
-  val ListBuffer            = scm.ListBuffer
-  val scmMap                = scm.HashMap
-  val scmSet                = scm.HashSet
-
   // other outside libs: scalaz, spire, shapeless, scodec
   type ByteVector     = scodec.bits.ByteVector
   type IO[A]          = scalaz.effect.IO[A]

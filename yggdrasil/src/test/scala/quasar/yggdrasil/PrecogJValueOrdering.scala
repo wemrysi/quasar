@@ -31,11 +31,11 @@ trait PrecogJValueOrder extends ScalazOrder[JValue] {
     val cols0  = (prims1.mapValues { _ => JUndefined } ++ prims0).toList.sortMe
     val cols1  = (prims0.mapValues { _ => JUndefined } ++ prims1).toList.sortMe
 
-    ScalazOrder[Vector[JPath -> JValue]].order(cols0, cols1)
+    ScalazOrder[Vector[(JPath, JValue)]].order(cols0, cols1)
   }
 }
 
 object PrecogJValueOrder {
   implicit object order extends PrecogJValueOrder
-  implicit def ordering: ScalaMathOrdering[JValue] = order.toScalaOrdering
+  implicit def ordering: scala.math.Ordering[JValue] = order.toScalaOrdering
 }
