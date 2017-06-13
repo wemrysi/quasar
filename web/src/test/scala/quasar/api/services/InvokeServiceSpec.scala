@@ -142,7 +142,7 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
                 sampleData: Vector[Data],
                 offset: Int @@ NonNegative,
                 limit: Int @@ RPositive) =>
-          val statements = List(sampleStatement(fileName(functionFile).value, dataFile))
+          val statements = List(sampleStatement(fileName(functionFile).value))
           val mounts = Map((fileParent(functionFile):APath) -> MountConfig.moduleConfig(statements))
           val state = InMemState.fromFiles(Map(dataFile -> sampleData))
           val request = Request(uri = pathUri(functionFile).copy(
