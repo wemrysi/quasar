@@ -31,14 +31,12 @@ import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import org.specs2.scalacheck.Parameters
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
-import xml.name._
 
 abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   implicit SP: StructuralPlanner[F, FMT], DP: Planner[F, FMT, Const[Data, ?]]
 ) extends XQuerySpec {
 
   def toM: F ~> M
-  def asMapKey(qn: QName): F[XQuery]
 
   implicit val scalacheckParams = Parameters(maxSize = 10)
 
@@ -84,18 +82,24 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
 
   case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
   case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
+  case class StrKey(asString: String)
+
+  val genStrKey: Gen[StrKey] = (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _) map StrKey
+  implicit val arbGenStrKey = Arbitrary(genStrKey)
 
   implicit val mapEntry: Arbitrary[(String, Data)] =
-    Arbitrary((Gen.alphaNumChar |@| Gen.alphaNumStr |@| arbitrary[Data])
-      ((start, key, value) => (start + key, value)))
+    Arbitrary((genStrKey |@| arbitrary[Data])((key, value) =>
+      (key.asString, value)))
 
+  // Generates a (key, obj) where key does not exist in obj
   implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
     Arbitrary(for {
       obj <- arbitrary[NonEmptyList[(String, Data)]]
       keys = obj.map(_._1).toList
-      key <- (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _).suchThat(!keys.contains(_))
+      key <- genStrKey.suchThat(c => !keys.contains(c.asString)) map (_.asString)
     } yield (WithoutKeyTestCase(key, ListMap(obj.toList: _*))))
 
+  // Generates a (key, obj) where key exists in obj
   implicit val withKey: Arbitrary[WithKeyTestCase] =
     Arbitrary(for {
       obj <- arbitrary[NonEmptyList[(String, Data)]]
@@ -207,9 +211,8 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
         evalF(lit(obj) >>= (SP.objectDelete(_, testCase.key.xs))) must resultIn(obj)
       }
 
-      "identity on empty object" >> {
-        val somekey = asMapKey(QName.unprefixed(NCName("somekey")))
-        evalF((lit(emptyObj) |@| somekey)(SP.objectDelete).join) must resultIn(emptyObj)
+      "identity on empty object" >> prop { key: StrKey =>
+        evalF((lit(emptyObj) |@| key.asString.xs.point[F])(SP.objectDelete).join) must resultIn(emptyObj)
       }
     }
 
@@ -217,34 +220,31 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
       "adds new assoc to non-empty object" >> prop { (testCase: WithoutKeyTestCase, y: Data) =>
         val res = evalF((lit(Data._obj(ListMap(testCase.obj.toList: _*))) |@| lit(y))(
           (SP.objectInsert(_, testCase.key.xs, _))).join)
-        val expected = testCase.obj + (testCase.key -> y)
 
-        res must resultIn(Data._obj(expected))
+        res must resultIn(Data._obj(testCase.obj + (testCase.key -> y)))
       }
 
-      "adds new assoc to empty object" >> prop { (testCase: WithoutKeyTestCase, y: Data) =>
-        val res = evalF((lit(emptyObj) |@| testCase.key.xs.point[F] |@| lit(y))(SP.objectInsert).join)
-        res must resultIn(Data._obj(ListMap(testCase.key -> y)))
+      "adds new assoc to empty object" >> prop { (key: StrKey, y: Data) =>
+        val res = evalF((lit(emptyObj) |@| key.asString.xs.point[F] |@| lit(y))(SP.objectInsert).join)
+        res must resultIn(Data._obj(ListMap(key.asString -> y)))
       }
     }
 
     "objectLookup" >> {
-      val notKey = asMapKey(QName.unprefixed(NCName("NOT_EXIST")))
+      "returns value for existing key" >> prop { testCase: WithKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        val expected = testCase.obj.get(testCase.key).get
 
-      "returns value for existing key" >> prop { values: NonEmptyList[Data] =>
-        val k0  = asMapKey(QName.unprefixed(NCName("k0")))
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-
-        evalF((lit(obj) |@| k0)(SP.objectLookup).join) must resultIn(values.head)
+        evalF((lit(obj) |@| testCase.key.xs.point[F])(SP.objectLookup).join) must resultIn(expected)
       }
 
-      "returns nothing for non-existent key in non-empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
-        evalF((lit(obj) |@| notKey)(SP.objectLookup).join) must resultInNothing
+      "returns nothing for non-existent key in non-empty object" >> prop { testCase: WithoutKeyTestCase =>
+        val obj = Data._obj(testCase.obj)
+        evalF(lit(obj) >>= (SP.objectLookup(_, testCase.key.xs))) must resultInNothing
       }
 
       "returns nothing for empty object" >> {
-        evalF((lit(emptyObj) |@| notKey)(SP.objectLookup).join) must resultInNothing
+        evalF((lit(emptyObj) |@| "NOT_EXIST".xs.point[F])(SP.objectLookup).join) must resultInNothing
       }
     }
 

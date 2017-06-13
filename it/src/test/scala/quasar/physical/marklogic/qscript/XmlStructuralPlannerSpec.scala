@@ -25,7 +25,6 @@ import quasar.physical.marklogic.xquery.syntax._
 
 import matryoshka._
 import scalaz._, Scalaz._
-import xml.name._
 
 final class XmlStructuralPlannerSpec
   extends StructuralPlannerSpec[XmlStructuralPlannerSpec.XmlPlan, DocType.Xml] {
@@ -36,7 +35,6 @@ final class XmlStructuralPlannerSpec
   val SP  = StructuralPlanner[XmlPlan, DocType.Xml]
   val DP  = Planner[XmlPlan, DocType.Xml, Const[Data, ?]]
   val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
-  def asMapKey(qn: QName) = qn.xqy.point[XmlPlan]
 
   xquerySpec(_ => "XML Specific") { evalM =>
     val eval = evalM.compose[XmlPlan[XQuery]](toM(_))
