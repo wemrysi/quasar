@@ -17,8 +17,6 @@
 package quasar.precog
 
 trait PackageAliases {
-  type Iso[T, L]      = shapeless.Generic.Aux[T, L]
-
   // It looks like scalaz.Id.Id is (now?) invariant.
   type Id[+X]        = X
 }
