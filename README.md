@@ -1,4 +1,4 @@
-[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+Ï[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -129,7 +129,7 @@ Once you have a running metastore you can start the web api service with [these]
 of the following format to create new mount points.
 
 ```bash
-curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol://><uri>" } }'
+curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
 ```
 The `<mountPath>` is the name of your mount point and the remaining parameters are listed below:
 
@@ -138,8 +138,8 @@ The `<mountPath>` is the name of your mount point and the remaining parameters a
 | `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
 | `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
 | `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
-| `spark-hdfs`    | `spark://`       | [Spark HDFS](#hdfs-using-apache-spark) |
-| `spark-local`   | `spark_local=`   | [Spark](#hdfs-using-apache-spark)      |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
 
 See [here](#get-mountfspath) for more details on the mount web api service.
 
@@ -265,13 +265,19 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-#### HDFS using Apache Spark
+#### Apache Spark
 
-To connect to HDFS using Apache Spark use the following `connectionUri` format:
+To connect to Apache Spark and use either local files or HDFS to query data use the following `connectionUri`:
+
+with local files:
+
+`spark_local=\"/path/to/data/my.data\"`
+
+with HDFS:
 
 `spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
 
-e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+For example: "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
 
 #### MarkLogic
 
