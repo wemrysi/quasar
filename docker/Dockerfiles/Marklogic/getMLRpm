@@ -22,21 +22,18 @@ function downloadMLRpm() {
   rm $ML_DEV_COOKIES /tmp/url /tmp/json
 }
 
-mkdir -p $HOME/.marklogic
-CACHE_DIR="$HOME/.marklogic"
+CACHE_DIR="$HOME/.cache/quasar/marklogic"
+mkdir -p CACHE_DIR
 ML_RPM_PATH="$CACHE_DIR/MarkLogic.rpm"
 ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"
 
 echo "$ML_SHA  $ML_RPM_PATH" > $ML_RPM_SHA1
 
-if [ -f $CACHE_DIR/MarkLogic.rpm ]
-  then
-    echo "Found MarkLogic.rpm in cache ..."
-    cp $CACHE_DIR/MarkLogic.rpm docker/Dockerfiles/Marklogic/
-  else
-    echo "Didn't find MarkLogic.rpm in cache, downloading ..."
-    downloadMLRpm
-    cp $CACHE_DIR/MarkLogic.rpm docker/Dockerfiles/Marklogic/
+if [ ! -f ML_RPM_PATH ]
+  echo "Didn't find MarkLogic.rpm in cache, downloading ..."
+  downloadMLRpm
 fi
+
+cp ML_RPM_PATH docker/Dockerfiles/Marklogic/
 
 shasum --status -c $ML_RPM_SHA1
