@@ -61,8 +61,8 @@ package object blueeyes extends precog.PackageTime with precog.PackageAliases {
 
   implicit val GlobalEC: ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
-    scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
+  implicit def comparableOrder[A <: Comparable[A]] : scalaz.Order[A] =
+    scalaz.Order.order[A]((x, y) => scalaz.Ordering.fromInt(x compareTo y))
 
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)

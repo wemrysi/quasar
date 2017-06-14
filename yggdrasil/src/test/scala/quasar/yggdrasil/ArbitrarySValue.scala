@@ -210,7 +210,7 @@ trait ArbitrarySValue extends SValueGenerators {
 
   implicit val listLongOrder = scalaz.std.list.listOrder[Long]
 
-  implicit val SEventIdentityOrder: ScalazOrder[SEvent] = ScalazOrder[List[Long]].contramap((_: SEvent)._1.toList)
+  implicit val SEventIdentityOrder: scalaz.Order[SEvent] = scalaz.Order[List[Long]].contramap((_: SEvent)._1.toList)
   implicit val SEventOrdering = SEventIdentityOrder.toScalaOrdering
 
   implicit val SEventChunkGen: Gen[Vector[SEvent]] = chunk(3, 3, 2)

@@ -17,19 +17,8 @@
 package quasar.precog
 
 trait PackageAliases {
-  // other outside libs: scalaz, spire, shapeless, scodec
-  type ByteVector     = scodec.bits.ByteVector
-  type IO[A]          = scalaz.effect.IO[A]
   type Iso[T, L]      = shapeless.Generic.Aux[T, L]
-  type Logging        = org.slf4s.Logging
-  type ScalazOrder[A] = scalaz.Order[A]
-  type ScalazOrdering = scalaz.Ordering
-  type SpireOrder[A]  = spire.algebra.Order[A]
-  type Task[+A]       = scalaz.concurrent.Task[A]
 
   // It looks like scalaz.Id.Id is (now?) invariant.
   type Id[+X]        = X
-  val ScalazOrder    = scalaz.Order
-  val ScalazOrdering = scalaz.Ordering
-  val IO             = scalaz.effect.IO
 }

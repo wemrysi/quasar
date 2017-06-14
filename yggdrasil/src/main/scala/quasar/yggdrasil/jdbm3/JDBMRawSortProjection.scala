@@ -17,7 +17,6 @@
 package quasar.yggdrasil
 package jdbm3
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.table._
 import quasar.yggdrasil.TableModule._

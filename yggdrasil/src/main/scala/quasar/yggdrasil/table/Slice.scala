@@ -673,7 +673,7 @@ trait Slice { source =>
     }
   }
 
-  def order: SpireOrder[Int] =
+  def order: spire.algebra.Order[Int] =
     if (columns.size == 1) {
       val col = columns.head._2
       Column.rowOrder(col)
@@ -710,7 +710,7 @@ trait Slice { source =>
             }
             .toArray
 
-          new SpireOrder[Int] {
+          new spire.algebra.Order[Int] {
             def compare(i: Int, j: Int): Int = {
               var k = 0
               while (k < cols.length) {

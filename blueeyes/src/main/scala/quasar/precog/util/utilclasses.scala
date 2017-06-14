@@ -26,6 +26,7 @@ import quasar.precog._
 import org.slf4s.Logging
 
 import scalaz._
+import scalaz.effect.IO
 import scalaz.Ordering.{LT, EQ, GT}
 
 import scala.collection.JavaConverters._

@@ -352,7 +352,7 @@ case class MmixPrng(_seed: Long) {
 }
 
 object Column {
-  def rowOrder(col: Column): SpireOrder[Int] = new SpireOrder[Int] {
+  def rowOrder(col: Column): spire.algebra.Order[Int] = new spire.algebra.Order[Int] {
     def compare(i: Int, j: Int): Int = {
       if (col.isDefinedAt(i)) {
         if (col.isDefinedAt(j)) {

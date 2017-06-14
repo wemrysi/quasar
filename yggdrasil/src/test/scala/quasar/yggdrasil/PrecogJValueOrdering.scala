@@ -24,14 +24,14 @@ import scalaz._, Scalaz._
  * columns in a table, rather than using JValue's default ordering which
  * behaves differently.
  */
-trait PrecogJValueOrder extends ScalazOrder[JValue] {
+trait PrecogJValueOrder extends scalaz.Order[JValue] {
   def order(a: JValue, b: JValue): Ordering = {
     val prims0 = a.flattenWithPath.toMap
     val prims1 = b.flattenWithPath.toMap
     val cols0  = (prims1.mapValues { _ => JUndefined } ++ prims0).toList.sortMe
     val cols1  = (prims0.mapValues { _ => JUndefined } ++ prims1).toList.sortMe
 
-    ScalazOrder[Vector[(JPath, JValue)]].order(cols0, cols1)
+    scalaz.Order[Vector[(JPath, JValue)]].order(cols0, cols1)
   }
 }
 
