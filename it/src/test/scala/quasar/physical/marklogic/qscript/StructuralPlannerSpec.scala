@@ -80,17 +80,16 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   val emptyObj: Data              = Data._obj(ListMap())
   val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
 
-  case class TestCase(obj: ListMap[String, Data])
-  case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
-  case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
-  case class MapEntry(key: String, value: Data)
-  case class StrKey(asString: String)
 
+  case class StrKey(asString: String)
   val genStrKey: Gen[StrKey] = (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _) map StrKey
   implicit val arbGenStrKey: Arbitrary[StrKey] = Arbitrary(genStrKey)
 
+  case class MapEntry(key: String, value: Data)
   implicit val arbMapEntry: Arbitrary[MapEntry] =
     Arbitrary((genStrKey |@| arbitrary[Data])((key, value) => MapEntry(key.asString, value)))
+
+  case class TestCase(obj: ListMap[String, Data])
 
   val genNonEmptyObj: Gen[ListMap[String, Data]] =
     arbitrary[NonEmptyList[MapEntry]] map (nel => ListMap(nel.toList.map(me => (me.key, me.value)): _*))
@@ -99,14 +98,16 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     Arbitrary(genNonEmptyObj map TestCase)
 
   // Generates a (key, obj) where key does not exist in obj
+  case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
   implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
     Arbitrary(for {
       obj <- genNonEmptyObj
       keys = obj.keys.toList
-      key <- genStrKey.suchThat(c => !keys.contains(c.asString)) map (_.asString)
-    } yield (WithoutKeyTestCase(key, obj)))
+      key <- Gen.oneOf(keys) map (_ + "foo")
+    } yield (WithoutKeyTestCase(key, obj - key)))
 
   // Generates a (key, obj) where key exists in obj
+  case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
   implicit val withKey: Arbitrary[WithKeyTestCase] =
     Arbitrary(for {
       obj <- genNonEmptyObj
@@ -274,10 +275,10 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
         val commonKeys = left.keySet & right.keySet
         val leftKeys = left.keySet &~ right.keySet
 
-        val commonObjs = commonKeys.map(key => right.get(key).map((key, _))).toList
-        val leftObjs = leftKeys.map(key => left.get(key).map((key, _))).toList
+        val commonEntries = commonKeys.map(key => right.get(key).map((key, _))).toList
+        val leftEntries = leftKeys.map(key => left.get(key).map((key, _))).toList
 
-        val o = Data._obj(ListMap((commonObjs ++ leftObjs).unite: _*))
+        val o = Data._obj(ListMap((commonEntries ++ leftEntries).unite: _*))
 
         evalF((lit(Data._obj(left)) |@| lit(Data._obj(right)))(SP.objectMerge).join) must resultIn(o)
       }
