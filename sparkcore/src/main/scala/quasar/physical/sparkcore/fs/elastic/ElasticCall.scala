@@ -37,8 +37,8 @@ object ElasticCall {
     def listIndecies: Free[S, List[String]] = lift(ListIndecies()).into[S]
   }
 
-  implicit object Ops {
-    def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
+  object Ops {
+    implicit def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
   }
 
   implicit def interpreter(sc: SparkContext): ElasticCall ~> Task = new (ElasticCall ~> Task) {
