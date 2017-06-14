@@ -22,7 +22,6 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, WriteFile._
-import pathy.Path.posixCodec
 
 import org.elasticsearch.spark._
 import org.apache.spark._
@@ -66,20 +65,18 @@ object writefile {
 
     implicit val codec: DataCodec = DataCodec.Precise
 
-    def path(file: AFile) = posixCodec.unsafePrintPath(file).substring(1) // TODO_ES handle invalid paths
-
     def writeToFile(f: AFile): Free[S, Vector[FileSystemError]] = read.asks { (sc: SparkContext) => {
-      // TODO_ES handle errors
       val lines = chunks.map(data => DataCodec.render(data)).toList.map(_.toList).join
       lift(Task.delay {
-        sc.makeRDD(lines).saveJsonToEs(path(f))
+        sc.makeRDD(lines).saveJsonToEs(file2ES(f).shows)
+        // TODO_ES handle errors
         Vector.empty[FileSystemError]
       }).into[S]
     }}.join
 
     val findAndWrite: OptionT[Free[S,?], Vector[FileSystemError]] = for {
       WriteCursor(f) <- writers.get(h)
-      errors <-writeToFile(f).liftM[OptionT]
+      errors <- writeToFile(f).liftM[OptionT]
     } yield errors
 
     findAndWrite.fold (

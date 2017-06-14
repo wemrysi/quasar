@@ -39,24 +39,26 @@ import scalaz.concurrent.Task
 // TODO_ES use ElasticCall.Ops instead of lift().into[S]
 object queryfile {
 
-  private def path(file: AFile) = posixCodec.unsafePrintPath(file) // TODO_ES handle invalid paths
   private def parseIndex(adir: ADir) = posixCodec.unsafePrintPath(adir).replace("/", "") // TODO_ES handle invalid paths
 
   def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = Task.delay {
-    sc.esJsonRDD(path(file)).map(_._2).map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+    sc
+      .esJsonRDD(file2ES(file).shows)
+      .map(_._2)
+      .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
     S: Task :<: S
   ): Free[S, Unit] = lift(Task.delay {
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
-      .saveJsonToEs(path(out))
+      .saveJsonToEs(file2ES(out).shows)
   }).into[S]
 
   def fileExists[S[_]](f: AFile)(implicit
     E: ElasticCall :<: S
   ): Free[S, Boolean] = {
-    val index :: typ :: Nil = path(f).split("/").toList // TODO_ES handle invalid paths
+    val IndexType(index, typ) = file2ES(f)
     lift(TypeExists(index, typ)).into[S]
   }
 

@@ -70,6 +70,7 @@ package object elastic {
       host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
       port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
     } yield {
+      // TODO_ES missng ES nodes and port
       (master(host.value, port) *> appName *> indexAuto).exec(new SparkConf())
     }
 
@@ -138,5 +139,21 @@ package object elastic {
     S0: Task :<: S, S1: PhysErr :<: S
   ) =
     quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
+
+  final case class IndexType(index: String, typ: String)
+
+  object IndexType {
+    implicit val ShowIndexType: Show[IndexType] = new Show[IndexType] {
+      override def shows(it: IndexType): String = s"${it.index}/${it.typ}"
+    }
+  }
+
+  def file2ES(afile: AFile): IndexType = {
+    val folder = fileParent(afile)
+    val typ = fileName(afile).value
+    val index = posixCodec.unsafePrintPath(folder).substring(1).replace("/", "_")
+    IndexType(index, typ)
+  }
+
 
 }
