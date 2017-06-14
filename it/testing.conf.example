@@ -6,5 +6,6 @@
 #postgresql        ="jdbc:postgresql://<host>/<database>?user=<user>&password=<password>"
 #spark_local       ="<path_to_folder>"
 #spark_hdfs        ="spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>"
+#spark_elastic     ="spark://<spark_host>:<spark_port>?rootPath=<root_path>"
 #marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
 #couchbase         ="couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]"
