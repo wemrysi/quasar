@@ -114,8 +114,8 @@ object Dependencies {
     "org.apache.parquet" % "parquet-format" % "2.3.1",
     "org.apache.parquet" % "parquet-hadoop" % "1.9.0",
     "org.http4s"         %% "http4s-core" % http4sVersion,
-    "org.http4s"                 %% "http4s-blaze-client"       % http4sVersion,
-    "org.elasticsearch" % "elasticsearch-spark-20_2.11" % "5.4.1"
+    "org.http4s"         %% "http4s-blaze-client"       % http4sVersion,
+    "org.elasticsearch"  %% "elasticsearch-spark-20" % "5.4.1"
   )
 
   def marklogic = Seq(
