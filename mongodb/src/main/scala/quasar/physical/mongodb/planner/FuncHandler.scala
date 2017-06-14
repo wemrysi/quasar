@@ -40,8 +40,7 @@ final case class FuncHandler[T[_[_]]: CorecursiveT, F[_]]
 
   def run[MF[_]]
       (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF):
-      MapFunc[T, ?] ~> OptionFree[F, ?] =
-      //TODO MF ~> OptionFree[F, ?] =
+      Coproduct[MapFuncCore[T, ?], MapFuncDerived[T, ?], ?] ~> OptionFree[F, ?] =
     coproduct(runCore, FuncHandler.handleUnhandled(runDerived, runCore))
 
   def orElse[G[_], H[_]](other: FuncHandler[T, G])
