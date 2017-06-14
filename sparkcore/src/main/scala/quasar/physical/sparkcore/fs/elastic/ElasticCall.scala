@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
+import quasar.fp.free._
 
 import org.http4s.client.blaze._
 import org.apache.spark._
@@ -29,6 +30,16 @@ final case class ListTypes(index: String) extends ElasticCall[List[String]]
 final case class ListIndecies() extends ElasticCall[List[String]]
 
 object ElasticCall {
+
+  class Ops[S[_]](implicit S: ElasticCall :<: S) {
+    def typeExists(index: String, typ: String): Free[S, Boolean] = lift(TypeExists(index, typ)).into[S]
+    def listTypes(index: String): Free[S, List[String]] = lift(ListTypes(index)).into[S]
+    def listIndecies: Free[S, List[String]] = lift(ListIndecies()).into[S]
+  }
+
+  implicit object Ops {
+    def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
+  }
 
   implicit def interpreter(sc: SparkContext): ElasticCall ~> Task = new (ElasticCall ~> Task) {
     def apply[A](from: ElasticCall[A]) = from match {
