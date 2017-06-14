@@ -91,21 +91,26 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     Arbitrary((genStrKey |@| arbitrary[Data])((key, value) =>
       (key.asString, value)))
 
+  val genNonEmptyObj: Gen[ListMap[String, Data]] =
+    arbitrary[NonEmptyList[(String, Data)]] map (nel => ListMap(nel.toList: _*))
+
+  implicit val arbNonEmptyObj: Arbitrary[ListMap[String, Data]] =
+    Arbitrary(genNonEmptyObj)
+
   // Generates a (key, obj) where key does not exist in obj
   implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
     Arbitrary(for {
-      obj <- arbitrary[NonEmptyList[(String, Data)]]
-      keys = obj.map(_._1).toList
+      obj <- genNonEmptyObj
+      keys = obj.keys.toList
       key <- genStrKey.suchThat(c => !keys.contains(c.asString)) map (_.asString)
-    } yield (WithoutKeyTestCase(key, ListMap(obj.toList: _*))))
+    } yield (WithoutKeyTestCase(key, obj)))
 
   // Generates a (key, obj) where key exists in obj
   implicit val withKey: Arbitrary[WithKeyTestCase] =
     Arbitrary(for {
-      obj <- arbitrary[NonEmptyList[(String, Data)]]
-      keys = obj.map(_._1).toList
-      key <- Gen.oneOf(keys)
-    } yield WithKeyTestCase(key, ListMap(obj.toList: _*)))
+      obj <- genNonEmptyObj
+      key <- Gen.oneOf(obj.keys.toList)
+    } yield WithKeyTestCase(key, obj))
 
 
   def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
@@ -249,13 +254,13 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     }
 
     "objectMerge" >> {
-      "left identity with empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
+      "left identity with empty object" >> prop { values: ListMap[String, Data] =>
+        val obj = Data._obj(values)
         evalF((lit(emptyObj) |@| lit(obj))(SP.objectMerge).join) must resultIn(obj)
       }
 
-      "right identity with empty object" >> prop { values: NonEmptyList[Data] =>
-        val obj = Data._obj(ListMap(keyed(values).toList: _*))
+      "right identity with empty object" >> prop { values: ListMap[String, Data] =>
+        val obj = Data._obj(values)
         evalF((lit(obj) |@| lit(emptyObj))(SP.objectMerge).join) must resultIn(obj)
       }
 
