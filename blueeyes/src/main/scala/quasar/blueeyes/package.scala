@@ -27,7 +27,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.util.UUID
 
-package object blueeyes extends precog.PackageTime with precog.PackageAliases {
+package object blueeyes extends precog.PackageTime {
   type spec    = scala.specialized
   type switch  = scala.annotation.switch
   type tailrec = scala.annotation.tailrec
