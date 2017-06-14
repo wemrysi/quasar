@@ -275,9 +275,9 @@ with local files:
 
 with HDFS:
 
-`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+`spark://<host>:<port>?rootPath=<rootPath>&hdfsUri=<hdfsUri>[&spark_configuration=spark_configuration_value]`
 
-For example: "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+For example: "spark://10.0.0.4:7077?hdfsUri=hdfs%3A%2F%2F10.0.0.3%3A9000&rootPath=/data&spark.executor.memory=4g&spark.eventLog.enabled=true"
 
 #### MarkLogic
 
