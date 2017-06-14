@@ -112,7 +112,7 @@ object Dependencies {
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
