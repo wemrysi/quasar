@@ -36,6 +36,9 @@ final class XmlStructuralPlannerSpec
   val DP  = Planner[XmlPlan, DocType.Xml, Const[Data, ?]]
   val toM = λ[XmlPlan ~> M](xp => EitherT(WriterT.writer(xp.leftMap(_.shows.wrapNel).run.run.eval(1))))
 
+  def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
+    xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
+
   xquerySpec(_ => "XML Specific") { evalM =>
     val eval = evalM.compose[XmlPlan[XQuery]](toM(_))
 

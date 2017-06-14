@@ -113,10 +113,6 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
       key <- Gen.oneOf(obj.keys.toList)
     } yield WithKeyTestCase(key, obj))
 
-
-  def keyed(xs: NonEmptyList[Data]): NonEmptyList[(String, Data)] =
-    xs.zipWithIndex map { case (v, i) => s"k$i" -> v }
-
   xquerySpec(bn => s"Structural Planner (${bn.name})") { evalM =>
     val evalF = evalM.compose[F[XQuery]](toM(_))
 
@@ -271,12 +267,19 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
         evalF((lit(Data._obj(ents1)) |@| lit(Data._obj(ents2)))(SP.objectMerge).join) must resultIn(Data._obj(ents1 ++ ents2))
       }
 
-      "right biased when keys overlap" >> prop { (vs1: NonEmptyList[Data], vs2: NonEmptyList[Data]) =>
-        val e1 = keyed(vs1).toList
-        val e2 = keyed(vs2).toList
-        val o  = Data._obj(ListMap(e1.drop(e2.length) ::: e2 : _*))
-        evalF((lit(Data._obj(ListMap(e1: _*))) |@| lit(Data._obj(ListMap(e2: _*))))(
-          SP.objectMerge).join) must resultIn(o)
+      "right biased when keys overlap" >> prop { (testCase: TestCase, values: NonEmptyList[Data]) =>
+        val left = testCase.obj
+        val right = ListMap(testCase.obj.keys.zip(values.toList).toList: _*)
+
+        val commonKeys = left.keySet & right.keySet
+        val leftKeys = left.keySet &~ right.keySet
+
+        val commonObjs = commonKeys.map(key => right.get(key).map((key, _))).toList
+        val leftObjs = leftKeys.map(key => left.get(key).map((key, _))).toList
+
+        val o = Data._obj(ListMap((commonObjs ++ leftObjs).unite: _*))
+
+        evalF((lit(Data._obj(left)) |@| lit(Data._obj(right)))(SP.objectMerge).join) must resultIn(o)
       }
     }
   }
