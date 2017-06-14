@@ -23,7 +23,7 @@ function downloadMLRpm() {
 }
 
 CACHE_DIR="$HOME/.cache/quasar/marklogic"
-mkdir -p CACHE_DIR
+mkdir -p $CACHE_DIR
 ML_RPM_PATH="$CACHE_DIR/MarkLogic.rpm"
 ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"
 
