@@ -80,22 +80,23 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
   val emptyObj: Data              = Data._obj(ListMap())
   val lit     : Data => F[XQuery] = DP.plan.compose[Data](Const(_))
 
+  case class TestCase(obj: ListMap[String, Data])
   case class WithKeyTestCase(key: String, obj: ListMap[String, Data])
   case class WithoutKeyTestCase(key: String, obj: ListMap[String, Data])
+  case class MapEntry(key: String, value: Data)
   case class StrKey(asString: String)
 
   val genStrKey: Gen[StrKey] = (Gen.alphaNumChar |@| Gen.alphaNumStr)(_ + _) map StrKey
-  implicit val arbGenStrKey = Arbitrary(genStrKey)
+  implicit val arbGenStrKey: Arbitrary[StrKey] = Arbitrary(genStrKey)
 
-  implicit val mapEntry: Arbitrary[(String, Data)] =
-    Arbitrary((genStrKey |@| arbitrary[Data])((key, value) =>
-      (key.asString, value)))
+  implicit val arbMapEntry: Arbitrary[MapEntry] =
+    Arbitrary((genStrKey |@| arbitrary[Data])((key, value) => MapEntry(key.asString, value)))
 
   val genNonEmptyObj: Gen[ListMap[String, Data]] =
-    arbitrary[NonEmptyList[(String, Data)]] map (nel => ListMap(nel.toList: _*))
+    arbitrary[NonEmptyList[MapEntry]] map (nel => ListMap(nel.toList.map(me => (me.key, me.value)): _*))
 
-  implicit val arbNonEmptyObj: Arbitrary[ListMap[String, Data]] =
-    Arbitrary(genNonEmptyObj)
+  implicit val arbNonEmptyObj: Arbitrary[TestCase] =
+    Arbitrary(genNonEmptyObj map TestCase)
 
   // Generates a (key, obj) where key does not exist in obj
   implicit val withoutKey: Arbitrary[WithoutKeyTestCase] =
@@ -254,19 +255,19 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     }
 
     "objectMerge" >> {
-      "left identity with empty object" >> prop { values: ListMap[String, Data] =>
-        val obj = Data._obj(values)
+      "left identity with empty object" >> prop { testCase: TestCase =>
+        val obj = Data._obj(testCase.obj)
         evalF((lit(emptyObj) |@| lit(obj))(SP.objectMerge).join) must resultIn(obj)
       }
 
-      "right identity with empty object" >> prop { values: ListMap[String, Data] =>
-        val obj = Data._obj(values)
+      "right identity with empty object" >> prop { testCase: TestCase =>
+        val obj = Data._obj(testCase.obj)
         evalF((lit(obj) |@| lit(emptyObj))(SP.objectMerge).join) must resultIn(obj)
       }
 
-      "union when keys are disjoint" >> prop { (vs1: NonEmptyList[Data], vs2: NonEmptyList[Data]) =>
-        val ents1 = ListMap(keyed(vs1).toList: _*)
-        val ents2 = ListMap(keyed(vs2).toList map { case (k, v) => s"${k}b" -> v }: _*)
+      "union when keys are disjoint" >> prop { testCase: TestCase =>
+        val ents1 = testCase.obj
+        val ents2 = testCase.obj map { case (k, v) => s"${k}b" -> v }
         evalF((lit(Data._obj(ents1)) |@| lit(Data._obj(ents2)))(SP.objectMerge).join) must resultIn(Data._obj(ents1 ++ ents2))
       }
 
