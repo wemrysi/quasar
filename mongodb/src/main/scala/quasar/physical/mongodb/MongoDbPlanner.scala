@@ -344,34 +344,38 @@ object MongoDbPlanner {
       case ToTimestamp(a1) => New(Name("Date"), List(a1)).point[M]
 
       case ExtractCentury(date) =>
-        Call(Select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(100, false))))).point[M]
+        Call(ident("NumberLong"), List(
+          Call(Select(ident("Math"), "ceil"), List(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(100, false))))))).point[M]
       case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
       case ExtractDecade(date) =>
-        trunc(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(10, false)))).point[M]
+        Call(ident("NumberLong"), List(
+          trunc(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(10, false)))))).point[M]
       case ExtractDayOfWeek(date) =>
         Call(Select(date, "getUTCDay"), Nil).point[M]
       case ExtractDayOfYear(date) =>
-        Call(Select(ident("Math"), "floor"), List(
-          BinOp(jscore.Add,
-            BinOp(jscore.Div,
-              BinOp(Sub,
-                date,
-                New(Name("Date"), List(
-                  Call(Select(date, "getFullYear"), Nil),
-                  Literal(Js.Num(0, false)),
-                  Literal(Js.Num(0, false))))),
-              Literal(Js.Num(86400000, false))),
-            Literal(Js.Num(1, false))))).point[M]
+        Call(ident("NumberInt"), List(
+          Call(Select(ident("Math"), "floor"), List(
+            BinOp(jscore.Add,
+              BinOp(jscore.Div,
+                BinOp(Sub,
+                  date,
+                  New(Name("Date"), List(
+                    Call(Select(date, "getFullYear"), Nil),
+                    Literal(Js.Num(0, false)),
+                    Literal(Js.Num(0, false))))),
+                Literal(Js.Num(86400000, false))),
+              Literal(Js.Num(1, false))))))).point[M]
       case ExtractEpoch(date) =>
-        BinOp(jscore.Div,
-          Call(Select(date, "valueOf"), Nil),
-          Literal(Js.Num(1000, false))).point[M]
+        Call(ident("NumberLong"), List(
+          BinOp(jscore.Div,
+            Call(Select(date, "valueOf"), Nil),
+            Literal(Js.Num(1000, false))))).point[M]
       case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
       case ExtractIsoDayOfWeek(date) =>
         Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
@@ -390,10 +394,11 @@ object MongoDbPlanner {
               Literal(Js.Num(1000, false)))),
           Literal(Js.Num(1000, false))).point[M]
       case ExtractMillennium(date) =>
-        Call(Select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(1000, false))))).point[M]
+        Call(ident("NumberLong"), List(
+          Call(Select(ident("Math"), "ceil"), List(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(1000, false))))))).point[M]
       case ExtractMilliseconds(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCMilliseconds"), Nil),
@@ -407,13 +412,14 @@ object MongoDbPlanner {
           Call(Select(date, "getUTCMonth"), Nil),
           Literal(Js.Num(1, false))).point[M]
       case ExtractQuarter(date) =>
-        BinOp(jscore.Add,
-          BinOp(jscore.BitOr,
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCMonth"), Nil),
-              Literal(Js.Num(3, false))),
-            Literal(Js.Num(0, false))),
-          Literal(Js.Num(1, false))).point[M]
+        Call(ident("NumberInt"), List(
+          BinOp(jscore.Add,
+            BinOp(jscore.BitOr,
+              BinOp(jscore.Div,
+                Call(Select(date, "getUTCMonth"), Nil),
+                Literal(Js.Num(3, false))),
+              Literal(Js.Num(0, false))),
+            Literal(Js.Num(1, false))))).point[M]
       case ExtractSecond(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCSeconds"), Nil),
@@ -421,23 +427,24 @@ object MongoDbPlanner {
             Call(Select(date, "getUTCMilliseconds"), Nil),
             Literal(Js.Num(1000, false)))).point[M]
       case ExtractWeek(date) =>
-        Call(Select(ident("Math"), "floor"), List(
-          BinOp(jscore.Add,
-            BinOp(jscore.Div,
-              Let(Name("startOfYear"),
-                New(Name("Date"), List(
-                  Call(Select(date, "getFullYear"), Nil),
-                  Literal(Js.Num(0, false)),
-                  Literal(Js.Num(1, false)))),
-                BinOp(jscore.Add,
-                  BinOp(Div,
-                    BinOp(Sub, date, ident("startOfYear")),
-                    Literal(Js.Num(86400000, false))),
+        Call(ident("NumberInt"), List(
+          Call(Select(ident("Math"), "floor"), List(
+            BinOp(jscore.Add,
+              BinOp(jscore.Div,
+                Let(Name("startOfYear"),
+                  New(Name("Date"), List(
+                    Call(Select(date, "getFullYear"), Nil),
+                    Literal(Js.Num(0, false)),
+                    Literal(Js.Num(1, false)))),
                   BinOp(jscore.Add,
-                    Call(Select(ident("startOfYear"), "getDay"), Nil),
-                    Literal(Js.Num(1, false))))),
-              Literal(Js.Num(7, false))),
-            Literal(Js.Num(1, false))))).point[M]
+                    BinOp(Div,
+                      BinOp(Sub, date, ident("startOfYear")),
+                      Literal(Js.Num(86400000, false))),
+                    BinOp(jscore.Add,
+                      Call(Select(ident("startOfYear"), "getDay"), Nil),
+                      Literal(Js.Num(1, false))))),
+                Literal(Js.Num(7, false))),
+              Literal(Js.Num(1, false))))))).point[M]
 
       case ExtractYear(date) => Call(Select(date, "getUTCFullYear"), Nil).point[M]
 

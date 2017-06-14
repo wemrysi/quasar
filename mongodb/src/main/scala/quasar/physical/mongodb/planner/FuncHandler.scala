@@ -99,7 +99,7 @@ object FuncHandler {
             trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
           case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
           case ExtractDecade(a1) => trunc($divide($year(a1), $literal(Bson.Int32(10))))
-          case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))
+          case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1)))
           case ExtractDayOfYear(a1) => $dayOfYear(a1)
           case ExtractEpoch(a1) =>
             $divide(
