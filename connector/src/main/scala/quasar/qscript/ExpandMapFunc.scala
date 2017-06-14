@@ -43,7 +43,7 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
     new ExpandMapFunc[MapFuncDerived[T, ?]] {
       type OUT[A] = OUTʹ[A]
 
-      override def expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
+      val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
           case D.Abs(a) =>
             MFC(Cond(
