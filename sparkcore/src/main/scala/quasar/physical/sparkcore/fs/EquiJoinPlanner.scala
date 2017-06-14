@@ -59,7 +59,7 @@ class EquiJoinPlanner[T[_[_]]: RecursiveT: ShowT]  extends Planner[EquiJoin[T, ?
         val (klRdd, krRdd) =
           Unzip[List].unzip(k).bimap(
             lk => lRdd.map(d => (lk.map(_(d)), d)),
-            rk => lRdd.map(d => (rk.map(_(d)), d)))
+            rk => rRdd.map(d => (rk.map(_(d)), d)))
 
         jt match {
           case JoinType.Inner => klRdd.join(krRdd).map {

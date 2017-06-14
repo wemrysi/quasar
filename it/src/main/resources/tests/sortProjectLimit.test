@@ -2,7 +2,8 @@
     "name": "sort, project, and limit",
 
     "backends": {
-        "postgresql":        "pending"
+        "mimir": "skip",
+        "postgresql": "pending"
     },
 
     "data": "zips.data",

@@ -1,6 +1,7 @@
 {
     "name": "project index with object flatten",
     "backends": {
+        "mimir": "skip",
         "couchbase":         "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",

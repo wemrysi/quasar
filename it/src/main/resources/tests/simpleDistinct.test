@@ -2,6 +2,7 @@
   "name": "simple distinct",
 
   "backends": {
+        "mimir": "skip",
     "postgresql": "pending"
   },
 

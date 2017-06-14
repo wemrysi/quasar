@@ -2,6 +2,7 @@
   "name": "dow and isodow",
 
   "backends": {
+    "mimir": "skip",
     "postgresql": "pending"
   },
 

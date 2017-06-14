@@ -2,6 +2,7 @@
     "name": "join with multiple fields selected",
 
     "backends": {
+        "mimir": "skip",
         "couchbase":         "pending",
         "marklogic_json":    "pending",
         "mongodb_2_6":       "pending",

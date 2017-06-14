@@ -2,8 +2,9 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
-      "mongodb_read_only": "pending",
-      "postgresql":        "pending"
+        "mimir": "skip",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending"
     },
 
     "data": "largeZips.data",

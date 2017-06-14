@@ -470,7 +470,7 @@ class PlannerSpec extends
                  $and(
                    $lte($literal(Check.minDate), $field("baz")),
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
-                 $add($dayOfWeek($field("baz")), $literal(Bson.Int32(-1))),
+                 $subtract($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }
@@ -488,7 +488,7 @@ class PlannerSpec extends
                    $lt($field("baz"), $literal(Bson.Regex("", "")))),
                  $cond($eq($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
-                   $add($dayOfWeek($field("baz")), $literal(Bson.Int32(-1)))),
+                   $subtract($dayOfWeek($field("baz")), $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }

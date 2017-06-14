@@ -1,7 +1,8 @@
 {
     "name": "match on case-insensitive string",
     "backends": {
-        "postgresql":  "pending"
+        "mimir": "skip",
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select * from zips where city ~* \"^bOu\"",

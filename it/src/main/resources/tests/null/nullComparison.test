@@ -1,6 +1,7 @@
 {
     "name": "filter on `!= null`",
     "backends": {
+        "mimir": "skip",
         "marklogic_json": "pending",
         "postgresql":     "pending"
     },

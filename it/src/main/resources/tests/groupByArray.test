@@ -1,6 +1,7 @@
 {
     "name": "group by array",
     "backends": {
+        "mimir": "skip",
         "postgresql":  "pending"
     },
     "data": "slamengine_commits.data",

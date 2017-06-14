@@ -2,7 +2,8 @@
     "name": "simple $project with one renamed field and one unchanged (see #598)",
 
     "backends": {
-        "postgresql": "pending"
+        "mimir": "skip",
+        "postgresql":        "pending"
     },
 
     "data": "zips.data",
