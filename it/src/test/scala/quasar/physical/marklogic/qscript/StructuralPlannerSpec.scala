@@ -272,13 +272,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
         val left = testCase.obj
         val right = ListMap(testCase.obj.keys.zip(values.toList).toList: _*)
 
-        val commonKeys = left.keySet & right.keySet
-        val leftKeys = left.keySet &~ right.keySet
-
-        val commonEntries = commonKeys.map(key => right.get(key).map((key, _))).toList
-        val leftEntries = leftKeys.map(key => left.get(key).map((key, _))).toList
-
-        val o = Data._obj(ListMap((commonEntries ++ leftEntries).unite: _*))
+        val o = Data._obj(left ++ right)
 
         evalF((lit(Data._obj(left)) |@| lit(Data._obj(right)))(SP.objectMerge).join) must resultIn(o)
       }
