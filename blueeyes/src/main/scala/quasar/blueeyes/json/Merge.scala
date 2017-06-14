@@ -16,8 +16,6 @@
 
 package quasar.blueeyes.json
 
-import quasar.blueeyes._
-
 /** Function to merge two JSONs.
   */
 object Merge {

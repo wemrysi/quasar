@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package accounts
+package quasar.precog.common.accounts
 
 import quasar.precog.common.Path
 import quasar.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
-import Permission._
+import quasar.precog.common.security.Permission._
 
-import quasar.blueeyes._, json._, serialization._
-import quasar.blueeyes.json.serialization.IsoSerialization._
+import quasar.blueeyes._, json._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.Versioned._
 
-import scalaz.Validation
-import scalaz.syntax.apply._
 import scalaz.syntax.plus._
 
 import java.time.LocalDateTime

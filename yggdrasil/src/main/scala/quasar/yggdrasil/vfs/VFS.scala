@@ -23,7 +23,6 @@ import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
-import quasar.precog.util._
 
 import java.util.Arrays
 import java.nio.{ByteBuffer, CharBuffer}
@@ -92,8 +91,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
       EitherT {
         resource.fold(
           br => br.asString.run.map(_.toRightDisjunction(notAQuery)),
-          _ => \/.left(notAQuery).point[M]
-        )
+          _ => \/.left(notAQuery).point[M])
       }
     }
 

@@ -21,7 +21,6 @@ import quasar.yggdrasil._
 
 import spire.implicits._
 import scala.util.Random
-import quasar.blueeyes._
 import scalaz._
 
 trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]

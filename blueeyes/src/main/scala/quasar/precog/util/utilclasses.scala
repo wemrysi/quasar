@@ -16,21 +16,29 @@
 
 package quasar.precog.util
 
-import quasar.blueeyes._, json._, serialization._
-import DefaultSerialization._, Extractor._
-import org.slf4s.Logging
+import quasar.blueeyes._
+import quasar.blueeyes.json.JValue
+import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
+import quasar.blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes.json.serialization.Extractor._
 import quasar.precog._
-import scala.{ collection => sc }
+
+import org.slf4s.Logging
+
+import scalaz._
+import scalaz.Ordering.{LT, EQ, GT}
+
 import scala.collection.JavaConverters._
-import scalaz._, Scalaz._, Ordering._
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable.Builder
+import scala.{ collection => sc }
+
 import java.io.FileReader
 import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 import java.nio.file.Files
-import scala.collection.generic.CanBuildFrom
-import scala.collection.mutable.Builder
-import java.util.Arrays.fill
 import java.time.LocalDateTime
+import java.util.Arrays.fill
 
 trait FileLock {
   def release: Unit

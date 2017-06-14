@@ -17,7 +17,6 @@
 package quasar.mimir
 
 import quasar.yggdrasil._
-import quasar.blueeyes._
 import quasar.precog.common._
 import scalaz._
 

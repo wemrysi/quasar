@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.util._
 
 import java.io._
 import java.nio.channels.WritableByteChannel

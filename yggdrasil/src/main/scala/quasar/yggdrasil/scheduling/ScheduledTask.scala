@@ -26,7 +26,6 @@ import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.precog.common.Path
 import quasar.precog.common.security.{APIKey, Authorities}
 
-import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
 import java.util.UUID

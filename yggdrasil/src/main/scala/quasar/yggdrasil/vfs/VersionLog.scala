@@ -16,17 +16,12 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.yggdrasil._
-
-import quasar.blueeyes.json.{ JParser, JString, JValue }
+import quasar.blueeyes.json.{ JParser, JString }
 import quasar.blueeyes.json.serialization._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
-import quasar.blueeyes.json.serialization.IsoSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
 import quasar.blueeyes.json.serialization.Versioned._
-//import quasar.blueeyes.json.serialization.JodaSerializationImplicits._
 
-//import quasar.precog.common.serialization._
 import quasar.precog.util.{FileLock, IOUtils}
 
 import org.slf4s.Logging
@@ -35,14 +30,12 @@ import java.io._
 import java.util.UUID
 import java.time.Instant
 
-import scalaz.{NonEmptyList => NEL, _}
+import scalaz._
 import scalaz.effect.IO
 import scalaz.std.list._
 import scalaz.std.option._
-import scalaz.syntax.std.option._
 import scalaz.syntax.traverse._
 import scalaz.syntax.applicative._
-import scalaz.syntax.effect.id._
 import scalaz.syntax.std.boolean._
 
 import shapeless._
@@ -151,7 +144,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   def addVersion(entry: VersionEntry): IO[Unit] = allVersions.find(_ == entry) map { _ =>
     IO(())
   } getOrElse {
-    log.debug("Adding version entry: " + entry)
+    log.debug(s"Adding version entry $entry for base directory $baseDir.")
     IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) flatMap { _ =>
       IO(allVersions = allVersions :+ entry)
     }

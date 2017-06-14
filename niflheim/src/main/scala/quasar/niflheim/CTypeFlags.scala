@@ -57,6 +57,7 @@ object CTypeFlags {
           case CArrayType(tpe) =>
             buffer += FArray
             flagForCValueType(tpe)
+          case CPeriod => ???
         }
       }
 

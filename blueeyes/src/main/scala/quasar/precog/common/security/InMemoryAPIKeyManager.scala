@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.precog.common
-package security
-
-import accounts.AccountId
+package quasar.precog.common.security
 
 import quasar.blueeyes._
 import quasar.blueeyes.util.Clock
-
-import scala.collection.mutable
+import quasar.precog.common._
 
 import scalaz._
 import scalaz.std.option._

@@ -17,13 +17,10 @@
 package quasar.niflheim
 
 import quasar.blueeyes.json._
-import quasar.precog.common._
-import quasar.precog.util._
 
-import scala.{specialized => spec}
 import scala.collection.mutable
 
-import java.io._
+import java.io.{File => JFile}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -106,7 +103,7 @@ private[niflheim] object RawLoader {
   def recover1(id: Long, f: File, rows: mutable.ArrayBuffer[JValue], events: mutable.ArrayBuffer[(Long, Int)]) {
 
     // open a tempfile to write a "corrected" rawlog to, and write the header
-    val tmp = File.createTempFile("nilfheim", "recovery")
+    val tmp = JFile.createTempFile("nilfheim", "recovery")
     val os = new BufferedOutputStream(new FileOutputStream(tmp, true))
     writeHeader(os, id)
 

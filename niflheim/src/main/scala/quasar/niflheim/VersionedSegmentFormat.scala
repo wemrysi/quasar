@@ -16,10 +16,9 @@
 
 package quasar.niflheim
 
-import java.nio.ByteBuffer
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
-import scalaz.{Validation, Success, Failure}
+import scalaz.{Validation, Failure}
 import scalaz.syntax.monad._
 
 /**

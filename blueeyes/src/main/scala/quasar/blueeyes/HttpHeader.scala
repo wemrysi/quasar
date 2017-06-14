@@ -19,8 +19,6 @@ package quasar.blueeyes
 import quasar.precog.ProductPrefixUnmangler
 
 import scalaz.Scalaz._
-import scala.util.parsing.combinator._
-import scala.util.parsing.input._
 
 // FIXME Just needed for tests. Move to test directory.
 sealed trait HttpHeaderField[T <: HttpHeader] extends ProductPrefixUnmangler {
@@ -40,8 +38,7 @@ object HttpHeaderField {
     `Content-Length`,
     `Cache-Control`,
     Trailer,
-    `Transfer-Encoding`
-  )
+    `Transfer-Encoding`)
 
   val ByName: Map[String, HttpHeaderField[_]] = All.map(v => (v.name.toLowerCase -> v)).toMap
 
@@ -85,8 +82,6 @@ sealed trait HttpHeader extends ProductPrefixUnmangler {
 }
 
 trait HttpHeaderImplicits {
-  import HttpHeaders._
-
   implicit def tuple2HttpHeader(t: (String, String)): HttpHeader = HttpHeader(t)
 }
 

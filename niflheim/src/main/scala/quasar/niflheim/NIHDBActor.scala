@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.common.accounts.AccountId
 import quasar.precog.common.ingest.EventId
 import quasar.precog.common.security.Authorities
 import quasar.precog.util._
@@ -26,7 +25,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.pattern.{AskSupport, GracefulStopSupport}
 import akka.util.Timeout
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
 import quasar.blueeyes.json._
@@ -35,19 +34,14 @@ import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.IsoSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
 
-import org.objectweb.howl.log._
-
 import scalaz._
 import scalaz.Validation._
 import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
 
-import java.io.FileNotFoundException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
 
 import scala.collection.immutable.SortedMap
-import scala.collection.JavaConverters._
 
 import shapeless._
 
