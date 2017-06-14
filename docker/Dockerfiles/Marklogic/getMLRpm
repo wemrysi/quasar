@@ -30,6 +30,7 @@ ML_RPM_SHA1="$CACHE_DIR/MarkLogic.rpm.sha1"
 echo "$ML_SHA  $ML_RPM_PATH" > $ML_RPM_SHA1
 
 if [ ! -f ML_RPM_PATH ]
+then
   echo "Didn't find MarkLogic.rpm in cache, downloading ..."
   downloadMLRpm
 fi
