@@ -97,9 +97,11 @@ package object fs {
       bkt     <- EitherT(Task.delay(cm.hasBucket(params.bucket).booleanValue).ifM(
                    Task.delay(cluster.openBucket(params.bucket, params.pass).right[DefinitionError]),
                    Task.now(s"Bucket ${params.bucket} not found".wrapNel.left.left)))
-    } yield Config(ClientContext(bkt, DocTypeKey(params.docTypeKey)), cluster)
+      bktMgr  =  bkt.bucketManager
+      lcv     =  ListContentsView(DocTypeKey(params.docTypeKey))
+      _       <- Task.delay(bktMgr.upsertDesignDocument(lcv.designDoc)).liftM[DefErrT]
+    } yield Config(ClientContext(bkt, DocTypeKey(params.docTypeKey), lcv), cluster)
   }
-
 
   def interp: Task[Eff ~> Task] =
     (
