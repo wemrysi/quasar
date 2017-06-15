@@ -136,15 +136,6 @@ package object qscript {
 
   ////
 
-  // A string consisting only of digits.
-  private val IntegralNumber = "^(\\d+)$".r
-
-  // Applies transformations to string to make them valid QNames
-  private val encodeForQName: String => String = {
-    case IntegralNumber(n) => "_" + n
-    case other             => other
-  }
-
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(
       MarkLogicPlannerError.invalidQName(s))

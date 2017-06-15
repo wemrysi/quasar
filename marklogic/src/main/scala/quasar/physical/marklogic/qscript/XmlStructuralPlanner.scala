@@ -132,7 +132,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             childrenNamedEncoded(obj, s.xs))
 
       case _ =>
-        guardQNameF(key, childrenNamedQName(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
+        guardQNameF(key, childrenNamed(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
     }
 
     prj >>= (manyToArray(_))
@@ -228,9 +228,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
     })
 
 
-  // ejson:children-named-qname($src as element()?, $name as xs:QName?) as item()*
-  lazy val childrenNamedQName: F[FunctionDecl2] =
-    ejs.declare[F]("children-named-qname") map (_(
+  // ejson:children-named($src as element()?, $name as xs:QName?) as item()*
+  lazy val childrenNamed: F[FunctionDecl2] =
+    ejs.declare[F]("children-named") map (_(
       $("src")  as ST("element()?"),
       $("name") as ST("xs:QName?")
     ).as(ST.Top) { (src: XQuery, field: XQuery) =>
@@ -299,7 +299,9 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
       ).as(ST(s"element()")) { (name: XQuery, value: XQuery) =>
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
-            element { name } { mkSeq_(e `/` axes.attribute.node(), e `/` child.node()) })
+            element { name }
+              { mkSeq_(e `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs),
+                e `/` child.node())})
         ) default (element { name } { mkSeq_(typeAttr(value), value) })
       })
     }
@@ -314,13 +316,11 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { ejsonEncodedName.xqy } {
-              mkSeq_(
-                attribute { ejsonEncodedAttr.xqy } { name },
-                e `/` axes.attribute.node(),
+              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
+                e `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs),
                 e `/` child.node())})
         ) default (element { ejsonEncodedName.xqy }
-          { mkSeq_(
-              attribute { ejsonEncodedAttr.xqy } { name },
+          { mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
               typeAttr(value),
               value)})
       })
