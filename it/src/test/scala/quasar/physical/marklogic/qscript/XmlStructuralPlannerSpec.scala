@@ -81,6 +81,24 @@ final class XmlStructuralPlannerSpec
       }
     }
 
+    "mkObjectEntry" >> {
+      "makes encoded object from encoded element" >> prop { (x: Data) =>
+        val innerObj = lit(x) >>= (SP.mkObjectEntry("1".xs, _))
+        val objEntry = innerObj >>= (SP.mkObjectEntry("2".xs, _))
+        val obj = objEntry >>= (e => SP.mkObject(mkSeq_(e)))
+
+        eval(obj) must resultIn(Data.Obj("2" -> x))
+      }
+
+      "makes non-encoded object from encoded element" >> prop { (x: Data) =>
+        val innerObj = lit(x) >>= (SP.mkObjectEntry("1".xs, _))
+        val objEntry = innerObj >>= (SP.mkObjectEntry(xs.QName("someElem".xs), _))
+        val obj = objEntry >>= (e => SP.mkObject(mkSeq_(e)))
+
+        eval(obj) must resultIn(Data.Obj("someElem" -> x))
+      }
+    }
+
     "objectMerge" >> {
       "merges non-QName keys" >> prop { (x: Data, y: Data) =>
         val obj1 = (lit(x) >>= (SP.mkObjectEntry("1".xs, _))) >>= (e => SP.mkObject(mkSeq_(e)))
