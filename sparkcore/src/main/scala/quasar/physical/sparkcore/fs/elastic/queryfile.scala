@@ -69,7 +69,7 @@ object queryfile {
       E.listIndeces.map(_.map(rootFolder).toSet.map(toDirName))
     else {
       val prefix = posixCodec.unsafePrintPath(adir).substring(1).replace("/", separator)
-      E.listIndeces.map(indices =>
+      val folders = E.listIndeces.map(indices =>
         indices
           .filter(_.startsWith(prefix))
           .map(s => s.substring(s.indexOf(prefix) + prefix.length))
@@ -79,7 +79,9 @@ object queryfile {
           }
           .toSet
           .map(toDirName))
-//      E.listTypes(parseIndex(adir)).map(_.map(toFileName).toSet)
+      val index = prefix.substring(0, prefix.length - separator.length)
+      val files = E.listTypes(index).map(_.map(toFileName).toSet)
+      (folders |@| files)(_ ++ _)
     }
     EitherT(segments.map(_.right[FileSystemError]))
   }
