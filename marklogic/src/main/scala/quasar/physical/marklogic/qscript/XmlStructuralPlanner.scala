@@ -113,8 +113,6 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   }
 
   def objectLookup(obj: XQuery, key: XQuery) = {
-    import axes.attribute
-
     val prj = key match {
       case XQuery.Step(_) =>
         (obj `/` key).point[F]
@@ -127,20 +125,13 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             obj `/` child(qn))
 
       case XQuery.StringLit(s) =>
-        freshName[F] map { m =>
-          val pred = attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs
+        freshName[F] map ( m =>
           if (XQuery.flwor.nonEmpty(obj))
-            let_(m := obj) return_ (~m `/` child(ejsonEncodedName)(pred))
+            let_(m := obj) return_ childrenNamedEncoded(~m, s.xs)
           else
-            obj `/` child(ejsonEncodedName)(pred)
-        }
+            childrenNamedEncoded(obj, s.xs))
 
-      case _ => {
-        val pred = attribute.attributeNamed(ejsonEncodedAttr.shows) === fn.string(key)
-        guardQNameF(
-          key, childrenNamed(obj, xs.QName(key)),
-          (obj `/` child(ejsonEncodedName)(pred)).point[F])
-      }
+      case _ => guardQNameF(key, childrenNamed(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)).point[F])
     }
 
     prj >>= (manyToArray(_))
@@ -148,6 +139,17 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
 
   def objectMerge(o1: XQuery, o2: XQuery) =
     elementMerge(o1, o2)
+
+  private def guardQNameF(candidate: XQuery, left: F[XQuery], right: F[XQuery]): F[XQuery] =
+    (left |@| right)((l, r) => guardQName(candidate, expr.func()(l), expr.func()(r))).join
+
+  private def childrenNamedEncoded(src: XQuery, field: XQuery): XQuery = {
+    val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
+    src `/` child(ejsonEncodedName)(pred)
+  }
+
+  private def nonEncodedAttrs(elt: XQuery): XQuery =
+    elt `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs)
 
   ////
 
@@ -297,8 +299,7 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { name }
-              { mkSeq_(e `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs),
-                e `/` child.node())})
+              { mkSeq_(nonEncodedAttrs(e), e `/` child.node())})
         ) default (element { name } { mkSeq_(typeAttr(value), value) })
       })
     }
@@ -313,9 +314,8 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         typeswitch(value)(
           $("e") as ST("element()") return_ (e =>
             element { ejsonEncodedName.xqy } {
-              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
-                e `/` axes.attribute.node()(fn.name() =/= ejsonEncodedAttr.shows.xs),
-                e `/` child.node())})
+              mkSeq_(attribute { ejsonEncodedAttr.xqy } { name }, nonEncodedAttrs(e), e `/` child.node())
+            })
         ) default (element { ejsonEncodedName.xqy }
           { mkSeq_(attribute { ejsonEncodedAttr.xqy } { name },
               typeAttr(value),
@@ -428,7 +428,4 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         "QName".xs,
         candidate)
     })
-
-  private def guardQNameF(candidate: XQuery, left: F[XQuery], right: F[XQuery]): F[XQuery] =
-    (left |@| right)((l, r) => guardQName(candidate, expr.func()(l), expr.func()(r))).join
 }
