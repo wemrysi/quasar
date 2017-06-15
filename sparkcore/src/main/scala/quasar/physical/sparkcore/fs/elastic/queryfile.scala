@@ -66,7 +66,7 @@ object queryfile {
     val rootFolder: String => String = _.split(separator).head
 
     val segments = if(adir === rootDir)
-      E.listIndecies.map(_.map(rootFolder).toSet.map(toDirName))
+      E.listIndeces.map(_.map(rootFolder).toSet.map(toDirName))
     else {
       E.listTypes(parseIndex(adir)).map(_.map(toFileName).toSet)
     }

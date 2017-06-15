@@ -28,7 +28,7 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
     def apply[A](from: ElasticCall[A]) = from match {
       case TypeExists(index, typ) => true
       case ListTypes(index) => List.empty[String]
-      case ListIndecies() => indices
+      case ListIndeces() => indices
     }
   }
 
