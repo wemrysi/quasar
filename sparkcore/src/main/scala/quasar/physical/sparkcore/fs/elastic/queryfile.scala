@@ -20,11 +20,8 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
-// import quasar.effect._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
-// import quasar.fs.FileSystemError._
-// import quasar.fs.PathError._
 import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
@@ -64,10 +61,15 @@ object queryfile {
   def listContents[S[_]](adir: ADir)(implicit
     E: ElasticCall.Ops[S]
   ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = {
+    val toDirName: String => PathSegment = t => DirName(t).left[FileName]
+    val toFileName: String => PathSegment = t => FileName(t).right[DirName]
+    val rootFolder: String => String = _.split(separator).head
+
     val segments = if(adir === rootDir)
-      E.listIndecies.map(_.map(t => DirName(t).left[FileName]).toSet)
-    else
-      E.listTypes(parseIndex(adir)).map(_.map(t => FileName(t).right[DirName]).toSet)
+      E.listIndecies.map(_.map(rootFolder).toSet.map(toDirName))
+    else {
+      E.listTypes(parseIndex(adir)).map(_.map(toFileName).toSet)
+    }
     EitherT(segments.map(_.right[FileSystemError]))
   }
 

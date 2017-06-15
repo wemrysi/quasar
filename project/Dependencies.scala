@@ -45,6 +45,7 @@ object Dependencies {
     "org.typelevel" %% "discipline"      % disciplineVersion  % Test,
     "org.typelevel" %% "spire-laws"      % spireVersion       % Test,
     "org.specs2"    %% "specs2-core"     % specsVersion       % Test,
+    "org.typelevel" %% "scalaz-specs2"   % "0.3.0"            % Test,
     CommonDependencies.scalaz.scalacheckBinding               % Test,
     CommonDependencies.typelevel.shapelessScalacheck          % Test,
     CommonDependencies.typelevel.scalazSpecs2                 % Test
