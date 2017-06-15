@@ -238,12 +238,12 @@ object view {
     def lift(e: Set[FPath], plan: Fix[LP]) =
       plan.project.map((e, _)).point[SemanticErrsT[Free[S, ?], ?]]
 
-    def lookup(loc: AFile): OptionT[Free[S, ?], (Fix[Sql], Variables)] =
+    def lookup(loc: AFile): OptionT[Free[S, ?], (Blob[Fix[Sql]], Variables)] =
       OptionT(M.lookupConfig(loc).run.map(_.flatMap(viewConfig.getOption)))
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], SemanticErrors \/ Fix[LP]] =
-      lookup(loc).map { case (expr, vars) =>
-         precompile[Fix[LP]](Block(expr, Nil), vars, fileParent(loc)).run.value
+      lookup(loc).map { case (blob, vars) =>
+         precompile[Fix[LP]](blob, vars, fileParent(loc)).run.value
       }
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler

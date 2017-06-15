@@ -38,7 +38,7 @@ class ViewReadQueryRegressionSpec
   val suiteName = "View Reads"
   type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: AnalyticalFileSystemIO)#M[A]
 
-  def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
+  def mounts(path: APath, expr: Blob[Fix[Sql]], vars: Variables): Task[Mounting ~> Task] =
     (
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(expr, vars))) |@|
       TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]) |@|
@@ -59,7 +59,7 @@ class ViewReadQueryRegressionSpec
   def queryResults(block: Block[Fix[Sql]], vars: Variables, basePath: ADir) = {
     val path = basePath </> file("view")
     val prg: Process[RF.unsafe.M, Data] = RF.scanAll(path)
-    val interp = mounts(path, block.expr, vars).flatMap(interpViews).unsafePerformSync
+    val interp = mounts(path, block, vars).flatMap(interpViews).unsafePerformSync
 
     def t: RF.unsafe.M ~> qfTransforms.CompExecM =
       new (RF.unsafe.M ~> qfTransforms.CompExecM) {

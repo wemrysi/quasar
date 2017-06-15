@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.queryPlan
 import quasar.effect._
 import quasar.fs.AnalyticalFileSystem
-import quasar.sql.Block
 import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
@@ -60,9 +59,9 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, MountingError \/ Unit] = {
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
-        case MountView(f, qry, vars) =>
-          queryPlan(Block(qry, Nil), vars, fileParent(f), 0L, None).run.value
-            .leftMap(e => invalidConfig(viewConfig(qry, vars), e.map(_.shows)))
+        case MountView(f, blob, vars) =>
+          queryPlan(blob, vars, fileParent(f), 0L, None).run.value
+            .leftMap(e => invalidConfig(viewConfig(blob, vars), e.map(_.shows)))
             .void.point[Free[T, ?]]
 
         case MountFileSystem(d, typ, uri) =>

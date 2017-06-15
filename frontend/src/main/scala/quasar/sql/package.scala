@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
 
+import contextual._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -59,6 +60,11 @@ package object sql {
 
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
+
+  implicit class SqlStringContext(sc: StringContext) {
+    val sqlE = Prefix(SqlExprInterpolator, sc)
+    val sqlB = Prefix(SqlBlobInterpolator, sc)
+  }
 
   def CrossRelation[T]
     (left: SqlRelation[T], right: SqlRelation[T])

@@ -16,10 +16,17 @@
 
 package quasar.sql
 
-trait Arbitraries extends
-  ExprArbitrary with
-  BlobArbitrary with
-  StatementArbitrary with
-  CINameArbitrary
+import slamdata.Predef._
 
-object Arbitraries extends Arbitraries
+import scala.Predef.implicitly
+
+import org.scalacheck.Arbitrary
+import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz.Scalaz._
+
+trait CINameArbitrary {
+  implicit val ciNameArbitrary: Arbitrary[CIName] =
+    implicitly[Arbitrary[String]].map(CIName(_))
+}
+
+object CINameArbitrary extends CINameArbitrary
