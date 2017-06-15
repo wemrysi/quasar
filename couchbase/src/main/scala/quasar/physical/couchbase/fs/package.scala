@@ -25,6 +25,7 @@ import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.Result
 import quasar.fs.mount._, FileSystemDef.{DefErrT, DefinitionError}
 
 import java.time.Duration
+import scala.collection.JavaConverters._
 import scala.math
 
 import com.couchbase.client.core.CouchbaseException
@@ -98,6 +99,14 @@ package object fs {
                    Task.delay(cluster.openBucket(params.bucket, params.pass).right[DefinitionError]),
                    Task.now(s"Bucket ${params.bucket} not found".wrapNel.left.left)))
       bktMgr  =  bkt.bucketManager
+      idxExst <- Task.delay(
+                   bktMgr.listN1qlIndexes.asScala.find { i =>
+                     \/.fromTryCatchThrowable[Boolean, Throwable](
+                       i.indexKey.getString(0) ≟ s"`${params.docTypeKey}`"
+                     ).valueOr(κ(false))
+                   }.isDefined).liftM[DefErrT]
+      _       <- idxExst.unlessM(Task.delay(bktMgr.createN1qlIndex(
+                   s"quasar_${params.docTypeKey}_idx", true, false, params.docTypeKey))).liftM[DefErrT]
       lcv     =  ListContentsView(DocTypeKey(params.docTypeKey))
       _       <- Task.delay(bktMgr.upsertDesignDocument(lcv.designDoc)).liftM[DefErrT]
     } yield Config(ClientContext(bkt, DocTypeKey(params.docTypeKey), lcv), cluster)
