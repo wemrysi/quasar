@@ -71,6 +71,7 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
 
         result must be_\/-(List(DirName("folder3"), DirName("folder4")).map(_.left[FileName]))
       }
+
       "return empty if no subfolders" in {
         val indices = List(
           "folder1",
@@ -81,6 +82,34 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
 
         result must be_\/-(List.empty[PathSegment])
       }
+    }
+
+    "for folder not directly under /" should {
+      "return its subfolders" in {
+        val indices = List(
+          "folder1",
+          s"folder2${separator}folder3",
+          s"folder2${separator}folder4${separator}folder5",
+          s"folder2${separator}folder4${separator}folder6${separator}folder7",
+          s"folder8${separator}folder9${separator}folder10",
+          s"folder11${separator}folder12${separator}folder13${separator}folder7"
+        )
+        val result = exec(rootDir </> dir("folder2") </> dir("folder4"), indices)
+
+        result must be_\/-(List(DirName("folder5"), DirName("folder6")).map(_.left[FileName]))
+      }
+
+      "return empty if no subfolders" in {
+        val indices = List(
+          "folder1",
+          s"folder2${separator}folder3",
+          s"folder2${separator}folder4${separator}folder5"
+        )
+        val result = exec(rootDir </> dir("folder3"), indices)
+
+        result must be_\/-(List.empty[PathSegment])
+      }
+
     }
   }
 }
