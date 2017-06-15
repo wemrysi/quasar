@@ -648,7 +648,7 @@ class PlannerSpec extends
            isNumeric(BsonField.Name("bar")),
            Selector.Doc(
              BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple reversed filter" in {
       plan("select * from foo where 10 < bar") must
@@ -658,7 +658,7 @@ class PlannerSpec extends
            isNumeric(BsonField.Name("bar")),
            Selector.Doc(
              BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple filter with expression in projection" in {
       plan("select a + b from foo where bar > 10") must
@@ -686,7 +686,7 @@ class PlannerSpec extends
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple js filter" in {
       val mjs = javascript[JsCore](_.embed)
@@ -766,7 +766,7 @@ class PlannerSpec extends
                  BsonField.Name("bar") -> Selector.Gte(Bson.Int32(10))),
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Lte(Bson.Int32(100))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with like" in {
       plan("select * from foo where bar like \"A.%\"") must
@@ -778,7 +778,7 @@ class PlannerSpec extends
            Selector.Doc(
              BsonField.Name("bar") ->
                Selector.Regex("^A\\..*$", false, true, false, false))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with LIKE and OR" in {
       plan("select * from foo where bar like \"A%\" or bar like \"Z%\"") must
@@ -804,7 +804,7 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.In(Bson.Arr(List(Bson.Text("AZ"), Bson.Text("CO"))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with field containing constant value" in {
       plan("select * from zips where 43.058514 in loc[_]") must
@@ -822,7 +822,7 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.Eq(Bson.Text("NV"))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "filter field “in” a bare value" in {
       plan("""select * from zips where state in "PA"""") must
@@ -830,7 +830,7 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.Eq(Bson.Text("PA"))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with field containing other field" in {
       import jscore._
@@ -855,7 +855,7 @@ class PlannerSpec extends
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
           Selector.Doc(
             BsonField.Name("city") -> Selector.Regex("^B[AEIOU]+LD.*", false, true, false, false))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with ~*" in {
       plan("select * from zips where city ~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
@@ -865,7 +865,7 @@ class PlannerSpec extends
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
           Selector.Doc(
             BsonField.Name("city") -> Selector.Regex("^B[AEIOU]+LD.*", true, true, false, false))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with !~" in {
       plan("select * from zips where city !~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
@@ -875,7 +875,7 @@ class PlannerSpec extends
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
           Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
             BsonField.Name("city") -> Selector.NotExpr(Selector.Regex("^B[AEIOU]+LD.*", false, true, false, false))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with !~*" in {
       plan("select * from zips where city !~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
@@ -885,7 +885,7 @@ class PlannerSpec extends
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
           Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
             BsonField.Name("city") -> Selector.NotExpr(Selector.Regex("^B[AEIOU]+LD.*", true, true, false, false))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with alternative ~" in {
       plan("select * from a where \"foo\" ~ pattern or target ~ pattern") must beWorkflow(chain[Workflow](
@@ -934,7 +934,7 @@ class PlannerSpec extends
                  BsonField.Name("bar") -> Selector.Neq(Bson.Int32(-10))),
                Selector.Doc(
                  BsonField.Name("baz") -> Selector.Gt(Bson.Dec(-1.0))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan complex filter" in {
       plan("select * from foo where bar > 10 and (baz = \"quux\" or foop = \"zebra\")") must
@@ -950,7 +950,7 @@ class PlannerSpec extends
                    BsonField.Name("baz") -> Selector.Eq(Bson.Text("quux"))),
                  Selector.Doc(
                    BsonField.Name("foop") -> Selector.Eq(Bson.Text("zebra")))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with not" in {
       plan("select * from zips where not (pop > 0 and pop < 1000)") must
@@ -967,7 +967,7 @@ class PlannerSpec extends
                    BsonField.Name("pop") -> Selector.NotExpr(Selector.Gt(Bson.Int32(0))))),
                  Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                    BsonField.Name("pop") -> Selector.NotExpr(Selector.Lt(Bson.Int32(1000)))))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with not and equality" in {
       plan("select * from zips where not (pop = 0)") must
@@ -976,7 +976,7 @@ class PlannerSpec extends
           $match(
             Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("pop") -> Selector.NotExpr(Selector.Eq(Bson.Int32(0))))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with \"is not null\"" in {
       plan("select * from zips where city is not null") must
@@ -985,7 +985,7 @@ class PlannerSpec extends
           $match(
             Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("city") -> Selector.Expr(Selector.Neq(Bson.Null)))))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan filter with both index and field projections" in {
       plan("select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = \"56d1caf5d082d1a6840090986e277d36d03f1859\"") must
@@ -1078,7 +1078,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp1")),
           ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "prefer projection+filter over nested JS filter" in {
       plan("select * from zips where city <> state and pop < 10000") must
@@ -2284,7 +2284,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $eq($field("foo"), $literal(Bson.Null))),
             ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan implicit group by with filter" in {
       plan("select avg(pop), min(city) from zips where state = \"CO\"") must
@@ -2314,7 +2314,7 @@ class PlannerSpec extends
                     $field("city"),
                     $literal(Bson.Undefined)))),
             \/-($literal(Bson.Null)))))
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple distinct" in {
       plan("select distinct city, state from zips") must

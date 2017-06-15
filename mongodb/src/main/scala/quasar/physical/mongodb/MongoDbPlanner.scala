@@ -948,14 +948,14 @@ object MongoDbPlanner {
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
                     WB.groupBy(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("f", i))).swap).toListMap ++ b.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("b", i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
                       b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
-                      DocContents.Doc(red.zipWithIndex.map(ai =>
+                      red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName("f", ai._2)),
-                          accumulator(ai._1.as($field(createFieldName("f", ai._2)))).left[Fix[ExprOp]])).toListMap)))(
+                          accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
                     exprs => WB.groupBy(src,
                       b,
-                      DocContents.Doc(exprs.zipWithIndex.map(ai =>
+                      exprs.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName("f", ai._2)),
-                          accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
+                          accumulator(ai._1))).toListMap)),
                     repair)
               }).join
           case Sort(src, bucket, order) =>
@@ -1265,29 +1265,41 @@ object MongoDbPlanner {
       SR: Const[ShiftedRead[AFile], ?] :<: F)
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           cond.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
             (c => QC.inj(Filter(src, c)))
         case _ => QC.inj(f).point[M]
       }
     case ls @ LeftShift(src, struct, id, repair) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (struct => QC.inj(LeftShift(src, struct, id, repair)))
         case _ => QC.inj(ls).point[M]
       }
     case m @ qscript.Map(src, mf) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))
         case _ => QC.inj(m).point[M]
       }
     case r @ Reduce(src, b, red, rep) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
             red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
             (b, red) => QC.inj(Reduce(src, b, red, rep)))

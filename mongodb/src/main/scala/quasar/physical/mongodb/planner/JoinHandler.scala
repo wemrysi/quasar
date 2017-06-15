@@ -235,9 +235,13 @@ object JoinHandler {
         rootField: BsonField.Name, otherField: BsonField.Name)
         : (WorkflowBuilder[WF], FixOp[WF]) =
       (DocBuilder(
-        groupBy(src, key, DocContents.Exp(-\/($push($$ROOT)))),
+        // TODO: If we can identify cases where the group key _is_ the `_id`
+        //       field, then we can avoid the `$group` / `$unwind` on whichever
+        //       side that applies to, since we know there’s only one entry per
+        //       `_id`.
+        groupBy(src, key, ListMap(BsonField.Name("0") -> $push($$ROOT))),
         ListMap(
-          rootField             -> \&/-($$ROOT),
+          rootField             -> \&/-($field("0")),
           otherField            -> \&/-($literal(Bson.Arr())),
           BsonField.Name("_id") -> \&/-($include()))),
         ι)
