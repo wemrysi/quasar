@@ -17,6 +17,8 @@
 package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
+import quasar.contrib.pathy._
+import quasar.fs.FileSystemError
 
 import pathy._, Path._
 import scalaz._, Scalaz._
@@ -32,23 +34,52 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
     }
   }
 
+  def exec(
+    adir: ADir,
+    indices: List[String]
+  ): FileSystemError \/ List[PathSegment] =
+    queryfile.listContents[ElasticCall](adir).run.foldMap(elasticInterpreter(indices)).map(_.toList)
 
   "ListContents" should {
     "for a /" should {
       "list all indexes if there are no multi-level folders" in {
         val indices = List("foo", "bar", "baz")
-        val program = queryfile.listContents[ElasticCall](rootDir).run
-        val result = program.foldMap(elasticInterpreter(indices)).map(_.toList)
+        val result = exec(rootDir, indices)
 
         result must be_\/-(indices.map(i => DirName(i).left[FileName]))
       }
 
       "list all indexes if there are multi-level folders" in {
         val indices = List(s"foo${separator}bar", "baz", s"muu${separator}nuu${separator}buu")
-        val program = queryfile.listContents[ElasticCall](rootDir).run
-        val result = program.foldMap(elasticInterpreter(indices)).map(_.toList)
+        val result = exec(rootDir, indices)
 
         result must be_\/-(List(DirName("foo"), DirName("baz"), DirName("muu")).map(_.left[FileName]))
+      }
+    }
+
+    "for any folder directly under /" should {
+      "return its subfolders" in {
+        val indices = List(
+          "folder1",
+          s"folder2${separator}folder3",
+          s"folder2${separator}folder4${separator}folder5",
+          s"folder2${separator}folder4${separator}folder6${separator}folder7",
+          s"folder8${separator}folder9${separator}folder10",
+          s"folder11${separator}folder12${separator}folder13${separator}folder7"
+        )
+        val result = exec(rootDir </> dir("folder2"), indices)
+
+        result must be_\/-(List(DirName("folder3"), DirName("folder4")).map(_.left[FileName]))
+      }
+      "return empty if no subfolders" in {
+        val indices = List(
+          "folder1",
+          s"folder2${separator}folder3",
+          s"folder2${separator}folder4${separator}folder5"
+        )
+        val result = exec(rootDir </> dir("folder1"), indices)
+
+        result must be_\/-(List.empty[PathSegment])
       }
     }
   }

@@ -68,7 +68,18 @@ object queryfile {
     val segments = if(adir === rootDir)
       E.listIndeces.map(_.map(rootFolder).toSet.map(toDirName))
     else {
-      E.listTypes(parseIndex(adir)).map(_.map(toFileName).toSet)
+      val prefix = posixCodec.unsafePrintPath(adir).substring(1).replace("/", separator)
+      E.listIndeces.map(indices =>
+        indices
+          .filter(_.startsWith(prefix))
+          .map(s => s.substring(s.indexOf(prefix) + prefix.length))
+          .map {
+            case s if s.contains(separator) => s.substring(0, s.indexOf(separator))
+            case s => s
+          }
+          .toSet
+          .map(toDirName))
+//      E.listTypes(parseIndex(adir)).map(_.map(toFileName).toSet)
     }
     EitherT(segments.map(_.right[FileSystemError]))
   }
