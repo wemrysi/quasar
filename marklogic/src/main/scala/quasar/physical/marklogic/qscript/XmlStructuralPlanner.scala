@@ -113,6 +113,8 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
   }
 
   def objectLookup(obj: XQuery, key: XQuery) = {
+    import axes.attribute
+
     val prj = key match {
       case XQuery.Step(_) =>
         (obj `/` key).point[F]
@@ -125,14 +127,20 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
             obj `/` child(qn))
 
       case XQuery.StringLit(s) =>
-        freshName[F] flatMap ( m =>
+        freshName[F] map { m =>
+          val pred = attribute.attributeNamed(ejsonEncodedAttr.shows) === s.xs
           if (XQuery.flwor.nonEmpty(obj))
-            childrenNamedEncoded(~m, s.xs) map ((el: XQuery) => let_(m := obj) return_ el)
+            let_(m := obj) return_ (~m `/` child(ejsonEncodedName)(pred))
           else
-            childrenNamedEncoded(obj, s.xs))
+            obj `/` child(ejsonEncodedName)(pred)
+        }
 
-      case _ =>
-        guardQNameF(key, childrenNamed(obj, xs.QName(key)), childrenNamedEncoded(obj, fn.string(key)))
+      case _ => {
+        val pred = attribute.attributeNamed(ejsonEncodedAttr.shows) === fn.string(key)
+        guardQNameF(
+          key, childrenNamed(obj, xs.QName(key)),
+          (obj `/` child(ejsonEncodedName)(pred)).point[F])
+      }
     }
 
     prj >>= (manyToArray(_))
@@ -216,17 +224,6 @@ private[qscript] final class XmlStructuralPlanner[F[_]: Monad: MonadPlanErr: Pro
         if_(fn.count(items) gt 1.xqy) then_ arr else_ items
       }
     })
-
-  // ejson:children-named-encoded($src as element()?, $field as xs:string?) as item()*
-  lazy val childrenNamedEncoded: F[FunctionDecl2] =
-    ejs.declare[F]("encoded-child") map (_(
-      $("src") as ST("element()?"),
-      $("field") as ST("xs:string?")
-    ).as(ST.Top) { (elt: XQuery, field: XQuery) =>
-      val pred = axes.attribute.attributeNamed(ejsonEncodedAttr.shows) === field
-      elt `/` child(ejsonEncodedName)(pred)
-    })
-
 
   // ejson:children-named($src as element()?, $name as xs:QName?) as item()*
   lazy val childrenNamed: F[FunctionDecl2] =
