@@ -148,8 +148,6 @@ abstract class QueryRegressionTest[S[_]](
         case Some(SkipDirective.Pending) =>
           if (BuildInfo.coverageEnabled)
             Skipped("(pending example skipped during coverage run)")
-          else if (BuildInfo.isCIBuild)
-            Skipped("(pending example skipped during CI build)")
           else
             runTest.pendingUntilFixed
         case _                           => runTest
