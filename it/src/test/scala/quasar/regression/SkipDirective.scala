@@ -26,7 +26,9 @@ object SkipDirective {
   final case object Skip              extends SkipDirective
   final case object SkipCI            extends SkipDirective
   final case object Pending           extends SkipDirective
+  final case object IgnoreAllOrder    extends SkipDirective
   final case object IgnoreFieldOrder  extends SkipDirective
+  final case object IgnoreResultOrder extends SkipDirective
 
   import DecodeResult.{ok, fail}
 
@@ -35,7 +37,9 @@ object SkipDirective {
       case "skip"              => ok(Skip)
       case "skipCI"            => ok(SkipCI)
       case "pending"           => ok(Pending)
+      case "ignoreAllOrder"    => ok(IgnoreAllOrder)
       case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
+      case "ignoreResultOrder" => ok(IgnoreResultOrder)
       case str => fail("\"" + str + "\" is not a valid backend directive.", c.history)
     })
 }

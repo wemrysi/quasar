@@ -222,7 +222,7 @@ abstract class QueryRegressionTest[S[_]](
       // TODO: Error if a backend ignores field order when the query already does.
       if (exp.ignoreFieldOrder) FieldOrderIgnored
       else exp.backends.get(backendName) match {
-        case Some(SkipDirective.IgnoreFieldOrder) =>
+        case Some(SkipDirective.IgnoreAllOrder | SkipDirective.IgnoreFieldOrder) =>
           FieldOrderIgnored
         case _ =>
           FieldOrderPreserved

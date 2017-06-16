@@ -5,7 +5,6 @@
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
-        "mongodb_read_only": "pending",
         "postgresql":        "pending"
   },
 
