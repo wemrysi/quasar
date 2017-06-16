@@ -32,35 +32,9 @@ import scalaz.syntax.traverse._
 
 import org.slf4s.Logging
 
-trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with SecureVFSModule[Future, Slice] with AskSupport with Logging {
-  def vfs: SecureVFS
+trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] = {
-      for {
-        _ <- EitherT.right(table.toJson map { json => log.trace("Starting load from " + json.toList.map(_.renderCompact)) })
-        paths <- EitherT.right(pathsM(table))
-        projections <- paths.toList.traverse[({ type l[a] = EitherT[Future, ResourceError, a] })#l, Projection] { path =>
-          log.debug("Loading path: " + path)
-          vfs.readProjection(apiKey, path, Version.Current, AccessMode.Read) leftMap { error =>
-            log.warn("An error was encountered in loading path %s: %s".format(path, error))
-            error
-          }
-        }
-      } yield {
-        val length = projections.map(_.length).sum
-        val stream = projections.foldLeft(StreamT.empty[Future, Slice]) { (acc, proj) =>
-          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList))
-          }
-
-          log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
-        }
-
-        Table(stream, ExactSize(length))
-      }
-    }
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] = ???   // TODO
   }
 }
