@@ -11,7 +11,7 @@
         GROUP BY sensor, dt
         ORDER BY sensor ASC, dt ASC",
     "ignoreFieldOrder": [ "couchbase" ],
-    "predicate": "containsExactly",
+    "predicate": "equalsExactly",
     "expected": [
         { "measure": 62, "dimension": { "$timestamp": "2017-05-15T16:54:29.615Z" }, "series": "S0" },
         { "measure": 54, "dimension": { "$timestamp": "2017-05-17T16:54:29.615Z" }, "series": "S0" },

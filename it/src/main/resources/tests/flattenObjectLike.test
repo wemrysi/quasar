@@ -13,5 +13,6 @@
     "query": "select * from nested_foo where foo{*} = 15",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["*"],
     "expected": [{ "foo": { "bar": 15, "baz": ["qx"] }}]
 }

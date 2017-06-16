@@ -19,6 +19,7 @@
                 foo[*] = 15)",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": ["*"],
     "expected": [{ "foo": [15, [{ "baz": ["quux"] }]] },
                  { "foo": ["15z", [{ "baz": ["qx"] }]] },
                  { "foo": { "bar": 15, "baz": ["qx"] } },

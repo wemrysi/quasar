@@ -18,7 +18,7 @@
                 WHERE codes[*].desc LIKE \"%flu%\"
                 GROUP BY state, gender
                 ORDER BY COUNT(*) DESC) as meh",
-    "predicate": "containsAtLeast",
+    "predicate": "equalsInitial",
     "expected": [{ "measure": 1.238095238095, "category": "NE" },
                  { "measure": 1.238095238095, "category": "MS" },
                  { "measure": 1.238095238095, "category": "AL" },

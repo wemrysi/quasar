@@ -20,6 +20,7 @@
                 a                LIKE \"%13%\")",
     "FIXME": "Should use `containsExactly`, but see issue #732.",
     "predicate": "equalsExactly",
+    "ignoreFieldOrder": ["*"],
     "expected": [
         { "_id": { "$oid": "5552744bd86735b7268fd002" }, "a": "13" },
         { "_id": { "$oid": "55538123d86735b7268fd003" }, "foo": "zap" },

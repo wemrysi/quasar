@@ -21,7 +21,5 @@
 
     "ignoreFieldOrder": ["marklogic_json"],
 
-    "expected": [
-        { "a": "BOULDER", "b": "CHICO", "diff": 9278 }
-    ]
+    "expected": [{ "a": "BOULDER", "b": "CHICO", "diff": 9278 }]
 }

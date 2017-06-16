@@ -14,7 +14,7 @@
 
   "ignoredFields": ["_id"],
 
-  "ignoreFieldOrder": ["marklogic_json"],
+  "ignoreFieldOrder": ["*"],
 
   "expected": [
       { "city": "BOULDER", "loc": [ -105.21426 , 40.049733], "pop": 18174, "state": "CO" },
