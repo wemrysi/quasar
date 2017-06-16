@@ -156,6 +156,4 @@ package object elastic {
     val index = posixCodec.unsafePrintPath(folder).substring(1).replace("/", separator)
     IndexType(index, typ)
   }
-
-
 }

@@ -20,6 +20,9 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fp.free._
 
+import com.sksamuel.elastic4s.http._
+import com.sksamuel.elastic4s._
+import com.sksamuel.elastic4s.http.ElasticDsl._
 import org.http4s.client.blaze._
 import org.apache.spark._
 import scalaz._, scalaz.concurrent.Task
@@ -42,10 +45,15 @@ object ElasticCall {
   }
 
   implicit def interpreter(sc: SparkContext): ElasticCall ~> Task = new (ElasticCall ~> Task) {
+
     def apply[A](from: ElasticCall[A]) = from match {
-      case TypeExists(index, typ) => Task.delay {
-        false
-      }
+      case TypeExists(index, typ) =>
+        Task.delay {
+          val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+          val result = client.execute { typesExist(typ) in index }.await.exists
+          client.close()
+          result
+        }
       case ListTypes(index) => for {
         httpClient <- Task.delay {
           PooledHttp1Client()
