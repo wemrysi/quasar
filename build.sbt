@@ -524,6 +524,12 @@ lazy val yggdrasil = project.setup
   .settings(name := "quasar-yggdrasil-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .withWarnings
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
+
+      "co.fs2" %% "fs2-core"   % "0.9.6",
+      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
