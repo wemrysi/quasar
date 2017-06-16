@@ -151,9 +151,9 @@ package object elastic {
   val separator = "__"
 
   def file2ES(afile: AFile): IndexType = {
-    val folder = fileParent(afile)
+    val folder = posixCodec.unsafePrintPath(fileParent(afile))
     val typ = fileName(afile).value
-    val index = posixCodec.unsafePrintPath(folder).substring(1).replace("/", separator)
+    val index = folder.substring(1, folder.length - 1).replace("/", separator)
     IndexType(index, typ)
   }
 }
