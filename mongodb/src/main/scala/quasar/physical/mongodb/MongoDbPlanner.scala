@@ -818,22 +818,17 @@ object MongoDbPlanner {
     invoke(node) <+> \/-(default)
   }
 
-  /** Brings a [[WorkflowBuilder.EitherE]] into our `M`.
-    */
-  def liftErr[M[_]: Applicative, A]
-    (meh: WorkflowBuilder.EitherE[A])
+  // TODO: Remove this type.
+  type WBM[X] = PlannerError \/ X
+
+  /** Brings a [[WBM]] into our `M`. */
+  def liftM[M[_]: Monad, A]
+    (meh: WBM[A])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[A] =
     meh.fold(
       e => merr.raiseError(qscriptPlanningFailed(e)),
       _.point[M])
-
-  /** Brings a [[WorkflowBuilder.M]] into our `M`. */
-  def liftM[M[_]: Monad, A]
-    (meh: WorkflowBuilder.M[A])
-    (implicit merr: MonadError_[M, FileSystemError], mst: MonadState_[M, NameGen])
-      : M[A] =
-    mst.gets(meh.eval) >>= (liftErr[M, A](_))
 
   def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 
@@ -842,11 +837,10 @@ object MongoDbPlanner {
 
     def plan
       [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-      (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+      (joinHandler: JoinHandler[WF, WBM],
         funcHandler: FuncHandler[IT, EX])
       (implicit
         merr: MonadError_[M, FileSystemError],
-        mst:  MonadState_[M, NameGen],
         ev0: WorkflowOpCoreF :<: WF,
         ev1: RenderTree[WorkflowBuilder[WF]],
         ev2: WorkflowBuilder.Ops[WF],
@@ -864,11 +858,10 @@ object MongoDbPlanner {
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: FuncHandler[T, EX])
           (implicit
             merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF],
@@ -907,11 +900,10 @@ object MongoDbPlanner {
           [M[_]: Monad,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: FuncHandler[T, EX])
           (implicit
             merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF],
@@ -981,7 +973,7 @@ object MongoDbPlanner {
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, lBranch, src) ⊛
               rebaseWB[T, M, WF, EX](joinHandler, funcHandler, rBranch, src))(
-              WB.unionAll).map(liftM[M, WorkflowBuilder[WF]]).join
+              WB.union[WBM]).map(liftM[M, WorkflowBuilder[WF]]).join
           case Subset(src, from, sel, count) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, from, src) ⊛
               (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, count, src) >>= (HasInt[M, WF](_))))(
@@ -1002,11 +994,10 @@ object MongoDbPlanner {
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: FuncHandler[T, EX])
           (implicit
             merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
@@ -1039,11 +1030,10 @@ object MongoDbPlanner {
         type IT[G[_]] = T[G]
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: FuncHandler[T, EX])
           (implicit
             merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
@@ -1062,11 +1052,10 @@ object MongoDbPlanner {
 
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: FuncHandler[T, EX])
           (implicit
             merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
@@ -1192,13 +1181,12 @@ object MongoDbPlanner {
 
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+    (joinHandler: JoinHandler[WF, WBM],
       funcHandler: FuncHandler[T, EX],
       free: FreeQS[T],
       src: WorkflowBuilder[WF])
     (implicit
       merr: MonadError_[M, FileSystemError],
-      mst:  MonadState_[M, NameGen],
       F: Planner.Aux[T, QScriptTotal[T, ?]],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: RenderTree[WorkflowBuilder[WF]],
@@ -1309,8 +1297,6 @@ object MongoDbPlanner {
       QC.inj(qc).point[M]
   }
 
-  type GenT[X[_], A]  = StateT[X, NameGen, A]
-
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
     (label: String, ma: M[A])
@@ -1354,7 +1340,7 @@ object MongoDbPlanner {
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
-      joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+      joinHandler: JoinHandler[WF, WBM],
       funcHandler: FuncHandler[T, EX])
     (lp: T[LogicalPlan])
     (implicit
@@ -1366,16 +1352,16 @@ object MongoDbPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
 
-    (for {
-      opt <- toMongoQScript(lp, listContents).liftM[GenT]
+    for {
+      opt <- toMongoQScript(lp, listContents)
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript[T, ?]].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler)))
-      wf1 <- log("Workflow (raw)", liftM[GenT[M, ?], Fix[WF]](WorkflowBuilder.build(wb)))
+        opt.cataM[M, WorkflowBuilder[WF]](Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler)))
+      wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
       wf2 <- log(
         "Workflow (crystallized)",
-        Crystallize[WF].crystallize(wf1).point[GenT[M, ?]])
-    } yield wf2).evalZero
+        Crystallize[WF].crystallize(wf1).point[M])
+    } yield wf2
   }
 
   /** Translate the QScript plan to an executable MongoDB "physical"
@@ -1396,17 +1382,17 @@ object MongoDbPlanner {
     queryContext.model match {
       case `3.2` =>
         val joinHandler =
-          JoinHandler.fallback(
-            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce[Workflow3_2F])
+          JoinHandler.fallback[Workflow3_2F, WBM](
+            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+            JoinHandler.mapReduce)
         plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2)(logical)
 
       case `3.0`     =>
-        val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
+        val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
         plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0)(logical).map(_.inject[WorkflowF])
 
       case _     =>
-        val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
+        val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
         plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6)(logical).map(_.inject[WorkflowF])
     }
   }

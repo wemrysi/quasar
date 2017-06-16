@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.Planner.PlannerError
 import quasar.RenderTree
 import quasar.contrib.scalaz._
 import quasar.fp._
@@ -64,16 +65,17 @@ object JoinHandler {
   /** When possible, plan a join using the more efficient \$lookup operator in
     * the aggregation pipeline.
     */
-  def pipeline[WF[_]: Functor: Coalesce: Crush: Crystallize]
+  def pipeline[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
     (stats: Collection => Option[CollectionStatistics],
       indexes: Collection => Option[Set[Index]])
     (implicit
+      M: MonadError_[M, PlannerError],
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowOp3_2F :<: WF,
       ev2: RenderTree[WorkflowBuilder[WF]],
       ev3: ExprOpOps.Uni[ExprOp])
-    : JoinHandler[WF, OptionT[WorkflowBuilder.M, ?]] = JoinHandler({ (tpe, left, right) =>
+    : JoinHandler[WF, OptionT[M, ?]] = JoinHandler({ (tpe, left, right) =>
 
     val WB = WorkflowBuilder.Ops[WF]
 
@@ -106,8 +108,8 @@ object JoinHandler {
     }
 
     def lookup(
-        lSrc: WorkflowBuilder[WF], lKey: Expr, lName: BsonField.Name,
-        rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
+      lSrc: WorkflowBuilder[WF], lKey: Expr, lName: BsonField.Name,
+      rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
 
       // NB: filtering on the left prior to the join is not strictly necessary,
       // but it avoids a runtime explosion in the common error case that the
@@ -121,7 +123,7 @@ object JoinHandler {
         case HasThat($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
-          generateWorkflow(filtered).map { case (left, _) =>
+          generateWorkflow[M, WF](filtered).map { case (left, _) =>
             CollectionBuilder(
               chain[Fix[WF]](
                 left,
@@ -129,28 +131,27 @@ object JoinHandler {
                 $unwind(DocField(rName))),
               Root(),
               None)
-            }
+          }
 
         case _ =>
           for {
-            tmpName <- emitSt(freshName)
-            t       <- generateWorkflow(
+            t <- generateWorkflow[M, WF](
               DocBuilder(lSrc, ListMap(
-                lName   -> docVarToExpr(DocVar.ROOT()),
-                tmpName -> lKey)))
+                lName               -> docVarToExpr(DocVar.ROOT()),
+                BsonField.Name("0") -> lKey)))
             (src, _) = t
           } yield CollectionBuilder(
-              chain[Fix[WF]](
-                src,
-                $lookup(rColl, tmpName, rField, rName),
-                $project(
-                  Reshape(ListMap(
-                    lName -> \/-($var(DocField(lName))),
-                    rName -> \/-($var(DocField(rName))))),
-                  IgnoreId),
-                $unwind(DocField(rName))),
-              Root(),
-              None)
+            chain[Fix[WF]](
+              src,
+              $lookup(rColl, BsonField.Name("0"), rField, rName),
+              $project(
+                Reshape(ListMap(
+                  lName -> \/-($var(DocField(lName))),
+                  rName -> \/-($var(DocField(rName))))),
+                IgnoreId),
+              $unwind(DocField(rName))),
+            Root(),
+            None)
       }
     }
 
@@ -202,9 +203,9 @@ object JoinHandler {
   /** Plan an arbitrary join using only "core" operators, which always means a
     * map-reduce.
     */
-  def mapReduce[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
-    : JoinHandler[WF, WorkflowBuilder.M] = JoinHandler({ (tpe, left0, right0) =>
+  def mapReduce[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
+    (implicit M: MonadError[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
+    : JoinHandler[WF, M] = JoinHandler({ (tpe, left0, right0) =>
 
     val ops = Ops[WF]
     import ops._
@@ -328,7 +329,7 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (generateWorkflow(left._1) |@| generateWorkflow(right._1)) {
+    (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
       case ((l, _), (r, _)) =>
         CollectionBuilder(
           chain(
@@ -357,7 +358,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    generateWorkflow[WF](wb).evalZero.fold(
+    generateWorkflow[PlannerError \/ ?, WF](wb).fold(
       κ(false),
       wf => checkTask(task(Crystallize[WF].crystallize(wf._1))))
   }

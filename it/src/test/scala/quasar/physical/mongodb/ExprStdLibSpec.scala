@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._
+import quasar._, Planner.PlannerError
 import quasar.contrib.scalaz._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
 import quasar.physical.mongodb.expression._
@@ -62,16 +62,16 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     queryModel match {
       case MongoQueryModel.`3.2` =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
       case MongoQueryModel.`3.0` =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
         (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6)(mf) >>=
-          (expr => WorkflowBuilder.build(WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).evalZero.leftMap(qscriptPlanningFailed.reverseGet)))
+          (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
     }

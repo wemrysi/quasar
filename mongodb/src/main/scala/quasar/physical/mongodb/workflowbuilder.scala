@@ -22,7 +22,6 @@ import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.fp._
-import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
 import quasar.jscore, jscore.JsFn
@@ -318,17 +317,6 @@ object WorkflowBuilder {
   private def prefixBase0(base: Base): PartialFunction[DocVar, DocVar] =
     prefixBase(base.toDocVar)
 
-  type EitherE[X] = PlannerError \/ X
-  type M[X] = StateT[EitherE, NameGen, X]
-
-  // Wrappers for results that don't use state:
-  def emit[A](a: A): M[A] = quasar.namegen.emit[EitherE, A](a)
-  def fail[A](e: PlannerError): M[A] = lift(-\/(e))
-  def lift[A](v: EitherE[A]): M[A] = quasar.namegen.lift[EitherE](v)
-  def emitSt[A](v: State[NameGen, A]): M[A] = emitName[EitherE, A](v)
-  def swapM[A](v: State[NameGen, PlannerError \/ A]): M[A] =
-    StateT[EitherE, NameGen, A](s => { val (s1, x) = v.run(s); x.map(s1 -> _) })
-
   private val jsBase = jscore.Name("__val")
 
   def schema[WF[_]]: Algebra[WorkflowBuilderF[WF, ?], Schema] = {
@@ -343,8 +331,8 @@ object WorkflowBuilder {
   // FIXME: There are a few recursive references to this function. We need to
   //        eliminate those.
   // TODO: See if we can extract `WB => Base` from this.
-  def toWorkflow[WF[_]: Coalesce]
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
+  def toWorkflow[M[_]: Monad, WF[_]: Coalesce]
+    (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
       : AlgebraM[M, WorkflowBuilderF[WF, ?], (Fix[WF], Base)] = {
     case CollectionBuilderF(graph, base, _) => (graph, base).point[M]
     case ShapePreservingBuilderF((g, b), inputs, op) =>
@@ -354,36 +342,35 @@ object WorkflowBuilder {
           inputs.traverse {
             case HasThat($var(DocField(x))) => x.some
             case _                          => none
-          }.fold(
-            emitSt(inputs.traverse(i => freshName.map((_, i)))) >>= (pairs =>
-              emitSt(freshName) >>= (srcName =>
-                op.lift(pairs.map(_._1)).fold(
-                  fail[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
-                  op => toWorkflow.apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
-                    case (graph, _) => (chain(graph, op), Field(srcName))
-                  }))))(
+          }.fold {
+            val pairs = inputs.zipWithIndex.map(_.map(i => BsonField.Name(i.shows)).swap)
+            val srcName = BsonField.Name("src")
+            op.lift(pairs.map(_._1)).fold(
+              M.raiseError[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
+              op => toWorkflow[M, WF].apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
+                case (graph, _) => (chain(graph, op), Field(srcName))
+              })
+          } (
             op.lift(_).fold(
-              fail[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
+              M.raiseError[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
               op => (chain(g, op), b).point[M]))
       }
     case ExprBuilderF((g, b), HasThat($var(d))) =>
       (g, b \ fromDocVar(d)).point[M]
     case ExprBuilderF((g, b), expr) =>
-      rewriteExprPrefix(expr, b) match {
+      (rewriteExprPrefix(expr, b) match {
         case HasThat(op) =>
-          emitSt(freshName) ∘ (name =>
-            (chain(g, $project[WF](Reshape(ListMap(name -> \/-(op))))),
-              Field(name)))
+          (chain(g, $project[WF](Reshape(ListMap(BsonField.Name("0") -> \/-(op))))),
+            Field(BsonField.Name("0")))
         case \&/.This(js) =>
-          emit(
-            (chain(g, $simpleMap[WF](NonEmptyList(MapExpr(js)), ListMap())),
-              Root()))
-      }
+          (chain(g, $simpleMap[WF](NonEmptyList(MapExpr(js)), ListMap())),
+            Root())
+      }).point[M]
     case DocBuilderF((wf, base), shape) =>
       alignExpr(rewriteDocPrefix(shape, base)).fold(
-        fail[(Fix[WF], Base)](InternalError fromMsg "Could not align the expressions"))(
-        s => shape.keys.toList.toNel.fold[M[(Fix[WF], Base)]](
-          fail(InternalError fromMsg "A shape with no fields does not make sense"))(
+        M.raiseError[(Fix[WF], Base)](InternalError fromMsg "Could not align the expressions"))(
+        s => shape.keys.toList.toNel.fold(
+          M.raiseError[(Fix[WF], Base)](InternalError fromMsg "A shape with no fields does not make sense"))(
           fields => (
             chain(wf,
               s.fold(
@@ -398,10 +385,12 @@ object WorkflowBuilder {
             Root(): Base).point[M]))
     case GroupBuilderF((gʹ, bʹ), keysʹ, content) =>
       val keys = keysʹ ∘ (rewriteExprPrefix(_, bʹ))
-      semiAlignExpr(keys).fold(
-        keys.traverse(emitSt(freshName) strengthR _) >>= (ks =>
-          toWorkflow.apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
-            ((Field(BsonField.Name("content")): Base, ks.map(key => $var(DocField(key._1)))))))(
+      semiAlignExpr(keys).fold {
+        val ks = keys.zipWithIndex.map(_.map(i => BsonField.Name(i.shows)).swap)
+
+        toWorkflow[M, WF].apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
+          ((Field(BsonField.Name("content")): Base, ks.map(key => $var(DocField(key._1)))))
+      }(
         ks => ((gʹ, bʹ), (bʹ, ks)).point[M]) >>= { case ((g, b), (c, keys)) =>
 
           val key: Reshape.Shape[ExprOp] =
@@ -414,9 +403,8 @@ object WorkflowBuilder {
                 case (key, index) => BsonField.Name(index.toString) -> \/-(key)
               }.toListMap)))
 
-          emitSt(
-            state[NameGen, Fix[WF]](chain(g,
-              $group[WF](Grouped(content).rewriteRefs(prefixBase0(c)), key)))).map((_, Root()))
+          (chain(g, $group[WF](Grouped(content).rewriteRefs(prefixBase0(c)), key)),
+            Root(): Base).point[M]
       }
     case FlatteningBuilderF((graph, base), fields) =>
       (
@@ -428,10 +416,10 @@ object WorkflowBuilder {
         base).point[M]
   }
 
-  def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+  def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+    (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[(Fix[F], Base)] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow)
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow[M, F])
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
     (implicit ev: WorkflowOpCoreF :<: F)
@@ -453,10 +441,10 @@ object WorkflowBuilder {
     }
   }
 
-  def build[F[_]: Coalesce](wb: WorkflowBuilder[F])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
+  def build[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+    (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[Fix[F]] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow, schema.generalizeM[M])) ∘ {
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow[M, F], schema.generalizeM[M])) ∘ {
       case ((graph, Root()), _)      => graph
       case ((graph, base),   struct) => shift(base, struct, graph)._1
     }
@@ -473,7 +461,7 @@ object WorkflowBuilder {
     * structures that we need to be able to extract later. This tells us how to
     * extract them.
     */
-  sealed abstract class Base {
+  sealed abstract class Base extends Product with Serializable {
     def \ (that: Base): Base = (this, that) match {
       case (Root(),      _)            => that
       case (_,           Root())       => this
@@ -553,10 +541,12 @@ object WorkflowBuilder {
     def flattenArray(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
       FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
 
-    def deleteField(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
+    private def deleteField(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {
         case DocBuilderF(wb0, doc) =>
           DocBuilder(wb0, doc - BsonField.Name(name))
+        case GroupBuilderF(wb0, keys, doc) =>
+          GroupBuilder(wb0, keys, doc - BsonField.Name(name))
         case ExprBuilderF(wb0, HasThis(js)) =>
           ExprBuilder(
             wb0,
@@ -601,31 +591,16 @@ object WorkflowBuilder {
           case x :: xs => $sort[F](NonEmptyList.nel(x, IList.fromList(xs)))
         })
 
-    def unionAll
+    def union[M[_]: Monad]
       (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
+      (implicit M: MonadError_[M, PlannerError], ev2: RenderTree[WorkflowBuilder[F]])
         : M[WorkflowBuilder[F]] =
-      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
+      (generateWorkflow[M, F](left) |@| generateWorkflow[M, F](right)) { case ((l, _), (r, _)) =>
         CollectionBuilder(
           $foldLeft(
             l,
             chain(r,
               $map($MapF.mapFresh, ListMap()),
-              $reduce($ReduceF.reduceNOP, ListMap()))),
-          Root(),
-          None)
-      }
-
-    def union
-      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit ev2: RenderTree[WorkflowBuilder[F]])
-        : M[WorkflowBuilder[F]] =
-      (generateWorkflow(left) |@| generateWorkflow(right)) { case ((l, _), (r, _)) =>
-        CollectionBuilder(
-          $foldLeft(
-            chain(l, $map($MapF.mapValKey, ListMap())),
-            chain(r,
-              $map($MapF.mapValKey, ListMap()),
               $reduce($ReduceF.reduceNOP, ListMap()))),
           Root(),
           None)

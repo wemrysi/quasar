@@ -1069,14 +1069,14 @@ class PlannerSpec extends
         $read(collection("db", "zips")),
         $project(
           reshape(
-            "__tmp0" -> $neq($field("city"), $field("state")),
-            "__tmp1" -> $$ROOT),
+            "0" -> $neq($field("city"), $field("state")),
+            "src" -> $$ROOT),
           IgnoreId),
         $match(
           Selector.Doc(
-            BsonField.Name("__tmp0") -> Selector.Eq(Bson.Bool(true)))),
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("__tmp1")),
+          reshape("value" -> $field("src")),
           ExcludeId)))
     }
 
@@ -3902,12 +3902,12 @@ class PlannerSpec extends
         $read(collection("db", "foo")),
         $project(
           reshape(
-            "__tmp0" -> divide($field("bar"), $literal(Bson.Dec(10.0))),
-            "__tmp1" -> $$ROOT),
+            "0" -> divide($field("bar"), $literal(Bson.Dec(10.0))),
+            "src" -> $$ROOT),
           IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
+        $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
         $project(
-          reshape("value" -> $field("__tmp1")),
+          reshape("value" -> $field("src")),
           ExcludeId)))
     }
 
