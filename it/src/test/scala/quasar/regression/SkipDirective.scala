@@ -23,17 +23,19 @@ import argonaut._, Argonaut._
 sealed abstract class SkipDirective
 
 object SkipDirective {
-  final case object Skip    extends SkipDirective
-  final case object SkipCI  extends SkipDirective
-  final case object Pending extends SkipDirective
+  final case object Skip              extends SkipDirective
+  final case object SkipCI            extends SkipDirective
+  final case object Pending           extends SkipDirective
+  final case object IgnoreFieldOrder  extends SkipDirective
 
   import DecodeResult.{ok, fail}
 
   implicit val SkipDirectiveDecodeJson: DecodeJson[SkipDirective] =
     DecodeJson(c => c.as[String].flatMap {
-      case "skip"    => ok(Skip)
-      case "skipCI"  => ok(SkipCI)
-      case "pending" => ok(Pending)
-      case str       => fail("skip, skipCI, pending; found: \"" + str + "\"", c.history)
+      case "skip"              => ok(Skip)
+      case "skipCI"            => ok(SkipCI)
+      case "pending"           => ok(Pending)
+      case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
+      case str => fail("\"" + str + "\" is not a valid backend directive.", c.history)
     })
 }

@@ -12,7 +12,7 @@
 
     "ignoredFields": ["_id"],
 
-    "ignoreFieldOrder": ["*"],
+    "ignoreFieldOrder": true,
 
     "predicate": "containsAtLeast",
 

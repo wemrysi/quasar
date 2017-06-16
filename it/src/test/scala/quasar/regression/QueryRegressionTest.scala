@@ -152,7 +152,7 @@ abstract class QueryRegressionTest[S[_]](
             Skipped("(pending example skipped during CI build)")
           else
             runTest.pendingUntilFixed
-        case None                        => runTest
+        case _                           => runTest
       }
     }
   }
@@ -221,11 +221,13 @@ abstract class QueryRegressionTest[S[_]](
     exp.predicate(
       exp.rows.toVector,
       act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
-      exp.ignoreFieldOrderBackend match {
-        case IgnoreFieldOrderAllBackends            =>
+      // TODO: Error if a backend ignores field order when the query already does.
+      if (exp.ignoreFieldOrder) FieldOrderIgnored
+      else exp.backends.get(backendName) match {
+        case Some(SkipDirective.IgnoreFieldOrder) =>
           FieldOrderIgnored
-        case IgnoreFieldOrderBackends(backendNames) =>
-          backendNames.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved)
+        case _ =>
+          FieldOrderPreserved
       })
   }
 
