@@ -135,11 +135,46 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
           s"folder2${separator}folder3",
           s"folder2${separator}folder4${separator}folder5"
         )
-        val result = exec(rootDir </> dir("folder3"), indices)
+        val result = exec(rootDir </> dir("folder2") </> dir("folder3"), indices)
 
         result must be_\/-(Set.empty[PathSegment])
       }
 
+      "return list of files under that folder if it has subfolders" in {
+        val indices = Map(
+          "folder1" -> List.empty[String],
+          s"folder2${separator}folder3" -> List.empty[String],
+          s"folder2${separator}folder4" -> List("type1", "type2"),
+          s"folder2${separator}folder4${separator}folder5" -> List.empty[String],
+          s"folder2${separator}folder4${separator}folder6${separator}folder7" -> List.empty[String],
+          s"folder8${separator}folder9${separator}folder10" -> List.empty[String],
+          s"folder11${separator}folder12${separator}folder13${separator}folder7" -> List.empty[String]
+        )
+        val result = exec(rootDir </> dir("folder2") </> dir("folder4"), indices)
+
+        result must be_\/-(Set(
+          FileName("type1").right[DirName],
+          FileName("type2").right[DirName],
+          DirName("folder5").left[FileName],
+          DirName("folder6").left[FileName]
+        ))
+      }
+
+      "return list of files under that folder if it doet not have subfolders" in {
+        val indices = Map(
+          "folder1" -> List.empty[String],
+          s"folder2${separator}folder3" -> List.empty[String],
+          s"folder2${separator}folder4" -> List("type1", "type2"),
+          s"folder11${separator}folder12${separator}folder13${separator}folder7" -> List.empty[String]
+        )
+
+        val result = exec(rootDir </> dir("folder2") </> dir("folder4"), indices)
+
+        result must be_\/-(Set(
+          FileName("type1").right[DirName],
+          FileName("type2").right[DirName]
+        ))
+      }
     }
   }
 }

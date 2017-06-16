@@ -79,7 +79,7 @@ object queryfile {
           }
           .toSet
           .map(toDirName))
-      val index = prefix.substring(0, prefix.length - separator.length)
+      val index = if(prefix.endsWith(separator)) prefix.substring(0, prefix.length - separator.length) else prefix
       val files = E.listTypes(index).map(_.map(toFileName).toSet)
       (folders |@| files)(_ ++ _)
     }
