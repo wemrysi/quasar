@@ -199,7 +199,7 @@ object Repl {
               state <- RS.get
               out   =  state.cwd </> file(name)
               expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
-              block <- resolveImports(expr, state.cwd)
+              block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
               query =  fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
               _     <- runQuery(state, query)(p =>
                         P.println(
@@ -212,7 +212,7 @@ object Repl {
             expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
             lim   =  (state.summaryCount > 0).option(state.summaryCount)
-            block <- resolveImports(expr, state.cwd)
+            block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
             query =  fsQ.queryResults(block, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
                        .map(_.toVector)
             _     <- runQuery(state, query)(ds => summarize[S](lim, state.format)(ds))
@@ -223,7 +223,7 @@ object Repl {
           state <- RS.get
           expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
-          block <- resolveImports(expr, state.cwd)
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
           t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
           (log, result) = t
           _     <- printLog(state.debugLevel, log)

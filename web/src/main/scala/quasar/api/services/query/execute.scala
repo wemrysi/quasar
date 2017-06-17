@@ -67,11 +67,12 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          resolveImports[S](xpr, basePath).map { block =>
-            queryPlan(block, requestVars(req), basePath, off, lim)
-              .run.value map (lp => formattedDataResponse(
-              MessageFormat.fromAccept(req.headers.get(Accept)),
-              lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases)))
+          resolveImports[S](xpr, basePath).run.map { block =>
+            block.leftMap(_.wrapNel).flatMap(block =>
+              queryPlan(block, requestVars(req), basePath, off, lim)
+                .run.value map (lp => formattedDataResponse(
+                MessageFormat.fromAccept(req.headers.get(Accept)),
+                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases))))
           }
         })
 
@@ -93,15 +94,15 @@ object execute {
 
               parseRes tuple absDestination tuple basePath
             } traverse { case ((expr, out), basePath) =>
-              resolveImports(expr, basePath).flatMap { block =>
-                fsQ.executeQuery(block, requestVars(req), basePath, out).run.run.run map {
-                  case (phases, result) =>
-                    result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
-                      .bimap(_ :+ ("phases" := phases), f => Json(
-                        "out"    := posixCodec.printPath(f),
-                        "phases" := phases))
-                }
-              }
+              resolveImports(expr, basePath).leftMap(_.toApiError).flatMap { block =>
+                  EitherT(fsQ.executeQuery(block, requestVars(req), basePath, out).run.run.run map {
+                    case (phases, result) =>
+                      result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
+                        .bimap(_ :+ ("phases" := phases), f => Json(
+                          "out"    := posixCodec.printPath(f),
+                          "phases" := phases))
+                  })
+              }.run
             })
           }
         }

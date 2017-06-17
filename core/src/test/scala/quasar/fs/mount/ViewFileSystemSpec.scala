@@ -24,7 +24,6 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._
-import quasar.frontend.SemanticErrors
 import quasar.fs._, InMemory.InMemState
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
@@ -567,7 +566,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def unsafeParse(sqlQry: String): Fix[Sql] =
       sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
-    def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): SemanticErrors \/ Fix[LogicalPlan] =
+    def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
       view.resolveViewRefs[Mounting](lp).run
         .foldMap(runMounting[State[VS, ?]])
         .eval(VS.emptyWithViews(views))

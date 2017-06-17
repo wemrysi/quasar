@@ -21,6 +21,8 @@ import quasar._, RenderTree.ops._
 import quasar.contrib.pathy.DPath
 
 import pathy.Path.posixCodec
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import monocle.macros.Lenses
 import monocle.Prism
 import scalaz._, Scalaz._
@@ -63,6 +65,21 @@ object Statement {
     f(body).map(FunctionDecl(name, args, _))
   override def pprint(implicit ev: BODY <~< String) =
     s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${ev(body)}\n  END"
+  def applyArgs(argsProvided: List[Fix[Sql]])(implicit ev: BODY <~< Fix[Sql]): SemanticError \/ Fix[Sql] = {
+    val expected = args.size
+    val actual   = argsProvided.size
+    if (expected ≠ actual) SemanticError.WrongArgumentCount(name, expected, actual).left
+    else {
+      val argMap = args.zip(argsProvided).toMap
+      ev(body).cataM[SemanticError \/ ?, Fix[Sql]] {
+        case v: Vari[Fix[Sql]]   =>
+          argMap.getOrElse(CIName(v.symbol), v.embed).right // Leave the variable there in case it will be substituted by an external variable
+        case s: Select[Fix[Sql]] =>
+          s.substituteRelationVariable[Id, Fix[Sql]](v => argMap.getOrElse(CIName(v.symbol), v.embed)).map(_.embed)
+        case other               => other.embed.right
+      }
+    }
+  }
 }
 
 object FunctionDecl {

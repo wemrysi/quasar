@@ -21,7 +21,7 @@ import slamdata.Predef._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._
+import scalaz._, Scalaz._
 
 class SQLSpec extends quasar.Qspec {
 
@@ -41,6 +41,17 @@ class SQLSpec extends quasar.Qspec {
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
         projectionNames(projections, None) must beLike { case \/-(list) =>
           list.map(_._1) must contain(allOf("name0", "name"))
+        }
+      }
+      "apply arguments to a function declaration" >> {
+        "in the general case" in {
+          val funcDef = FunctionDecl(CIName("foo"), args = List(CIName("bar")), body = sqlE"SELECT * from `/person` where :bar")
+          funcDef.applyArgs(List(sqlE"age > 10")) must_=== sqlE"SELECT * from `/person` where age > 10".right
+        }
+        "if the variable is inside of a `from`" in {
+          val funcDef = FunctionDecl(CIName("foo"), args = List(CIName("bar")), body = sqlE"SELECT * from :bar")
+          println(sqlE"`/person`")
+          funcDef.applyArgs(List(sqlE"`/person`")) must_=== sqlE"SELECT * from `/person`".right
         }
       }
     }

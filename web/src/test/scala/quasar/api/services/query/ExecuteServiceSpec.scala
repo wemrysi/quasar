@@ -207,11 +207,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
       val sampleFile = rootDir </> file("foo")
       val query =
         """
-          |CREATE FUNCTION TRIVIAL(:user_id)
+          |CREATE FUNCTION TRIVIAL(:table)
           |  BEGIN
-          |    SELECT * FROM `/foo`
+          |    SELECT * FROM :table
           |  END;
-          |TRIVIAL("bob")
+          |TRIVIAL(`/foo`)
         """.stripMargin
       get(executeService)(
         path = rootDir,
@@ -222,6 +222,23 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
       )
     }
     "execute a query with imported functions" >> {
+      val sampleFile = rootDir </> file("foo")
+      val funcDec = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * from :from")
+      val query =
+        """
+          |import `/mymodule/`;
+          |TRIVIAL(`/foo`)
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "5"
+      )
+    }
+    "fail on a query that has ambiguous imports" >> {
       val sampleFile = rootDir </> file("foo")
       val funcDec = {
         val selectAll = SelectR(
@@ -234,15 +251,25 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
       val query =
         """
           |import `/mymodule/`;
+          |import `/otherModule/`;
           |TRIVIAL("bob")
         """.stripMargin
       get(executeService)(
         path = rootDir,
         query = Some(Query(query)),
         state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
-        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
-        status = Status.Ok,
-        response = (a: String) => a.trim must_= "5"
+        mounts = Map(
+          (rootDir </> dir("mymodule"): APath)    -> MountConfig.moduleConfig(List(funcDec)),
+          (rootDir </> dir("otherModule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.BadRequest,
+        response = (_: AJson) must_=== AJson(
+          "error" := AJson(
+            "status" := "Ambiguous imports",
+            "detail" := AJson(
+              "message"      := "Function call `TRIVIAL` is ambiguous because all of the following imports: `/mymodule/`, `/otherModule/` define a function with that name accepting 1 argument",
+              "functionName" := "TRIVIAL",
+              "arity"        := 1,
+              "imports"      := List("/mymodule/", "/otherModule/"))))
       )
     }
     "POST (error conditions)" >> {

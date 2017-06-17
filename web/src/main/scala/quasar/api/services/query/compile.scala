@@ -54,13 +54,17 @@ object compile {
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      resolveImports(blob, basePath).flatMap { block =>
-        queryPlan(block, vars, basePath, offset, limit)
-          .run.value
-          .traverse(_.fold(
-            data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-            lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson))))
-          .map(_.valueOr(_.toApiError.left[Json]))
+      resolveImports(blob, basePath).run.flatMap { block =>
+        block.fold(
+          semErr => semErr.toApiError.left.point[Free[S, ?]],
+          block =>
+            queryPlan(block, vars, basePath, offset, limit)
+              .run.value
+              .traverse(_.fold(
+                data => constantResponse(data).right[ApiError].point[Free[S, ?]],
+                lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson))))
+              .map(_.valueOr(_.toApiError.left[Json])))
+
       }
 
     QHttpService {

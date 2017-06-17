@@ -239,6 +239,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Invalid ObjectId.",
           err.message,
           "objectId" := oid)
+      case CompilationFailed(semErrs) =>
+        fromMsg(
+          BadRequest withReason "Compilation failed",
+          err.message,
+          "compilation errors" := semErrs.map(_.toApiError)
+        )
       case NonRepresentableInJS(value) =>
         fromMsg(
           InternalServerError withReason "Unable to compile to JavaScript.",
@@ -341,6 +347,13 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           err.message,
           "functionName" := fn.shows,
           "input"        := str)
+      case e@AmbiguousImport(name, arity, imports) =>
+        fromMsg(
+          BadRequest withReason "Ambiguous imports",
+          err.message,
+          "functionName" := name.value,
+          "arity"        := arity,
+          "imports"      := imports.map(i => posixCodec.printPath(i.path)))
       case other =>
         fromMsg_(
           InternalServerError withReason "Compilation error.",

@@ -24,12 +24,15 @@ import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Free => _, _}
-import quasar.fs.FileSystemError
+import quasar.fs.{FileSystemError, FileSystemErrT}
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
-import quasar.fs.mount.Mounting
+import quasar.fs.mount.{Mounting, MountConfig}
 import quasar.sql._
 import quasar.std.StdLib.set._
+
+// Needed for unzip
+import scala.Predef.{Map => _, _}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -83,26 +86,54 @@ package object quasar {
       case _                           => lp.right
     }
 
-  // It would be nice if this were in the sql package but that is not possible right now because
-  // Mounting is defined in core
-  def resolveImports[S[_]](blob: Blob[Fix[Sql]], basePath: ADir)(implicit
+  def resolveImports[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S],
     fsFail: Failure.Ops[FileSystemError, S]
-  ): Free[S, Block[Fix[Sql]]] = {
-    def resolvePath(path: DPath, base: ADir): ADir = refineTypeAbs(path).fold(ι, base </> _)
-    def retrieveDeclarations(module: ADir, allReadyImported: Set[ADir]): Free[S, List[FunctionDecl[Fix[Sql]]]] = {
-      if (allReadyImported.contains(module)) List.empty[FunctionDecl[Fix[Sql]]].point[Free[S, ?]]
-      else {
-        val configOrFailure = mount.lookupModuleConfig(module).toRight(pathErr(pathNotFound(module)))
-        for {
-          config       <- fsFail.unattemptT(configOrFailure)
-          childrenDecl <- config.imports.traverse(i => retrieveDeclarations(resolvePath(i.path, module), allReadyImported + module))
-        } yield childrenDecl.join ++ config.declarations
+  ): EitherT[Free[S, ?], SemanticError, Block[Fix[Sql]]] =
+    EitherT(fsFail.unattemptT(resolveImports_(blob, baseDir).run))
+
+  def resolveImports_[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S]
+  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Block[Fix[Sql]]] =
+    resolveImportsImpl(blob, baseDir, d => mount.lookupModuleConfig(d).toRight(pathErr(pathNotFound(d))))
+
+  // It would be nice if this were in the sql package but that is not possible right now because
+  // Mounting is defined in core
+  def resolveImportsImpl[M[_]: Monad](blob: Blob[Fix[Sql]], baseDir: ADir, retrieve: ADir => M[MountConfig.ModuleConfig])
+    : EitherT[M, SemanticError, Block[Fix[Sql]]] = {
+
+    def absolutizeImport(i: Import[Fix[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
+
+    def inlineInvokes(in: Fix[Sql], scope: List[ADir]): EitherT[M, SemanticError, Fix[Sql]] = {
+      in.cataM[EitherT[M, SemanticError, ?], Fix[Sql]] {
+        case invoke @ InvokeFunction(name, args) =>
+          EitherT(findMatchingDecs(name, scope).flatMap(_ match {
+            case Nil =>
+              scala.Predef.println("hmm")
+              invoke.embed.right.point[M] // Leave the invocation there in case it's a library function
+            case List(((funcDef, newScope), _)) =>
+              scala.Predef.println("sss")
+              EitherT(funcDef.applyArgs(args).point[M]).flatMap(inlineInvokes(_, newScope)).run
+            case ambiguous =>
+              SemanticError.ambiguousImport(name, args.size, ambiguous.unzip._2.map(Import[Fix[Sql]](_))).left.point[M]
+          }))
+        case other => EitherT.right(other.embed.point[M])
       }
     }
-    blob.imports.traverse(i => retrieveDeclarations(resolvePath(i.path, basePath), Set.empty)).map { allDecs =>
-      Block(blob.expr, allDecs.join ++ blob.defs)
-    }
+
+    def findMatchingDecs(name: CIName, scope: List[ADir]): M[List[((FunctionDecl[Fix[Sql]], List[ADir]), ADir)]] =
+      scope.traverse(d => resolveImport(d).strengthL(d)).map(maps =>
+        maps.flatMap{ case(d, map) => map.get(name).toList.strengthR(d)})
+
+    def resolveImport(at: ADir): M[Map[CIName, (FunctionDecl[Fix[Sql]], List[ADir])]] =
+      retrieve(at).map { module =>
+        val scope = module.imports.map(absolutizeImport(_, at))
+        module.declarations.map(d => (d.name, (d, scope))).toMap
+      }
+
+    // This blob has no more imports (assuming the implementation of `inlineInvokes` is correct)
+    val blobInlined = blob.traverse(inlineInvokes(_, blob.imports.map(absolutizeImport(_, baseDir))))
+    blobInlined.map(blob => Block(blob.expr, blob.defs))
   }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of

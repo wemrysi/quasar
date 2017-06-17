@@ -106,8 +106,11 @@ object Mounting {
     def lookupConfig(path: APath): OptionT[FreeS, MountConfig] =
       OptionT(lift(LookupConfig(path)))
 
+    def lookupViewConfig(path: AFile): OptionT[FreeS, ViewConfig] =
+      OptionT(lookupConfig(path).run.map(_.flatMap(viewConfig.getOption).map(ViewConfig.tupled)))
+
     def lookupModuleConfig(path: ADir): OptionT[FreeS, ModuleConfig] =
-      lookupConfig(path).flatMap(config => OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS]))
+      OptionT(lookupConfig(path).run.map(_.flatMap(moduleConfig.getOption).map(ModuleConfig(_))))
 
     /** Returns the type of mount the path refers to, if any. */
     def lookupType(path: APath): OptionT[FreeS, MountType] =
