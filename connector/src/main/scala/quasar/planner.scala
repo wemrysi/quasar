@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.ADir
 import quasar.fp._
 import quasar.fs.PathError
@@ -30,6 +31,12 @@ import scalaz._, Scalaz._
 import shapeless.Nat
 
 object Planner {
+  type PlannerErrorMErr[F[_]] = MonadError_[F, PlannerError]
+
+  object PlannerErrorMErr {
+    def apply[F[_]](implicit F: PlannerErrorMErr[F]) = F
+  }
+
   sealed abstract class PlannerError {
     def message: String
   }
