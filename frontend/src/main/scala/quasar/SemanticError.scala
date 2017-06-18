@@ -39,11 +39,10 @@ object SemanticError {
     def message = s"The data '${data.shows}' did not fall within its expected domain" + hint.map(": " + _).getOrElse("")
   }
 
-  final case class AmbiguousImport(name: CIName, arity: Int, imports: List[Import[Fix[Sql]]]) extends SemanticError {
+  final case class AmbiguousFunctionInvoke(name: CIName, relevantFuncs: List[String]) extends SemanticError {
     def message = {
-      val importList:String = imports.map(i => "`" + posixCodec.printPath(i.path) + "`").mkString(", ")
-      val argument:String = if (arity === 1) "argument" else "arguments"
-      s"Function call `${name.shows}` is ambiguous because all of the following imports: $importList define a function with that name accepting $arity $argument"
+      val functions = relevantFuncs.mkString(", ")
+      s"Function call `${name.shows}` is ambiguous because the following functions: $functions could be applied here"
     }
   }
 
@@ -112,10 +111,10 @@ object SemanticError {
     case UnboundVariable(varname) => varname
   }(UnboundVariable(_))
 
-  val ambiguousImport: Prism[SemanticError, (CIName, Int, List[Import[Fix[Sql]]])] =
-    Prism.partial[SemanticError, (CIName, Int, List[Import[Fix[Sql]]])] {
-      case AmbiguousImport(name, arity, imports) => (name, arity, imports)
-    }(AmbiguousImport.tupled)
+  val ambiguousFunctionInvoke: Prism[SemanticError, (CIName, List[String])] =
+    Prism.partial[SemanticError, (CIName, List[String])] {
+      case AmbiguousFunctionInvoke(name, funcs) => (name, funcs)
+    }(AmbiguousFunctionInvoke.tupled)
 
   val duplicateAlias: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
     case DuplicateAlias(name) => name

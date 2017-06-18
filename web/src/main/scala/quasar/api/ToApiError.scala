@@ -347,13 +347,12 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           err.message,
           "functionName" := fn.shows,
           "input"        := str)
-      case e@AmbiguousImport(name, arity, imports) =>
+      case e@AmbiguousFunctionInvoke(name, funcs) =>
         fromMsg(
-          BadRequest withReason "Ambiguous imports",
+          BadRequest withReason "Ambiguous function call",
           err.message,
-          "functionName" := name.value,
-          "arity"        := arity,
-          "imports"      := imports.map(i => posixCodec.printPath(i.path)))
+          "invoke"              := name.value,
+          "ambiguous functions" := funcs)
       case other =>
         fromMsg_(
           InternalServerError withReason "Compilation error.",

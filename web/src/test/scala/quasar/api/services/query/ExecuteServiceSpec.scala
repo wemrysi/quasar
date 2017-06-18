@@ -264,12 +264,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         status = Status.BadRequest,
         response = (_: AJson) must_=== AJson(
           "error" := AJson(
-            "status" := "Ambiguous imports",
+            "status" := "Ambiguous function call",
             "detail" := AJson(
-              "message"      := "Function call `TRIVIAL` is ambiguous because all of the following imports: `/mymodule/`, `/otherModule/` define a function with that name accepting 1 argument",
-              "functionName" := "TRIVIAL",
-              "arity"        := 1,
-              "imports"      := List("/mymodule/", "/otherModule/"))))
+              "message" := "Function call `TRIVIAL` is ambiguous because the following functions: Trivial, Trivial could be applied here",
+              "invoke"  := "TRIVIAL",
+              "ambiguous functions"   := List("Trivial", "Trivial"))))
       )
     }
     "POST (error conditions)" >> {

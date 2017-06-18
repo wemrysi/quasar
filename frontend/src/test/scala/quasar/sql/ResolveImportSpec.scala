@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
-import quasar.fs.mount.MountConfig.ModuleConfig
-import quasar.sql._
 
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -29,8 +27,7 @@ class ResolveImportSpec extends quasar.Qspec {
     "simple case" >> {
       val blob = sqlB"import `/mymodule/`; TRIVIAL(`/foo`)"
       val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
-      val module = ModuleConfig(List(trivial))
-      resolveImportsImpl[Id](blob, rootDir, κ(module)).run must_=== Block(sqlE"select * from `/foo`", Nil).right
+      resolveImportsImpl[Id](blob, rootDir, κ(List(trivial))).run must_=== Block(sqlE"select * from `/foo`", Nil).right
     }
   }
 }
