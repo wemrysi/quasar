@@ -21,7 +21,7 @@ import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, Times
 import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
-import quasar.Planner.PlannerErrorMErr
+import quasar.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFunc, MapFuncs => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import quasar.std.TemporalPart, TemporalPart._
@@ -30,7 +30,7 @@ import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorMErr]
+final class MapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
   extends Planner[T, F, MapFunc[T, ?]] {
 
   def str(s: String): T[N1QL]   = Data[T[N1QL]](QData.Str(s)).embed

@@ -26,7 +26,7 @@ import quasar.physical.couchbase._,
   N1QL.{Id, Union, Unreferenced, _},
   planner.Planner._,
   Select.{Filter, Value, _}, Case._
-import quasar.Planner.{PlannerErrorMErr, InternalError}
+import quasar.Planner.{PlannerErrorME, InternalError}
 import quasar.qscript, qscript._
 
 import matryoshka._
@@ -37,7 +37,7 @@ import scalaz._, Scalaz._, NonEmptyList.nels
 
 final class QScriptCorePlanner[
     T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorMErr
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME
   ] extends Planner[T, F, QScriptCore[T, ?]] {
 
   def int(i: Int) = Data[T[N1QL]](QData.Int(i)).embed
@@ -54,7 +54,7 @@ final class QScriptCorePlanner[
             case Embed(MapFunc.EC(ejson.Str(key))) =>
               Data[T[N1QL]](QData.Str(key)).embed.η[F]
             case key =>
-              PlannerErrorMErr[F].raiseError[T[N1QL]](
+              PlannerErrorME[F].raiseError[T[N1QL]](
                 InternalError.fromMsg(s"Unsupported object key: ${key.shows}"))
           },
           v => processFreeMapDefault(v, id)

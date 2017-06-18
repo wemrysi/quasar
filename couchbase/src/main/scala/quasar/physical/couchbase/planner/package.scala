@@ -19,7 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.InternalError
-import quasar.Planner.PlannerErrorMErr
+import quasar.Planner.PlannerErrorME
 
 import matryoshka._
 import matryoshka.implicits._
@@ -47,9 +47,9 @@ package object planner {
         Value(true), ResultExpr(a, none).wrapNel, keyspace = none, join = none,
         unnest = none, let = nil,  filter = none, groupBy = none, orderBy = Nil).embed)
 
-  def unexpected[F[_]: PlannerErrorMErr, A](name: String): F[A] =
-    PlannerErrorMErr[F].raiseError(InternalError.fromMsg(s"unexpected $name"))
+  def unexpected[F[_]: PlannerErrorME, A](name: String): F[A] =
+    PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unexpected $name"))
 
-  def unimplemented[F[_]: PlannerErrorMErr, A](name: String): F[A] =
-    PlannerErrorMErr[F].raiseError(InternalError.fromMsg(s"unimplemented $name"))
+  def unimplemented[F[_]: PlannerErrorME, A](name: String): F[A] =
+    PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unimplemented $name"))
 }

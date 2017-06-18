@@ -18,11 +18,11 @@ package quasar.physical.couchbase.planner
 
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._
-import quasar.Planner.{PlannerErrorMErr, InternalError}
+import quasar.Planner.{PlannerErrorME, InternalError}
 
 import matryoshka._
 
-final class UnreachablePlanner[T[_[_]], F[_]: PlannerErrorMErr, QS[_]] extends Planner[T, F, QS] {
+final class UnreachablePlanner[T[_[_]], F[_]: PlannerErrorME, QS[_]] extends Planner[T, F, QS] {
   def plan: AlgebraM[F, QS, T[N1QL]] =
-    κ(PlannerErrorMErr[F].raiseError(InternalError.fromMsg("unreachable")))
+    κ(PlannerErrorME[F].raiseError(InternalError.fromMsg("unreachable")))
 }

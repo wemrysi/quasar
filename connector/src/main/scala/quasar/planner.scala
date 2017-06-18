@@ -31,10 +31,10 @@ import scalaz._, Scalaz._
 import shapeless.Nat
 
 object Planner {
-  type PlannerErrorMErr[F[_]] = MonadError_[F, PlannerError]
+  type PlannerErrorME[F[_]] = MonadError_[F, PlannerError]
 
-  object PlannerErrorMErr {
-    def apply[F[_]](implicit F: PlannerErrorMErr[F]) = F
+  object PlannerErrorME {
+    def apply[F[_]](implicit F: PlannerErrorME[F]) = F
   }
 
   sealed abstract class PlannerError {

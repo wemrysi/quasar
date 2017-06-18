@@ -26,7 +26,7 @@ import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
-import quasar.Planner.PlannerErrorMErr
+import quasar.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
 
 import matryoshka._
@@ -39,7 +39,7 @@ import scalaz._, Scalaz._
 
 final class EquiJoinPlanner[
     T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorMErr]
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {

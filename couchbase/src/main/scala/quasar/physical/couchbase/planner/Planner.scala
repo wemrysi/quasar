@@ -19,7 +19,7 @@ package quasar.physical.couchbase.planner
 import quasar.NameGenerator
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.couchbase._, common._
-import quasar.Planner.PlannerErrorMErr
+import quasar.Planner.PlannerErrorME
 import quasar.qscript._
 
 import matryoshka._
@@ -40,15 +40,15 @@ object Planner {
         _.run.fold(F.plan, G.plan)
     }
 
-  implicit def constDeadEndPlanner[T[_[_]], F[_]: PlannerErrorMErr]
+  implicit def constDeadEndPlanner[T[_[_]], F[_]: PlannerErrorME]
     : Planner[T, F, Const[DeadEnd, ?]] =
     new UnreachablePlanner[T, F, Const[DeadEnd, ?]]
 
-  implicit def constReadPlanner[T[_[_]], F[_]: PlannerErrorMErr, A]
+  implicit def constReadPlanner[T[_[_]], F[_]: PlannerErrorME, A]
     : Planner[T, F, Const[Read[A], ?]] =
     new UnreachablePlanner[T, F, Const[Read[A], ?]]
 
-  implicit def constShiftedReadDirPlanner[T[_[_]], F[_]: PlannerErrorMErr]
+  implicit def constShiftedReadDirPlanner[T[_[_]], F[_]: PlannerErrorME]
     : Planner[T, F, Const[ShiftedRead[ADir], ?]] =
     new UnreachablePlanner[T, F, Const[ShiftedRead[ADir], ?]]
 
@@ -60,21 +60,21 @@ object Planner {
 
   implicit def equiJoinPlanner[
     T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorMErr]
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T, F]
 
-  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorMErr]
+  def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
     : Planner[T, F, MapFunc[T, ?]] =
     new MapFuncPlanner[T, F]
 
-  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorMErr]
+  implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
     : Planner[T, F, ProjectBucket[T, ?]] =
     new UnreachablePlanner[T, F, ProjectBucket[T, ?]]
 
   implicit def qScriptCorePlanner[
     T[_[_]]: BirecursiveT: ShowT,
-    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorMErr]
+    F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
     : Planner[T, F, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T, F]
 
@@ -82,7 +82,7 @@ object Planner {
     : Planner[T, F, ReduceFunc] =
     new ReduceFuncPlanner[T, F]
 
-  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorMErr]
+  implicit def thetaJoinPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
     : Planner[T, F, ThetaJoin[T, ?]] =
     new UnreachablePlanner[T, F, ThetaJoin[T, ?]]
 }
