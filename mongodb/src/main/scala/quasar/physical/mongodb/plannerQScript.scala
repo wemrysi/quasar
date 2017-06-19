@@ -33,7 +33,7 @@ import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource}
+import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource, OptionFree}
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
@@ -97,7 +97,7 @@ object MongoDbQScriptPlanner {
 
   def processMapFuncExpr
     [T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[ExprOp])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
@@ -157,13 +157,13 @@ object MongoDbQScriptPlanner {
   val check = new Check[Fix[ExprOp], ExprOp]
 
   def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
       AlgebraM[M, MapFuncCore[T, ?], Fix[ExprOp]] = {
     import MapFuncsCore._
 
     def handleCommon(mf: MapFuncCore[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
-      funcHandler.runCore(mf).map(t => unpack(t.mapSuspension(inj)))
+      funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
 
     val handleSpecial: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) =>
@@ -778,7 +778,7 @@ object MongoDbQScriptPlanner {
     def plan
       [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
       (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-        funcHandler: FuncHandler[IT, EX])
+        funcHandler: MapFuncCore[IT, ?] ~> OptionFree[EX, ?])
       (implicit
         merr: MonadError_[M, FileSystemError],
         mst:  MonadState_[M, NameGen],
@@ -800,7 +800,7 @@ object MongoDbQScriptPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-            funcHandler: FuncHandler[T, EX])
+            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             mst:  MonadState_[M, NameGen],
@@ -829,12 +829,12 @@ object MongoDbQScriptPlanner {
       new Planner[QScriptCore[T, ?]] {
         type IT[G[_]] = T[G]
 
-        def plan
+        override def plan
           [M[_]: Monad,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-            funcHandler: FuncHandler[T, EX])
+            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             mst:  MonadState_[M, NameGen],
@@ -918,7 +918,7 @@ object MongoDbQScriptPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-            funcHandler: FuncHandler[T, EX])
+            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             mst:  MonadState_[M, NameGen],
@@ -950,7 +950,7 @@ object MongoDbQScriptPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-            funcHandler: FuncHandler[T, EX])
+            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             mst:  MonadState_[M, NameGen],
@@ -974,7 +974,7 @@ object MongoDbQScriptPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-            funcHandler: FuncHandler[T, EX])
+            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             mst:  MonadState_[M, NameGen],
@@ -1002,7 +1002,7 @@ object MongoDbQScriptPlanner {
   }
 
   def getExpr[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
@@ -1037,7 +1037,7 @@ object MongoDbQScriptPlanner {
 
   def getExprBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
@@ -1045,7 +1045,7 @@ object MongoDbQScriptPlanner {
 
   def getReduceBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
@@ -1071,19 +1071,19 @@ object MongoDbQScriptPlanner {
       _ => jsf(a).map(_.left[Fix[ExprOp]]))
 
   def handleFreeMap[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX], fm: FreeMap[T])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
   def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
   def getExprRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: FuncHandler[T, EX])
+    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
@@ -1099,7 +1099,7 @@ object MongoDbQScriptPlanner {
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
     (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-      funcHandler: FuncHandler[T, EX],
+      funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?],
       free: FreeQS[T],
       src: WorkflowBuilder[WF])
     (implicit
@@ -1249,7 +1249,7 @@ object MongoDbQScriptPlanner {
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
       joinHandler: JoinHandler[WF, WorkflowBuilder.M],
-      funcHandler: FuncHandler[T, EX])
+      funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
     (lp: T[LogicalPlan])
     (implicit
       merr: MonadError_[M, FileSystemError],
@@ -1293,15 +1293,15 @@ object MongoDbQScriptPlanner {
           JoinHandler.fallback(
             JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce[Workflow3_2F])
-        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2)(logical)
+        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFuncCore[T, ?]])(logical)
 
       case `3.0`     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0)(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFuncCore[T, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6)(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFuncCore[T, ?]])(logical).map(_.inject[WorkflowF])
     }
   }
 }

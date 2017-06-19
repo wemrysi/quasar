@@ -496,7 +496,7 @@ object MongoDbPlanner {
   import quasar.physical.mongodb.accumulator._
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: MapFuncCore[Fix, ?] ~> OptionFree[EX, ?])
     (implicit
       ev0: WorkflowOpCoreF :<: F,
       ev1: RenderTree[WorkflowBuilder[F]],
@@ -630,9 +630,9 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          val mf: MapFuncCore[Fix, UnaryArg] = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
-            funcHandler.runCore(mf)) { (wb1, f) =>
+            funcHandler(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
@@ -640,7 +640,7 @@ object MongoDbPlanner {
           val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
-            funcHandler.runCore(mf)) { (wb1, wb2, f) =>
+            funcHandler(mf)) { (wb1, wb2, f) =>
             val exp: Binary[ExprOp] = createOp[BinaryArg](f)
             WB.expr2(wb1, wb2)(exp.eval)
           }
@@ -649,7 +649,7 @@ object MongoDbPlanner {
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|
-            funcHandler.runCore(mf)) { (wb1, wb2, wb3, f) =>
+            funcHandler(mf)) { (wb1, wb2, wb3, f) =>
             val exp: Ternary[ExprOp] = createOp[TernaryArg](f)
             WB.expr(List(wb1, wb2, wb3)) {
               case List(_1, _2, _3) => exp.eval[Fix[ExprOp]](_1, _2, _3)
@@ -967,7 +967,7 @@ object MongoDbPlanner {
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: FuncHandler[Fix, EX])
+    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: MapFuncCore[Fix, ?] ~> OptionFree[EX, ?])
     (logical: Fix[LP])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
@@ -1027,15 +1027,15 @@ object MongoDbPlanner {
         val joinHandler = JoinHandler.fallback(
           JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
           JoinHandler.mapReduce[Workflow3_2F])
-        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2)(logical)
+        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2[MapFuncCore[Fix, ?]])(logical)
 
       case `3.0` =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0)(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0[MapFuncCore[Fix, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6)(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6[MapFuncCore[Fix, ?]])(logical).map(_.inject[WorkflowF])
     }
   }
 }
