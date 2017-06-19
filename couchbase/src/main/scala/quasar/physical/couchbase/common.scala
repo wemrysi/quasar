@@ -123,11 +123,8 @@ object common {
   def existsWithPrefix(
     ctx: ClientContext,
     prefix: String
-  ): Task[FileSystemError \/ Boolean] = {
-    val qStr = s"""SELECT count(*) > 0 v FROM `${ctx.bucket.name}`
-                   WHERE `${ctx.docTypeKey.v}` = "${prefix}" OR `${ctx.docTypeKey.v}` like "${prefix}/%""""
-    query(ctx.bucket, qStr).map(_.map(_.toList.exists(_.value.getBoolean("v").booleanValue === true)))
-  }
+  ): Task[FileSystemError \/ Boolean] =
+    docTypeValuesFromPrefix(ctx, prefix) ∘ (_ ∘ (_.nonEmpty))
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
     paths.collect {
