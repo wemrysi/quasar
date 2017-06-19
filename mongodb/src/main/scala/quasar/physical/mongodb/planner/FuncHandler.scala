@@ -262,7 +262,7 @@ object FuncHandler {
           }
     }
 
-  implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
+  def mapFuncDerived[T[_[_]]: CorecursiveT]
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       def emptyDerived[T[_[_]], F[_]]: MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
@@ -291,6 +291,25 @@ object FuncHandler {
             }
           }
         }
+    }
+
+  implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
+      (implicit core: FuncHandler[MapFuncCore[T, ?]])
+      : FuncHandler[MapFuncDerived[T, ?]] =
+    new FuncHandler[MapFuncDerived[T, ?]] {
+      val derived = mapFuncDerived
+      def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
+          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
+        handleUnhandled(derived.handleOpsCore(trunc), core.handleOpsCore(trunc))
+
+      def handleOps3_0[EX[_]: Functor](implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX)
+          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
+        handleUnhandled(derived.handleOps3_0, core.handleOps3_0)
+
+      def handleOps3_2[EX[_]: Functor]
+          (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
+        handleUnhandled(derived.handleOps3_2, core.handleOps3_2)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
