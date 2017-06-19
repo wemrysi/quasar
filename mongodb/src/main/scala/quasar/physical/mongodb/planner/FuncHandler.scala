@@ -87,18 +87,6 @@ trait FuncHandler[IN[_]] {
 
 object FuncHandler {
 
-  def handleUnhandled[T[_[_]]: CorecursiveT, F[_]]
-    (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
-      : MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
-        new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
-          def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] = {
-            val alg: AlgebraM[Option, CoEnv[A, MapFuncCore[T,?], ?], Free[F,A]] =
-              _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_).map(_.join))
-            derived(f)
-              .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(alg))
-        }
-      }
-
   implicit def mapFuncCore[T[_[_]]: CorecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
@@ -298,6 +286,19 @@ object FuncHandler {
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived
+
+      private def handleUnhandled[T[_[_]]: CorecursiveT, F[_]]
+        (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
+          : MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
+            new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
+              def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] = {
+                val alg: AlgebraM[Option, CoEnv[A, MapFuncCore[T,?], ?], Free[F,A]] =
+                  _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_).map(_.join))
+                derived(f)
+                  .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(alg))
+            }
+          }
+
       def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
           : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
         handleUnhandled(derived.handleOpsCore(trunc), core.handleOpsCore(trunc))
