@@ -275,8 +275,8 @@ Prerequisites
 - Invalid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
 
   ```xml
-<ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
-<ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
+  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
+  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
   ```
 
 - It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
