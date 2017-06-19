@@ -22,7 +22,7 @@
               group by location
               order by counter desc
               limit 10",
-    "predicate": "equalsInitial",
+    "predicate": "initial",
     "expected": [{ "counter": 3, "location": "Boston"  },
                  { "counter": 2, "location": "Denver"  },
                  { "counter": 1, "location": "Boulder" }]

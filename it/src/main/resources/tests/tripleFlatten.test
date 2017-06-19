@@ -11,6 +11,6 @@
     "data": "nested.data",
     "query": "select topObj{*}{*}{*} from nested",
     "NB": "containsExactly has a bug that gets confused on duplicate results (#732).",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": ["m", "n", "o"]
 }

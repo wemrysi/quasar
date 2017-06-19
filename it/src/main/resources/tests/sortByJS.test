@@ -10,7 +10,7 @@
 
   "query": "select city, pop from zips where pop > 110000 order by length(city)",
 
-  "predicate": "equalsExactly",
+  "predicate": "exactly",
   "expected": [
     { "city": "CHICAGO",  "pop": 112047.0 },
     { "city": "BROOKLYN", "pop": 111396.0 }

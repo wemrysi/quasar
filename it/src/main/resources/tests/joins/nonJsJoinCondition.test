@@ -20,7 +20,8 @@
               from `../zips` as z1 join `../zips` as z2
               on z1.loc[*] = z2.pop",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [
         { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "VAN HORNESVILLE", "pop": 40 },

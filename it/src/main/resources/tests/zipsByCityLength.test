@@ -17,7 +17,8 @@
                 from largeZips
                 where state != \"MI\"
                 group by length(city)",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "len":  3, "cnt":   2 },
                  { "len":  4, "cnt":  65 },
                  { "len":  5, "cnt": 206 },

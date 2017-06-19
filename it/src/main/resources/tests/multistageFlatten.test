@@ -19,7 +19,7 @@
                 foo[*][*].baz[*] LIKE \"%quu%\" OR
                 a                LIKE \"%13%\")",
     "FIXME": "Should use `containsExactly`, but see issue #732.",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "ignoreFieldOrder": true,
     "expected": [
         { "_id": { "$oid": "5552744bd86735b7268fd002" }, "a": "13" },

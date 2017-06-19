@@ -16,7 +16,8 @@
                 foo{*} = 15 OR
                 foo[*] LIKE \"%15%\" OR
                 foo[*] = 15)",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "ignoredFields": ["_id"],
     "ignoreFieldOrder": true,
     "expected": [{ "foo": [15, [{ "baz": ["quux"] }]] },

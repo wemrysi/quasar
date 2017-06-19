@@ -18,6 +18,7 @@
                     and date_trunc(\"day\", ts) <= start_of_day(date(\"2014-08-20\")))
                   and date_trunc(\"day\", ts) != start_of_day(date(\"2014-08-19\")))
                 or date_trunc(\"day\", ts) = start_of_day(date(\"2014-08-22\"))",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Monday", "Wednesday", "Friday"]
 }

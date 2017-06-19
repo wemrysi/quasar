@@ -10,7 +10,8 @@
 
   "query": "select * from zips where `_id` like \"8030%\" group by city",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "ignoredFields": ["_id"],
 

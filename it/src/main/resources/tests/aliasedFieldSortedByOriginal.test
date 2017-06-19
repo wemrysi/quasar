@@ -14,7 +14,7 @@
     },
     "data": "zips.data",
     "query": "SELECT state AS `ResultAlias`, COUNT(*) as cnt FROM zips GROUP BY state ORDER BY state",
-    "predicate": "containsAtLeast",
+    "predicate": "initial",
     "expected": [{ "ResultAlias": "AK", "cnt":  195 },
                  { "ResultAlias": "AL", "cnt":  567 },
                  { "ResultAlias": "AR", "cnt":  578 },

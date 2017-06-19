@@ -45,7 +45,7 @@
                 where pop <= 10
                 order by pop",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [
       { "cardinal": "nobody",   "power": null, "parity": "even" , "grade": null },
       { "cardinal": "one",      "power": 0   , "parity": "odd"  , "grade": null },

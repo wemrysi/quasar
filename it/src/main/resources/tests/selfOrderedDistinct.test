@@ -16,7 +16,7 @@
 
     "query": "select distinct city from zips order by city",
 
-    "predicate": "equalsInitial",
+    "predicate": "initial",
 
     "expected": ["AARON",
                  "AARONSBURG",

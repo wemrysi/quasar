@@ -12,7 +12,8 @@
 
   "query": "select distinct day, date_part(\"dow\", ts) as dow, date_part(\"isodow\", ts) as isodow from `../days`",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "day": "Sunday" ,   "dow": 0, "isodow" : 7 },

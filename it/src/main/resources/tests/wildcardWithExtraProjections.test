@@ -7,7 +7,8 @@
   },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
   "ignoreFieldOrder": true,
   "expected": [
     { "_id": "80301", "city": "BOULDER",          "loc": [ -105.21426, 40.049733 ],  "pop": 18174.0, "state": "CO", "city_state": "BOULDER, CO",          "boulderish": true  },

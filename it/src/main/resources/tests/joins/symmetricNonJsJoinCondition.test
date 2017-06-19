@@ -21,7 +21,8 @@
               on z1.loc[*] = z2.loc[*]
               where z1.city < z2.city",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [
         { "city1": "GERLAW",    "loc1": [-90.622765, 40.999519], "city2": "SAINT PETERS", "loc2": [-90.622765, 38.78024]  },

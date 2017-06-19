@@ -16,8 +16,8 @@
 
 package quasar.regression
 
-sealed abstract class FieldOrder
+sealed abstract class OrderSignificance
 
-final case object FieldOrderPreserved extends FieldOrder
+final case object OrderPreserved extends OrderSignificance
 
-final case object FieldOrderIgnored extends FieldOrder
+final case object OrderIgnored extends OrderSignificance

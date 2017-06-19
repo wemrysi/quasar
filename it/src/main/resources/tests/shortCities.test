@@ -14,7 +14,7 @@
            Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.",
     "data": "largeZips.data",
     "query": "select distinct city from largeZips order by length(city), city limit 5",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "city": "M M" },
                  { "city": "RYE" },
                  { "city": "ABAC" },

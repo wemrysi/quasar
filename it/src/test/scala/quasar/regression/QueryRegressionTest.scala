@@ -220,12 +220,19 @@ abstract class QueryRegressionTest[S[_]](
       exp.rows.toVector,
       act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
       // TODO: Error if a backend ignores field order when the query already does.
-      if (exp.ignoreFieldOrder) FieldOrderIgnored
+      if (exp.ignoreFieldOrder) OrderIgnored
       else exp.backends.get(backendName) match {
         case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
-          FieldOrderIgnored
+          OrderIgnored
         case _ =>
-          FieldOrderPreserved
+          OrderPreserved
+      },
+      if (exp.ignoreResultOrder) OrderIgnored
+      else exp.backends.get(backendName) match {
+        case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+          OrderIgnored
+        case _ =>
+          OrderPreserved
       })
   }
 

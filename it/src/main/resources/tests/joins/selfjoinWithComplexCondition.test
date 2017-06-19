@@ -20,7 +20,8 @@
               on r.sha = l.parents[0].sha and l.author.login = r.author.login
               where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\"",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [
         { "child": "56d1caf5d082d1a6840090986e277d36d03f1859", "c_auth": "jdegoes",

@@ -6,7 +6,7 @@
     },
     "data": "largeZips.data",
     "query": "select * from largeZips order by pop/10 desc",
-    "predicate": "equalsInitial",
+    "predicate": "initial",
     "ignoreFieldOrder": true,
     "expected": [
         {"_id": "60623", "city": "CHICAGO",      "loc": [ -87.7157,   41.849015], "pop": 112047.0, "state": "IL"},
