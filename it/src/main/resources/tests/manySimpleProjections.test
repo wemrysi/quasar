@@ -2,7 +2,9 @@
   "name": "many simple projections (order matters)",
 
   "backends": {
-    "postgresql": "pending"
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir": "skip",
+        "postgresql": "pending"
   },
 
   "data": "zips.data",
@@ -10,8 +12,6 @@
   "query": "select city as a, city as b, city as c, city as d, city as e, city as f from zips where `_id` = \"80301\"",
 
   "predicate": "containsExactly",
-
-  "ignoreFieldOrder": ["marklogic_json"],
 
   "expected": [
     { "a": "BOULDER", "b": "BOULDER", "c": "BOULDER", "d": "BOULDER", "e": "BOULDER", "f": "BOULDER" }

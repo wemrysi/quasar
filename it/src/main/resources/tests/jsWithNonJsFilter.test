@@ -1,7 +1,7 @@
 {
     "name": "filter on JS with non-JS",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

@@ -17,12 +17,13 @@
 package quasar.regression
 
 import slamdata.Predef._
+import quasar.BackendName
 
 import argonaut._, Json._
 
 case class ExpectedResult(
-  rows:                    List[Json],
-  predicate:               Predicate,
-  ignoredFields:           List[JsonField],
-  ignoreFieldOrderBackend: IgnoreFieldOrderBackend
-)
+  rows:             List[Json],
+  predicate:        Predicate,
+  ignoredFields:    List[JsonField],
+  ignoreFieldOrder: Boolean,
+  backends:         Map[BackendName, TestDirective])

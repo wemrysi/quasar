@@ -1,7 +1,7 @@
 {
     "name": "flatten a flattened field",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "slamengine_commits.data",

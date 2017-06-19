@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 case class RegressionTest(
   name:      String,
-  backends:  Map[BackendName, SkipDirective],
+  backends:  Map[BackendName, TestDirective],
   data:      List[RelFile[Unsandboxed]],
   query:     String,
   variables: Map[String, String],
@@ -41,21 +41,18 @@ object RegressionTest {
     DecodeJson(c => for {
       name             <- (c --\ "name").as[String]
       backends         <- if ((c --\ "backends").succeeded)
-                            (c --\ "backends").as[Map[String, SkipDirective]]
+                            (c --\ "backends").as[Map[String, TestDirective]]
                               .map(_ mapKeys (BackendName(_)))
-                          else ok(Map[BackendName, SkipDirective]())
+                          else ok(Map[BackendName, TestDirective]())
       data             <- (c --\ "data").as[List[RelFile[Unsandboxed]]] |||
                           optional[RelFile[Unsandboxed]](c--\ "data").map(_.toList)
       query            <- (c --\ "query").as[String]
       variables        <- orElse(c --\ "variables", Map.empty[String, String])
       ignoredFields    <- orElse(c --\ "ignoredFields", List.empty[String])
-      ignoreFieldOrder <- orElse(c --\ "ignoreFieldOrder", List.empty[String]).map {
-                            case v if v.contains("*") => IgnoreFieldOrderAllBackends
-                            case v => IgnoreFieldOrderBackends(v ∘ BackendName.apply)
-                          }
+      ignoreFieldOrder <- orElse(c --\ "ignoreFieldOrder", false)
       rows             <- (c --\ "expected").as[List[Json]]
       predicate        <- (c --\ "predicate").as[Predicate]
     } yield RegressionTest(
       name, backends, data, query, variables,
-      ExpectedResult(rows, predicate, ignoredFields, ignoreFieldOrder)))
+      ExpectedResult(rows, predicate, ignoredFields, ignoreFieldOrder, backends)))
 }

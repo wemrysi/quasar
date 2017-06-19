@@ -1,13 +1,14 @@
 {
     "name": "match on case-insensitive string",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select * from zips where city ~* \"^bOu\"",
     "predicate": "containsAtLeast",
     "ignoredFields": ["_id"],
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
     "expected": [
         { "city": "BOUCKVILLE",       "loc": [ -75.567841,  42.894024], "pop":   650, "state": "NY" },
         { "city": "BOUTON",           "loc": [ -93.996286,  41.828432], "pop":   552, "state": "IA" },

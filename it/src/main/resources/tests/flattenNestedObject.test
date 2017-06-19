@@ -1,7 +1,7 @@
 {
     "name": "flatten an object inside a field projection",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "slamengine_commits.data",

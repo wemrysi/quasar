@@ -1,6 +1,7 @@
 {
     "name": "LIKE with constant-foldable pattern",
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
     "data": "zips.data",
@@ -8,7 +9,7 @@
     "query": "select * from zips where city like (\"%\" || :substr || \"%\")",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
     "expected": [
         { "city": "BOULDER JUNCTION", "loc": [ -89.632454, 46.111183], "pop": 563,   "state": "WI" },
         { "city": "BOULDER",          "loc": [-112.113757, 46.230647], "pop": 1737,  "state": "MT" },

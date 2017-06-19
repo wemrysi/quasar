@@ -1,14 +1,15 @@
 {
     "name": "flatten array on the left with unflattened field",
     "backends": {
+        "mimir": "skip",
         "couchbase": "skip",
+        "marklogic_json": "ignoreFieldOrder",
         "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "SELECT loc[*] as coord, `_id` as zip FROM zips",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["marklogic_json"],
     "expected": [
         {"coord": -72.622739, "zip": "01001"},
         {"coord": 42.070206,  "zip": "01001"},
