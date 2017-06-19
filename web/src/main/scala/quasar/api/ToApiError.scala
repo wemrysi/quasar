@@ -352,7 +352,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Ambiguous function call",
           err.message,
           "invoke"              := name.value,
-          "ambiguous functions" := funcs)
+          "ambiguous functions" := e.fullyQualifiedFuncs)
       case other =>
         fromMsg_(
           InternalServerError withReason "Compilation error.",

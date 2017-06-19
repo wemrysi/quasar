@@ -48,18 +48,18 @@ package object quasar {
     */
   // TODO: Move this into the SQL package, provide a type class for it in core.
   def precompile[T: Equal: RenderTree]
-    (query: Block[Fix[Sql]], vars: Variables, basePath: ADir)
+    (query: Fix[Sql], vars: Variables, basePath: ADir)
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : CompileM[T] = {
     import SemanticAnalysis._
     for {
       ast      <- phase("SQL AST", query.right)
-      substAst <- phase("Variables Substituted", ast.mapExpressionM(Variables.substVars(_, vars)))
-      absAst   <- phase("Absolutized", substAst.map(_.mkPathsAbsolute(basePath)).right)
-      normed   <- phase("Normalized Projections", absAst.map(normalizeProjections[Fix[Sql]]).right)
-      sortProj <- phase("Sort Keys Projected", normed.map(projectSortKeys[Fix[Sql]]).right)
-      annBlock <- phase("Annotated Tree", (sortProj.traverse(annotate[Fix[Sql]])))
-      logical  <- phase("Logical Plan", Compiler.compile[T](annBlock.expr, annBlock.defs) leftMap (_.wrapNel))
+      substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
+      absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
+      normed   <- phase("Normalized Projections", normalizeProjections[Fix[Sql]](absAst).right)
+      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](normed).right)
+      annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
     } yield logical
   }
 
@@ -86,12 +86,12 @@ package object quasar {
   def resolveImports[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S],
     fsFail: Failure.Ops[FileSystemError, S]
-  ): EitherT[Free[S, ?], SemanticError, Block[Fix[Sql]]] =
+  ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
     EitherT(fsFail.unattemptT(resolveImports_(blob, baseDir).run))
 
   def resolveImports_[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S]
-  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Block[Fix[Sql]]] =
+  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
     resolveImportsImpl(blob, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
 
   // It would be nice if this were in the sql package but that is not possible right now because
@@ -102,9 +102,9 @@ package object quasar {
     * results, if the query was foldable to a constant.
     */
   def queryPlan(
-    block: Block[Fix[Sql]], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
+    expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
       CompileM[List[Data] \/ Fix[LP]] =
-    precompile[Fix[LP]](block, vars, basePath)
+    precompile[Fix[LP]](expr, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
       .map(refineConstantPlan)
 

@@ -29,7 +29,6 @@ import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.sql.{Positive => _, _}
-import quasar.sql.fixpoint._
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -42,6 +41,7 @@ import org.http4s.argonaut._
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import pathy.scalacheck.AlphaCharacters
 // TODO: Consider if possible to use argonaut backend and avoid printing followed by parsing
 import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
@@ -118,7 +118,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
       sql.fixParser.parseExpr(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        expr => quasar.queryPlan(Block(expr, Nil), vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+        expr => quasar.queryPlan(expr, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -129,8 +129,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           query = Some(Query(query)),
           state = filesystem.state,
           status = Status.Ok,
-          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString("")
-        )
+          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString(""))
       }
       "POST" >> prop { (filesystem: SingleFileMemState, destination: FPath) => {
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
@@ -218,8 +217,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         query = Some(Query(query)),
         state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
         status = Status.Ok,
-        response = (a: String) => a.trim must_= "5"
-      )
+        response = (a: String) => a.trim must_= "5")
     }
     "execute a query with imported functions" >> {
       val sampleFile = rootDir </> file("foo")
@@ -235,17 +233,11 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
         mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
         status = Status.Ok,
-        response = (a: String) => a.trim must_= "5"
-      )
+        response = (a: String) => a.trim must_= "5")
     }
     "fail on a query that has ambiguous imports" >> {
-      val sampleFile = rootDir </> file("foo")
       val funcDec = {
-        val selectAll = SelectR(
-          SelectAll,
-          List(Proj(SpliceR(None), None)),
-          Some(TableRelationAST(unsandbox(sampleFile), None)),
-          None, None, None)
+        val selectAll = sqlE"select * from `foo`"
         FunctionDecl(CIName("Trivial"), List(CIName("user_id")), selectAll)
       }
       val query =
@@ -257,7 +249,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
       get(executeService)(
         path = rootDir,
         query = Some(Query(query)),
-        state = InMemState.fromFiles(Map(sampleFile -> Vector(Data.Int(5)))),
+        state = InMemState.empty,
         mounts = Map(
           (rootDir </> dir("mymodule"): APath)    -> MountConfig.moduleConfig(List(funcDec)),
           (rootDir </> dir("otherModule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
@@ -266,10 +258,9 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           "error" := AJson(
             "status" := "Ambiguous function call",
             "detail" := AJson(
-              "message" := "Function call `TRIVIAL` is ambiguous because the following functions: Trivial, Trivial could be applied here",
+              "message" := "Function call `TRIVIAL` is ambiguous because the following functions: /mymodule/Trivial, /otherModule/Trivial could be applied here",
               "invoke"  := "TRIVIAL",
-              "ambiguous functions"   := List("Trivial", "Trivial"))))
-      )
+              "ambiguous functions"   := List("/mymodule/Trivial", "/otherModule/Trivial")))))
     }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
@@ -279,8 +270,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(destination),
           state = InMemState.empty,
           status = Status.NotFound,
-          response = _ must_== "???"
-        )
+          response = _ must_== "???")
       }.pendingUntilFixed("SD-773")
       "be 400 with missing query" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
@@ -290,8 +280,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must equal(ApiError.fromStatus(
-            Status.BadRequest withReason "No SQL^2 query found in message body."))
-        )
+            Status.BadRequest withReason "No SQL^2 query found in message body.")))
       }
       "be 400 with missing Destination header" >> prop { filesystem: SingleFileMemState =>
         post[ApiError](fileSystem)(
@@ -300,8 +289,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = None,
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must beHeaderMissingError("Destination")
-        )
+          response = _ must beHeaderMissingError("Destination"))
       }
       "be 400 for query error" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post[ApiError](fileSystem)(
@@ -311,8 +299,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           state = filesystem.state,
           status = Status.BadRequest,
           response = _ must beApiErrorWithMessage(
-            Status.BadRequest withReason "Malformed SQL^2 query.")
-        )
+            Status.BadRequest withReason "Malformed SQL^2 query."))
       }
       "be 400 for compile error" >> prop { (fs: SingleFileMemState, dst: AFile) =>
         val q = "select sum(1, 2, 3, 4)"
@@ -324,7 +311,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(Block(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](fileSystem)(
           path = fs.parent,
@@ -332,8 +319,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(dst),
           state = fs.state,
           status = Status.BadRequest,
-          response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases))
-        )
+          response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases)))
       }
       "be 500 for execution error" >> {
         val q = s"select * from `/foo`"
@@ -345,7 +331,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
-          queryPlan(Block(expr, Nil), Variables.empty, rootDir, 0L, None).run.written
+          queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
         post[ApiError](failingExecPlan(msg, fileSystem))(
           path = rootDir,
@@ -353,8 +339,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           destination = Some(rootDir </> file("outA")),
           state = InMemState.empty,
           status = Status.InternalServerError,
-          response = _ must equal(err.toApiError :+ ("phases" := phases))
-        )
+          response = _ must equal(err.toApiError :+ ("phases" := phases)))
       }
     }
   }

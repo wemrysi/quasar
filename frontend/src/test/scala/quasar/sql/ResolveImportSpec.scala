@@ -27,7 +27,7 @@ class ResolveImportSpec extends quasar.Qspec {
     "simple case" >> {
       val blob = sqlB"import `/mymodule/`; TRIVIAL(`/foo`)"
       val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM :from")
-      resolveImportsImpl[Id](blob, rootDir, κ(List(trivial))).run must_=== Block(sqlE"select * from `/foo`", Nil).right
+      resolveImportsImpl[Id](blob, rootDir, κ(List(trivial))).run must_=== sqlE"select * from `/foo`".right
     }
   }
 }

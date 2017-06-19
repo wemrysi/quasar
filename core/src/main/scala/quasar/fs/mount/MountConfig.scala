@@ -34,7 +34,7 @@ object MountConfig {
     extends MountConfig
   {
     def declarations: List[FunctionDecl[Fix[Sql]]] =
-      statements.declarations
+      statements.decls
     def imports: List[Import[Fix[Sql]]] =
       statements.imports
   }

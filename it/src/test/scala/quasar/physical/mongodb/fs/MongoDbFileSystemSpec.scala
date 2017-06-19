@@ -30,7 +30,7 @@ import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
-import quasar.sql, sql.{Block, Sql}
+import quasar.sql, sql.Sql
 
 import scala.Predef.$conforms
 
@@ -245,7 +245,7 @@ class MongoDbFileSystemSpec
             def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
-                runExec(fsQ.executeQuery(Block(expr, Nil), Variables.empty, rootDir, out))
+                runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
                   .run.value.unsafePerformSync
               ) must beSome(file))
 

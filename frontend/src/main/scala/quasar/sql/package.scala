@@ -152,16 +152,17 @@ package object sql {
     /**
       * Inlines all function invocations with the bodies of functions in scope.
       * Leaves invocations to functions outside of scope untouched (as opposed to erroring out)
-      * @param scope Returns the list of function definitions that match a given name and function arity
+      * @param scope Returns the list of function definitions that match a given name and function arity along with a
+      *              path specifying whether this function was found
       */
-    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[FunctionDecl[T[Sql]]]]): EitherT[M, SemanticError, T[Sql]] = {
+    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]]): EitherT[M, SemanticError, T[Sql]] = {
       q.cataM[EitherT[M, SemanticError, ?], T[Sql]] {
         case invoke @ InvokeFunction(name, args) =>
           EitherT(scope(name, args.size).flatMap {
-            case Nil           => invoke.embed.right.point[M]
-            case List(funcDef) => funcDef.applyArgs(args).point[M]
-            case ambiguous     =>
-              SemanticError.ambiguousFunctionInvoke(name, ambiguous.map(_.name.value)).left.point[M]
+            case Nil              => invoke.embed.right.point[M]
+            case List((funcDef, _)) => funcDef.applyArgs(args).point[M]
+            case ambiguous        =>
+              SemanticError.ambiguousFunctionInvoke(name, ambiguous.map { case(func, from) => (func.name, from)}).left.point[M]
           })
         case other => EitherT.right(other.embed.point[M])
       }
@@ -169,33 +170,35 @@ package object sql {
   }
 
   def resolveImportsImpl[M[_]: Monad](blob: Blob[Fix[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[Fix[Sql]]]])
-  : EitherT[M, SemanticError, Block[Fix[Sql]]] = {
+  : EitherT[M, SemanticError, Fix[Sql]] = {
 
-    def absolutizeImport(i: Import[Fix[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
+    def absImport(i: Import[Fix[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
 
-    def scopeFromImports(imports: List[ADir]): (CIName, Int) => EitherT[M, SemanticError, List[FunctionDecl[Fix[Sql]]]] = {
+    def scopeFromHere(imports: List[Import[Fix[Sql]]], funcsHere: List[FunctionDecl[Fix[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[Fix[Sql]], ADir)]] = {
       case (name, arity) =>
-        imports.traverse(d =>
-          EitherT.right(retrieve(d)).flatMap { statements =>
-            def matchesSignature(func: FunctionDecl[Fix[Sql]]) = func.name === name && arity === func.args.size
-            statements.declarations.filter(matchesSignature).traverse { decl =>
-              val others = statements.declarations.filterNot(matchesSignature) // No recursice calls in SQL^2
-            val currentImportScope = scopeFromImports(statements.imports.map(i => absolutizeImport(i, d)))
-              def currentScope(name: CIName, arity: Int): EitherT[M, SemanticError, List[FunctionDecl[Fix[Sql]]]] =
-                currentImportScope(name, arity).flatMap(decls =>
-                  others.traverse(decl => decl.traverse(_.inlineInvokes(currentScope).flattenLeft)).map(decls ++ _))
-              decl.traverse(_.inlineInvokes(currentScope).flattenLeft)
-            }
-          }).map(_.join)
+        // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
+        val funcsFromImports = imports.map(absImport(_, here)).traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
+        // All functions in "this" scope along with their own imports
+        val allFuncs         = funcsFromImports.map((funcsHere, imports, here) :: _)
+        EitherT.right(allFuncs).flatMap(_.traverse{ case (funcs, imports, from) =>
+          def matchesSignature(func: FunctionDecl[Fix[Sql]]) = func.name === name && arity === func.args.size
+          funcs.filter(matchesSignature).traverse { decl =>
+            val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
+            val currentScope = scopeFromHere(imports, others, from)
+            decl.traverse(_.inlineInvokes(currentScope)).flattenLeft.strengthR(from)
+          }
+        }).map(_.join)
     }
 
+    blob.expr.inlineInvokes(scopeFromHere(blob.imports, blob.defs, baseDir)).flattenLeft
+
     // This blob has no more imports (assuming the implementation is correct)
-    val blobInlined = blob.traverse(_.inlineInvokes(scopeFromImports(blob.imports.map(absolutizeImport(_, baseDir)))).flattenLeft)
-    blobInlined.map(blob => Block(blob.expr, blob.defs))
+//    val blobInlined = blob.traverse(_.inlineInvokes(scopeFromImports(blob.imports.map(absolutizeImport(_, baseDir)))).flattenLeft)
+//    blobInlined.map(blob => Block(blob.expr, blob.defs))
   }
 
   implicit class StatementsOps[A](a: List[Statement[A]]) {
-    def declarations: List[FunctionDecl[A]] =
+    def decls: List[FunctionDecl[A]] =
       a.collect { case funcDec: FunctionDecl[_] => funcDec }
 
     def imports: List[Import[A]] =

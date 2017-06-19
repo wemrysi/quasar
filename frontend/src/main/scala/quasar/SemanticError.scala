@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.contrib.pathy.ADir
 import quasar.sql._
 
 import matryoshka._
@@ -39,9 +40,10 @@ object SemanticError {
     def message = s"The data '${data.shows}' did not fall within its expected domain" + hint.map(": " + _).getOrElse("")
   }
 
-  final case class AmbiguousFunctionInvoke(name: CIName, relevantFuncs: List[String]) extends SemanticError {
+  final case class AmbiguousFunctionInvoke(name: CIName, from: List[(CIName,ADir)]) extends SemanticError {
+    def fullyQualifiedFuncs = from.map { case (name, dir) => posixCodec.printPath(dir) + name.value}
     def message = {
-      val functions = relevantFuncs.mkString(", ")
+      val functions = fullyQualifiedFuncs.mkString(", ")
       s"Function call `${name.shows}` is ambiguous because the following functions: $functions could be applied here"
     }
   }
@@ -111,9 +113,9 @@ object SemanticError {
     case UnboundVariable(varname) => varname
   }(UnboundVariable(_))
 
-  val ambiguousFunctionInvoke: Prism[SemanticError, (CIName, List[String])] =
-    Prism.partial[SemanticError, (CIName, List[String])] {
-      case AmbiguousFunctionInvoke(name, funcs) => (name, funcs)
+  val ambiguousFunctionInvoke: Prism[SemanticError, (CIName, List[(CIName, ADir)])] =
+    Prism.partial[SemanticError, (CIName, List[(CIName, ADir)])] {
+      case AmbiguousFunctionInvoke(name, from) => (name, from)
     }(AmbiguousFunctionInvoke.tupled)
 
   val duplicateAlias: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
