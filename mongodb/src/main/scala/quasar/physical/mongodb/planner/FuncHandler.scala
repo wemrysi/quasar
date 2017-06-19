@@ -287,7 +287,7 @@ object FuncHandler {
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived
 
-      private def handleUnhandled[T[_[_]]: CorecursiveT, F[_]]
+      private def handleUnhandled[F[_]]
         (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
           : MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
             new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
