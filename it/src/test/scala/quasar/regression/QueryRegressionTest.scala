@@ -142,17 +142,15 @@ abstract class QueryRegressionTest[S[_]](
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
-        case Some(SkipDirective.Skip)    => skipped
-        case Some(SkipDirective.SkipCI)  =>
+        case Some(TestDirective.Skip)    => skipped
+        case Some(TestDirective.SkipCI)  =>
           BuildInfo.isCIBuild.fold(Skipped("(skipped during CI build)"), runTest)
-        case Some(SkipDirective.Pending) =>
+        case Some(TestDirective.Pending) =>
           if (BuildInfo.coverageEnabled)
             Skipped("(pending example skipped during coverage run)")
-          else if (BuildInfo.isCIBuild)
-            Skipped("(pending example skipped during CI build)")
           else
             runTest.pendingUntilFixed
-        case None                        => runTest
+        case _                           => runTest
       }
     }
   }
@@ -221,11 +219,13 @@ abstract class QueryRegressionTest[S[_]](
     exp.predicate(
       exp.rows.toVector,
       act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
-      exp.ignoreFieldOrderBackend match {
-        case IgnoreFieldOrderAllBackends            =>
+      // TODO: Error if a backend ignores field order when the query already does.
+      if (exp.ignoreFieldOrder) FieldOrderIgnored
+      else exp.backends.get(backendName) match {
+        case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
           FieldOrderIgnored
-        case IgnoreFieldOrderBackends(backendNames) =>
-          backendNames.exists(_ ≟ backendName).fold(FieldOrderIgnored, FieldOrderPreserved)
+        case _ =>
+          FieldOrderPreserved
       })
   }
 
