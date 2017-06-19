@@ -2,9 +2,9 @@
     "name": "join with multiple fields selected",
 
     "backends": {
-        "mimir": "skip",
         "couchbase":         "pending",
-        "mongodb_read_only": "pending",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "skip",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
@@ -21,8 +21,6 @@
               FROM `../smallZips` JOIN `../extraSmallZips`
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
-
-    "ignoreFieldOrder": [ "marklogic_json" ],
 
     "predicate": "containsAtLeast",
 
