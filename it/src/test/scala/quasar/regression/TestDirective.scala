@@ -20,19 +20,19 @@ import slamdata.Predef._
 
 import argonaut._, Argonaut._
 
-sealed abstract class SkipDirective
+sealed abstract class TestDirective
 
-object SkipDirective {
-  final case object Skip              extends SkipDirective
-  final case object SkipCI            extends SkipDirective
-  final case object Pending           extends SkipDirective
-  final case object IgnoreAllOrder    extends SkipDirective
-  final case object IgnoreFieldOrder  extends SkipDirective
-  final case object IgnoreResultOrder extends SkipDirective
+object TestDirective {
+  final case object Skip              extends TestDirective
+  final case object SkipCI            extends TestDirective
+  final case object Pending           extends TestDirective
+  final case object IgnoreAllOrder    extends TestDirective
+  final case object IgnoreFieldOrder  extends TestDirective
+  final case object IgnoreResultOrder extends TestDirective
 
   import DecodeResult.{ok, fail}
 
-  implicit val SkipDirectiveDecodeJson: DecodeJson[SkipDirective] =
+  implicit val TestDirectiveDecodeJson: DecodeJson[TestDirective] =
     DecodeJson(c => c.as[String].flatMap {
       case "skip"              => ok(Skip)
       case "skipCI"            => ok(SkipCI)

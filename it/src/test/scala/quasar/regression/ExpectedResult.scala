@@ -26,4 +26,4 @@ case class ExpectedResult(
   predicate:        Predicate,
   ignoredFields:    List[JsonField],
   ignoreFieldOrder: Boolean,
-  backends:         Map[BackendName, SkipDirective])
+  backends:         Map[BackendName, TestDirective])

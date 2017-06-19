@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 case class RegressionTest(
   name:      String,
-  backends:  Map[BackendName, SkipDirective],
+  backends:  Map[BackendName, TestDirective],
   data:      List[RelFile[Unsandboxed]],
   query:     String,
   variables: Map[String, String],
@@ -41,9 +41,9 @@ object RegressionTest {
     DecodeJson(c => for {
       name             <- (c --\ "name").as[String]
       backends         <- if ((c --\ "backends").succeeded)
-                            (c --\ "backends").as[Map[String, SkipDirective]]
+                            (c --\ "backends").as[Map[String, TestDirective]]
                               .map(_ mapKeys (BackendName(_)))
-                          else ok(Map[BackendName, SkipDirective]())
+                          else ok(Map[BackendName, TestDirective]())
       data             <- (c --\ "data").as[List[RelFile[Unsandboxed]]] |||
                           optional[RelFile[Unsandboxed]](c--\ "data").map(_.toList)
       query            <- (c --\ "query").as[String]
