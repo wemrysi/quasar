@@ -46,6 +46,7 @@ object EquiJoin {
   implicit def equal[T[_[_]]: EqualT]:
       Delay[Equal, EquiJoin[T, ?]] =
     new Delay[Equal, EquiJoin[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (EquiJoin(a1, l1, r1, lk1, rk1, f1, c1),

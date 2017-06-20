@@ -141,6 +141,7 @@ object SemanticAnalysis {
       CoalgebraM[ValidSem, Sql, (Scope, T)] = {
     case (Scope(ts, bs), Embed(expr)) => expr match {
       case Select(_, _, relations, _, _, _) =>
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def findRelations(r: SqlRelation[T]): ValidSem[Map[String, SqlRelation[Unit]]] =
           r match {
             case IdentRelationAST(name, aliasOpt) =>
@@ -184,6 +185,7 @@ object SemanticAnalysis {
 
     def | (that: Provenance): Provenance = Either(this, that)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Equlas"))
     def simplify: Provenance = this match {
       case x : Either => anyOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))
       case x : Both => allOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))

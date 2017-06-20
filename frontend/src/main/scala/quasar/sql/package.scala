@@ -82,6 +82,7 @@ package object sql {
     (projections: List[Proj[T]], relName: Option[String])
     (implicit T: Recursive.Aux[T, Sql])
       : SemanticError \/ List[(String, T)] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def extractName(expr: T): Option[String] = expr.project match {
       case Ident(name) if name.some ≠ relName            => name.some
       case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
@@ -123,6 +124,7 @@ package object sql {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
       q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def makeTables(bindings: List[String]): T[Sql] = q.project match {
       case sel @ Select(_, _, _, _, _, _) => {
         // perform all the appropriate recursions
@@ -167,6 +169,7 @@ package object sql {
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def pprintRelationƒ[T]
     (r: SqlRelation[(T, String)])
     (implicit T: Recursive.Aux[T, Sql])
@@ -297,6 +300,7 @@ package object sql {
     case _ => None
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def traverseRelation[G[_], A, B](r: SqlRelation[A], f: A => G[B])(
     implicit G: Applicative[G]):
       G[SqlRelation[B]] =
