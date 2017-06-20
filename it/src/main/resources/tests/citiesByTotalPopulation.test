@@ -1,10 +1,8 @@
 {
     "name": "top 5 cities by total population",
 
-    "NB": "Couchbase is skipped due to largish generated N1QL that leads to a timeout.",
-
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "ignoreFieldOrder",
         "mimir":             "skip",
         "mongodb_2_6":       "ignoreFieldOrder",
         "mongodb_3_0":       "ignoreFieldOrder",

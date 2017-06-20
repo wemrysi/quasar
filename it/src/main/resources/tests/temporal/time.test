@@ -1,10 +1,8 @@
 {
     "name": "filter on time_of_day",
 
-    "NB": "Couchbase disabled due to heap exhaustion",
-
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
         "mimir": "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",

@@ -1,7 +1,7 @@
 {
     "name": "flatten array with unflattened field",
     "backends": {
-        "couchbase":  "skip",
+        "couchbase": "pending",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
         "postgresql": "pending"
