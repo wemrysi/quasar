@@ -230,7 +230,7 @@ package object sql {
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
         case UnshiftMap => "{" + lhs._2 + " : " + rhs._2 + " ...}"
-        case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
+        case _ => List("((" + lhs._2 + ")", op.sql, "(" + rhs._2 + "))").mkString(" ")
       }
       case Unop(expr, op) => op match {
         case FlattenMapKeys      => "(" + expr._2 + "){*:}"
