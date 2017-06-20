@@ -3,7 +3,8 @@
 
     "backends": {
         "couchbase":         "skip",
-        "mongodb_read_only": "pending",
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "skip",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
@@ -18,9 +19,5 @@
 
     "predicate": "equalsExactly",
 
-    "ignoreFieldOrder": ["marklogic_json"],
-
-    "expected": [
-        { "a": "BOULDER", "b": "CHICO", "diff": 9278 }
-    ]
+    "expected": [{ "a": "BOULDER", "b": "CHICO", "diff": 9278 }]
 }

@@ -15,7 +15,7 @@ Quasar is an open source NoSQL analytics engine that can be used as a library or
 
 SQL² is the dialect of SQL that Quasar understands.
 
-SQL² is a superset of standard SQL. Therefore, in the following documentation SQL² will be used interchangeably with SQL.
+In the following documentation SQL² will be used interchangeably with SQL.
 
 See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
@@ -271,9 +271,7 @@ Prerequisites
 - Namespaces used in queries must be defined on the server.
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
-[Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
-- Field aliases when working with XML must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- "Default" numeric field names are prefixed with an underscore ("_") when working with XML in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+[Known Limitations](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+marklogic+label%3A%22topic%3A+MarkLogic%22)
 - It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
 - Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
@@ -285,6 +283,13 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
   - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
   - Element attributes are serialized to an object at the `_xml.attributes` key.
   - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
+- Fields that are not valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
+
+  ```xml
+  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
+  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
+  ```
+
 
 ### View mounts
 
@@ -293,6 +298,24 @@ If the mount's key is "view" then the mount represents a "virtual" file, defined
 For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+### Module mounts
+
+If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.
+
+A module function can be thought of as a parameterized view, i.e. a view with "holes" that can be filled dynamically.
+
+The value of a module mount is simply the SQL string which will be parsed into a list of SQL Statements.
+
+To create a new module one would send a json blob similar to this one to the mount endpoint:
+
+```json
+{ "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
+```
+
+See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
+
+Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
 
 #### Build Quasar for Apache Spark
 

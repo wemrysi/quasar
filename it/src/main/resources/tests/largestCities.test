@@ -5,10 +5,15 @@
 
     "backends": {
         "couchbase":  "skip",
+        "mimir": "skip",
+        "mongodb_2_6": "ignoreFieldOrder",
+        "mongodb_3_0": "ignoreFieldOrder",
+        "mongodb_3_2": "ignoreFieldOrder",
+        "mongodb_3_4": "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
         "postgresql": "pending"
     },
     "data": "zips.data",
-    "ignoreFieldOrder": [ "mongodb_2_6", "mongodb_3_0", "mongodb_3_2", "mongodb_read_only" ],
     "query": "select city, state, sum(pop) as total from zips group by city, state order by sum(pop) desc limit 10",
     "predicate": "equalsExactly",
     "expected": [{ "city": "CHICAGO",      "state": "IL", "total": 2452177 },

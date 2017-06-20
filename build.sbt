@@ -466,19 +466,23 @@ val headerSettings = Seq(
 import precogbuild.Build._
 
 lazy val precog = project.setup
+  .settings(name := "quasar-precog-internal")
   .dependsOn(common % BothScopes)
   .withWarnings
   .deps(Dependencies.precog: _*)
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
+  .settings(name := "quasar-blueeyes-internal")
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
@@ -517,9 +521,11 @@ lazy val niflheim = project.setup
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
+  .settings(name := "quasar-yggdrasil-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .withWarnings
   .settings(headerSettings)
+  .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)

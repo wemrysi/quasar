@@ -1,7 +1,8 @@
 {
     "name": "select twenty fields quickly",
     "backends": {
-        "mongodb_read_only": "pending",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
@@ -11,7 +12,6 @@
       city as k, city as l, city as m, city as n, city as o,
       city as p, city as q, city as r, city as s, city as t from largeZips",
     "predicate": "containsAtLeast",
-    "ignoreFieldOrder": [ "marklogic_json" ],
     "expected": [{ "a": "CUSHMAN", "b": "CUSHMAN", "c": "CUSHMAN", "d": "CUSHMAN",
                    "e": "CUSHMAN", "f": "CUSHMAN", "g": "CUSHMAN", "h": "CUSHMAN",
                    "i": "CUSHMAN", "j": "CUSHMAN", "k": "CUSHMAN", "l": "CUSHMAN",

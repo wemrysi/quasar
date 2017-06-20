@@ -2,7 +2,7 @@
     "name": "perform inner equi-join with wildcard",
 
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
         "marklogic_json":    "skip",
@@ -18,6 +18,8 @@
     "query": "select * from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
 
     "predicate": "containsAtLeast",
+
+    "ignoreFieldOrder": true,
 
     "expected": [
         {"_id":"01001", "city":"AGAWAM",       "loc":[-72.622739,42.070206], "pop":15338, "state":"MA"},

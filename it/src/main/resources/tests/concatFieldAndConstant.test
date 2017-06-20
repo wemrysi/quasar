@@ -1,7 +1,7 @@
 {
     "name": "concat field with constant array",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

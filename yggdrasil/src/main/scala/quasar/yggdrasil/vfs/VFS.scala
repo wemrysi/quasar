@@ -24,12 +24,14 @@ import quasar.precog.common._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
 
-import java.util.Arrays
+import java.util.{Arrays, UUID}
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
+
 import scalaz._, Scalaz._
+import scalaz.effect.IO
 
 sealed trait Version
 object Version {
@@ -91,8 +93,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
       EitherT {
         resource.fold(
           br => br.asString.run.map(_.toRightDisjunction(notAQuery)),
-          _ => \/.left(notAQuery).point[M]
-        )
+          _ => \/.left(notAQuery).point[M])
       }
     }
 

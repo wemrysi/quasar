@@ -1,7 +1,7 @@
 {
     "name": "concat known array structure",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

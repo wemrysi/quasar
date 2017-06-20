@@ -31,12 +31,16 @@ import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
 import eu.timepit.refined.auto._
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+
 import monocle.macros.Lenses
+
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
+
 import scalaz.{Failure => _, _}, Scalaz._
 
 class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
