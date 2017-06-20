@@ -285,10 +285,10 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
   - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
 - Fields that are not valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
 
-```xml
-<ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
-<ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
-```
+  ```xml
+  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
+  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
+  ```
 
 
 ### View mounts
