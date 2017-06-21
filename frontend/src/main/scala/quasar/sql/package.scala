@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
 
+import contextual._
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -59,6 +60,18 @@ package object sql {
 
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
   val fixParser = parser[Fix]
+
+  // Note: This is hardcoded to `Fix` but cannot be made generic with version `1.0.1` of contextual,
+  //       it results in a `ClassNotFound` exception being thrown at compile time
+  //       https://github.com/propensive/contextual/issues/28
+  // Note: This cannot be moved to tests as it will also result in a `ClassNotFound`
+  //       exception being thrown at compile time as of contextual `1.0.1`
+  //       https://github.com/propensive/contextual/issues/29
+  // TODO: Write custom macro to do this ourselves in order to work around above issues
+  implicit class SqlStringContext(sc: StringContext) {
+    val sqlE = Prefix(SqlInterpolator.Expr, sc)
+    val sqlB = Prefix(SqlInterpolator.Blob, sc)
+  }
 
   def CrossRelation[T]
     (left: SqlRelation[T], right: SqlRelation[T])

@@ -64,7 +64,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     def emptyWithViews(views: Map[AFile, Fix[Sql]]) =
       mountConfigs.set(views.map { case (p, expr) =>
-        p -> MountConfig.viewConfig(expr, Variables.empty)
+        p -> MountConfig.viewConfig(Blob(expr, Nil), Variables.empty)
       })(empty)
   }
 
@@ -116,7 +116,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
-      views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, expr, Variables.empty) }
+      views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, Blob(expr, Nil), Variables.empty) }
 
     val toBeTraced: Free[ViewFileSystem, A] =
       mountViews *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
