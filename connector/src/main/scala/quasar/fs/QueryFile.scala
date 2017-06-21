@@ -328,6 +328,7 @@ object QueryFile {
     def descendantFiles(dir: ADir): M[Set[RFile]] = {
       type S[A] = StreamT[M, A]
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def lsR(desc: RDir): StreamT[M, RFile] =
         StreamT.fromStream[M, PathSegment](ls(dir </> desc) map (_.toStream))
           .flatMap(_.fold(

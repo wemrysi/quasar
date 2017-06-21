@@ -63,6 +63,7 @@ object EquiJoin {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, EquiJoin[T, ?]] =
     new Delay[Show, EquiJoin[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
         case EquiJoin(src, lBr, rBr, lkey, rkey, f, combine) =>
           Cord("EquiJoin(") ++
@@ -79,6 +80,7 @@ object EquiJoin {
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
     new Delay[RenderTree, EquiJoin[T, ?]] {
       val nt = List("EquiJoin")
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](r: RenderTree[A]): RenderTree[EquiJoin[T, A]] = RenderTree.make {
           case EquiJoin(src, lBr, rBr, lKey, rKey, tpe, combine) =>
             NonTerminal(nt, None, List(

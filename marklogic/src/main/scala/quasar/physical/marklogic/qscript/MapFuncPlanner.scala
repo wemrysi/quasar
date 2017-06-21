@@ -36,6 +36,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 ) extends Planner[F, FMT, MapFunc[T, ?]] {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
     case Undefined()                  => emptySeq.point[F]

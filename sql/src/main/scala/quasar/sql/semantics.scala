@@ -185,7 +185,7 @@ object SemanticAnalysis {
 
     def | (that: Provenance): Provenance = Either(this, that)
 
-    @SuppressWarnings(Array("org.wartremover.warts.Equlas"))
+    @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
     def simplify: Provenance = this match {
       case x : Either => anyOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))
       case x : Both => allOf(x.flatten.map(_.simplify).filterNot(_.equals(Empty)))
@@ -195,6 +195,7 @@ object SemanticAnalysis {
     def namedRelations: Map[String, List[NamedRelation[Unit]]] =
       relations.foldMap(_.namedRelations)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def relations: List[SqlRelation[Unit]] = this match {
       case Empty => Nil
       case Value => Nil
@@ -229,6 +230,7 @@ object SemanticAnalysis {
 
     implicit val renderTree: RenderTree[Provenance] =
       new RenderTree[Provenance] { self =>
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def render(v: Provenance) = {
           val ProvenanceNodeType = List("Provenance")
 
@@ -277,6 +279,7 @@ object SemanticAnalysis {
     final case class Either(left: Provenance, right: Provenance)
         extends Provenance {
       override def flatten: Set[Provenance] = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def flatten0(x: Provenance): Set[Provenance] = x match {
           case Either(left, right) => flatten0(left) ++ flatten0(right)
           case _ => Set(x)
@@ -287,6 +290,7 @@ object SemanticAnalysis {
     final case class Both(left: Provenance, right: Provenance)
         extends Provenance {
       override def flatten: Set[Provenance] = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def flatten0(x: Provenance): Set[Provenance] = x match {
           case Both(left, right) => flatten0(left) ++ flatten0(right)
           case _ => Set(x)
