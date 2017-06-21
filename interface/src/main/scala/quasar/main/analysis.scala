@@ -16,13 +16,15 @@
 
 package quasar.main
 
-import quasar.Data
+import quasar.{Data, queryPlan, Variables}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.ejson.EJson
 import quasar.fp.numeric.Positive
 import quasar.fs._
+import quasar.frontend.SemanticErrors
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.sql.{Blob, Sql}
 import quasar.sst._
 import quasar.std.StdLib
 
@@ -89,34 +91,35 @@ object analysis {
       .reduce((x, y) => repeatedly(compress)(x |+| y))
   }
 
-  /** A random sample of the dataset at the given path. */
-  def sample[S[_]](file: AFile, size: Positive)(
-    implicit Q: QueryFile.Ops[S]
-  ): Process[Q.M, Data] =
-    Q.evaluate(sampleQuery[Fix[LogicalPlan]](file, size)).translate(Q.transforms.dropPhases)
-
-  /** A random sample of `size` items from the given dataset. */
-  def sampleOf[T](dataset: T, size: Positive)(
+  /** A plan representing a random sample of `size` items from the dataset
+    * represented by the given plan.
+    */
+  def sampled[P](plan: P, size: Positive)(
     implicit
-    TR: Recursive.Aux[T, LogicalPlan],
-    TC: Corecursive.Aux[T, LogicalPlan]
-  ): T = {
-    val lpr   = new LogicalPlanR[T]
+    TR: Recursive.Aux[P, LogicalPlan],
+    TC: Corecursive.Aux[P, LogicalPlan]
+  ): P = {
+    val lpr   = new LogicalPlanR[P]
     val dsize = Data._int(size.value)
-    lpr.invoke2(StdLib.set.Sample, dataset, lpr.constant(dsize))
+    lpr.invoke2(StdLib.set.Sample, plan, lpr.constant(dsize))
   }
 
-  /** Query representing a random sample of `size` items from the specified file. */
-  def sampleQuery[T](file: AFile, size: Positive)(
-    implicit
-    TR: Recursive.Aux[T, LogicalPlan],
-    TC: Corecursive.Aux[T, LogicalPlan]
-  ): T =
-    sampleOf((new LogicalPlanR[T]).read(file), size)
-
-  /** An eager random sample of the dataset at the given path. */
-  def sampleResults[S[_]](file: AFile, size: Positive)(
+  /** A random sample of at most `size` elements from the dataset represented
+    * by the given plan.
+    *
+    * TODO: Streaming
+    */
+  def sampleOfPlan[S[_]](plan: Fix[LogicalPlan], size: Positive)(
     implicit Q: QueryFile.Ops[S]
   ): Q.M[Process0[Data]] =
-    Q.transforms.dropPhases(Q.results(sampleQuery[Fix[LogicalPlan]](file, size)))
+    Q.transforms.dropPhases(Q.results(sampled(plan, size)))
+
+  /** A random sample of at most `size` elements from the dataset represented
+    * by the given query.
+    */
+  def sampleOfQuery[S[_]](query: Blob[Fix[Sql]], vars: Variables, baseDir: ADir, size: Positive)(
+    implicit Q: QueryFile.Ops[S]
+  ): Q.M[SemanticErrors \/ Process0[Data]] =
+    queryPlan(query, vars, baseDir, 0L, none).run.value
+      .traverse(_.fold(xs => Process.emitAll(xs).point[Q.M], sampleOfPlan[S](_, size)))
 }

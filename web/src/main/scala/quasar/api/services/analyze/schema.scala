@@ -17,10 +17,11 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef.{-> => _, _}
-import quasar.{Data, queryPlan}
+import quasar.Data
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.api.services.query._
+import quasar.contrib.scalaz.disjunction._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.numeric._
@@ -30,12 +31,10 @@ import quasar.main.analysis
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.Accept
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 import spire.std.double._
 
 object schema {
@@ -77,30 +76,26 @@ object schema {
           valueOrInvalid("unionMaxSize", unionMax0)
             .map(_ | analysis.CompressionSettings.DefaultUnionMaxSize)
 
-        respond_((arrMax |@| mapMax |@| strMax |@| unionMax) { (amax, mmax, smax, umax) =>
-          val compressionSettings = analysis.CompressionSettings(
-            arrayMaxLength  = amax,
-            mapMaxSize      = mmax,
-            stringMaxLength = smax,
-            unionMaxSize    = umax)
+        val compressionSettings =
+          (arrMax |@| mapMax |@| strMax |@| unionMax)((amax, mmax, smax, umax) =>
+            analysis.CompressionSettings(
+              arrayMaxLength  = amax,
+              mapMaxSize      = mmax,
+              stringMaxLength = smax,
+              unionMaxSize    = umax))
 
-          sampling[S](req) map (p => formattedDataResponse(
+        respondT(for {
+          settings    <- compressionSettings.liftT[Free[S, ?]]
+          rq          <- requestQuery[Fix](req).liftT[Free[S, ?]]
+          (blob, dir) =  rq
+          r           <- analysis.sampleOfQuery[S](blob, requestVars(req), dir, DefaultSampleSize)
+                           .leftMap(_.toApiError)
+          sample      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
+        } yield {
+          formattedDataResponse(
             MessageFormat.fromAccept(req.headers.get(Accept)),
-            p.pipe(analysis.extractSchema[J, Double](compressionSettings))
-              .map(sst => sst.asEJson[J].cata(Data.fromEJson))))
+            sample.pipe(analysis.extractSchema[J, Double](settings))
+              .map(sst => sst.asEJson[J].cata(Data.fromEJson)))
         })
-    }
-
-  def sampling[S[_]](req: Request)(
-    implicit Q: QueryFile.Ops[S]
-  ): ApiError \/ Process[FileSystemErrT[Free[S, ?], ?], Data] =
-    parsedQueryRequest(req, none, none) flatMap { case (blob, basePath, off, lim) =>
-      queryPlan(blob, requestVars(req), basePath, off, lim)
-        .run.value.bimap(
-          _.toApiError,
-          _.fold(
-            Process.emitAll,
-            lp => Q.evaluate(analysis.sampleOf(lp, DefaultSampleSize))))
-        .map(_.translate(QueryFile.Transforms[Free[S, ?]].dropPhases))
     }
 }

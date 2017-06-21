@@ -66,7 +66,7 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
 
   def stateForFile(file: AFile, contents: Vector[Data]) =
     InMemState.empty.copy(queryResps = Map(
-      analysis.sampleOf(simpleRead(file), schema.DefaultSampleSize) -> contents
+      analysis.sampled(simpleRead(file), schema.DefaultSampleSize) -> contents
     ))
 
   def baseUri(file: AFile) =

@@ -57,7 +57,7 @@ object Repl {
       |  [query]
       |  [id] <- [query]
       |  explain [query]
-      |  schema [path]
+      |  schema [query]
       |  ls [path]
       |  save [path] [value]
       |  append [path] [value]
@@ -230,18 +230,19 @@ object Repl {
                       κ(().point[Free[S, ?]])))
         } yield ()
 
-      case Schema(f) =>
+      case Schema(q) =>
         for {
           state <- RS.get
-          file  =  state targetFile f
-          proc  <- analysis.sampleResults(file, 1000L).run
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          r     <- analysis.sampleOfQuery[S](expr, vars, state.cwd, 1000L)
+                     .leftMap(_.shows).run
+          proc  <- DF.unattempt_(r.map(_.leftMap(_.shows)).join)
           p1    =  analysis.extractSchema[Fix[EJson], Double](
                      analysis.CompressionSettings.Default)
-          sst   =  proc.map(_.pipe(p1).map(_.asEJson[Fix[EJson]].cata(Data.fromEJson)))
-          js    =  sst.map(_.toVector.headOption.flatMap(DataCodec.Precise.encode))
-          _     <- js.fold(
-                     err => DF.fail(err.shows),
-                     j   => P.println(j.fold("{}")(_.spaces2)))
+          sst   =  proc.pipe(p1).map(_.asEJson[Fix[EJson]].cata(Data.fromEJson))
+          js    =  sst.toVector.headOption.flatMap(DataCodec.Precise.encode)
+          _     <- P.println(js.fold("{}")(_.spaces2))
         } yield ()
 
 
