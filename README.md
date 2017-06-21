@@ -1,4 +1,4 @@
-[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+Ï[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -123,13 +123,31 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
+
+Once you have a running metastore you can start the web api service with [these](#web-jar) instructions and issue curl commands 
+of the following format to create new mount points.
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
+```
+The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
+
+| mountKey        | protocol         | uri                                    |
+|-----------------|------------------|----------------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
+
+See [here](#get-mountfspath) for more details on the mount web api service.
+
+For example, to create a couchbase mount point, issue a `curl` command like:
 
 ```bash
 curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
 ```
-
-You can find examples of `connectionUri` values [here](#database-mounts).
 
 #### Web JAR
 
@@ -247,13 +265,19 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-#### HDFS using Apache Spark
+#### Apache Spark
 
-To connect to HDFS using Apache Spark use the following `connectionUri` format:
+To connect to Apache Spark and use either local files or HDFS to query data use the following `connectionUri`:
 
-`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+with local files:
 
-e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+`spark_local=\"/path/to/data/my.data\"`
+
+with HDFS:
+
+`spark://<host>:<port>?rootPath=<rootPath>&hdfsUri=<hdfsUri>[&spark_configuration=spark_configuration_value]`
+
+For example: "spark://10.0.0.4:7077?hdfsUri=hdfs%3A%2F%2F10.0.0.3%3A9000&rootPath=/data&spark.executor.memory=4g&spark.eventLog.enabled=true"
 
 #### MarkLogic
 
