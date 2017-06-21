@@ -1,10 +1,7 @@
 {
     "name": "largest cities",
 
-    "NB": "Couchbase is skipped due to largish generated N1QL that leads to a timeout.",
-
     "backends": {
-        "couchbase":  "skip",
         "mimir": "skip",
         "mongodb_2_6": "ignoreFieldOrder",
         "mongodb_3_0": "ignoreFieldOrder",

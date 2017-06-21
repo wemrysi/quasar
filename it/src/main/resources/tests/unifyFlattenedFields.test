@@ -2,7 +2,7 @@
     "name": "unify flattened fields",
     "backends": {
         "mimir": "skip",
-        "couchbase":  "skip",
+        "couchbase":  "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
