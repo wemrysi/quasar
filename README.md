@@ -131,7 +131,7 @@ of the following format to create new mount points.
 ```bash
 curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
 ```
-The `<mountPath>` is the name of your mount point and the remaining parameters are listed below:
+The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
 | mountKey        | protocol         | uri                                    |
 |-----------------|------------------|----------------------------------------|
