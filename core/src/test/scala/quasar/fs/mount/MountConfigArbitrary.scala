@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Variables
 import quasar.VariablesArbitrary._
 import quasar.fs._, FileSystemTypeArbitrary._
-import quasar.sql._, ExprArbitrary._
+import quasar.sql._, BlobArbitrary._
 
 import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
@@ -38,9 +38,9 @@ trait MountConfigArbitrary {
 
   private def genViewConfig: Gen[MountConfig] =
     for {
-      expr <- Arbitrary.arbitrary[Fix[Sql]]
+      blob <- Arbitrary.arbitrary[Blob[Fix[Sql]]]
       vars <- Arbitrary.arbitrary[Variables]
-    } yield viewConfig(expr, vars)
+    } yield viewConfig(blob, vars)
 }
 
 object MountConfigArbitrary extends MountConfigArbitrary

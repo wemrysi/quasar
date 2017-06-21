@@ -20,7 +20,7 @@ import slamdata.Predef.List
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.FileSystemType
-import quasar.sql.{Sql, Statement}
+import quasar.sql.{Blob, Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -46,7 +46,7 @@ sealed abstract class MountRequest {
 object MountRequest {
   final case class MountView private[mount] (
     file: AFile,
-    query: Fix[Sql],
+    blob: Blob[Fix[Sql]],
     vars: Variables
   ) extends MountRequest
 
@@ -61,7 +61,7 @@ object MountRequest {
     statements: List[Statement[Fix[Sql]]]
   ) extends MountRequest
 
-  val mountView = Prism.partial[MountRequest, (AFile, Fix[Sql], Variables)] {
+  val mountView = Prism.partial[MountRequest, (AFile, Blob[Fix[Sql]], Variables)] {
     case MountView(f, q, vs) => (f, q, vs)
   } ((MountView(_, _, _)).tupled)
 

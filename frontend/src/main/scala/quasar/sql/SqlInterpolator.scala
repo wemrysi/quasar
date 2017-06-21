@@ -14,26 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.sql
 
 import slamdata.Predef._
+import quasar.contrib.contextual.StaticInterpolator
 
-import argonaut._, Argonaut._
+import matryoshka.data.Fix
+import scalaz._
 
-sealed abstract class SkipDirective
+object SqlInterpolator {
 
-object SkipDirective {
-  final case object Skip    extends SkipDirective
-  final case object SkipCI  extends SkipDirective
-  final case object Pending extends SkipDirective
+  object Expr extends StaticInterpolator[Fix[Sql]] {
+    def parse(s: String): String \/ Fix[Sql] =
+      parser[Fix].parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
+  }
 
-  import DecodeResult.{ok, fail}
+  object Blob extends StaticInterpolator[Blob[Fix[Sql]]] {
+    def parse(s: String): String \/ Blob[Fix[Sql]] =
+      parser[Fix].parseBlob(s).leftMap(parseError => s"Not a valid SQL blob: $parseError")
+  }
 
-  implicit val SkipDirectiveDecodeJson: DecodeJson[SkipDirective] =
-    DecodeJson(c => c.as[String].flatMap {
-      case "skip"    => ok(Skip)
-      case "skipCI"  => ok(SkipCI)
-      case "pending" => ok(Pending)
-      case str       => fail("skip, skipCI, pending; found: \"" + str + "\"", c.history)
-    })
 }

@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.{PathError, FileSystemType}
-import quasar.sql, sql.Sql
+import quasar.sql, sql.{Blob, Sql}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -57,8 +57,8 @@ abstract class MountingSpec[S[_]](
   }
 
   val noVars   = Variables.fromMap(Map.empty)
-  val exprA    = sql.stringLiteral[Fix[Sql]]("A").embed
-  val exprB    = sql.stringLiteral[Fix[Sql]]("B").embed
+  val exprA    = Blob(sql.stringLiteral[Fix[Sql]]("A").embed, Nil)
+  val exprB    = Blob(sql.stringLiteral[Fix[Sql]]("B").embed, Nil)
   val viewCfgA = viewConfig(exprA, noVars)
   val viewCfgB = viewConfig(exprB, noVars)
 
@@ -84,8 +84,8 @@ abstract class MountingSpec[S[_]](
   def maybeExists[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism pathExists getOption dj
 
-  def mountViewNoVars(loc: AFile, query: Fix[Sql]): FreeS[Unit] =
-    mountView(loc, query, noVars)
+  def mountViewNoVars(loc: AFile, blob: Blob[Fix[Sql]]): FreeS[Unit] =
+    mountView(loc, blob, noVars)
 
   s"$interpName mounting interpreter" should {
     "havingPrefix" >> {
