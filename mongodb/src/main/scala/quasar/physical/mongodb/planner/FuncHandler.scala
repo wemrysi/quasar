@@ -281,6 +281,7 @@ object FuncHandler {
         }
     }
 
+  // TODO generalize this and make available for other connectors
   implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
       (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
@@ -320,24 +321,24 @@ object FuncHandler {
       def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
           : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
         λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOpsCore(trunc)(implicitly[Functor[EX]], e26)(_),
-          G.handleOpsCore(trunc)(implicitly[Functor[EX]], e26)(_)
+          F.handleOpsCore(trunc).apply _,
+          G.handleOpsCore(trunc).apply _
         ))
 
       def handleOps3_0[EX[_]: Functor](implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX)
           : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
         λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOps3_0(implicitly[Functor[EX]], e26, e30)(_),
-          G.handleOps3_0(implicitly[Functor[EX]], e26, e30)(_)
+          F.handleOps3_0[EX].apply _,
+          G.handleOps3_0[EX].apply _
         ))
 
       def handleOps3_2[EX[_]: Functor]
           (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
           : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
         λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOps3_2(implicitly[Functor[EX]], e26, e30, e32)(_),
-          G.handleOps3_2(implicitly[Functor[EX]], e26, e30, e32)(_))
-        )
+          F.handleOps3_2[EX].apply _,
+          G.handleOps3_2[EX].apply _
+        ))
     }
 
   def handle2_6[F[_]: FuncHandler]: F ~> OptionFree[Expr2_6, ?] =
