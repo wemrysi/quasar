@@ -2,6 +2,7 @@
   "name": "select wildcard with group by",
 
   "backends": {
+        "mimir": "skip",
     "postgresql": "pending"
   },
 
@@ -13,7 +14,7 @@
 
   "ignoredFields": ["_id"],
 
-  "ignoreFieldOrder": ["marklogic_json"],
+  "ignoreFieldOrder": true,
 
   "expected": [
       { "city": "BOULDER", "loc": [ -105.21426 , 40.049733], "pop": 18174, "state": "CO" },

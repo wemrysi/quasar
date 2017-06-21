@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.common.accounts.AccountId
 import quasar.precog.common.ingest.EventId
 import quasar.precog.common.security.Authorities
 import quasar.precog.util._
@@ -26,8 +25,10 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.pattern.{AskSupport, GracefulStopSupport}
 import akka.util.Timeout
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+
+import org.slf4s.Logging
 
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._
@@ -35,19 +36,16 @@ import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.IsoSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
 
-import org.objectweb.howl.log._
-
 import scalaz._
+import scalaz.effect.IO
 import scalaz.Validation._
 import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
 
-import java.io.FileNotFoundException
+import java.io.File
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
 
 import scala.collection.immutable.SortedMap
-import scala.collection.JavaConverters._
 
 import shapeless._
 
@@ -90,7 +88,7 @@ object NIHDB {
 trait NIHDB {
   def authorities: Authorities
 
-  def insert(batch: Seq[NIHDB.Batch]): IO[PrecogUnit]
+  def insert(batch: Seq[NIHDB.Batch]): IO[Unit]
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult]
 
@@ -116,9 +114,9 @@ trait NIHDB {
    */
   def count(paths0: Option[Set[CPath]]): Future[Long]
 
-  def quiesce: IO[PrecogUnit]
+  def quiesce: IO[Unit]
 
-  def close(implicit actorSystem: ActorSystem): Future[PrecogUnit]
+  def close(implicit actorSystem: ActorSystem): Future[Unit]
 }
 
 private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: Timeout, val authorities: Authorities)(implicit executor: ExecutionContext) extends NIHDB with GracefulStopSupport with AskSupport {
@@ -126,7 +124,7 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
 
   val projectionId = NIHDB.projectionIdGen.getAndIncrement
 
-  def insert(batch: Seq[NIHDB.Batch]): IO[PrecogUnit] =
+  def insert(batch: Seq[NIHDB.Batch]): IO[Unit] =
     IO(actor ! Insert(batch, false))
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult] =
@@ -153,11 +151,11 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   def count(paths0: Option[Set[CPath]]): Future[Long] =
     getSnapshot().map(_.count(paths0))
 
-  def quiesce: IO[PrecogUnit] =
+  def quiesce: IO[Unit] =
     IO(actor ! Quiesce)
 
-  def close(implicit actorSystem: ActorSystem): Future[PrecogUnit] =
-    gracefulStop(actor, timeout.duration) map { _ => PrecogUnit }
+  def close(implicit actorSystem: ActorSystem): Future[Unit] =
+    gracefulStop(actor, timeout.duration).map(_ => ())
 }
 
 private[niflheim] object NIHDBActor extends Logging {

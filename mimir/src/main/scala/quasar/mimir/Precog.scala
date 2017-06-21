@@ -18,7 +18,7 @@ package quasar.mimir
 
 import quasar.blueeyes.json.JValue
 import quasar.blueeyes.util.Clock
-import quasar.niflheim.{Chef, CookedBlockFormat, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
+import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 import quasar.precog.common.Path
 import quasar.precog.common.ingest.{EventId, IngestMessage, IngestRecord, StreamRef}
 import quasar.precog.common.accounts.AccountFinder
@@ -38,10 +38,18 @@ import quasar.yggdrasil.table.{Slice, VFSColumnarTableModule}
 import quasar.yggdrasil.vfs.{ActorVFSModule, ResourceError, SecureVFSModule}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.routing.{CustomRouterConfig, ActorRefRoutee, RouterConfig, RoundRobinGroup, RoundRobinRoutingLogic, Routee, Router}
+import akka.routing.{
+  ActorRefRoutee,
+  CustomRouterConfig,
+  RouterConfig,
+  RoundRobinRoutingLogic,
+  Routee,
+  Router
+}
 
 import scalaz.{EitherT, Monad, StreamT}
 import scalaz.std.scalaFuture.futureInstance
+import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
 import java.io.File
@@ -52,7 +60,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.collection.immutable.IndexedSeq
 
-object Precog
+// calling this constructor is a side-effect; you must always shutdown allocated instances
+class Precog(dataDir0: File)
     extends SecureVFSModule[Future, Slice]
     with ActorVFSModule
     with VFSColumnarTableModule {
@@ -63,7 +72,7 @@ object Precog
     val storageTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val maxOpenPaths: Int = 500
-    val dataDir: File = new File("/tmp")
+    val dataDir: File = dataDir0
   }
 
   // for the time being, do everything with this key
@@ -113,13 +122,18 @@ object Precog
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
+  private lazy val pathRoutingActor =
+    new PathRoutingActor(Config.dataDir, Config.storageTimeout, Config.quiescenceTimeout, Config.maxOpenPaths, clock)
+
   // Members declared in quasar.yggdrasil.table.VFSColumnarTableModule
   private val projectionsActor: ActorRef =
-    actorSystem.actorOf(Props(
-      new PathRoutingActor(Config.dataDir, Config.storageTimeout, Config.quiescenceTimeout, Config.maxOpenPaths, clock)))
+    actorSystem.actorOf(Props(pathRoutingActor))
 
   private val actorVFS: ActorVFS =
     new ActorVFS(projectionsActor, Config.storageTimeout, Config.storageTimeout)
+
+  def stopPath(path: Path): Unit =
+    pathRoutingActor.stopPath(path)
 
   def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] =
     actorVFS.findDirectChildren(path)
@@ -130,7 +144,7 @@ object Precog
   def ingest(path: Path, chunks: StreamT[Future, Vector[JValue]]): Future[Unit] = {
     val streamId = java.util.UUID.randomUUID()
 
-    val stream = StreamT.unfoldM((0, chunks)) {
+    def stream = StreamT.unfoldM((0, chunks)) {
       case (pseudoOffset, chunks) =>
         chunks.uncons flatMap {
           case Some((chunk, tail)) =>
@@ -142,11 +156,9 @@ object Precog
 
             for {
               terminal <- tail.isEmpty
-
+              _ = log.debug(s"Replacing with new version $streamId.")
               streamRef = StreamRef.Replace(streamId, terminal)
-
               apiKey <- RootAPIKey
-
               msg =
                 IngestMessage(
                   apiKey,
@@ -175,6 +187,10 @@ object Precog
         }
     }
 
-    stream.foldLeft(())((_, _) => ())
+    ().point[Future]
+    // TODO reenable ingest when it doesn't throw exceptions
+    //stream.foldLeft(())((_, _) => ())
   }
+
+  def shutdown: Future[Unit] = actorSystem.terminate.map(_ => ())
 }

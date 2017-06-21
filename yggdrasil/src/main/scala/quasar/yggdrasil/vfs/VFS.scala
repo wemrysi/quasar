@@ -23,14 +23,15 @@ import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
-import quasar.precog.util._
 
-import java.util.Arrays
+import java.util.{Arrays, UUID}
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
+
 import scalaz._, Scalaz._
+import scalaz.effect.IO
 
 sealed trait Version
 object Version {
@@ -92,8 +93,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
       EitherT {
         resource.fold(
           br => br.asString.run.map(_.toRightDisjunction(notAQuery)),
-          _ => \/.left(notAQuery).point[M]
-        )
+          _ => \/.left(notAQuery).point[M])
       }
     }
 
@@ -107,7 +107,7 @@ trait VFSModule[M[+ _], Block] extends Logging {
   }
 
   trait ProjectionResource extends Resource {
-    def append(data: NIHDB.Batch): IO[PrecogUnit]
+    def append(data: NIHDB.Batch): IO[Unit]
     def recordCount(implicit M: Monad[M]): M[Long]
     def projection(implicit M: Monad[M]): M[Projection]
 
@@ -159,9 +159,9 @@ trait VFSModule[M[+ _], Block] extends Logging {
     * VFS is an unsecured interface to the virtual filesystem; validation must be performed higher in the stack.
     */
   abstract class VFS(implicit M: Monad[M]) {
-    def writeAll(data: Seq[(Long, EventMessage)]): IO[PrecogUnit]
+    def writeAll(data: Seq[(Long, EventMessage)]): IO[Unit]
 
-    def writeAllSync(data: Seq[(Long, EventMessage)]): EitherT[M, ResourceError, PrecogUnit]
+    def writeAllSync(data: Seq[(Long, EventMessage)]): EitherT[M, ResourceError, Unit]
 
     def readResource(path: Path, version: Version): EitherT[M, ResourceError, Resource]
 

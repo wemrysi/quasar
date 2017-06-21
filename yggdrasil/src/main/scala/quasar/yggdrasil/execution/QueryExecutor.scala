@@ -18,20 +18,15 @@ package quasar.yggdrasil.execution
 
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.vfs._
-import quasar.yggdrasil.vfs.ResourceError._
 
 import quasar.precog.common._
-import quasar.precog.common.security._
 
-import quasar.blueeyes.json._
 import quasar.blueeyes.{ MimeType, MimeTypes }
 
 import scala.concurrent.duration.Duration
 
 import scalaz._
-import scalaz.Validation._
 import scalaz.NonEmptyList.nels
-import scalaz.syntax.monad._
 
 sealed trait EvaluationError
 case class InvalidStateError(message: String) extends EvaluationError

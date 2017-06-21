@@ -17,7 +17,6 @@
 package quasar.mimir
 
 import quasar.yggdrasil.bytecode._
-import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {

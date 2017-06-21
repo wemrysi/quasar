@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.precog.util.IdGen
 import quasar.precog.common._
 import quasar.yggdrasil.TableModule

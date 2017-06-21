@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package vfs
+package quasar.yggdrasil.vfs
 
 import quasar.precog.common.security.Authorities
 
@@ -24,8 +23,6 @@ import java.time.LocalDateTime
 import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.blueeyes.json.serialization._
-
-import shapeless.HList
 
 import scalaz.syntax.std.option._
 

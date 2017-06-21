@@ -1,9 +1,9 @@
 {
     "name": "project unrelated field with object flatten",
     "backends": {
-        "couchbase":         "skip",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "couchbase": "pending",
+        "mimir": "skip",
+        "postgresql": "pending"
     },
     "data": "usa_factbook.data",
     "query": "select intro from usa_factbook where geo{*}.text = \"19,924 km\"",

@@ -18,16 +18,15 @@ package quasar.blueeyes.json
 
 import quasar.Data
 import quasar.blueeyes._
-import quasar.precog._
+import quasar.precog.ToString
 
-import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
+import scalaz._, Scalaz._
 
 import scala.collection.immutable.ListMap
 import scala.util.Sorting.quickSort
+import scala.util.Try
 
 import java.lang.Double.isInfinite
-
-import JValue.{ RenderMode, Compact, Pretty, Canonical }
 
 /**
   * Data type for Json AST.
@@ -337,7 +336,7 @@ object JString {
 final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
   def _1                        = name
   def _2                        = value
-  def toTuple: String -> JValue = name -> value
+  def toTuple: (String, JValue) = name -> value
   def isUndefined               = value == JUndefined
 }
 

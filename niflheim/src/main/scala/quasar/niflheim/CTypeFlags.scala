@@ -17,13 +17,13 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.util.PrecogUnit
 
 import scalaz.{ Validation, Success, Failure }
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 
+import java.io.IOException
 import java.nio.ByteBuffer
 
 object CTypeFlags {
@@ -58,6 +58,7 @@ object CTypeFlags {
           case CArrayType(tpe) =>
             buffer += FArray
             flagForCValueType(tpe)
+          case CPeriod => ???
         }
       }
 

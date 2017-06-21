@@ -23,8 +23,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
 import java.util.concurrent.atomic.AtomicLong
 
-import scalaz._
-import scalaz.State
+import scalaz.{Monad, State}
 
 /**
   * A `Monad` for working with `ByteBuffer`s.
@@ -34,8 +33,6 @@ trait ByteBufferMonad[M[_]] extends Monad[M] {
 }
 
 final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int = 8, direct: Boolean = false) {
-  import ByteBufferPool._
-
   private val _hits   = new AtomicLong()
   private val _misses = new AtomicLong()
 

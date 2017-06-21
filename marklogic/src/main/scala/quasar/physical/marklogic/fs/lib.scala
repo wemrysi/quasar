@@ -158,10 +158,10 @@ object lib {
       $("parent") as ST("xs:string"),
       $("filter") as ST("cts:query")
     ).as(ST("xs:string?")) { (parent: XQuery, filter: XQuery) =>
-			val s = $("s")
-			fn.filter(
-				func(s.render) {
-					fn.contains(fn.substringAfter(~s, parent), "/".xs)
+      val s = $("s")
+      fn.filter(
+        func(s.render) {
+          fn.contains(fn.substringAfter(~s, parent), "/".xs)
         },
         fn.baseUri(cts.search(fn.doc(), cts.andQuery(mkSeq_(
           cts.directoryQuery(parent, "infinity".xs),

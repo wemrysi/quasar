@@ -17,13 +17,18 @@
 package quasar.niflheim
 
 import quasar.blueeyes.json._
-import quasar.precog.common._
-import quasar.precog.util._
 
-import scala.{specialized => spec}
 import scala.collection.mutable
 
-import java.io._
+import java.io.{
+  BufferedReader,
+  BufferedOutputStream,
+  File,
+  FileInputStream,
+  FileOutputStream,
+  InputStreamReader,
+  OutputStream
+}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 

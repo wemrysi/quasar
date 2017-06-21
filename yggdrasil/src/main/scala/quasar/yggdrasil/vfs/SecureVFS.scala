@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package vfs
+package quasar.yggdrasil.vfs
 
 import quasar.precog.common._
-import quasar.precog.common.accounts._
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
+import quasar.precog.common.security.Permission._
 import quasar.precog.common.jobs._
+import quasar.yggdrasil._
 import quasar.yggdrasil.execution._
-import quasar.yggdrasil.metadata._
-// import quasar.yggdrasil.nihdb._
 import quasar.yggdrasil.scheduling._
-import quasar.precog.util._
-import ResourceError._
-import Permission._
+import quasar.yggdrasil.vfs.ResourceError._
 
 import quasar.blueeyes.util.Clock
 
@@ -192,10 +188,10 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] with Logging {
         result   <- cacheAt match {
           case Some(cachePath) =>
             for {
-              _ <- EitherT[M, EvaluationError, PrecogUnit] {
+              _ <- EitherT[M, EvaluationError, Unit] {
                 permissionsFinder.writePermissions(ctx.apiKey, cachePath, clock.instant()) map { pset =>
                   /// here, we just terminate the computation early if no write permissions are available.
-                  if (pset.nonEmpty) \/.right(PrecogUnit)
+                  if (pset.nonEmpty) \/.right(())
                   else \/.left(
                     storageError(PermissionsError("API key %s has no permission to write to the caching path %s.".format(ctx.apiKey, cachePath)))
                   )

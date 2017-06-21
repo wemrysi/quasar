@@ -17,10 +17,12 @@
 package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
+import quasar.{Planner => QPlanner}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.uuid._
 import quasar.fp.numeric._
+import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xquery._
@@ -167,6 +169,24 @@ object ops {
   /** Returns whether the given path exists having the specified format. */
   def pathHavingFormatExists[F[_]: Functor: Xcc, FMT: SearchOptions](path: APath): F[Boolean] =
     refineType(path).fold(descendantsHavingFormatExist[F, FMT], fileHavingFormatExists[F, FMT])
+
+  /** Attempts to pretty print the given expression. */
+  def prettyPrint[F[_]: Monad: MonadFsErr: Xcc](xqy: XQuery): F[Option[XQuery]] = {
+    val prettyPrinted =
+      Xcc[F].queryResults(xdmp.prettyPrint(XQuery(s"'$xqy'")))
+        .map(_.headOption collect { case s: XSString => XQuery(s.asString) })
+
+    Xcc[F].handleWith(prettyPrinted) {
+      case err @ XccError.QueryError(_, cause) =>
+        MonadFsErr[F].raiseError(
+          FileSystemError.qscriptPlanningFailed(QPlanner.InternalError(
+            err.shows, Some(cause))))
+
+      // NB: As this is only for pretty printing, if we fail for some other reason
+      //     just return an empty result.
+      case _ => none[XQuery].point[F]
+    }
+  }
 
   /** Stream of the left-shifted contents of the given file. */
   def readFile[F[_]: Monad: Xcc: PrologL, FMT: SearchOptions](

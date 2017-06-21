@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package table
+package quasar.yggdrasil.table
 
-import quasar.blueeyes._
-import scalaz._
-import TableModule._
+import quasar.yggdrasil.TableModuleSpec
+import quasar.yggdrasil.TableModule._
+
+import scalaz.Need
 
 trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
   type MemoId = Int
@@ -47,8 +47,8 @@ trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with Block
       "empty input"                   in emptySort
       "with uniqueness for keys"      in uniqueSort
 
-      "arbitrary datasets"            in checkSortDense(SortAscending)
-      "arbitrary datasets descending" in checkSortDense(SortDescending)
+      "arbitrary datasets" in skipped { checkSortDense(SortAscending) } // FIXME skipped per #2309
+      "arbitrary datasets descending" in skipped { checkSortDense(SortDescending) } // FIXME skipped per #2309
     }
   }
 }

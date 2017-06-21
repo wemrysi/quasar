@@ -18,13 +18,13 @@ package quasar.physical.couchbase
 
 import slamdata.Predef._
 import quasar.{Planner => _, _}
-import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.Planner.PlannerError
 import quasar.qscript.{Map => _, Read => _, _}, MapFuncsCore._
 import quasar.sql.CompilerHelpers
 
@@ -63,6 +63,8 @@ class BasicQueryEnablementSpec
 
   val cbEnv = DefaultCouchbaseEnvironment.builder.build
 
+  val docTypeKey = DocTypeKey("type")
+
   val cfg =
     Config(
       ClientContext(
@@ -72,7 +74,8 @@ class BasicQueryEnablementSpec
           "beer-sample",
           "",
           List[transcoder.Transcoder[_, _]]().asJava),
-        DocTypeKey("type")),
+        docTypeKey,
+        ListContentsView(docTypeKey)),
       CouchbaseCluster.create(cbEnv))
 
   def compileLogicalPlan(query: String): Fix[LogicalPlan] =
@@ -88,9 +91,9 @@ class BasicQueryEnablementSpec
       .unsafePerformSync
 
   def n1qlFromQS(qs: Fix[QST]): String =
-    (qs.cataM(Planner[Fix, Kleisli[Free[MonotonicSeq, ?], Context, ?], QST].plan) >>= (n1ql =>
-      EitherT(RenderQuery.compact(n1ql).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]].liftM[PhaseResultT])
-    )).run.run.run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey)).map(_._2)
+    qs.cataM(Planner[Fix, EitherT[Kleisli[Free[MonotonicSeq, ?], Context, ?], PlannerError, ?], QST].plan)
+      .flatMapF(RenderQuery.compact(_).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]])
+      .run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey))
       .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
       .unsafePerformSync
       .fold(e => scala.sys.error(e.shows), ι)

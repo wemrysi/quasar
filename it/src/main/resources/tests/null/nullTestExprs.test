@@ -1,8 +1,10 @@
 {
     "name": "expressions with `= null` and `is null`",
     "backends": {
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
+        "couchbase": "ignoreFieldOrder",
+        "mimir": "skip",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
         "postgresql": "pending"
     },
     "data": "nulls.data",
@@ -11,7 +13,6 @@
                      nested.val as nval, nested.val = null, nested.val is null, nested.val is not null
               from nulls",
     "predicate": "containsExactly",
-    "ignoreFieldOrder": [ "couchbase" ],
     "expected": [
         { "name": "null",  "val": null, "2": true,  "3": true,  "4": false, "nval": null, "6": true,  "7": true,  "8": false },
         { "name": "empty", "val": {},   "2": false, "3": false, "4": true,  "nval": {},   "6": false, "7": false, "8": true  },

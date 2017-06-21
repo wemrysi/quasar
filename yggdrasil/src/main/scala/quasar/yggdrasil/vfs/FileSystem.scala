@@ -24,23 +24,10 @@ import quasar.niflheim._
 
 import quasar.precog.common.Path
 import quasar.precog.common.ingest.FileContent
-import quasar.precog.common.jobs._
-import quasar.precog.common.security._
 
-//import quasar.precog.yggdrasil.nihdb._
-
-import scalaz.{NonEmptyList => NEL, _}
 import scalaz.Validation._
-import scalaz.std.list._
-import scalaz.std.stream._
-import scalaz.std.option._
-import scalaz.std.tuple._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.list._
 import scalaz.syntax.std.option._
 import scalaz.syntax.apply._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.traverse._
 
 sealed class PathData(val typeName: PathData.DataType)
 object PathData {

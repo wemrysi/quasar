@@ -230,7 +230,7 @@ package object sql {
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
         case UnshiftMap => "{" + lhs._2 + " : " + rhs._2 + " ...}"
-        case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
+        case _ => List("((" + lhs._2 + ")", op.sql, "(" + rhs._2 + "))").mkString(" ")
       }
       case Unop(expr, op) => op match {
         case FlattenMapKeys      => "(" + expr._2 + "){*:}"
@@ -266,7 +266,7 @@ package object sql {
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
       case Let(ident, bindTo, in) =>
-        ident.shows ++ " :: " ++ bindTo._2 ++ "; " ++ in._2
+        ident.shows ++ " := " ++ bindTo._2 ++ "; " ++ in._2
       case IntLiteral(v) => v.toString
       case FloatLiteral(v) => v.toString
       case StringLiteral(v) => _q(v)

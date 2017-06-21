@@ -16,11 +16,13 @@
 
 package quasar.blueeyes.json.serialization
 
-import quasar.blueeyes._, json._
+import quasar.blueeyes._
+import quasar.blueeyes.json._
 
 import scalaz._, Scalaz._
 import ExtractorDecomposer.by
 
+import java.util.UUID
 import java.time.LocalDateTime
 
 /** Decomposes the value into a JSON object.

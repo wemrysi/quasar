@@ -2,6 +2,7 @@
     "name": "handle variable referenced in filter",
 
     "backends": {
+        "mimir": "skip",
         "postgresql": "pending"
     },
 
@@ -11,7 +12,7 @@
 
     "ignoredFields": ["_id"],
 
-    "ignoreFieldOrder": ["marklogic_json"],
+    "ignoreFieldOrder": true,
 
     "predicate": "containsAtLeast",
 

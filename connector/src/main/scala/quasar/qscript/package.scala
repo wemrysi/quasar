@@ -124,21 +124,57 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+  private def concatNaive[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
+    val norml = norm.freeMF(l)
+    val normr = norm.freeMF(r)
+
     // NB: Might be better to do this later, after some normalization, part of
     //     array compaction, but this helps us avoid some autojoins.
-    (norm.freeMF(l) ≟ norm.freeMF(r)).fold(
-      (norm.freeMF(l), HoleF[T], HoleF[T]),
+    (norml ≟ normr).fold(
+      (norml, HoleF[T], HoleF[T]),
       (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
         Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
         Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
   }
 
-  def concat3[T[_[_]]: CorecursiveT, A](
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val rewrite = new Rewrite[T]
+    val norm = Normalizable.normalizable[T]
+
+    val norml = norm.freeMF(l)
+    val normr = norm.freeMF(r)
+
+    val leftElems: List[FreeMapA[T, A]] = norml.resume match {
+      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
+      case _ => Nil
+    }
+
+    val rightElems: List[FreeMapA[T, A]] = normr.resume match {
+      case -\/(array @ ConcatArrays(_, _)) => rewrite.flattenArray[A](array)
+      case _ => Nil
+    }
+
+    def projectIndex(idx: Int): FreeMap[T] =
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](idx)))
+
+    def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
+      IList.fromList(elems).indexOf(Free.roll(MakeArray(value)))
+
+    indexOf(leftElems, normr).cata(
+      idx => (norml, HoleF[T], projectIndex(idx)),
+      indexOf(rightElems, norml).cata(
+        idx => (normr, projectIndex(idx), HoleF[T]),
+        concatNaive(norml, normr)))
+  }
+
+  // FIXME naive - use `concat`
+  def naiveConcat3[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
@@ -146,7 +182,8 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
-  def concat4[T[_[_]]: CorecursiveT, A](
+  // FIXME naive - use `concat`
+  def naiveConcat4[T[_[_]]: CorecursiveT, A](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))), Free.roll(MakeArray(r2)))),

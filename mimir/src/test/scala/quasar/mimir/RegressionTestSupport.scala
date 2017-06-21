@@ -19,7 +19,6 @@ package quasar.mimir
 import scala.util.Random
 import scala.collection.mutable
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.util.CPathUtils._
 import quasar.blueeyes.json._

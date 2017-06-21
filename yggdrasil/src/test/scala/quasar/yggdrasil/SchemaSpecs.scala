@@ -17,7 +17,6 @@
 package quasar.yggdrasil
 
 import quasar.yggdrasil.bytecode._
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.TestSupport._
 

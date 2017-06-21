@@ -1,7 +1,7 @@
 {
     "name": "project from static concatted array prefix",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir": "skip",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

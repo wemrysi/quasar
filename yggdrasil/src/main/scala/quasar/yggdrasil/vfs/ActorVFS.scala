@@ -23,19 +23,15 @@ import quasar.yggdrasil.vfs.ResourceError._
 import quasar.niflheim._
 
 import quasar.precog.common._
-import quasar.precog.common.accounts.AccountId
 import quasar.precog.common.ingest._
 import quasar.precog.common.security._
-import quasar.precog.common.jobs._
 import quasar.precog.util._
 
 import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.table.ColumnarTableModule
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, ReceiveTimeout}
-import akka.dispatch._
-import akka.pattern.ask
-import akka.pattern.pipe
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, ReceiveTimeout}
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 
 import quasar.blueeyes.MimeType
@@ -52,17 +48,15 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scalaz._
-import scalaz.NonEmptyList._
 import scalaz.EitherT._
 import scalaz.effect.IO
 import scalaz.std.scalaFuture
 
 import Scalaz.{futureInstance => _, _}   // have to import like this because of syntax ambiguities
 
-import scala.concurrent.{Future, Promise, Await}
+import scala.concurrent.{Future, Await}
 
 import java.io.{File, IOException, FileInputStream, FileOutputStream}
-import java.nio.CharBuffer
 import java.util.UUID
 import java.util.concurrent.{ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
@@ -214,7 +208,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
     def authorities = db.authorities
 
-    def append(batch: NIHDB.Batch): IO[PrecogUnit] = db.insert(Seq(batch))
+    def append(batch: NIHDB.Batch): IO[Unit] = db.insert(Seq(batch))
 
     def projection(implicit M: Monad[Future]) = NIHDBProjection.wrap(db)
 
@@ -304,11 +298,11 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
   class ActorVFS(projectionsActor: ActorRef, projectionReadTimeout: Timeout, sliceIngestTimeout: Timeout)(implicit M: Monad[Future]) extends VFS {
 
-    def writeAll(data: Seq[(Long, EventMessage)]): IO[PrecogUnit] = {
+    def writeAll(data: Seq[(Long, EventMessage)]): IO[Unit] = {
       IO { projectionsActor ! IngestData(data) }
     }
 
-    def writeAllSync(data: Seq[(Long, EventMessage)]): EitherT[Future, ResourceError, PrecogUnit] = EitherT {
+    def writeAllSync(data: Seq[(Long, EventMessage)]): EitherT[Future, ResourceError, Unit] = EitherT {
       implicit val timeout = sliceIngestTimeout
 
       // it's necessary to group by path then traverse since each path will respond to ingest independently.
@@ -319,7 +313,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
       M.map(ingested) { allResults =>
         val errors: List[ResourceError] = allResults.toList collect { case PathOpFailure(_, error) => error }
-        errors.toNel.map(ResourceError.all).toLeftDisjunction(PrecogUnit)
+        errors.toNel.map(ResourceError.all).toLeftDisjunction(Unit)
       }
     }
 
@@ -377,10 +371,15 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
     private[this] val pathLRU = Cache.simple[Path, Unit](
       MaxSize(maxOpenPaths),
-      OnRemoval({(p: Path, _: Unit, _: RemovalCause) => pathActors.get(p).foreach(_ ! ReceiveTimeout) })
-    )
+      OnRemoval({(p: Path, _: Unit, _: RemovalCause) => pathActors.get(p).foreach(_ ! ReceiveTimeout) }))
 
     private[this] var pathActors = Map.empty[Path, ActorRef]
+
+    // not atomic
+    def stopPath(path: Path): Unit = {
+      pathActors.get(path).map(_ ! PoisonPill)
+      pathActors -= path
+    }
 
     override def postStop = {
       log.info("Shutdown of path actors complete")
@@ -485,7 +484,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
     override def postStop = {
       val closeAll = versions.values.toStream traverse {
         case NIHDBResource(db) => db.close(context.system)
-        case _ => Future.successful(PrecogUnit)
+        case _ => Future.successful(())
       }
 
       Await.result(closeAll, shutdownTimeout)
@@ -500,10 +499,10 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
       PermissionsFinder.canWriteAs(permissions filter { _.path.isEqualOrParentOf(path) }, authorities)
     }
 
-    private def promoteVersion(version: UUID): IO[PrecogUnit] = {
+    private def promoteVersion(version: UUID): IO[Unit] = {
       // we only promote if the requested version is in progress
       if (versionLog.isCompleted(version)) {
-        IO(PrecogUnit)
+        IO(())
       } else {
         versionLog.completeVersion(version)
       }
@@ -557,7 +556,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
           for {
             _ <- IO { versions += (version -> resource) }
             _ <- complete.whenM(versionLog.completeVersion(version) >> versionLog.setHead(version) >> maybeExpireCache(apiKey, resource))
-          } yield PrecogUnit
+          } yield ()
         }
       } yield {
         created.fold(
@@ -567,7 +566,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
       }
     }
 
-    private def maybeExpireCache(apiKey: APIKey, resource: Resource): IO[PrecogUnit] = {
+    private def maybeExpireCache(apiKey: APIKey, resource: Resource): IO[Unit] = {
       resource.fold(
         blobr => IO {
           if (blobr.mimeType == FileContent.XQuirrelScript) {
@@ -577,7 +576,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
             routingActor ! ArchiveMessage(apiKey, cachePath, None, EventId.fromLong(0l), clock.instant())
           }
         },
-        nihdbr => IO(PrecogUnit)
+        nihdbr => IO(())
       )
     }
 
@@ -587,7 +586,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
       (response == UpdateSuccess(msg.path) && terminal).option(msg.jobId).join traverse { _ => Future.successful(()) /*jobManager.finish(_, clock.now())*/ } map { _ => response }
     }
 
-    def processEventMessages(msgs: Stream[(Long, EventMessage)], permissions: Map[APIKey, Set[WritePermission]], requestor: ActorRef): IO[PrecogUnit] = {
+    def processEventMessages(msgs: Stream[(Long, EventMessage)], permissions: Map[APIKey, Set[WritePermission]], requestor: ActorRef): IO[Unit] = {
       log.debug("About to persist %d messages; replying to %s".format(msgs.size, requestor.toString))
 
       def openNIHDB(version: UUID): EitherT[IO, ResourceError, ProjectionResource] = {
@@ -599,11 +598,11 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
         }
       }
 
-      def persistNIHDB(createIfAbsent: Boolean, offset: Long, msg: IngestMessage, streamId: UUID, terminal: Boolean): IO[PrecogUnit] = {
+      def persistNIHDB(createIfAbsent: Boolean, offset: Long, msg: IngestMessage, streamId: UUID, terminal: Boolean): IO[Unit] = {
         def batch(msg: IngestMessage) = NIHDB.Batch(offset, msg.data.map(_.value))
 
         if (versionLog.find(streamId).isDefined) {
-          openNIHDB(streamId).fold[IO[PrecogUnit]](
+          openNIHDB(streamId).fold[IO[Unit]](
             error => IO(requestor ! PathOpFailure(path, error)),
             resource => for {
               _ <- resource.append(batch(msg))
@@ -612,15 +611,14 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
             } yield {
               log.trace("Sent insert message for " + msg + " to nihdb")
               // FIXME: We aren't actually guaranteed success here because NIHDB might do something screwy.
-              maybeCompleteJob(msg, terminal, UpdateSuccess(msg.path)) pipeTo requestor
-              PrecogUnit
+              maybeCompleteJob(msg, terminal, UpdateSuccess(msg.path)).pipeTo(requestor)
             }
           ).join
         } else if (createIfAbsent) {
             log.trace("Creating new nihdb database for streamId " + streamId)
             performCreate(msg.apiKey, NIHDBData(List(batch(msg))), streamId, msg.writeAs, terminal) map { response =>
               maybeCompleteJob(msg, terminal, response) pipeTo requestor
-              PrecogUnit
+              Unit
             }
         } else {
           //TODO: update job
@@ -629,15 +627,14 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
         }
       }
 
-      def persistFile(createIfAbsent: Boolean, offset: Long, msg: StoreFileMessage, streamId: UUID, terminal: Boolean): IO[PrecogUnit] = {
+      def persistFile(createIfAbsent: Boolean, offset: Long, msg: StoreFileMessage, streamId: UUID, terminal: Boolean): IO[Unit] = {
         log.debug("Persisting file on %s for offset %d".format(path, offset))
         // TODO: I think the semantics here of createIfAbsent aren't
         // quite right. If we're in a replay we don't want to return
         // errors if we're already complete
         if (createIfAbsent) {
           performCreate(msg.apiKey, BlobData(msg.content.data, msg.content.mimeType), streamId, msg.writeAs, terminal) map { response =>
-            maybeCompleteJob(msg, terminal, response) pipeTo requestor
-            PrecogUnit
+            maybeCompleteJob(msg, terminal, response).pipeTo(requestor)
           }
         } else {
           //TODO: update job
@@ -662,7 +659,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
               for {
                 _ <- persistNIHDB(canCreate(msg.path, permissions(apiKey), msg.writeAs), offset, msg, streamId, false)
                 _ <- versionLog.completeVersion(streamId) >> versionLog.setHead(streamId)
-              } yield PrecogUnit: PrecogUnit
+              } yield ()
           }
 
         case (offset, msg @ StoreFileMessage(_, path, _, _, _, _, _, streamRef)) =>
@@ -680,14 +677,12 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
               persistFile(!versionLog.isCompleted(streamId), offset, msg, streamId, terminal)
 
             case StreamRef.Append =>
-              IO(requestor ! PathOpFailure(path, IllegalWriteRequestError("Append is not yet supported for binary files."))) >> IO(PrecogUnit: PrecogUnit)
+              IO(requestor ! PathOpFailure(path, IllegalWriteRequestError("Append is not yet supported for binary files."))) >> IO(Unit: Unit)
           }
 
         case (offset, ArchiveMessage(apiKey, path, jobId, _, timestamp)) =>
-          versionLog.clearHead >> IO(requestor ! UpdateSuccess(path)) >> IO(PrecogUnit: PrecogUnit)
-      } map {
-        _ => PrecogUnit: PrecogUnit
-      }
+          versionLog.clearHead >> IO(requestor ! UpdateSuccess(path)) >> IO(())
+      } map { _ => () }
     }
 
     def versionOpt(version: Version) = version match {

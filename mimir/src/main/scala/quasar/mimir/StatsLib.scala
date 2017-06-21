@@ -24,6 +24,8 @@ import quasar.precog.util._
 import scalaz._, Scalaz._
 import TableModule.SortAscending
 
+import scala.collection.mutable
+
 trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
   //import library._
   import trans._
@@ -1163,7 +1165,6 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       * This provides scaffolding that is useful in all cases.
       */
     trait BaseRankScanner extends CScanner {
-      import scala.collection.mutable
 
       // collapses number columns into one decimal column.
       //
@@ -1171,8 +1172,8 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       // decimals are going to be a significant performance problem for rank
       // (compared to sorting) and this simplifies the algorithm a lot.
       protected def decimalize(m: Map[ColumnRef, Column], r: Range): Map[ColumnRef, Column] = {
-        val m2   = scmMap[ColumnRef, Column]()
-        val nums = scmMap[CPath, List[Column]]()
+        val m2   = mutable.Map[ColumnRef, Column]()
+        val nums = mutable.Map[CPath, List[Column]]()
 
         m.foreach {
           case (ref @ ColumnRef(path, ctype), col) =>
@@ -1352,7 +1353,6 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       * rows that are identical.
       */
     trait UniqueRankScanner extends BaseRankScanner {
-      import scala.collection.mutable
 
       /**
         * Determines whether row is a duplicate of lastRow.

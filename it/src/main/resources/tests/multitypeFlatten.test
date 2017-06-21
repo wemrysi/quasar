@@ -1,15 +1,16 @@
 {
     "name": "flatten a single field as both object and array",
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
+        "mimir": "skip",
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
         "marklogic_xml":     "skip",
-        "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "spark_local":       "pending",
+        "spark_hdfs":        "pending"
     },
+    "NB": "Skipped for marklogic_xml because it times out.",
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (
                 foo{*} LIKE \"%15%\" OR
@@ -18,6 +19,7 @@
                 foo[*] = 15)",
     "predicate": "containsExactly",
     "ignoredFields": ["_id"],
+    "ignoreFieldOrder": true,
     "expected": [{ "foo": [15, [{ "baz": ["quux"] }]] },
                  { "foo": ["15z", [{ "baz": ["qx"] }]] },
                  { "foo": { "bar": 15, "baz": ["qx"] } },

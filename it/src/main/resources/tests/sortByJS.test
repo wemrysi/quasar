@@ -2,8 +2,8 @@
   "name": "sort by JS expression with filter",
 
   "backends": {
-    "mongodb_read_only": "pending",
-    "postgresql":        "pending"
+        "mimir": "skip",
+        "postgresql": "pending"
   },
 
   "data": "zips.data",

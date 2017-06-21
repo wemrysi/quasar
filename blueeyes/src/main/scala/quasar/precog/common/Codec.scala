@@ -21,7 +21,7 @@ import quasar.blueeyes._
 import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
 
 import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
+import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
 import java.time.LocalDateTime
 
