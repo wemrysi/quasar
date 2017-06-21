@@ -93,18 +93,30 @@ object analysis {
   def sample[S[_]](file: AFile, size: Positive)(
     implicit Q: QueryFile.Ops[S]
   ): Process[Q.M, Data] =
-    Q.evaluate(sampleQuery(file, size)).translate(Q.transforms.dropPhases)
+    Q.evaluate(sampleQuery[Fix[LogicalPlan]](file, size)).translate(Q.transforms.dropPhases)
+
+  /** A random sample of `size` items from the given dataset. */
+  def sampleOf[T](dataset: T, size: Positive)(
+    implicit
+    TR: Recursive.Aux[T, LogicalPlan],
+    TC: Corecursive.Aux[T, LogicalPlan]
+  ): T = {
+    val lpr   = new LogicalPlanR[T]
+    val dsize = Data._int(size.value)
+    lpr.invoke2(StdLib.set.Sample, dataset, lpr.constant(dsize))
+  }
 
   /** Query representing a random sample of `size` items from the specified file. */
-  def sampleQuery(file: AFile, size: Positive): Fix[LogicalPlan] = {
-    val lpr   = new LogicalPlanR[Fix[LogicalPlan]]
-    val dsize = Data._int(size.value)
-    lpr.invoke2(StdLib.set.Sample, lpr.read(file), lpr.constant(dsize))
-  }
+  def sampleQuery[T](file: AFile, size: Positive)(
+    implicit
+    TR: Recursive.Aux[T, LogicalPlan],
+    TC: Corecursive.Aux[T, LogicalPlan]
+  ): T =
+    sampleOf((new LogicalPlanR[T]).read(file), size)
 
   /** An eager random sample of the dataset at the given path. */
   def sampleResults[S[_]](file: AFile, size: Positive)(
     implicit Q: QueryFile.Ops[S]
   ): Q.M[Process0[Data]] =
-    Q.transforms.dropPhases(Q.results(sampleQuery(file, size)))
+    Q.transforms.dropPhases(Q.results(sampleQuery[Fix[LogicalPlan]](file, size)))
 }
