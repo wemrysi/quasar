@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.sql.{Sql, Statement}
+import quasar.sql.{Blob, Sql, Statement}
 
 import matryoshka.data.Fix
 import monocle.Prism
@@ -47,7 +47,7 @@ object Mounting {
   final case class LookupConfig(path: APath)
     extends Mounting[Option[MountConfig]]
 
-  final case class MountView(loc: AFile, query: Fix[Sql], vars: Variables)
+  final case class MountView(loc: AFile, blob: Blob[Fix[Sql]], vars: Variables)
     extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
@@ -116,12 +116,12 @@ object Mounting {
     /** Create a view mount at the given location. */
     def mountView(
       loc: AFile,
-      query: Fix[Sql],
+      blob: Blob[Fix[Sql]],
       vars: Variables
     )(implicit
       S0: MountingFailure :<: S
     ): FreeS[Unit] =
-      MountingFailure.Ops[S].unattempt(lift(MountView(loc, query, vars)))
+      MountingFailure.Ops[S].unattempt(lift(MountView(loc, blob, vars)))
 
     /** Create a filesystem mount at the given location. */
     def mountFileSystem(

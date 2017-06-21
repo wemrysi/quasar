@@ -16,10 +16,22 @@
 
 package quasar.sql
 
-trait Arbitraries extends
-  ExprArbitrary with
-  BlobArbitrary with
-  StatementArbitrary with
-  CINameArbitrary
+import slamdata.Predef._
+import quasar.contrib.contextual.StaticInterpolator
 
-object Arbitraries extends Arbitraries
+import matryoshka.data.Fix
+import scalaz._
+
+object SqlInterpolator {
+
+  object Expr extends StaticInterpolator[Fix[Sql]] {
+    def parse(s: String): String \/ Fix[Sql] =
+      parser[Fix].parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
+  }
+
+  object Blob extends StaticInterpolator[Blob[Fix[Sql]]] {
+    def parse(s: String): String \/ Blob[Fix[Sql]] =
+      parser[Fix].parseBlob(s).leftMap(parseError => s"Not a valid SQL blob: $parseError")
+  }
+
+}
