@@ -94,14 +94,14 @@ class Transform
           val (combine, lacc, racc) = concat(lval, rval)
           (combine, lann.provenance, rann.provenance, lacc, racc)
         case (None, Some((rProvs, rBuck))) =>
-          val (combine, bacc, lacc, racc) = concat3(rBuck, lval, rval)
+          val (combine, bacc, lacc, racc) = naiveConcat3(rBuck, lval, rval)
           (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
         case (Some((lProvs, lBuck)), None) =>
-          val (combine, bacc, lacc, racc) = concat3(lBuck, lval, rval)
+          val (combine, bacc, lacc, racc) = naiveConcat3(lBuck, lval, rval)
           (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
         case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
           val (combine, lbacc, rbacc, lacc, racc) =
-            concat4(lBuck, rBuck, lval, rval)
+            naiveConcat4(lBuck, rBuck, lval, rval)
           (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
       }
 

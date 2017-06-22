@@ -27,9 +27,7 @@ import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
 
-import contextual._
 import matryoshka._
-import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
@@ -38,44 +36,6 @@ sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
 final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
-
-trait StaticInterpolator[A] extends Interpolator {
-  def parse(s: String): String \/ A
-
-  def contextualize(interpolation: StaticInterpolation) = {
-    interpolation.parts.foreach {
-      case lit@Literal(_, string) =>
-        parse(string) match {
-          case -\/(msg) => interpolation.abort(lit, 0, msg)
-          case _        => ()
-        }
-
-      case hole@Hole(_, _) =>
-        interpolation.abort(hole, "substitutions are not supported")
-    }
-
-    Nil
-  }
-
-  // A String that would not parse should not have made it past compile time
-  def evaluate(interpolation: RuntimeInterpolation): A =
-    parse(interpolation.parts.mkString).valueOr(errMsg =>
-      scala.sys.error(s"Something terribly wrong happened. Failed to parse something at runtime that we checked at compile time. Reason: $errMsg. This is either because the `parse` function of this `StaticInterpolator` is not pure or could (less likely) be a bug with `StaticInterpolator`"))
-}
-
-object SqlExprInterpolator extends StaticInterpolator[Fix[Sql]] {
-
-  def parse(s: String): String \/ Fix[Sql] =
-    fixParser.parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
-
-}
-
-object SqlBlobInterpolator extends StaticInterpolator[Blob[Fix[Sql]]] {
-
-  def parse(s: String): String \/ Blob[Fix[Sql]] =
-    fixParser.parseBlob(s).leftMap(parseError => s"Not a valid SQL blob: $parseError")
-
-}
 
 private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     extends StandardTokenParsers {

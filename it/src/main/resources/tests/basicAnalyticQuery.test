@@ -1,7 +1,7 @@
 {
     "name": "basic analytic query",
     "backends": {
-        "couchbase":      "skip",
+        "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
         "mimir":          "skip",
         "mongodb_q_3_2":  "pending",

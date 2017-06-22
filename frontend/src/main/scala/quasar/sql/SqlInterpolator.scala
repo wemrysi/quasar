@@ -14,15 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.physical.couchbase.planner
+package quasar.sql
 
-import quasar.fp.ski.κ
-import quasar.physical.couchbase._
-import quasar.Planner.{PlannerErrorME, InternalError}
+import slamdata.Predef._
+import quasar.contrib.contextual.StaticInterpolator
 
-import matryoshka._
+import matryoshka.data.Fix
+import scalaz._
 
-final class UnreachablePlanner[T[_[_]], F[_]: PlannerErrorME, QS[_]] extends Planner[T, F, QS] {
-  def plan: AlgebraM[F, QS, T[N1QL]] =
-    κ(PlannerErrorME[F].raiseError(InternalError.fromMsg("unreachable")))
+object SqlInterpolator {
+
+  object Expr extends StaticInterpolator[Fix[Sql]] {
+    def parse(s: String): String \/ Fix[Sql] =
+      parser[Fix].parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
+  }
+
+  object Blob extends StaticInterpolator[Blob[Fix[Sql]]] {
+    def parse(s: String): String \/ Blob[Fix[Sql]] =
+      parser[Fix].parseBlob(s).leftMap(parseError => s"Not a valid SQL blob: $parseError")
+  }
+
 }

@@ -3,8 +3,8 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "mimir": "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
         "postgresql": "pending"
     },
     "data": "nulls.data",

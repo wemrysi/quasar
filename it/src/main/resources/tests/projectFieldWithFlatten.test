@@ -1,7 +1,7 @@
 {
     "name": "project unrelated field with object flatten",
     "backends": {
-        "couchbase": "skip",
+        "couchbase": "pending",
         "mimir": "skip",
         "postgresql": "pending"
     },
