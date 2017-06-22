@@ -19,8 +19,8 @@ package quasar.qscript
 import slamdata.Predef.{ Map => ScalaMap, _ }
 import quasar.contrib.matryoshka._
 import quasar.fp.ski._
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -88,7 +88,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     func.project.run.fold(k => ScalaMap(k -> none), κ(findIndicesInStruct(func)))
 
   def findIndicesInStruct[A](func: FreeMapA[A]): ScalaMap[A, KnownIndices] = {
-    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFunc, ScalaMap[A, KnownIndices]] = {
+    def accumulateIndices: GAlgebra[(FreeMapA[A], ?), MapFuncCore, ScalaMap[A, KnownIndices]] = {
       case ProjectIndex((src, acc1), (value, acc2)) =>
         val newMap = acc1 |++| acc2
         (src.project.run, value.project.run) match {
@@ -111,7 +111,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
       CoEnvMapA[A, FreeMapA[A]] =
-    CoEnv[A, MapFunc, FreeMapA[A]](ProjectIndex[T, FreeMapA[A]](
+    CoEnv[A, MapFuncCore, FreeMapA[A]](ProjectIndex[T, FreeMapA[A]](
       hole,
       IntLit(mapping.get(idx).getOrElse(idx))).right[A])
 

@@ -13,7 +13,6 @@ import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
-import slamdata.CommonDependencies
 import slamdata.SbtSlamData.transferPublishAndTagResources
 
 val BothScopes = "test->test;compile->compile"
@@ -34,8 +33,6 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
       Integer.parseInt(version.split("\\.")(1)) >= 8,
       "Java 8 or above required, found " + version)
   },
-
-  libraryDependencies += CommonDependencies.slamdata.predef,
 
   ScoverageKeys.coverageHighlighting := true,
 

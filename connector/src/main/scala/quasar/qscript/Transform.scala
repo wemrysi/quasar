@@ -24,8 +24,8 @@ import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
@@ -135,7 +135,7 @@ class Transform
 
   private def merge3Map(
     values: Func.Input[Target[F], nat._3])(
-    func: (FreeMap, FreeMap, FreeMap) => MapFunc[FreeMap]
+    func: (FreeMap, FreeMap, FreeMap) => MapFuncCore[FreeMap]
   ): Target[F] = {
     val AutoJoin3Result(base, lval, cval, rval) = autojoin3(values(0), values(1), values(2))
     base asTarget Free.roll(func(lval, cval, rval))
@@ -145,11 +145,11 @@ class Transform
     val Ann(provs, value) = input.ann
     val (sides, leftAccess, rightAccess) =
       concat(
-        Free.point[MapFunc, JoinSide](LeftSide),
-        Free.point[MapFunc, JoinSide](RightSide))
+        Free.point[MapFuncCore, JoinSide](LeftSide),
+        Free.point[MapFuncCore, JoinSide](RightSide))
 
     Target(Ann(
-      provenance.Value(Free.roll[MapFunc, Hole](ProjectIndex(rightAccess, IntLit(0)))) :: prov.rebase(leftAccess, provs),
+      provenance.Value(Free.roll[MapFuncCore, Hole](ProjectIndex(rightAccess, IntLit(0)))) :: prov.rebase(leftAccess, provs),
       Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
       QC.inj(LeftShift(input.value, value, IncludeId, sides)).embed)
   }
@@ -159,8 +159,8 @@ class Transform
     val Ann(provs, value) = input.ann
     val (sides, leftAccess, rightAccess) =
       concat(
-        Free.point[MapFunc, JoinSide](LeftSide),
-        Free.point[MapFunc, JoinSide](RightSide))
+        Free.point[MapFuncCore, JoinSide](LeftSide),
+        Free.point[MapFuncCore, JoinSide](RightSide))
 
     Target(Ann(
       provenance.Value(rightAccess) :: prov.rebase(leftAccess, provs),
@@ -229,8 +229,8 @@ class Transform
         val join: AutoJoinResult = autojoin(values(0), values(1))
         val (sides, leftAccess, rightAccess) =
           concat(
-            Free.point[MapFunc, JoinSide](LeftSide),
-            Free.point[MapFunc, JoinSide](RightSide))
+            Free.point[MapFuncCore, JoinSide](LeftSide),
+            Free.point[MapFuncCore, JoinSide](RightSide))
 
         Target(
           Ann(provenance.Nada[T]() :: prov.rebase(leftAccess, join.base.buckets), rightAccess),
@@ -351,14 +351,14 @@ class Transform
       shiftValues(pathToProj(path)).right
 
     case lp.Constant(data) =>
-      fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](
+      fromData(data).fold[PlannerError \/ MapFuncCore[FreeMap]](
         {
           case Data.NA => Undefined[T, FreeMap]().right
           case d       => NonRepresentableData(d).left
         },
         Constant[T, FreeMap](_).right) ∘ (mf =>
         Target(
-          Ann(Nil, Free.roll[MapFunc, Hole](mf)),
+          Ann(Nil, Free.roll[MapFuncCore, Hole](mf)),
           QC.inj(Unreferenced[T, T[F]]()).embed))
 
     case lp.Free(name) =>
@@ -373,14 +373,14 @@ class Transform
     case lp.InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized())
         if func.effect ≟ Mapping =>
       Target(
-        Ann(Nil, Free.roll[MapFunc, Hole](MapFunc.translateNullaryMapping(func))),
+        Ann(Nil, Free.roll[MapFuncCore, Hole](MapFuncCore.translateNullaryMapping(func))),
         QC.inj(Unreferenced[T, T[F]]()).embed).right
 
     case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.ann
       Target(
-        Ann(buckets, Free.roll[MapFunc, Hole](MapFunc.translateUnaryMapping(func)(value))),
+        Ann(buckets, Free.roll[MapFuncCore, Hole](MapFuncCore.translateUnaryMapping(func)(value))),
         a1.value).right
 
     case lp.InvokeUnapply(structural.ObjectProject, Sized(a1, a2)) =>
@@ -407,12 +407,12 @@ class Transform
         if func.effect ≟ Mapping =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
-        Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(func)(lval, rval))),
+        Ann[T](base.buckets, Free.roll(MapFuncCore.translateBinaryMapping(func)(lval, rval))),
         base.src).right[PlannerError]
 
     case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
-      merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(func)).right[PlannerError]
+      merge3Map(Func.Input3(a1, a2, a3))(MapFuncCore.translateTernaryMapping(func)).right[PlannerError]
 
     case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>
@@ -484,7 +484,7 @@ class Transform
     case lp.TemporalTrunc(part, src) =>
       val Ann(buckets, value) = src.ann
       Target(
-        Ann(buckets, Free.roll[MapFunc, Hole](TemporalTrunc(part, value))),
+        Ann(buckets, Free.roll[MapFuncCore, Hole](TemporalTrunc(part, value))),
         src.value).right
 
     case lp.InvokeUnapply(set.Filter, Sized(a1, a2)) =>
@@ -571,7 +571,7 @@ class Transform
 
     case lp.JoinSideName(name) =>
       Target(
-        Ann(Nil, Free.roll[MapFunc, Hole](JoinSideName[T, FreeMap](name))),
+        Ann(Nil, Free.roll[MapFuncCore, Hole](JoinSideName[T, FreeMap](name))),
         QC.inj(Unreferenced[T, T[F]]()).embed).right
 
     case lp.Join(left, right, joinType, lp.JoinCondition(lName, rName, func)) =>

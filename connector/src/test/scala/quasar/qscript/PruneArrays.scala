@@ -19,7 +19,7 @@ package quasar.qscript
 import slamdata.Predef.List
 import quasar.common.{JoinType, SortDir}
 import quasar.fp._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 import quasar.sql.CompilerHelpers
 
 import matryoshka.data.Fix

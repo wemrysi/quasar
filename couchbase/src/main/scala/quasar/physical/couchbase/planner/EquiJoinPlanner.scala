@@ -27,7 +27,7 @@ import quasar.physical.couchbase._,
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
 import quasar.Planner.PlannerErrorME
-import quasar.qscript, qscript.{MapFuncs => mfs, _}, MapFunc.StaticArray
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
 
 import matryoshka._
 import matryoshka.data._
@@ -77,7 +77,7 @@ final class EquiJoinPlanner[
     def unapply(mf: FreeMap[T]): Boolean = mf match {
       case Embed(StaticArray(v :: Nil)) => v.resume match {
         case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFunc.EC(ejson.Str(v2)))))) => true
+          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2)))))) => true
           case _                                                                       => false
         }
         case v => false
@@ -89,7 +89,7 @@ final class EquiJoinPlanner[
   lazy val tPlan: AlgebraM[F, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[F, MapFunc[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[F, MapFuncCore[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
   def unimpl[A] =
