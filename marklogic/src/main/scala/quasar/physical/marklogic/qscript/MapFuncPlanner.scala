@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.qscript.{MapFuncCore, MapFuncsCore}, MapFuncsCore._
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
@@ -33,10 +33,10 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
   implicit
   DP: Planner[F, FMT, Const[Data, ?]],
   SP: StructuralPlanner[F, FMT]
-) extends Planner[F, FMT, MapFunc[T, ?]] {
+) extends Planner[F, FMT, MapFuncCore[T, ?]] {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
-  val plan: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => DP.plan(Const(ejson.cata(Data.fromEJson)))
     case Undefined()                  => emptySeq.point[F]
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
@@ -95,7 +95,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 
     // relations
     case Not(x)                       => SP.castIfNode(x) map (fn.not)
-    case MapFuncs.Eq(x, y)            => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
+    case MapFuncsCore.Eq(x, y)        => castedBinOp(x, y)((a, b) => handleWith(a eq b, fn.False))
     case Neq(x, y)                    => castedBinOp(x, y)((a, b) => handleWith(a ne b, fn.True))
     case Lt(x, y)                     => castedBinOp(x, y)(_ lt _)
     case Lte(x, y)                    => castedBinOp(x, y)(_ le _)

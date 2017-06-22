@@ -16,7 +16,8 @@
       from largeZips
       where city ~ \"^B[^ ]+ER$\" and \"BOULDER or BEELER\" ~ city",
 
-  "predicate": "containsExactly",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "city": "BOULDER", "a": true,  "b": true  },

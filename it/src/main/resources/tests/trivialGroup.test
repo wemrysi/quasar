@@ -15,6 +15,7 @@
     },
     "data": "largeZips.data",
     "query": "select city, sum(pop) as totalPop from largeZips group by city",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "BOULDER", "totalPop": 110948 }]
 }

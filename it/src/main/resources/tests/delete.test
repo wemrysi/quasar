@@ -8,7 +8,8 @@
     },
     "data": "zips.data",
     "query": "delete from zips where pop < 100000",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "ignoredFields": ["_id"],
     "expected": [
         { "city": "NEW YORK", "loc": [-73.958805, 40.768476], "pop": 106564, "state": "NY" },

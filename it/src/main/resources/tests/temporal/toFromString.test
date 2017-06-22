@@ -14,7 +14,8 @@
     },
     "data": "../days.data",
     "query": "select date(substring(str, 0, 10)) as d, time(substring(str, 11, 8)) as t, timestamp(str) as ts, to_string(ts) as s from `../days`",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "d": { "$date": "2014-08-17" }, "t": { "$time": "06:00:00.000" }, "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "s": "2014-08-17T06:00:00.000Z" },
         { "d": { "$date": "2014-08-18" }, "t": { "$time": "07:00:00.000" }, "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "s": "2014-08-18T07:00:00.000Z" },

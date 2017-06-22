@@ -11,6 +11,7 @@
 
     "query": "select avg(pop) as avg_pop, sum(pop) as tot_pop from zips where city = \"BOULDER\" and state = \"CO\"",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "avg_pop": 27242.0, "tot_pop": 108968 }]
 }

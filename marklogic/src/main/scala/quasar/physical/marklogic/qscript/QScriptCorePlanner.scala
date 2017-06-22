@@ -38,7 +38,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
   implicit
   SP: StructuralPlanner[F, FMT],
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
-  MFP: Planner[F, FMT, MapFunc[T, ?]]
+  MFP: Planner[F, FMT, MapFuncCore[T, ?]]
 ) extends Planner[F, FMT, QScriptCore[T, ?]] {
 
   import expr.{func, for_, if_, let_}

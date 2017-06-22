@@ -17,7 +17,8 @@
             from `../zips` as a, `../largeZips` as b
             where a.`_id` like \"80301\" and b.`_id` like \"95928\"",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "a": "BOULDER", "b": "CHICO", "diff": 9278 }]
 }

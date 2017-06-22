@@ -11,7 +11,8 @@
     },
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "commit": "https://api.github.com/repos/slamdata/slamengine/git/commits/859f02befb7774aae6f7526a5a7d0a083697e4ea", "1": 9 },
         { "commit": "https://api.github.com/repos/slamdata/slamengine/git/commits/5b54522e340244d618645ace4bd0cbb7edf8bd5b", "1": 6 },

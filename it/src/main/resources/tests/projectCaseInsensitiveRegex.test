@@ -9,7 +9,8 @@
     "data": "largeZips.data",
     "query": "select city, city ~* \"boU\" as a, city !~* \"Bou\" as b from largeZips",
     "NB": "Should also test `doesNotContain`, see SD-577.",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "city": "CUSHMAN",          "a": false, "b": true  },
         { "city": "CHICOPEE",         "a": false, "b": true  },

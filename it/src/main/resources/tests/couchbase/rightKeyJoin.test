@@ -21,7 +21,8 @@
               from `beer` as beer
               join `brewery` as brewery on beer.brewery_id = meta(brewery).id
               where beer.name = \"Pale\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         {
             "beer_brewery_id": "coastal_fog_brewing", "beer_name": "Pale",

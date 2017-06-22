@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.regression
+package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.BackendName
 
-import argonaut._, Json._
+import scalaz._
 
-case class ExpectedResult(
-  rows:              List[Json],
-  predicate:         Predicate,
-  ignoredFields:     List[JsonField],
-  ignoreFieldOrder:  Boolean,
-  ignoreResultOrder: Boolean,
-  backends:          Map[BackendName, TestDirective])
+package object planner {
+  type OptionFree[F[_], A] = Option[Free[F, A]]
+}

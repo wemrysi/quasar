@@ -47,11 +47,11 @@ final class QScriptCorePlanner[
 
   def processFreeMap(f: FreeMap[T], id: Id[T[N1QL]]): F[T[N1QL]] =
     f.project match {
-      case MapFunc.StaticMap(elems) =>
+      case MapFuncCore.StaticMap(elems) =>
         elems.traverse(_.bitraverse(
           // TODO: Revisit String key requirement
           {
-            case Embed(MapFunc.EC(ejson.Str(key))) =>
+            case Embed(MapFuncCore.EC(ejson.Str(key))) =>
               Data[T[N1QL]](QData.Str(key)).embed.η[F]
             case key =>
               PlannerErrorME[F].raiseError[T[N1QL]](
@@ -280,5 +280,4 @@ final class QScriptCorePlanner[
         groupBy = none,
         orderBy = nil).embed
     }
-
 }

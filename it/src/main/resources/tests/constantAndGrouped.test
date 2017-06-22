@@ -16,6 +16,7 @@
 
     "query": "select :state as state, count(*) as `count` from zips where state = :state",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "state": "CO", "count": 414 }]
 }

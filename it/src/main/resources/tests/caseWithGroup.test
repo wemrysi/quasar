@@ -28,9 +28,7 @@
                 group by state
                 order by funnel, state",
 
-    "FIXME": "should be `equalsInitial`, with a separate `containsAtLeast` with
-             the IL entry (and perhaps others).",
-    "predicate": "containsAtLeast",
+    "predicate": "initial",
     "expected": [{ "abbr": "CO", "quantity":  414, "funnel":   1 },
                  { "abbr": "WA", "quantity":  484, "funnel":   2 },
                  { "abbr": "PA", "quantity": 1458, "funnel":   3 },
