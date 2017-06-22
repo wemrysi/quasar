@@ -5,9 +5,6 @@
         "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

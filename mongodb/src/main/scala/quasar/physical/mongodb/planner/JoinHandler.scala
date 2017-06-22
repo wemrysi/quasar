@@ -213,28 +213,28 @@ object JoinHandler {
     val leftField0 = LeftName
     val rightField0 = RightName
 
-    def keyMap(keyExpr: List[JsFn], rootField: BsonField.Name, otherField: BsonField.Name): Js.AnonFunDecl =
+    def keyMap(base: Base, keyExpr: List[JsFn], rootField: BsonField.Name, otherField: BsonField.Name): Js.AnonFunDecl =
       $MapF.mapKeyVal(("key", "value"),
         keyExpr match {
           case Nil => Js.Null
           case _   =>
-            jscore.Obj(keyExpr.map(_(jscore.ident("value"))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
+            jscore.Obj(keyExpr.map(_(base.toDocVar.toJs(jscore.ident("value")))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
               case (acc, (j, i)) => acc + (jscore.Name(i.toString) -> j)
             }).toJs
         },
         Js.AnonObjDecl(List(
           (otherField.asText, Js.AnonElem(Nil)),
-          (rootField.asText, Js.AnonElem(List(Js.Ident("value")))))))
+          (rootField.asText, Js.AnonElem(List(base.toDocVar.toJs(jscore.ident("value")).toJs))))))
 
     def jsReduce(src: WorkflowBuilder[WF], key: List[JsFn],
                  rootField: BsonField.Name, otherField: BsonField.Name):
-        (WorkflowBuilder[WF], FixOp[WF]) =
-      (src, $map[WF](keyMap(key, rootField, otherField), ListMap()))
+        (WorkflowBuilder[WF], Base => FixOp[WF]) =
+      (src, b => $map[WF](keyMap(b, key, rootField, otherField), ListMap()))
 
     def wbReduce
       (src: WorkflowBuilder[WF], key: List[Expr],
         rootField: BsonField.Name, otherField: BsonField.Name)
-        : (WorkflowBuilder[WF], FixOp[WF]) =
+        : (WorkflowBuilder[WF], Base => FixOp[WF]) =
       (DocBuilder(
         // TODO: If we can identify cases where the group key _is_ the `_id`
         //       field, then we can avoid the `$group` / `$unwind` on whichever
@@ -245,7 +245,8 @@ object JoinHandler {
           rootField             -> \&/-($field("0")),
           otherField            -> \&/-($literal(Bson.Arr())),
           BsonField.Name("_id") -> \&/-($include()))),
-        ι)
+        // FIXME: Don’t ignore the base.
+        _ => ι)
 
     val (left, right, leftField, rightField) =
       (left0.keys.map(HasThis.unapply).sequence, right0.keys.map(HasThis.unapply).sequence) match {
@@ -330,12 +331,12 @@ object JoinHandler {
     }
 
     (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
-      case ((l, _), (r, _)) =>
+      case ((l, lb), (r, rb)) =>
         CollectionBuilder(
           chain(
             $foldLeft[WF](
-              left._2(l),
-              chain(r, right._2, $reduce[WF](rightReduce, ListMap()))),
+              left._2(lb)(l),
+              chain(r, right._2(rb), $reduce[WF](rightReduce, ListMap()))),
             (op: Fix[WF]) => buildJoin(op, tpe),
             $unwind[WF](DocField(leftField)),
             $unwind[WF](DocField(rightField))),
