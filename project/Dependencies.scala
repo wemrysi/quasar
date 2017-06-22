@@ -77,15 +77,15 @@ object Dependencies {
     "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.4"
   )
   def core = Seq(
-    "org.tpolecat"               %% "doobie-core"     % doobieVersion,
-    "org.tpolecat"               %% "doobie-contrib-hikari"   % doobieVersion,
+    "org.tpolecat"               %% "doobie-core"               % doobieVersion,
+    "org.tpolecat"               %% "doobie-contrib-hikari"     % doobieVersion,
     "org.tpolecat"               %% "doobie-contrib-postgresql" % doobieVersion,
-    "org.http4s"                 %% "http4s-core"     % http4sVersion,
-    "com.github.julien-truffaut" %% "monocle-macro"   % monocleVersion,
-    "com.github.tototoshi"       %% "scala-csv"       % "1.3.4",
-    "com.slamdata"               %% "pathy-argonaut"  % pathyVersion,
-    "org.tpolecat"               %% "doobie-contrib-specs2"   % doobieVersion % Test,
-    "org.tpolecat"               %% "doobie-contrib-h2"       % doobieVersion % Test
+    "org.http4s"                 %% "http4s-core"               % http4sVersion,
+    "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
+    "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    "org.tpolecat"               %% "doobie-contrib-specs2"     % doobieVersion % Test,
+    "org.tpolecat"               %% "doobie-contrib-h2"         % doobieVersion % Test
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
@@ -110,7 +110,7 @@ object Dependencies {
   }
 
   val postgresql = Seq(
-    "org.tpolecat" %% "doobie-core"     % doobieVersion % "compile, test",
+    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
 
