@@ -22,7 +22,9 @@ object Dependencies {
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
-  private val refinedVersion      = "0.8.2"
+  // Staying on 0.8.0 version of refined due to latest version using scala 2.11.11 which
+  // causes duplicate libjansi libraries for linux, mac, and windows that in turn make assembly sbt task fail.
+  private val refinedVersion      = "0.8.0"
   private val scodecBitsVersion   = "1.1.0"
   private val http4sVersion       = "0.15.13a"
   private val scalacheckVersion   = "1.13.4"
@@ -113,7 +115,7 @@ object Dependencies {
   )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.0" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
