@@ -310,6 +310,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                   mf >> mfInner).some
               case _ => None
             }
+            case Union(innerSrc, lBranch, rBranch) =>
+              Union(innerSrc, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lBranch, mf))), Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(rBranch, mf)))).some
             case _ => None
           })
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
@@ -333,11 +335,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
                 if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(id match {
-                case IncludeId =>
-                  Free.roll(ConcatArrays[T, FreeMap](
-                    Free.roll(MakeArray(k)),
-                    Free.roll(MakeArray(elem))))
-                case _ => elem
+                case ExcludeId => elem
+                case IdOnly    => k
+                case IncludeId => StaticArray(List(k, elem))
               })(shiftRepair) ∘ (Map(srcInner, _))
             case _ => None
           }
