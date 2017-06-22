@@ -59,6 +59,8 @@ object WorkflowBuilderF {
             eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
           case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
             eq.equal(s1, s2) && f1 == f2
+          case (UnionBuilderF(ls1, rs1), UnionBuilderF(ls2, rs2)) =>
+            eq.equal(ls1, ls2) && eq.equal(rs1, rs2)
           case _ => false
         })
       }
@@ -81,6 +83,8 @@ object WorkflowBuilderF {
             f(src).map(GroupBuilderF(_, keys, contents))
           case FlatteningBuilderF(src, fields) =>
             f(src).map(FlatteningBuilderF(_, fields))
+          case UnionBuilderF(lSrc, rSrc) =>
+            (f(lSrc) ⊛ f(rSrc))(UnionBuilderF(_, _))
         }
     }
 
@@ -131,6 +135,9 @@ object WorkflowBuilderF {
                 case StructureType.Array(_) => "Array"
                 case StructureType.Object(_) => "Object"
               }) :: nt)))
+        case UnionBuilderF(lSrc, rSrc) =>
+          val nt = "UnionBuilder" :: nodeType
+          NonTerminal(nt, None, List(rt.render(lSrc), rt.render(rSrc)))
       }
     }))
 }
@@ -304,6 +311,12 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields))
   }
 
+  final case class UnionBuilderF[F[_], A](lSrc: A, rSrc: A) extends WorkflowBuilderF[F, A]
+  object UnionBuilder {
+    def apply[F[_]](lSrc: WorkflowBuilder[F], rSrc: WorkflowBuilder[F]) =
+      Fix[WorkflowBuilderF[F, ?]](new UnionBuilderF(lSrc, rSrc))
+  }
+
   private def rewriteDocPrefix(doc: ListMap[BsonField.Name, Expr], base: Base)
       (implicit exprOps: ExprOpOps.Uni[ExprOp]): ListMap[BsonField.Name, Expr] =
     doc ∘ (rewriteExprPrefix(_, base))
@@ -326,6 +339,8 @@ object WorkflowBuilder {
     case DocBuilderF(_, shape)              => shape.keys.toList.toNel
     case GroupBuilderF(_, _, shape)         => shape.keys.toList.toNel
     case FlatteningBuilderF(src, _)         => src
+    case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
+
   }
 
   // FIXME: There are a few recursive references to this function. We need to
@@ -414,6 +429,26 @@ object WorkflowBuilder {
             $simpleMap[WF](NonEmptyList(FlatExpr(JsFn(jsBase, (base.toDocVar \\ field).toJs(jscore.Ident(jsBase))))), ListMap()).apply(acc)
         },
         base).point[M]
+    case UnionBuilderF((lGraph, lBase), (rGraph, rBase)) =>
+      if (lBase == rBase)
+        ($foldLeft(
+          lGraph,
+          chain(rGraph,
+            $map($MapF.mapFresh, ListMap()),
+            $reduce($ReduceF.reduceNOP, ListMap()))),
+          lBase).point[M]
+      else
+        (toWorkflow[M, WF].apply(DocBuilderF((lGraph, Root()), ListMap(
+          BsonField.Name("0") -> docVarToExpr(lBase.toDocVar)))) ⊛
+          toWorkflow[M, WF].apply(DocBuilderF((rGraph, Root()), ListMap(
+            BsonField.Name("0") -> docVarToExpr(rBase.toDocVar)))))((l, r) =>
+          ($foldLeft(
+            l._1,
+            chain(
+              r._1,
+              $map($MapF.mapFresh, ListMap()),
+              $reduce($ReduceF.reduceNOP, ListMap()))),
+            Field(BsonField.Name("0"))))
   }
 
   def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
@@ -590,21 +625,6 @@ object WorkflowBuilder {
         _.zip(sortTypes) match {
           case x :: xs => $sort[F](NonEmptyList.nel(x, IList.fromList(xs)))
         })
-
-    def union[M[_]: Monad]
-      (left: WorkflowBuilder[F], right: WorkflowBuilder[F])
-      (implicit M: MonadError_[M, PlannerError], ev2: RenderTree[WorkflowBuilder[F]])
-        : M[WorkflowBuilder[F]] =
-      (generateWorkflow[M, F](left) |@| generateWorkflow[M, F](right)) { case ((l, _), (r, _)) =>
-        CollectionBuilder(
-          $foldLeft(
-            l,
-            chain(r,
-              $map($MapF.mapFresh, ListMap()),
-              $reduce($ReduceF.reduceNOP, ListMap()))),
-          Root(),
-          None)
-      }
   }
   object Ops {
     implicit def apply[F[_]: Coalesce](implicit ev0: WorkflowOpCoreF :<: F, ev1: ExprOpOps.Uni[ExprOp]): Ops[F] =

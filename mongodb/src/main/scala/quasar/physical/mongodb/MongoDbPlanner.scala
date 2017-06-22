@@ -874,20 +874,20 @@ object MongoDbPlanner {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` from the value here?
                 qs.getConst.idStatus match {
-                    case IdOnly    =>
-                      handleFreeMap[T, M, EX](
-                        funcHandler,
-                        Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id")))) ∘
-                        (ExprBuilder(dataset, _))
-                    case IncludeId =>
-                      handleFreeMap[T, M, EX](
-                        funcHandler,
+                  case IdOnly    =>
+                    getExprBuilder[T, M, WF, EX](
+                      funcHandler)(
+                      dataset,
+                        Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id"))))
+                  case IncludeId =>
+                    getExprBuilder[T, M, WF, EX](
+                      funcHandler)(
+                      dataset,
                         MapFunc.StaticArray(List(
                           Free.roll(MapFuncs.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncs.StrLit("_id"))),
-                          HoleF))) ∘
-                        (ExprBuilder(dataset, _))
-                    case ExcludeId => dataset.point[M]
-                  }
+                          HoleF)))
+                  case ExcludeId => dataset.point[M]
+                }
               })
       }
 
@@ -973,7 +973,7 @@ object MongoDbPlanner {
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, lBranch, src) ⊛
               rebaseWB[T, M, WF, EX](joinHandler, funcHandler, rBranch, src))(
-              WB.union[WBM]).map(liftM[M, WorkflowBuilder[WF]]).join
+              UnionBuilder(_, _))
           case Subset(src, from, sel, count) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, from, src) ⊛
               (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, count, src) >>= (HasInt[M, WF](_))))(

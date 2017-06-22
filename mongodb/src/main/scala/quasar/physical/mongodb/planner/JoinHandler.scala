@@ -105,6 +105,7 @@ object JoinHandler {
       case FlatteningBuilderF(src, _)         => src
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
+      case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
     }
 
     def lookup(
@@ -124,13 +125,14 @@ object JoinHandler {
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
           generateWorkflow[M, WF](filtered).map { case (left, _) =>
-            CollectionBuilder(
-              chain[Fix[WF]](
-                left,
-                $lookup(rColl, lName \ lField, rField, rName),
-                $unwind(DocField(rName))),
-              Root(),
-              None)
+            FlatteningBuilder(
+              CollectionBuilder(
+                chain[Fix[WF]](
+                  left,
+                  $lookup(rColl, lName \ lField, rField, rName)),
+                Root(),
+                None),
+              Set(StructureType.Array(DocField(rName))))
           }
 
         case _ =>
@@ -140,18 +142,19 @@ object JoinHandler {
                 lName               -> docVarToExpr(DocVar.ROOT()),
                 BsonField.Name("0") -> lKey)))
             (src, _) = t
-          } yield CollectionBuilder(
-            chain[Fix[WF]](
-              src,
-              $lookup(rColl, BsonField.Name("0"), rField, rName),
-              $project(
-                Reshape(ListMap(
-                  lName -> \/-($var(DocField(lName))),
-                  rName -> \/-($var(DocField(rName))))),
-                IgnoreId),
-              $unwind(DocField(rName))),
-            Root(),
-            None)
+          } yield
+              FlatteningBuilder(
+                DocBuilder(
+                  CollectionBuilder(
+                    chain[Fix[WF]](
+                      src,
+                      $lookup(rColl, BsonField.Name("0"), rField, rName)),
+                    Root(),
+                    None),
+                  ListMap(
+                    lName -> docVarToExpr(DocField(lName)),
+                    rName -> docVarToExpr(DocField(rName)))),
+                Set(StructureType.Array(DocField(rName))))
       }
     }
 
@@ -206,6 +209,8 @@ object JoinHandler {
   def mapReduce[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
     (implicit M: MonadError[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : JoinHandler[WF, M] = JoinHandler({ (tpe, left0, right0) =>
+
+    val WB = WorkflowBuilder.Ops[WF]
 
     val ops = Ops[WF]
     import ops._
@@ -276,32 +281,41 @@ object JoinHandler {
         $literal(Bson.Arr(List(Bson.Doc()))),
         $var(DocField(side)))
 
-    def buildProjection(l: Fix[ExprOp], r: Fix[ExprOp]): FixOp[WF] =
-      $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
+    // TODO: Generate `Both` not `That`.
+    def buildProjection(src: WorkflowBuilder[WF], l: Fix[ExprOp], r: Fix[ExprOp])
+        : WorkflowBuilder[WF] =
+      DocBuilder(src, ListMap(leftField -> \&/-(l), rightField -> \&/-(r)))
 
     // TODO exhaustive pattern match
-    def buildJoin(src: Fix[WF], tpe: MongoJoinType): Fix[WF] =
+    def buildJoin(src: WorkflowBuilder[WF], tpe: MongoJoinType): WorkflowBuilder[WF] =
       tpe match {
         case set.FullOuterJoin =>
-          chain(src,
-            buildProjection(padEmpty(leftField), padEmpty(rightField)))
+          buildProjection(src, padEmpty(leftField), padEmpty(rightField))
         case set.LeftOuterJoin =>
-          chain(src,
-            $match[WF](Selector.Doc(ListMap(
-              leftField.asInstanceOf[BsonField] -> nonEmpty))),
-            buildProjection($var(DocField(leftField)), padEmpty(rightField)))
+          buildProjection(
+            WB.filter(src,
+              List(docVarToExpr(DocField(leftField))),
+              { case l :: Nil => Selector.Doc(ListMap(l -> nonEmpty)) }),
+            $var(DocField(leftField)),
+            padEmpty(rightField))
         case set.RightOuterJoin =>
-          chain(src,
-            $match[WF](Selector.Doc(ListMap(
-              rightField.asInstanceOf[BsonField] -> nonEmpty))),
-            buildProjection(padEmpty(leftField), $var(DocField(rightField))))
+          buildProjection(
+            WB.filter(
+              src,
+              List(docVarToExpr(DocField(rightField))),
+              { case r :: Nil => Selector.Doc(ListMap(r -> nonEmpty)) }),
+            padEmpty(leftField),
+            $var(DocField(rightField)))
         case set.InnerJoin =>
-          chain(
+          WB.filter(
             src,
-            $match[WF](
-              Selector.Doc(ListMap(
-                leftField.asInstanceOf[BsonField] -> nonEmpty,
-                rightField -> nonEmpty))))
+            List(
+              docVarToExpr(DocField(leftField)),
+              docVarToExpr(DocField(rightField))),
+            {
+              case l :: r :: Nil =>
+                Selector.Doc(ListMap(l -> nonEmpty, r -> nonEmpty))
+            })
         case _ => scala.sys.error("How did this get here?")
       }
 
@@ -332,16 +346,18 @@ object JoinHandler {
 
     (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
       case ((l, lb), (r, rb)) =>
-        CollectionBuilder(
-          chain(
-            $foldLeft[WF](
-              left._2(lb)(l),
-              chain(r, right._2(rb), $reduce[WF](rightReduce, ListMap()))),
-            (op: Fix[WF]) => buildJoin(op, tpe),
-            $unwind[WF](DocField(leftField)),
-            $unwind[WF](DocField(rightField))),
-          Root(),
-          None)
+        FlatteningBuilder(
+          buildJoin(
+            CollectionBuilder(
+              $foldLeft[WF](
+                left._2(lb)(l),
+                chain(r, right._2(rb), $reduce[WF](rightReduce, ListMap()))),
+              Root(),
+              None),
+            tpe),
+          Set(
+            StructureType.Array(DocField(leftField)),
+            StructureType.Array(DocField(rightField))))
     }
   })
 
