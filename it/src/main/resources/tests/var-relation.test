@@ -15,6 +15,7 @@
     "query": "select count(*) as cnt from :table where pop < 1000",
 
     "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "cnt": 19 }]
 }

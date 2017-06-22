@@ -8,5 +8,6 @@
   "data": "zips.data",
   "query": "select distinct * from zips where pop ~* \"foo\"",
   "predicate": "exactly",
+  "ignoreResultOrder": true,
   "expected": []
 }

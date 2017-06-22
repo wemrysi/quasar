@@ -80,7 +80,7 @@ object Predicate {
           .flatMap {
             case (a, e) if jsonMatches(a, e) =>
               Process.halt
-            case (a, e) if (a == e && fieldOrder === OrderIgnored) =>
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
               Process.halt
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
@@ -103,7 +103,7 @@ object Predicate {
             case Some((exp, wrongOrder)) =>
               (exp aka "unmatched expected values" must beEmpty) and
                 (wrongOrder aka "matched but field order differs" must beEmpty)
-                .unless(fieldOrder === OrderIgnored): Result
+                .unless(fieldOrder ≟ OrderIgnored): Result
             case None =>
               failure
           }
@@ -126,7 +126,7 @@ object Predicate {
           .flatMap {
             case (a, e) if jsonMatches(a, e) =>
               Process.halt
-            case (a, e) if (a == e && fieldOrder === OrderIgnored) =>
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
               Process.halt
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
@@ -149,7 +149,7 @@ object Predicate {
             case Some((exp, wrongOrder, extra)) =>
               (extra aka "unexpected value" must beNone) and
                 (wrongOrder aka "matched but field order differs" must beEmpty)
-                .unless(fieldOrder === OrderIgnored) and
+                .unless(fieldOrder ≟ OrderIgnored) and
                 (exp aka "unmatched expected values" must beEmpty): Result
             case None =>
               failure
@@ -175,7 +175,7 @@ object Predicate {
               Process.halt
             case (a, e) if (jsonMatches(a, e)) =>
               Process.halt
-            case (a, e) if (a == e && fieldOrder === OrderIgnored) =>
+            case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
               Process.halt
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
@@ -203,7 +203,7 @@ object Predicate {
           // NB: want to ignore field-order here
           exp.filterNot(_ == e)
         }
-        .dropWhile(_.size == expected.size)
+        .dropWhile(_.size ≟ expected.size)
         .take(1)
         .map(unseen => expected.filterNot(unseen contains _) aka "prohibited values" must beEmpty : Result)
         .runLastOr(success)

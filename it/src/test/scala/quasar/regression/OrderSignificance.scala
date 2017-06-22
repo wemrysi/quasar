@@ -16,8 +16,12 @@
 
 package quasar.regression
 
+import scalaz._
+
 sealed abstract class OrderSignificance
-
 final case object OrderPreserved extends OrderSignificance
-
 final case object OrderIgnored extends OrderSignificance
+
+object OrderSignificance {
+  implicit val equal: Equal[OrderSignificance] = Equal.equalRef
+}
