@@ -11,7 +11,8 @@
 
   "query": "select TO_STRING(city), state || \"S\" from smallZips",
 
-  "predicate": "containsAtLeast",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "0": "NEW SALEM", "1": "MAS" }

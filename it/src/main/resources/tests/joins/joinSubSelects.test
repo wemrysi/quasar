@@ -25,7 +25,8 @@
               order by sum(pop) desc limit 200) as t2
             on t1.city = t2.city",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "CONCORD",    "popCA": 115027, "popMA": 17076 },
                  { "city": "WILMINGTON", "popCA":  49178, "popMA": 17647 }]
 }

@@ -8,7 +8,8 @@
     },
     "data": "smallZips.data",
     "query": "select integer(`_id`) as intId, decimal(`_id`) as decId from smallZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "intId": 1001, "decId": 1001.0 },
         { "intId": 1002, "decId": 1002.0 },

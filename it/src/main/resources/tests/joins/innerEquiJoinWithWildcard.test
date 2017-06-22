@@ -17,7 +17,8 @@
 
     "query": "select * from `../smallZips` join `../zips` on smallZips.`_id` = zips.`_id`",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "ignoreFieldOrder": true,
 

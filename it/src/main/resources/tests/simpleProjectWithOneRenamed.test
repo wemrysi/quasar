@@ -16,7 +16,8 @@
 
     "query": "select `_id` as zip, city from zips where pop = 18174",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "zip": "80301", "city": "BOULDER"   },
                  { "zip": "92029", "city": "ESCONDIDO" }]
 }

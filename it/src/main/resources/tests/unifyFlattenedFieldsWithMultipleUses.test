@@ -13,7 +13,7 @@
     "NB": "Skipped in marklogic because it times out.",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "zip": "99722", "loc": 68.077395},
                  { "zip": "99721", "loc": 68.11878},
                  { "zip": "99766", "loc": 68.312058},

@@ -19,7 +19,8 @@
               from `../smallZips`, `../zips`
               where smallZips.`_id` = zips.`_id`",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [{ "city": "AGAWAM",  "state": "MA" },
                  { "city": "CUSHMAN", "state": "MA" }]

@@ -13,7 +13,8 @@
                 state != \"CO\" or
                 (pop between 20000 and 40000 and loc[1] != 40.017235))",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "zip": "80301" },
                  { "zip": "80302" }]
 }

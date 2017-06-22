@@ -10,7 +10,8 @@
 
   "query": "select * from smallZips",
 
-  "predicate": "containsAtLeast",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
 
   "ignoredFields": ["_id"],
 

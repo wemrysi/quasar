@@ -18,7 +18,8 @@
     "query": "select smallZips.city, zips.state from `../smallZips`, `../zips`
               where smallZips.`_id` = zips.`_id` and \"MA\" = zips.state",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [{ "city": "AGAWAM",  "state": "MA" },
                  { "city": "CUSHMAN", "state": "MA" }]

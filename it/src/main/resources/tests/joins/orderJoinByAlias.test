@@ -20,7 +20,7 @@
               on z1.`_id` = z2.`_id`
               order by popK desc",
 
-    "predicate": "equalsInitial",
+    "predicate": "initial",
 
     "expected": [{ "zip": "01201", "popK": 50.655 },
                  { "zip": "01040", "popK": 43.704 },
