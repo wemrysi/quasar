@@ -65,7 +65,7 @@ object Planner {
     new EquiJoinPlanner[T, F]
 
   def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
-    : Planner[T, F, MapFunc[T, ?]] =
+    : Planner[T, F, MapFuncCore[T, ?]] =
     new MapFuncPlanner[T, F]
 
   implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]

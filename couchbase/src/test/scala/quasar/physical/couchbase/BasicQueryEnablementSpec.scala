@@ -25,7 +25,7 @@ import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.Planner.PlannerError
-import quasar.qscript.{Map => _, Read => _, _}, MapFuncs._
+import quasar.qscript.{Map => _, Read => _, _}, MapFuncsCore._
 import quasar.sql._
 
 import scala.collection.JavaConverters._

@@ -81,21 +81,21 @@ package object qscript {
     fm: FreeMap[T],
     src: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]],
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]],
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
     fm.project match {
-      case MapFunc.StaticArray(elements) =>
+      case MapFuncCore.StaticArray(elements) =>
         for {
           xqyElts <- elements.traverse(planMapFunc[T, F, FMT, Hole](_)(κ(src)))
           arrElts <- xqyElts.traverse(SP.mkArrayElt)
           arr     <- SP.mkArray(mkSeq(arrElts))
         } yield arr
 
-      case MapFunc.StaticMap(entries) =>
+      case MapFuncCore.StaticMap(entries) =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     case Embed(MapFunc.EC(Str(s))) => s.xs.point[F]
+                     case Embed(MapFuncCore.EC(Str(s))) => s.xs.point[F]
                      case key                       => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
                    planMapFunc[T, F, FMT, Hole](_)(κ(src))))
@@ -111,7 +111,7 @@ package object qscript {
     l: XQuery,
     r: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): F[XQuery] =
     planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
@@ -122,7 +122,7 @@ package object qscript {
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): F[XQuery] =
     freeMap.cataM(interpretM(recover(_).point[F], MFP.plan))
 
