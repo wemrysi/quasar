@@ -223,7 +223,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     }
 
   private def eliminateRightSideProj(elem: FreeMap): Option[FreeMap] = {
-    val oneRef = Free.roll[MapFuncCore, Hole](ProjectIndex(HoleF, IntLit(1)))
+    val oneRef = Free.roll[MapFunc, Hole](MFC(ProjectIndex(HoleF, IntLit(1))))
     val rightCount: Int = elem.elgotPara(count(HoleF))
 
     // all `RightSide` access is through `oneRef`
@@ -325,9 +325,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.some)) =>
               rightOnly(id match {
                 case IncludeId =>
-                  Free.roll(ConcatArrays[T, FreeMap](
-                    Free.roll(MakeArray(k)),
-                    Free.roll(MakeArray(elem))))
+                  Free.roll(MFC(ConcatArrays[T, FreeMap](
+                    Free.roll(MFC(MakeArray(k))),
+                    Free.roll(MFC(MakeArray(elem))))))
                 case _ => elem
               })(shiftRepair) ∘ (Map(srcInner, _))
             case _ => None
@@ -374,7 +374,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {
           case Filter(srcInner, condInner) =>
-            Filter(srcInner, Free.roll[MapFuncCore, Hole](And(condInner, cond))).some
+            Filter(srcInner, Free.roll[MapFunc, Hole](MFC(And(condInner, cond)))).some
           case _ => None
         }
         case Subset(src, from, sel, count) =>

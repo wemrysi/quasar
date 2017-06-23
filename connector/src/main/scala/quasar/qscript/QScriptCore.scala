@@ -335,9 +335,9 @@ object QScriptCore {
             val rFunc: FreeMap[IT] = norm.freeMF(struct2 >> right)
 
             val proj0: FreeMap[IT] =
-              Free.roll(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](0)))
+              Free.roll(MFC(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](0))))
             val proj1: FreeMap[IT] =
-              Free.roll(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](1)))
+              Free.roll(MFC(MapFuncsCore.ProjectIndex(HoleF[IT], MapFuncsCore.IntLit[IT, Hole](1))))
 
             def constructMerge(
               struct: FreeMap[IT],
