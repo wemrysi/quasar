@@ -32,42 +32,16 @@ object POSIXOp {
 
   case object GenUUID extends POSIXOp[UUID]
 
-  def genUUID: POSIX[UUID] = Free.liftF(GenUUID)
-
   final case class OpenW(target: AFile) extends POSIXOp[Sink[POSIXWithTask, ByteVector]]
-
-  def openW(target: AFile): POSIX[Sink[POSIXWithTask, ByteVector]] =
-    Free.liftF(OpenW(target))
-
   final case class OpenR(target: AFile) extends POSIXOp[Stream[POSIXWithTask, ByteVector]]
 
-  def openR(target: AFile): POSIX[Stream[POSIXWithTask, ByteVector]] =
-    Free.liftF(OpenR(target))
+  final case class Ls(target: ADir) extends POSIXOp[List[APath]]
 
   final case class MkDir(target: ADir) extends POSIXOp[Unit]
-
-  def mkDir(target: ADir): POSIX[Unit] = Free.liftF(MkDir(target))
-
   final case class LinkDir(src: ADir, target: ADir) extends POSIXOp[Unit]
-
-  def linkDir(src: ADir, target: ADir): POSIX[Unit] =
-    Free.liftF(LinkDir(src, target))
-
   final case class LinkFile(src: AFile, target: AFile) extends POSIXOp[Unit]
 
-  def linkFile(src: AFile, target: AFile): POSIX[Unit] =
-    Free.liftF(LinkFile(src, target))
-
   final case class Move(src: AFile, target: AFile) extends POSIXOp[Unit]
-
-  def move(src: AFile, target: AFile): POSIX[Unit] =
-    Free.liftF(Move(src, target))
-
   final case class Exists(target: APath) extends POSIXOp[Boolean]
-
-  def exists(target: APath): POSIX[Boolean] = Free.liftF(Exists(target))
-
   final case class Delete(target: APath) extends POSIXOp[Unit]
-
-  def delete(target: APath): POSIX[Unit] = Free.liftF(Delete(target))
 }

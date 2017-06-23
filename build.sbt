@@ -525,11 +525,17 @@ lazy val yggdrasil = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
   .withWarnings
   .settings(
+    resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
+
     libraryDependencies ++= Seq(
       "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
 
       "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
+      "co.fs2" %% "fs2-scalaz" % "0.2.0",
+
+      "io.argonaut" %% "argonaut" % "6.1",
+
+      "com.codecommit" %% "smock" % "0.1" % "test"))
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

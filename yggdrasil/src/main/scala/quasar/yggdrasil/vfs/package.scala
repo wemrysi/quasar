@@ -16,10 +16,42 @@
 
 package quasar.yggdrasil
 
-import scalaz.{Coproduct, Free}
+import argonaut.{Argonaut, CodecJson, DecodeResult}
+
+import scalaz.{~>, :<:, Coproduct, Free}
 import scalaz.concurrent.Task
+
+import java.util.UUID
 
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
   type POSIXWithTask[A] = Free[Coproduct[POSIXOp, Task, ?], A]
+
+  object POSIXWithTask {
+    def generalize[S[_]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
+
+
+    trait GeneralizeSyntax[S[_]] {
+      def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, A] =
+        pwt.mapSuspension(λ[Coproduct[POSIXOp, Task, ?] ~> S](_.run.fold(IP.inj, IT.inj)))
+    }
+  }
+
+  final case class Version(value: UUID) extends AnyVal
+
+  object Version extends (UUID => Version) {
+    import Argonaut._
+
+    implicit val codec: CodecJson[Version] =
+      CodecJson[Version](v => jString(v.value.toString), { c =>
+        c.as[String] flatMap { str =>
+          try {
+            DecodeResult.ok(Version(UUID.fromString(str)))
+          } catch {
+            case _: IllegalArgumentException =>
+              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+          }
+        }
+      })
+  }
 }
