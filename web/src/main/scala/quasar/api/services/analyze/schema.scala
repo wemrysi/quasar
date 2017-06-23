@@ -17,11 +17,11 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef.{-> => _, _}
-import quasar.Data
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.api.services.query._
 import quasar.contrib.scalaz.disjunction._
+import quasar.contrib.scalaz.foldable._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.numeric._
@@ -30,7 +30,6 @@ import quasar.main.analysis
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.http4s.dsl._
 import org.http4s.headers.Accept
 import scalaz._, Scalaz._
@@ -88,14 +87,14 @@ object schema {
           settings    <- compressionSettings.liftT[Free[S, ?]]
           rq          <- requestQuery[Fix](req).liftT[Free[S, ?]]
           (blob, dir) =  rq
-          r           <- analysis.sampleOfQuery[S](blob, requestVars(req), dir, DefaultSampleSize)
-                           .leftMap(_.toApiError)
-          sample      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
+          r           <- analysis.querySchema[S, J, Double](
+                           blob, requestVars(req), dir, DefaultSampleSize, settings
+                         ).leftMap(_.toApiError)
+          schema      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
         } yield {
           formattedDataResponse(
             MessageFormat.fromAccept(req.headers.get(Accept)),
-            sample.pipe(analysis.extractSchema[J, Double](settings))
-              .map(sst => sst.asEJson[J].cata(Data.fromEJson)))
+            schema.map(analysis.schemaToData(_)).toProcess)
         })
     }
 }

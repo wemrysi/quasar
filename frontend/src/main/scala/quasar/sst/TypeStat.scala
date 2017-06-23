@@ -169,54 +169,8 @@ sealed abstract class TypeStatInstances {
 
   implicit def encodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A]] =
     new EncodeEJson[TypeStat[A]] {
-      def encode[J](ts: TypeStat[A])(implicit J: Corecursive.Aux[J, EJson]): J = {
-        def emap(xs: (String, J)*): J =
-          E(ejs.map(xs.toList.map(_.leftMap(_.asEJson[J])))).embed
-
-        def optEntry[B: EncodeEJson](k: String, b: Option[B]): List[(String, J)] =
-          b.map(x => (k, x.asEJson[J])).toList
-
-        def minmax[B: EncodeEJson](c: A, mn: B, mx: B): J =
-          emap(
-            "count" -> c.asEJson[J],
-            "min"   -> mn.asEJson[J],
-            "max"   -> mx.asEJson[J])
-
-        def dist[B: EncodeEJson](ss: SampleStats[A], mn: B, mx: B): J =
-          emap(
-            "count"        -> ss.size.asEJson[J],
-            "distribution" -> emap(
-                      ("mean"   -> ss.mean.asEJson[J])    ::
-              optEntry("variance", ss.populationVariance) :::
-              optEntry("skewness", ss.populationSkewness) :::
-              optEntry("kurtosis", ss.populationKurtosis) : _*),
-            "min"          -> mn.asEJson[J],
-            "max"          -> mx.asEJson[J])
-
-        ts match {
-          case Bool(t, f)               => emap("true" -> t.asEJson[J], "false" -> f.asEJson[J])
-          case Byte(c, mn, mx)          => minmax(c, mn, mx)
-          case Char(c, mn, mx)          => minmax(c, mn, mx)
-          case Int(s, mn, mx)           => dist(s, mn, mx)
-          case Dec(s, mn, mx)           => dist(s, mn, mx)
-          case Count(c)                 => emap("count" -> c.asEJson[J])
-
-          case Coll(c, mnl, mxl)        =>
-            emap(
-              ("count" -> c.asEJson[J])  ::
-              optEntry("minLength", mnl) :::
-              optEntry("maxLength", mxl) : _*)
-
-
-          case Str(c, mnl, mxl, mn, mx) =>
-            emap(
-              "count"     -> c.asEJson[J],
-              "minLength" -> mnl.asEJson[J],
-              "maxLength" -> mxl.asEJson[J],
-              "min"       -> mn.asEJson[J],
-              "max"       -> mx.asEJson[J])
-        }
-      }
+      def encode[J](ts: TypeStat[A])(implicit J: Corecursive.Aux[J, EJson]): J =
+        encodeEJson0(ts, isPopulation = false)
     }
 
   implicit def semigroup[A: Order: Field]: Semigroup[TypeStat[A]] =
@@ -249,4 +203,66 @@ sealed abstract class TypeStatInstances {
       case  Coll(c, min, max)             => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
       case Count(c          )             => s"Count(${c.shows})"
     }
+
+  ////
+
+  private[sst] def encodeEJson0[A: EncodeEJson: Equal: Field: NRoot, J](
+    ts: TypeStat[A],
+    isPopulation: Boolean
+  )(implicit
+    J: Corecursive.Aux[J, EJson]
+  ): J = {
+    def emap(xs: (String, J)*): J =
+      E(ejs.map(xs.toList.map(_.leftMap(_.asEJson[J])))).embed
+
+    def optEntry[B: EncodeEJson](k: String, b: Option[B]): List[(String, J)] =
+      b.map(x => (k, x.asEJson[J])).toList
+
+    def minmax[B: EncodeEJson](c: A, mn: B, mx: B): J =
+      emap(
+        "count" -> c.asEJson[J],
+        "min"   -> mn.asEJson[J],
+        "max"   -> mx.asEJson[J])
+
+    def sstats(ss: SampleStats[A]): J =
+      emap(
+        ("mean", ss.mean.asEJson[J])                             ::
+        optEntry("variance",
+          isPopulation.fold(ss.variance, ss.populationVariance)) :::
+        optEntry("skewness",
+          isPopulation.fold(ss.skewness, ss.populationSkewness)) :::
+        optEntry("kurtosis",
+          isPopulation.fold(ss.kurtosis, ss.populationKurtosis)) : _*)
+
+    def dist[B: EncodeEJson](ss: SampleStats[A], mn: B, mx: B): J =
+      emap(
+        "count"        -> ss.size.asEJson[J],
+        "distribution" -> sstats(ss),
+        "min"          -> mn.asEJson[J],
+        "max"          -> mx.asEJson[J])
+
+    ts match {
+      case Bool(t, f)               => emap("true" -> t.asEJson[J], "false" -> f.asEJson[J])
+      case Byte(c, mn, mx)          => minmax(c, mn, mx)
+      case Char(c, mn, mx)          => minmax(c, mn, mx)
+      case Int(s, mn, mx)           => dist(s, mn, mx)
+      case Dec(s, mn, mx)           => dist(s, mn, mx)
+      case Count(c)                 => emap("count" -> c.asEJson[J])
+
+      case Coll(c, mnl, mxl)        =>
+        emap(
+          ("count" -> c.asEJson[J])  ::
+          optEntry("minLength", mnl) :::
+          optEntry("maxLength", mxl) : _*)
+
+
+      case Str(c, mnl, mxl, mn, mx) =>
+        emap(
+          "count"     -> c.asEJson[J],
+          "minLength" -> mnl.asEJson[J],
+          "maxLength" -> mxl.asEJson[J],
+          "min"       -> mn.asEJson[J],
+          "max"       -> mx.asEJson[J])
+    }
+  }
 }

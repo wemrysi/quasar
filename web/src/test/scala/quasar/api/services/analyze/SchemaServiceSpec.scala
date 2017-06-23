@@ -30,6 +30,7 @@ import quasar.fp.numeric._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.fs._, InMemory.InMemState
 import quasar.main.analysis
+import quasar.sst._
 import quasar.std.IdentityLib
 
 import argonaut._, Argonaut._, JsonScalaz._
@@ -37,7 +38,6 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl._
@@ -75,12 +75,16 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
   def nonPos(i: Int): Int =
     if (i > 0) -i else i
 
-  def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json =
+  def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json = {
+    type P[X] = StructuralType[J, Option[X]]
+
     Process.emitAll(dataset)
       .pipe(analysis.extractSchema[J, Double](cfg))
-      .map(sst => DataCodec.Precise.encode(sst.asEJson[J].cata[Data](Data.fromEJson)))
+      .map(Population.subst[P, TypeStat[Double]] _)
+      .map(psst => DataCodec.Precise.encode(analysis.schemaToData(psst.right)))
       .pipe(process1.stripNone)
       .toVector.headOption.getOrElse(Json.jNull)
+  }
 
   case class SmallPositive(p: Positive)
 
