@@ -4,7 +4,7 @@
         "couchbase": "ignoreFieldOrder",
         "mimir": "skip",
         "marklogic_json": "ignoreFieldOrder",
-        "marklogic_xml":  "ignoreFieldOrder",
+        "marklogic_xml":  "pending",
         "postgresql": "pending"
     },
     "data": "nulls.data",
