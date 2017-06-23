@@ -58,17 +58,32 @@ object VersionLog {
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
     for {
-      fileStream <- POSIX.openR[S](baseDir </> VersionsJson).liftM[ST]
+      exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
-      // TODO character encoding!
-      fileString = fileStream.map(_.toArray).map(new String(_)).foldMonoid
-      json <- POSIXWithTask.generalize[S](fileString.runLast).liftM[ST]
+      committed <- if (exists) {
+        for {
+          fileStream <- POSIX.openR[S](baseDir </> VersionsJson)
 
-      committed = json.flatMap(Parse.decodeOption[List[Version]](_)).getOrElse(Nil)
+          // TODO character encoding!
+          fileString = fileStream.map(_.toArray).map(new String(_)).foldMonoid
+          json <- POSIXWithTask.generalize[S](fileString.runLast)
+        } yield json.flatMap(Parse.decodeOption[List[Version]](_)).getOrElse(Nil)
+      } else {
+        for {
+          vnew <- POSIX.openW[S](baseDir </> VersionsJsonNew)
 
-      paths <- POSIX.ls[S](baseDir).liftM[ST]
+          json = List[Version]().asJson.nospaces
+          // TODO character encoding!
+          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
+          _ <- POSIXWithTask.generalize(writer)
+
+          _ <- POSIX.move[S](baseDir </> VersionsJsonNew, baseDir </> VersionsJson)
+        } yield Nil
+      }
+
+      paths <- POSIX.ls[S](baseDir)
 
       versions = for {
         path <- paths
@@ -81,9 +96,7 @@ object VersionLog {
           case _: IllegalArgumentException => Nil
         }
       } yield version
-
-      _ <- putS[Free[S, ?], VersionLog](VersionLog(baseDir, committed, versions.toSet))
-    } yield ()
+    } yield VersionLog(baseDir, committed, versions.toSet)
   }
 
   def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
