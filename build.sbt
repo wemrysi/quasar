@@ -535,7 +535,7 @@ lazy val yggdrasil = project.setup
 
       "io.argonaut" %% "argonaut" % "6.1",
 
-      "com.codecommit" %% "smock" % "0.1" % "test"))
+      "com.codecommit" %% "smock" % "0.3-specs2-3.8.4" % "test"))
   .settings(headerSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
