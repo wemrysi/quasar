@@ -18,6 +18,7 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
+import quasar.contrib.scalaz.zipper._
 import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK}
 import quasar.fp.ski.κ
 import quasar.tpe._
@@ -101,84 +102,48 @@ object StructuralType extends StructuralTypeInstances {
   }
 
   /** Unfold a pair of structural types into their deep structural merge. */
-  def mergeƒ[L: Order, V: Monoid, T](
+  def mergeƒ[L, V: Monoid, F[_]: Functor, T](
     implicit
-    TR: Recursive.Aux[T, EnvT[V, TypeF[L, ?], ?]],
-    TC: Corecursive.Aux[T, EnvT[V, TypeF[L, ?], ?]]
-  ): ElgotCoalgebra[T \/ ?, EnvT[V, TypeF[L, ?], ?], (T, T)] = {
-    import TypeF._
-    type TT = (T, T)
-    val ⊥ = envT(∅[V], bottom[L, T]()).embed
+    I: TypeF[L, ?] :<: F,
+    F: StructuralMerge[F],
+    TC: Corecursive.Aux[T, EnvT[V, F, ?]],
+    TR: Recursive.Aux[T, EnvT[V, F, ?]]
+  ): ElgotCoalgebra[T \/ ?, EnvT[V, F, ?], (T, T)] =
+    tt => {
+      val pp = tt.umap(_.project)
+      F.merge[V, T](pp) getOrElse (pp match {
+        case (EnvT((v, _)), EnvT((w, _))) =>
+          envT(v |+| w, I(TypeF.coproduct[L, T](tt))).embed.left
+      })
+    }
 
-    def mergeThese[F[_]: Align](xs: F[T], ys: F[T]): F[TT] =
-      xs.alignWith(ys)(_.fold((_, ⊥), (_, ⊥), (_, _)))
-
-    def mergeArr(l: (V, IList[T] \/ T), r: (V, IList[T] \/ T)): TypeF[L, T] \/ TypeF[L, TT] =
-      (l, r) match {
-        case ((_, -\/(              xs)), (_, -\/(              ys))) => arr[L, TT](mergeThese(xs, ys).left).right
-        case ((_, \/-(               x)), (_, \/-(               y))) => arr[L, TT]((x, y).right).right
-        case ((_, -\/(          INil())), (_, y @ \/-(           _))) => arr[L,  T](y).left
-        case ((_, x @ \/-(           _)), (_, -\/(          INil()))) => arr[L,  T](x).left
-        case ((_, -\/(ICons(x, INil()))), (_, \/-(               y))) => arr[L, TT]((x, y).right).right
-        case ((_, \/-(               x)), (_, -\/(ICons(y, INil())))) => arr[L, TT]((x, y).right).right
-
-        case ((v, -\/(ICons(a, ICons(b, cs)))), (_, \/-(y))) =>
-          arr[L, TT]((envT(v, union[L, T](a, b, cs)).embed, y).right).right
-
-        case ((_, \/-(x)), (v, -\/(ICons(a, ICons(b, cs))))) =>
-          arr[L, TT]((x, envT(v, union[L, T](a, b, cs)).embed).right).right
+  /** A transform ensuring unions are disjoint by merging their members. */
+  def disjoinUnionsƒ[L, V: Monoid, F[_]: Functor, T](
+    implicit
+    I: TypeF[L, ?] :<: F,
+    F: StructuralMerge[F],
+    TC: Corecursive.Aux[T, EnvT[V, F, ?]],
+    TR: Recursive.Aux[T, EnvT[V, F, ?]]
+  ): EnvT[V, F, T] => EnvT[V, F, T] = {
+    def strictMerge(x: T, y: T): Option[T] =
+      some((x, y).elgotApo[T](mergeƒ[L, V, F, T])) filter { t =>
+        I.prj(t.project.lower) all TypeF.union[L, T].isEmpty
       }
 
-    def mergeUnk(xu: Option[TT], yu: Option[TT]): Option[(TT, TT)] =
-      (xu, yu) match {
-        case (Some((xk, xv)), Some((yk, yv))) => some(((xk, yk), (xv, yv)))
-        case (Some((xk, xv)),           None) => some(((xk,  ⊥), (xv,  ⊥)))
-        case (          None, Some((yk, yv))) => some(((⊥ , yk), (⊥ , yv)))
-        case (          None,           None) => none
-      }
-
-    def mergeable(x: T, y: T): Boolean =
-      (x, y).umap(_.project.lower) match {
-        case (    Top(),     Top()) => true
-        case (Simple(a), Simple(b)) => a ≟ b
-        case ( Const(a),  Const(b)) => a ≟ b
-        case (   Arr(_),    Arr(_)) => true
-        case (Map(_, _), Map(_, _)) => true
-        case _                      => false
-      }
-
-    def mergeUnions(v: V, xs: NonEmptyList[T], ys: NonEmptyList[T]): T \/ EnvT[V, TypeF[L, ?], TT] =
-      xs.foldLeft(ys.toZipper map (_.right[TT]))((z, x) =>
-        // Pair with merge candidate if found, otherwise add to the union.
-        z.findZ(_ exists (mergeable(x, _))).cata(
-          _.modify(_ >>= ((x, _).left[T])),
-          z.insert((x, ⊥).left[T])))
-        .map(_.swap valueOr ((⊥, _)))
-        .toNel match {
-          case NonEmptyList(a, ICons(b, cs)) => envT(v, union[L, TT](a, b, cs)).right
-          case NonEmptyList(a,       INil()) => envT(v, coproduct[L, T](a)).embed.left
+    orOriginal(ft => I.prj(ft.lower) collect {
+      case TypeF.Unioned(NonEmptyList(h, t)) =>
+        val disjoint = t.foldLeft(h.wrapNel.toZipper) { (z, t) =>
+          z.findMap(strictMerge(t, _)) getOrElse z.insert(t)
         }
 
-    _.umap(_.project) match {
-      case (                     x, EnvT((_,    Bottom())))            => x.embed.left
-      case (EnvT((_,    Bottom())),                      y)            => y.embed.left
-      case (EnvT((v,       Top())), EnvT((w,       Top())))            => envT(v |+| w, top[L, T]()).embed.left
-      case (EnvT((v,   Simple(x))), EnvT((w,   Simple(y)))) if (x ≟ y) => envT(v |+| w, simple[L, T](x)).embed.left
-      case (EnvT((v,    Const(x))), EnvT((w,    Const(y)))) if (x ≟ y) => envT(v |+| w, const[L, T](x)).embed.left
-      case (EnvT((v, Unioned(xs))), EnvT((w, Unioned(ys))))            => mergeUnions(v |+| w, xs, ys)
-      case (x @ EnvT((v,       _)), EnvT((w, Unioned(ys))))            => mergeUnions(v |+| w, x.embed.wrapNel, ys)
-      case (EnvT((v, Unioned(xs))), y @ EnvT((w,       _)))            => mergeUnions(v |+| w, xs, y.embed.wrapNel)
+        disjoint.toNel match {
+          case NonEmptyList(a, INil()) =>
+            a.project
 
-      case (EnvT((v, Arr(x))), EnvT((w, Arr(y)))) =>
-        val sum = v |+| w
-        mergeArr((v, x), (w, y)).bimap(envT(sum, _).embed, envT(sum, _))
-
-      case (EnvT((v, Map(xs, xunk))), EnvT((w, Map(ys, yunk)))) =>
-        envT(v |+| w, map[L, TT](mergeThese(xs, ys), mergeUnk(xunk, yunk))).right
-
-      case (x @ EnvT((v, _)), y @ EnvT((w, _))) =>
-        envT(v |+| w, coproduct[L, T](x.embed, y.embed)).embed.left
-    }
+          case NonEmptyList(a, ICons(b, cs)) =>
+            envT(ft.ask, I(TypeF.union[L, T](a, b, cs)))
+        }
+    })
   }
 }
 
@@ -206,10 +171,13 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
 
   implicit def monoid[L: Order, V: Monoid]: Monoid[StructuralType[L, V]] =
     new Monoid[StructuralType[L, V]] {
-      type T = Cofree[TypeF[L, ?], V]
+      type F[A] = TypeF[L, A]
+      type T    = Cofree[F, V]
+      val norm = (_: T).transAna[T](StructuralType.disjoinUnionsƒ[L, V, F, T])
       val zero = StructuralType(Cofree(∅[V], TypeF.bottom[L, T]()))
       def append(x: StructuralType[L, V], y: => StructuralType[L, V]) =
-        StructuralType((x.toCofree, y.toCofree).elgotApo[T](StructuralType.mergeƒ[L, V, T]))
+        StructuralType((x.toCofree, y.toCofree).elgotApo[T](
+          StructuralType.mergeƒ[L, V, F, T] >>> (_ leftMap norm)))
     }
 
   implicit def comonad[L]: Comonad[StructuralType[L, ?]] =

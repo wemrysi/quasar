@@ -76,9 +76,15 @@ final class StructuralTypeSpec extends Spec
       val consts = xs.toIList.map(mkST)
 
       val exp = envT(2, TypeF.arr[J, S](\/-(consts match {
-        case INil()                 => ySimple
-        case ICons(a, INil())       => envT(2, TypeF.coproduct[J, S](ySimple, a)).embed
-        case ICons(a, ICons(b, cs)) => envT(2, TypeF.union[J, S](ySimple, a, b :: cs)).embed
+        case INil() => ySimple
+
+        case ICons(a, INil()) =>
+          envT(2, TypeF.coproduct[J, S](ySimple, a)).embed
+
+        case ICons(a, ICons(b, cs)) =>
+          StructuralType.disjoinUnionsƒ[J, Int, TypeF[J, ?], S].apply(
+            envT(2, TypeF.union[J, S](ySimple, a, b :: cs))
+          ).embed
       }))).embed
 
       (lubArr |+| arr) must equal(exp)

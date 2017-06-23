@@ -149,7 +149,6 @@ object TypeF extends TypeFInstances {
     JR: Recursive.Aux[J, EJson]
   ): GCoalgebra[T \/ ?, TypeF[J, ?], (T, T)] = {
     type LR  = (T, T)
-    type OUT = TypeF[J, T \/ LR]
     val T    = top[J, T]().embed
     val ⊥    = bottom[J, T]().embed
 

@@ -31,6 +31,7 @@ import spire.math.ConvertableTo
 
 package object sst {
   /** Statistical Structural Type */
+  type TypeS[J, A]         = Coproduct[TypeF[J, ?], Tagged, A]
   type SSTF[J, A, B]       = EnvT[Option[TypeStat[A]], TypeF[J, ?], B]
   type SST[J, A]           = StructuralType[J, Option[TypeStat[A]]]
   type PopulationSST[J, A] = StructuralType[J, Option[TypeStat[A] @@ Population]]
