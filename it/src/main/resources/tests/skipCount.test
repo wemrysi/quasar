@@ -3,20 +3,8 @@
 
     "backends": {
         "mimir": "skip",
-        "couchbase":      "pending",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_2_6":    "pending",
-        "mongodb_3_0":    "pending",
-        "mongodb_3_2":    "pending",
-        "postgresql":     "pending",
-        "spark_hdfs":     "skip",
-        "spark_local":    "skip"
+        "postgresql": "pending"
     },
-
-    "NB": "#1748: Disabled in spark due to ListMap serialization stack overflow.
-           #2122: Improves the qscript, but the qscript _should_ currently be correct.
-           Skipped for marklogic because it times out.",
 
     "data": "zips.data",
 
