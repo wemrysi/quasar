@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 private[qscript] final class ThetaJoinPlanner[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
   implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
-  MFP: Planner[F, FMT, MapFunc[T, ?]]
+  MFP: Planner[F, FMT, MapFuncCore[T, ?]]
 ) extends Planner[F, FMT, ThetaJoin[T, ?]] {
   import expr.let_
 

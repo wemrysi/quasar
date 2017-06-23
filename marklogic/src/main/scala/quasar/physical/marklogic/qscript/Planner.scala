@@ -53,7 +53,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
     implicit
     DP: Planner[M, FMT, Const[Data, ?]],
     SP: StructuralPlanner[M, FMT]
-  ): Planner[M, FMT, MapFunc[T, ?]] =
+  ): Planner[M, FMT, MapFuncCore[T, ?]] =
     new MapFuncPlanner[M, FMT, T]
 }
 
@@ -70,7 +70,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): Planner[F, FMT, QScriptCore[T, ?]] = {
     implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new QScriptCorePlanner[F, FMT, T]
@@ -79,7 +79,7 @@ sealed abstract class PlannerInstances1 extends PlannerInstances2 {
   implicit def thetaJoin[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
     implicit
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?]]],
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): Planner[F, FMT, ThetaJoin[T, ?]] = {
     implicit val qtp: Planner[F, FMT, QScriptTotal[T, ?]] = QTP.value
     new ThetaJoinPlanner[F, FMT, T]

@@ -81,14 +81,14 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
     (free ≠ freeNormalized).option(freeNormalized)
   }
 
-  def freeMFEq[A: Equal: Show](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
+  def freeMFEq[A: Equal: Show](fm: Free[MapFuncCore, A]): Option[Free[MapFuncCore, A]] = {
     val fmNormalized = freeMF[A](fm)
     (fm ≠ fmNormalized).option(fmNormalized)
   }
 
-  def freeMF[A: Equal: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
-    fm.transCata[Free[MapFunc, A]](MapFunc.normalize[T, A])
-      .transCata[Free[MapFunc, A]](repeatedly(MapFunc.extractGuards[T, A]))
+  def freeMF[A: Equal: Show](fm: Free[MapFuncCore, A]): Free[MapFuncCore, A] =
+    fm.transCata[Free[MapFuncCore, A]](MapFuncCore.normalize[T, A])
+      .transCata[Free[MapFuncCore, A]](repeatedly(MapFuncCore.extractGuards[T, A]))
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
@@ -144,8 +144,8 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
       (Zip[List].zipWith(bucketNormOpt, bucket)(_.getOrElse(_)): List[FreeMap]) >>= (b =>
         b.resume.fold(
           {
-            case MapFuncs.Constant(_) => Nil
-            case _                    => List(b)
+            case MapFuncsCore.Constant(_) => Nil
+            case _                        => List(b)
           },
           κ(List(b)))))
   }

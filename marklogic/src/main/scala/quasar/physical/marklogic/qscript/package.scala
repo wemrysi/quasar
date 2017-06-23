@@ -32,7 +32,6 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import _root_.xml.name._
 
 package object qscript {
   type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
@@ -55,11 +54,6 @@ package object qscript {
 
   val EJsonTypeKey  = "_ejson.type"
   val EJsonValueKey = "_ejson.value"
-
-  /** Converts the given string to a QName if valid, failing with an error otherwise. */
-  def asQName[F[_]: MonadPlanErr: Applicative](s: String): F[QName] =
-    (QName.string.getOption(s) orElse QName.string.getOption(encodeForQName(s)))
-      .fold(invalidQName[F, QName](s))(_.point[F])
 
   /** XQuery evaluating to the documents having the specified format in the directory. */
   def directoryDocuments[FMT: SearchOptions](uri: XQuery, includeDescendants: Boolean): XQuery =
@@ -87,21 +81,21 @@ package object qscript {
     fm: FreeMap[T],
     src: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]],
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]],
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
     fm.project match {
-      case MapFunc.StaticArray(elements) =>
+      case MapFuncCore.StaticArray(elements) =>
         for {
           xqyElts <- elements.traverse(planMapFunc[T, F, FMT, Hole](_)(κ(src)))
           arrElts <- xqyElts.traverse(SP.mkArrayElt)
           arr     <- SP.mkArray(mkSeq(arrElts))
         } yield arr
 
-      case MapFunc.StaticMap(entries) =>
+      case MapFuncCore.StaticMap(entries) =>
         for {
           xqyKV <- entries.traverse(_.bitraverse({
-                     case Embed(MapFunc.EC(Str(s))) => s.xs.point[F]
+                     case Embed(MapFuncCore.EC(Str(s))) => s.xs.point[F]
                      case key                       => invalidQName[F, XQuery](key.convertTo[Fix[EJson]].shows)
                    },
                    planMapFunc[T, F, FMT, Hole](_)(κ(src))))
@@ -117,7 +111,7 @@ package object qscript {
     l: XQuery,
     r: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): F[XQuery] =
     planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
@@ -128,7 +122,7 @@ package object qscript {
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFunc[T, ?]]
+    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
   ): F[XQuery] =
     freeMap.cataM(interpretM(recover(_).point[F], MFP.plan))
 
@@ -141,15 +135,6 @@ package object qscript {
     fqs.cataM(interpretM(κ(src.point[F]), QTP.plan))
 
   ////
-
-  // A string consisting only of digits.
-  private val IntegralNumber = "^(\\d+)$".r
-
-  // Applies transformations to string to make them valid QNames
-  private val encodeForQName: String => String = {
-    case IntegralNumber(n) => "_" + n
-    case other             => other
-  }
 
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(

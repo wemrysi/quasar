@@ -2,13 +2,14 @@
     "name": "count grouped joined tables",
 
     "backends": {
-        "mimir": "skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
+        "mimir": "skip",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending",
         "spark_hdfs":        "pending",
@@ -24,12 +25,8 @@
               ON p.sha = c.sha
               GROUP BY p.author.login",
 
-    "predicate": "containsExactly",
-
-    "ignoreFieldOrder": ["mongodb_2_6",
-                         "mongodb_3_0",
-                         "mongodb_3_2",
-                         "mongodb_read_only"],
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "login": "mossprescott", "count": 15 },
                  { "login": "sellout"     , "count":  9 },

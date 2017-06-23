@@ -37,4 +37,6 @@ object Blob {
     def traverseImpl[G[_]:Applicative,A,B](ba: Blob[A])(f: A => G[B]): G[Blob[B]] =
       (f(ba.expr) |@| ba.scope.traverse(_.traverse(f)))(Blob(_, _))
   }
+
+  implicit def equal[T: Equal]: Equal[Blob[T]] = Equal.equalBy(b => (b.expr, b.scope))
 }

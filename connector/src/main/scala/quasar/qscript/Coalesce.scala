@@ -22,8 +22,8 @@ import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -223,7 +223,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     }
 
   private def eliminateRightSideProj(elem: FreeMap): Option[FreeMap] = {
-    val oneRef = Free.roll[MapFunc, Hole](ProjectIndex(HoleF, IntLit(1)))
+    val oneRef = Free.roll[MapFuncCore, Hole](ProjectIndex(HoleF, IntLit(1)))
     val rightCount: Int = elem.elgotPara(count(HoleF))
 
     // all `RightSide` access is through `oneRef`
@@ -382,7 +382,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {
           case Filter(srcInner, condInner) =>
-            Filter(srcInner, Free.roll[MapFunc, Hole](And(condInner, cond))).some
+            Filter(srcInner, Free.roll[MapFuncCore, Hole](And(condInner, cond))).some
           case _ => None
         }
         case Subset(src, from, sel, count) =>

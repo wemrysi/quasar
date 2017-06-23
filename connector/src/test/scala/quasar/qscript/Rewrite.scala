@@ -25,7 +25,7 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.sql.CompilerHelpers
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncsCore._
 
 import scala.Predef.implicitly
 

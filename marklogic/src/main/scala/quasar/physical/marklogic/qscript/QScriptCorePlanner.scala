@@ -38,7 +38,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
   implicit
   SP: StructuralPlanner[F, FMT],
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
-  MFP: Planner[F, FMT, MapFunc[T, ?]]
+  MFP: Planner[F, FMT, MapFuncCore[T, ?]]
 ) extends Planner[F, FMT, QScriptCore[T, ?]] {
 
   import expr.{func, for_, if_, let_}
@@ -108,7 +108,7 @@ private[qscript] final class QScriptCorePlanner[F[_]: Monad: QNameGenerator: Pro
         y     <- freshName[F]
         rpr   <- planMapFunc[T, F, FMT, ReduceIndex](repair)(_.idx.fold(i => (~y)(1.xqy)((i + 1).xqy), i => (~y)((i + 2).xqy)))
         rfnl  <- fx(x => let_(y := fnl.fnapply(x)).return_(rpr).point[F])
-        bckt  <- fx(mapFuncXQuery[T, F, FMT](MapFunc.StaticArray(bucket), _))
+        bckt  <- fx(mapFuncXQuery[T, F, FMT](MapFuncCore.StaticArray(bucket), _))
         red   <- lib.reduceWith[F] apply (init, cmb, rfnl, bckt, src)
       } yield red
 

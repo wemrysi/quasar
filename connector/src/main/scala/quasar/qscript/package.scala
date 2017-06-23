@@ -22,8 +22,8 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{provenance => prov}
-import quasar.qscript.MapFunc._
-import quasar.qscript.MapFuncs._
+import quasar.qscript.MapFuncCore._
+import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
@@ -58,6 +58,7 @@ import scalaz._, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
+
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
@@ -103,29 +104,27 @@ package object qscript {
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
-  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
+  type FreeMapA[T[_[_]], A] = Free[MapFuncCore[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
-  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
+  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFuncCore[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
   type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
-  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFuncCore[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
+    Free.point[MapFuncCore[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFunc[T, ?], JoinSide](RightSide)
+    Free.point[MapFuncCore[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Int \/ Int): FreeMapA[T, ReduceIndex] =
-    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
+    Free.point[MapFuncCore[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  // TODO: Handle all these `concat` methods more elegantly.
-
-  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+  private def concatNaive[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
@@ -143,7 +142,39 @@ package object qscript {
     }
   }
 
-  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
+    (l: FreeMapA[T, A], r: FreeMapA[T, A])
+      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
+    val norm = Normalizable.normalizable[T]
+
+    val norml = norm.freeMF(l)
+    val normr = norm.freeMF(r)
+
+    val leftElems: List[FreeMapA[T, A]] = norml.project match {
+      case StaticArray(array) => array
+      case _                  => Nil
+    }
+
+    val rightElems: List[FreeMapA[T, A]] = normr.project  match {
+      case StaticArray(array) => array
+      case _                  => Nil
+    }
+
+    def projectIndex(idx: Int): FreeMap[T] =
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](idx)))
+
+    def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
+      IList.fromList(elems).indexOf(Free.roll(MakeArray(value)))
+
+    indexOf(leftElems, normr).cata(
+      idx => (norml, HoleF[T], projectIndex(idx)),
+      indexOf(rightElems, norml).cata(
+        idx => (normr, projectIndex(idx), HoleF[T]),
+        concatNaive(norml, normr)))
+  }
+
+  // FIXME naive - use `concat`
+  def naiveConcat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
@@ -189,7 +220,8 @@ package object qscript {
     }
   }
 
-  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  // FIXME naive - use `concat`
+  def naiveConcat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]

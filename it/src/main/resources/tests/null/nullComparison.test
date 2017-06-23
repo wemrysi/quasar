@@ -7,6 +7,7 @@
     },
     "data": "nulls.data",
     "query": "select distinct (val != null) as expr from nulls where val != null",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "expr": true }]
 }

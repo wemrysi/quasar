@@ -1,17 +1,19 @@
 {
     "name": "union",
     "backends": {
+        "couchbase":         "pending",
         "mimir": "skip",
-        "couchbase":         "skip",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
     "data": "zips.data",
     "query": "select `_id` as zip from zips union select city, state from zips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [
         { "zip": "01001" },
         { "zip": "01002" },

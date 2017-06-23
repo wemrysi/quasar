@@ -19,7 +19,8 @@
               from `../largeZips` as a, `../largeZips` as b
               where a.`_id` = b.`_id` and \"CA\" = b.state",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [{ "city": "REDONDO BEACH", "state": "CA" }]
 }

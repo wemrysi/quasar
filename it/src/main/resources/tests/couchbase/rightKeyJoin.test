@@ -1,12 +1,14 @@
 {
     "name": "right key join (Couchbase)",
     "backends": {
-        "mimir": "skip",
+        "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
+        "mimir":             "skip",
         "mongodb_2_6":       "skip",
         "mongodb_3_0":       "skip",
         "mongodb_3_2":       "skip",
+        "mongodb_3_4":       "skip",
         "mongodb_read_only": "skip",
         "postgresql":        "skip",
         "spark_hdfs":        "skip",
@@ -18,8 +20,8 @@
               from `beer` as beer
               join `brewery` as brewery on beer.brewery_id = meta(brewery).id
               where beer.name = \"Pale\"",
-    "ignoreFieldOrder": [ "couchbase" ],
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         {
             "beer_brewery_id": "coastal_fog_brewing", "beer_name": "Pale",

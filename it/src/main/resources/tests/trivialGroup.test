@@ -1,14 +1,15 @@
 {
     "name": "trivial group by",
     "backends": {
+        "couchbase": "ignoreFieldOrder",
         "mimir": "skip",
-        "postgresql":    "pending"
+        "postgresql":    "pending",
+        "spark_hdfs": "ignoreFieldOrder",
+        "spark_local": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, sum(pop) as totalPop from largeZips group by city",
-    "predicate": "containsAtLeast",
-    "ignoreFieldOrder": ["couchbase",
-                         "spark_hdfs",
-                         "spark_local"],
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "city": "BOULDER", "totalPop": 110948 }]
 }
