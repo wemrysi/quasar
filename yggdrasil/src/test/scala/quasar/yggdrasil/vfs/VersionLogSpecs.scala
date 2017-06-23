@@ -27,6 +27,7 @@ import pathy.Path
 
 import scalaz.Coproduct
 import scalaz.concurrent.Task
+import scalaz.syntax.monad._
 
 import scodec.bits.ByteVector
 
@@ -90,17 +91,7 @@ object VersionLogSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("versions.json.new"))
 
-              val sink: Sink[POSIXWithTask, ByteVector] = { s =>
-                s flatMap { bv =>
-                  Stream suspend {
-                    new String(bv.toArray) mustEqual "[]"
-
-                    Stream.empty
-                  }
-                }
-              }
-
-              sink
+              assertionSink(_ mustEqual "[]")
             }
         }
 
@@ -158,6 +149,140 @@ object VersionLogSpecs extends Specification {
         interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, Nil, versions.toSet)
+    }
+
+    "generate fresh version from empty version set" in {
+      val init = VersionLog(BaseDir, Nil, Set())
+      val uuid = UUID.randomUUID()
+
+      val interp = for {
+        _ <- H.pattern[UUID] {
+          case GenUUID => Task.now(uuid)
+        }
+
+        _ <- H.pattern[Unit] {
+          case MkDir(target) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.dir(uuid.toString))
+            }
+        }
+      } yield ()
+
+      val (log, version) = interp(VersionLog.fresh[POSIXOp].run(init)).unsafePerformSync
+
+      log mustEqual VersionLog(BaseDir, Nil, Set(Version(uuid)))
+      version mustEqual Version(uuid)
+    }
+
+    "re-generate version upon collision with existing version" in {
+      val uuid = UUID.randomUUID()
+      val collision = UUID.randomUUID()
+
+      val init = VersionLog(BaseDir, Nil, Set(Version(collision)))
+
+      val interp = for {
+        _ <- H.pattern[UUID] {
+          case GenUUID => Task.now(collision)
+        }
+
+        _ <- H.pattern[UUID] {
+          case GenUUID => Task.now(uuid)
+        }
+
+        _ <- H.pattern[Unit] {
+          case MkDir(target) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.dir(uuid.toString))
+            }
+        }
+      } yield ()
+
+      val (log, version) = interp(VersionLog.fresh[POSIXOp].run(init)).unsafePerformSync
+
+      log mustEqual VersionLog(BaseDir, Nil, Set(Version(uuid), Version(collision)))
+      version mustEqual Version(uuid)
+    }
+
+    "commit version to head" in {
+      val v = Version(UUID.randomUUID())
+      val other = Version(UUID.randomUUID())
+      val init = VersionLog(BaseDir, List(other), Set(v, other))
+
+      val interp = for {
+        _ <- HWT.pattern[Sink[POSIXWithTask, ByteVector]] {
+          case CPL(OpenW(target)) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.file("versions.json.new"))
+
+              assertionSink(_ mustEqual s"""["${v.value.toString}","${other.value.toString}"]""")
+            }
+        }
+
+        _ <- HWT.pattern[Unit] {
+          case CPL(Move(from, to)) =>
+            Task delay {
+              from mustEqual (BaseDir </> Path.file("versions.json.new"))
+              to mustEqual (BaseDir </> Path.file("versions.json"))
+            }
+        }
+      } yield ()
+
+      val state =
+        interp(VersionLog.commit[Coproduct[POSIXOp, Task, ?]](v).exec(init)).unsafePerformSync
+
+      state mustEqual VersionLog(BaseDir, v :: other :: Nil, Set(v, other))
+    }
+
+    "silently ignore invalid commits" in {
+      val v = Version(UUID.randomUUID())
+      val other = Version(UUID.randomUUID())
+      val init = VersionLog(BaseDir, List(other), Set(other))
+
+      val interp = ().point[Harness[Coproduct[POSIXOp, Task, ?], Task, ?]]
+
+      val state =
+        interp(VersionLog.commit[Coproduct[POSIXOp, Task, ?]](v).exec(init)).unsafePerformSync
+
+      state mustEqual init
+    }
+
+    "purge old versions beyond the limit" in {
+      val front = List.fill(5)(UUID.randomUUID())
+      val back = List.fill(2)(UUID.randomUUID())
+
+      val uuids = front ++ back
+      val init = VersionLog(BaseDir, uuids.map(Version), uuids.map(Version).toSet)
+
+      val interp = for {
+        _ <- H.pattern[Unit] {
+          case Delete(target) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.dir(back(0).toString))
+            }
+        }
+
+        _ <- H.pattern[Unit] {
+          case Delete(target) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.dir(back(1).toString))
+            }
+        }
+      } yield ()
+
+      val result = interp(VersionLog.purgeOld[POSIXOp].exec(init)).unsafePerformSync
+
+      val committed2 = init.committed.take(5)
+      result mustEqual VersionLog(BaseDir, committed2, committed2.toSet)
+    }
+  }
+
+  def assertionSink(pred: String => Unit): Sink[POSIXWithTask, ByteVector] = { s =>
+    s flatMap { bv =>
+      Stream suspend {
+        pred(new String(bv.toArray))
+
+        Stream.empty
+      }
     }
   }
 
