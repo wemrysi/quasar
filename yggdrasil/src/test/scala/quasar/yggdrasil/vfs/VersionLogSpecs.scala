@@ -115,7 +115,7 @@ object VersionLogSpecs extends Specification {
     }
 
     "read and return empty log with uncommitted versions" in {
-      val versions = (UUID.randomUUID() :: UUID.randomUUID() :: Nil).map(Version)
+      val versions = List.fill(2)(UUID.randomUUID()).map(Version)
 
       val members =
         Path.file("versions.json") :: versions.map(v => Path.dir(v.value.toString))
@@ -149,6 +149,45 @@ object VersionLogSpecs extends Specification {
         interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, Nil, versions.toSet)
+    }
+
+    "read and return non-empty log with uncommitted versions" in {
+      val uncommitted = List.fill(2)(UUID.randomUUID()).map(Version)
+      val committed = List.fill(2)(UUID.randomUUID()).map(Version)
+      val versions = uncommitted ++ committed
+
+      val members =
+        Path.file("versions.json") :: versions.map(v => Path.dir(v.value.toString))
+
+      val vpaths = members.map(BaseDir </> _)
+
+      val interp = for {
+        _ <- HWT.pattern[Boolean] {
+          case CPL(Exists(target)) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.file("versions.json"))
+
+              true
+            }
+        }
+        _ <- HWT.pattern[Stream[POSIXWithTask, ByteVector]] {
+          case CPL(OpenR(target)) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.file("versions.json"))
+
+              Stream(ByteVector(s"""["${committed(0).value.toString}","${committed(1).value.toString}"]""".getBytes))
+            }
+        }
+
+        _ <- HWT.pattern[List[APath]] {
+          case CPL(Ls(BaseDir)) => Task.now(vpaths)
+        }
+      } yield ()
+
+      val result =
+        interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
+
+      result mustEqual VersionLog(BaseDir, committed, versions.toSet)
     }
 
     "generate fresh version from empty version set" in {
