@@ -29,7 +29,7 @@ import quasar.fs.mount.Fixture.runConstantMount
 import quasar.sql._
 import quasar.sql.Arbitraries._
 
-import argonaut._, Argonaut._
+import argonaut._, Argonaut._, EncodeJsonScalaz._
 import matryoshka.data.Fix
 import org.http4s._
 import org.http4s.argonaut._
@@ -100,7 +100,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
-          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.toIList.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
         .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
@@ -136,7 +136,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
             FsNode(viewName.value, "file", Some("view"), None),
             FsNode(fsMountName.value, "directory", Some(fsCfg._1.value), None),
             FsNode(moduleName.value, "directory", Some("module"), None)
-          ).sorted)
+          ).toIList.sorted)
       }}
 
       "and functions as files on a module mount with additionnal info about functions parameters" >> prop { dir: ADir =>
@@ -151,7 +151,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
           .as[Json].unsafePerformSync must_=== Json("children" := List(
           FsNode("FOO", "file", mount = None, args = Some(List("BAR"))),
           FsNode("BAR", "file", mount = None, args = Some(List("BAR", "BAZ")))
-        ).sorted)
+        ).toIList.sorted)
       }
 
       "and empty object for existing file" >> prop { s: SingleFileMemState =>
