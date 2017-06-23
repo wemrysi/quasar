@@ -62,6 +62,23 @@ object JoinHandler {
       second: JoinHandler[WF, F]): JoinHandler[WF, F] =
     JoinHandler((tpe, l, r) => first(tpe, l, r) getOrElseF second(tpe, l, r))
 
+  def padEmpty(side: BsonField): Fix[ExprOp] =
+    $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
+      $literal(Bson.Arr(List(Bson.Doc()))),
+      $var(DocField(side)))
+
+  // TODO: Generate `Both` not `That`.
+  // TODO: Modify this to include the flattening, and on 3.2+, use
+  //       `preserveNullAndEmptyArrays: true` rather than `padEmpty`.
+  def buildProjection[WF[_]]
+    (src: WorkflowBuilder[WF],
+      leftField: BsonField.Name, l: BsonField.Name => Fix[ExprOp],
+      rightField: BsonField.Name, r: BsonField.Name => Fix[ExprOp])
+      : WorkflowBuilder[WF] =
+    DocBuilder(src, ListMap(
+      leftField -> \&/-(l(leftField)),
+      rightField -> \&/-(r(rightField))))
+
   /** When possible, plan a join using the more efficient \$lookup operator in
     * the aggregation pipeline.
     */
@@ -165,10 +182,12 @@ object JoinHandler {
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT]
 
-      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.LeftOuterJoin, JoinSource(src, List(key)), IsLookupFrom(coll, field))
-      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   ???
+      case (set.LeftOuterJoin, JoinSource(src, List(key)), IsLookupFrom(coll, field))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+        lookup(
+          src, key, LeftName,
+          coll.collection, field, RightName).liftM[OptionT] ∘
+          (buildProjection(_, LeftName, n => $var(DocField(n)), RightName, padEmpty))
 
       case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -176,10 +195,12 @@ object JoinHandler {
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT]
 
-      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key)))
-      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   ???
+      case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key)))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+        lookup(
+          src, key, RightName,
+          coll.collection, field, LeftName).liftM[OptionT] ∘
+          (buildProjection(_, RightName, n => $var(DocField(n)), LeftName, padEmpty))
 
       case _ => OptionT.none
     }
@@ -276,36 +297,26 @@ object JoinHandler {
 
     val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
 
-    def padEmpty(side: BsonField): Fix[ExprOp] =
-      $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
-        $literal(Bson.Arr(List(Bson.Doc()))),
-        $var(DocField(side)))
-
-    // TODO: Generate `Both` not `That`.
-    def buildProjection(src: WorkflowBuilder[WF], l: Fix[ExprOp], r: Fix[ExprOp])
-        : WorkflowBuilder[WF] =
-      DocBuilder(src, ListMap(leftField -> \&/-(l), rightField -> \&/-(r)))
-
     // TODO exhaustive pattern match
     def buildJoin(src: WorkflowBuilder[WF], tpe: MongoJoinType): WorkflowBuilder[WF] =
       tpe match {
         case set.FullOuterJoin =>
-          buildProjection(src, padEmpty(leftField), padEmpty(rightField))
+          buildProjection(src, leftField, padEmpty, rightField, padEmpty)
         case set.LeftOuterJoin =>
           buildProjection(
             WB.filter(src,
               List(docVarToExpr(DocField(leftField))),
               { case l :: Nil => Selector.Doc(ListMap(l -> nonEmpty)) }),
-            $var(DocField(leftField)),
-            padEmpty(rightField))
+            leftField, n => $var(DocField(n)),
+            rightField, padEmpty)
         case set.RightOuterJoin =>
           buildProjection(
             WB.filter(
               src,
               List(docVarToExpr(DocField(rightField))),
               { case r :: Nil => Selector.Doc(ListMap(r -> nonEmpty)) }),
-            padEmpty(leftField),
-            $var(DocField(rightField)))
+            leftField, padEmpty,
+            rightField, n => $var(DocField(n)))
         case set.InnerJoin =>
           WB.filter(
             src,

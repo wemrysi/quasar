@@ -1,0 +1,28 @@
+{
+    "name": "right outer join",
+
+    "backends": {
+        "mimir": "skip",
+        "couchbase":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending"
+    },
+
+    "NB": "#2120: Disabled in marklogic due to slow performance.
+           #1587: Disabled in couchbase due to lack of general join.",
+
+    "data": ["../smallZips.data", "../zips.data"],
+
+    "query": "select smallZips.city, zips.state
+              from `../smallZips` right outer join `../zips`
+              on smallZips.`_id` = zips.`_id`",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "city": "AGAWAM",  "state": "MA" },
+                 { "city": "CUSHMAN", "state": "MA" },
+                 {                    "state": "PA" }]
+}
