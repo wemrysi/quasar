@@ -83,35 +83,43 @@ class Transform
     val rann = right.ann
     val lval: JoinFunc = lann.values.as[JoinSide](LeftSide)
     val rval: JoinFunc = rann.values.as[JoinSide](RightSide)
-    val SrcMerge(src, lBranch, rBranch) = merge.mergeT(left.value, right.value)
 
-    val lprovs = prov.genBuckets(lann.provenance) ∘ (_ ∘ (_.as[JoinSide](LeftSide)))
-    val rprovs = prov.genBuckets(rann.provenance) ∘ (_ ∘ (_.as[JoinSide](RightSide)))
+    (left.value, right.value) match {
+      case (Embed(QC(Unreferenced())), r) =>
+        AutoJoinResult(AutoJoinBase(r, rann.provenance), lann.values, rann.values)
+      case (l, Embed(QC(Unreferenced()))) =>
+        AutoJoinResult(AutoJoinBase(l, lann.provenance), lann.values, rann.values)
+      case (l, r) =>
+        val SrcMerge(src, lBranch, rBranch) = merge.mergeT(l, r)
 
-    val (combine, newLprov, newRprov, lacc, racc) =
-      (lprovs, rprovs) match {
-        case (None, None) =>
-          val (combine, lacc, racc) = concat(lval, rval)
-          (combine, lann.provenance, rann.provenance, lacc, racc)
-        case (None, Some((rProvs, rBuck))) =>
-          val (combine, bacc, lacc, racc) = naiveConcat3(rBuck, lval, rval)
-          (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
-        case (Some((lProvs, lBuck)), None) =>
-          val (combine, bacc, lacc, racc) = naiveConcat3(lBuck, lval, rval)
-          (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
-        case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
-          val (combine, lbacc, rbacc, lacc, racc) =
-            naiveConcat4(lBuck, rBuck, lval, rval)
-          (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
-      }
+        val lprovs = prov.genBuckets(lann.provenance) ∘ (_ ∘ (_.as[JoinSide](LeftSide)))
+        val rprovs = prov.genBuckets(rann.provenance) ∘ (_ ∘ (_.as[JoinSide](RightSide)))
 
-    AutoJoinResult(
-      AutoJoinBase(
-        rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
-          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))).embed,
-        prov.joinProvenances(newLprov, newRprov)),
-      lacc,
-      racc)
+        val (combine, newLprov, newRprov, lacc, racc) =
+          (lprovs, rprovs) match {
+            case (None, None) =>
+              val (combine, lacc, racc) = concat(lval, rval)
+              (combine, lann.provenance, rann.provenance, lacc, racc)
+            case (None, Some((rProvs, rBuck))) =>
+              val (combine, bacc, lacc, racc) = naiveConcat3(rBuck, lval, rval)
+              (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
+            case (Some((lProvs, lBuck)), None) =>
+              val (combine, bacc, lacc, racc) = naiveConcat3(lBuck, lval, rval)
+              (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
+            case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
+              val (combine, lbacc, rbacc, lacc, racc) =
+                naiveConcat4(lBuck, rBuck, lval, rval)
+              (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
+          }
+
+        AutoJoinResult(
+          AutoJoinBase(
+            rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
+              TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))).embed,
+            prov.joinProvenances(newLprov, newRprov)),
+          lacc,
+          racc)
+    }
   }
 
   /** A convenience for a pair of autojoins, does the same thing, but returns
