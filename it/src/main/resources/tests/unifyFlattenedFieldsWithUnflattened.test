@@ -1,15 +1,9 @@
 {
     "name": "unify flattened fields with unflattened field",
     "backends": {
-        "couchbase":      "pending",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "pending",
-        "mimir":          "skip",
-        "mongodb_2_6":    "pending",
-        "mongodb_3_0":    "pending",
-        "mongodb_3_2":    "pending",
-        "mongodb_3_4":    "pending",
-        "postgresql":     "pending"
+        "couchbase":  "pending",
+        "mimir": "skip",
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
