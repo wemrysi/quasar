@@ -86,9 +86,11 @@ class Transform
 
     (left.value, right.value) match {
       case (Embed(QC(Unreferenced())), r) =>
-        AutoJoinResult(AutoJoinBase(r, rann.provenance), lann.values, rann.values)
+        val buckets = prov.joinProvenances(List(provenance.Nada()), rann.provenance)
+        AutoJoinResult(AutoJoinBase(r, buckets), lann.values, rann.values)
       case (l, Embed(QC(Unreferenced()))) =>
-        AutoJoinResult(AutoJoinBase(l, lann.provenance), lann.values, rann.values)
+        val buckets = prov.joinProvenances(lann.provenance, List(provenance.Nada()))
+        AutoJoinResult(AutoJoinBase(l, buckets), lann.values, rann.values)
       case (l, r) =>
         val SrcMerge(src, lBranch, rBranch) = merge.mergeT(l, r)
 
