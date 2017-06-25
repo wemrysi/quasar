@@ -51,6 +51,9 @@ object SemanticError {
   final case class FunctionNotFound(name: CIName) extends SemanticError {
     def message = s"The function '${name.shows}' could not be found in the standard library"
   }
+  final case class InvalidFunctionDefinition(funcDef: FunctionDecl[Fix[Sql]], reason: String) extends SemanticError {
+    def message = s"The function '${funcDef.name.shows}' is invalid because: $reason"
+  }
   final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
     def message = s"Expected type ${expected.shows} but found ${actual.shows}" + hint.map(": " + _).getOrElse("")
   }
@@ -118,6 +121,16 @@ object SemanticError {
       case AmbiguousFunctionInvoke(name, from) => (name, from)
     }(AmbiguousFunctionInvoke.tupled)
 
+  val invalidFunctionDefinition: Prism[SemanticError, (FunctionDecl[Fix[Sql]], String)] =
+    Prism.partial[SemanticError, (FunctionDecl[Fix[Sql]], String)] {
+      case InvalidFunctionDefinition(funcDef, reason) => (funcDef, reason)
+    }(InvalidFunctionDefinition.tupled)
+
+  val ambiguousReference: Prism[SemanticError, (Fix[Sql], List[SqlRelation[Unit]])] =
+    Prism.partial[SemanticError, (Fix[Sql], List[SqlRelation[Unit]])] {
+      case AmbiguousReference(node, relations) => (node, relations)
+    }(AmbiguousReference.tupled)
+
   val duplicateAlias: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
     case DuplicateAlias(name) => name
   }(DuplicateAlias(_))
@@ -125,4 +138,8 @@ object SemanticError {
   val wrongArgumentCount: Prism[SemanticError, (CIName, Int, Int)] = Prism.partial[SemanticError, (CIName, Int, Int)] {
     case WrongArgumentCount(name, expected, found) => (name, expected, found)
   }(WrongArgumentCount.tupled)
+
+  val compiledSubtableMissing: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
+    case CompiledSubtableMissing(name) => name
+  }(CompiledSubtableMissing(_))
 }

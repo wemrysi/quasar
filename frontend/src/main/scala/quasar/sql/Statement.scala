@@ -19,10 +19,12 @@ package quasar.sql
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.contrib.pathy.DPath
+import quasar.contrib.scala._
 
 import pathy.Path.posixCodec
 import matryoshka._
 import matryoshka.implicits._
+import matryoshka.data.Fix
 import monocle.macros.Lenses
 import monocle.Prism
 import scalaz._, Scalaz._
@@ -65,20 +67,23 @@ object Statement {
     f(body).map(FunctionDecl(name, args, _))
   override def pprint(implicit ev: BODY <~< String) =
     s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${ev(body)}\n  END"
-  def applyArgs[T[_[_]]: BirecursiveT](argsProvided: List[T[Sql]])(implicit ev: BODY <~< T[Sql]): SemanticError \/ T[Sql] = {
+  def applyArgs(argsProvided: List[Fix[Sql]])(implicit ev: BODY <~< Fix[Sql]): SemanticError \/ Fix[Sql] = {
     val expected = args.size
     val actual   = argsProvided.size
-    if (expected ≠ actual) SemanticError.WrongArgumentCount(name, expected, actual).left
-    else {
-      val argMap = args.zip(argsProvided).toMap
-      ev(body).cataM[SemanticError \/ ?, T[Sql]] {
-        case v: Vari[T[Sql]]   =>
-          argMap.getOrElse(CIName(v.symbol), v.embed).right // Leave the variable there in case it will be substituted by an external variable
-        case s: Select[T[Sql]] =>
-          s.substituteRelationVariable[Id, T[Sql]](v => argMap.getOrElse(CIName(v.symbol), v.embed)).map(_.embed)
-        case other               => other.embed.right
-      }
-    }
+    args.duplicates.headOption.cata(
+      duplicates => SemanticError.InvalidFunctionDefinition(this.map(ev(_)), s"parameter :${duplicates.head.value} is defined multiple times").left, {
+        if (expected ≠ actual) SemanticError.WrongArgumentCount(name, expected, actual).left
+        else {
+          val argMap = args.zip(argsProvided).toMap
+          ev(body).cataM[SemanticError \/ ?, Fix[Sql]] {
+            case v: Vari[Fix[Sql]] =>
+              argMap.getOrElse(CIName(v.symbol), v.embed).right // Leave the variable there in case it will be substituted by an external variable
+            case s: Select[Fix[Sql]] =>
+              s.substituteRelationVariable[Id, Fix[Sql]](v => argMap.getOrElse(CIName(v.symbol), v.embed)).map(_.embed)
+            case other => other.embed.right
+          }
+        }
+      })
   }
 }
 

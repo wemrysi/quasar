@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.contrib
 
-trait Arbitraries extends
-  ExprArbitrary with
-  ScopedExprArbitrary with
-  StatementArbitrary with
-  CINameArbitrary
+import slamdata.Predef._
+import quasar.fp.ski._
 
-object Arbitraries extends Arbitraries
+import _root_.scalaz._, Scalaz._
+
+package object scala {
+  implicit class AugmentedList[A](a: List[A]) {
+    def duplicates: List[NonEmptyList[A]] = {
+      a.groupBy1(ι).values.filter(_.size > 1).toList
+    }
+  }
+}

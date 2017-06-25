@@ -262,6 +262,22 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
               "invoke"  := "TRIVIAL",
               "ambiguous functions"   := List("/mymodule/Trivial", "/otherModule/Trivial")))))
     }
+    // TODO: Consider changing this behavior
+    "if the query has a user defined functions that shadows a standard library function, it will choose the user defined function (consider changing this behavior)" >> {
+      val funcDec = FunctionDecl(CIName("SUM"), List(CIName("a")), sqlE"1")
+      val query =
+        """
+          |import `/mymodule/`;
+          |SUM(`/foo`)
+        """.stripMargin
+      get(executeService)(
+        path = rootDir,
+        query = Some(Query(query)),
+        state = InMemState.empty,
+        mounts = Map((rootDir </> dir("mymodule"): APath) -> MountConfig.moduleConfig(List(funcDec))),
+        status = Status.Ok,
+        response = (a: String) => a.trim must_= "1")
+    }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
         post[String](fileSystem)(

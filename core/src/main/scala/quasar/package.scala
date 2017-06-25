@@ -83,20 +83,16 @@ package object quasar {
       case _                           => lp.right
     }
 
-  def resolveImports[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S],
     fsFail: Failure.Ops[FileSystemError, S]
   ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
-    EitherT(fsFail.unattemptT(resolveImports_(blob, baseDir).run))
+    EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
 
-  def resolveImports_[S[_]](blob: Blob[Fix[Sql]], baseDir: ADir)(implicit
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S]
   ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
-    resolveImportsImpl(blob, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
-
-  // It would be nice if this were in the sql package but that is not possible right now because
-  // Mounting is defined in core
-
+    resolveImportsImpl(scopedExpr, baseDir, d => mount.lookupModuleConfig(d).map(_.statements).toRight(pathErr(pathNotFound(d))))
 
   /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
     * results, if the query was foldable to a constant.

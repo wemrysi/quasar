@@ -58,6 +58,10 @@ final class MountRequestHandler[F[_], S[_]](
     val handleMount: MntErrT[Free[T, ?], Unit] =
       EitherT(req match {
         case MountFileSystem(d, typ, uri) => fsm.mount[T](d, typ, uri)
+        // Previously we would validate at this point that a view's Sql could be compiled
+        // to `LogicalPlan` but now that views can contain Imports, that's no longer easy or very
+        // valuable. Validation can once again be performed once `LogicalPlan` has a representation
+        // for functions and imports
         case _ => ().right.point[Free[T, ?]]
       })
 

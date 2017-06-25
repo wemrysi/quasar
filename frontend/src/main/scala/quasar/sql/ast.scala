@@ -180,7 +180,7 @@ object Sql {
 @Lenses final case class Select[A] private[sql] (
   isDistinct:  IsDistinct,
   projections: List[Proj[A]],
-  relations:   Option[SqlRelation[A]],
+  relation:    Option[SqlRelation[A]],
   filter:      Option[A],
   groupBy:     Option[GroupBy[A]],
   orderBy:     Option[OrderBy[A]])
@@ -190,19 +190,21 @@ object Sql {
     T1: Corecursive.Aux[T, Sql],
     ev: A <~< T
   ): M[SemanticError \/ Select[A]] = {
-      val newRelation = relations.traverse(_.transformM[EitherT[M, SemanticError, ?], A]({
+      val newRelation = relation.traverse(_.transformM[EitherT[M, SemanticError, ?], A]({
         case VariRelationAST(vari, alias) =>
           EitherT(mapping(vari).map(ev(_).project match {
             case Ident(name) =>
               posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
                 TableRelationAST(_, alias).right,
                 SemanticError.GenericError(s"bad path: $name (note: absolute file path required)").left) // FIXME
+            // If the variable points to another variable, substitute the old one for the new one
+            case Vari(symbol) => VariRelationAST(Vari(symbol), alias).right
             case x =>
               SemanticError.GenericError(s"not a valid table name: ${pprint(x.embed)}").left // FIXME
           }))
         case otherRelation => otherRelation.point[EitherT[M, SemanticError, ?]]
       }, _.point[EitherT[M, SemanticError, ?]]))
-      newRelation.map(r => this.copy(relations = r)).run
+      newRelation.map(r => this.copy(relation = r)).run
   }
 }
 @Lenses final case class Vari[A] private[sql] (symbol: String) extends Sql[A] {

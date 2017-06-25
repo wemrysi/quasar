@@ -49,13 +49,13 @@ object analysis {
         "value" := data.map(DataCodec.Precise.encode).unite)
 
     def analyzeQuery(
-      blob: sql.Blob[Fix[sql.Sql]],
+      scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
       vars: Variables,
       basePath: ADir,
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      quasar.resolveImports(blob, basePath).run.flatMap(block =>
+      quasar.resolveImports(scopedExpr, basePath).run.flatMap(block =>
         block.fold(
           semErr => semErr.toApiError.left.point[Free[S, ?]],
           block => queryPlan(block, vars, basePath, offset, limit)

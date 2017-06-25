@@ -160,9 +160,9 @@ object Module {
           val notFoundError = fsError(pathErr(pathNotFound(file)))
           // case insensitive args
           val iArgs = args.map{ case (key, value) => (CIName(key), value)}
-          val currenDir = fileParent(file)
+          val currentDir = fileParent(file)
           (for {
-            moduleConfig <- mount.lookupModuleConfig(currenDir).toRight(notFoundError)
+            moduleConfig <- mount.lookupModuleConfig(currentDir).toRight(notFoundError)
             name         =  fileName(file).value
             funcDec      <- EitherT(moduleConfig.declarations.find(_.name.value ≟ name)
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])
@@ -171,9 +171,9 @@ object Module {
             userArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
             parsedArgs   <- EitherT(userArgs.traverse(argString => fixParser.parseExpr(Query(argString)))
                               .leftMap(parsingErr(_)).point[Free[S, ?]])
-            blob         =  Blob(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, moduleConfig.statements)
-            sql          <- EitherT(resolveImports_(blob, currenDir).leftMap(e => semErrors(e.wrapNel)).run.leftMap(fsError(_))).flattenLeft
-            logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sql, Variables.empty, basePath = fileParent(file))
+            scopedExpr   =  ScopedExpr(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, moduleConfig.statements)
+            sql          <- EitherT(resolveImports_(scopedExpr, currentDir).leftMap(e => semErrors(e.wrapNel)).run.leftMap(fsError(_))).flattenLeft
+            logicalPlan  <- EitherT(quasar.precompile[Fix[LogicalPlan]](sql, Variables.empty, basePath = currentDir)
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
             withOffLim   =  addOffsetLimit(logicalPlan, offset, limit)
             handle       <- EitherT(query.eval(withOffLim).run.value).leftMap(fsError(_))

@@ -499,8 +499,9 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail to compile let inside select with ambigious reference" in {
-      compile(sqlE"select foo from (bar := 12; baz) as quag") must
-        beLeftDisjunction  // AmbiguousReference(baz)
+      // TODO: Make description and query match
+      compile(sqlE"select foo from (bar := 12; baz) as quag") must_===
+        compiledSubtableMissing("quag").wrapNel.left
     }
 
     "compile let inside select with table reference" in {
@@ -567,9 +568,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail to compile let with an inner context of let that shares a binding name in expression context" in {
+      // TODO: Make description and query match
       val query = sqlE"foo := 4; select * from (foo := bar; foo) as quag"
 
-      compile(query) must beLeftDisjunction // ambiguous reference for `bar` - `4` or `foo`
+      compile(query) must_=== compiledSubtableMissing("quag").wrapNel.left
     }
 
     "compile let with an inner context of as that shares a binding name in table context" in {

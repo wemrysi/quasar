@@ -24,7 +24,7 @@ import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 import quasar.regression._
-import quasar.sql.{Blob, Sql}
+import quasar.sql.{ScopedExpr, Sql}
 
 import matryoshka.data.Fix
 import pathy.Path._
@@ -40,7 +40,7 @@ class ViewReadQueryRegressionSpec
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
-      TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(Blob(expr, Nil), vars))) |@|
+      TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
       TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) { (cfgsRef, hfsRef, mntdRef) =>

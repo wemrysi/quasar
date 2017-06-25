@@ -30,6 +30,7 @@ import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
+import com.softwaremill.quicklens._
 
 package object sql {
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
@@ -70,8 +71,9 @@ package object sql {
   //       https://github.com/propensive/contextual/issues/29
   // TODO: Write custom macro to do this ourselves in order to work around above issues
   implicit class SqlStringContext(sc: StringContext) {
-    val sqlE = Prefix(SqlInterpolator.Expr, sc)
-    val sqlB = Prefix(SqlInterpolator.Blob, sc)
+    val sqlE = Prefix(SqlInterpolator.Expr,       sc)
+    val sqlB = Prefix(SqlInterpolator.ScopedExpr, sc)
+    val sqlM = Prefix(SqlInterpolator.Module,     sc)
   }
 
   def CrossRelation[T]
@@ -143,8 +145,7 @@ package object sql {
           case other => other
         }
 
-        // TODO use lenses
-        sel2.copy(relations = sel2.relations.map(mkRel(_))).embed
+        sel2.modify(_.relation).using(_.map(mkRel(_))).embed
       }
 
       case Let(ident, bindTo, in) => {
@@ -155,20 +156,22 @@ package object sql {
 
       case other => other.map(_.makeTables(bindings)).embed
     }
+  }
 
+  implicit class FixExprOps(q: Fix[Sql]) {
     /**
       * Inlines all function invocations with the bodies of functions in scope.
       * Leaves invocations to functions outside of scope untouched (as opposed to erroring out)
       * @param scope Returns the list of function definitions that match a given name and function arity along with a
       *              path specifying whether this function was found
       */
-    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]]): EitherT[M, SemanticError, T[Sql]] = {
-      q.cataM[EitherT[M, SemanticError, ?], T[Sql]] {
+    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[Fix[Sql]], ADir)]]): EitherT[M, SemanticError, Fix[Sql]] = {
+      q.cataM[EitherT[M, SemanticError, ?], Fix[Sql]] {
         case invoke @ InvokeFunction(name, args) =>
           EitherT(scope(name, args.size).flatMap {
-            case Nil              => invoke.embed.right.point[M]
+            case Nil                => invoke.embed.right.point[M]
             case List((funcDef, _)) => funcDef.applyArgs(args).point[M]
-            case ambiguous        =>
+            case ambiguous          =>
               SemanticError.ambiguousFunctionInvoke(name, ambiguous.map { case(func, from) => (func.name, from)}).left.point[M]
           })
         case other => EitherT.right(other.embed.point[M])
@@ -176,7 +179,7 @@ package object sql {
     }
   }
 
-  def resolveImportsImpl[M[_]: Monad](blob: Blob[Fix[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[Fix[Sql]]]])
+  def resolveImportsImpl[M[_]: Monad](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[Fix[Sql]]]])
   : EitherT[M, SemanticError, Fix[Sql]] = {
 
     def absImport(i: Import[Fix[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
@@ -197,11 +200,7 @@ package object sql {
         }).map(_.join)
     }
 
-    blob.expr.inlineInvokes(scopeFromHere(blob.imports, blob.defs, baseDir)).flattenLeft
-
-    // This blob has no more imports (assuming the implementation is correct)
-//    val blobInlined = blob.traverse(_.inlineInvokes(scopeFromImports(blob.imports.map(absolutizeImport(_, baseDir)))).flattenLeft)
-//    blobInlined.map(blob => Block(blob.expr, blob.defs))
+    scopedExpr.expr.inlineInvokes(scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir)).flattenLeft
   }
 
   implicit class StatementsOps[A](a: List[Statement[A]]) {

@@ -136,6 +136,29 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
           }
+        "if function references other functions in the same module" >>
+          prop { (moduleDir: ADir,
+                  dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+                  sampleData: Vector[Data]) => moduleDir ≠ rootDir ==> {
+            val statements =
+              sqlM"""
+                    CREATE FUNCTION FOO(:a)
+                      BEGIN
+                        tmp := BAR(:a);
+                        SELECT * FROM tmp
+                      END;
+                    CREATE FUNCTION BAR(:a)
+                      BEGIN
+                        select * from :a
+                      END
+                """
+            val mounts = Map((moduleDir: APath) -> MountConfig.moduleConfig(statements))
+            val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+            val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
+            val request = Request(uri = pathUri(moduleDir </> file("FOO")).copy(query = Query.fromPairs("a" -> arg)))
+            val response = service(state, mounts)(request).unsafePerformSync
+            isExpectedResponse(sampleData, response, MessageFormat.Default)
+          }}
       }
       "support offset and limit" >> {
         prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],

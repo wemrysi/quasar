@@ -168,11 +168,11 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     "org.wartremover.warts.Product",
     "org.wartremover.warts.Serializable"))
   def statements: Parser[List[Statement[T[Sql]]]] =
-    repsep(func_def | import_, op(";"))
+    repsep(func_def | import_, op(";")) <~ opt(op(";"))
 
-  def blob: Parser[Blob[T[Sql]]] =
-    opt(statements <~ op(";")) ~ expr ^^ {
-      case stats ~ expr => Blob(expr, stats.getOrElse(Nil))
+  def scopedExpr: Parser[ScopedExpr[T[Sql]]] =
+    statements ~ expr ^^ {
+      case stats ~ expr => ScopedExpr(expr, stats)
     }
 
   def block: Parser[Block[T[Sql]]] =
@@ -490,11 +490,11 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case Failure(msg, input)  => \/.left(GenericParsingError(s"$msg; but found `${input.first.chars}'"))
     }
 
-  val parse: Query => ParsingError \/ Blob[T[Sql]] = query =>
-    parseBlob(query.value)
+  val parse: Query => ParsingError \/ ScopedExpr[T[Sql]] = query =>
+    parseScopedExpr(query.value)
 
-  def parseBlob(blobString: String): ParsingError \/ Blob[T[Sql]] =
-    parseWithParser(blobString, blob).map(_.map(normalize))
+  def parseScopedExpr(scopedExprString: String): ParsingError \/ ScopedExpr[T[Sql]] =
+    parseWithParser(scopedExprString, scopedExpr).map(_.map(normalize))
 
   def parseModule(moduleString: String): ParsingError \/ List[Statement[T[Sql]]] =
     parseWithParser(moduleString, statements).map(_.map(_.map(normalize)))

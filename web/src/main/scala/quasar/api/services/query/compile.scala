@@ -48,13 +48,13 @@ object compile {
         "value" := data.map(DataCodec.Precise.encode).unite)
 
     def explainQuery(
-      blob: sql.Blob[Fix[sql.Sql]],
+      scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
       vars: Variables,
       basePath: ADir,
       offset: Natural,
       limit: Option[Positive]
     ): Free[S, ApiError \/ Json] =
-      resolveImports(blob, basePath).run.flatMap { block =>
+      resolveImports(scopedExpr, basePath).run.flatMap { block =>
         block.fold(
           semErr => semErr.toApiError.left.point[Free[S, ?]],
           block =>

@@ -39,7 +39,7 @@ object MountConfig {
       statements.imports
   }
 
-  final case class ViewConfig private[mount] (query: Blob[Fix[Sql]], vars: Variables)
+  final case class ViewConfig private[mount] (query: ScopedExpr[Fix[Sql]], vars: Variables)
     extends MountConfig
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
@@ -49,16 +49,16 @@ object MountConfig {
     case ModuleConfig(statements) => statements
   } (ModuleConfig)
 
-  def viewConfig0(blob: Blob[Fix[Sql]], vars: (String, String)*): MountConfig = {
+  def viewConfig0(scopedExpr: ScopedExpr[Fix[Sql]], vars: (String, String)*): MountConfig = {
     val vars0 = Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
-    viewConfig.apply(blob, vars0)
+    viewConfig.apply(scopedExpr, vars0)
   }
 
-  val viewConfig = Prism.partial[MountConfig, (Blob[Fix[Sql]], Variables)] {
+  val viewConfig = Prism.partial[MountConfig, (ScopedExpr[Fix[Sql]], Variables)] {
     case ViewConfig(query, vars) => (query, vars)
   } ((ViewConfig(_, _)).tupled)
 
-  val viewConfigUri: Prism[String, (Blob[Fix[Sql]], Variables)] =
+  val viewConfigUri: Prism[String, (ScopedExpr[Fix[Sql]], Variables)] =
     Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
 
   val fileSystemConfig =
@@ -128,7 +128,7 @@ object MountConfig {
 
   // FIXME
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-  private def viewCfgFromUri(uri: String): String \/ (Blob[Fix[Sql]], Variables) = {
+  private def viewCfgFromUri(uri: String): String \/ (ScopedExpr[Fix[Sql]], Variables) = {
     import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
 
     for {
@@ -136,20 +136,20 @@ object MountConfig {
       scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
       _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
-      blob    <- sql.fixParser.parseBlob(queryStr).leftMap(_.message)
+      sExpr    <- sql.fixParser.parseScopedExpr(queryStr).leftMap(_.message)
       vars     =  Variables(parsed.multiParams collect {
                     case (n, vs) if n.startsWith(VarPrefix) => (
                       VarName(n.substring(VarPrefix.length)),
                       VarValue(vs.lastOption.getOrElse(""))
                     )
                   })
-    } yield (blob, vars)
+    } yield (sExpr, vars)
   }
 
-  private def viewCfgAsUri(blob: Blob[Fix[Sql]], vars: Variables): String = {
+  private def viewCfgAsUri(scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): String = {
     import org.http4s._, util._, CaseInsensitiveString._
 
-    val qryMap = vars.value.foldLeft(Map("q" -> List(blobAsSqlStr(blob)))) {
+    val qryMap = vars.value.foldLeft(Map("q" -> List(scopedExprAsSqlStr(scopedExpr)))) {
       case (qm, (n, v)) => qm + ((VarPrefix + n.value, List(v.value)))
     }
 
@@ -169,8 +169,8 @@ object MountConfig {
   private def stmtsAsSqlStr(stmts: List[Statement[Fix[Sql]]]): String =
     stmts.map(st => st.map(sql.pprint[Fix[Sql]]).pprint).mkString(";\n")
 
-  private def blobAsSqlStr(blob: Blob[Fix[Sql]]): String = {
-    val scopeString = if (blob.scope.isEmpty) "" else stmtsAsSqlStr(blob.scope) + ";\n"
-    scopeString + sql.pprint(blob.expr)
+  private def scopedExprAsSqlStr(scopedExpr: ScopedExpr[Fix[Sql]]): String = {
+    val scopeString = if (scopedExpr.scope.isEmpty) "" else stmtsAsSqlStr(scopedExpr.scope) + ";\n"
+    scopeString + sql.pprint(scopedExpr.expr)
   }
 }

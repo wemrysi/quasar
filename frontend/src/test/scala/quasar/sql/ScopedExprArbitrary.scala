@@ -25,13 +25,13 @@ import scala.Predef._
 import org.scalacheck.Arbitrary
 import matryoshka.data.Fix
 
-trait BlobArbitrary {
+trait ScopedExprArbitrary {
 
-  implicit val blobArbitrary: Arbitrary[Blob[Fix[Sql]]] =
+  implicit val scopedExprArbitrary: Arbitrary[ScopedExpr[Fix[Sql]]] =
     Arbitrary(for {
       expr <- Arbitrary.arbitrary[Fix[Sql]]
       scope <- Arbitrary.arbitrary[List[Statement[Fix[Sql]]]]
-    } yield Blob(expr, scope))
+    } yield ScopedExpr(expr, scope))
 }
 
-object BlobArbitrary extends BlobArbitrary
+object ScopedExprArbitrary extends ScopedExprArbitrary
