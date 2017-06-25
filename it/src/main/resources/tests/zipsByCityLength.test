@@ -1,15 +1,10 @@
 {
     "name": "count occurrences of each value of length(city), with filtering",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
+        "couchbase":      "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "skip",
-        "mongodb_2_6": "ignoreFieldOrder",
-        "mongodb_3_0": "ignoreFieldOrder",
-        "mongodb_3_2": "ignoreFieldOrder",
-        "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mimir":          "skip",
+        "postgresql":     "pending"
     },
     "data": "largeZips.data",
     "query": "select length(city) as len, count(*) as cnt

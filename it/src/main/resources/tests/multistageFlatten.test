@@ -9,11 +9,12 @@
         "mongodb_3_0":    "pending",
         "mongodb_3_2":    "pending",
         "mongodb_3_4":    "pending",
+        "mongodb_read_only": "skip",
         "postgresql":     "pending",
         "spark_hdfs":     "skip",
         "spark_local":    "skip"
     },
-    "NB": "Skipped for spark and marklogic_xml because it times out.",
+    "NB": "Skipped for marklogic_xml, mongodb_read_only, and spark because it times out.",
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (
                 foo              LIKE \"%zap%\" OR

@@ -3,9 +3,9 @@
 
     "backends": {
         "mimir": "skip",
-        "mongodb_2_6": "ignoreFieldOrder",
-        "mongodb_3_0": "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
+        "mongodb_2_6": "ignoreResultOrder",
+        "mongodb_3_0": "ignoreResultOrder",
+        "mongodb_read_only": "ignoreResultOrder",
         "postgresql": "pending"
     },
     "data": "zips.data",

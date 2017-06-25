@@ -10,7 +10,9 @@
         "mongodb_3_0": "pending",
         "mongodb_3_2": "pending",
         "mongodb_3_4": "pending",
-        "postgresql": "pending"
+        "postgresql": "pending",
+        "spark_hdfs":     "pending",
+        "spark_local":    "pending"
     },
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM

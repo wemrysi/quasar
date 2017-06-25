@@ -3,6 +3,7 @@
     "backends": {
         "mimir": "skip",
         "couchbase": "pending",
+        "mongodb_read_only": "ignoreResultOrder",
         "postgresql": "pending"
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",

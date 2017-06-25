@@ -6,13 +6,14 @@
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
         "mimir": "skip",
-        "mongodb_2_6":    "pending",
-        "mongodb_3_0":    "pending",
-        "mongodb_3_2":    "pending",
-        "mongodb_3_4":    "pending",
-        "postgresql":     "pending",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "ignoreResultOrder",
+        "mongodb_3_4":       "ignoreResultOrder",
+        "mongodb_read_only": "pending",
+        "postgresql":        "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
 
     "data": "zips.data",
