@@ -140,6 +140,18 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
   }
 
+  def rewriteNullCheck[T[_[_]]: BirecursiveT, A](mfc: MapFuncCore[T, A]): MapFuncCore[T, A] = {
+    import quasar.qscript.MapFuncsCore.{StrLit, NullLit}
+    import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf}
+
+    mfc match {
+      case Eq(lhs, NullLit) => Eq(TypeOf(lhs), StrLit("null"))
+      case Eq(NullLit, rhs) => Eq(TypeOf(rhs), StrLit("null"))
+      case Neq(lhs, NullLit) => Neq(TypeOf(lhs), StrLit("null"))
+      case Neq(lhs, NullLit) => Neq(TypeOf(lhs), StrLit("null"))
+    }
+  }
+
   ////
 
   private def asDate(x: XQuery)     = SP.castIfNode(x) >>= (lib.asDate[F] apply _)
