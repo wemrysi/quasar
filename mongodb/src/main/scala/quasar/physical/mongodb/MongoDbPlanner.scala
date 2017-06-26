@@ -1354,7 +1354,9 @@ object MongoDbPlanner {
       opt <- toMongoQScript(lp, listContents)
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[M, WorkflowBuilder[WF]](Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler)))
+        opt.cataM[M, WorkflowBuilder[WF]](
+          Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler).apply(_) ∘
+            (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
       wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
       wf2 <- log(
         "Workflow (crystallized)",

@@ -63,6 +63,8 @@ object ExprOp3_0F {
           "date" -> date))
     }
 
+    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
+
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
       κ(None)
   }

@@ -104,6 +104,8 @@ object ExprOp3_2F {
       case $isArrayF(value)          => Bson.Doc("$isArray" -> value)
     }
 
+    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
+
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
   }
 

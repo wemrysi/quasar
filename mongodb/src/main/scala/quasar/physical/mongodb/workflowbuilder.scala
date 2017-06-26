@@ -327,10 +327,36 @@ object WorkflowBuilder {
       base.toDocVar.toJs >>> _,
       _.cata(exprOps.rewriteRefs(prefixBase0(base))))
 
+  private def rewriteExpr
+    (expr: Expr, base: Expr)
+    (implicit exprOps: ExprOpOps.Uni[ExprOp])
+      : Option[Expr] =
+    (expr, base) match {
+      case (\&/.Both(js1, ex1), \&/.Both(js2, ex2)) =>
+        ex1.transCataM(exprOps.rebase(ex2)) ∘ (\&/(js2 >>> js1, _))
+      case (HasThat(ex1),       HasThat(ex2))       =>
+        ex1.transCataM(exprOps.rebase(ex2)) ∘ \&/-
+      case (HasThis(js1),       HasThis(js2))       => -\&/(js2 >>> js1).some
+      case (_,                  _)                  => none
+    }
+
   private def prefixBase0(base: Base): PartialFunction[DocVar, DocVar] =
     prefixBase(base.toDocVar)
 
   private val jsBase = jscore.Name("__val")
+
+  // TODO: Determine if this is necessary. If so, flesh it out.
+  def normalize[WF[_], T]
+    (implicit T: Recursive.Aux[T, WorkflowBuilderF[WF, ?]],
+      exprOps: ExprOpOps.Uni[ExprOp])
+      : TransformM[Option, T, WorkflowBuilderF[WF, ?], WorkflowBuilderF[WF, ?]] = {
+    case ExprBuilderF(Embed(ExprBuilderF(src, inner)), outer) =>
+      rewriteExpr(outer, inner) ∘ (ExprBuilderF(src, _))
+    case DocBuilderF(Embed(ExprBuilderF(src, inner)), doc) =>
+      doc.traverse(rewriteExpr(_, inner)) >>=
+        (d => (doc ≠ d).option(DocBuilderF(src, d)))
+    case _ => none
+  }
 
   def schema[WF[_]]: Algebra[WorkflowBuilderF[WF, ?], Schema] = {
     case CollectionBuilderF(_, _, schema)   => schema

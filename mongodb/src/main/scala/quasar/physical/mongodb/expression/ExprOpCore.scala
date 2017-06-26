@@ -22,6 +22,7 @@ import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._
 import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 /** "Pipeline" operators available in all supported version of MongoDB
@@ -280,6 +281,12 @@ object ExprOpCoreF {
       case $condF(predicate, ifTrue, ifFalse) =>
         Bson.Doc("$cond" -> Bson.Arr(predicate, ifTrue, ifFalse))
       case $ifNullF(expr, replacement)   => Bson.Doc("$ifNull" -> Bson.Arr(expr, replacement))
+    }
+
+    def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = {
+      case $varF(DocVar.ROOT(None)) => base.project.some
+      case $includeF()          => none
+      case in                   => I(in).some
     }
 
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
