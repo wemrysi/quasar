@@ -108,9 +108,9 @@ object MongoDbQScriptPlanner {
         expression(funcHandler)))
 
   def getSelector
-      [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-      (fm: FreeMap[T])
-      (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (fm: FreeMap[T])
+    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
       interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
@@ -121,7 +121,7 @@ object MongoDbQScriptPlanner {
         selector[T]))
 
 
-  def processMapFunc[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, A]
+  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, A]
     (fm: FreeMapA[T, A])
     (recovery: A => JsCore)
     (implicit merr: MonadError_[M, FileSystemError])
@@ -159,8 +159,8 @@ object MongoDbQScriptPlanner {
 
   def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
-      AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
+    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
+      : AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
     import MapFuncsCore._
     import MapFuncsDerived._
 
@@ -265,7 +265,7 @@ object MongoDbQScriptPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative]
+  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative]
     (implicit merr: MonadError_[M, FileSystemError])
       : AlgebraM[M, MapFunc[T, ?], JsCore] = {
     import jscore.{
@@ -290,7 +290,7 @@ object MongoDbQScriptPlanner {
           BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
 
     def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
-      JsFuncHandler(mf).map(unpack[Fix, JsCoreF])
+      JsFuncHandler.handle[MapFunc[T, ?]].apply(mf).map(unpack[Fix, JsCoreF])
 
     val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
       case Constant(v1) =>
@@ -684,7 +684,7 @@ object MongoDbQScriptPlanner {
         case Or(a, b)  => Some(Or(a, b))
         case _         => None
       }
-      
+
       val flip: MapFunc[T, _] => Option[MapFunc[T, _]] = {
         case MFC(mfc) => flipCore(mfc).map(MFC(_))
         case _ => None
@@ -1034,14 +1034,14 @@ object MongoDbQScriptPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
-  def getJsFn[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
+  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
@@ -1103,7 +1103,7 @@ object MongoDbQScriptPlanner {
       exf(a).map(_.right[JsFn]))(
       _ => jsf(a).map(_.left[Fix[ExprOp]]))
 
-  def handleFreeMap[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
@@ -1115,14 +1115,14 @@ object MongoDbQScriptPlanner {
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(createFieldName)))
 
-  def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
+  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
@@ -1175,8 +1175,8 @@ object MongoDbQScriptPlanner {
     tf => (f.lift(tf) \/> tf.project).swap
 
   def elideMoreGeneralGuards[M[_]: Applicative, T[_[_]]: RecursiveT]
-      (subType: Type)
-      (implicit merr: MonadError_[M, FileSystemError])
+    (subType: Type)
+    (implicit merr: MonadError_[M, FileSystemError])
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
     val MFC = quasar.qscript.MFC[T]
     def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {

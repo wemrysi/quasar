@@ -283,7 +283,7 @@ object FuncHandler {
 
   // TODO generalize this and make available for other connectors
   implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
-      (implicit core: FuncHandler[MapFuncCore[T, ?]])
+    (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived

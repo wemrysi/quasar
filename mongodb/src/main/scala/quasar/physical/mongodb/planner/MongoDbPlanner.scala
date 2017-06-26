@@ -165,13 +165,13 @@ object MongoDbPlanner {
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
           val mf = (MapFuncCore.translateUnaryMapping[Fix, MapFunc[Fix, ?], UnaryArg] _)(func)(UnaryArg._1)
-          JsFuncHandler(mf).map(exp => Arity1(exp.eval))
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity1(exp.eval))
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
           val mf = (MapFuncCore.translateBinaryMapping[Fix, MapFunc[Fix, ?], BinaryArg] _)(func)(BinaryArg._1, BinaryArg._2)
-          JsFuncHandler(mf).map(exp => Arity2(exp.eval))
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity2(exp.eval))
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
           val mf = (MapFuncCore.translateTernaryMapping[Fix, MapFunc[Fix, ?], TernaryArg] _)(func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
-          JsFuncHandler(mf).map(exp => Arity3(exp.eval))
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity3(exp.eval))
         case _ => None
       }).getOrElse(func match {
         case Constantly => Arity1(ι)  // FIXME: this cannot possibly be right

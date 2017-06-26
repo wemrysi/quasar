@@ -117,7 +117,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       IntLit(mapping.get(idx).getOrElse(idx))))
 
     CoEnv[A, MapFunc, FreeMapA[A]](x.right[A])
-    }
+  }
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
