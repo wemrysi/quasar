@@ -156,4 +156,7 @@ package object elastic {
     val index = folder.substring(1, folder.length - 1).replace("/", separator)
     IndexType(index, typ)
   }
+
+  def dir2Index(adir: ADir): String =
+    posixCodec.unsafePrintPath(adir).substring(1).replace("/", separator)
 }

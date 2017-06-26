@@ -68,7 +68,7 @@ object queryfile {
     val segments = if(adir === rootDir)
       E.listIndeces.map(_.map(rootFolder).toSet.map(toDirName))
     else {
-      val prefix = posixCodec.unsafePrintPath(adir).substring(1).replace("/", separator)
+      val prefix = dir2Index(adir)
       val folders = E.listIndeces.map(indices =>
         indices
           .filter(_.startsWith(prefix))
