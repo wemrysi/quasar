@@ -53,10 +53,7 @@ object queryfile {
 
   def fileExists[S[_]](f: AFile)(implicit
     E: ElasticCall.Ops[S]
-  ): Free[S, Boolean] = {
-    val IndexType(index, typ) = file2ES(f)
-    E.typeExists(index, typ)
-  }
+  ): Free[S, Boolean] = E.typeExists(file2ES(f))
 
   def listContents[S[_]](adir: ADir)(implicit
     E: ElasticCall.Ops[S]

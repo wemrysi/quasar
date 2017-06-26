@@ -140,14 +140,6 @@ package object elastic {
   ) =
     quasar.physical.sparkcore.fs.definition[Eff, S, SparkFSConf](FsType, parseUri, sparkFsDef, fsInterpret)
 
-  final case class IndexType(index: String, typ: String)
-
-  object IndexType {
-    implicit val ShowIndexType: Show[IndexType] = new Show[IndexType] {
-      override def shows(it: IndexType): String = s"${it.index}/${it.typ}"
-    }
-  }
-
   val separator = "__"
 
   def file2ES(afile: AFile): IndexType = {

@@ -59,26 +59,21 @@ object managefile {
     ): Free[S, Boolean] = 
     refineType(path).fold(
       d => elastic.listIndeces.map(_.contains(dir2Index(d))),
-      f => {
-        val IndexType(index, typ) = file2ES(f)
-        elastic.typeExists(index, typ)
-      }
+      f => elastic.typeExists(file2ES(f))
     )
 
   def moveFile[S[_]](sf: AFile, df: AFile)(implicit
     elastic: ElasticCall.Ops[S]
   ): Free[S, Unit] = for {
-    sourceIndexType              <- file2ES(sf).point[Free[S, ?]]
-    destinationIndexType         <- file2ES(df).point[Free[S, ?]]
-    IndexType(srcIndex, srcType) = sourceIndexType
-    IndexType(dstIndex, dstType) = destinationIndexType
-    dstIndexExists               <- elastic.indexExists(dstIndex)
-    dstTypeExists                <- elastic.typeExists(dstIndex, dstType)
-    _                            <- if(dstTypeExists) elastic.deleteType(dstIndex, dstType)
-                                    else if(!dstIndexExists) elastic.createIndex(dstIndex)
+    src                          <- file2ES(sf).point[Free[S, ?]]
+    dst                          <- file2ES(df).point[Free[S, ?]]
+    dstIndexExists               <- elastic.indexExists(dst.index)
+    dstTypeExists                <- elastic.typeExists(dst)
+    _                            <- if(dstTypeExists) elastic.deleteType(dst)
+                                    else if(!dstIndexExists) elastic.createIndex(dst.index)
                                     else ().point[Free[S, ?]]
-    _                            <- elastic.copy(sourceIndexType, destinationIndexType)
-    _                            <- elastic.deleteType(srcIndex, srcType)
+    _                            <- elastic.copy(src, dst)
+    _                            <- elastic.deleteType(src)
   } yield ()
 
 
@@ -96,9 +91,8 @@ object managefile {
     elastic: ElasticCall.Ops[S]
   ): Free[S, FileSystemError \/ Unit] = for {
     indexType <- file2ES(file).point[Free[S, ?]]
-    IndexType(index, typ) = indexType
-    exists <- elastic.typeExists(index, typ)
-    res <- if(exists) elastic.deleteType(index, typ).map(_.right) else pathErr(pathNotFound(file)).left[Unit].point[Free[S, ?]]
+    exists <- elastic.typeExists(indexType)
+    res <- if(exists) elastic.deleteType(indexType).map(_.right) else pathErr(pathNotFound(file)).left[Unit].point[Free[S, ?]]
   } yield res
 
   private def deleteDir[S[_]](dir: ADir)(implicit
