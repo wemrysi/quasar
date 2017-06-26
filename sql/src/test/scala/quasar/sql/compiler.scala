@@ -499,7 +499,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail to compile let inside select with ambigious reference" in {
-      // TODO: Make description and query match
+      // TODO: Investigate why this is not producing an ambigious reference
       compile(sqlE"select foo from (bar := 12; baz) as quag") must_===
         compiledSubtableMissing("quag").wrapNel.left
     }
@@ -568,7 +568,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail to compile let with an inner context of let that shares a binding name in expression context" in {
-      // TODO: Make description and query match
+      // TODO: Investigate why this is not producing an ambigious reference
       val query = sqlE"foo := 4; select * from (foo := bar; foo) as quag"
 
       compile(query) must_=== compiledSubtableMissing("quag").wrapNel.left

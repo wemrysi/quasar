@@ -30,7 +30,6 @@ import matryoshka.implicits._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._, Scalaz._
-import com.softwaremill.quicklens._
 
 package object sql {
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
@@ -145,7 +144,7 @@ package object sql {
           case other => other
         }
 
-        sel2.modify(_.relation).using(_.map(mkRel(_))).embed
+        Select.relation.modify((r: Option[SqlRelation[T[Sql]]]) => r.map(mkRel(_)))(sel2).embed
       }
 
       case Let(ident, bindTo, in) => {
@@ -156,17 +155,15 @@ package object sql {
 
       case other => other.map(_.makeTables(bindings)).embed
     }
-  }
 
-  implicit class FixExprOps(q: Fix[Sql]) {
     /**
       * Inlines all function invocations with the bodies of functions in scope.
       * Leaves invocations to functions outside of scope untouched (as opposed to erroring out)
       * @param scope Returns the list of function definitions that match a given name and function arity along with a
       *              path specifying whether this function was found
       */
-    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[Fix[Sql]], ADir)]]): EitherT[M, SemanticError, Fix[Sql]] = {
-      q.cataM[EitherT[M, SemanticError, ?], Fix[Sql]] {
+    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]]): EitherT[M, SemanticError, T[Sql]] = {
+      q.cataM[EitherT[M, SemanticError, ?], T[Sql]] {
         case invoke @ InvokeFunction(name, args) =>
           EitherT(scope(name, args.size).flatMap {
             case Nil                => invoke.embed.right.point[M]
@@ -179,19 +176,19 @@ package object sql {
     }
   }
 
-  def resolveImportsImpl[M[_]: Monad](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[Fix[Sql]]]])
-  : EitherT[M, SemanticError, Fix[Sql]] = {
+  def resolveImportsImpl[M[_]: Monad, T[_[_]]: BirecursiveT](scopedExpr: ScopedExpr[T[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[T[Sql]]]])
+  : EitherT[M, SemanticError, T[Sql]] = {
 
-    def absImport(i: Import[Fix[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
+    def absImport(i: Import[T[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
 
-    def scopeFromHere(imports: List[Import[Fix[Sql]]], funcsHere: List[FunctionDecl[Fix[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[Fix[Sql]], ADir)]] = {
+    def scopeFromHere(imports: List[Import[T[Sql]]], funcsHere: List[FunctionDecl[T[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[T[Sql]], ADir)]] = {
       case (name, arity) =>
         // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
         val funcsFromImports = imports.map(absImport(_, here)).traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
         // All functions in "this" scope along with their own imports
         val allFuncs         = funcsFromImports.map((funcsHere, imports, here) :: _)
         EitherT.right(allFuncs).flatMap(_.traverse{ case (funcs, imports, from) =>
-          def matchesSignature(func: FunctionDecl[Fix[Sql]]) = func.name === name && arity === func.args.size
+          def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
           funcs.filter(matchesSignature).traverse { decl =>
             val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
             val currentScope = scopeFromHere(imports, others, from)

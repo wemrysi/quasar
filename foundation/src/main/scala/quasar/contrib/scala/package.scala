@@ -21,8 +21,8 @@ import quasar.fp.ski._
 
 import _root_.scalaz._, Scalaz._
 
-package object scala {
-  implicit class AugmentedList[A](a: List[A]) {
+package object std {
+  implicit class AugmentedList[A](val a: List[A]) extends scala.AnyVal {
     def duplicates: List[NonEmptyList[A]] = {
       a.groupBy1(ι).values.filter(_.size > 1).toList
     }

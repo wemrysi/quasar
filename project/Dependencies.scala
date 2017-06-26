@@ -54,7 +54,6 @@ object Dependencies {
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
     "com.propensive"             %% "contextual"                % "1.0.1",
-    "com.softwaremill.quicklens" %% "quicklens"                 % "1.4.8",
     "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
     "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,

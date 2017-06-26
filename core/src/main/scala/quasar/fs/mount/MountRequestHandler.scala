@@ -62,6 +62,7 @@ final class MountRequestHandler[F[_], S[_]](
         // to `LogicalPlan` but now that views can contain Imports, that's no longer easy or very
         // valuable. Validation can once again be performed once `LogicalPlan` has a representation
         // for functions and imports
+        // See https://github.com/quasar-analytics/quasar/issues/2398
         case _ => ().right.point[Free[T, ?]]
       })
 

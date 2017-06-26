@@ -35,7 +35,7 @@ class ResolveImportSpec extends quasar.Qspec {
         case `mymodule` => List(trivial)
         case _          => Nil
       }
-      resolveImportsImpl[Id](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/foo`".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/foo`".right
     }
     "multiple imports" >> {
       val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
@@ -48,7 +48,7 @@ class ResolveImportSpec extends quasar.Qspec {
         case `otherModule` => List(bar)
         case _             => Nil
       }
-      resolveImportsImpl[Id](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
     "multiple functions within one import" >> {
       val scopedExpr = sqlB"import `/mymodule/`; FOO(1) + Bar(2)"
@@ -59,7 +59,7 @@ class ResolveImportSpec extends quasar.Qspec {
         case `mymodule` => List(foo, bar)
         case _          => Nil
       }
-      resolveImportsImpl[Id](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
     "multiple functions within one import and unused imports" >> {
       val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
@@ -72,7 +72,7 @@ class ResolveImportSpec extends quasar.Qspec {
         case `otherModule` => Nil
         case _             => Nil
       }
-      resolveImportsImpl[Id](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"(1 + 1) + (2 + 2)".right
     }
     "a function that depends on another" >> {
       val scopedExpr = sqlB"""
@@ -87,7 +87,7 @@ class ResolveImportSpec extends quasar.Qspec {
           END;
         FOO(`/people`)
       """
-      resolveImportsImpl[Id](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"tmp := select * from `/people`; select * from tmp".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"tmp := select * from `/people`; select * from tmp".right
     }
     "multiple use of the same var name" >> {
       val scopedExpr = sqlB"""
@@ -97,7 +97,7 @@ class ResolveImportSpec extends quasar.Qspec {
           End;
         FOO(1)
       """
-      resolveImportsImpl[Id](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"COUNT(1,1,1)".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"COUNT(1,1,1)".right
     }
     "multiple arguments" >> {
       val scopedExpr = sqlB"""
@@ -107,7 +107,7 @@ class ResolveImportSpec extends quasar.Qspec {
           End;
         FOO(1,2,3)
       """
-      resolveImportsImpl[Id](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"COUNT(1,2,3)".right
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_=== sqlE"COUNT(1,2,3)".right
     }
     "error out if same function defined twice" >> {
       val scopedExpr = sqlB"""
@@ -123,9 +123,9 @@ class ResolveImportSpec extends quasar.Qspec {
       """
       // This error is slightly bizarre because they are both defined in the same scope, but I don't think it's
       // worth creating a special error type for this particular case
-      // Besides, this is the kind of thing that should be caugth when compiling to LogicalPlan once
+      // Besides, this is the kind of thing that should be caught when compiling to LogicalPlan once
       // importing resolution is done at that layer
-      resolveImportsImpl[Id](scopedExpr, rootDir, κ(Nil)).run must_===
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
         AmbiguousFunctionInvoke(CIName("foo"), List((CIName("foo"), rootDir), (CIName("foo"), rootDir))).left
     }
     // This should not be the kind of thing caught by import resolution,
@@ -133,7 +133,7 @@ class ResolveImportSpec extends quasar.Qspec {
     "error out if same var name appears multiple times in function signature" >> {
       val func = FunctionDecl(CIName("FOO"), List(CIName("a"), CIName("a")), sqlE"1")
       val scopedExpr = ScopedExpr(sqlE"FOO(1,2)", List(func))
-      resolveImportsImpl[Id](scopedExpr, rootDir, κ(Nil)).run must_===
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
         InvalidFunctionDefinition(func, "parameter :a is defined multiple times").left
     }
   }
