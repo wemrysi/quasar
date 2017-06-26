@@ -408,35 +408,26 @@ class QScriptSpec
           HoleF,
           IncludeId,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(0)))))),
-              Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))))),
-            Free.roll(Constant(ejsonArr(ejsonStr("loc")))))))),
+            Free.roll(MakeArray(LeftSideF)),
+            Free.roll(MakeArray(RightSideF)))))),
         QC.inj(LeftShift((),
           ProjectFieldR(
-            ProjectIndexR(HoleF, IntLit(1)),
-            ProjectIndexR(HoleF, IntLit(2))),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
+            StrLit("loc")),
           IdOnly,
           Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(ConcatArrays(
-                  Free.roll(MakeArray(RightSideF)),
-                  Free.roll(MakeArray(
-                    ProjectIndexR(
-                      ProjectIndexR(LeftSideF, IntLit(0)),
-                      IntLit(0)))))))),
-              Free.roll(MakeArray(RightSideF)))),
-            Free.roll(Constant(ejsonArr(ejsonInt(10)))))))),
+            Free.roll(MakeArray(LeftSideF)),
+            Free.roll(MakeArray(RightSideF)))))),
         QC.inj(Reduce((),
           Free.roll(MakeArray(
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)))),
+            ProjectIndexR(
+              ProjectIndexR(ProjectIndexR(HoleF, IntLit(0)), IntLit(1)),
+              IntLit(0)))),
           List(
             ReduceFuncs.UnshiftArray(
               Free.roll(Multiply(
                 ProjectIndexR(HoleF, IntLit(1)),
-                ProjectIndexR(HoleF, IntLit(2)))))),
+                IntLit(10))))),
           Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             ReduceIndexF(0.some))))))(
@@ -946,50 +937,47 @@ class QScriptSpec
           ConcatArraysR(
             MakeArrayR(ConcatArraysR(
               ConcatArraysR(
-                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                Free.roll(Constant(ejsonArr(ejsonStr("city"))))),
-              MakeArrayR(
-                ProjectFieldR(
+                ConcatArraysR(
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
+                MakeArrayR(ProjectIndexR(RightSideF, IntLit(1)))),
+              MakeArrayR(ProjectIndexR(RightSideF, IntLit(1))))),
+            MakeArrayR(ConcatArraysR(
+              ConcatArraysR(
+                ConcatArraysR(
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
+                  MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
+                MakeArrayR(ProjectFieldR(
                   Free.roll(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(), Some(Type.Top)),
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Free.roll(Undefined()))),
-                  StrLit("city"))))),
-            MakeArrayR(ConcatArraysR(
-              ConcatArraysR(
-                MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                MakeArrayR(ConcatArraysR(
-                  ConcatArraysR(
-                    ConcatArraysR(
-                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
-                      MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
-                    MakeArrayR(ProjectFieldR(
-                      Free.roll(Guard(
-                        ProjectIndexR(RightSideF, IntLit(1)),
-                        Type.Obj(ScalaMap(), Some(Type.Top)),
-                        ProjectIndexR(RightSideF, IntLit(1)),
-                        Free.roll(Undefined()))),
-                      StrLit("loc")))),
-                  MakeArrayR(ProjectFieldR(
-                    Free.roll(Guard(
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      Type.Obj(ScalaMap(), Some(Type.Top)),
-                      ProjectIndexR(RightSideF, IntLit(1)),
-                      Free.roll(Undefined()))),
-                    StrLit("loc")))))),
-              MakeArrayR(Free.roll(Undefined()))))))),
+                  StrLit("loc")))),
+              MakeArrayR(ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Type.Obj(ScalaMap(), Some(Type.Top)),
+                  ProjectIndexR(RightSideF, IntLit(1)),
+                  Free.roll(Undefined()))),
+                StrLit("loc")))))))),
         QC.inj(LeftShift((),
           Free.roll(Guard(
-            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(2)),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)),
             Type.FlexArr(0, None, Type.Top),
-            ProjectIndexR(ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)), IntLit(3)),
-            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)))),
+            ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(3)),
+            Free.roll(Undefined()))),
           ExcludeId,
           ConcatMapsR(
             MakeMapR(
-              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-              ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2))),
+              StrLit("city"),
+              ProjectFieldR(
+                Free.roll(Guard(
+                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2)),
+                  Type.Obj(ScalaMap(), Some(Type.Top)),
+                  ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(3)),
+                  Free.roll(Undefined()))),
+                StrLit("city"))),
             MakeMapR(StrLit("loc"), RightSideF)))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
