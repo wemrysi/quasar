@@ -157,11 +157,11 @@ package object qscript {
     val nullString: U = UC.embed(CoEnv(stringLit("null").right))
 
     fa => CoEnv(fa.run.map {
-      case Eq(lhs, Embed(NullLit()))  => Eq(UC.embed (CoEnv(TypeOf(lhs).right)), nullString)
-      case Eq(Embed(NullLit()), rhs)  => Eq(UC.embed (CoEnv(TypeOf(rhs).right)), nullString)
+      case Eq(lhs, Embed(NullLit()))  => Eq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
+      case Eq(Embed(NullLit()), rhs)  => Eq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
       case Neq(lhs, Embed(NullLit())) => Neq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
       case Neq(Embed(NullLit()), rhs) => Neq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
-      case other             => other
+      case other                      => other
     })
   }
 
