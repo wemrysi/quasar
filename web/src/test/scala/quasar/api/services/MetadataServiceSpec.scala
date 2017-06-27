@@ -110,7 +110,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
         fsMountName: DirName,
         viewName: FileName,
         moduleName: DirName,
-        vcfg: (Blob[Fix[Sql]], Variables),
+        vcfg: (ScopedExpr[Fix[Sql]], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
       ) => (fileName ≠ viewName &&
           directoryName ≠ fsMountName &&

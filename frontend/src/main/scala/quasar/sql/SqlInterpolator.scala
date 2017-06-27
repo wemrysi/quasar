@@ -29,9 +29,14 @@ object SqlInterpolator {
       parser[Fix].parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
   }
 
-  object Blob extends StaticInterpolator[Blob[Fix[Sql]]] {
-    def parse(s: String): String \/ Blob[Fix[Sql]] =
-      parser[Fix].parseBlob(s).leftMap(parseError => s"Not a valid SQL blob: $parseError")
+  object ScopedExpr extends StaticInterpolator[ScopedExpr[Fix[Sql]]] {
+    def parse(s: String): String \/ ScopedExpr[Fix[Sql]] =
+      parser[Fix].parseScopedExpr(s).leftMap(parseError => s"Not a valid SQL scopedExpr: $parseError")
+  }
+
+  object Module extends StaticInterpolator[List[Statement[Fix[Sql]]]] {
+    def parse(s: String): String \/ List[Statement[Fix[Sql]]] =
+      parser[Fix].parseModule(s).leftMap(parseError => s"Not a valid SQL module: $parseError")
   }
 
 }

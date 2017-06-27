@@ -14,24 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.contrib
 
 import slamdata.Predef._
-import quasar.sql.StatementArbitrary._
-import quasar.sql.ExprArbitrary._
+import quasar.fp.ski._
 
-import scala.Predef._
+import _root_.scalaz._, Scalaz._
 
-import org.scalacheck.Arbitrary
-import matryoshka.data.Fix
-
-trait BlobArbitrary {
-
-  implicit val blobArbitrary: Arbitrary[Blob[Fix[Sql]]] =
-    Arbitrary(for {
-      expr <- Arbitrary.arbitrary[Fix[Sql]]
-      scope <- Arbitrary.arbitrary[List[Statement[Fix[Sql]]]]
-    } yield Blob(expr, scope))
+package object std {
+  implicit class AugmentedList[A](val a: List[A]) extends scala.AnyVal {
+    def duplicates: List[NonEmptyList[A]] = {
+      a.groupBy1(ι).values.filter(_.size > 1).toList
+    }
+  }
 }
-
-object BlobArbitrary extends BlobArbitrary
