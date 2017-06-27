@@ -592,23 +592,30 @@ class SQLParserSpec extends quasar.Qspec {
     "parse import statement" in {
       val importString = "import `/foo/bar/baz/`"
       fixParser.parseWithParser(importString, fixParser.import_) must beRightDisjunction(
-        Import("/foo/bar/baz/"))
+        Import(rootDir </> dir("foo") </> dir("bar") </> dir("baz")))
     }
 
-    "parse module" in {
-      val moduleString =
-        """
-          |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
-          |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
-          |import `/other/stuff/in/filesystem/`
-        """.stripMargin
-      fixParser.parseWithParser(moduleString, fixParser.statements) must beLike {
-        case \/-(List(FunctionDecl(_,_,_),FunctionDecl(_,_,_),Import(_))) => ok
+    "parse module" >> {
+      "typical case" in {
+        val moduleString =
+          """
+            |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
+            |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
+            |import `/other/stuff/in/filesystem/`
+          """.stripMargin
+        fixParser.parseModule(moduleString) must beLike {
+          case \/-(List(FunctionDecl(_, _, _), FunctionDecl(_, _, _), Import(_))) => ok
+        }
+      }
+      "does not complain about a trailing semicolon" in {
+        val moduleString = "CREATE FUNCTION FOO(:foo) BEGIN :foo END;"
+        fixParser.parseModule(moduleString) must_===
+          \/-(List(FunctionDecl(CIName("foo"), List(CIName("foo")), sqlE":foo")))
       }
     }
 
-    "parse blob" in {
-      val blobString =
+    "parse scopedExpr" in {
+      val scopedExprString =
         """
           |CREATE FUNCTION USER_DATA(:user_id)
           |  BEGIN
@@ -617,8 +624,8 @@ class SQLParserSpec extends quasar.Qspec {
           |USER_DATA("bob")
         """.stripMargin
       val invokeAST: Fix[Sql] = Fix(invokeFunction[Fix[Sql]](CIName("USER_DATA"),List(Fix(stringLiteral[Fix[Sql]]("bob")))))
-      fixParser.parse(blobString) must beLike {
-        case \/-(Blob(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
+      fixParser.parse(scopedExprString) must beLike {
+        case \/-(ScopedExpr(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
       }
     }
 
