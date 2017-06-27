@@ -22,11 +22,11 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFuncCore, MapFuncsCore}, MapFuncsCore._
+import quasar.qscript.{MapFuncCore, MapFuncsCore, FreeMapA}, MapFuncsCore._
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
-import scalaz.{Const, Monad, Show}
+import scalaz.{Const, Monad, Show, Free}
 import scalaz.syntax.monad._
 
 private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
@@ -140,15 +140,31 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
   }
 
-  def rewriteNullCheck[T[_[_]]: BirecursiveT, A](mfc: MapFuncCore[T, A]): MapFuncCore[T, A] = {
+  def rewriteNullCheck[T[_[_]]: BirecursiveT, A](mfc: MapFuncCore[T, A]): FreeMapA[T, A] = {
     import quasar.qscript.MapFuncsCore.{StrLit, NullLit}
     import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf}
+    import quasar.ejson._
+
+    val nullString: FreeMapA[T, A] = StrLit("null")
+
+    def EqR[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
+      Free.roll(Eq(left, right))
+
+    def NeqR[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
+      Free.roll(Neq(left, right))
+
+    def TypeOfR[A](t: FreeMapA[T, A]): FreeMapA[T, A] =
+      Free.roll(TypeOf(t))
+
+    def stringLit(str: String): T[EJson] =
+      EJson.fromCommon(Str[T[EJson]](str))
 
     mfc match {
-      case Eq(lhs, NullLit) => Eq(TypeOf(lhs), StrLit("null"))
-      case Eq(NullLit, rhs) => Eq(TypeOf(rhs), StrLit("null"))
-      case Neq(lhs, NullLit) => Neq(TypeOf(lhs), StrLit("null"))
-      case Neq(lhs, NullLit) => Neq(TypeOf(lhs), StrLit("null"))
+      case Eq(lhs, NullLit)  => EqR(TypeOfR(Free.point(lhs)),  nullString)
+      case Eq(NullLit, rhs)  => EqR(TypeOfR(Free.point(rhs)),  nullString)
+      case Neq(lhs, NullLit) => NeqR(TypeOfR(Free.point(lhs)), nullString)
+      case Neq(NullLit, rhs) => NeqR(TypeOfR(Free.point(rhs)), nullString)
+      case other             => Free.liftF(other)
     }
   }
 
