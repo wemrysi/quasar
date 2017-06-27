@@ -16,16 +16,42 @@
 
 package quasar.yggdrasil
 
+import quasar.contrib.scalaz.catchable
+
 import argonaut.{Argonaut, CodecJson, DecodeResult}
+
+import fs2.util.Catchable
 
 import scalaz.{~>, :<:, Coproduct, Free}
 import scalaz.concurrent.Task
 
 import java.util.UUID
 
+import scala.util.Either
+
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
   type POSIXWithTask[A] = Free[Coproduct[POSIXOp, Task, ?], A]
+
+  // this is needed kind of a lot
+  private[vfs] implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] = {
+    val delegate = catchable.freeCatchable[Task, S]
+
+    new Catchable[Free[S, ?]] {
+
+      def pure[A](a: A): Free[S, A] =
+        Free.pure[S, A](a)
+
+      def attempt[A](fa: Free[S, A]): Free[S, Either[Throwable, A]] =
+        delegate.attempt(fa).map(_.toEither)
+
+      def fail[A](err: Throwable): Free[S, A] =
+        delegate.fail(err)
+
+      def flatMap[A, B](fa: Free[S, A])(f: A => Free[S, B]): Free[S, B] =
+        fa.flatMap(f)
+    }
+  }
 
   object POSIXWithTask {
     def generalize[S[_]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
@@ -47,6 +73,24 @@ package object vfs {
         c.as[String] flatMap { str =>
           try {
             DecodeResult.ok(Version(UUID.fromString(str)))
+          } catch {
+            case _: IllegalArgumentException =>
+              DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+          }
+        }
+      })
+  }
+
+  final case class Blob(value: UUID) extends AnyVal
+
+  object Blob extends (UUID => Blob) {
+    import Argonaut._
+
+    implicit val codec: CodecJson[Blob] =
+      CodecJson[Blob](v => jString(v.value.toString), { c =>
+        c.as[String] flatMap { str =>
+          try {
+            DecodeResult.ok(Blob(UUID.fromString(str)))
           } catch {
             case _: IllegalArgumentException =>
               DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)

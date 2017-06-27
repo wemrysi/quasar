@@ -16,11 +16,9 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
 
 import fs2.{Stream, Sink}
-
-import scalaz.Free
 
 import scodec.bits.ByteVector
 
@@ -35,7 +33,7 @@ object POSIXOp {
   final case class OpenW(target: AFile) extends POSIXOp[Sink[POSIXWithTask, ByteVector]]
   final case class OpenR(target: AFile) extends POSIXOp[Stream[POSIXWithTask, ByteVector]]
 
-  final case class Ls(target: ADir) extends POSIXOp[List[APath]]
+  final case class Ls(target: ADir) extends POSIXOp[List[RPath]]
 
   final case class MkDir(target: ADir) extends POSIXOp[Unit]
   final case class LinkDir(src: ADir, target: ADir) extends POSIXOp[Unit]

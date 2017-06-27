@@ -16,28 +16,25 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{ADir, RDir, RFile}
+import quasar.contrib.pathy.{ADir, RFile}
+import quasar.contrib.scalaz.stateT, stateT._
 
-import argonaut.{Argonaut, CodecJson, Parse}
+import argonaut.{Argonaut, Parse}
 
 import fs2.Stream
 import fs2.interop.scalaz.StreamScalazOps
-import fs2.util.Catchable
 
 import pathy.Path
 
-import scalaz.{~>, :<:, EitherT, Free, Monad, StateT}
+import scalaz.{:<:, Free, Monad, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.string._
-import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
 import scodec.bits.ByteVector
-
-import scala.util.Either
 
 import java.util.UUID
 
@@ -101,7 +98,7 @@ object VersionLog {
 
   def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
     for {
-      log <- getS[Free[S, ?], VersionLog]
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
       uuid <- POSIX.genUUID[S].liftM[ST]
       v = Version(uuid)
 
@@ -109,25 +106,26 @@ object VersionLog {
         fresh[S]
       } else {
         for {
-          _ <- putS[Free[S, ?], VersionLog](log.copy(versions = log.versions + v))
-          target <- dirForVersion[Free[S, ?]](v)
+          _ <- StateTContrib.put[Free[S, ?], VersionLog](log.copy(versions = log.versions + v))
+          target <- underlyingDir[Free[S, ?]](v)
           _ <- POSIX.mkDir[S](target).liftM[ST]
         } yield v
       }
     } yield back
   }
 
-  def dirForVersion[F[_]: Monad](v: Version): StateT[F, VersionLog, ADir] =
-    getS[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
+  def underlyingDir[F[_]: Monad](v: Version): StateT[F, VersionLog, ADir] =
+    StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
+  // TODO add symlink
   def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
-      log <- getS[Free[S, ?], VersionLog]
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
 
       _ <- if (log.versions.contains(v)) {
         for {
-          _ <- putS[Free[S, ?], VersionLog](log2)
+          _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)
 
           vnew <- POSIX.openW[S](log.baseDir </> VersionsJsonNew).liftM[ST]
 
@@ -144,22 +142,22 @@ object VersionLog {
     } yield ()
   }
 
-  def headDir[F[_]: Monad]: StateT[F, VersionLog, Option[ADir]] = {
+  def underlyingHeadDir[F[_]: Monad]: StateT[F, VersionLog, Option[ADir]] = {
     for {
-      log <- getS[F, VersionLog]
+      log <- StateTContrib.get[F, VersionLog]
 
-      back <- log.head.traverse(dirForVersion[F](_))
+      back <- log.head.traverse(underlyingDir[F](_))
     } yield back
   }
 
   def purgeOld[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
-      log <- getS[Free[S, ?], VersionLog]
+      log <- StateTContrib.get[Free[S, ?], VersionLog]
       toPurge = log.committed.drop(KeepLimit)
 
       _ <- toPurge traverse { v =>
         for {
-          dir <- dirForVersion[Free[S, ?]](v)
+          dir <- underlyingDir[Free[S, ?]](v)
           _ <- POSIX.delete[S](dir).liftM[ST]
         } yield ()
       }
@@ -168,39 +166,7 @@ object VersionLog {
         committed = log.committed.take(KeepLimit),
         versions = log.versions -- toPurge)
 
-      _ <- putS[Free[S, ?], VersionLog](log2)
+      _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)
     } yield ()
   }
-
-  // how is this not a member of StateT???
-  private def putS[F[_]: Monad, S](s: S): StateT[F, S, Unit] =
-    StateT[F, S, Unit](_ => (s, ()).point[F])
-
-  // ditto
-  private def getS[F[_]: Monad, S]: StateT[F, S, S] =
-    StateT[F, S, S](s => (s, s).point[F])
-
-  implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] =
-    new Catchable[Free[S, ?]] {
-
-      def pure[A](a: A): Free[S, A] = a.point[Free[S, ?]]
-
-      def fail[A](t: Throwable): Free[S, A] = Free.liftF(I.inj(Task.fail(t)))
-
-      def attempt[A](fa: Free[S, A]): Free[S, Either[Throwable, A]] = {
-        val et = fa.foldMap(λ[S ~> EitherT[Free[S, ?], Throwable, ?]] { sa =>
-          val fse = I.prj(sa) match {
-            case Some(ta) => Free.liftF(I.inj(ta.attempt))
-            case None => Free.liftF(sa).map(_.right[Throwable])
-          }
-
-          EitherT(fse)
-        })
-
-        et.run.map(_.toEither)
-      }
-
-      def flatMap[A, B](fa: Free[S, A])(f: A => Free[S, B]): Free[S, B] =
-        fa.flatMap(f)
-    }
 }

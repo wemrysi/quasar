@@ -533,8 +533,6 @@ lazy val yggdrasil = project.setup
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
-      "io.argonaut" %% "argonaut" % "6.1",
-
       "com.codecommit" %% "smock" % "0.3-specs2-3.8.4" % "test"))
   .settings(headerSettings)
   .settings(publishSettings)

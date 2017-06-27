@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.RPath
 
 import fs2.{Sink, Stream}
 import fs2.interop.scalaz._
@@ -64,7 +64,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- HWT.pattern[List[APath]] {
+        _ <- HWT.pattern[List[RPath]] {
           case CPL(Ls(BaseDir)) => Task.now(Nil)
         }
       } yield ()
@@ -103,7 +103,7 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- HWT.pattern[List[APath]] {
+        _ <- HWT.pattern[List[RPath]] {
           case CPL(Ls(BaseDir)) => Task.now(Nil)
         }
       } yield ()
@@ -119,8 +119,6 @@ object VersionLogSpecs extends Specification {
 
       val members =
         Path.file("versions.json") :: versions.map(v => Path.dir(v.value.toString))
-
-      val vpaths = members.map(BaseDir </> _)
 
       val interp = for {
         _ <- HWT.pattern[Boolean] {
@@ -140,8 +138,8 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- HWT.pattern[List[APath]] {
-          case CPL(Ls(BaseDir)) => Task.now(vpaths)
+        _ <- HWT.pattern[List[RPath]] {
+          case CPL(Ls(BaseDir)) => Task.now(members)
         }
       } yield ()
 
@@ -158,8 +156,6 @@ object VersionLogSpecs extends Specification {
 
       val members =
         Path.file("versions.json") :: versions.map(v => Path.dir(v.value.toString))
-
-      val vpaths = members.map(BaseDir </> _)
 
       val interp = for {
         _ <- HWT.pattern[Boolean] {
@@ -179,8 +175,8 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- HWT.pattern[List[APath]] {
-          case CPL(Ls(BaseDir)) => Task.now(vpaths)
+        _ <- HWT.pattern[List[RPath]] {
+          case CPL(Ls(BaseDir)) => Task.now(members)
         }
       } yield ()
 

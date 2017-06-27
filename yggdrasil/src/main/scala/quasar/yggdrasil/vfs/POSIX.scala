@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
 
 import fs2.{Sink, Stream}
 
@@ -38,7 +38,7 @@ object POSIX {
   def openR[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenR(target)))
 
-  def ls[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, List[APath]] =
+  def ls[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, List[RPath]] =
     Free.liftF(S.inj(Ls(target)))
 
   def mkDir[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, Unit] =
