@@ -24,7 +24,7 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class ThetaJoinPlanner[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: RecursiveT](
+private[qscript] final class ThetaJoinPlanner[F[_]: Monad: QNameGenerator, FMT, T[_[_]]: BirecursiveT](
   implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?]],
   MFP: Planner[F, FMT, MapFuncCore[T, ?]]

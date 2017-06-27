@@ -22,11 +22,11 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFuncCore, MapFuncsCore, FreeMapA}, MapFuncsCore._
+import quasar.qscript.{MapFuncCore, MapFuncsCore}, MapFuncsCore._
 
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
-import scalaz.{Const, Monad, Show, Free}
+import scalaz.{Const, Monad, Show}
 import scalaz.syntax.monad._
 
 private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: RecursiveT](
@@ -52,7 +52,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
+    case TypeOf(x)                    => SP.typeOf(x)
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
@@ -138,34 +138,6 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
 
     // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
     case Guard(_, _, cont, _)         => s"(: GUARD CONT :)$cont".xqy.point[F]
-  }
-
-  def rewriteNullCheck[T[_[_]]: BirecursiveT, A](mfc: MapFuncCore[T, A]): FreeMapA[T, A] = {
-    import quasar.qscript.MapFuncsCore.{StrLit, NullLit}
-    import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf}
-    import quasar.ejson._
-
-    val nullString: FreeMapA[T, A] = StrLit("null")
-
-    def EqR[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
-      Free.roll(Eq(left, right))
-
-    def NeqR[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
-      Free.roll(Neq(left, right))
-
-    def TypeOfR[A](t: FreeMapA[T, A]): FreeMapA[T, A] =
-      Free.roll(TypeOf(t))
-
-    def stringLit(str: String): T[EJson] =
-      EJson.fromCommon(Str[T[EJson]](str))
-
-    mfc match {
-      case Eq(lhs, NullLit)  => EqR(TypeOfR(Free.point(lhs)),  nullString)
-      case Eq(NullLit, rhs)  => EqR(TypeOfR(Free.point(rhs)),  nullString)
-      case Neq(lhs, NullLit) => NeqR(TypeOfR(Free.point(lhs)), nullString)
-      case Neq(NullLit, rhs) => NeqR(TypeOfR(Free.point(rhs)), nullString)
-      case other             => Free.liftF(other)
-    }
   }
 
   ////

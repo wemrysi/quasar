@@ -214,7 +214,6 @@ private[qscript] final class JsonStructuralPlanner[F[_]: Monad: PrologW: QNameGe
         $("node") as ST("node()?")
       ).as(ST("item()?")) { (node: XQuery) =>
         typeswitch(node)(
-                      ST("null-node()") return_ "null".xs,
           $("obj") as ST("object-node()") return_ jsObjCast
         ) default node
       })
