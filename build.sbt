@@ -101,6 +101,9 @@ lazy val assemblySettings = Seq(
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
+    case s if s.endsWith("libjansi.jnilib") => MergeStrategy.last
+    case s if s.endsWith("jansi.dll") => MergeStrategy.last
+    case s if s.endsWith("libjansi.so") => MergeStrategy.last
     case "log4j.properties" => MergeStrategy.discard
 
     case other => (assemblyMergeStrategy in assembly).value apply other

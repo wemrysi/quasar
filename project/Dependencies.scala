@@ -21,9 +21,7 @@ object Dependencies {
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
-  // Staying on 0.8.0 version of refined due to latest version using scala 2.11.11 which
-  // causes duplicate libjansi libraries for linux, mac, and windows that in turn make assembly sbt task fail.
-  private val refinedVersion      = "0.8.0"
+  private val refinedVersion      = "0.8.2"
   private val scodecBitsVersion   = "1.1.0"
   private val http4sVersion       = "0.15.13a"
   private val scalacheckVersion   = "1.13.4"
