@@ -31,7 +31,6 @@ import java.net.URLDecoder
 import org.apache.spark._
 import org.http4s.{ParseFailure, Uri}
 import pathy.Path._
-import pathy.Path.posixCodec
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
@@ -149,6 +148,15 @@ package object elastic {
     IndexType(index, typ)
   }
 
-  def dir2Index(adir: ADir): String =
-    posixCodec.unsafePrintPath(adir).substring(1).replace("/", separator)
+  def dirPath2Index(dirPath: String): String =
+    dirPath.substring(1).replace("/", separator)
+
+  def dir2Index(adir: ADir): String = dirPath2Index(posixCodec.unsafePrintPath(adir))
+
+  def toFile(indexType: IndexType): AFile = {
+    val adir: ADir = indexType.index.split(separator).foldLeft(rootDir){
+      case (acc, dirName) => acc </> dir(dirName)
+    }
+    adir </> file(indexType.typ)
+  }
 }

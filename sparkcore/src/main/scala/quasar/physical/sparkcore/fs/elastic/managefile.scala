@@ -76,11 +76,33 @@ object managefile {
     _                            <- elastic.deleteType(src)
   } yield ()
 
+  private def copyIndex[S[_]](srcIndex: String, dstIndex: String)(implicit
+    elastic: ElasticCall.Ops[S]
+  ): Free[S, Unit] = for {
+    types          <- elastic.listTypes(srcIndex)
+    dstIndexExists <- elastic.indexExists(dstIndex)
+    _              <- if(!dstIndexExists) elastic.createIndex(dstIndex) else ().point[Free[S, ?]]
+    _              <- types.map { tn =>
+      moveFile(toFile(IndexType(srcIndex, tn)), toFile(IndexType(dstIndex, tn)))
+    }.sequence
+  } yield ()
 
-  // TODO_ES
   def moveDir[S[_]](sd: ADir, dd: ADir)(implicit
-    cass: ElasticCall.Ops[S]
-  ): Free[S, Unit] = ().point[Free[S, ?]]
+    elastic: ElasticCall.Ops[S]
+  ): Free[S, Unit] = {
+
+    def calculateDestinationIndex(index: String): String = {
+      val destinationPath = posixCodec.unsafePrintPath(dd) ++ index.diff(posixCodec.unsafePrintPath(sd))
+      dirPath2Index(destinationPath)
+    }
+
+    for {
+      src      <- dir2Index(sd).point[Free[S, ?]]
+      toMove   <- elastic.listIndeces.map(_.filter(i => i.startsWith(src)))
+      _        <- toMove.map(i => copyIndex(i, calculateDestinationIndex(i))).sequence
+      _        <- toMove.map(elastic.deleteIndex(_)).sequence
+    } yield ()
+  }
 
   def delete[S[_]](path: APath)(implicit
     elastic: ElasticCall.Ops[S]
