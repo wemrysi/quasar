@@ -51,12 +51,34 @@ class ElasticCallSpec extends quasar.Qspec
       val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       created must_== true
     }
+
+    "not fail if index already exitst" in {
+      val program = for {
+        _      <- elastic.createIndex("hello")
+        _      <- elastic.createIndex("hello")
+        exists <- elastic.indexExists("hello")
+      } yield exists
+
+      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      created must_== true
+    }
+
   }
 
   "DeleteIndex" should {
     "delete existing index" in {
       val program = for {
         _      <- elastic.createIndex("hello")
+        _      <- elastic.deleteIndex("hello")
+        exists <- elastic.indexExists("hello")
+      } yield exists
+
+      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      created must_== false
+    }
+
+    "not fail if index does not exists" in {
+      val program = for {
         _      <- elastic.deleteIndex("hello")
         exists <- elastic.indexExists("hello")
       } yield exists

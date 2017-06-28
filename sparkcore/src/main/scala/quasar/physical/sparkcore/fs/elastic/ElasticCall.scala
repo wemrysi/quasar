@@ -24,7 +24,7 @@ import com.sksamuel.elastic4s.http._
 import com.sksamuel.elastic4s._
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import org.http4s.client.blaze._
-import scalaz._, scalaz.concurrent.Task
+import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 final case class IndexType(index: String, typ: String)
 
@@ -61,18 +61,50 @@ object ElasticCall {
     implicit def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
   }
 
+
+  //TODO_ES reuse single client per interpreter, close when unmounted
   implicit def interpreter: ElasticCall ~> Task = new (ElasticCall ~> Task) {
 
-    def apply[A](from: ElasticCall[A]) = from match {
-      case CreateIndex(index) => Task.delay {
+    def listIndices: Task[List[String]] = for {
+      httpClient <- Task.delay {
+        PooledHttp1Client()
+      }
+      indices <- httpClient.expect[String]("http://localhost:9200/_aliases")
+    } yield {
+      val result = DataCodec.parse(indices)(DataCodec.Precise).fold(error => List.empty[String], {
+        case Data.Obj(m) => m.keys.toList.map(d => s"$d")
+        case _ => List.empty[String] // TODO_ES handling errors
+      })
+      httpClient.shutdownNow() // TODO_ES handling resources
+      result
+    }
+
+    def create(index: String): Task[Unit] = for {
+      indices <- listIndices
+      _       <- if(indices.contains(index)) ().point[Task] else Task.delay {
         val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
         val result = client.execute { createIndex(index) }.await
         client.close()
         ()
       }
+    } yield ()
+
+    def delete(index: String): Task[Unit] = for {
+      indices <- listIndices
+      _       <- if(!indices.contains(index)) ().point[Task] else Task.delay {
+        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+        val result = client.execute { deleteIndex(index) }.await
+        client.close()
+        ()
+      }
+    } yield ()
+
+    def apply[A](from: ElasticCall[A]) = from match {
+      case CreateIndex(index) => create(index)
       case Copy(src, dst) => Task.delay {
         // TODO_ES
       }
+
       case TypeExists(IndexType(index, typ)) =>
         Task.delay {
           val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
@@ -99,25 +131,8 @@ object ElasticCall {
         httpClient.shutdownNow() // TODO_ES handling resources
         result
       }
-      case ListIndeces() => for {
-        httpClient <- Task.delay {
-          PooledHttp1Client()
-        }
-        indices <- httpClient.expect[String]("http://localhost:9200/_aliases")
-      } yield {
-        val result = DataCodec.parse(indices)(DataCodec.Precise).fold(error => List.empty[String], {
-          case Data.Obj(m) => m.keys.toList.map(d => s"$d")
-          case _ => List.empty[String] // TODO_ES handling errors
-        })
-        httpClient.shutdownNow() // TODO_ES handling resources
-        result
-      }
-      case DeleteIndex(index) =>  Task.delay {
-        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-        val result = client.execute { deleteIndex(index) }.await
-        client.close()
-        ()
-      }
+      case ListIndeces() => listIndices
+      case DeleteIndex(index) => delete(index)
       case DeleteType(IndexType(index, typ)) => Task.delay {
         // TODO_ES
         ()
