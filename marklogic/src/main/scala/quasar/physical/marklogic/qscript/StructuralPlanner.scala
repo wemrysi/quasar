@@ -211,15 +211,16 @@ trait StructuralPlanner[F[_], FMT] { self =>
     ejs.declare[F]("type-of-q") flatMap (_(
       $("item") as ST.Top
     ).as(ST("xs:string?")) { item: XQuery =>
-      val lookup = $("lookup")
+      val (lookup, mapped) = ($("lookup"), $("mapped"))
       typeOf(item) map ( tpe =>
         let_(
           lookup := map.new_(mkSeq_(
             map.entry("object".xs, "map".xs),
-            map.entry("string".xs, "array".xs),
-            map.entry("na".xs, "".xs)
-          )))
-          .return_(map.get(~lookup, tpe)))
+            map.entry("string".xs, "array".xs)
+          )),
+          mapped := map.get(~lookup, tpe)
+        )
+        .return_(if_(fn.empty(~mapped)).then_(tpe).else_(~mapped)))
     })
 
   // ejson:type-of($item as item()*) as xs:string?
