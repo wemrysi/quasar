@@ -24,7 +24,6 @@ import com.sksamuel.elastic4s.http._
 import com.sksamuel.elastic4s._
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import org.http4s.client.blaze._
-import org.apache.spark._
 import scalaz._, scalaz.concurrent.Task
 
 final case class IndexType(index: String, typ: String)
@@ -62,11 +61,14 @@ object ElasticCall {
     implicit def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
   }
 
-  implicit def interpreter(sc: SparkContext): ElasticCall ~> Task = new (ElasticCall ~> Task) {
+  implicit def interpreter: ElasticCall ~> Task = new (ElasticCall ~> Task) {
 
     def apply[A](from: ElasticCall[A]) = from match {
       case CreateIndex(index) => Task.delay {
-        // TODO_ES
+        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+        val result = client.execute { createIndex(index) }.await
+        client.close()
+        ()
       }
       case Copy(src, dst) => Task.delay {
         // TODO_ES
@@ -110,8 +112,10 @@ object ElasticCall {
         httpClient.shutdownNow() // TODO_ES handling resources
         result
       }
-      case DeleteIndex(index) => Task.delay {
-        // TODO_ES
+      case DeleteIndex(index) =>  Task.delay {
+        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+        val result = client.execute { deleteIndex(index) }.await
+        client.close()
         ()
       }
       case DeleteType(IndexType(index, typ)) => Task.delay {

@@ -1,0 +1,68 @@
+/*
+ * Copyright 2014–2017 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package quasar.physical.sparkcore.fs.elastic
+
+import slamdata.Predef._
+import com.sksamuel.elastic4s.testkit._
+import com.sksamuel.elastic4s.embedded._
+import scalaz._, Scalaz._
+import org.specs2.specification.BeforeAfterEach
+
+class ElasticCallSpec extends quasar.Qspec
+    with AlwaysNewLocalNodeProvider
+    with BeforeAfterEach  {
+
+  sequential
+
+  val elastic = new ElasticCall.Ops[ElasticCall]
+
+  var node: Option[LocalNode] = None
+
+  def before = {
+    node = getNode.some
+  }
+
+  def after = {
+    node.map(_.stop(removeData = true))
+    node = None
+  }
+
+  "CreateIndex" should {
+    "create new index" in {
+      val program = for {
+        _      <- elastic.createIndex("hello")
+        exists <- elastic.indexExists("hello")
+      } yield exists
+
+      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      created must_== true
+    }
+  }
+
+  "DeleteIndex" should {
+    "delete existing index" in {
+      val program = for {
+        _      <- elastic.createIndex("hello")
+        _      <- elastic.deleteIndex("hello")
+        exists <- elastic.indexExists("hello")
+      } yield exists
+
+      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      created must_== false
+    }
+  }
+}

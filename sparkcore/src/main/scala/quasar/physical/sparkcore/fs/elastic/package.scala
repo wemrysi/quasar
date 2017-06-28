@@ -109,7 +109,7 @@ package object elastic {
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
           (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-          (ElasticCall.interpreter(sc) andThen injectNT[Task, S]) :+:
+          (ElasticCall.interpreter andThen injectNT[Task, S]) :+:
           (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
           injectNT[Task, S] :+:
           injectNT[PhysErr, S]

@@ -120,6 +120,7 @@ object Dependencies {
     ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.5")
       .exclude("commons-logging", "commons-logging"),
     "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.5",
+    "com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.5" % Test,
     "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
   )
 
