@@ -52,7 +52,7 @@ private[qscript] final class MapFuncPlanner[F[_]: Monad: QNameGenerator: PrologW
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => SP.typeOf(x)
+    case TypeOf(x)                    => SP.typeOfQ(x)
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
