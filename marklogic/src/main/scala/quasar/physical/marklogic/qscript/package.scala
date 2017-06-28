@@ -21,11 +21,13 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
+import quasar.contrib.matryoshka.totally
 import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
+import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -138,11 +140,6 @@ package object qscript {
     implicit UR: Recursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]],
              UC: Corecursive.Aux[U, CoEnv[E, MapFuncCore[T, ?], ?]]
   ): CoEnv[E, MapFuncCore[T, ?], U] => CoEnv[E, MapFuncCore[T, ?], U] = {
-
-    import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
-    import quasar.ejson._
-    import matryoshka._
-
     object NullLit {
       def unapply[T[_[_]]: RecursiveT, A](mfc: CoEnv[E, MapFuncCore[T, ?], A]): Boolean =
         mfc.run.exists[MapFuncCore[T, A]] {
@@ -151,18 +148,15 @@ package object qscript {
         }
     }
 
-    def stringLit(str: String): Constant[T, U] =
-      Constant[T, U](EJson.fromCommon(Str[T[EJson]](str)))
+    val nullString: U =
+      UC.embed(CoEnv(Constant[T, U](EJson.fromCommon(Str[T[EJson]]("null"))).right))
 
-    val nullString: U = UC.embed(CoEnv(stringLit("null").right))
-
-    fa => CoEnv(fa.run.map {
+    fa => CoEnv(fa.run.map (totally {
       case Eq(lhs, Embed(NullLit()))  => Eq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
       case Eq(Embed(NullLit()), rhs)  => Eq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
       case Neq(lhs, Embed(NullLit())) => Neq(UC.embed(CoEnv(TypeOf(lhs).right)), nullString)
       case Neq(Embed(NullLit()), rhs) => Neq(UC.embed(CoEnv(TypeOf(rhs).right)), nullString)
-      case other                      => other
-    })
+    }))
   }
 
   ////
