@@ -2,7 +2,7 @@
     "name": "select over fields with same name",
 
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
         "mongodb_q_3_2": "pending",
