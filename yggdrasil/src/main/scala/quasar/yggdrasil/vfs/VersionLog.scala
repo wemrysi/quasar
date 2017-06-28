@@ -114,6 +114,7 @@ object VersionLog {
     } yield back
   }
 
+  // TODO there isn't any error handling here
   def underlyingDir[F[_]: Monad](v: Version): StateT[F, VersionLog, ADir] =
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 

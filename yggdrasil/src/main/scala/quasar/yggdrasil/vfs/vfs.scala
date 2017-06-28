@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
+import quasar.contrib.pathy.{sandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
 
 import argonaut.{Argonaut, Parse}
@@ -93,9 +93,9 @@ object FreeVFS {
             }
           } yield pair
 
-          pair <- pathsST.eval(metaLog)
-          (paths, index) = pair
-        } yield (metaLog, paths, index)
+          pairPair <- pathsST(metaLog)
+          (metaLog2, (paths, index)) = pairPair
+        } yield (metaLog2, paths, index)
       }
 
       (metaLog, paths, index) = triple
@@ -164,11 +164,7 @@ object FreeVFS {
 
             paths = pathsFromStrings flatMap {
               case (k, v) =>
-                val maybe = for {
-                  abs <- Path.posixCodec.parseAbsFile(k)
-                  sandboxed <- Path.sandbox(Path.currentDir, abs)
-                } yield Path.rootDir </> sandboxed
-
+                val maybe = Path.posixCodec.parseAbsFile(k).map(sandboxAbs)
                 maybe.fold(Map[AFile, Blob]())(k => Map(k -> v))
             }
 
@@ -181,10 +177,7 @@ object FreeVFS {
 
             index = indexFromStrings flatMap {
               case (k, v) =>
-                val maybe = for {
-                  abs <- Path.posixCodec.parseAbsDir(k)
-                  sandboxed <- Path.sandbox(Path.currentDir, abs)
-                } yield Path.rootDir </> sandboxed
+                val maybe = Path.posixCodec.parseAbsDir(k).map(sandboxAbs)
 
                 maybe.fold(Map[ADir, Vector[RPath]]())(k => Map(k -> v))
             }
@@ -204,7 +197,7 @@ object FreeVFS {
       target = vfs.baseDir </> Path.dir(uuid.toString)
       blob = Blob(uuid)
 
-      back <- if (vfs.blobs.contains(blob)) {
+      back <- if (!vfs.blobs.contains(blob)) {
         for {
           _ <- POSIX.mkDir[S](target).liftM[ST]
           vlog <- VersionLog.init[S](target).liftM[ST]
@@ -230,7 +223,7 @@ object FreeVFS {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
-      success <- if (vfs.paths.contains(to)) {
+      success <- if (vfs.paths.contains(to) || !vfs.blobs.contains(from)) {
         false.point[ST[Free[S, ?], ?]]
       } else {
         val paths2 = vfs.paths + (to -> from)
@@ -288,7 +281,7 @@ object FreeVFS {
   def readPath[F[_]: Monad](path: AFile): StateT[F, VFS, Option[Blob]] =
     StateTContrib.get[F, VFS].map(_.paths.get(path))
 
-  def underlyingDir[S[_]](blob: Blob, version: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, ADir] =
+  def underlyingDir[S[_]](blob: Blob, version: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[ADir]] =
     withVLog(blob)(VersionLog.underlyingDir[Free[S, ?]](version))
 
   private def blobVLog[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, VersionLog] = {
@@ -310,27 +303,35 @@ object FreeVFS {
   private def withVLog[S[_], A](blob: Blob)(st: StateT[Free[S, ?], VersionLog, A])(
     implicit
       IP: POSIXOp :<: S,
-      IT: Task :<: S): StateT[Free[S, ?], VFS, A] = {
+      IT: Task :<: S): StateT[Free[S, ?], VFS, Option[A]] = {
 
     for {
-      vlog <- blobVLog[S](blob)
-      pair <- st(vlog).liftM[ST]
-      (vlog2, a) = pair
-
       vfs <- StateTContrib.get[Free[S, ?], VFS]
-      vfs2 = vfs.copy(versions = vfs.versions.updated(blob, vlog2))
-      _ <- StateTContrib.put[Free[S, ?], VFS](vfs2)
-    } yield a
+
+      back <- if (vfs.blobs.contains(blob)) {
+        for {
+          vlog <- blobVLog[S](blob)
+          pair <- st(vlog).liftM[ST]
+          (vlog2, a) = pair
+
+          vfs <- StateTContrib.get[Free[S, ?], VFS]
+          vfs2 = vfs.copy(versions = vfs.versions.updated(blob, vlog2))
+          _ <- StateTContrib.put[Free[S, ?], VFS](vfs2)
+        } yield Some(a)
+      } else {
+        (None: Option[A]).point[StateT[Free[S, ?], VFS, ?]]
+      }
+    } yield back
   }
 
   def headOfBlob[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
     blobVLog[S](blob).map(_.head)
 
-  def fresh[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Version] =
+  def fresh[S[_]](blob: Blob)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Option[Version]] =
     withVLog(blob)(VersionLog.fresh[S])
 
   def commit[S[_]](blob: Blob, version: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Unit] =
-    withVLog(blob)(VersionLog.commit[S](version))
+    withVLog(blob)(VersionLog.commit[S](version)).void
 
   private def computeIndex(paths: List[APath]): Map[ADir, Vector[RPath]] =
     paths.foldMap(computeSubIndex(_))
@@ -381,13 +382,13 @@ final class SerialVFS private (
   def readPath(path: AFile): Task[Option[Blob]] =
     runST(FreeVFS.readPath[POSIXWithTask](path))
 
-  def underlyingDir(blob: Blob, version: Version): Task[ADir] =
+  def underlyingDir(blob: Blob, version: Version): Task[Option[ADir]] =
     runST(FreeVFS.underlyingDir[S](blob, version))
 
   def headOfBlob(blob: Blob): Task[Option[Version]] =
     runST(FreeVFS.headOfBlob[S](blob))
 
-  def fresh(blob: Blob): Task[Version] =
+  def fresh(blob: Blob): Task[Option[Version]] =
     runST(FreeVFS.fresh[S](blob))
 
   def commit(blob: Blob, version: Version): Task[Unit] =
