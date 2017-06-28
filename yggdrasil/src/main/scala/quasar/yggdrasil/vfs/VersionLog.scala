@@ -166,6 +166,7 @@ object VersionLog {
         committed = log.committed.take(KeepLimit),
         versions = log.versions -- toPurge)
 
+      // TODO write new versions.json
       _ <- StateTContrib.put[Free[S, ?], VersionLog](log2)
     } yield ()
   }

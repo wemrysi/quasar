@@ -63,8 +63,8 @@ object FreeVFS {
 
           paths = Map[AFile, Blob]()
           index = Map[ADir, Vector[RPath]]()
-          _ <- persistMeta[S](paths, index).eval(metaLog)
-        } yield (metaLog, paths, index)
+          metaLog2 <- persistMeta[S](paths, index).exec(metaLog)
+        } yield (metaLog2, paths, index)
       } else {
         for {
           metaLog <- VersionLog.init[S](baseDir </> MetaDir)

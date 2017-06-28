@@ -37,6 +37,7 @@ import java.util.UUID
 
 object VersionLogSpecs extends Specification {
   import POSIXOp._
+  import StreamTestUtils._
 
   "version log manager" should {
     val H = Harness[POSIXOp, Task]
@@ -93,6 +94,10 @@ object VersionLogSpecs extends Specification {
 
               assertionSink(_ mustEqual "[]")
             }
+        }
+
+        _ <- HWT.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- HWT.pattern[Unit] {
@@ -254,6 +259,10 @@ object VersionLogSpecs extends Specification {
         }
 
         _ <- HWT.pattern[Unit] {
+          case CPR(ta) => ta
+        }
+
+        _ <- HWT.pattern[Unit] {
           case CPL(Move(from, to)) =>
             Task delay {
               from mustEqual (BaseDir </> Path.file("versions.json.new"))
@@ -308,16 +317,6 @@ object VersionLogSpecs extends Specification {
 
       val committed2 = init.committed.take(5)
       result mustEqual VersionLog(BaseDir, committed2, committed2.toSet)
-    }
-  }
-
-  def assertionSink(pred: String => Unit): Sink[POSIXWithTask, ByteVector] = { s =>
-    s flatMap { bv =>
-      Stream suspend {
-        pred(new String(bv.toArray))
-
-        Stream.empty
-      }
     }
   }
 
