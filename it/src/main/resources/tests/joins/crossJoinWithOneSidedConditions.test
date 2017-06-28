@@ -2,7 +2,7 @@
     "name": "cross join with conditions that must be pushed ahead of the join (or else the join explodes, taking several minutes to complete)",
 
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "timeout",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip",
         "mongodb_q_3_2":     "pending",

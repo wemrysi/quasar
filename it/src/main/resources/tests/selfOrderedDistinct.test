@@ -3,13 +3,13 @@
 
     "backends": {
         "mimir": "skip",
-        "couchbase":      "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "mongodb_q_3_2":  "skip",
+        "couchbase":      "timeout",
+        "marklogic_json": "timeout",
+        "marklogic_xml":  "timeout",
+        "mongodb_q_3_2":  "pending",
         "postgresql":     "pending",
-        "spark_hdfs":     "skip",
-        "spark_local":    "skip"
+        "spark_hdfs":     "timeout",
+        "spark_local":    "timeout"
     },
 
     "data": "zips.data",

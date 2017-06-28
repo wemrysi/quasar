@@ -5,9 +5,9 @@
         "mimir": "skip",
         "mongodb_q_3_2": "pending",
         "postgresql":        "pending",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "couchbase":         "skip"
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "couchbase":         "timeout"
     },
 
     "NB": "#2120: Disabled in marklogic due to slow performance.
