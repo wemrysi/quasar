@@ -184,13 +184,11 @@ final class Compiler[M[_], T: Equal]
 
   // CORE COMPILER
   private def compile0
-    (node: CoExpr, functionDecls: Map[CIName, HomomorphicFunction[T, T]])
+    (node: CoExpr)
     (implicit
       MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]])
       : M[T] = {
-
-    def compile1(node: CoExpr) = compile0(node, functionDecls)
 
     // NB: When there are multiple names for the same function, we may mark one
     //     with an `*` to indicate that it’s the “preferred” name, and others
@@ -332,7 +330,7 @@ final class Compiler[M[_], T: Equal]
 
     def compileFunction[N <: Nat](func: GenericFunc[N], args: Func.Input[CoExpr, N]):
         M[T] =
-      args.traverse(compile1).map(func.applyGeneric(_).embed)
+      args.traverse(compile0).map(func.applyGeneric(_).embed)
 
     def buildRecord(names: List[Option[String]], values: List[T]):
         T = {
@@ -359,7 +357,7 @@ final class Compiler[M[_], T: Equal]
             p => emit(lpr.read(p)),
             fail(InvalidPathError(path, None)))
 
-        case ExprRelationAST(expr, _) => compile1(expr)
+        case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
           (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
@@ -371,7 +369,7 @@ final class Compiler[M[_], T: Equal]
               CompilerState.contextual(
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))
-              (compile1(clause)))((left0, right0, clause0) =>
+              (compile0(clause)))((left0, right0, clause0) =>
                 lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
           }).join
       }
@@ -421,7 +419,7 @@ final class Compiler[M[_], T: Equal]
     def temporalPartFunc[A](
       name: CIName, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
     ): M[T] =
-      args.traverse(compile1).flatMap {
+      args.traverse(compile0).flatMap {
         case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
           f1(part).cata(
             f2(_, expr),
@@ -471,14 +469,14 @@ final class Compiler[M[_], T: Equal]
                   (names.some,
                     projections
                       .map(_.expr)
-                      .traverse(compile1)
+                      .traverse(compile0)
                       .map(buildRecord(names, _)))
-                case List(Proj(expr, None)) => (none, compile1(expr))
+                case List(Proj(expr, None)) => (none, compile0(expr))
                 case _ =>
                   (names.some,
                     projections
                       .map(_.expr)
-                      .traverse(compile1)
+                      .traverse(compile0)
                       .map(buildRecord(names, _)))
               }
 
@@ -488,18 +486,18 @@ final class Compiler[M[_], T: Equal]
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
                   val filtered = filter.map(filter =>
-                    (CompilerState.rootTableReq[M, T] ⊛ compile1(filter))(
+                    (CompilerState.rootTableReq[M, T] ⊛ compile0(filter))(
                       set.Filter(_, _).embed))
 
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
                       (CompilerState.rootTableReq[M, T] ⊛
-                        groupBy.keys.traverse(compile1)) ((src, keys) =>
+                        groupBy.keys.traverse(compile0)) ((src, keys) =>
                         set.GroupBy(src, structural.MakeArrayN(keys: _*).embed).embed))
 
                     stepBuilder(grouped) {
                       val having = groupBy.flatMap(_.having).map(having =>
-                        (CompilerState.rootTableReq[M, T] ⊛ compile1(having))(
+                        (CompilerState.rootTableReq[M, T] ⊛ compile0(having))(
                           set.Filter(_, _).embed))
 
                       stepBuilder(having) {
@@ -512,7 +510,7 @@ final class Compiler[M[_], T: Equal]
                                 ord.keys.map(p => (nu, p._1)).point[M])(
                                 na => CompilerState.addFields(na.unite)(ord.keys.traverse {
                                   case (ot, key) =>
-                                    compile1(key).map(_.transApoT(substitute(preSorted, nu))) strengthR ot
+                                    compile0(key).map(_.transApoT(substitute(preSorted, nu))) strengthR ot
                                 })) ∘
                                 (ks =>
                                   lpr.sort(nu,
@@ -563,24 +561,24 @@ final class Compiler[M[_], T: Equal]
 
       case Let(name, form, body) => {
         val rel = ExprRelationAST(form, name.value)
-        step(rel)(compile1(form).some)(compile1(body))
+        step(rel)(compile0(form).some)(compile0(body))
       }
 
       case SetLiteral(values0) =>
-        values0.traverse(compile1).map(vs =>
+        values0.traverse(compile0).map(vs =>
           structural.ShiftArray(structural.MakeArrayN(vs: _*).embed).embed)
 
       case ArrayLiteral(exprs) =>
-        exprs.traverse(compile1).map(structural.MakeArrayN(_: _*).embed)
+        exprs.traverse(compile0).map(structural.MakeArrayN(_: _*).embed)
 
       case MapLiteral(exprs) =>
-        exprs.traverse(_.bitraverse(compile1, compile1)) ∘
+        exprs.traverse(_.bitraverse(compile0, compile0)) ∘
         (structural.MakeObjectN(_: _*).embed)
 
       case Splice(expr) =>
         expr.fold(
           CompilerState.fullTable.flatMap(_.map(emit _).getOrElse(fail(GenericError("Not within a table context so could not find table expression for wildcard")))))(
-          compile1)
+          compile0)
 
       case Binop(left, right, op) =>
         ((op match {
@@ -623,9 +621,9 @@ final class Compiler[M[_], T: Equal]
           case Not                 => relations.Not.left
           case f @ Exists          => fail(GenericError("Should not have encountered an exists at this point in compilation")).right
           // TODO: NOP, but should we ensure we have a Num or Interval here?
-          case Positive            => compile1(expr).right
+          case Positive            => compile0(expr).right
           case Negative            => math.Negate.left
-          case Distinct            => (compile1(expr) >>= compileDistinct).right
+          case Distinct            => (compile0(expr) >>= compileDistinct).right
           case FlattenMapKeys      => structural.FlattenMapKeys.left
           case FlattenMapValues    => structural.FlattenMap.left
           case ShiftMapKeys        => structural.ShiftMapKeys.left
@@ -664,7 +662,7 @@ final class Compiler[M[_], T: Equal]
       case InvokeFunction(name, args) if name ≟ CIName("coalesce") =>
         args match {
           case List(a1, a2) =>
-            (CompilerState.freshName("c") ⊛ compile1(a1) ⊛ compile1(a2))((name, c1, c2) =>
+            (CompilerState.freshName("c") ⊛ compile0(a1) ⊛ compile0(a2))((name, c1, c2) =>
               lpr.let(name, c1,
                 relations.Cond(
                   // TODO: Ideally this would use `is null`, but that doesn’t makes it
@@ -676,29 +674,29 @@ final class Compiler[M[_], T: Equal]
         }
 
       case InvokeFunction(name, args) =>
-        val function: Option[HomomorphicFunction[T, T]] = functionDecls.orElse(functionMapping.mapValues(_.toFunction[T].andThen(_.embed))).lift.apply(name)
+        val function: Option[HomomorphicFunction[T, T]] = functionMapping.mapValues(_.toFunction[T].andThen(_.embed)).lift.apply(name)
         function.cata[M[T]](
-          func => args.traverse(compile1).flatMap(func.apply(_).cata(
+          func => args.traverse(compile0).flatMap(func.apply(_).cata(
             successfulInvoke => successfulInvoke.point[M],
             fail(WrongArgumentCount(name, func.arity, args.size)))),
           fail(FunctionNotFound(name)))
 
       case Match(expr, cases, default0) =>
         for {
-          expr    <- compile1(expr)
-          default <- default0.fold(emit(lpr.constant(Data.Null)))(compile1)
+          expr    <- compile0(expr)
+          default <- default0.fold(emit(lpr.constant(Data.Null)))(compile0)
           cases   <- compileCases(cases, default) {
             case Case(cse, expr2) =>
-              (compile1(cse) ⊛ compile1(expr2))((cse, expr2) =>
+              (compile0(cse) ⊛ compile0(expr2))((cse, expr2) =>
                 (relations.Eq(expr, cse).embed, expr2))
           }
         } yield cases
 
       case Switch(cases, default0) =>
-        default0.fold(emit(lpr.constant(Data.Null)))(compile1).flatMap(
+        default0.fold(emit(lpr.constant(Data.Null)))(compile0).flatMap(
           compileCases(cases, _) {
             case Case(cond, expr2) =>
-              (compile1(cond) ⊛ compile1(expr2))((_, _))
+              (compile0(cond) ⊛ compile0(expr2))((_, _))
           })
 
       case IntLiteral(value) => emit(lpr.constant(Data.Int(value)))
@@ -713,25 +711,12 @@ final class Compiler[M[_], T: Equal]
   // TODO: This could have fewer constraints if we didn’t have to use the same
   //       Monad as `compile0`.
   def compile
-    (tree: Cofree[Sql, SA.Annotations], userFuncs: List[FunctionDecl[Cofree[Sql, SA.Annotations]]])
+    (tree: Cofree[Sql, SA.Annotations])
     (implicit
       MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]])
-      : M[T] = {
-    val functions = userFuncs.foldLeftM(Map.empty[CIName, HomomorphicFunction[T, T]]) { (map, func) =>
-      compile0(func.body, map).map { body =>
-        val lpFunc = new HomomorphicFunction[T, T] {
-          def arity = func.args.size
-          def apply(args: List[T]): Option[T] =
-            func.args.alignBoth(args).sequence.map { argsMap =>
-              lpr.bindFree(argsMap.toMap)(body)
-            }
-        }
-        map + (func.name -> lpFunc)
-      }
-    }
-    functions.flatMap(compile0(tree, _)).map(Compiler.reduceGroupKeys[T])
-  }
+      : M[T] =
+    compile0(tree).map(Compiler.reduceGroupKeys[T])
 }
 
 object Compiler {
@@ -744,10 +729,10 @@ object Compiler {
     apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
 
   def compile[T: Equal]
-    (tree: Cofree[Sql, SA.Annotations], scope: List[FunctionDecl[Cofree[Sql, SA.Annotations]]])
+    (tree: Cofree[Sql, SA.Annotations])
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : SemanticError \/ T =
-    trampoline[T].compile(tree, scope).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
+    trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
 
   /** Emulate SQL semantics by reducing any projection which trivially
     * matches a key in the "group by".

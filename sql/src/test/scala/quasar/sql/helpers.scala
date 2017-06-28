@@ -39,7 +39,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   val compile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] = query => {
     for {
       attr   <- parseAndAnnotate(query)
-      cld    <- Compiler.compile[Fix[LP]](attr, Nil).leftMap(NonEmptyList(_))
+      cld    <- Compiler.compile[Fix[LP]](attr).leftMap(NonEmptyList(_))
     } yield cld
   }
 

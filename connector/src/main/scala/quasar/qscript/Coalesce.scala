@@ -468,6 +468,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         case Map(Embed(src), mf) =>
           (FToOut(src) >>= TJ.prj).map(
             tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc))(tj)))
+        case Filter(Embed(src), cond) =>
+          (FToOut(src) >>= TJ.prj).map(
+            tj => TJ.inj(ThetaJoin.on[IT, IT[F]].modify(on => Free.roll(And(on, cond >> tj.combine)))(tj)))
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeTJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
         case Union(src, from, count) =>

@@ -16,10 +16,22 @@
 
 package quasar.sql
 
-trait Arbitraries extends
-  ExprArbitrary with
-  ScopedExprArbitrary with
-  StatementArbitrary with
-  CINameArbitrary
+import slamdata.Predef._
+import quasar.sql.StatementArbitrary._
+import quasar.sql.ExprArbitrary._
 
-object Arbitraries extends Arbitraries
+import scala.Predef._
+
+import org.scalacheck.Arbitrary
+import matryoshka.data.Fix
+
+trait ScopedExprArbitrary {
+
+  implicit val scopedExprArbitrary: Arbitrary[ScopedExpr[Fix[Sql]]] =
+    Arbitrary(for {
+      expr <- Arbitrary.arbitrary[Fix[Sql]]
+      scope <- Arbitrary.arbitrary[List[Statement[Fix[Sql]]]]
+    } yield ScopedExpr(expr, scope))
+}
+
+object ScopedExprArbitrary extends ScopedExprArbitrary
