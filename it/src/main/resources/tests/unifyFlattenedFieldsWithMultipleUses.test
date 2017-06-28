@@ -10,7 +10,6 @@
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
-    "NB": "Skipped in marklogic because it times out.",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",
     "predicate": "exactly",

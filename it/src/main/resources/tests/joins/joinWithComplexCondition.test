@@ -3,15 +3,14 @@
 
     "backends": {
         "mimir": "skip",
-        "couchbase":         "timeout",
+        "couchbase":         "pending",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
         "mongodb_q_3_2":     "pending",
         "postgresql":        "pending"
     },
 
-    "NB": "#2120: Disabled in marklogic due to slow performance.
-           #1587: Disabled in couchbase due to lack of general join.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 
