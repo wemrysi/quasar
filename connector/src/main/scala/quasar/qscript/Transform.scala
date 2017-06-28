@@ -370,14 +370,14 @@ class Transform
     case lp.InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized())
         if func.effect ≟ Mapping =>
       Target(
-        Ann(Nil, Free.roll[MapFunc, Hole](MapFuncCore.translateNullaryMapping(MFC)(func))),
+        Ann(Nil, Free.roll[MapFunc, Hole](MapFunc.translateNullaryMapping(MFC)(func))),
         QC.inj(Unreferenced[T, T[F]]()).embed).right
 
     case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.ann
       Target(
-        Ann(buckets, Free.roll[MapFunc, Hole](MapFuncCore.translateUnaryMapping(MFC)(func)(value))),
+        Ann(buckets, Free.roll[MapFunc, Hole](MapFunc.translateUnaryMapping(MFC, MFD)(func)(value))),
         a1.value).right
 
     case lp.InvokeUnapply(structural.ObjectProject, Sized(a1, a2)) =>
@@ -404,12 +404,12 @@ class Transform
         if func.effect ≟ Mapping =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
-        Ann[T](base.buckets, Free.roll(MapFuncCore.translateBinaryMapping(MFC)(func)(lval, rval))),
+        Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(MFC)(func)(lval, rval))),
         base.src).right[PlannerError]
 
     case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
-      merge3Map(Func.Input3(a1, a2, a3))(MapFuncCore.translateTernaryMapping(MFC)(func)).right[PlannerError]
+      merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(MFC)(func)).right[PlannerError]
 
     case lp.InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>

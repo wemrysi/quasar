@@ -81,7 +81,7 @@ package object qscript {
     fm: FreeMap[T],
     src: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]],
+    MFP: Planner[F, FMT, MapFunc[T, ?]],
     SP:  StructuralPlanner[F, FMT]
   ): F[XQuery] =
     fm.project match {
@@ -111,7 +111,7 @@ package object qscript {
     l: XQuery,
     r: XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): F[XQuery] =
     planMapFunc[T, F, FMT, JoinSide](jf) {
       case LeftSide  => l
@@ -122,7 +122,7 @@ package object qscript {
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
-    MFP: Planner[F, FMT, MapFuncCore[T, ?]]
+    MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): F[XQuery] =
     freeMap.cataM(interpretM(recover(_).point[F], MFP.plan))
 

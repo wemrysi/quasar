@@ -19,7 +19,6 @@ package quasar.physical.couchbase.planner
 import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
-import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
@@ -27,7 +26,7 @@ import quasar.physical.couchbase._,
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
 import quasar.Planner.PlannerErrorME
-import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}
 
 import matryoshka._
 import matryoshka.data._
@@ -42,6 +41,8 @@ final class EquiJoinPlanner[
     F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
+  val MFC = quasar.qscript.MFC[T]
+
   object CShiftedRead {
     def unapply[F[_], A](
       fa: F[A]
@@ -53,12 +54,12 @@ final class EquiJoinPlanner[
 
   object MetaGuard {
     def unapply[A](mf: FreeMapA[T, A]): Boolean = (
-      mf.resume.swap.toOption >>= { case mfs.Guard(Meta(), _, _, _) => ().some; case _ => none }
+      mf.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
     ).isDefined
 
     object Meta {
       def unapply[A](mf: FreeMapA[T, A]): Boolean =
-        (mf.resume.swap.toOption >>= { case mfs.Meta(_) => ().some; case _ => none }).isDefined
+        (mf.resume.swap.toOption >>= { case MFC(mfs.Meta(_)) => ().some; case _ => none }).isDefined
     }
   }
 
@@ -74,22 +75,16 @@ final class EquiJoinPlanner[
   }
 
   object KeyMetaId {
-    def unapply(mf: FreeMap[T]): Boolean = mf match {
-      case Embed(StaticArray(v :: Nil)) => v.resume match {
-        case -\/(mfs.ProjectField(src, field)) => (src.resume, field.resume) match {
-          case (-\/(mfs.Meta(_)), -\/(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2)))))) => true
-          case _                                                                       => false
-        }
-        case v => false
-      }
-      case _ => false
+    def unapply(mf: FreeMap[T]): Boolean = mf.resume match {
+      case -\/(MFC(mfs.ProjectField(Embed(CoEnv(\/-(MFC(mfs.Meta(_))))), mfs.StrLit("id")))) => true
+      case _                                                                                 => false
     }
   }
 
   lazy val tPlan: AlgebraM[F, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[F, MapFuncCore[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[F, MapFunc[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
   def unimpl[A] =

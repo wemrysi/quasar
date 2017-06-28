@@ -48,6 +48,7 @@ trait TTypes[T[_[_]]] {
   type Target[F[_]]     = quasar.qscript.Target[T, F]
 
   val MFC = quasar.qscript.MFC[T]
+  val MFD = quasar.qscript.MFD[T]
 }
 
 object TTypes {

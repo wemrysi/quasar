@@ -23,7 +23,6 @@ import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.std.StdLib._
 import quasar.std.TemporalPart
 
 import matryoshka._
@@ -679,99 +678,6 @@ object MapFuncCore {
         }
       }
     }
-
-  def translateNullaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : NullaryFunc => MF[A] = {
-    case date.Now => MFC(Now())
-  }
-
-  def translateUnaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : UnaryFunc => A => MF[A] = {
-    case date.ExtractCentury => a => MFC(ExtractCentury(a))
-    case date.ExtractDayOfMonth => a => MFC(ExtractDayOfMonth(a))
-    case date.ExtractDecade => a => MFC(ExtractDecade(a))
-    case date.ExtractDayOfWeek => a => MFC(ExtractDayOfWeek(a))
-    case date.ExtractDayOfYear => a => MFC(ExtractDayOfYear(a))
-    case date.ExtractEpoch => a => MFC(ExtractEpoch(a))
-    case date.ExtractHour => a => MFC(ExtractHour(a))
-    case date.ExtractIsoDayOfWeek => a => MFC(ExtractIsoDayOfWeek(a))
-    case date.ExtractIsoYear => a => MFC(ExtractIsoYear(a))
-    case date.ExtractMicroseconds => a => MFC(ExtractMicroseconds(a))
-    case date.ExtractMillennium => a => MFC(ExtractMillennium(a))
-    case date.ExtractMilliseconds => a => MFC(ExtractMilliseconds(a))
-    case date.ExtractMinute => a => MFC(ExtractMinute(a))
-    case date.ExtractMonth => a => MFC(ExtractMonth(a))
-    case date.ExtractQuarter => a => MFC(ExtractQuarter(a))
-    case date.ExtractSecond => a => MFC(ExtractSecond(a))
-    case date.ExtractTimezone => a => MFC(ExtractTimezone(a))
-    case date.ExtractTimezoneHour => a => MFC(ExtractTimezoneHour(a))
-    case date.ExtractTimezoneMinute => a => MFC(ExtractTimezoneMinute(a))
-    case date.ExtractWeek => a => MFC(ExtractWeek(a))
-    case date.ExtractYear => a => MFC(ExtractYear(a))
-    case date.Date => a => MFC(Date(a))
-    case date.Time => a => MFC(Time(a))
-    case date.Timestamp => a => MFC(Timestamp(a))
-    case date.Interval => a => MFC(Interval(a))
-    case date.StartOfDay => a => MFC(StartOfDay(a))
-    case date.TimeOfDay => a => MFC(TimeOfDay(a))
-    case date.ToTimestamp => a => MFC(ToTimestamp(a))
-    case identity.TypeOf => a => MFC(TypeOf(a))
-    case math.Negate => a => MFC(Negate(a))
-    case relations.Not => a => MFC(Not(a))
-    case string.Length => a => MFC(Length(a))
-    case string.Lower => a => MFC(Lower(a))
-    case string.Upper => a => MFC(Upper(a))
-    case string.Boolean => a => MFC(Bool(a))
-    case string.Integer => a => MFC(Integer(a))
-    case string.Decimal => a => MFC(Decimal(a))
-    case string.Null => a => MFC(Null(a))
-    case string.ToString => a => MFC(ToString(a))
-    case structural.MakeArray => a => MFC(MakeArray(a))
-    case structural.Meta => a => MFC(Meta(a))
-  }
-
-  def translateBinaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : BinaryFunc => (A, A) => MF[A] = {
-    // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
-    //     about the second. And it shouldn’t even have two in LP.
-    case array.ArrayLength => (a1, a2) => MFC(Length(a1))
-    case math.Add => (a1, a2) => MFC(Add(a1, a2))
-    case math.Multiply => (a1, a2) => MFC(Multiply(a1, a2))
-    case math.Subtract => (a1, a2) => MFC(Subtract(a1, a2))
-    case math.Divide => (a1, a2) => MFC(Divide(a1, a2))
-    case math.Modulo => (a1, a2) => MFC(Modulo(a1, a2))
-    case math.Power => (a1, a2) => MFC(Power(a1, a2))
-    case relations.Eq => (a1, a2) => MFC(Eq(a1, a2))
-    case relations.Neq => (a1, a2) => MFC(Neq(a1, a2))
-    case relations.Lt => (a1, a2) => MFC(Lt(a1, a2))
-    case relations.Lte => (a1, a2) => MFC(Lte(a1, a2))
-    case relations.Gt => (a1, a2) => MFC(Gt(a1, a2))
-    case relations.Gte => (a1, a2) => MFC(Gte(a1, a2))
-    case relations.IfUndefined => (a1, a2) => MFC(IfUndefined(a1, a2))
-    case relations.And => (a1, a2) => MFC(And(a1, a2))
-    case relations.Or => (a1, a2) => MFC(Or(a1, a2))
-    case set.Within => (a1, a2) => MFC(Within(a1, a2))
-    case structural.MakeObject => (a1, a2) => MFC(MakeMap(a1, a2))
-    case structural.ObjectConcat => (a1, a2) => MFC(ConcatMaps(a1, a2))
-    case structural.ArrayProject => (a1, a2) => MFC(ProjectIndex(a1, a2))
-    case structural.ObjectProject => (a1, a2) => MFC(ProjectField(a1, a2))
-    case structural.DeleteField => (a1, a2) => MFC(DeleteField(a1, a2))
-    case string.Concat
-       | structural.ArrayConcat
-       | structural.ConcatOp => (a1, a2) => MFC(ConcatArrays(a1, a2))
-  }
-
-  def translateTernaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : TernaryFunc => (A, A, A) => MF[A] = {
-    case relations.Between => (a1, a2, a3) => MFC(Between(a1, a2, a3))
-    case relations.Cond    => (a1, a2, a3) => MFC(Cond(a1, a2, a3))
-    case string.Search     => (a1, a2, a3) => MFC(Search(a1, a2, a3))
-    case string.Substring  => (a1, a2, a3) => MFC(Substring(a1, a2, a3))
-  }
 }
 
 object MapFuncsCore {
