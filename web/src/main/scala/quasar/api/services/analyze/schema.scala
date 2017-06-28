@@ -26,6 +26,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.mount.Mounting
 import quasar.main.analysis
 
 import eu.timepit.refined.auto._
@@ -49,6 +50,7 @@ object schema {
   def service[S[_]](
     implicit
     Q : QueryFile.Ops[S],
+    M : Mounting.Ops[S],
     S0: Task :<: S,
     S1: FileSystemFailure :<: S
   ): QHttpService[S] =

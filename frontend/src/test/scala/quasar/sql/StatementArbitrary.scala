@@ -17,6 +17,8 @@
 package quasar.sql
 
 import slamdata.Predef._
+import quasar.contrib.pathy.DPath
+import quasar.contrib.pathy.PathArbitrary._
 import quasar.sql.ExprArbitrary._
 import quasar.sql.CINameArbitrary._
 
@@ -38,7 +40,7 @@ trait StatementArbitrary {
     } yield FunctionDecl(name, args, body)
 
   val importGen: Gen[Import[Fix[Sql]]] =
-    Arbitrary.arbitrary[String].map(Import(_))
+    Arbitrary.arbitrary[DPath].map(Import(_))
 }
 
 object StatementArbitrary extends StatementArbitrary

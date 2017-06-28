@@ -22,6 +22,7 @@ import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.contrib.pathy._
+import quasar.effect._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -29,6 +30,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.fs._, InMemory.InMemState
+import quasar.fs.mount._
 import quasar.main.analysis
 import quasar.sst._
 import quasar.std.IdentityLib
@@ -192,19 +194,26 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
 }
 
 object SchemaServiceSpec {
-  type SchemaEff[A] = (QueryFile :\: FileSystemFailure :/: Task)#M[A]
+  type SchemaEff[A] = (Mounting :\: QueryFile :\: FileSystemFailure :/: Task)#M[A]
 
   def runQueryFile(mem: InMemState): Task[QueryFile ~> ResponseOr] =
     InMemory.runStatefully(mem) map { eval =>
       liftMT[Task, ResponseT] compose eval compose InMemory.queryFile
     }
 
+  val runMounting: Task[Mounting ~> ResponseOr] =
+    KeyValueStore.impl.empty[APath, MountConfig] map { eval =>
+      liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
+    }
+
   def service(mem: InMemState): HttpService =
-    Kleisli(req => runQueryFile(mem) flatMap { runQF =>
-      schema.service[SchemaEff].toHttpService(
-        runQF                              :+:
-        failureResponseOr[FileSystemError] :+:
-        liftMT[Task, ResponseT]
-      )(req)
+    Kleisli(req => runQueryFile(mem).tuple(runMounting) flatMap {
+      case (runQF, runM) =>
+        schema.service[SchemaEff].toHttpService(
+          runM                               :+:
+          runQF                              :+:
+          failureResponseOr[FileSystemError] :+:
+          liftMT[Task, ResponseT]
+        )(req)
     })
 }

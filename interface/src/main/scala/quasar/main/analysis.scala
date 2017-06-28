@@ -17,16 +17,17 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.{Data, queryPlan, Variables}
+import quasar.{Data, queryPlan, resolveImports_, Variables}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp.numeric.Positive
 import quasar.fs._
+import quasar.fs.mount.Mounting
 import quasar.frontend.SemanticErrors
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.sql.{Blob, Sql}
+import quasar.sql.{ScopedExpr, Sql}
 import quasar.sst._
 import quasar.std.StdLib
 
@@ -95,13 +96,14 @@ object analysis {
 
   /** The schema of the results of the given query. */
   def querySchema[S[_], J: Order, A: ConvertableTo: Field: Order](
-    query: Blob[Fix[Sql]],
+    query: ScopedExpr[Fix[Sql]],
     vars: Variables,
     baseDir: ADir,
     sampleSize: Positive,
     settings: CompressionSettings
   )(implicit
     Q : QueryFile.Ops[S],
+    M : Mounting.Ops[S],
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): Q.M[SemanticErrors \/ Option[SST[J, A] \/ PopulationSST[J, A]]] = {
@@ -142,11 +144,17 @@ object analysis {
   /** A random sample of at most `size` elements from the dataset represented
     * by the given query.
     */
-  def sampleOfQuery[S[_]](query: Blob[Fix[Sql]], vars: Variables, baseDir: ADir, size: Positive)(
-    implicit Q: QueryFile.Ops[S]
+  def sampleOfQuery[S[_]](expr: ScopedExpr[Fix[Sql]], vars: Variables, baseDir: ADir, size: Positive)(
+    implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]
   ): Q.M[SemanticErrors \/ Process0[Data]] =
-    queryPlan(query, vars, baseDir, 0L, none).run.value
-      .traverse(_.fold(xs => Process.emitAll(xs).point[Q.M], sampleOfPlan[S](_, size)))
+    resolveImports_[S](expr, baseDir)
+      .leftMap(_.wrapNel)
+      .flatMapF(query =>
+        queryPlan(query, vars, baseDir, 0L, none).run.value
+          .traverse(_.fold(
+            xs => Process.emitAll(xs).point[Q.M],
+            sampleOfPlan[S](_, size))))
+      .run
 
   def schemaToData[T[_[_]]: BirecursiveT, A: EncodeEJson: Equal: Field: NRoot](
     schema: SST[T[EJson], A] \/ PopulationSST[T[EJson], A]
