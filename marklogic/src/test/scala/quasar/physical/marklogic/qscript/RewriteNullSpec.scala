@@ -16,16 +16,46 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef.{Eq =>_, _}
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
 import matryoshka._
+import matryoshka.implicits._
+import matryoshka.data._
 
-import scalaz._
+import scalaz._, Scalaz._
 
 final class RewriteNullSpec extends quasar.Qspec {
-  def eqRightNull[T[_[_]]: BirecursiveT, A](mf: MapFuncCore[T, A]): FreeMapA[T, A] =
-    Free.roll(Eq(NullLit(), Free.liftF(mf)))
+  def eq[T[_[_]]: BirecursiveT, A](lhs: FreeMapA[T, A], rhs: FreeMapA[T, A]): FreeMapA[T, A] =
+    Free.roll(Eq(lhs, rhs))
 
-  def eqLeftNull[T[_[_]]: BirecursiveT, A](mf: MapFuncCore[T, A]): FreeMapA[T, A] =
-    Free.roll(Eq(Free.liftF(mf), NullLit()))
+  def neq[T[_[_]]: BirecursiveT, A](lhs: FreeMapA[T, A], rhs: FreeMapA[T, A]): FreeMapA[T, A] =
+    Free.roll(Neq(lhs, rhs))
+
+  def typeOf[T[_[_]]: BirecursiveT, A](fm: FreeMapA[T, A]): FreeMapA[T, A] =
+    Free.roll(TypeOf(fm))
+
+  def rewrite(fm: FreeMapA[Fix, Unit]): FreeMapA[Fix, Unit] =
+    fm.transCata[FreeMapA[Fix, Unit]](rewriteNullCheck[Fix, FreeMapA[Fix, Unit], Unit])
+
+  val expr = StrLit[Fix, Unit]("foo")
+  val nullStr = StrLit[Fix, Unit]("null")
+
+  "rewriteNullCheck" should {
+    "rewrite Eq(Null, rhs) into Eq(TypeOf(rhs), 'null')" in {
+      rewrite(eq(NullLit(), expr)) must equal(eq(typeOf(expr), nullStr))
+    }
+
+    "rewrite Eq(lhs, Null) into Eq(TypeOf(lhs), 'null')" in {
+      rewrite(eq(expr, NullLit())) must equal(eq(typeOf(expr), nullStr))
+    }
+
+    "rewrite Neq(Null, rhs) into Neq(TypeOf(rhs), 'null')" in {
+      rewrite(neq(NullLit(), expr)) must equal(neq(typeOf(expr), nullStr))
+    }
+
+    "rewrite Neq(lhs, Null) into Neq(TypeOf(lhs), 'null')" in {
+      rewrite(neq(expr, NullLit())) must equal(neq(typeOf(expr), nullStr))
+    }
+  }
 }
