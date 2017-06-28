@@ -22,11 +22,13 @@ import quasar.contrib.scalaz.stateT, stateT._
 import argonaut.{Argonaut, Parse}
 
 import fs2.Stream
-import fs2.interop.scalaz.StreamScalazOps
+import fs2.async, async.mutable
+import fs2.interop.scalaz._
+import fs2.util.Async
 
 import pathy.Path
 
-import scalaz.{:<:, Free, Monad, StateT}
+import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.map._
@@ -40,6 +42,14 @@ import scalaz.syntax.monoid._
 import scodec.bits.ByteVector
 
 import java.util.UUID
+
+final case class VFS(
+    baseDir: ADir,
+    metaLog: VersionLog,
+    paths: Map[AFile, Blob],
+    index: Map[ADir, Vector[RPath]],
+    versions: Map[Blob, VersionLog],    // always getOrElse this with VersionLog.init
+    blobs: Set[Blob])
 
 object FreeVFS {
   import Argonaut._
@@ -337,14 +347,92 @@ object FreeVFS {
   }
 }
 
-final case class VFS(
-    baseDir: ADir,
-    metaLog: VersionLog,
-    paths: Map[AFile, Blob],
-    index: Map[ADir, Vector[RPath]],
-    versions: Map[Blob, VersionLog],    // always getOrElse this with VersionLog.init
-    blobs: Set[Blob])
+/**
+ * A Task frontend to FreeVFS which imposes serial access semantics.
+ * This may result in lower throughput than a frontend with transactional
+ * semantics, but it is considerably easier to implement.  Note that the
+ * serialization is imposed without thread locking.
+ */
+final class SerialVFS private (
+    @volatile private var current: VFS,
+    worker: mutable.Queue[Task, Task[Unit]],    // this exists solely for #serialize
+    interp: POSIXWithTask ~> Task) {
 
-object VFS extends ((ADir, VersionLog, Map[AFile, Blob], Map[ADir, Vector[RPath]], Map[Blob, VersionLog], Set[Blob]) => VFS) {
+  import SerialVFS.S
 
+  def scratch: Task[Blob] =
+    runST(FreeVFS.scratch[S])
+
+  def exists(path: AFile): Task[Boolean] =
+    runST(FreeVFS.exists[POSIXWithTask](path))
+
+  def ls(parent: ADir): Task[List[RPath]] =
+    runST(FreeVFS.ls[POSIXWithTask](parent))
+
+  def link(from: Blob, to: AFile): Task[Boolean] =
+    runST(FreeVFS.link[S](from, to))
+
+  def move(from: AFile, to: AFile): Task[Boolean] =
+    runST(FreeVFS.move[S](from, to))
+
+  def delete(target: AFile): Task[Boolean] =
+    runST(FreeVFS.delete[S](target))
+
+  def readPath(path: AFile): Task[Option[Blob]] =
+    runST(FreeVFS.readPath[POSIXWithTask](path))
+
+  def underlyingDir(blob: Blob, version: Version): Task[ADir] =
+    runST(FreeVFS.underlyingDir[S](blob, version))
+
+  def headOfBlob(blob: Blob): Task[Option[Version]] =
+    runST(FreeVFS.headOfBlob[S](blob))
+
+  def fresh(blob: Blob): Task[Version] =
+    runST(FreeVFS.fresh[S](blob))
+
+  def commit(blob: Blob, version: Version): Task[Unit] =
+    runST(FreeVFS.commit[S](blob, version))
+
+  // runs the given State against the current mutable cell with serialized semantics
+  private def runST[A](st: StateT[POSIXWithTask, VFS, A]): Task[A] = {
+    val run = for {
+      vfs <- Task.delay(current)
+      pair <- st.mapT(interp(_)).apply(vfs)
+      (vfs2, back) = pair
+      _ <- Task.delay(current = vfs2)
+    } yield back
+
+    serialize(run)
+  }
+
+  private def serialize[A](ta: Task[A]): Task[A] = {
+    for {
+      ref <- Async[Task].ref[A]
+      _ <- worker.enqueue1(ta.flatMap(ref.setPure))
+      a <- ref.get
+    } yield a
+  }
+}
+
+object SerialVFS {
+  import java.io.File
+
+  private[SerialVFS] type S[A] = Coproduct[POSIXOp, Task, A]
+
+  /**
+   * Returns a stream which will immediately emit SerialVFS and then
+   * continue running until the end of the world.  When the stream ends,
+   * SerialVFS will no longer function.
+   */
+  def apply(root: File): Stream[Task, SerialVFS] = {
+    for {
+      pint <- Stream.eval(RealPOSIX(root))
+      interp = λ[S ~> Task](_.fold(pint, NaturalTransformation.refl[Task]))
+      vfs <- Stream.eval(FreeVFS.init[S](Path.rootDir).foldMap(interp))
+      worker <- Stream.eval(async.boundedQueue[Task, Task[Unit]](10))
+
+      svfs = new SerialVFS(vfs, worker, λ[POSIXWithTask ~> Task](_.foldMap(interp)))
+      back <- Stream.emit(svfs).merge(worker.dequeue.evalMap(t => t).drain)
+    } yield back
+  }
 }
