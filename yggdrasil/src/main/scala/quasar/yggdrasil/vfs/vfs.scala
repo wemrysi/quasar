@@ -134,6 +134,7 @@ object FreeVFS {
       _ <- POSIXWithTask.generalize[S](indexWriter).liftM[StateT[?[_], VersionLog, ?]]
 
       _ <- VersionLog.commit[S](v)
+      _ <- VersionLog.purgeOld[S]
     } yield ()
   }
 
