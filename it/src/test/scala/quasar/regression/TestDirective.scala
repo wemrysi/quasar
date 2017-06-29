@@ -25,6 +25,7 @@ sealed abstract class TestDirective
 object TestDirective {
   final case object Skip              extends TestDirective
   final case object SkipCI            extends TestDirective
+  final case object Timeout           extends TestDirective
   final case object Pending           extends TestDirective
   final case object IgnoreAllOrder    extends TestDirective
   final case object IgnoreFieldOrder  extends TestDirective
@@ -36,6 +37,7 @@ object TestDirective {
     DecodeJson(c => c.as[String].flatMap {
       case "skip"              => ok(Skip)
       case "skipCI"            => ok(SkipCI)
+      case "timeout"           => ok(Timeout)
       case "pending"           => ok(Pending)
       case "ignoreAllOrder"    => ok(IgnoreAllOrder)
       case "ignoreFieldOrder"  => ok(IgnoreFieldOrder)
