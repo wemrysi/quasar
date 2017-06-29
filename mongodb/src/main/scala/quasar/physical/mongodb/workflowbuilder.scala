@@ -28,6 +28,7 @@ import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
+import quasar.qscript.IdStatus
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -95,8 +96,6 @@ object WorkflowBuilderF {
     ): Delay[RenderTree, WorkflowBuilderF[F, ?]] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ WorkflowBuilderF[F, ?])#λ](rt => {
       val nodeType = "WorkflowBuilder" :: Nil
-      import fixExprOp._
-
       RenderTree.make {
         case CollectionBuilderF(graph, base, struct) =>
           NonTerminal("CollectionBuilder" :: nodeType, Some(base.shows),
@@ -131,10 +130,12 @@ object WorkflowBuilderF {
           val nt = "FlatteningBuilder" :: nodeType
           NonTerminal(nt, None,
             rt.render(src) ::
-              fields.toList.map(x => $var(x.field).render.copy(nodeType = (x match {
-                case StructureType.Array(_) => "Array"
-                case StructureType.Object(_) => "Object"
-              }) :: nt)))
+              fields.toList.map {
+                case StructureType.Array(field, id) =>
+                  NonTerminal("Array" :: nt, field.shows.some, List(id.render))
+                case StructureType.Object(field, id) =>
+                  NonTerminal("Object" :: nt, field.shows.some, List(id.render))
+              })
         case UnionBuilderF(lSrc, rSrc) =>
           val nt = "UnionBuilder" :: nodeType
           NonTerminal(nt, None, List(rt.render(lSrc), rt.render(rSrc)))
@@ -290,16 +291,18 @@ object WorkflowBuilder {
     val field: A
   }
   object StructureType {
-    final case class Array[A](field: A) extends StructureType[A]
-    final case class Object[A](field: A) extends StructureType[A]
+    final case class Array[A](field: A, includeIndex: IdStatus)
+        extends StructureType[A]
+    final case class Object[A](field: A, includeKey: IdStatus)
+        extends StructureType[A]
 
     implicit val StructureTypeTraverse: Traverse[StructureType] =
       new Traverse[StructureType] {
         def traverseImpl[G[_], A, B](fa: StructureType[A])(f: A => G[B])(implicit G: Applicative[G]):
             G[StructureType[B]] =
           fa match {
-            case Array(field) => f(field).map(Array(_))
-              case Object(field) => f(field).map(Object(_))
+            case Array(field, i) => f(field).map(Array(_, i))
+            case Object(field, i) => f(field).map(Object(_, i))
           }
       }
   }
@@ -449,10 +452,78 @@ object WorkflowBuilder {
       }
     case FlatteningBuilderF((graph, base), fields) =>
       (
+        // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
         fields.foldRight(graph) {
-          case (StructureType.Array(field), acc) => $unwind[WF](base.toDocVar \\ field).apply(acc)
-          case (StructureType.Object(field), acc) =>
-            $simpleMap[WF](NonEmptyList(FlatExpr(JsFn(jsBase, (base.toDocVar \\ field).toJs(jscore.Ident(jsBase))))), ListMap()).apply(acc)
+          case (StructureType.Array(field, quasar.qscript.ExcludeId), acc) =>
+            $unwind[WF](base.toDocVar \\ field).apply(acc)
+          case (StructureType.Array(field, includeIndex), acc) =>
+            $simpleMap[WF](
+              includeIndex match {
+                case quasar.qscript.ExcludeId =>
+                  NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+                case quasar.qscript.IncludeId =>
+                  NonEmptyList(
+                    SubExpr(
+                      (base.toDocVar \\ field).toJs,
+                      JsFn(jsBase,
+                        jscore.Let(
+                          jscore.Name("m"),
+                          (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
+                          jscore.Call(
+                            jscore.Select(
+                              jscore.Call(
+                                jscore.Select(jscore.ident("Object"), "keys"),
+                                List(jscore.ident("m"))),
+                              "map"),
+                            List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
+                              jscore.ident("k"),
+                              jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
+                    FlatExpr((base.toDocVar \\ field).toJs))
+                case quasar.qscript.IdOnly =>
+                  NonEmptyList(
+                    SubExpr(
+                      (base.toDocVar \\ field).toJs,
+                      JsFn(jsBase,
+                        jscore.Call(
+                          jscore.Select(jscore.ident("Object"), "keys"),
+                          List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
+                    FlatExpr((base.toDocVar \\ field).toJs))
+              },
+              ListMap()).apply(acc)
+          case (StructureType.Object(field, includeKey), acc) =>
+            $simpleMap[WF](
+              includeKey match {
+                case quasar.qscript.ExcludeId =>
+                  NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+                case quasar.qscript.IncludeId =>
+                  NonEmptyList(
+                    SubExpr(
+                      (base.toDocVar \\ field).toJs,
+                      JsFn(jsBase,
+                        jscore.Let(
+                          jscore.Name("m"),
+                          (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
+                          jscore.Call(
+                            jscore.Select(
+                              jscore.Call(
+                                jscore.Select(jscore.ident("Object"), "keys"),
+                                List(jscore.ident("m"))),
+                              "map"),
+                            List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
+                              jscore.ident("k"),
+                              jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
+                    FlatExpr((base.toDocVar \\ field).toJs))
+                case quasar.qscript.IdOnly =>
+                  NonEmptyList(
+                    SubExpr(
+                      (base.toDocVar \\ field).toJs,
+                      JsFn(jsBase,
+                        jscore.Call(
+                          jscore.Select(jscore.ident("Object"), "keys"),
+                          List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
+                    FlatExpr((base.toDocVar \\ field).toJs))
+              },
+              ListMap()).apply(acc)
         },
         base).point[M]
     case UnionBuilderF((lGraph, lBase), (rGraph, rBase)) =>
@@ -595,12 +666,6 @@ object WorkflowBuilder {
         case _ =>
           DocBuilder(wb, ListMap(BsonField.Name(name) -> \&/.Both(JsFn.identity, $$ROOT)))
       }
-
-    def flattenMap(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
-      FlatteningBuilder(wb, Set(StructureType.Object(DocVar.ROOT())))
-
-    def flattenArray(wb: WorkflowBuilder[F]): WorkflowBuilder[F] =
-      FlatteningBuilder(wb, Set(StructureType.Array(DocVar.ROOT())))
 
     private def deleteField(wb: WorkflowBuilder[F], name: String): WorkflowBuilder[F] =
       wb.unFix match {

@@ -328,7 +328,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
               case _ => None
             }
             case Union(innerSrc, lBranch, rBranch) =>
-              Union(innerSrc, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lBranch, mf))), Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(rBranch, mf)))).some
+              Union(
+                innerSrc,
+                Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lBranch, mf))),
+                Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(rBranch, mf)))).some
             case _ => None
           })
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
@@ -344,6 +347,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                 HoleF,
                 id,
                 shiftRepair).some
+            // TODO: Should be able to apply this where there _is_ a `LeftSide`
+            //       reference, but currently that breaks merging.
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)

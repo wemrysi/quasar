@@ -913,7 +913,7 @@ object MongoDbPlanner {
                 getJsMerge[T, M](
                   repair,
                   jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
-                  jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, jm) =>
+                  jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
               ExprBuilder(
                 FlatteningBuilder(
                   DocBuilder(
@@ -922,12 +922,16 @@ object MongoDbPlanner {
                       BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                       BsonField.Name("f") -> expr)),
                   // TODO: Handle arrays properly
-                  Set(StructureType.Object(DocField(BsonField.Name("f"))))),
-                -\&/(jm)))
+                  Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                -\&/(j)))
             else
-              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) >>=
-                (builder =>
-                  getExprBuilder[T, M, WF, EX](funcHandler)(WB.flattenMap(builder), repair.as(SrcHole)))
+              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) >>= (builder =>
+                getExprBuilder[T, M, WF, EX](
+                  funcHandler)(
+                  FlatteningBuilder(
+                    builder,
+                    Set(StructureType.Object(DocVar.ROOT(), id))),
+                    repair.as(SrcHole)))
           case Reduce(src, bucket, reducers, repair) =>
             (bucket.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
               reducers.traverse(_.traverse(handleFreeMap[T, M, EX](funcHandler, _))))((b, red) => {
@@ -935,7 +939,12 @@ object MongoDbPlanner {
                   funcHandler)(
                   // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
-                    WB.groupBy(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("f", i))).swap).toListMap ++ b.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("b", i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
+                    WB.groupBy(
+                      DocBuilder(
+                        src,
+                        // FIXME: Doesn’t work with UnshiftMap
+                        red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("f", i))).swap).toListMap ++
+                          b.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("b", i))).swap).toListMap),
                       b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
                       red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName("f", ai._2)),
@@ -1009,8 +1018,7 @@ object MongoDbPlanner {
               rKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)))(
               (lk, rk) =>
               liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-                // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
-                LogicalPlan.funcFromJoinType(qs.f),
+                qs.f,
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
                 (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {

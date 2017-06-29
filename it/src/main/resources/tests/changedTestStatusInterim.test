@@ -32,6 +32,8 @@
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
+        { "name": "basic analytic query",           "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
+        { "name": "basic analytic query",           "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_2_6",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_3_0",       "prevStatus": "success", "currStatus": "pending" },
         { "name": "select count and another field", "backend": "mongodb_3_2",       "prevStatus": "success", "currStatus": "pending" },
