@@ -4062,7 +4062,7 @@ class PlannerSpec extends
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (Mongo-specific)",
-          "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)"))
+          "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 
     "include correct phases with type error" in {
@@ -4077,7 +4077,7 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (Mongo-specific)"))
+          "QScript", "QScript (Mongo-specific)")
     }
   }
 }

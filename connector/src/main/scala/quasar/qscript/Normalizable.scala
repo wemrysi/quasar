@@ -123,18 +123,39 @@ class NormalizableT[T[_[_]]: BirecursiveT : EqualT : ShowT] extends TTypes[T] {
       }
     }))
 
+  private def extractFilterFromThetaJoin[A](tj: ThetaJoin[A])
+      : Option[ThetaJoin[A]] =
+    (MapFuncCore.extractFilter(tj.on) {
+      case LeftSide => SrcHole.some
+      case RightSide => none
+    },
+      MapFuncCore.extractFilter(tj.on) {
+        case LeftSide => none
+        case RightSide => SrcHole.some
+      }) match {
+      case (None, None) => none
+      case (Some((lf, on)), _) =>
+        quasar.qscript.ThetaJoin(tj.src, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Filter(tj.lBranch, lf))), tj.rBranch, on, tj.f, tj.combine).some
+      case (_, Some((rf, on))) =>
+        quasar.qscript.ThetaJoin(tj.src, tj.lBranch, Free.roll(Inject[QScriptCore, QScriptTotal].inj(Filter(tj.rBranch, rf))), on, tj.f, tj.combine).some
+    }
+
   def ThetaJoin = make(
     λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj =>
       (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), freeMFEq(tj.on), freeMFEq(tj.combine)) match {
-        case (None, None, None, None) => None
+        case (None, None, None, None) => extractFilterFromThetaJoin(tj)
+
         case (lBranchNorm, rBranchNorm, onNorm, combineNorm) =>
-          quasar.qscript.ThetaJoin(
-            tj.src,
-            lBranchNorm.getOrElse(tj.lBranch),
-            rBranchNorm.getOrElse(tj.rBranch),
-            onNorm.getOrElse(tj.on),
-            tj.f,
-            combineNorm.getOrElse(tj.combine)).some
+          val newTJ =
+            quasar.qscript.ThetaJoin(
+              tj.src,
+              lBranchNorm.getOrElse(tj.lBranch),
+              rBranchNorm.getOrElse(tj.rBranch),
+              onNorm.getOrElse(tj.on),
+              tj.f,
+              combineNorm.getOrElse(tj.combine))
+
+          extractFilterFromThetaJoin(newTJ).getOrElse(newTJ).some
       }))
 
   def rebucket(bucket: List[FreeMap]): Option[List[FreeMap]] = {

@@ -244,7 +244,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             as.fold[Option[Option[A]]](Some(a.some))(oldA => (oldA ≟ a).option(as)) strengthR (b :: bs)
         }
 
-
       // TODO: I feel like this must be some standard fold.
       def sequenceReduce[A: Equal, B](rf: ReduceFunc[(A, B)])
           : Option[(A, ReduceFunc[B])] =
@@ -270,6 +269,24 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
 
       val rewrite = new Rewrite[T]
       val nm = new NormalizableT[T]
+
+      // TODO: Use this. It seems like a valid normalization, but it breaks
+      //       autojoins. Maybe it can be applied as part of optimization, or as
+      //       a connector-specific transformation.
+      private def extractFilterFromQC[F[_]: Functor]
+        (FToOut: OUT ~> F)
+        (implicit QC: QScriptCore :<: OUT)
+          : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
+        case LeftShift(src, struct, id, repair) =>
+          MapFuncCore.extractFilter(struct)(_.some) ∘ { case (f, m) =>
+            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, m, id, repair)
+          }
+        case Map(src, mf) =>
+          MapFuncCore.extractFilter(mf)(_.some) ∘ { case (f, m) =>
+            Map(FToOut(QC.inj(Filter(src, f))).embed, m)
+          }
+        case _ => none
+      }
 
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])

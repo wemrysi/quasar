@@ -6,9 +6,11 @@
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
+        "mimir":             "skip",
+        "mongodb_2_6":       "pending",
         "postgresql":        "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip"
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip"
     },
 
     "data": "../../days.data",

@@ -238,6 +238,12 @@ object MapFuncCore {
       }) ∘ (_.embed)
   }
 
+  def flattenAnd[T[_[_]], A](fm: FreeMapA[T, A]): NonEmptyList[FreeMapA[T, A]] =
+    fm.resume match {
+      case -\/(And(a, b)) => flattenAnd(a) append flattenAnd(b)
+      case _              => NonEmptyList(fm)
+    }
+
   // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
   //     take way too long, so instead we apply it separately afterward.
   def extractGuards[T[_[_]]: BirecursiveT, A]
@@ -267,6 +273,24 @@ object MapFuncCore {
                 Guard(e, t, Free.roll(s), Free.roll(Undefined[T, FreeMapA[T, A]]()))
             }).some
         }
+    }
+
+  /** Converts conditional `Undefined`s into conditions that can be used in a
+    * `Filter`.
+    */
+  def extractFilter[T[_[_]]: CorecursiveT, A](mf: FreeMapA[T, A])(test: A => Option[Hole])
+      : Option[(FreeMap[T], FreeMapA[T, A])] =
+    mf.resume.swap.toOption >>= {
+      case Cond(c, e, Embed(CoEnv(\/-(Undefined())))) =>
+        c.traverse(test) strengthR e
+      case Cond(c, Embed(CoEnv(\/-(Undefined()))), f) =>
+        c.traverse(test) ∘ (h => (Free.roll(Not[T, FreeMap[T]](h)), f))
+      case Guard(c, t, e, Embed(CoEnv(\/-(Undefined())))) =>
+        c.traverse(test) ∘
+          (h => (Free.roll(Guard(h, t, BoolLit[T, Hole](true), BoolLit[T, Hole](false))), e))
+      case Guard(c, t, Embed(CoEnv(\/-(Undefined()))), f) =>
+        c.traverse(test) ∘ (h => (Free.roll(Guard(h, t, BoolLit[T, Hole](false), BoolLit[T, Hole](true))), f))
+      case _ => none
     }
 
   def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]

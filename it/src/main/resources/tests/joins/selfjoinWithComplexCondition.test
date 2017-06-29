@@ -6,10 +6,11 @@
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
         "mimir": "skip",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
+        "mongodb_2_6":       "timeout",
+        "mongodb_3_0":       "timeout",
         "mongodb_3_2":       "timeout",
         "mongodb_3_4":       "timeout",
+        "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
 

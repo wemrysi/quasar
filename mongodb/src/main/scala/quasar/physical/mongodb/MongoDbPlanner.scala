@@ -43,7 +43,7 @@ import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
 sealed abstract class InputFinder[T[_[_]]] {
@@ -908,27 +908,26 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) => getExprBuilder[T, M, WF, EX](funcHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
-            (handleFreeMap[T, M, EX](funcHandler, struct) ⊛
-              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) ⊛
-              (if (repair.contains(LeftSideF))
-                 getJsMerge[T, M](
-                   repair,
-                   jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
-                   jscore.Select(jscore.Ident(JsFn.defaultName), "f")).map(_.left)
-               else
-                 handleFreeMap[T, M, EX](funcHandler, repair.as(SrcHole)).map(_.right)))(
-              (expr, builder, jm) => jm.fold(j =>
-                ExprBuilder(
-                  FlatteningBuilder(
-                    DocBuilder(
-                      src,
-                      ListMap(
-                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                        BsonField.Name("f") -> expr)),
-                    // TODO: Handle arrays properly
-                    Set(StructureType.Object(DocField(BsonField.Name("f"))))),
-                  -\&/(j)),
-                  ExprBuilder(WB.flattenMap(builder), _)))
+            if (repair.contains(LeftSideF))
+              (handleFreeMap[T, M, EX](funcHandler, struct) ⊛
+                getJsMerge[T, M](
+                  repair,
+                  jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
+                  jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, jm) =>
+              ExprBuilder(
+                FlatteningBuilder(
+                  DocBuilder(
+                    src,
+                    ListMap(
+                      BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                      BsonField.Name("f") -> expr)),
+                  // TODO: Handle arrays properly
+                  Set(StructureType.Object(DocField(BsonField.Name("f"))))),
+                -\&/(jm)))
+            else
+              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) >>=
+                (builder =>
+                  getExprBuilder[T, M, WF, EX](funcHandler)(WB.flattenMap(builder), repair.as(SrcHole)))
           case Reduce(src, bucket, reducers, repair) =>
             (bucket.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
               reducers.traverse(_.traverse(handleFreeMap[T, M, EX](funcHandler, _))))((b, red) => {
@@ -1243,7 +1242,7 @@ object MongoDbPlanner {
   //       generate more correct PatternGuards in the first place, rather than
   //       trying to strip out unnecessary ones after the fact
   // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
-  def assumeReadType[M[_]: Monad, T[_[_]]: BirecursiveT, F[_]: Functor]
+  def assumeReadType[M[_]: Monad, T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor]
     (typ: Type)
     (implicit
       merr: MonadError_[M, FileSystemError],
@@ -1256,8 +1255,15 @@ object MongoDbPlanner {
            | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
            | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
            | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          cond.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-            (c => QC.inj(Filter(src, c)))
+          ((MapFuncCore.flattenAnd(cond))
+            .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
+            .map(_.toList.filter {
+              case MapFuncsCore.BoolLit(true) => false
+              case _                      => true
+            } match {
+              case Nil    => src.project
+              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MapFuncsCore.And(acc, e)))))
+            })
         case _ => QC.inj(f).point[M]
       }
     case ls @ LeftShift(src, struct, id, repair) =>
