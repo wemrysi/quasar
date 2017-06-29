@@ -101,10 +101,15 @@ lazy val assemblySettings = Seq(
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
-    case s if s.endsWith("libjansi.jnilib") => MergeStrategy.last
-    case s if s.endsWith("jansi.dll") => MergeStrategy.last
-    case s if s.endsWith("libjansi.so") => MergeStrategy.last
-    case "log4j.properties" => MergeStrategy.discard
+    case "log4j.properties"                                   => MergeStrategy.discard
+    // After recent library version upgrades there seems to be a library pulling 
+    // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
+    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11 
+    // So the merge needed the following lines to avoid the "deduplicate: different file contents found" 
+    // produced by web/assembly. Look into removing this once we move to scala v2.11.11.
+    case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
+    case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
+    case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
 
     case other => (assemblyMergeStrategy in assembly).value apply other
   },
