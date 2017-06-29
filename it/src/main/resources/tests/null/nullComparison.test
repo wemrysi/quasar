@@ -2,7 +2,6 @@
     "name": "filter on `!= null`",
     "backends": {
         "mimir": "skip",
-        "marklogic_json": "pending",
         "mongodb_q_3_2":  "pending",
         "postgresql":     "pending"
     },
